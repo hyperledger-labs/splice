@@ -219,9 +219,12 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
         T <: Template,
     ](companion: Contract.Companion.Template[TCid, T])(payload: T): TCid = {
       val (created, _) = actAndCheck(
-        s"create sample ${companion.TEMPLATE_ID.getEntityName}",
+        s"create sample ${companion.getTemplateIdWithPackageId.getEntityName}",
         exerciseDso(payload.create()),
-      )(s"ensure ${companion.TEMPLATE_ID.getEntityName} is there", _ => nonEmptyOnSv1(companion))
+      )(
+        s"ensure ${companion.getTemplateIdWithPackageId.getEntityName} is there",
+        _ => nonEmptyOnSv1(companion),
+      )
       companion.toContractId(new ContractId(created.contractId.contractId))
     }
 
@@ -641,7 +644,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     def allContractsMigrated(rows: (FilterableCompanion, PartyId)*) = {
       val companions = Table[JIdentifier, FilterableCompanion, PartyId](
         ("template", "companion", "querying party"),
-        rows.map { case (c, p) => (c.TEMPLATE_ID, c, p) }*
+        rows.map { case (c, p) => (c.getTemplateIdWithPackageId, c, p) }*
       )
       eventually() {
         tForEvery(companions) { (_, companion, queryingParty) =>

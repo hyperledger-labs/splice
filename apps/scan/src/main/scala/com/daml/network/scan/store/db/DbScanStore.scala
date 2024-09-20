@@ -167,8 +167,9 @@ class DbScanStore(
               ScanTables.acsTableName,
               storeId,
               domainMigrationId,
-              where =
-                sql"""template_id_qualified_name = ${QualifiedName(AmuletRules.TEMPLATE_ID)}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(
+                  AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupAmuletRules",
@@ -191,7 +192,9 @@ class DbScanStore(
               ScanTables.acsTableName,
               storeId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(AnsRules.TEMPLATE_ID)}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(
+                  AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupAnsRules",
@@ -222,7 +225,7 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                AnsEntry.COMPANION.TEMPLATE_ID
+                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
               )} and ans_entry_name ^@ $limitedPrefix
               and acs.contract_expires_at >= $now
             """,
@@ -253,7 +256,7 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                AnsEntry.COMPANION.TEMPLATE_ID
+                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                 and ans_entry_owner = $partyId
                 and ans_entry_name >= ''
@@ -283,7 +286,7 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                AnsEntry.COMPANION.TEMPLATE_ID
+                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and ans_entry_name = ${lengthLimited(name)}
               and acs.contract_expires_at >= $now
@@ -362,7 +365,9 @@ class DbScanStore(
               storeId,
               domainMigrationId,
               where = sql"""
-                  template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
+                  template_id_qualified_name = ${QualifiedName(
+                  FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
                     and featured_app_right_provider = $providerPartyId
                  """,
               orderLimit = sql"limit 1",
@@ -658,8 +663,9 @@ class DbScanStore(
             ScanTables.acsTableName,
             storeId,
             domainMigrationId,
-            where =
-              sql"""template_id_qualified_name = ${QualifiedName(ValidatorLicense.TEMPLATE_ID)}""",
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}""",
             orderLimit =
               sql"""order by validator_license_rounds_collected desc limit ${sqlLimit(limit)}""",
           ),
@@ -680,7 +686,9 @@ class DbScanStore(
                select sum(total_traffic_purchased)
                from #${ScanTables.acsTableName}
                where store_id = $storeId
-                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
+                and template_id_qualified_name = ${QualifiedName(
+              MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
+            )}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",

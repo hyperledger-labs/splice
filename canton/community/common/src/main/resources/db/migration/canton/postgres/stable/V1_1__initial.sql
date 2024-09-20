@@ -195,13 +195,13 @@ create table common_topology_dispatching (
   watermark_ts bigint not null
 );
 
--- change type: activation [create, transfer-in], deactivation [archive, transfer-out]
+-- change type: activation [create, assign], deactivation [archive, unassign]
 -- `deactivation` comes before `activation` so that comparisons `(timestamp, change) <= (bound, 'deactivation')`
 -- select only deactivations if the timestamp matches the bound.
 create type change_type as enum ('deactivation', 'activation');
 
 -- The specific operation type that introduced a contract change.
-create type operation_type as enum ('create', 'add', 'transfer-in', 'archive', 'purge', 'transfer-out');
+create type operation_type as enum ('create', 'add', 'assign', 'archive', 'purge', 'unassign');
 
 -- Maintains the status of contracts
 create table par_active_contracts (
@@ -214,9 +214,9 @@ create table par_active_contracts (
   ts bigint not null,
   -- Request counter of the time of change
   request_counter bigint not null,
-  -- optional remote domain index in case of transfers
+  -- optional remote domain index in case of reassignments
   remote_domain_idx int,
-  transfer_counter bigint default null,
+  reassignment_counter bigint default null,
   primary key (domain_id, contract_id, ts, request_counter, change)
 );
 
@@ -373,28 +373,28 @@ create index idx_par_event_log_associated_domain on par_event_log (log_id, assoc
   where log_id = 0 -- must be the same as the ParticipantEventLog.ProductionParticipantEventLogId.index
     and associated_domain is not null;
 
-create table par_transfers (
-  -- transfer id
+create table par_reassignments (
+  -- reassignment id
   target_domain varchar(300) collate "C" not null,
   origin_domain varchar(300) collate "C" not null,
 
-  primary key (target_domain, origin_domain, transfer_out_timestamp),
+  primary key (target_domain, origin_domain, unassignment_timestamp),
 
-  transfer_out_global_offset bigint,
-  transfer_in_global_offset bigint,
+  unassignment_global_offset bigint,
+  assignment_global_offset bigint,
 
   -- UTC timestamp in microseconds relative to EPOCH
-  transfer_out_timestamp bigint not null,
-  transfer_out_request_counter bigint not null,
-  transfer_out_request bytea not null,
+  unassignment_timestamp bigint not null,
+  unassignment_request_counter bigint not null,
+  unassignment_request bytea not null,
   -- UTC timestamp in microseconds relative to EPOCH
-  transfer_out_decision_time bigint not null,
+  unassignment_decision_time bigint not null,
   contract bytea not null,
   creating_transaction_id bytea not null,
-  transfer_out_result bytea,
+  unassignment_result bytea,
   submitter_lf varchar(300) not null,
 
-  -- defined if transfer was completed
+  -- defined if reassignment was completed
   time_of_completion_request_counter bigint,
   -- UTC timestamp in microseconds relative to EPOCH
   time_of_completion_timestamp bigint,
@@ -463,6 +463,7 @@ create table par_outstanding_acs_commitments (
   -- UTC timestamp in microseconds relative to EPOCH
   to_inclusive bigint not null,
   counter_participant varchar(300) collate "C" not null,
+  matching_state smallint not null,
   constraint check_nonempty_interval_outstanding check(to_inclusive > from_exclusive)
 );
 
@@ -657,6 +658,9 @@ create table sequencer_counter_checkpoints (
   primary key (member, counter)
 );
 
+-- This index helps fetching the latest checkpoint for a member
+create index idx_sequencer_counter_checkpoints_by_member_ts on sequencer_counter_checkpoints(member, ts);
+
 -- record the latest acknowledgement sent by a sequencer client of a member for the latest event they have successfully
 -- processed and will not re-read.
 create table sequencer_acknowledgements (
@@ -705,25 +709,6 @@ CREATE TABLE par_pruning_schedules (
   retention bigint not null, -- positive number of seconds
   prune_internally_only boolean NOT NULL DEFAULT false -- whether to prune only canton-internal stores not visible to ledger api
 );
-
--- store nonces that have been requested for authentication challenges
-create table sequencer_authentication_nonces (
-  nonce varchar(300) collate "C" primary key,
-  member varchar(300) collate "C" not null,
-  generated_at_ts bigint not null,
-  expire_at_ts bigint not null
-);
-
-create index idx_nonces_for_member on sequencer_authentication_nonces (member, nonce);
-
--- store tokens that have been generated for successful authentication requests
-create table sequencer_authentication_tokens (
-  token varchar(300) collate "C" primary key,
-  member varchar(300) collate "C" not null,
-  expire_at_ts bigint not null
-);
-
-create index idx_tokens_for_member on sequencer_authentication_tokens (member);
 
 -- store in-flight submissions
 create table par_in_flight_submission (
@@ -950,9 +935,9 @@ create table seq_traffic_control_consumed_journal (
 -- Individual blocks/transactions exist in separate table
 create table ord_completed_epochs (
   -- strictly-increasing, contiguous epoch number
-  epoch_number bigint not null primary key ,
+  epoch_number bigint not null primary key,
   -- first block sequence number (globally) of the epoch
-  start_block_number bigint not null ,
+  start_block_number bigint not null,
   -- number of total blocks in the epoch
   epoch_length integer not null,
   -- enable idempotent writes: "on conflict, do nothing"
@@ -975,9 +960,13 @@ create table ord_availability_batch (
   primary key (id)
 );
 
-create table ord_pbft_messages(
+-- messages stored during the progress of a block possibly across different pbft views
+create table ord_pbft_messages_in_progress(
   -- global sequence number of the ordered block
   block_number bigint not null,
+
+  -- view number
+  view_number smallint not null,
 
   -- pbft message for the block
   message bytea not null,
@@ -988,18 +977,40 @@ create table ord_pbft_messages(
   -- sender of the message
   from_sequencer_id varchar(300) collate "C" not null,
 
-  -- for each block number, we only expect one message of each kind for the same sender.
+  -- for each block number, we only expect one message of each kind for the same sender and view number.
+  primary key (block_number, view_number, from_sequencer_id, discriminator)
+);
+
+-- final pbft messages stored only once for each block when it completes
+-- currently only commit messages and the pre-prepare used for that block
+create table ord_pbft_messages_completed(
+  -- global sequence number of the ordered block
+  block_number bigint not null,
+
+  -- pbft message for the block
+  message bytea not null,
+
+  -- pbft message discriminator (0 = pre-prepare, 2 = commit)
+  discriminator smallint not null,
+
+  -- sender of the message
+  from_sequencer_id varchar(300) collate "C" not null,
+
+  -- for each completed block number, we only expect one message of each kind for the same sender.
   -- in the case of pre-prepare, we only expect one message for the whole block, but for simplicity
   -- we won't differentiate that at the database level.
   primary key (block_number, from_sequencer_id, discriminator)
 );
 
+
+
 -- Stores metadata for blocks that have been assigned timestamps in the output module
 create table ord_metadata_output_blocks (
+  epoch_number bigint not null,
   block_number bigint not null,
   bft_ts bigint not null,
   last_topology_ts bigint not null,
   primary key (block_number),
   -- enable idempotent writes: "on conflict, do nothing"
-  constraint unique_output_block unique (block_number, bft_ts, last_topology_ts)
+  constraint unique_output_block unique (epoch_number, block_number, bft_ts, last_topology_ts)
 );

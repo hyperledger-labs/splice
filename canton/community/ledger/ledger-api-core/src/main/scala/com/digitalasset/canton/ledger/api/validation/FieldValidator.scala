@@ -6,7 +6,7 @@ package com.digitalasset.canton.ledger.api.validation
 import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, JwksUrl, TemplateFilter}
+import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, JwksUrl}
 import com.digitalasset.canton.ledger.api.util.TimestampConversion
 import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator.{
   AnnotationsSizeExceededError,
@@ -15,7 +15,7 @@ import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator
 }
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.*
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.daml.lf.data.Ref.{Party, TypeConRef}
 import com.digitalasset.daml.lf.data.{Ref, Time}
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -41,9 +41,18 @@ object FieldValidator {
   ): Either[StatusRuntimeException, Ref.Party] =
     Ref.Party.fromString(s).left.map(invalidField(fieldName, _))
 
+  def optionalParticipantId(participantId: String, fieldName: String)(implicit
+      contextualizedErrorLogger: ContextualizedErrorLogger
+  ): Either[StatusRuntimeException, Option[ParticipantId]] = optionalString(participantId) { s =>
+    ParticipantId
+      .fromProtoPrimitive("PAR::" + s, fieldName)
+      .left
+      .map(err => invalidField(fieldName = fieldName, message = err.message))
+  }
+
   def requireResourceVersion(raw: String, fieldName: String)(implicit
       errorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Long] = {
+  ): Either[StatusRuntimeException, Long] =
     Try {
       raw.toLong
     } match {
@@ -53,7 +62,6 @@ object FieldValidator {
           invalidField(fieldName = fieldName, message = "Invalid resource version number")
         )
     }
-  }
 
   def requireJwksUrl(raw: String, fieldName: String)(implicit
       errorLogger: ContextualizedErrorLogger
@@ -102,7 +110,7 @@ object FieldValidator {
 
   def eventSequentialId(raw: String, fieldName: String, message: String)(implicit
       errorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Long] = {
+  ): Either[StatusRuntimeException, Long] =
     Try {
       raw.toLong
     } match {
@@ -111,7 +119,6 @@ object FieldValidator {
         // Do not mention event sequential id as this should be opaque externally
         Left(invalidField(fieldName = fieldName, message))
     }
-  }
 
   def optionalEventSequentialId(
       s: String,
@@ -139,11 +146,10 @@ object FieldValidator {
       fieldName: String,
   )(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, IdentityProviderId] = {
+  ): Either[StatusRuntimeException, IdentityProviderId] =
     if (s.isEmpty) Right(IdentityProviderId.Default)
     else
       IdentityProviderId.Id.fromString(s).left.map(invalidField(fieldName, _))
-  }
 
   def requireLedgerString(s: String)(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
@@ -222,20 +228,6 @@ object FieldValidator {
         .map(invalidField("package reference", _))
     } yield Ref.TypeConRef(pkgRef, qualifiedName)
 
-  def validateIdentifierWithPackageUpgrading(
-      identifier: Identifier,
-      includeCreatedEventBlob: Boolean,
-  )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, TemplateFilter] =
-    for {
-      typeRef <- validateTypeConRef(identifier)
-      templateFilter = TemplateFilter(
-        templateTypeRef = typeRef,
-        includeCreatedEventBlob = includeCreatedEventBlob,
-      )
-    } yield templateFilter
-
   def optionalString[T](s: String)(
       someValidation: String => Either[StatusRuntimeException, T]
   ): Either[StatusRuntimeException, Option[T]] =
@@ -253,7 +245,7 @@ object FieldValidator {
       fieldName: String,
   )(implicit
       errorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Map[String, String]] = {
+  ): Either[StatusRuntimeException, Map[String, String]] =
     ResourceAnnotationValidator.validateAnnotationsFromApiRequest(
       annotations,
       allowEmptyValues = allowEmptyValues,
@@ -268,7 +260,6 @@ object FieldValidator {
       case Left(e: EmptyAnnotationsValueError) => Left(invalidArgument(e.reason))
       case Right(_) => Right(annotations)
     }
-  }
 
   def validateTimestamp(timestamp: Timestamp, fieldName: String)(implicit
       errorLogger: ContextualizedErrorLogger

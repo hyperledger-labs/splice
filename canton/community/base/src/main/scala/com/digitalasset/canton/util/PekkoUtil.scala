@@ -19,7 +19,7 @@ import com.digitalasset.canton.concurrent.{DirectExecutionContext, Threading}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggerFactory, NamedLoggingContext}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -124,7 +124,7 @@ object PekkoUtil extends HasLoggerName {
   def remember[A, Mat](
       graph: FlowOps[A, Mat],
       memory: NonNegativeInt,
-  ): graph.Repr[NonEmpty[Seq[A]]] = {
+  ): graph.Repr[NonEmpty[Seq[A]]] =
     // Prepend window many None to the given source
     // so that sliding starts emitting upon the first element received
     graph
@@ -140,7 +140,6 @@ object PekkoUtil extends HasLoggerName {
         // because then the source completed before emitting any elements
         NonEmpty.from(elems)
       }
-  }
 
   /** A version of [[org.apache.pekko.stream.scaladsl.FlowOps.mapAsync]] that additionally allows to pass state of type `S` between
     * every subsequent element. Unlike [[org.apache.pekko.stream.scaladsl.FlowOps.statefulMapConcat]], the state is passed explicitly.
@@ -231,13 +230,12 @@ object PekkoUtil extends HasLoggerName {
     */
   def mapAsyncAndDrainUS[A, Mat, B](graph: FlowOps[A, Mat], parallelism: Int)(
       f: A => FutureUnlessShutdown[B]
-  )(implicit loggingContext: NamedLoggingContext): graph.Repr[B] = {
+  )(implicit loggingContext: NamedLoggingContext): graph.Repr[B] =
     mapAsyncUS(graph, parallelism)(f)
       // Important to use `collect` instead of `takeWhile` here
       // so that the return source completes only after all `source`'s elements have been consumed.
       // TODO(#13789) Should we cancel/pull a kill switch to signal upstream that no more elements are needed?
       .collect { case Outcome(x) => x }
-  }
 
   /** Lifts [[statefulMapAsyncUS]] over a context. */
   def statefulMapAsyncContextualizedUS[Out, Mat, S, T, Context[_], C](
@@ -290,13 +288,12 @@ object PekkoUtil extends HasLoggerName {
 
   def statefulMapAsyncUSAndDrain[Out, Mat, S, T](graph: FlowOps[Out, Mat], initial: S)(
       f: (S, Out) => FutureUnlessShutdown[(S, T)]
-  )(implicit loggingContext: NamedLoggingContext): graph.Repr[T] = {
+  )(implicit loggingContext: NamedLoggingContext): graph.Repr[T] =
     statefulMapAsyncUS(graph, initial)(f)
       // Important to use `collect` instead of `takeWhile` here
       // so that the return source completes only after all `source`'s elements have been consumed.
       // TODO(#13789) Should we cancel/pull a kill switch to signal upstream that no more elements are needed?
       .collect { case Outcome(x) => x }
-  }
 
   /** Combines two kill switches into one */
   class CombinedKillSwitch(private val killSwitch1: KillSwitch, private val killSwitch2: KillSwitch)
@@ -575,31 +572,29 @@ object PekkoUtil extends HasLoggerName {
     */
   def withUniqueKillSwitch[A, Mat, Mat2](
       graph: FlowOpsMat[A, Mat]
-  )(mat: (Mat, UniqueKillSwitch) => Mat2): graph.ReprMat[WithKillSwitch[A], Mat2] = {
+  )(mat: (Mat, UniqueKillSwitch) => Mat2): graph.ReprMat[WithKillSwitch[A], Mat2] =
     withMaterializedValueMat(new AtomicReference[UniqueKillSwitch])(graph)(Keep.both)
       .viaMat(KillSwitches.single) { case ((m, ref), killSwitch) =>
         ref.set(killSwitch)
         mat(m, killSwitch)
       }
       .map { case (a, ref) => WithKillSwitch(a)(ref.get()) }
-  }
 
   def injectKillSwitch[A, Mat](
       graph: FlowOpsMat[A, Mat]
-  )(killSwitch: Mat => KillSwitch): graph.ReprMat[WithKillSwitch[A], Mat] = {
+  )(killSwitch: Mat => KillSwitch): graph.ReprMat[WithKillSwitch[A], Mat] =
     withMaterializedValueMat(new AtomicReference[KillSwitch])(graph)(Keep.both)
       .mapMaterializedValue { case (mat, ref) =>
         ref.set(killSwitch(mat))
         mat
       }
       .map { case (a, ref) => WithKillSwitch(a)(ref.get()) }
-  }
 
   /** Drops the first `count` many elements from the `graph` that satisfy the `condition`.
     * Keeps all elements that do not satisfy the `condition`.
     */
   def dropIf[A, Mat](graph: FlowOps[A, Mat], count: Int, condition: A => Boolean): graph.Repr[A] =
-    graph.statefulMapConcat(() => {
+    graph.statefulMapConcat { () =>
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var remaining = count
       elem =>
@@ -607,7 +602,7 @@ object PekkoUtil extends HasLoggerName {
           remaining -= 1
           Seq.empty
         } else Seq(elem)
-    })
+    }
 
   private[util] def withMaterializedValueMat[M, A, Mat, Mat2](create: => M)(
       graph: FlowOpsMat[A, Mat]
@@ -722,7 +717,7 @@ object PekkoUtil extends HasLoggerName {
       graph: FlowOps[WithKillSwitch[A], Mat],
       condition: A => Boolean,
   ): graph.Repr[WithKillSwitch[A]] =
-    graph.statefulMapConcat(() => {
+    graph.statefulMapConcat { () =>
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var draining = false
       elem => {
@@ -735,7 +730,7 @@ object PekkoUtil extends HasLoggerName {
           Iterable.single(elem)
         }
       }
-    })
+    }
 
   val noOpKillSwitch = new KillSwitch {
     override def shutdown(): Unit = ()
@@ -1028,24 +1023,16 @@ object PekkoUtil extends HasLoggerName {
       fromExclusive: Long,
   )
 
+  /** RecoveringFutureQueue governs the life cycle of a FutureQueue, which is created asynchronously,
+    * can be initialized and started again after a failure and operates on elements that
+    * define a monotonically increasing index.
+    * As part of the recovery process, the implementation keeps track of already offered elements,
+    * and based on the provided fromExclusive index, replays the missing elements.
+    * The FutureQueue needs to make sure with help of the Commit, that up to the INDEX, the elements are fully
+    * processed. This needs to be done as soon as possible, because this allows to "forget" about the offered elements
+    * in the RecoveringFutureQueue implementation.
+    */
   trait RecoveringFutureQueue[T] extends FutureQueue[T] {
-
-    /** Explicit registration allows lazy construction.
-      * Only one consumer can be registered.
-      *
-      * RecoveringFutureQueue governs the life cycle of a FutureQueue, which is created asynchronously,
-      * can be initialized and started again after a failure and operates on elements that
-      * define a monotonically increasing index.
-      * As part of the recovery process, the implementation keeps track of already offered elements,
-      * and based on the provided fromExclusive index, replays the missing elements.
-      * The FutureQueue needs to make sure with help of the Commit, that up to the INDEX, the elements are fully
-      * processed. This needs to be done as soon as possible, because this allows to "forget" about the offered elements
-      * in the RecoveringFutureQueue implementation.
-      */
-    def registerConsumerFactory(
-        consumer: Commit => Future[FutureQueueConsumer[T]]
-    ): Unit
-
     def firstSuccessfulConsumerInitialization: Future[Unit]
 
     def uncommittedQueueSnapshot: Vector[(Long, T)]
@@ -1080,6 +1067,7 @@ object PekkoUtil extends HasLoggerName {
       retryAttemptErrorThreshold: Int,
       uncommittedWarnTreshold: Int,
       recoveringQueueMetrics: RecoveringQueueMetrics,
+      consumerFactory: Commit => Future[FutureQueueConsumer[T]],
   ) extends RecoveringFutureQueue[T] {
     assert(maxBlockedOffer > 0)
     assert(retryAttemptWarnThreshold > 0)
@@ -1089,8 +1077,6 @@ object PekkoUtil extends HasLoggerName {
     private val logger = loggerFactory.getLogger(this.getClass)
     private implicit val directEC: ExecutionContext = DirectExecutionContext(logger)
 
-    private var consumerFactory: Option[Commit => Future[FutureQueueConsumer[T]]] =
-      None
     private var consumer: Option[FutureQueuePullProxy[T]] = None
 
     private val recoveringQueue: RecoveringQueue[T] = new RecoveringQueue(
@@ -1112,21 +1098,6 @@ object PekkoUtil extends HasLoggerName {
 
     def firstSuccessfulConsumerInitialization: Future[Unit] =
       firstSuccessfulConsumerInitializationPromise.future
-
-    override def registerConsumerFactory(
-        consumerFactory: Commit => Future[FutureQueueConsumer[T]]
-    ): Unit = blockingSynchronized {
-      if (donePromise.isCompleted)
-        throw new IllegalStateException("Cannot register consumer: already shut down")
-      if (shuttingDown)
-        throw new IllegalStateException("Cannot register consumer: shutdown in progress")
-      if (this.consumerFactory.nonEmpty)
-        throw new IllegalStateException("Consumer factory already defined")
-
-      logger.info("Consumer factory registered")
-      this.consumerFactory = Some(consumerFactory)
-      initializeConsumer()
-    }
 
     override def offer(elem: T): Future[Done] = blockingSynchronized {
       if (shuttingDown) {
@@ -1154,12 +1125,8 @@ object PekkoUtil extends HasLoggerName {
             logger.info("Consumer shutdown initiated")
             c.shutdown()
 
-          case None if consumerFactory.isDefined =>
-            logger.debug("Consumer initialization is in progress, delaying shutdown...")
-
           case None =>
-            logger.info("Terminated (no consumer factory set)")
-            discard(donePromise.trySuccess(Done))
+            logger.debug("Consumer initialization is in progress, delaying shutdown...")
         }
       }
     }
@@ -1168,10 +1135,8 @@ object PekkoUtil extends HasLoggerName {
 
     private def initializeConsumer(): Unit = blockingSynchronized {
       logger.info("Initializing consumer...")
-      consumerFactory.foreach(
-        _(recoveringQueue.commit)
-          .onComplete(consumerInitialized(_, 1))(directEC)
-      )
+      consumerFactory(recoveringQueue.commit)
+        .onComplete(consumerInitialized(_, 1))(directEC)
     }
 
     private def consumerInitialized(
@@ -1225,8 +1190,8 @@ object PekkoUtil extends HasLoggerName {
             else if (attempt > retryAttemptWarnThreshold) logger.warn(logMessage, failure)
             else logger.info(logMessage, failure)
             Threading.sleep(waitMillis)
-            consumerFactory.foreach(
-              _(recoveringQueue.commit).onComplete(consumerInitialized(_, attempt + 1))(directEC)
+            consumerFactory(recoveringQueue.commit).onComplete(consumerInitialized(_, attempt + 1))(
+              directEC
             )
           }
       }
@@ -1254,6 +1219,8 @@ object PekkoUtil extends HasLoggerName {
 
     private def blockingSynchronized[U](u: => U): U =
       blocking(synchronized(u))
+
+    initializeConsumer()
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -1290,12 +1257,11 @@ object PekkoUtil extends HasLoggerName {
       }
     }
 
-    override def done: Future[Done] = {
+    override def done: Future[Done] =
       // it is possible that the delegate signals done earlier than completing the last offer Future (for example the failure case for pekko SourceQueue), but it is alright not waiting for those Future-s as
       // - might not ever complete (for example the failure case for pekko SourceQueue)
       // - this is not observable: decoupled from the observable RecoveryFutureQueue.offer completely
       delegate.done
-    }
 
     private def offerCompleted(result: Try[Done]): Unit = blockingSynchronized {
       offerInProgress = false
@@ -1526,5 +1492,12 @@ object PekkoUtil extends HasLoggerName {
 
     override def done: Future[Done] =
       futureQueueConsumer.futureQueue.done
+  }
+
+  /** A `KillSwitch` that calls `FlagCloseable.close` on shutdown or abort.
+    */
+  class KillSwitchFlagCloseable(flagClosable: FlagCloseable) extends KillSwitch {
+    override def shutdown(): Unit = flagClosable.close()
+    override def abort(ex: Throwable): Unit = flagClosable.close()
   }
 }

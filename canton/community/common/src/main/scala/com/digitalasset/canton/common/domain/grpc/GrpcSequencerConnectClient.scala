@@ -31,8 +31,7 @@ import com.digitalasset.canton.topology.{
   UniqueIdentifier,
 }
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
-import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
-import com.digitalasset.canton.util.retry.Success
+import com.digitalasset.canton.util.retry.{AllExceptionRetryPolicy, Success}
 import com.digitalasset.canton.util.{Thereafter, retry}
 import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
 import com.digitalasset.canton.{DomainAlias, ProtoDeserializationError}
@@ -57,7 +56,7 @@ class GrpcSequencerConnectClient(
 
   override def getDomainClientBootstrapInfo(
       domainAlias: DomainAlias
-  )(implicit traceContext: TraceContext): EitherT[Future, Error, DomainClientBootstrapInfo] = {
+  )(implicit traceContext: TraceContext): EitherT[Future, Error, DomainClientBootstrapInfo] =
     for {
       _ <- CantonGrpcUtil
         .checkCantonApiInfo(
@@ -66,6 +65,7 @@ class GrpcSequencerConnectClient(
           builder.build(),
           logger,
           timeouts.network,
+          None,
         )
         .leftMap(err => Error.Transport(err))
       response <- CantonGrpcUtil
@@ -78,6 +78,7 @@ class GrpcSequencerConnectClient(
           logger = logger,
           logPolicy = CantonGrpcUtil.silentLogPolicy,
           retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
+          token = None,
         )(_.getDomainId(v30.SequencerConnect.GetDomainIdRequest()))
         .leftMap(err => Error.Transport(err.toString))
 
@@ -94,7 +95,6 @@ class GrpcSequencerConnectClient(
 
       sequencerId <- EitherT.fromEither[Future](sequencerId)
     } yield DomainClientBootstrapInfo(domainId, sequencerId)
-  }
 
   override def getDomainParameters(
       domainIdentifier: String
@@ -109,6 +109,7 @@ class GrpcSequencerConnectClient(
         logger = logger,
         logPolicy = CantonGrpcUtil.silentLogPolicy,
         retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
+        token = None,
       )(_.getDomainParameters(v30.SequencerConnect.GetDomainParametersRequest()))
       .leftMap(err => Error.Transport(err.toString))
 
@@ -133,6 +134,7 @@ class GrpcSequencerConnectClient(
         logger = logger,
         logPolicy = CantonGrpcUtil.silentLogPolicy,
         retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
+        token = None,
       )(_.getDomainId(v30.SequencerConnect.GetDomainIdRequest()))
       .leftMap(err => Error.Transport(err.toString))
 
@@ -161,11 +163,12 @@ class GrpcSequencerConnectClient(
           logger = logger,
           logPolicy = CantonGrpcUtil.silentLogPolicy,
           retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
-        )(_.handshake(SequencerConnect.HandshakeRequest(Some(request.toProtoV30))))
+          token = None,
+        )(_.handshake(request.toProtoV30))
         .leftMap(err => Error.Transport(err.toString))
 
       handshakeResponse <- EitherT
-        .fromEither[Future](HandshakeResponse.fromProtoV30(responseP.getHandshakeResponse))
+        .fromEither[Future](HandshakeResponse.fromProtoV30(responseP))
         .leftMap[Error](err => Error.DeserializationFailure(err.toString))
       _ = if (handshakeResponse.serverProtocolVersion.isDeprecated && !dontWarnOnDeprecatedPV)
         DeprecatedProtocolVersion.WarnSequencerClient(
@@ -187,10 +190,10 @@ class GrpcSequencerConnectClient(
 
     // retry in case of failure. Also if waitForActive is true, retry if response is negative
     implicit val success: Success[Either[Error, Boolean]] =
-      retry.Success({
+      retry.Success {
         case Left(_) => false
         case Right(value) => value || !waitForActive
-      })
+      }
 
     def verifyActive(): Future[Either[Error, Boolean]] =
       service.verifyActive(VerifyActiveRequest()).map(handleVerifyActiveResponse)
@@ -205,7 +208,7 @@ class GrpcSequencerConnectClient(
     EitherT(
       retry
         .Pause(logger, this, maxRetries, interval, "verify active")
-        .apply(verifyActive(), AllExnRetryable)
+        .apply(verifyActive(), AllExceptionRetryPolicy)
     ).thereafter(_ => closeableChannel.close())
   }
 
@@ -226,6 +229,7 @@ class GrpcSequencerConnectClient(
         logger = logger,
         logPolicy = CantonGrpcUtil.silentLogPolicy,
         retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
+        token = None,
       )(
         _.registerOnboardingTopologyTransactions(
           SequencerConnect.RegisterOnboardingTopologyTransactionsRequest(

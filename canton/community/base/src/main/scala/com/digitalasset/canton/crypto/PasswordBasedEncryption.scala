@@ -47,7 +47,7 @@ object PasswordBasedEncrypted extends HasVersionedMessageCompanion[PasswordBased
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v31,
+      ProtocolVersion.v32,
       supportedProtoVersion(v30.PasswordBasedEncrypted)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -73,7 +73,7 @@ object PasswordBasedEncrypted extends HasVersionedMessageCompanion[PasswordBased
 /** Password-Based Encryption (PBE) */
 trait PasswordBasedEncryptionOps { this: EncryptionOps =>
 
-  protected def defaultPbkdfScheme: PbkdfScheme
+  protected[crypto] def defaultPbkdfScheme: PbkdfScheme
 
   /** Derive a symmetric encryption key from a given password.
     *

@@ -52,27 +52,22 @@ private[update] class TrafficControlValidator(
     rateLimitManager: SequencerRateLimitManager,
     override val loggerFactory: NamedLoggerFactory,
     metrics: SequencerMetrics,
-    unifiedSequencer: Boolean,
 )(implicit closeContext: CloseContext)
     extends NamedLogging {
 
   private def invalidSubmissionRequest(
-      state: BlockUpdateEphemeralState,
       submissionRequest: SubmissionRequest,
       sequencingTimestamp: CantonTimestamp,
       sequencerError: SequencerDeliverError,
-  )(implicit traceContext: TraceContext): SubmissionRequestOutcome = {
+  )(implicit traceContext: TraceContext): SubmissionRequestOutcome =
     SubmissionRequestValidator.invalidSubmissionRequest(
-      state,
       submissionRequest,
       sequencingTimestamp,
       sequencerError,
       logger,
       domainId,
       protocolVersion,
-      unifiedSequencer = unifiedSequencer,
     )
-  }
 
   def applyTrafficControl(
       submissionValidation: SequencedEventValidationF[SubmissionRequestValidationResult],
@@ -106,7 +101,6 @@ private[update] class TrafficControlValidator(
             latestSequencerEventTimestamp,
             warnIfApproximate =
               state.headCounterAboveGenesis(signedOrderingRequest.submissionRequest.sender),
-            state,
           )
             .map { receipt =>
               // On successful consumption, updated the result with the receipt
@@ -153,7 +147,6 @@ private[update] class TrafficControlValidator(
       sequencingTimestamp: CantonTimestamp,
       latestSequencerEventTimestamp: Option[CantonTimestamp],
       warnIfApproximate: Boolean,
-      st: BlockUpdateEphemeralState,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -181,7 +174,6 @@ private[update] class TrafficControlValidator(
             s"Sender does not have enough traffic at $sequencingTimestamp for event with cost ${error.trafficCost} processed by sequencer ${orderingRequest.signature.signedBy}"
           )
           invalidSubmissionRequest(
-            st,
             request.content,
             sequencingTimestamp,
             SequencerErrors.TrafficCredit(error.toString),
@@ -204,7 +196,6 @@ private[update] class TrafficControlValidator(
               s" to sequencer ${orderingRequest.signature.signedBy} was outdated: $error."
           )
           invalidSubmissionRequest(
-            st,
             request.content,
             sequencingTimestamp,
             SequencerErrors.OutdatedTrafficCost(error.toString),
@@ -231,11 +222,12 @@ private[update] class TrafficControlValidator(
   private def recordTrafficSpentSuccessfully(
       receipt: Option[TrafficReceipt],
       metricsContext: MetricsContext,
-  ): Unit = {
+  ): Unit =
     receipt.map(_.consumedCost.value).foreach { cost =>
-      metrics.trafficControl.eventDelivered.mark(cost)(metricsContext)
+      metrics.trafficControl.trafficConsumption.trafficCostOfDeliveredSequencedEvent
+        .mark(cost)(metricsContext)
+      metrics.trafficControl.trafficConsumption.deliveredEventCounter.inc()(metricsContext)
     }
-  }
 
   // Record when traffic is deducted but results in a event that is not delivered
   private def recordTrafficWasted(
@@ -245,17 +237,18 @@ private[update] class TrafficControlValidator(
   )(implicit traceContext: TraceContext): Unit = {
     val costO = receipt.map(_.consumedCost.value)
     val messageId = signedOrderingRequest.submissionRequest.messageId
-    val sequencerFingerprint = signedOrderingRequest.signature.signedBy
+    val sequencerId = signedOrderingRequest.content.sequencerId.member
     val sender = signedOrderingRequest.submissionRequest.sender
 
     // Note that the fingerprint of the submitting sequencer is not validated yet by the driver layer
     // So it does not protect against malicious sequencers, only notifies when honest sequencers let requests to be sequenced
     // which end up being invalidated on the read path
     logger.debug(
-      s"Wasted traffic cost${costO.map(c => s" (cost = $c)").getOrElse("")} for messageId $messageId accepted by sequencer $sequencerFingerprint from sender $sender."
+      s"Wasted traffic cost${costO.map(c => s" (cost = $c)").getOrElse("")} for messageId $messageId accepted by sequencer $sequencerId from sender $sender."
     )
     costO.foreach { cost =>
       metrics.trafficControl.wastedTraffic.mark(cost)(metricsContext)
+      metrics.trafficControl.wastedTrafficCounter.inc()(metricsContext)
     }
   }
 
@@ -278,6 +271,7 @@ private[update] class TrafficControlValidator(
       s"Wasted sequencing of event with raw byte size $byteSize for messageId $messageId accepted by sequencer $sequencerId from sender $sender."
     )
     metrics.trafficControl.wastedSequencing.mark(byteSize)(metricsContext)
+    metrics.trafficControl.wastedSequencingCounter.inc()(metricsContext)
   }
 
 }

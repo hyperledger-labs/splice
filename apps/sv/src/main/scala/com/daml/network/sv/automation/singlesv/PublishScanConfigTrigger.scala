@@ -23,7 +23,7 @@ import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.store.DsoRulesStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.TemplateJsonDecoder
-import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext

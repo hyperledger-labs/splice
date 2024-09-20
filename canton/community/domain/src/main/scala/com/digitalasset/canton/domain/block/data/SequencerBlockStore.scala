@@ -252,12 +252,12 @@ trait SequencerBlockStore extends AutoCloseable {
         // So we allow that the last ts is after the last member registration.
         ErrorUtil.requireState(
           memberTs == currentBlock.lastTs || prevBlockO.isEmpty && memberTs <= currentBlock.lastTs,
-          s"The last timestamp ${currentBlock.lastTs} for block ${currentBlock.height} differs from the block's last registration (for member $member) at ${memberTs} and there are no events",
+          s"The last timestamp ${currentBlock.lastTs} for block ${currentBlock.height} differs from the block's last registration (for member $member) at $memberTs and there are no events",
         )
       case (Some(maxEvent), Some((member, memberTs))) =>
         ErrorUtil.requireState(
           Ordering[CantonTimestamp].max(maxEvent.timestamp, memberTs) == currentBlock.lastTs,
-          s"The last timestamp ${currentBlock.lastTs} for block ${currentBlock.height} differs from both the block's last registration (for member $member) at ${memberTs} and the block's last event at ${maxEvent.timestamp}",
+          s"The last timestamp ${currentBlock.lastTs} for block ${currentBlock.height} differs from both the block's last registration (for member $member) at $memberTs and the block's last event at ${maxEvent.timestamp}",
         )
     }
 
@@ -292,7 +292,7 @@ trait SequencerBlockStore extends AutoCloseable {
         )
     }
 
-    inFlightAggregationsAtEndOfBlock.foreach { case (aggregationId, inFlightAggregation) =>
+    inFlightAggregationsAtEndOfBlock.foreach { case (_aggregationId, inFlightAggregation) =>
       inFlightAggregation.checkInvariant()
     }
   }
@@ -304,24 +304,21 @@ object SequencerBlockStore {
       protocolVersion: ProtocolVersion,
       timeouts: ProcessingTimeout,
       enableAdditionalConsistencyChecks: Boolean,
-      checkedInvariant: Option[Member],
       loggerFactory: NamedLoggerFactory,
-      unifiedSequencer: Boolean,
   )(implicit
       executionContext: ExecutionContext
   ): SequencerBlockStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemorySequencerBlockStore(checkedInvariant, loggerFactory)
+        new InMemorySequencerBlockStore(checkedInvariant = None, loggerFactory)
       case dbStorage: DbStorage =>
         new DbSequencerBlockStore(
           dbStorage,
           protocolVersion,
           timeouts,
           enableAdditionalConsistencyChecks,
-          checkedInvariant,
+          checkedInvariant = None,
           loggerFactory,
-          unifiedSequencer = unifiedSequencer,
         )
     }
 }

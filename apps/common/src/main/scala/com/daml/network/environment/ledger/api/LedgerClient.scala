@@ -3,6 +3,7 @@
 
 package com.daml.network.environment.ledger.api
 
+import com.daml.grpc.AuthCallCredentials
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.daml.ledger.api.v2 as lapi
@@ -28,14 +29,14 @@ import com.daml.network.util.DisclosedContracts
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.ledger.client.{GrpcChannel, LedgerCallCredentials}
+import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf.{ByteString, Duration}
+import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
@@ -52,10 +53,6 @@ sealed abstract class DedupConfig
 final case object NoDedup extends DedupConfig
 
 final case class DedupOffset(offset: String) extends DedupConfig
-
-final case object DedupBeginOffset extends DedupConfig
-
-final case class DedupDuration(duration: Duration) extends DedupConfig
 
 /** Ledger client built on top of the Java bindings. The Java equivalent of
   * com.daml.ledger.client.LedgerClient.
@@ -97,7 +94,7 @@ private[environment] class LedgerClient(
         checkTokenUser(token)
         TraceContextGrpc.addTraceContextToCallOptions(
           stub
-            .withCallCredentials(new LedgerCallCredentials(token.accessToken))
+            .withCallCredentials(new AuthCallCredentials(token.accessToken))
         )
       }
     }
@@ -135,20 +132,22 @@ private[environment] class LedgerClient(
 
   def ledgerEnd()(implicit
       traceContext: TraceContext
-  ): Future[lapi.participant_offset.ParticipantOffset.Value.Absolute] = {
+  ): Future[String] = {
     val req = lapi.state_service.GetLedgerEndRequest()
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
-      offset <- stub.getLedgerEnd(req).map { resp =>
-        val participantOffset =
-          resp.offset
-            .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
-        val absolute = participantOffset.value.absolute
-          .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
+      resp <- stub.getLedgerEnd(req)
+    } yield resp.offset
+  }
 
-        lapi.participant_offset.ParticipantOffset.Value.Absolute(absolute)
-      }
-    } yield offset
+  def latestPrunedOffset()(implicit
+      traceContext: TraceContext
+  ): Future[String] = {
+    val req = lapi.state_service.GetLatestPrunedOffsetsRequest()
+    for {
+      stub <- withCredentialsAndTraceContext(stateServiceStub)
+      resp <- stub.getLatestPrunedOffsets(req)
+    } yield resp.participantPrunedUpToInclusive
   }
 
   def activeContracts(
@@ -211,10 +210,11 @@ private[environment] class LedgerClient(
       .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
     deduplicationConfig match {
       case DedupOffset(offset) =>
-        commandsBuilder.setDeduplicationOffset(offset)
-      case DedupDuration(duration) =>
-        commandsBuilder.setDeduplicationDuration(duration)
-      case DedupBeginOffset =>
+        // Canton does not allow an empty offset (ledger begin) so just go for
+        // not specfying anything which means max deduplication duration.
+        if (!offset.isEmpty) {
+          commandsBuilder.setDeduplicationOffset(offset)
+        }
       case NoDedup =>
     }
 
@@ -486,7 +486,7 @@ private[environment] class LedgerClient(
   def completions(
       applicationId: String,
       parties: Seq[PartyId],
-      begin: lapi.participant_offset.ParticipantOffset.Value.Absolute,
+      begin: String,
   )(implicit tc: TraceContext): Source[CompletionStreamResponse, NotUsed] =
     toSource(
       for {
@@ -495,9 +495,7 @@ private[environment] class LedgerClient(
         lapi.command_completion_service.CompletionStreamRequest(
           applicationId = applicationId,
           parties = parties.map(_.toProtoPrimitive),
-          // empty string does work but it now starts from ledger begin instead of ledger end
-          // which we never want.
-          beginExclusive = begin.value,
+          beginExclusive = begin,
         ),
         stub.completionStream,
       ) map CompletionStreamResponse.fromProto
@@ -569,14 +567,14 @@ object LedgerClient {
   }
 
   final case class GetUpdatesRequest(
-      begin: lapi.participant_offset.ParticipantOffset,
-      end: Option[lapi.participant_offset.ParticipantOffset],
+      begin: String,
+      end: Option[String],
       filter: IngestionFilter,
   ) {
     private[LedgerClient] def toProto: lapi.update_service.GetUpdatesRequest =
       lapi.update_service.GetUpdatesRequest(
-        beginExclusive = Some(begin),
-        endInclusive = end,
+        beginExclusive = begin,
+        endInclusive = end.getOrElse(""),
         filter = Some(filter.toTransactionFilter),
       )
   }
@@ -756,10 +754,18 @@ object LedgerClient {
     def fromProto(
         spb: lapi.command_completion_service.CompletionStreamResponse
     ): CompletionStreamResponse = {
-      val offset = spb.checkpoint
-        .map(_.offset)
-        .getOrElse(throw new IllegalArgumentException("missing offset in CompletionStreamResponse"))
-      // ignoring checkpoint.record_time
+      val offset = spb.completionResponse match {
+        case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse
+              .Completion(completion) =>
+          completion.offset
+        case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse
+              .OffsetCheckpoint(checkpoint) =>
+          checkpoint.offset
+        case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse.Empty =>
+          throw GrpcStatus.INTERNAL
+            .withDescription(s"Unexpected completion response: ${spb.completionResponse}")
+            .asRuntimeException
+      }
       CompletionStreamResponse(
         offset,
         Completion.fromProto(spb.getCompletion),

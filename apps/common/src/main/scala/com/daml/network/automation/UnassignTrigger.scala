@@ -47,7 +47,7 @@ class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Contrac
     val contract = task.contract
     for {
       targetDomainId <- targetDomain()(tc)
-      cid = PrettyContractId(companion.TEMPLATE_ID, contract.contractId)
+      cid = PrettyContractId(companion.getTemplateIdWithPackageId, contract.contractId)
       outcome <-
         if (task.domain == targetDomainId) {
           Future.successful(

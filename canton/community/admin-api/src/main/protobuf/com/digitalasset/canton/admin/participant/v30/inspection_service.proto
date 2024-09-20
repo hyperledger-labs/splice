@@ -5,7 +5,9 @@ syntax = "proto3";
 
 package com.digitalasset.canton.admin.participant.v30;
 
+import "com/digitalasset/canton/admin/participant/v30/active_contract.proto";
 import "google/protobuf/timestamp.proto";
+import "scalapb/scalapb.proto";
 
 /**
  * Inspection Service
@@ -21,12 +23,14 @@ service InspectionService {
   // Look up the ledger offset corresponding to the timestamp, specifically the largest offset such that no later
   // offset corresponds to a later timestamp than the specified one.
   rpc LookupOffsetByTime(LookupOffsetByTime.Request) returns (LookupOffsetByTime.Response);
-  // Look up the ledger offset by an index, e.g. 1 returns the first offset, 2 the second, etc.
-  rpc LookupOffsetByIndex(LookupOffsetByIndex.Request) returns (LookupOffsetByIndex.Response);
-  // TODO(#18452) R5
+  // Request metadata about shared contracts used in commitment computation at a specific time
+  // Subject to the data still being available on the participant
+  // TODO(#9557) R2
+  rpc OpenCommitment(OpenCommitment.Request) returns (stream OpenCommitment.Response);
+  // TODO(#9557) R2
+  rpc InspectCommitmentContracts(InspectCommitmentContracts.Request) returns (stream InspectCommitmentContracts.Response);
   // Look up the ACS commitments computed and sent by a participant
   rpc LookupSentAcsCommitments(LookupSentAcsCommitments.Request) returns (LookupSentAcsCommitments.Response);
-  // TODO(#18452) R5
   // List the counter-participants and their ACS commitments together with the match status
   // TODO(#18749) R1 Can also be used for R1, to fetch commitments that a counter participant received from myself
   rpc LookupReceivedAcsCommitments(LookupReceivedAcsCommitments.Request) returns (LookupReceivedAcsCommitments.Response);
@@ -82,18 +86,49 @@ message LookupOffsetByTime {
   }
 }
 
-message LookupOffsetByIndex {
+message OpenCommitment {
   message Request {
-    // the index to look up the offset for, needs to be 1 or larger
-    int64 index = 1;
+    // the commitment to be opened
+    bytes commitment = 1;
+    string domain_id = 2;
+    // the participant for whom the receiving participant computed the commitment
+    string computed_for_counter_participant_uid = 3;
+    // interval end tick which the commitment corresponds to
+    google.protobuf.Timestamp periodEndTick = 4;
   }
 
   message Response {
-    // the absolute offset as a string corresponding to the specified index.
-    // empty string if no such offset exists.
-    string offset = 1;
+    // commitment contracts metadata
+    bytes chunk = 1;
   }
 }
+
+// Contract ids (cids) need to be authenticated, otherwise the cid does not uniquely identify the stakeholders and
+// the contract hash
+message CommitmentContractMeta {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  bytes cid = 1;
+  int64 reassignment_counter = 2;
+}
+
+// The participant needs to be authorized to see the requested contracts, for example using JWT authorization
+message InspectCommitmentContracts {
+  message Request {
+    repeated bytes cids = 1;
+  }
+
+  message Response {
+    // commitment contracts
+    bytes chunk = 1;
+  }
+}
+
+message CommitmentContract {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  Contract serialized_contract = 1;
+  bytes creating_tx_id = 2;
+}
+
 
 // list the commitments received from counter-participants
 // optional filtering by domain, time ranges, counter participants, commitment state and verbosity
@@ -167,6 +202,7 @@ message ReceivedAcsCommitmentPerDomain {
 }
 
 enum ReceivedCommitmentState {
+  // unspecified can happen if we have received a commitment outside any outstanding window, but have not yet stored it in our buffering queue
   RECEIVED_COMMITMENT_STATE_UNSPECIFIED = 0;
   RECEIVED_COMMITMENT_STATE_MATCH = 1;
   RECEIVED_COMMITMENT_STATE_MISMATCH = 2;
@@ -200,8 +236,7 @@ enum SentCommitmentState {
   SENT_COMMITMENT_STATE_UNSPECIFIED = 0;
   SENT_COMMITMENT_STATE_MATCH = 1;
   SENT_COMMITMENT_STATE_MISMATCH = 2;
-  // commitment was not compared yet with the counter-participant's commitments, because, e.g., the counter-participant
-  // commitment has not been received yet
+  // commitment was not compared yet with the counter-participant's commitments, because, the counter-participant commitment has not been received yet, or because we have computed a commitment but not yet marked the period as outstanding
   SENT_COMMITMENT_STATE_NOT_COMPARED = 3;
 }
 

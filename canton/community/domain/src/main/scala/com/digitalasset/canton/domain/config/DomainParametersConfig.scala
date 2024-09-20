@@ -38,7 +38,8 @@ final case class DomainParametersConfig(
     requiredSymmetricKeySchemes: Option[NonEmpty[Set[SymmetricKeyScheme]]] = None,
     requiredHashAlgorithms: Option[NonEmpty[Set[HashAlgorithm]]] = None,
     requiredCryptoKeyFormats: Option[NonEmpty[Set[CryptoKeyFormat]]] = None,
-    override val alphaVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    override val alphaVersionSupport: Boolean = true,
     override val betaVersionSupport: Boolean = false,
     override val dontWarnOnDeprecatedPV: Boolean = false,
 ) extends ProtocolConfig

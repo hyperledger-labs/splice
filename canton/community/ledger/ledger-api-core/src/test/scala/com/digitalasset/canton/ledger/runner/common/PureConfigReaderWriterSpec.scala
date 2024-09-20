@@ -117,10 +117,9 @@ class PureConfigReaderWriterSpec
       |""".stripMargin
 
   it should "read/write against predefined values" in {
-    def compare(configString: String, expectedValue: Option[JwtTimestampLeeway]) = {
+    def compare(configString: String, expectedValue: Option[JwtTimestampLeeway]) =
       convert(jwtTimestampLeewayConfigConvert, configString).value shouldBe expectedValue
 
-    }
     compare(
       """
         |  enabled = true
@@ -369,7 +368,7 @@ class PureConfigReaderWriterSpec
       |  indexer-worker-lock-id = 105305793
       |  main-lock-acquire-retry-timeout= 500 milliseconds
       |  main-lock-checker-period = 1000 milliseconds
-      |  worker-lock-acquire-max-retries = 1000
+      |  worker-lock-acquire-max-retries = 10
       |  worker-lock-acquire-retry-timeout = 500 milliseconds
       |  main-lock-checker-jdbc-network-timeout = 10000 milliseconds
       |  """.stripMargin

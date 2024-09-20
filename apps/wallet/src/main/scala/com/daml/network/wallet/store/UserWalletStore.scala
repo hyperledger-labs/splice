@@ -397,7 +397,9 @@ trait UserWalletStore extends AppStore with NamedLogging {
   )(ct: Option[ContractWithState[TCid, T]]) =
     ct flatMap (_.toAssignedContract) getOrElse {
       throw Status.NOT_FOUND
-        .withDescription(s"${companion.TEMPLATE_ID.getEntityName} contract not found")
+        .withDescription(
+          s"${companion.getTemplateIdWithPackageId.getEntityName} contract not found"
+        )
         .asRuntimeException()
     }
 }

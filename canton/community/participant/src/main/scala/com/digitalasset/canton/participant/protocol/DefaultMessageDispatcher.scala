@@ -131,7 +131,7 @@ class DefaultMessageDispatcher(
 
   private def processOrdinary(
       signedEventE: WithOpeningErrors[SignedContent[SequencedEvent[DefaultOpenEnvelope]]]
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     signedEventE.event.content match {
       case deliver @ Deliver(sc, ts, _, _, _, _, _) if TimeProof.isTimeProofDeliver(deliver) =>
         logTimeProof(sc, ts)
@@ -158,13 +158,12 @@ class DefaultMessageDispatcher(
 
       case error @ DeliverError(sc, ts, _, msgId, status, _) =>
         logDeliveryError(sc, ts, msgId, status)
-        logger.debug(s"Received a deliver error at ${sc} / ${ts}")
+        logger.debug(s"Received a deliver error at $sc / $ts")
         for {
           _unit <- observeDeliverError(error)
           _unit <- tickTrackers(sc, ts, triggerAcsChangePublication = false)
         } yield ()
     }
-  }
 
   private def tickTrackers(
       sc: SequencerCounter,
@@ -175,14 +174,16 @@ class DefaultMessageDispatcher(
       // Signal to the topology processor that all messages up to timestamp `ts` have arrived
       // Publish the empty ACS change only afterwards as this may trigger an ACS commitment computation which accesses the topology state.
       _unit <- runAsyncResult(topologyProcessor(sc, SequencedTime(ts), None, Traced(List.empty)))
-    } yield {
-      // Make sure that the tick is not lost
-      requestTracker.tick(sc, ts)
-      if (triggerAcsChangePublication)
-        recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
-
-      recordOrderPublisher.tick(sc, ts)
-    }
+      _ = {
+        // Make sure that the tick is not lost
+        requestTracker.tick(sc, ts)
+        if (triggerAcsChangePublication)
+          recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
+      }
+      _ <- FutureUnlessShutdown.outcomeF(
+        recordOrderPublisher.tick(sc, ts, eventO = None, requestCounterO = None)
+      )
+    } yield ()
 
   @VisibleForTesting
   override def flush(): Future[Unit] = Future.unit

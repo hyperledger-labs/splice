@@ -28,7 +28,6 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NamedLoggingContext}
 import com.digitalasset.canton.metrics.*
-import com.digitalasset.canton.participant.RequestOffset
 import com.digitalasset.canton.participant.metrics.TransactionProcessingMetrics
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.ParsedRequest
@@ -82,12 +81,13 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.{
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
+import com.digitalasset.canton.sequencing.client.SendAsyncClientError
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.serialization.DefaultDeserializationError
 import com.digitalasset.canton.store.SessionKeyStore
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, LfTransactionUtil}
 import com.digitalasset.canton.{
@@ -162,9 +162,8 @@ class TransactionProcessingSteps(
 
   override def requestKind: String = "Transaction"
 
-  override def submissionDescription(param: SubmissionParam): String = {
+  override def submissionDescription(param: SubmissionParam): String =
     show"submitters ${param.submitterInfo.actAs}, command-id ${param.submitterInfo.commandId}"
-  }
 
   override def submissionIdOfPendingRequest(pendingData: PendingTransaction): Unit = ()
 
@@ -290,14 +289,13 @@ class TransactionProcessingSteps(
     private def mkTransactionSubmissionTrackingData(
         error: TransactionError,
         completionInfo: CompletionInfo,
-    ): TransactionSubmissionTrackingData = {
+    ): TransactionSubmissionTrackingData =
       TransactionSubmissionTrackingData(
         completionInfo,
         TransactionSubmissionTrackingData.CauseWithTemplate(error),
         domainId,
         protocolVersion,
       )
-    }
 
     override def submissionId: Option[LedgerSubmissionId] = submitterInfo.submissionId
 
@@ -340,11 +338,10 @@ class TransactionProcessingSteps(
         val allParties =
           (informeesCheckPartiesPerNode.flatten ++ signatoriesCheckPartiesPerNode.flatten).toSet
         val eligibleParticipantsF =
-          topologySnapshot.activeParticipantsOfPartiesWithAttributes(allParties.toSeq).map {
-            result =>
-              result.map { case (party, attributesMap) =>
-                (party, attributesMap.values.exists(_.permission.canConfirm))
-              }
+          topologySnapshot.activeParticipantsOfPartiesWithInfo(allParties.toSeq).map { result =>
+            result.map { case (party, info) =>
+              (party, info.participants.values.exists(_.permission.canConfirm))
+            }
           }
 
         eligibleParticipantsF.map { eligibleParticipants =>
@@ -549,8 +546,12 @@ class TransactionProcessingSteps(
     override def submissionErrorTrackingData(
         error: SubmissionSendError
     )(implicit traceContext: TraceContext): TransactionSubmissionTrackingData = {
-      val errorCode: TransactionError =
-        TransactionProcessor.SubmissionErrors.SequencerRequest.Error(error.sendError)
+      val errorCode: TransactionError = error.sendError match {
+        case SendAsyncClientError.RequestRefused(SendAsyncError.Overloaded(_)) =>
+          TransactionProcessor.SubmissionErrors.DomainBackpressure.Rejection(error.toString)
+        case otherSendError =>
+          TransactionProcessor.SubmissionErrors.SequencerRequest.Error(otherSendError)
+      }
       val rejectionCause = TransactionSubmissionTrackingData.CauseWithTemplate(errorCode)
       TransactionSubmissionTrackingData(
         completionInfo,
@@ -732,7 +733,7 @@ class TransactionProcessingSteps(
       ): FutureUnlessShutdown[Either[
         EncryptedViewMessageError,
         (WithRecipients[DecryptedView], Option[Signature]),
-      ]] = {
+      ]] =
         for {
           _ <- FutureUnlessShutdown.outcomeF(extractRandomnessFromView(transactionViewEnvelope))
           randomness <- randomnessMap(transactionViewEnvelope.protocolMessage.viewHash).futureUS
@@ -743,8 +744,6 @@ class TransactionProcessingSteps(
         } yield lightViewTreeE.map { case (view, signature) =>
           (WithRecipients(view, transactionViewEnvelope.recipients), signature)
         }
-
-      }
 
       EitherT.right {
         for {
@@ -830,11 +829,10 @@ class TransactionProcessingSteps(
       parsedRequest: ParsedTransactionRequest
   )(implicit
       traceContext: TraceContext
-  ): Either[TransactionProcessorError, ActivenessSet] = {
+  ): Either[TransactionProcessorError, ActivenessSet] =
     // TODO(i12911): check that all non-root lightweight trees can be decrypted with the expected (derived) randomness
     //   Also, check that all the view's informees received the derived randomness
     Right(parsedRequest.usedAndCreated.activenessSet)
-  }
 
   def authenticateInputContracts(
       parsedRequest: ParsedTransactionRequest
@@ -847,7 +845,7 @@ class TransactionProcessingSteps(
 
   override def constructPendingDataAndResponse(
       parsedRequest: ParsedTransactionRequest,
-      transferLookup: TransferLookup,
+      reassignmentLookup: ReassignmentLookup,
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       engineController: EngineController,
   )(implicit
@@ -954,9 +952,9 @@ class TransactionProcessingSteps(
           throw new RuntimeException(
             s"Activeness result for a transaction confirmation request contains already non-free contracts ${contractResult.notFree}"
           )
-        if (activenessResult.inactiveTransfers.nonEmpty)
+        if (activenessResult.inactiveReassignments.nonEmpty)
           throw new RuntimeException(
-            s"Activeness result for a transaction confirmation request contains inactive transfers ${activenessResult.inactiveTransfers}"
+            s"Activeness result for a transaction confirmation request contains inactive reassignments ${activenessResult.inactiveReassignments}"
           )
         activenessResult
     }
@@ -1095,21 +1093,26 @@ class TransactionProcessingSteps(
       error: TransactionError,
   )(implicit
       traceContext: TraceContext
-  ): (Option[TimestampedEvent], Option[PendingSubmissionId]) = {
-    val rejection = LedgerSyncEvent.CommandRejected.FinalReason(error.rpcStatus())
-
+  ): (Option[Traced[Update]], Option[PendingSubmissionId]) = {
+    val rejection = Update.CommandRejected.FinalReason(error.rpcStatus())
     completionInfoFromSubmitterMetadataO(submitterMetadata, freshOwnTimelyTx).map {
       completionInfo =>
-        TimestampedEvent(
-          LedgerSyncEvent.CommandRejected(
+        Traced(
+          Update.CommandRejected(
             ts.toLf,
             completionInfo,
             rejection,
-            requestType,
             domainId,
-          ),
-          RequestOffset(ts, rc),
-          Some(sc),
+            Some(
+              DomainIndex.of(
+                RequestIndex(
+                  counter = rc,
+                  sequencerCounter = Some(sc),
+                  timestamp = ts,
+                )
+              )
+            ),
+          )
         )
     } -> None // Transaction processing doesn't use pending submissions
   }
@@ -1123,7 +1126,7 @@ class TransactionProcessingSteps(
 
   override def createRejectionEvent(rejectionArgs: TransactionProcessingSteps.RejectionArgs)(
       implicit traceContext: TraceContext
-  ): Either[TransactionProcessorError, Option[TimestampedEvent]] = {
+  ): Either[TransactionProcessorError, Option[Traced[Update]]] = {
 
     val RejectionArgs(pendingTransaction, rejectionReason) = rejectionArgs
     val PendingTransaction(
@@ -1143,18 +1146,28 @@ class TransactionProcessingSteps(
       submitterMetaO.flatMap(completionInfoFromSubmitterMetadataO(_, freshOwnTimelyTx))
 
     rejectionReason.logWithContext(Map("requestId" -> pendingTransaction.requestId.toString))
-    val rejection = LedgerSyncEvent.CommandRejected.FinalReason(rejectionReason.reason())
+    val rejection = Update.CommandRejected.FinalReason(rejectionReason.reason())
 
-    val tseO = completionInfoO.map(info =>
-      TimestampedEvent(
-        LedgerSyncEvent
-          .CommandRejected(requestTime.toLf, info, rejection, requestType, domainId),
-        RequestOffset(requestTime, requestCounter),
-        Some(requestSequencerCounter),
+    val updateO = completionInfoO.map(info =>
+      Traced(
+        Update.CommandRejected(
+          requestTime.toLf,
+          info,
+          rejection,
+          domainId,
+          Some(
+            DomainIndex.of(
+              RequestIndex(
+                counter = requestCounter,
+                sequencerCounter = Some(requestSequencerCounter),
+                timestamp = requestTime,
+              )
+            )
+          ),
+        )
       )
     )
-
-    Right(tseO)
+    Right(updateO)
   }
 
   @VisibleForTesting
@@ -1199,7 +1212,7 @@ class TransactionProcessingSteps(
       engineController: EngineController,
   )(implicit traceContext: TraceContext): PendingTransaction = {
     // We consider that we rejected if at least one of the responses is not "approve'
-    val locallyRejectedF = responsesF.map(_.exists { response => !response.localVerdict.isApprove })
+    val locallyRejectedF = responsesF.map(_.exists(response => !response.localVerdict.isApprove))
 
     // The request was aborted if the model conformance check ended with an abort error, due to either a timeout
     // or a negative mediator verdict concurrently received in Phase 7
@@ -1290,40 +1303,42 @@ class TransactionProcessingSteps(
             contractId -> DriverContractMetadata(salt).toLfBytes(protocolVersion)
         }.toMap
 
-      acceptedEvent = LedgerSyncEvent.TransactionAccepted(
-        completionInfoO = completionInfoO,
-        transactionMeta = TransactionMeta(
-          ledgerEffectiveTime = lfTx.metadata.ledgerTime.toLf,
-          workflowId = workflowIdO.map(_.unwrap),
-          submissionTime = lfTx.metadata.submissionTime.toLf,
-          // Set the submission seed to zeros one (None no longer accepted) because it is pointless for projected
-          // transactions and it leaks the structure of the omitted parts of the transaction.
-          submissionSeed = LedgerSyncEvent.noOpSeed,
-          optUsedPackages = None,
-          optNodeSeeds = Some(lfTx.metadata.seeds.to(ImmArray)),
-          optByKeyNodes = None, // optByKeyNodes is unused by the indexer
-        ),
-        transaction = LfCommittedTransaction(lfTx.unwrap),
-        transactionId = lfTxId,
-        recordTime = requestTime.toLf,
-        divulgedContracts = witnessedAndDivulged.map { case (divulgedCid, divulgedContract) =>
-          DivulgedContract(divulgedCid, divulgedContract.contractInstance)
-        }.toList,
-        blindingInfoO = None,
-        hostedWitnesses = hostedWitnesses.toList,
-        contractMetadata = contractMetadata,
-        domainId = domainId,
-      )
-
-      timestampedEvent = TimestampedEvent(
-        acceptedEvent,
-        RequestOffset(requestTime, requestCounter),
-        Some(requestSequencerCounter),
+      acceptedEvent = Traced(
+        Update.TransactionAccepted(
+          completionInfoO = completionInfoO,
+          transactionMeta = TransactionMeta(
+            ledgerEffectiveTime = lfTx.metadata.ledgerTime.toLf,
+            workflowId = workflowIdO.map(_.unwrap),
+            submissionTime = lfTx.metadata.submissionTime.toLf,
+            // Set the submission seed to zeros one (None no longer accepted) because it is pointless for projected
+            // transactions and it leaks the structure of the omitted parts of the transaction.
+            submissionSeed = LedgerSyncEvent.noOpSeed,
+            optUsedPackages = None,
+            optNodeSeeds = Some(lfTx.metadata.seeds.to(ImmArray)),
+            optByKeyNodes = None, // optByKeyNodes is unused by the indexer
+          ),
+          transaction = LfCommittedTransaction(lfTx.unwrap),
+          transactionId = lfTxId,
+          recordTime = requestTime.toLf,
+          blindingInfoO = None,
+          hostedWitnesses = hostedWitnesses.toList,
+          contractMetadata = contractMetadata,
+          domainId = domainId,
+          domainIndex = Some(
+            DomainIndex.of(
+              RequestIndex(
+                counter = requestCounter,
+                sequencerCounter = Some(requestSequencerCounter),
+                timestamp = requestTime,
+              )
+            )
+          ),
+        )
       )
     } yield CommitAndStoreContractsAndPublishEvent(
       Some(commitSetF),
       contractsToBeStored,
-      Some(timestampedEvent),
+      Some(acceptedEvent),
     )
   }
 
@@ -1335,7 +1350,7 @@ class TransactionProcessingSteps(
       topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionProcessorError, CommitAndStoreContractsAndPublishEvent] = {
+  ): EitherT[Future, TransactionProcessorError, CommitAndStoreContractsAndPublishEvent] =
     for {
       usedAndCreated <- EitherT.right(
         ExtractUsedAndCreated(
@@ -1372,7 +1387,6 @@ class TransactionProcessingSteps(
         lfTx = validSubTransaction,
       )
     } yield commitAndContractsAndEvent
-  }
 
   override def getCommitSetAndContractsToBeStoredAndEvent(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
@@ -1464,13 +1478,12 @@ class TransactionProcessingSteps(
             //   -> we can reject as no participant will commit a subtransaction and violate transparency.
             rejectedWithModelConformanceError(error)
         },
-        { modelConformanceResult =>
+        modelConformanceResult =>
           getCommitSetAndContractsToBeStoredAndEventApproveConform(
             pendingRequestData,
             completionInfoO,
             modelConformanceResult,
-          ).mapK(FutureUnlessShutdown.outcomeK)
-        },
+          ).mapK(FutureUnlessShutdown.outcomeK),
       )
 
     def rejectedWithModelConformanceError(error: ErrorWithSubTransaction) =
@@ -1486,14 +1499,13 @@ class TransactionProcessingSteps(
       FutureUnlessShutdown,
       TransactionProcessorError,
       CommitAndStoreContractsAndPublishEvent,
-    ] = {
+    ] =
       (for {
         event <- EitherT.fromEither[Future](
           createRejectionEvent(RejectionArgs(pendingRequestData, rejection))
         )
       } yield CommitAndStoreContractsAndPublishEvent(None, Seq(), event))
         .mapK(FutureUnlessShutdown.outcomeK)
-    }
 
     for {
       topologySnapshot <- EitherT

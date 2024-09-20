@@ -401,7 +401,7 @@ class HttpSvSoftDomainMigrationPocHandler(
       staticDomainParameters = node.parameters
         .toStaticDomainParameters(
           CommunityCryptoConfig(provider = CommunityCryptoProvider.Jce),
-          ProtocolVersion.v31,
+          ProtocolVersion.v32,
         )
         .valueOr(err =>
           throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
@@ -476,14 +476,11 @@ class HttpSvSoftDomainMigrationPocHandler(
         .map(sv => ParticipantId.tryFromProtoPrimitive(sv.participantId))
         .toSeq
       participantId <- participantAdminConnection.getParticipantId()
-      // We resign the PartyToParticipant mapping instead of replaying it to limit the topology
-      // transactions that need to be transferred across protocol versions to the bare minimum.
       _ <- participantAdminConnection.proposeInitialPartyToParticipant(
         TopologyStoreId.DomainStore(domainId),
         dsoStore.key.dsoParty,
         participantIds,
         participantId.uid.namespace.fingerprint,
-        Some(domainId),
         isProposal = true,
       )
     } yield SvSoftDomainMigrationPocResource.SignDsoPartyToParticipantResponse.OK

@@ -4,9 +4,7 @@
 package com.digitalasset.canton.domain.sequencing
 
 import cats.data.EitherT
-import cats.syntax.foldable.*
 import cats.syntax.parallel.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.connection.GrpcApiInfoService
@@ -16,6 +14,10 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.api.v30
 import com.digitalasset.canton.domain.config.PublicServerConfig
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
+import com.digitalasset.canton.domain.sequencing.admin.data.{
+  SequencerAdminStatus,
+  SequencerHealthStatus,
+}
 import com.digitalasset.canton.domain.sequencing.authentication.grpc.{
   SequencerAuthenticationServerInterceptor,
   SequencerConnectServerInterceptor,
@@ -29,11 +31,7 @@ import com.digitalasset.canton.domain.sequencing.config.SequencerNodeParameters
 import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.domain.sequencing.service.*
 import com.digitalasset.canton.health.HealthListener
-import com.digitalasset.canton.health.admin.data.{
-  SequencerAdminStatus,
-  SequencerHealthStatus,
-  TopologyQueueStatus,
-}
+import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -44,32 +42,20 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.protocol.DomainParametersLookup.SequencerDomainParameters
-import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.protocol.{
   DomainParametersLookup,
   DynamicDomainParametersLookup,
   StaticDomainParameters,
 }
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencer.admin.v30.{
-  SequencerAdministrationServiceGrpc,
-  SequencerVersionServiceGrpc,
-}
+import com.digitalasset.canton.sequencer.admin.v30.SequencerAdministrationServiceGrpc
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.sequencing.handlers.{
   DiscardIgnoredEvents,
   EnvelopeOpener,
   StripSignature,
 }
-import com.digitalasset.canton.sequencing.protocol.SequencedEvent
 import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
-import com.digitalasset.canton.sequencing.{
-  BoxedEnvelope,
-  HandlerResult,
-  SubscriptionStart,
-  UnsignedEnvelopeBox,
-  UnsignedProtocolEventHandler,
-}
 import com.digitalasset.canton.store.{IndexedDomain, SequencerCounterTrackerStore}
 import com.digitalasset.canton.time.{Clock, DomainTimeTracker}
 import com.digitalasset.canton.topology.*
@@ -195,7 +181,7 @@ class SequencerRuntime(
     } yield ()
   }
 
-  protected val sequencerDomainParamsLookup
+  private val sequencerDomainParamsLookup
       : DynamicDomainParametersLookup[SequencerDomainParameters] =
     DomainParametersLookup.forSequencerDomainParameters(
       staticDomainParameters,
@@ -213,7 +199,6 @@ class SequencerRuntime(
     sequencerDomainParamsLookup,
     localNodeParameters,
     staticDomainParameters.protocolVersion,
-    domainTopologyManager,
     topologyStateForInitializationService,
     loggerFactory,
   )
@@ -249,7 +234,7 @@ class SequencerRuntime(
   private val authenticationServices = {
     val authenticationService = memberAuthenticationServiceFactory.createAndSubscribe(
       syncCrypto,
-      MemberAuthenticationStore(storage, timeouts, loggerFactory, closeContext),
+      new MemberAuthenticationStore(),
       // closing the subscription when the token expires will force the client to try to reconnect
       // immediately and notice it is unauthenticated, which will cause it to also start reauthenticating
       // it's important to disconnect the member AFTER we expired the token, as otherwise, the member
@@ -277,8 +262,7 @@ class SequencerRuntime(
     )
   }
 
-  def health: Future[SequencerHealthStatus] =
-    Future.successful(sequencer.getState)
+  def health: SequencerHealthStatus = sequencer.getState
 
   def topologyQueue: TopologyQueueStatus = TopologyQueueStatus(
     manager = topologyManagerStatusO.map(_.queueSize).getOrElse(0),
@@ -286,22 +270,14 @@ class SequencerRuntime(
     clients = topologyClient.numPendingChanges,
   )
 
-  def adminStatus: SequencerAdminStatus =
-    sequencer.adminStatus
+  def adminStatus: SequencerAdminStatus = sequencer.adminStatus
 
-  def fetchActiveMembers(): Future[Seq[Member]] =
-    Future.successful(sequencerService.membersWithActiveSubscriptions)
+  def fetchActiveMembers(): Seq[Member] =
+    sequencerService.membersWithActiveSubscriptions
 
   def registerAdminGrpcServices(
       register: ServerServiceDefinition => Unit
   ): Unit = {
-    register(
-      SequencerVersionServiceGrpc
-        .bindService(
-          new GrpcSequencerVersionService(staticDomainParameters.protocolVersion, loggerFactory),
-          executionContext,
-        )
-    )
     // hook for registering enterprise administration service if in an appropriate environment
     additionalAdminServiceFactory(sequencer).foreach(register)
     sequencer.adminServices.foreach(register)
@@ -322,33 +298,25 @@ class SequencerRuntime(
     )
   }
 
-  def domainServices(implicit ec: ExecutionContext): Seq[ServerServiceDefinition] = Seq(
-    {
-      ServerInterceptors.intercept(
-        v30.SequencerConnectServiceGrpc.bindService(
-          new GrpcSequencerConnectService(
-            domainId,
-            sequencerId,
-            staticDomainParameters,
-            domainTopologyManager,
-            syncCrypto,
-            loggerFactory,
-          )(
-            ec
-          ),
-          executionContext,
+  def sequencerServices(implicit ec: ExecutionContext): Seq[ServerServiceDefinition] = Seq(
+    ServerInterceptors.intercept(
+      v30.SequencerConnectServiceGrpc.bindService(
+        new GrpcSequencerConnectService(
+          domainId,
+          sequencerId,
+          staticDomainParameters,
+          domainTopologyManager,
+          syncCrypto,
+          loggerFactory,
+        )(
+          ec
         ),
-        new SequencerConnectServerInterceptor(loggerFactory),
-      )
-    }, {
-      SequencerVersionServiceGrpc.bindService(
-        new GrpcSequencerVersionService(staticDomainParameters.protocolVersion, loggerFactory),
-        ec,
-      )
-    }, {
-      v30.SequencerAuthenticationServiceGrpc
-        .bindService(authenticationServices.sequencerAuthenticationService, ec)
-    }, {
+        executionContext,
+      ),
+      new SequencerConnectServerInterceptor(loggerFactory),
+    ),
+    v30.SequencerAuthenticationServiceGrpc
+      .bindService(authenticationServices.sequencerAuthenticationService, ec), {
       import scala.jdk.CollectionConverters.*
 
       // use the auth service interceptor if available
@@ -358,14 +326,13 @@ class SequencerRuntime(
         v30.SequencerServiceGrpc.bindService(sequencerService, ec),
         interceptors,
       )
-    }, {
-      ApiInfoServiceGrpc.bindService(
-        new GrpcApiInfoService(
-          CantonGrpcUtil.ApiName.SequencerPublicApi
-        ),
-        executionContext,
-      )
     },
+    ApiInfoServiceGrpc.bindService(
+      new GrpcApiInfoService(
+        CantonGrpcUtil.ApiName.SequencerPublicApi
+      ),
+      executionContext,
+    ),
   )
 
   @VisibleForTesting
@@ -395,7 +362,6 @@ class SequencerRuntime(
         case _ => Seq.empty
       }
 
-      // TODO(#18394): Batch the member registrations?
       // TODO(#18401): Change F to FUS in registerMemberInternal
       val f = possibleNewMembers
         .parTraverse_ { member =>
@@ -432,38 +398,7 @@ class SequencerRuntime(
 
   sequencer.rateLimitManager.foreach(rlm => trafficProcessor.subscribe(rlm.balanceUpdateSubscriber))
 
-  // TODO(i17434): Use topologyHandler.combineWith(trafficProcessorHandler)
-  private def handler(domainId: DomainId): UnsignedProtocolEventHandler =
-    new UnsignedProtocolEventHandler {
-      override def name: String = s"sequencer-runtime-$domainId"
-
-      override def subscriptionStartsAt(
-          start: SubscriptionStart,
-          domainTimeTracker: DomainTimeTracker,
-      )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-        Seq(
-          topologyProcessor.subscriptionStartsAt(start, domainTimeTracker),
-          trafficProcessor.subscriptionStartsAt(start),
-        ).sequence_
-
-      override def apply(
-          tracedEvents: BoxedEnvelope[UnsignedEnvelopeBox, DefaultOpenEnvelope]
-      ): HandlerResult =
-        tracedEvents.withTraceContext { implicit traceContext => events =>
-          NonEmpty.from(events).fold(HandlerResult.done)(handle)
-        }
-
-      private def handle(tracedEvents: NonEmpty[Seq[Traced[SequencedEvent[DefaultOpenEnvelope]]]])(
-          implicit traceContext: TraceContext
-      ): HandlerResult = {
-        for {
-          topology <- topologyHandler(Traced(tracedEvents))
-          _ <- trafficProcessor.handle(tracedEvents)
-        } yield topology
-      }
-    }
-
-  private val eventHandler = StripSignature(handler(domainId))
+  private val eventHandler = StripSignature(topologyHandler.combineWith(trafficProcessor))
 
   private val sequencerAdministrationService =
     new GrpcSequencerAdministrationService(
@@ -476,7 +411,7 @@ class SequencerRuntime(
       loggerFactory,
     )
 
-  def initializeAll()(implicit traceContext: TraceContext): EitherT[Future, String, Unit] = {
+  def initializeAll()(implicit traceContext: TraceContext): EitherT[Future, String, Unit] =
     for {
       _ <- initialize()
       _ = logger.debug("Subscribing topology client within sequencer runtime")
@@ -498,9 +433,8 @@ class SequencerRuntime(
       logger.info("Sequencer runtime initialized")
       runtimeReadyPromise.outcome(())
     }
-  }
 
-  override def onClosed(): Unit = {
+  override def onClosed(): Unit =
     Lifecycle.close(
       Lifecycle.toCloseableOption(sequencer.rateLimitManager),
       timeTracker,
@@ -513,5 +447,4 @@ class SequencerRuntime(
       authenticationServices.memberAuthenticationService,
       sequencer,
     )(logger)
-  }
 }

@@ -160,7 +160,7 @@ abstract class MultiDomainAcsStoreTest[
       paymentRequest: AppPaymentRequest.ContractId,
   ) =
     contract(
-      identifier = TransferInProgress.TEMPLATE_ID,
+      identifier = TransferInProgress.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new TransferInProgress.ContractId(s"#$i"),
       payload = new TransferInProgress(
         new Group(
@@ -706,7 +706,7 @@ abstract class MultiDomainAcsStoreTest[
         results <- store.listContracts(AppRewardCoupon.COMPANION)
         _ = results should have size 4
         _ = forExactly(2, results) { c =>
-          c.contract.identifier.getPackageId shouldBe AppRewardCoupon.TEMPLATE_ID.getPackageId
+          c.contract.identifier.getPackageId shouldBe AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID.getPackageId
         }
         _ = forExactly(2, results) { c =>
           c.contract.identifier.getPackageId shouldBe upgradedPackageId

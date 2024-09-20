@@ -64,7 +64,7 @@ class TransactionTreeExtensionsTest extends AnyWordSpec with BaseTest {
         )
 
       val expectedContract = Contract(
-        fakeCompanion.TEMPLATE_ID,
+        fakeCompanion.getTemplateIdWithPackageId,
         new jcg.ContractId(c.getContractId),
         FakeTpl(),
         c.getCreatedEventBlob,

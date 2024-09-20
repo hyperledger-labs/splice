@@ -5,6 +5,7 @@ package com.digitalasset.canton.domain.sequencing.service
 
 import cats.data.EitherT
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -176,7 +177,6 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
       sequencerSubscriptionFactory,
       domainParamsLookup,
       params,
-      mockDomainTopologyManager,
       topologyStateForInitializationService,
       BaseTest.testedProtocolVersion,
     )
@@ -221,6 +221,10 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
             )
         )
       )
+    override def logout(
+        request: v30.SequencerAuthentication.LogoutRequest
+    ): Future[v30.SequencerAuthentication.LogoutResponse] =
+      Future.successful(v30.SequencerAuthentication.LogoutResponse())
   }
   private val serverPort = UniquePortGenerator.next
   logger.debug(s"Using port $serverPort for integration test")
@@ -263,7 +267,7 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
         CommonMockMetrics.sequencerClient,
         LoggingConfig(),
         loggerFactory,
-        ProtocolVersionCompatibility.supportedProtocolsParticipant(
+        ProtocolVersionCompatibility.supportedProtocols(
           includeAlphaVersions = BaseTest.testedProtocolVersion.isAlpha,
           includeBetaVersions = BaseTest.testedProtocolVersion.isBeta,
           release = ReleaseVersion.current,
@@ -308,7 +312,7 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
   def mockSubscription(
       subscribeCallback: Unit => Unit = _ => (),
       unsubscribeCallback: Unit => Unit = _ => (),
-  ): Unit = {
+  ): Unit =
     // when a subscription is made resolve the subscribe promise
     // return to caller a subscription that will resolve the unsubscribe promise on close
     when(
@@ -337,7 +341,6 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
           }
         }
       }
-  }
 }
 
 class GrpcSequencerIntegrationTest
@@ -391,7 +394,7 @@ class GrpcSequencerIntegrationTest
         .thenReturn(EitherT.pure[FutureUnlessShutdown, SendAsyncError](()))
       when(env.sequencer.sendAsyncSigned(any[SignedContent[SubmissionRequest]])(anyTraceContext))
         .thenReturn(EitherT.pure[FutureUnlessShutdown, SendAsyncError](()))
-
+      implicit val metricsContext: MetricsContext = MetricsContext.Empty
       val result = for {
         response <- env.client
           .sendAsync(

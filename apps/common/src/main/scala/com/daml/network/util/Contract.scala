@@ -128,7 +128,12 @@ object Contract {
       decoder: TemplateJsonDecoder
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     val contractId = companion.toContractId(new ContractId[T](contract.contractId))
-    fromHttp(companion.TEMPLATE_ID, contractId, decoder.decodeTemplate(companion), contract)
+    fromHttp(
+      companion.getTemplateIdWithPackageId,
+      contractId,
+      decoder.decodeTemplate(companion),
+      contract,
+    )
   }
 
   def fromHttp[ICid <: ContractId[Marker], Marker, View <: DamlRecord[?]](
@@ -138,7 +143,7 @@ object Contract {
   ): Either[ProtoDeserializationError, Contract[ICid, View]] = {
     val contractId = interfaceCompanion.toContractId(new ContractId[Marker](contract.contractId))
     fromHttp(
-      interfaceCompanion.TEMPLATE_ID,
+      interfaceCompanion.getTemplateIdWithPackageId,
       contractId,
       decoder.decodeInterface(interfaceCompanion),
       contract,

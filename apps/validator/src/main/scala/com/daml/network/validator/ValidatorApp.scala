@@ -255,8 +255,8 @@ class ValidatorApp(
                     nodeIdentitiesDump <- ParticipantInitializer.getDump(
                       participantBootstrappingConfig
                     )
-                    (_, _) <- (
-                      setupDarsForAcsImport(participantAdminConnection),
+                    _ <- setupDarsForAcsImport(participantAdminConnection)
+                    _ <-
                       participantPartyMigrator
                         .migrate(
                           nodeIdentitiesDump,
@@ -278,8 +278,7 @@ class ValidatorApp(
                             DarResources.amuletNameService.bootstrap,
                           ),
                           partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
-                        ),
-                    ).tupled
+                        )
                   } yield ()
                 }
               case (Some(_), None) =>
@@ -412,6 +411,7 @@ class ValidatorApp(
           retryProvider,
           logger,
           CommandPriority.High,
+          RetryFor.WaitingOnInitDependency,
         )
     } yield {
       logger.info(
@@ -789,6 +789,7 @@ class ValidatorApp(
           retryProvider,
           logger,
           CommandPriority.High,
+          RetryFor.WaitingOnInitDependency,
         )
       }
       _ <- appInitStep(s"Ensure validator is onboarded") {

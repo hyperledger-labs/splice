@@ -6,9 +6,9 @@ package com.digitalasset.canton.platform.apiserver
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.tracing.Telemetry
+import com.digitalasset.canton.auth.Authorizer
 import com.digitalasset.canton.config
 import com.digitalasset.canton.ledger.api.SubmissionIdGenerator
-import com.digitalasset.canton.ledger.api.auth.Authorizer
 import com.digitalasset.canton.ledger.api.auth.services.*
 import com.digitalasset.canton.ledger.api.grpc.GrpcHealthService
 import com.digitalasset.canton.ledger.api.health.HealthChecks
@@ -81,7 +81,6 @@ object ApiServices {
       partyRecordStore: PartyRecordStore,
       authorizer: Authorizer,
       engine: Engine,
-      authorityResolver: AuthorityResolver,
       timeProvider: TimeProvider,
       timeProviderType: TimeProviderType,
       submissionTracker: SubmissionTracker,
@@ -312,7 +311,6 @@ object ApiServices {
             participantId,
             writeService,
             contractStore,
-            authorityResolver,
             authenticateContract,
             metrics,
             engineLoggingConfig,

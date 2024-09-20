@@ -12,8 +12,8 @@ import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting

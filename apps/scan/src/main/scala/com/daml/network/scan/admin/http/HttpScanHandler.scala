@@ -227,7 +227,7 @@ class HttpScanHandler(
           body.cachedAmuletRulesContractId match {
             case Some(cachedContractId) if cachedContractId == amuletRules.contractId.contractId =>
               logger.debug(
-                show"Not sending ${PrettyContractId(AmuletRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+                show"Not sending ${PrettyContractId(AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID, cachedContractId)}, as it is cached by the client."
               )
               None
             case Some(_) // else: amulet rules are cached but outdated.
@@ -260,7 +260,7 @@ class HttpScanHandler(
           body.cachedAnsRulesContractId match {
             case Some(cachedContractId) if cachedContractId == ansRules.contractId.contractId =>
               logger.debug(
-                show"Not sending ${PrettyContractId(ansCodegen.AnsRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+                show"Not sending ${PrettyContractId(ansCodegen.AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID, cachedContractId)}, as it is cached by the client."
               )
               None
             case Some(_) | None =>

@@ -3,13 +3,11 @@
 
 package com.daml.network.auth
 
-import com.daml.jwt.JwtDecoder
-import com.daml.jwt.domain.Jwt
+import com.daml.jwt.{AuthServiceJWTCodec, Jwt, JwtDecoder, StandardJWTPayload}
 import org.apache.pekko.actor.ActorSystem
 import com.daml.network.auth.OAuthApi.TokenResponse
 import com.daml.network.config.AuthTokenSourceConfig
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.api.auth.AuthServiceJWTCodec
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -39,7 +37,11 @@ object AuthToken {
       // AuthServiceJWTCodec.readPayload() guesses the token format, but only works if audience-based tokens
       // use the default ledger API audience prefix.
       payload <- Try(AuthServiceJWTCodec.readAudienceBasedToken(json)).toOption
-    } yield payload.userId
+    } yield {
+      payload match {
+        case standard: StandardJWTPayload => standard.userId
+      }
+    }
   }
 }
 

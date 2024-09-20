@@ -1,7 +1,5 @@
 package com.daml.network.util
 
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.ledger.api.v2.ParticipantOffsetOuterClass.ParticipantOffset as ledgerApiParticipantOffset
 import com.daml.ledger.javaapi.data.{
   Bool,
   ContractId,
@@ -21,7 +19,6 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   Unit,
   Variant,
-  ParticipantOffset as javaApiParticipantOffset,
 }
 import com.daml.network.console.{ScanAppClientReference, SvAppBackendReference}
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
@@ -57,7 +54,7 @@ import org.scalactic.{Equality, Prettifier}
 trait UpdateHistoryComparator extends TestCommon {
 
   def compareHistoryViaScanApi(
-      ledgerBegin: ParticipantOffset,
+      ledgerBegin: String,
       svAppBackend: SvAppBackendReference,
       scanClient: ScanAppClientReference,
   ) = {
@@ -68,8 +65,8 @@ trait UpdateHistoryComparator extends TestCommon {
       .trees(
         partyIds = Set(dsoParty),
         completeAfter = Int.MaxValue,
-        beginOffset = ledgerBegin,
-        endOffset = Some(ledgerEnd),
+        beginOffsetExclusive = ledgerBegin,
+        endOffsetInclusive = ledgerEnd,
         verbose = false,
       )
       .map {
@@ -177,8 +174,13 @@ trait UpdateHistoryComparator extends TestCommon {
             )
           ) =>
         compare(
-          Seq(left.updateId, left.offset, left.recordTime, left.event),
-          Seq(updateId, offset, CantonTimestamp.tryFromInstant(Instant.parse(recordTime)), event),
+          Seq[Any](left.updateId, left.offset, left.recordTime, left.event),
+          Seq[Any](
+            updateId,
+            offset,
+            CantonTimestamp.tryFromInstant(Instant.parse(recordTime)),
+            event,
+          ),
         )
       case _ => MatchResult(false, s"Left was a reassignment, but right was: $right", "")
     }
@@ -552,8 +554,6 @@ trait UpdateHistoryComparator extends TestCommon {
         MatchResult(false, "Left was an exercisedEvent, but Right was a createdEvent", "")
       case (l: Assign, r: definitions.UpdateHistoryReassignment.Event) => compare(l, r)
       case (l: Unassign, r: definitions.UpdateHistoryReassignment.Event) => compare(l, r)
-      case (l: javaApiParticipantOffset, right: String) => compare(l.toProto, right)
-      case (l: ledgerApiParticipantOffset, right: String) => compare(l.getAbsolute, right)
       // We explicitly list types that we want compared by ==, in order to easily catch unexpected comparisons
       case (l: Boolean, r: Boolean) => equalityCompare(l, r)
       case (l: String, r: String) => equalityCompare(l, r)

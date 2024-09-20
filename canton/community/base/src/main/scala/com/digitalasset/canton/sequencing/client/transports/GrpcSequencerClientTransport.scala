@@ -38,7 +38,7 @@ import com.digitalasset.canton.util.EitherTUtil.syntax.*
 import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Context.CancellableContext
-import io.grpc.{CallOptions, Context, ManagedChannel}
+import io.grpc.{CallOptions, Context, ManagedChannel, Status}
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -58,6 +58,9 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
     materializer: Materializer,
 ) extends SequencerClientTransportCommon
     with NamedLogging {
+
+  override def logout(): EitherT[FutureUnlessShutdown, Status, Unit] =
+    clientAuth.logout()
 
   protected val sequencerServiceClient: SequencerServiceStub = clientAuth(
     new SequencerServiceStub(channel, options = callOptions)
@@ -80,7 +83,7 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
       timeout: Duration,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit] =
     sendInternal(
       stub =>
         stub.sendAsyncVersioned(
@@ -91,7 +94,6 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
       timeout,
       SendAsyncVersionedResponse.fromProtoV30,
     )
-  }
 
   private def sendInternal[Resp](
       send: SequencerServiceStub => Future[Resp],
@@ -124,7 +126,7 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
   private def fromResponse[Proto](
       p: Proto,
       deserializer: Proto => ParsingResult[SendAsyncVersionedResponse],
-  ): Either[SendAsyncClientResponseError, Unit] = {
+  ): Either[SendAsyncClientResponseError, Unit] =
     for {
       response <- deserializer(p)
         .leftMap[SendAsyncClientResponseError](err =>
@@ -132,7 +134,6 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
         )
       _ <- response.error.toLeft(()).leftMap(SendAsyncClientError.RequestRefused)
     } yield ()
-  }
 
   private def fromGrpcError(error: GrpcError, messageId: MessageId)(implicit
       traceContext: TraceContext

@@ -19,7 +19,7 @@ object GroupAddressResolver {
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[Map[GroupRecipient, Set[Member]]] = {
+  ): Future[Map[GroupRecipient, Set[Member]]] =
     if (groupRecipients.isEmpty) Future.successful(Map.empty)
     else
       for {
@@ -30,11 +30,9 @@ object GroupAddressResolver {
           if (parties.isEmpty)
             Future.successful(Map.empty[GroupRecipient, Set[Member]])
           else
-            for {
-              mapping <-
-                topologyOrSequencingSnapshot
-                  .activeParticipantsOfParties(parties.toSeq)
-            } yield asGroupRecipientsToMembers(mapping)
+            topologyOrSequencingSnapshot
+              .activeParticipantsOfParties(parties.toSeq)
+              .map(asGroupRecipientsToMembers)
         }
         mediatorGroupByMember <- {
           val mediatorGroups = groupRecipients.collect { case MediatorGroupRecipient(group) =>
@@ -68,7 +66,7 @@ object GroupAddressResolver {
                 topologyOrSequencingSnapshot
                   .sequencerGroup()
                   .map(
-                    _.map(group => (group.active.forgetNE ++ group.passive).toSet[Member])
+                    _.map(group => (group.active ++ group.passive).toSet[Member])
                       .getOrElse(Set.empty[Member])
                   )
             } yield Map((SequencersOfDomain: GroupRecipient) -> sequencers)
@@ -76,25 +74,23 @@ object GroupAddressResolver {
             Future.successful(Map.empty[GroupRecipient, Set[Member]])
         }
       } yield participantsOfParty ++ mediatorGroupByMember ++ sequencersOfDomain ++ allRecipients
-  }
 
   def asGroupRecipientsToMembers(
       groups: Seq[MediatorGroup]
   ): Map[GroupRecipient, Set[Member]] =
     groups
       .map(group =>
-        MediatorGroupRecipient(group.index) -> (group.active.forgetNE ++ group.passive)
+        MediatorGroupRecipient(group.index) -> (group.active ++ group.passive)
           .toSet[Member]
       )
       .toMap[GroupRecipient, Set[Member]]
 
   def asGroupRecipientsToMembers(
       mapping: Map[LfPartyId, Set[ParticipantId]]
-  ): Map[GroupRecipient, Set[Member]] = {
+  ): Map[GroupRecipient, Set[Member]] =
     mapping.map[GroupRecipient, Set[Member]] { case (party, participants) =>
       ParticipantsOfParty(
         PartyId.tryFromLfParty(party)
       ) -> participants.toSet[Member]
     }
-  }
 }

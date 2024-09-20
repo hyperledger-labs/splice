@@ -59,36 +59,6 @@ class TransactionViewDecompositionTest
 
   "A view decomposition" when {
     import ExampleTransactionFactory.*
-    "a view has the same informees and thresholds as its parent" can {
-      "not be constructed" in {
-
-        val node = createNode(unsuffixedId(0))
-        val informees =
-          Map(signatory -> NonNegativeInt.one)
-        val rootSeed = ExampleTransactionFactory.lfHash(-1)
-        val viewConfirmationParameters =
-          ViewConfirmationParameters.create(informees, NonNegativeInt.one)
-        val child =
-          NewView(
-            node,
-            viewConfirmationParameters,
-            Some(rootSeed),
-            LfNodeId(0),
-            Seq.empty,
-            RollbackContext.empty,
-          )
-
-        an[IllegalArgumentException] should be thrownBy
-          NewView(
-            node,
-            viewConfirmationParameters,
-            Some(rootSeed),
-            LfNodeId(0),
-            Seq(child),
-            RollbackContext.empty,
-          )
-      }
-    }
 
     "there are lots of top-level nodes" can {
       "be constructed without stack overflow" in {
@@ -243,7 +213,7 @@ class TransactionViewDecompositionTest
 
   private def toWellFormedUnsuffixedTransaction(
       tx: LfVersionedTransaction
-  ): WellFormedTransaction[WithoutSuffixes] = {
+  ): WellFormedTransaction[WithoutSuffixes] =
     WellFormedTransaction
       .normalizeAndCheck(
         tx,
@@ -255,7 +225,6 @@ class TransactionViewDecompositionTest
         WithoutSuffixes,
       )
       .value
-  }
 
 }
 
@@ -277,7 +246,7 @@ object RollbackDecomposition {
     */
   def rollbackDecomposition(
       decompositions: Seq[TransactionViewDecomposition]
-  ): List[RollbackDecomposition] = {
+  ): List[RollbackDecomposition] =
     decompositions
       .map[RollbackDecomposition] {
         case view: NewView =>
@@ -290,7 +259,6 @@ object RollbackDecomposition {
           RbSameTree(view.rbContext.enterRollback.rollbackScope.toList)
       }
       .toList
-  }
 
   def rbScope(rollbackScope: RollbackSibling*): RollbackScope = rollbackScope.toList
 

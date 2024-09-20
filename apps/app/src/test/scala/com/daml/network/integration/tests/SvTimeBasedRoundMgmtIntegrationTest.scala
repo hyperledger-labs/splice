@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.sv.util.SvUtil
@@ -55,17 +54,14 @@ class SvTimeBasedRoundMgmtIntegrationTest
     eventually() {
       // Check for closing mining round in transactions instead of acs
       // to guard against automation archiving it concurrently.
+      val ledgerEnd = sv1Backend.participantClientWithAdminToken.ledger_api.state.end()
       val transactions =
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.transactions
           .treesJava(
             Set(dsoParty),
             completeAfter = Int.MaxValue,
             beginOffset = offsetBefore,
-            endOffset = Some(
-              new ParticipantOffset().withBoundary(
-                ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_END
-              )
-            ),
+            endOffset = Some(ledgerEnd),
           )
       val rounds =
         transactions.flatMap(

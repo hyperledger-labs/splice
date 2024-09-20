@@ -96,7 +96,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         secret,
         Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
       )
-    val templateId = vo.ValidatorOnboarding.TEMPLATE_ID
+    val templateId = vo.ValidatorOnboarding.TEMPLATE_ID_WITH_PACKAGE_ID
 
     contract(
       identifier = templateId,
@@ -109,7 +109,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
     val template =
       new UsedSecret(storeSvParty.toProtoPrimitive, secret, storeSvParty.toProtoPrimitive)
 
-    val templateId = vo.UsedSecret.TEMPLATE_ID
+    val templateId = vo.UsedSecret.TEMPLATE_ID_WITH_PACKAGE_ID
 
     contract(
       templateId,

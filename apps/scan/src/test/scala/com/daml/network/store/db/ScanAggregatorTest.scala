@@ -705,7 +705,7 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(party, 0),
         mkTransferResult(
@@ -755,7 +755,7 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(rewardedParty, 0),
         mkTransferResult(
@@ -784,7 +784,7 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(rewardedParty, 0),
         mkTransferResult(

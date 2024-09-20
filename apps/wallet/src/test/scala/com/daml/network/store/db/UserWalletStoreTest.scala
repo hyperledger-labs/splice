@@ -961,7 +961,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   private def time(n: Long) = CantonTimestamp.ofEpochSecond(n)
 
   private def walletInstall(endUserParty: PartyId) = {
-    val templateId = installCodegen.WalletAppInstall.TEMPLATE_ID
+    val templateId = installCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new installCodegen.WalletAppInstall(
       dsoParty.toProtoPrimitive,
       validator.toProtoPrimitive,
@@ -985,7 +985,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId: transferOffersCodegen.TransferOffer.ContractId =
         new transferOffersCodegen.TransferOffer.ContractId(nextCid()),
   ) = {
-    val templateId = transferOffersCodegen.TransferOffer.TEMPLATE_ID
+    val templateId = transferOffersCodegen.TransferOffer.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new transferOffersCodegen.TransferOffer(
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
@@ -1011,7 +1011,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       trackingId: String = UUID.randomUUID().toString,
       cid: String = nextCid(),
   ) = {
-    val templateId = transferOffersCodegen.AcceptedTransferOffer.TEMPLATE_ID
+    val templateId = transferOffersCodegen.AcceptedTransferOffer.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new transferOffersCodegen.AcceptedTransferOffer(
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
@@ -1036,7 +1036,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       trackingId: String,
       cid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
   ) = {
-    val templateId = trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID
+    val templateId = trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new trafficRequestCodegen.BuyTrafficRequest(
       dsoParty.toProtoPrimitive,
       buyer.toProtoPrimitive,
@@ -1062,7 +1062,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       expiresAt: CantonTimestamp,
       description: String,
   ) = {
-    val templateId = paymentCodegen.AppPaymentRequest.TEMPLATE_ID
+    val templateId = paymentCodegen.AppPaymentRequest.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new paymentCodegen.AppPaymentRequest(
       sender.toProtoPrimitive,
       java.util.List.of(
@@ -1088,7 +1088,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       provider: PartyId,
       reference: subsCodegen.SubscriptionRequest.ContractId,
   ) = {
-    val templateId = subsCodegen.Subscription.TEMPLATE_ID
+    val templateId = subsCodegen.Subscription.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new subsCodegen.Subscription(
       new subsCodegen.SubscriptionData(
         user.toProtoPrimitive,
@@ -1111,7 +1111,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       payData: subsCodegen.SubscriptionPayData,
       nextPaymentDueAt: CantonTimestamp,
   ) = {
-    val templateId = subsCodegen.SubscriptionIdleState.TEMPLATE_ID
+    val templateId = subsCodegen.SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new subsCodegen.SubscriptionIdleState(
       subscriptionContract.contractId,
       subscriptionContract.payload.subscriptionData,
@@ -1133,7 +1133,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       lockedAmuletCid: amuletCodegen.LockedAmulet.ContractId,
       round: Long,
   ) = {
-    val templateId = subsCodegen.SubscriptionPayment.TEMPLATE_ID
+    val templateId = subsCodegen.SubscriptionPayment.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new subsCodegen.SubscriptionPayment(
       subscription.contractId,
       subscription.payload.subscriptionData,
@@ -1206,7 +1206,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       subscriptionData: subsCodegen.SubscriptionData,
       payData: subsCodegen.SubscriptionPayData,
   ) = {
-    val templateId = subsCodegen.SubscriptionRequest.TEMPLATE_ID
+    val templateId = subsCodegen.SubscriptionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new subsCodegen.SubscriptionRequest(
       subscriptionData,
       payData,
@@ -1225,7 +1225,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       entryUrl: String = "https://ans-entry-url.com",
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = ansCodegen.AnsEntry.TEMPLATE_ID
+    val templateId = ansCodegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new ansCodegen.AnsEntry(
       user.toProtoPrimitive,
       provider.toProtoPrimitive,
@@ -1248,7 +1248,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       entryUrl: String = "https://ans-entry-url.com",
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = ansCodegen.AnsEntryContext.TEMPLATE_ID
+    val templateId = ansCodegen.AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new ansCodegen.AnsEntryContext(
       dsoParty.toProtoPrimitive,
       user.toProtoPrimitive,
@@ -1284,7 +1284,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         amuletRulesCid,
-        amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
+        amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
         None,
         amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_Mint.name,
         consuming = false,
@@ -1320,7 +1320,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         walletAppInstallCid,
-        installCodegen.WalletAppInstall.TEMPLATE_ID,
+        installCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID,
         None,
         installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_CreateTransferOffer.name,
         consuming = false,
@@ -1369,7 +1369,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         walletAppInstallCid,
-        transferOffersCodegen.TransferOffer.TEMPLATE_ID,
+        transferOffersCodegen.TransferOffer.TEMPLATE_ID_WITH_PACKAGE_ID,
         None,
         transferOffersCodegen.TransferOffer.CHOICE_TransferOffer_Accept.name,
         consuming = false,
@@ -1411,7 +1411,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         walletAppInstallCid,
-        installCodegen.WalletAppInstall.TEMPLATE_ID,
+        installCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID,
         None,
         installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_CreateBuyTrafficRequest.name,
         consuming = false,
@@ -1456,7 +1456,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         requestCid,
-        trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID,
+        trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
         None,
         trafficRequestCodegen.BuyTrafficRequest.CHOICE_BuyTrafficRequest_Cancel.name,
         consuming = false,

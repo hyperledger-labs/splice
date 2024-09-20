@@ -21,6 +21,22 @@ object ForceFlag {
   case object LedgerTimeRecordTimeToleranceIncrease
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_LEDGER_TIME_RECORD_TIME_TOLERANCE_INCREASE)
 
+  case object AllowUnvetPackage extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVET_PACKAGE)
+
+  case object AllowUnvetPackageWithActiveContracts
+      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVET_PACKAGE_WITH_ACTIVE_CONTRACTS)
+
+  case object AllowUnknownPackage extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNKNOWN_PACKAGE)
+
+  case object AllowUnvettedDependencies
+      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVETTED_DEPENDENCIES)
+
+  case object DisablePartyWithActiveContracts
+      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_DISABLE_PARTY_WITH_ACTIVE_CONTRACTS)
+
+  case object AllowUnvalidatedSigningKeys
+      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVALIDATED_SIGNING_KEYS)
+
   /** This should only be used internally in situations where
     * <ul>
     *   <li>the caller knows what they are doing</li>
@@ -29,7 +45,16 @@ object ForceFlag {
     * </ul>
     */
   val all: Map[v30.ForceFlag, ForceFlag] =
-    Seq[ForceFlag](AlienMember, LedgerTimeRecordTimeToleranceIncrease)
+    Seq[ForceFlag](
+      AlienMember,
+      LedgerTimeRecordTimeToleranceIncrease,
+      AllowUnvetPackage,
+      AllowUnknownPackage,
+      AllowUnvettedDependencies,
+      DisablePartyWithActiveContracts,
+      AllowUnvalidatedSigningKeys,
+      AllowUnvetPackageWithActiveContracts,
+    )
       .map(ff => ff.toProtoV30 -> ff)
       .toMap
 

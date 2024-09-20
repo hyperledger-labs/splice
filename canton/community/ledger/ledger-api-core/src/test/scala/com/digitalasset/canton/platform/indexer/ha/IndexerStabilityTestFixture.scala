@@ -1,6 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+/* TODO(i18695): fix
 package com.digitalasset.canton.platform.indexer.ha
 
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
@@ -32,8 +35,8 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
 /** Stores a running indexer and the read service the indexer is reading from.
-  * The read service is used exclusively by this indexer.
-  */
+ * The read service is used exclusively by this indexer.
+ */
 final case class ReadServiceAndIndexer(
     readService: EndlessReadService,
     indexing: ReportsHealth,
@@ -62,14 +65,13 @@ final class IndexerStabilityTestFixture(loggerFactory: NamedLoggerFactory) {
       lockIdSeed: Int,
       materializer: Materializer,
   ): ResourceOwner[Indexers] = new ResourceOwner[Indexers] {
-    override def acquire()(implicit context: ResourceContext): Resource[Indexers] = {
+    override def acquire()(implicit context: ResourceContext): Resource[Indexers] =
       createIndexers(
         updatesPerSecond = updatesPerSecond,
         indexerCount = indexerCount,
         jdbcUrl = jdbcUrl,
         lockIdSeed = lockIdSeed,
       )(context, materializer)
-    }
   }
 
   private def createIndexers(
@@ -175,3 +177,4 @@ final class IndexerStabilityTestFixture(loggerFactory: NamedLoggerFactory) {
     }
   }
 }
+ */

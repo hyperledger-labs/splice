@@ -7,7 +7,6 @@ import cats.syntax.bifunctor.toBifunctorOps
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.completion.Completion
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.FinalReason
 import com.digitalasset.canton.ledger.participant.state.{
@@ -66,6 +65,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -163,7 +163,7 @@ class InMemoryStateUpdaterSpec
   }
 
   "update" should "update the in-memory state" in new Scope {
-    InMemoryStateUpdater.update(inMemoryState, logger)(prepareResult)
+    InMemoryStateUpdater.update(inMemoryState, logger)(prepareResult, false)
 
     // TODO(i12283) LLP: Unit test contract state event conversion and cache updating
 
@@ -195,15 +195,46 @@ class InMemoryStateUpdaterSpec
     inOrder.verifyNoMoreInteractions()
   }
 
+  "update" should "update the in-memory state, but not the ledger-end and the dispatcher in repair mode" in new Scope {
+    InMemoryStateUpdater.update(inMemoryState, logger)(prepareResult, true)
+
+    // TODO(i12283) LLP: Unit test contract state event conversion and cache updating
+
+    inOrder
+      .verify(inMemoryFanoutBuffer)
+      .push(
+        tx_accepted_withCompletionDetails_offset,
+        tx_accepted_withCompletionDetails,
+      )
+    inOrder
+      .verify(inMemoryFanoutBuffer)
+      .push(tx_accepted_withoutCompletionDetails_offset, tx_accepted_withoutCompletionDetails)
+    inOrder.verify(inMemoryFanoutBuffer).push(tx_rejected_offset, tx_rejected)
+
+    inOrder
+      .verify(submissionTracker)
+      .onCompletion(
+        tx_accepted_completionDetails.completionStreamResponse -> tx_accepted_submitters
+      )
+
+    inOrder
+      .verify(submissionTracker)
+      .onCompletion(
+        tx_rejected_completionDetails.completionStreamResponse -> tx_rejected_submitters
+      )
+
+    inOrder.verifyNoMoreInteractions()
+  }
+
   "updateOffsetCheckpointCacheFlowWithTickingSource" should "not alter the original flow" in new Scope {
     implicit val ec: ExecutionContext = executorService
 
     // here we define the offset, domainId and recordTime for each offset-update pair the same way they arrive to the flow as Some values
     // the None values denote the ticks arrived that are used to update the offset checkpoint cache
     val offsetsAndTicks =
-      Seq(None, Some(1L), Some(2L), None, None, Some(3L), Some(4L), Some(5L), None, Some(6L), None)
+      Seq(Some(1L), Some(2L), None, None, Some(3L), Some(4L), Some(5L), None, Some(6L), None)
     val domainIdsAndTicks =
-      Seq(None, Some(1L), Some(2L), None, None, Some(2L), Some(1L), Some(3L), None, Some(1L), None)
+      Seq(Some(1L), Some(2L), None, None, Some(2L), Some(1L), Some(3L), None, Some(1L), None)
     val recordTimesAndTicks = offsetsAndTicks
 
     val offsetCheckpointsExpected =
@@ -227,14 +258,14 @@ class InMemoryStateUpdaterSpec
           2 -> 3,
           3 -> 5,
         ),
-      ).map({ case (offset, domainTimesRaw) =>
+      ).map { case (offset, domainTimesRaw) =>
         OffsetCheckpoint(
           offset = Offset.fromLong(offset.toLong),
-          domainTimes = domainTimesRaw.map({ case (d, t) =>
+          domainTimes = domainTimesRaw.map { case (d, t) =>
             DomainId.tryFromString(d.toString + "::default") -> Timestamp(t.toLong)
-          }),
+          },
         )
-      })
+      }
 
     val input = createInputSeq(
       offsetsAndTicks,
@@ -270,7 +301,7 @@ object InMemoryStateUpdaterSpec {
 
     val cacheUpdates = ArrayBuffer.empty[PrepareResult]
     val cachesUpdateCaptor =
-      (v: PrepareResult) => cacheUpdates.addOne(v).pipe(_ => ())
+      (v: PrepareResult, _: Boolean) => cacheUpdates.addOne(v).pipe(_ => ())
 
     val inMemoryStateUpdater = InMemoryStateUpdaterFlow(
       prepareUpdatesParallelism = 2,
@@ -316,7 +347,7 @@ object InMemoryStateUpdaterSpec {
           reassignmentCounter = 15L,
           hostedStakeholders = party2 :: Nil,
           unassignId = CantonTimestamp.assertFromLong(155555L),
-          isTransferringParticipant = true,
+          isReassigningParticipant = true,
         ),
         reassignment = TransactionLogUpdate.ReassignmentAccepted.Assigned(
           CreatedEvent(
@@ -364,7 +395,7 @@ object InMemoryStateUpdaterSpec {
           reassignmentCounter = 15L,
           hostedStakeholders = party1 :: Nil,
           unassignId = CantonTimestamp.assertFromLong(1555551L),
-          isTransferringParticipant = true,
+          isReassigningParticipant = true,
         ),
         reassignment = TransactionLogUpdate.ReassignmentAccepted.Unassigned(
           Reassignment.Unassign(
@@ -430,15 +461,17 @@ object InMemoryStateUpdaterSpec {
       tx_accepted_completion.copy(updateId = tx_rejected_transactionId)
     val tx_accepted_completionDetails: TransactionLogUpdate.CompletionDetails =
       TransactionLogUpdate.CompletionDetails(
-        completionStreamResponse =
-          CompletionStreamResponse(completion = Some(tx_accepted_completion)),
+        completionStreamResponse = CompletionStreamResponse(completionResponse =
+          CompletionStreamResponse.CompletionResponse.Completion(tx_accepted_completion)
+        ),
         submitters = tx_accepted_submitters,
       )
 
     val tx_rejected_completionDetails: TransactionLogUpdate.CompletionDetails =
       TransactionLogUpdate.CompletionDetails(
-        completionStreamResponse =
-          CompletionStreamResponse(completion = Some(tx_rejected_completion)),
+        completionStreamResponse = CompletionStreamResponse(completionResponse =
+          CompletionStreamResponse.CompletionResponse.Completion(tx_rejected_completion)
+        ),
         submitters = tx_rejected_submitters,
       )
 
@@ -512,7 +545,7 @@ object InMemoryStateUpdaterSpec {
         input: Seq[(Vector[(Offset, Traced[Update])], Long, CantonTimestamp)]
     )(implicit mat: Materializer): Done =
       Source(input)
-        .via(inMemoryStateUpdater)
+        .via(inMemoryStateUpdater(false))
         .runWith(Sink.ignore)
         .futureValue
   }
@@ -652,7 +685,7 @@ object InMemoryStateUpdaterSpec {
         reassignmentCounter = 15L,
         hostedStakeholders = party2 :: Nil,
         unassignId = CantonTimestamp.assertFromLong(155555L),
-        isTransferringParticipant = true,
+        isReassigningParticipant = true,
       ),
       reassignment = Reassignment.Assign(
         ledgerEffectiveTime = Timestamp.assertFromLong(12222),
@@ -680,7 +713,7 @@ object InMemoryStateUpdaterSpec {
         reassignmentCounter = 15L,
         hostedStakeholders = party1 :: Nil,
         unassignId = CantonTimestamp.assertFromLong(1555551L),
-        isTransferringParticipant = true,
+        isReassigningParticipant = true,
       ),
       reassignment = Reassignment.Unassign(
         contractId = someCreateNode.coid,
@@ -808,7 +841,15 @@ object InMemoryStateUpdaterSpec {
                 hostedWitnesses = Nil,
                 contractMetadata = Map.empty,
                 domainId = domain,
-                domainIndex = None,
+                domainIndex = Some(
+                  DomainIndex.of(
+                    RequestIndex(
+                      RequestCounter(1),
+                      Some(SequencerCounter(1)),
+                      CantonTimestamp.MinValue,
+                    )
+                  )
+                ),
               )
             )
           )
@@ -825,17 +866,33 @@ object InMemoryStateUpdaterSpec {
   def runUpdateOffsetCheckpointCacheFlow(
       inputSeq: Seq[Option[(Offset, Traced[Update.TransactionAccepted])]]
   )(implicit materializer: Materializer, ec: ExecutionContext) = {
+    val elementsQueue =
+      new ConcurrentLinkedQueue[Option[(Offset, Traced[Update.TransactionAccepted])]]
+    inputSeq.foreach(elementsQueue.add)
 
     val flattenedSeq: Seq[(Vector[(Offset, Traced[Update])], Long, CantonTimestamp)] =
       inputSeq.flatten.map(Vector(_)).map((_, 1L, CantonTimestamp.MinValue))
 
-    val bufferSize = 1000
+    val bufferSize = 100
     val (sourceQueueSomes, sourceSomes) = Source
       .queue[(Vector[(Offset, Traced[Update])], Long, CantonTimestamp)](bufferSize)
       .preMaterialize()
     val (sourceQueueNones, sourceNones) = Source
       .queue[Option[Nothing]](bufferSize)
       .preMaterialize()
+
+    def offerNext() =
+      Option(elementsQueue.poll()) match {
+        // send element
+        case Some(Some(pair)) =>
+          sourceQueueSomes.offer((Vector(pair), 1L, CantonTimestamp.MinValue))
+        // send tick
+        case Some(None) =>
+          sourceQueueNones.offer(None)
+        // queue is empty send finished message
+        case None => sourceQueueSomes.complete()
+      }
+    offerNext()
 
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     var checkpoints: Seq[OffsetCheckpoint] = Seq.empty
@@ -846,24 +903,13 @@ object InMemoryStateUpdaterSpec {
           .updateOffsetCheckpointCacheFlowWithTickingSource(
             updateOffsetCheckpointCache = oc => {
               checkpoints = checkpoints :+ oc
+              offerNext()
             },
             tick = sourceNones,
           )
       )
+      .alsoTo(Sink.foreach(_ => offerNext()))
       .runWith(Sink.seq)
-
-    inputSeq
-      .foreach { x =>
-        // add delay to ensure that the order of the original sequence is preserved
-        Threading.sleep(100)
-        x match {
-          case Some(pair) =>
-            sourceQueueSomes.offer((Vector(pair), 1L, CantonTimestamp.MinValue))
-          case None =>
-            sourceQueueNones.offer(None)
-        }
-      }
-    sourceQueueSomes.complete()
 
     output.map(o => (flattenedSeq, o, checkpoints))
 

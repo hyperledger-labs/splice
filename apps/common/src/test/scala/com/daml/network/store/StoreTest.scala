@@ -7,7 +7,6 @@ import com.daml.ledger.javaapi.data.{
   DamlRecord,
   ExercisedEvent,
   Identifier,
-  ParticipantOffset,
   TransactionTree,
   TreeEvent,
   Unit as damlUnit,
@@ -114,7 +113,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       dummyDomain,
     )
   protected def amuletRules() = {
-    val templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID
+    val templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
 
     val template = new amuletrulesCodegen.AmuletRules(
       dsoParty.toProtoPrimitive,
@@ -129,7 +128,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def ansRules() = {
-    val templateId = ansCodegen.AnsRules.TEMPLATE_ID
+    val templateId = ansCodegen.AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID
 
     val template = new ansCodegen.AnsRules(
       dsoParty.toProtoPrimitive,
@@ -163,7 +162,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
 
     contract(
-      roundCodegen.OpenMiningRound.TEMPLATE_ID,
+      roundCodegen.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID,
       new roundCodegen.OpenMiningRound.ContractId(round.toString),
       template,
     )
@@ -181,7 +180,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
 
     contract(
-      roundCodegen.ClosedMiningRound.TEMPLATE_ID,
+      roundCodegen.ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID,
       new roundCodegen.ClosedMiningRound.ContractId(nextCid()),
       template,
     )
@@ -247,7 +246,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId: String = nextCid(),
   ): Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon] =
     contract(
-      identifier = amuletCodegen.AppRewardCoupon.TEMPLATE_ID,
+      identifier = amuletCodegen.AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new amuletCodegen.AppRewardCoupon.ContractId(contractId),
       payload = new amuletCodegen.AppRewardCoupon(
         dsoParty.toProtoPrimitive,
@@ -267,7 +266,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       sponsor: PartyId,
       faucetState: Option[validatorLicenseCodegen.FaucetState] = None,
   ) = {
-    val templateId = validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID
+    val templateId = validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
     val dummyVersion = "0.1.0"
     val dummyContactPoint = s"${validator.uid.identifier}@example.com"
     val template = new validatorLicenseCodegen.ValidatorLicense(
@@ -300,7 +299,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     amuletCodegen.ValidatorRewardCoupon,
   ] =
     contract(
-      identifier = amuletCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
+      identifier = amuletCodegen.ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new amuletCodegen.ValidatorRewardCoupon.ContractId(nextCid()),
       payload = new amuletCodegen.ValidatorRewardCoupon(
         dsoParty.toProtoPrimitive,
@@ -312,7 +311,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def validatorFaucetCoupon(validator: PartyId, round: Long = 1L) = {
     contract(
-      identifier = validatorLicenseCodegen.ValidatorFaucetCoupon.TEMPLATE_ID,
+      identifier = validatorLicenseCodegen.ValidatorFaucetCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new validatorLicenseCodegen.ValidatorFaucetCoupon.ContractId(nextCid()),
       payload = new validatorLicenseCodegen.ValidatorFaucetCoupon(
         dsoParty.toProtoPrimitive,
@@ -364,7 +363,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       reference,
     )
     contract(
-      subCodegen.SubscriptionInitialPayment.TEMPLATE_ID,
+      subCodegen.SubscriptionInitialPayment.TEMPLATE_ID_WITH_PACKAGE_ID,
       paymentId,
       template,
     )
@@ -376,7 +375,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ) = {
     val template = new FeaturedAppRight(dsoParty.toProtoPrimitive, providerParty.toProtoPrimitive)
     contract(
-      FeaturedAppRight.TEMPLATE_ID,
+      FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID,
       new FeaturedAppRight.ContractId(contractId),
       template,
     )
@@ -390,7 +389,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId: String = nextCid(),
   ): Contract[amuletCodegen.SvRewardCoupon.ContractId, amuletCodegen.SvRewardCoupon] =
     contract(
-      identifier = amuletCodegen.SvRewardCoupon.TEMPLATE_ID,
+      identifier = amuletCodegen.SvRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new amuletCodegen.SvRewardCoupon.ContractId(contractId),
       payload = new amuletCodegen.SvRewardCoupon(
         dsoParty.toProtoPrimitive,
@@ -407,7 +406,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId: String = nextCid(),
   ): Contract[SvRewardState.ContractId, SvRewardState] =
     contract(
-      identifier = SvRewardState.TEMPLATE_ID,
+      identifier = SvRewardState.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new SvRewardState.ContractId(contractId),
       payload = new SvRewardState(
         dsoParty.toProtoPrimitive,
@@ -466,7 +465,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
 
     contract(
-      VoteRequest.TEMPLATE_ID,
+      VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
       cid,
       template,
     )
@@ -1051,7 +1050,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ): Reassignment[T] =
     Reassignment(
       updateId = "",
-      offset = new ParticipantOffset.Absolute(offset),
+      offset = offset,
       recordTime = recordTime,
       event = event,
     )

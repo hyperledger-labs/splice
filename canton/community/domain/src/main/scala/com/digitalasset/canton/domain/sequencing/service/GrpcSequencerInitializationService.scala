@@ -53,7 +53,7 @@ class GrpcSequencerInitializationService(
 
   override def initializeSequencerFromGenesisState(
       responseObserver: StreamObserver[InitializeSequencerFromGenesisStateResponse]
-  ): StreamObserver[InitializeSequencerFromGenesisStateRequest] = {
+  ): StreamObserver[InitializeSequencerFromGenesisStateRequest] =
     GrpcStreamingUtils.streamFromClient(
       _.topologySnapshot,
       _.domainParameters,
@@ -61,7 +61,6 @@ class GrpcSequencerInitializationService(
         initializeSequencerFromGenesisState(topologySnapshot, domainParams),
       responseObserver,
     )
-  }
 
   private def initializeSequencerFromGenesisState(
       topologySnapshot: ByteString,
@@ -85,7 +84,6 @@ class GrpcSequencerInitializationService(
           )
           .leftMap(ProtoDeserializationFailure.Wrap(_))
       )
-      // TODO(i17940): Remove this when we have a method to distinguish between initialization during an upgrade and initialization during the bootstrap of a domain
       // reset effective time and sequenced time if we are initializing the sequencer from the beginning
       genesisState: StoredTopologyTransactions[TopologyChangeOp, TopologyMapping] =
         StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](
@@ -133,7 +131,7 @@ class GrpcSequencerInitializationService(
 
   override def initializeSequencerFromOnboardingState(
       responseObserver: StreamObserver[InitializeSequencerFromOnboardingStateResponse]
-  ): StreamObserver[InitializeSequencerFromOnboardingStateRequest] = {
+  ): StreamObserver[InitializeSequencerFromOnboardingStateRequest] =
     GrpcStreamingUtils.streamFromClient(
       _.onboardingState,
       _ => (),
@@ -141,7 +139,6 @@ class GrpcSequencerInitializationService(
         initializeSequencerFromOnboardingState(onboardingState),
       responseObserver,
     )
-  }
 
   private def initializeSequencerFromOnboardingState(onboardingState: ByteString) = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext

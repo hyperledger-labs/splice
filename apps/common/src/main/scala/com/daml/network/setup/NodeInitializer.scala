@@ -13,7 +13,8 @@ import com.daml.network.environment.{
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.util.PrettyInstances.prettyString
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForId}
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
+import com.digitalasset.canton.crypto.KeyPurpose
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -88,7 +89,7 @@ class NodeInitializer(
       _ <- connection.ensureInitialOwnerToKeyMapping(
         member = nodeId,
         keys = NonEmpty(Seq, signingKey, encryptionKey),
-        signedBy = namespace.fingerprint,
+        signedBy = Seq(namespace.fingerprint, signingKey.fingerprint).distinct,
         retryFor = RetryFor.Automation,
       )
     } yield {
@@ -208,7 +209,9 @@ class NodeInitializer(
                 connection.ensureInitialOwnerToKeyMapping(
                   expectedId.member,
                   keysNE.map(_.publicKey),
-                  expectedId.uid.namespace.fingerprint,
+                  (expectedId.uid.namespace.fingerprint +: keysNE
+                    .filter(_.purpose == KeyPurpose.Signing)
+                    .map(_.publicKey.fingerprint)).distinct,
                   RetryFor.Automation,
                 )
             }

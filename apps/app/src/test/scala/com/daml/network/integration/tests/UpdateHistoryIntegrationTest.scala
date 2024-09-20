@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.config.ConfigTransforms
 import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
@@ -284,7 +283,7 @@ class UpdateHistoryIntegrationTest
   private def compareHistory(
       participant: ParticipantClientReference,
       updateHistory: UpdateHistory,
-      ledgerBegin: ParticipantOffset,
+      ledgerBegin: String,
       mustIncludeReassignments: Boolean = false,
   ): Assertion = {
     val ledgerEnd = participant.ledger_api.state.end()
@@ -293,8 +292,8 @@ class UpdateHistoryIntegrationTest
       .trees(
         partyIds = Set(updateHistory.updateStreamParty),
         completeAfter = Int.MaxValue,
-        beginOffset = ledgerBegin,
-        endOffset = Some(ledgerEnd),
+        beginOffsetExclusive = ledgerBegin,
+        endOffsetInclusive = ledgerEnd,
         verbose = false,
       )
       .map {

@@ -29,9 +29,8 @@ class SymbolicPureCrypto extends CryptoPureApi {
   private val signatureCounter = new AtomicInteger
 
   @VisibleForTesting
-  def setRandomnessFlag(newValue: Boolean): Unit = {
+  def setRandomnessFlag(newValue: Boolean): Unit =
     neverRandomizeAsymmetricEncryption.set(newValue)
-  }
 
   // iv to pre-append to the asymmetric ciphertext
   private val ivForAsymmetricEncryptInBytes = 16
@@ -166,7 +165,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
       randomized = false,
     )
 
-  override protected def decryptWithInternal[M](
+  override protected[crypto] def decryptWithInternal[M](
       encrypted: AsymmetricEncrypted[M],
       privateKey: EncryptionPrivateKey,
   )(
@@ -286,7 +285,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
 
     } yield message
 
-  override protected def computeHkdfInternal(
+  override protected[crypto] def computeHkdfInternal(
       keyMaterial: ByteString,
       outputBytes: Int,
       info: HkdfInfo,
@@ -304,7 +303,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
         )
     }
 
-  override protected def hkdfExpandInternal(
+  override protected[crypto] def hkdfExpandInternal(
       keyMaterial: SecureRandomness,
       outputBytes: Int,
       info: HkdfInfo,
@@ -321,7 +320,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
   ): Either[HkdfError, SecureRandomness] =
     computeHkdfInternal(keyMaterial, outputBytes, info, salt, algorithm)
 
-  override protected def generateRandomBytes(length: Int): Array[Byte] = {
+  override protected[crypto] def generateRandomBytes(length: Int): Array[Byte] = {
     // Not really random
     val random =
       DeterministicEncoding.encodeInt(randomnessCounter.getAndIncrement()).toByteArray.take(length)

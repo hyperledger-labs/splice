@@ -56,7 +56,6 @@ class DbSequencerBlockStore(
     enableAdditionalConsistencyChecks: Boolean,
     private val checkedInvariant: Option[Member],
     override protected val loggerFactory: NamedLoggerFactory,
-    unifiedSequencer: Boolean,
 )(implicit override protected val executionContext: ExecutionContext)
     extends SequencerBlockStore
     with DbStore {
@@ -78,27 +77,23 @@ class DbSequencerBlockStore(
     storage.query(
       for {
         blockInfoO <- {
-          if (unifiedSequencer) {
-            for {
-              watermark <- safeWaterMarkDBIO
-              blockInfoO <- watermark match {
-                case Some(watermark) =>
-                  findBlockContainingTimestamp(watermark).flatMap {
-                    case Some(block) => DBIO.successful(Some(block))
-                    case None =>
-                      // WM is ahead of complete blocks, so we pick the latest complete block
-                      readLatestBlockInfo()
-                  }
-                case None =>
-                  // if there's no WM (blank sequencer), we start from the beginning below
-                  DBIO.successful(
-                    None
-                  )
-              }
-            } yield blockInfoO
-          } else {
-            readLatestBlockInfo()
-          }
+          for {
+            watermark <- safeWaterMarkDBIO
+            blockInfoO <- watermark match {
+              case Some(watermark) =>
+                findBlockContainingTimestamp(watermark).flatMap {
+                  case Some(block) => DBIO.successful(Some(block))
+                  case None =>
+                    // WM is ahead of complete blocks, so we pick the latest complete block
+                    readLatestBlockInfo()
+                }
+              case None =>
+                // if there's no WM (blank sequencer), we start from the beginning below
+                DBIO.successful(
+                  None
+                )
+            }
+          } yield blockInfoO
         }
         state <- blockInfoO match {
           case None => DBIO.successful(BlockEphemeralState.empty)
@@ -154,7 +149,7 @@ class DbSequencerBlockStore(
 
   private def readAtBlock(
       block: BlockInfo
-  ): DBIOAction[BlockEphemeralState, NoStream, Effect.Read with Effect.Transactional] = {
+  ): DBIOAction[BlockEphemeralState, NoStream, Effect.Read with Effect.Transactional] =
     for {
       initialCounters <- initialMemberCountersDBIO
       stateAtTimestamp <- sequencerStore.readAtBlockTimestampDBIO(block.lastTs)
@@ -162,7 +157,6 @@ class DbSequencerBlockStore(
       block,
       mergeWithInitialCounters(stateAtTimestamp, initialCounters),
     )
-  }
 
   private def mergeWithInitialCounters(
       state: EphemeralState,
@@ -221,11 +215,10 @@ class DbSequencerBlockStore(
 
   override def finalizeBlockUpdate(block: BlockInfo)(implicit
       traceContext: TraceContext
-  ): Future[Unit] = {
+  ): Future[Unit] =
     storage
       .queryAndUpdate(updateBlockHeightDBIO(block), functionFullName)
       .flatMap((_: Unit) => checkBlockInvariantIfEnabled(block.height))
-  }
 
   override def readRange(
       member: Member,

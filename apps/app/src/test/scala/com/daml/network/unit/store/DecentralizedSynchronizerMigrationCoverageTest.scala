@@ -27,7 +27,8 @@ class DecentralizedSynchronizerMigrationCoverageTest
 
   filtersAndMoveLists.foreach { case (label, filtered, rawHandled) =>
     s"${label.getClass.getSimpleName}" should {
-      val handled = rawHandled.view.map(t => PackageQualifiedName(t.TEMPLATE_ID)).toSet
+      val handled =
+        rawHandled.view.map(t => PackageQualifiedName(t.getTemplateIdWithPackageId)).toSet
 
       "handle every listened-to contract type not handled elsewhere" in {
         filtered.templateIds should contain allElementsOf handled
@@ -54,7 +55,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
         .flatMap { case (id, _, handled) =>
           handled.view.map(id -> _)
         }
-        .groupMap(_._2.TEMPLATE_ID)(_._1.getClass.getSimpleName)
+        .groupMap(_._2.getTemplateIdWithPackageId)(_._1.getClass.getSimpleName)
         .filter(_._2.sizeIs > 1)
       overlappingAutomationStoresById shouldBe empty
     }
@@ -62,7 +63,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
 
   "knownNotHandled" should {
     val allHandled = filtersAndMoveLists.view
-      .flatMap(_._3.map(i => PackageQualifiedName(i.TEMPLATE_ID)))
+      .flatMap(_._3.map(i => PackageQualifiedName(i.getTemplateIdWithPackageId)))
       .toSet
 
     "not list any handled contracts" in {
@@ -165,7 +166,7 @@ object DecentralizedSynchronizerMigrationCoverageTest {
       trafficRequestCodegen.BuyTrafficRequest.COMPANION ->
         reason("tied to a specific domainId, never migrated", UserWalletStore),
     ).view.map { case (c, reason) =>
-      (PackageQualifiedName(c.TEMPLATE_ID), reason)
+      (PackageQualifiedName(c.getTemplateIdWithPackageId), reason)
     }.toMap
   }
 

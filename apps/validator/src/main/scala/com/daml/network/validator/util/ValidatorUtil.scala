@@ -37,6 +37,7 @@ private[validator] object ValidatorUtil {
       retryProvider: RetryProvider,
       logger: TracedLogger,
       priority: CommandPriority,
+      retryFor: RetryFor,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -46,7 +47,8 @@ private[validator] object ValidatorUtil {
       s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, dsoParty=$dsoParty"
     )
     for {
-      _ <- retryProvider.retryForClientCalls(
+      _ <- retryProvider.retry(
+        retryFor,
         "installWalletForUser",
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
@@ -93,6 +95,7 @@ private[validator] object ValidatorUtil {
       retryProvider: RetryProvider,
       logger: TracedLogger,
       priority: CommandPriority = CommandPriority.Low,
+      retryFor: RetryFor = RetryFor.ClientCalls,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
     val store = storeWithIngestion.store
     for {
@@ -137,6 +140,7 @@ private[validator] object ValidatorUtil {
         retryProvider = retryProvider,
         logger = logger,
         priority = priority,
+        retryFor = retryFor,
       )
       // Create validator right contract so validator can collect validator rewards
       _ <- SpliceUtil.createValidatorRight(

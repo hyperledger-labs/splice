@@ -40,9 +40,8 @@ trait OnShutdownRunner { this: AutoCloseable =>
     */
   def runOnShutdown_[T](
       task: RunOnShutdown
-  )(implicit traceContext: TraceContext): Unit = {
+  )(implicit traceContext: TraceContext): Unit =
     runOnShutdown(task).discard
-  }
 
   /** Same as [[runOnShutdown_]] but returns a token that allows you to remove the task explicitly from being run
     * using [[cancelShutdownTask]]

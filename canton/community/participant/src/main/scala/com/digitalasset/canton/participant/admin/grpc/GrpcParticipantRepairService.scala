@@ -14,10 +14,10 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
 import com.digitalasset.canton.participant.admin.data.ActiveContract.loadFromByteString
 import com.digitalasset.canton.participant.admin.grpc.GrpcParticipantRepairService.ValidExportAcsRequest
-import com.digitalasset.canton.participant.admin.inspection
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError.ImportAcsError
 import com.digitalasset.canton.participant.admin.repair.{EnsureValidContractIds, RepairServiceError}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.participant.store.AcsInspectionError
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.{DomainId, PartyId, UniqueIdentifier}
@@ -75,7 +75,7 @@ object GrpcParticipantRepairService {
     private def validateRequest(
         request: ExportAcsRequest,
         allProtocolVersions: Map[DomainId, ProtocolVersion],
-    ): Either[String, ValidExportAcsRequest] = {
+    ): Either[String, ValidExportAcsRequest] =
       for {
         parties <- request.parties.traverse(party =>
           UniqueIdentifier.fromProtoPrimitive_(party).map(PartyId(_).toLf).leftMap(_.message)
@@ -94,7 +94,6 @@ object GrpcParticipantRepairService {
         force = request.force,
         partiesOffboarding = request.partiesOffboarding,
       )
-    }
 
     def apply(request: ExportAcsRequest, allProtocolVersions: Map[DomainId, ProtocolVersion])(
         implicit elc: ErrorLoggingContext
@@ -128,43 +127,43 @@ final class GrpcParticipantRepairService(
   private val domainMigrationInProgress = new AtomicReference[Boolean](false)
 
   private def toRepairServiceError(
-      error: inspection.Error
+      error: AcsInspectionError
   )(implicit tc: TraceContext): RepairServiceError =
     error match {
-      case inspection.Error.TimestampAfterPrehead(domainId, requested, clean) =>
+      case AcsInspectionError.TimestampAfterPrehead(domainId, requested, clean) =>
         RepairServiceError.InvalidAcsSnapshotTimestamp.Error(
           requested,
           clean,
           domainId,
         )
-      case inspection.Error.TimestampBeforePruning(domainId, requested, pruned) =>
+      case AcsInspectionError.TimestampBeforePruning(domainId, requested, pruned) =>
         RepairServiceError.UnavailableAcsSnapshot.Error(
           requested,
           pruned,
           domainId,
         )
-      case inspection.Error.InconsistentSnapshot(domainId, missingContract) =>
+      case AcsInspectionError.InconsistentSnapshot(domainId, missingContract) =>
         logger.warn(
           s"Inconsistent ACS snapshot for domain $domainId. Contract $missingContract (and possibly others) is missing."
         )
         RepairServiceError.InconsistentAcsSnapshot.Error(domainId)
-      case inspection.Error.SerializationIssue(domainId, contractId, errorMessage) =>
+      case AcsInspectionError.SerializationIssue(domainId, contractId, errorMessage) =>
         logger.error(
           s"Contract $contractId for domain $domainId cannot be serialized due to: $errorMessage"
         )
         RepairServiceError.SerializationError.Error(domainId, contractId)
-      case inspection.Error.InvariantIssue(domainId, contractId, errorMessage) =>
+      case AcsInspectionError.InvariantIssue(domainId, contractId, errorMessage) =>
         logger.error(
           s"Contract $contractId for domain $domainId cannot be serialized due to an invariant violation: $errorMessage"
         )
         RepairServiceError.SerializationError.Error(domainId, contractId)
-      case inspection.Error.OffboardingParty(domainId, error) =>
+      case AcsInspectionError.OffboardingParty(domainId, error) =>
         RepairServiceError.InvalidArgument.Error(s"Parties offboarding on domain $domainId: $error")
     }
 
   /** purge contracts
     */
-  override def purgeContracts(request: PurgeContractsRequest): Future[PurgeContractsResponse] = {
+  override def purgeContracts(request: PurgeContractsRequest): Future[PurgeContractsResponse] =
     TraceContext.withNewTraceContext { implicit traceContext =>
       val res: Either[RepairServiceError, Unit] = for {
         cids <- request.contractIds
@@ -189,7 +188,6 @@ final class GrpcParticipantRepairService(
         _ => Future.successful(PurgeContractsResponse()),
       )
     }
-  }
 
   /** originates from download above
     */
@@ -336,7 +334,7 @@ final class GrpcParticipantRepairService(
                           RepairContract(
                             c.contract,
                             Set.empty,
-                            c.transferCounter,
+                            c.reassignmentCounter,
                           )
                         ),
                         ignoreAlreadyAdded = true,
@@ -368,7 +366,7 @@ final class GrpcParticipantRepairService(
     }
   }
 
-  override def migrateDomain(request: MigrateDomainRequest): Future[MigrateDomainResponse] = {
+  override def migrateDomain(request: MigrateDomainRequest): Future[MigrateDomainResponse] =
     TraceContext.withNewTraceContext { implicit traceContext =>
       // ensure here we don't process migration requests concurrently
       if (!domainMigrationInProgress.getAndSet(true)) {
@@ -411,7 +409,6 @@ final class GrpcParticipantRepairService(
             .asRuntimeException()
         )
     }
-  }
 
   /* Purge specified deactivated sync-domain and selectively prune domain stores.
    */

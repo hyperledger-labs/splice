@@ -80,7 +80,7 @@ object AmuletArchive {
   def unapply(event: ExercisedEvent): Option[ExercisedEvent] =
     if (
       QualifiedName(event.getTemplateId) == QualifiedName(
-        amuletCodegen.Amulet.COMPANION.TEMPLATE_ID
+        amuletCodegen.Amulet.COMPANION.getTemplateIdWithPackageId
       ) && event.isConsuming
     ) {
       Some(event)

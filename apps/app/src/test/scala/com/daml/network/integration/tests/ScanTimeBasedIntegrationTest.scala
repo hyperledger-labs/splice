@@ -454,7 +454,10 @@ class ScanTimeBasedIntegrationTest
       CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
       migrationId,
       templates = Some(
-        Vector(PackageQualifiedName(Amulet.TEMPLATE_ID), PackageQualifiedName(AnsEntry.TEMPLATE_ID))
+        Vector(
+          PackageQualifiedName(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
+          PackageQualifiedName(AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID),
+        )
       ),
       partyIds = Some(Vector(aliceUserParty)),
     )
@@ -462,7 +465,7 @@ class ScanTimeBasedIntegrationTest
     inside(snapshotAfterData) { case Some(data) =>
       val (entries, coins) =
         data.createdEvents.partition(
-          _.templateId.contains(QualifiedName(AnsEntry.TEMPLATE_ID).toString)
+          _.templateId.contains(QualifiedName(AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID).toString)
         )
       val entry = AnsEntry
         .jsonDecoder()

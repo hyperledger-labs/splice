@@ -9,6 +9,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   ParticipantAdminCommands,
 }
+import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{CantonCommunityConfig, ClientConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.CommandErrors.GenericCommandError
@@ -83,9 +84,11 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
       mock[SequencerNodes[config.SequencerNodeConfigType]]
     val mediators: MediatorNodes[config.MediatorNodeConfigType] =
       mock[MediatorNodes[config.MediatorNodeConfigType]]
-    val participant: ParticipantNodeBootstrap = mock[ParticipantNodeBootstrap]
+    val participantBootstrap: ParticipantNodeBootstrap = mock[ParticipantNodeBootstrap]
+    val participant: ParticipantNode = mock[ParticipantNode]
     val sequencer: SequencerNodeBootstrap = mock[SequencerNodeBootstrap]
     val mediator: MediatorNodeBootstrap = mock[MediatorNodeBootstrap]
+    val adminToken: String = "0" * 64
 
     when(environment.config).thenReturn(config)
     when(environment.testingConfig).thenReturn(
@@ -109,6 +112,10 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
     when(participants.startAndWait(anyString())(anyTraceContext)).thenReturn(Right(()))
     when(participants.stopAndWait(anyString())(anyTraceContext)).thenReturn(Right(()))
     when(participants.isRunning(anyString())).thenReturn(true)
+    when(participants.getRunning(anyString())).thenReturn(Some(participantBootstrap))
+    when(participantBootstrap.getNode).thenReturn(Some(participant))
+    when(participantBootstrap.getAdminToken).thenReturn(Some(adminToken))
+    when(participant.adminToken).thenReturn(CantonAdminToken(adminToken))
 
     val adminCommandRunner: ConsoleGrpcAdminCommandRunner = mock[ConsoleGrpcAdminCommandRunner]
     val testConsoleOutput: TestConsoleOutput = new TestConsoleOutput(loggerFactory)
@@ -120,7 +127,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
           anyString(),
           any[GrpcAdminCommand[_, _, Nothing]],
           any[ClientConfig],
-          isEq(None),
+          any[Option[String]],
         )
     )
       .thenReturn(GenericCommandError("Mocked error"))
@@ -181,7 +188,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
           isEq((id)),
           any[GrpcAdminCommand[_, _, Result]],
           any[ClientConfig],
-          isEq(None),
+          any[Option[String]],
         )
       )
         .thenReturn(result.toResult)
@@ -279,7 +286,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
           isEq(p),
           any[ParticipantAdminCommands.Package.UploadDar],
           any[ClientConfig],
-          isEq(None),
+          isEq(Some(adminToken)),
         )
 
       verifyUploadDar("p1")
@@ -290,9 +297,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
 
     "participants.local help shows help from both InstanceExtensions and ParticipantExtensions" in new TestEnvironment {
       testConsoleOutput.assertConsoleOutput(
-        {
-          runOrFail("participants.local help")
-        },
+        runOrFail("participants.local help"),
         { helpText =>
           helpText should include("start") // from instance extensions
           helpText should include("stop")

@@ -43,11 +43,11 @@ class WalletTxLogIntegrationTest
   private val amuletPrice = BigDecimal(0.75).setScale(10)
 
   override lazy val updateHistoryIgnoredRootCreates = Seq(
-    amuletCodegen.Amulet.TEMPLATE_ID
+    amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 
   override lazy val updateHistoryIgnoredRootExercises = Seq(
-    (amuletCodegen.Amulet.TEMPLATE_ID, "Archive")
+    (amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID, "Archive")
   )
 
   private def usdAsTappedAmulet(usd: Double) =

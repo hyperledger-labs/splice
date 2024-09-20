@@ -31,8 +31,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.RetryUtil
-import com.digitalasset.canton.util.retry.RetryUtil.ExceptionRetryable
+import com.digitalasset.canton.util.retry.{ExceptionRetryPolicy, ErrorKind}
 import io.circe.Json
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
@@ -631,18 +630,15 @@ object BftScanConnection {
         s"Failed to reach consensus from $numRequests Scan nodes. Responses: $responses"
       )
 
-  object ConsensusNotReachedRetryable extends ExceptionRetryable {
-    override def retryOK(
-        outcome: Try[_],
-        logger: TracedLogger,
-        lastErrorKind: Option[RetryUtil.ErrorKind],
-    )(implicit tc: TraceContext): RetryUtil.ErrorKind = {
-      outcome match {
-        case Success(_) => RetryUtil.NoErrorKind
-        case Failure(c: ConsensusNotReached) =>
+  object ConsensusNotReachedRetryable extends ExceptionRetryPolicy {
+    override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = {
+      exception match {
+        case c: ConsensusNotReached =>
           logger.info("Consensus not reached. Will be retried.", c)
-          RetryUtil.SpuriousTransientErrorKind
-        case Failure(_) => RetryUtil.FatalErrorKind
+          ErrorKind.TransientErrorKind()
+        case _ => ErrorKind.FatalErrorKind
       }
     }
   }

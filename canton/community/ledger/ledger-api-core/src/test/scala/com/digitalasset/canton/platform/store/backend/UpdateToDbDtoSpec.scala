@@ -270,7 +270,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         contractMetadata = Map(contractId -> someContractDriverMetadata),
         hostedWitnesses = Nil,
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -509,7 +509,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         contractMetadata = Map.empty,
         hostedWitnesses = Nil,
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -928,7 +928,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         contractMetadata = Map.empty,
         hostedWitnesses = Nil,
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -1115,7 +1115,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -1192,7 +1192,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -1313,7 +1313,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -1470,7 +1470,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -1534,7 +1534,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         hostedWitnesses = Nil,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -1601,7 +1601,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
         domainId = someDomainId1,
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
       val dtos = updateToDtos(update)
 
@@ -1688,7 +1688,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
             completionInfo,
             state.Update.CommandRejected.FinalReason(status),
             domainId = someDomainId1,
-            domainIndex = None,
+            domainIndex = someDomainIndexWithSequencerCounter,
           )
           val dtos = updateToDtos(update)
 
@@ -1711,7 +1711,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
               deduplication_start = None,
               domain_id = someDomainId1.toProtoPrimitive,
               message_uuid = None,
-              request_sequencer_counter = None,
+              request_sequencer_counter = Some(10),
               is_transaction = true,
               trace_context = serializedEmptyTraceContext,
             )
@@ -1751,7 +1751,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
             hostedWitnesses = Nil,
             contractMetadata = Map(contractId -> someContractDriverMetadata),
             domainId = someDomainId1,
-            domainIndex = None,
+            domainIndex = someDomainIndex,
           )
           val dtos = updateToDtos(update)
 
@@ -1849,14 +1849,14 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           reassignmentCounter = 1500L,
           hostedStakeholders = Nil,
           unassignId = CantonTimestamp.assertFromLong(1000000000),
-          isTransferringParticipant = true,
+          isReassigningParticipant = true,
         ),
         reassignment = Reassignment.Assign(
           ledgerEffectiveTime = Time.Timestamp.assertFromLong(17000000),
           createNode = createNode,
           contractMetadata = someContractDriverMetadata,
         ),
-        domainIndex = None,
+        domainIndex = someDomainIndex,
       )
 
       val dtos = updateToDtos(update)
@@ -1954,7 +1954,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           reassignmentCounter = 1500L,
           hostedStakeholders = Nil,
           unassignId = CantonTimestamp.assertFromLong(1000000000),
-          isTransferringParticipant = true,
+          isReassigningParticipant = true,
         ),
         reassignment = Reassignment.Unassign(
           contractId = contractId,
@@ -2042,6 +2042,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           counter = SequencerCounter(1000),
           timestamp = CantonTimestamp.ofEpochMicro(2000),
         ),
+        requestCounterO = None,
       )
       val dtos = updateToDtos(update)
 
@@ -2053,7 +2054,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
 
   }
 
-  private def updateToDtos(update: Update) = {
+  private def updateToDtos(update: Update) =
     UpdateToDbDto(
       someParticipantId,
       valueSerialization,
@@ -2064,7 +2065,6 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
     )(
       someOffset
     )(Traced[Update](update)).toList
-  }
 }
 
 object UpdateToDbDtoSpec {
@@ -2121,6 +2121,26 @@ object UpdateToDbDtoSpec {
   private val someOffset = Offset.fromHexString(Ref.HexString.assertFromString("abcdef"))
   private val someRecordTime =
     Time.Timestamp.assertFromInstant(Instant.parse(("2000-01-01T00:00:00.000000Z")))
+  private val someDomainIndex =
+    Some(
+      DomainIndex.of(
+        RequestIndex(
+          counter = RequestCounter(10),
+          sequencerCounter = None,
+          timestamp = CantonTimestamp(someRecordTime),
+        )
+      )
+    )
+  private val someDomainIndexWithSequencerCounter =
+    Some(
+      DomainIndex.of(
+        RequestIndex(
+          counter = RequestCounter(10),
+          sequencerCounter = Some(SequencerCounter(10)),
+          timestamp = CantonTimestamp(someRecordTime),
+        )
+      )
+    )
   private val someApplicationId =
     Ref.ApplicationId.assertFromString("UpdateToDbDtoSpecApplicationId")
   private val someCommandId = Ref.CommandId.assertFromString("UpdateToDbDtoSpecCommandId")

@@ -429,7 +429,9 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         } yield {
           val actual = tfResult.map(_.contract.identifier.getEntityName)
           val expected =
-            ValidatorStore.templatesMovedByMyAutomation(true).map(_.TEMPLATE_ID.getEntityName)
+            ValidatorStore
+              .templatesMovedByMyAutomation(true)
+              .map(_.getTemplateIdWithPackageId.getEntityName)
           actual should contain theSameElementsAs expected
         }
       }
@@ -450,7 +452,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   )
 
   private def walletInstall(endUserParty: PartyId, endUserName: String) = {
-    val templateId = walletCodegen.WalletAppInstall.TEMPLATE_ID
+    val templateId = walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new walletCodegen.WalletAppInstall(
       dsoParty.toProtoPrimitive,
       validator.toProtoPrimitive,
@@ -465,7 +467,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def validatorRight(user: PartyId) = {
-    val templateId = amuletCodegen.ValidatorRight.TEMPLATE_ID
+    val templateId = amuletCodegen.ValidatorRight.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new amuletCodegen.ValidatorRight(
       dsoParty.toProtoPrimitive,
       user.toProtoPrimitive,
@@ -479,7 +481,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def validatorTopUpState(domainId: DomainId) = {
-    val templateId = topUpCodegen.ValidatorTopUpState.TEMPLATE_ID
+    val templateId = topUpCodegen.ValidatorTopUpState.TEMPLATE_ID_WITH_PACKAGE_ID
     val sequencerMemberId = "sequencerMemberId"
     val lastPurchasedAt = Instant.EPOCH
     val template = new topUpCodegen.ValidatorTopUpState(
@@ -498,7 +500,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def appConfiguration(provider: PartyId, version: Long, name: String) = {
-    val templateId = appManagerCodegen.AppConfiguration.TEMPLATE_ID
+    val templateId = appManagerCodegen.AppConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
     val json = new definitions.AppConfiguration(
       version,
       name,
@@ -519,7 +521,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def appRelease(provider: PartyId, version: String) = {
-    val templateId = appManagerCodegen.AppRelease.TEMPLATE_ID
+    val templateId = appManagerCodegen.AppRelease.TEMPLATE_ID_WITH_PACKAGE_ID
     val json = "{}"
     val template = new appManagerCodegen.AppRelease(
       validator.toProtoPrimitive,
@@ -535,7 +537,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def registeredApp(provider: PartyId) = {
-    val templateId = appManagerCodegen.RegisteredApp.TEMPLATE_ID
+    val templateId = appManagerCodegen.RegisteredApp.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new appManagerCodegen.RegisteredApp(
       validator.toProtoPrimitive,
       provider.toProtoPrimitive,
@@ -548,7 +550,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def installedApp(provider: PartyId) = {
-    val templateId = appManagerCodegen.InstalledApp.TEMPLATE_ID
+    val templateId = appManagerCodegen.InstalledApp.TEMPLATE_ID_WITH_PACKAGE_ID
     val url = "https://app.canton.network/install"
     val template = new appManagerCodegen.InstalledApp(
       validator.toProtoPrimitive,
@@ -563,7 +565,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def approvedReleaseConfig(provider: PartyId, version: Long) = {
-    val templateId = appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID
+    val templateId = appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
     val json = "{}"
     val jsonHash = "abcd"
     val template = new appManagerCodegen.ApprovedReleaseConfiguration(

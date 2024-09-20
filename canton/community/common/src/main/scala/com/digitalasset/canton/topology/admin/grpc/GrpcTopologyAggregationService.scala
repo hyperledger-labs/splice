@@ -44,7 +44,7 @@ class GrpcTopologyAggregationService(
 
   private def snapshots(filterStore: String, asOf: Option[ProtoTimestamp])(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CantonError, List[(DomainId, TopologySnapshotLoader)]] = {
+  ): EitherT[Future, CantonError, List[(DomainId, TopologySnapshotLoader)]] =
     for {
       asOfO <- wrapErr(asOf.traverse(CantonTimestamp.fromProtoTimestamp))
     } yield {
@@ -64,7 +64,6 @@ class GrpcTopologyAggregationService(
           )
       }.toList
     }
-  }
 
   private def groupBySnd[A, B, C](item: Seq[(A, B, C)]): Map[B, Seq[(A, C)]] =
     item.groupBy(_._2).map { case (b, res) =>
@@ -85,7 +84,7 @@ class GrpcTopologyAggregationService(
     .foldLeftM((Set.empty[PartyId], false), clients) { case ((res, isDone), (_, client)) =>
       if (isDone) Future.successful((res, true))
       else
-        client.inspectKnownParties(filterParty, filterParticipant, limit).map { found =>
+        client.inspectKnownParties(filterParty, filterParticipant).map { found =>
           val tmp = found ++ res
           if (tmp.size >= limit) (tmp.take(limit), true) else (tmp, false)
         }

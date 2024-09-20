@@ -66,7 +66,7 @@ class AuthenticationTokenManager(
   def getToken: EitherT[FutureUnlessShutdown, Status, AuthenticationToken] =
     refreshToken(refreshWhenHaveToken = false)
 
-  /** Invalid the current token if it matches the provided value.
+  /** Invalidate the current token if it matches the provided value.
     * Although unlikely, the token must be provided here in case a response terminates after a new token has already been generated.
     */
   def invalidateToken(invalidToken: AuthenticationToken): Unit = {
@@ -83,7 +83,7 @@ class AuthenticationTokenManager(
       new PromiseUnlessShutdown[Either[Status, AuthenticationTokenWithExpiry]](
         "refreshToken",
         FutureSupervisor.Noop,
-      )(ecl = ErrorLoggingContext.fromTracedLogger(logger), ec = executionContext)
+      )(ecl = ErrorLoggingContext.fromTracedLogger(logger))
     val refreshingState = Refreshing(EitherT(refreshTokenPromise.futureUS))
 
     state.getAndUpdate {
@@ -110,12 +110,11 @@ class AuthenticationTokenManager(
     logger.debug("Refreshing authentication token")
 
     val currentRefresh = promise.futureUS
-    def completeRefresh(result: State): Unit = {
+    def completeRefresh(result: State): Unit =
       state.updateAndGet {
         case Refreshing(pending) if pending.value == currentRefresh => result
         case other => other
       }.discard
-    }
 
     // asynchronously update the state once completed, one way or another
     val currentRefreshTransformed = currentRefresh.thereafter {
@@ -129,9 +128,8 @@ class AuthenticationTokenManager(
                 ex.getMessage.contains("Channel shutdown invoked") =>
             logger.info("Token refresh aborted due to shutdown", ex)
           case ex: io.grpc.StatusRuntimeException =>
-            def collectCause(ex: Throwable): Seq[String] = {
+            def collectCause(ex: Throwable): Seq[String] =
               Seq(ex.getMessage) ++ Option(ex.getCause).toList.flatMap(collectCause)
-            }
             val causes = collectCause(ex).mkString(", ")
             logger.warn(s"Token refresh failed with ${ex.getStatus} / $causes")
           case _ => logger.warn("Token refresh failed", exception)
@@ -158,7 +156,7 @@ class AuthenticationTokenManager(
     EitherT(currentRefreshTransformed).map(_.token)
   }
 
-  private def scheduleRefreshBefore(expiresAt: CantonTimestamp): Unit = {
+  private def scheduleRefreshBefore(expiresAt: CantonTimestamp): Unit =
     if (!isClosed) {
       clock
         .scheduleAt(
@@ -167,7 +165,6 @@ class AuthenticationTokenManager(
         )
         .discard
     }
-  }
 
   private def backgroundRefreshToken(_now: CantonTimestamp): Unit = if (!isClosed) {
     refreshToken(refreshWhenHaveToken = true).discard

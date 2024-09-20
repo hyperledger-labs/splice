@@ -87,7 +87,6 @@ final class GeneratorsProtocol(
       for {
         sender <- Arbitrary.arbitrary[Member]
         messageId <- Arbitrary.arbitrary[MessageId]
-        isRequest <- Arbitrary.arbitrary[Boolean]
         envelopes <- Generators.nonEmptyListGen[ClosedEnvelope](closedEnvelopeArb)
         batch = Batch(envelopes.map(_.closeEnvelope), protocolVersion)
         maxSequencingTime <- Arbitrary.arbitrary[CantonTimestamp]
@@ -128,14 +127,13 @@ final class GeneratorsProtocol(
 
   private val sequencerDeliverErrorCodeArb: Arbitrary[SequencerDeliverErrorCode] = genArbitrary
 
-  private implicit val sequencerDeliverErrorArb: Arbitrary[SequencerDeliverError] = {
+  private implicit val sequencerDeliverErrorArb: Arbitrary[SequencerDeliverError] =
     Arbitrary(
       for {
         code <- sequencerDeliverErrorCodeArb.arbitrary
         message <- Arbitrary.arbitrary[String]
       } yield code.apply(message)
     )
-  }
 
   private implicit val deliverErrorArb: Arbitrary[DeliverError] = Arbitrary(
     for {

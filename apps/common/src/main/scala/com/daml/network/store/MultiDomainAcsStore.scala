@@ -5,7 +5,6 @@ package com.daml.network.store
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
   TransactionFilter as LapiTransactionFilter,
@@ -15,7 +14,6 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.environment.BaseLedgerConnection
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -349,7 +347,7 @@ object MultiDomainAcsStore {
     override def mightContain[TC, TCid, T](
         templateCompanion: JavaContractCompanion[TC, TCid, T]
     ): Boolean =
-      templateFilters.contains(PackageQualifiedName(templateCompanion.TEMPLATE_ID))
+      templateFilters.contains(PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId))
 
     override def mightContain(identifier: Identifier): Boolean = {
       templateFiltersWithoutPackageNames.contains(QualifiedName(identifier))
@@ -401,7 +399,7 @@ object MultiDomainAcsStore {
       TemplateFilter[TCid, T, R],
   ) =
     (
-      PackageQualifiedName(templateCompanion.TEMPLATE_ID),
+      PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId),
       TemplateFilter(
         ev => {
           val c = Contract.fromCreatedEvent(templateCompanion)(ev)
@@ -516,7 +514,7 @@ object MultiDomainAcsStore {
       ): Boolean = filter.mightContain(companion)
 
       override def typeId(companion: Contract.Companion.Template[TCid, T]): Identifier =
-        companion.TEMPLATE_ID
+        companion.getTemplateIdWithPackageId
 
       override def toContractId(companion: Companion.Template[TCid, T], contractId: String): TCid =
         companion.toContractId(new ContractId[T](contractId))
@@ -602,25 +600,6 @@ object MultiDomainAcsStore {
         traceContext: TraceContext
     ): Future[Unit]
   }
-
-  def fromParticipantOffset(offset: ParticipantOffset): String =
-    offset.value match {
-      case ParticipantOffset.Value.Boundary(
-            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-          ) =>
-        BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
-      case ParticipantOffset.Value.Absolute(offset) => offset
-      case offset => throw new IllegalArgumentException(s"Cannot convert $offset to string")
-    }
-
-  def toParticipantOffset(offset: String): ParticipantOffset =
-    if (offset == BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET)
-      ParticipantOffset(
-        ParticipantOffset.Value.Boundary(
-          ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-        )
-      )
-    else ParticipantOffset(ParticipantOffset.Value.Absolute(offset))
 
   // The state of a contract in the store. Note that, contrary to `ContractState`, this can
   // also include archived contracts.

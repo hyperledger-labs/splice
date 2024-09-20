@@ -30,9 +30,14 @@ import com.digitalasset.canton.protocol.StoredParties
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
   CommitmentPeriod,
+  CommitmentPeriodState,
   SignedProtocolMessage,
 }
-import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile}
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.{
+  mergeBuildersIntoChain,
+  toSQLActionBuilderChain,
+}
+import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile, SQLActionBuilderChain}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.serialization.DeterministicEncoding
 import com.digitalasset.canton.store.IndexedDomain
@@ -197,7 +202,7 @@ class DbAcsCommitmentStore(
                 using (with updates as (""" ++
               counterParticipants.toList
                 .map(p =>
-                  sql"select $domainId did, ${period.fromExclusive} periodFrom, ${period.toInclusive} periodTo, $p counter_participant from dual"
+                  sql"select $domainId did, ${period.fromExclusive} periodFrom, ${period.toInclusive} periodTo, $p counter_participant, ${CommitmentPeriodState.Outstanding} matching_state from dual"
                 )
                 .intercalate(sql" union all ") ++
               sql""") select * from updates) U on (
@@ -206,15 +211,18 @@ class DbAcsCommitmentStore(
                      U.periodTo = par_outstanding_acs_commitments.to_inclusive and
                      U.counter_participant = par_outstanding_acs_commitments.counter_participant)
                      when not matched then
-                     insert (domain_id, from_exclusive, to_inclusive, counter_participant)
-                     values (U.did, U.periodFrom, U.periodTo, U.counter_participant)""").asUpdate
+                     insert (domain_id, from_exclusive, to_inclusive, counter_participant, matching_state)
+                     values (U.did, U.periodFrom, U.periodTo, U.counter_participant, U.matching_state)""").asUpdate
           case _ =>
-            (sql"""insert into par_outstanding_acs_commitments (domain_id, from_exclusive, to_inclusive, counter_participant) values """ ++
+            (sql"""insert into par_outstanding_acs_commitments (domain_id, from_exclusive, to_inclusive, counter_participant, matching_state) values """ ++
               counterParticipants.toList
-                .map(p => sql"($domainId, ${period.fromExclusive}, ${period.toInclusive}, $p)")
+                .map(p =>
+                  sql"($domainId, ${period.fromExclusive}, ${period.toInclusive}, $p,${CommitmentPeriodState.Outstanding})"
+                )
                 .intercalate(sql", ") ++ sql" on conflict do nothing").asUpdate
 
         }
+
       storage.update_(insertOutstanding, operationName = "commitments: storeOutstanding")
     }
   }
@@ -251,18 +259,29 @@ class DbAcsCommitmentStore(
   override def outstanding(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Option[ParticipantId],
-  )(implicit traceContext: TraceContext): Future[Iterable[(CommitmentPeriod, ParticipantId)]] = {
-    val participantFilter =
-      counterParticipant.fold(sql"")(p => sql" and counter_participant = $p")
+      counterParticipants: Seq[ParticipantId],
+      includeMatchedPeriods: Boolean,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Iterable[(CommitmentPeriod, ParticipantId, CommitmentPeriodState)]] = {
+    val participantFilter: SQLActionBuilderChain = counterParticipants match {
+      case Seq() => sql""
+      case list =>
+        sql" AND counter_participant IN (" ++ list
+          .map(part => sql"$part")
+          .intercalate(sql", ") ++ sql")"
+    }
+
     import DbStorage.Implicits.BuilderChain.*
     val query =
-      sql"""select from_exclusive, to_inclusive, counter_participant
+      sql"""select from_exclusive, to_inclusive, counter_participant, matching_state
                     from par_outstanding_acs_commitments where domain_id = $domainId and to_inclusive >= $start and from_exclusive < $end
+                    and ($includeMatchedPeriods or matching_state != ${CommitmentPeriodState.Matched})
                 """ ++ participantFilter
+
     storage.query(
       query
-        .as[(CommitmentPeriod, ParticipantId)]
+        .as[(CommitmentPeriod, ParticipantId, CommitmentPeriodState)]
         .transactionally
         .withTransactionIsolation(TransactionIsolation.ReadCommitted),
       operationName = functionFullName,
@@ -309,42 +328,52 @@ class DbAcsCommitmentStore(
     )
   }
 
-  override def markSafe(
+  override def markPeriod(
       counterParticipant: ParticipantId,
       period: CommitmentPeriod,
       sortedReconciliationIntervalsProvider: SortedReconciliationIntervalsProvider,
+      matchingState: CommitmentPeriodState,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     def dbQueries(
         sortedReconciliationIntervals: SortedReconciliationIntervals
     ): DBIOAction[Unit, NoStream, Effect.All] = {
-      def containsTick(commitmentPeriod: CommitmentPeriod): Boolean = sortedReconciliationIntervals
-        .containsTick(
-          commitmentPeriod.fromExclusive.forgetRefinement,
-          commitmentPeriod.toInclusive.forgetRefinement,
-        )
-        .getOrElse {
-          logger.warn(s"Unable to determine whether $commitmentPeriod contains a tick.")
-          true
-        }
+      def containsTick(commitmentPeriod: CommitmentPeriod): Boolean =
+        sortedReconciliationIntervals
+          .containsTick(
+            commitmentPeriod.fromExclusive.forgetRefinement,
+            commitmentPeriod.toInclusive.forgetRefinement,
+          )
+          .getOrElse {
+            logger.warn(s"Unable to determine whether $commitmentPeriod contains a tick.")
+            true
+          }
 
       val insertQuery = storage.profile match {
         case Profile.H2(_) | Profile.Postgres(_) =>
-          """insert into par_outstanding_acs_commitments (domain_id, from_exclusive, to_inclusive, counter_participant)
-               values (?, ?, ?, ?) on conflict do nothing"""
+          """insert into par_outstanding_acs_commitments (domain_id, from_exclusive, to_inclusive, counter_participant, matching_state)
+               values (?, ?, ?, ?, ?) on conflict do nothing"""
 
         case Profile.Oracle(_) =>
-          """merge /*+ INDEX ( par_outstanding_acs_commitments ( counter_participant, domain_id, from_exclusive, to_inclusive ) ) */
+          """merge /*+ INDEX ( par_outstanding_acs_commitments ( counter_participant, domain_id, from_exclusive, to_inclusive, matching_state ) ) */
             |into par_outstanding_acs_commitments t
-            |using (select ? domain_id, ? from_exclusive, ? to_inclusive, ? counter_participant from dual) input
+            |using (select ? domain_id, ? from_exclusive, ? to_inclusive, ? counter_participant, ? matching_state from dual) input
             |on (t.counter_participant = input.counter_participant and t.domain_id = input.domain_id and
             |    t.from_exclusive = input.from_exclusive and t.to_inclusive = input.to_inclusive)
             |when not matched then
-            |  insert (domain_id, from_exclusive, to_inclusive, counter_participant)
-            |  values (input.domain_id, input.from_exclusive, input.to_inclusive, input.counter_participant)""".stripMargin
+            |  insert (domain_id, from_exclusive, to_inclusive, counter_participant,matching_state)
+            |  values (input.domain_id, input.from_exclusive, input.to_inclusive, input.counter_participant, input.matching_state)""".stripMargin
       }
 
+      val stateUpdateFilter: SQLActionBuilderChain =
+        if (matchingState == CommitmentPeriodState.Matched)
+          sql"""(matching_state = ${CommitmentPeriodState.Outstanding} or matching_state = ${CommitmentPeriodState.Mismatched}
+               or matching_state = ${CommitmentPeriodState.Matched})"""
+        else if (matchingState == CommitmentPeriodState.Mismatched)
+          sql"""(matching_state = ${CommitmentPeriodState.Outstanding} or matching_state = ${CommitmentPeriodState.Mismatched})"""
+        else
+          sql"""matching_state = ${CommitmentPeriodState.Outstanding}"""
       /*
       This is a three steps process:
       - First, we select the outstanding intervals that are overlapping with the new one.
@@ -353,31 +382,41 @@ class DbAcsCommitmentStore(
        */
       for {
         overlappingIntervals <-
-          sql"""select from_exclusive, to_inclusive from par_outstanding_acs_commitments
+          (sql"""select from_exclusive, to_inclusive, matching_state from par_outstanding_acs_commitments
           where domain_id = $domainId and counter_participant = $counterParticipant
-          and from_exclusive < ${period.toInclusive} and to_inclusive > ${period.fromExclusive}"""
-            .as[(CantonTimestampSecond, CantonTimestampSecond)]
+          and from_exclusive < ${period.toInclusive} and to_inclusive > ${period.fromExclusive}
+          and """ ++ stateUpdateFilter).toActionBuilder
+            .as[(CantonTimestampSecond, CantonTimestampSecond, CommitmentPeriodState)]
 
         _ <-
-          sqlu"""delete from par_outstanding_acs_commitments
+          (sql"""delete from par_outstanding_acs_commitments
           where domain_id = $domainId and counter_participant = $counterParticipant
-          and from_exclusive < ${period.toInclusive} and to_inclusive > ${period.fromExclusive}"""
+          and from_exclusive < ${period.toInclusive} and to_inclusive > ${period.fromExclusive}
+          and """ ++ stateUpdateFilter).toActionBuilder.asUpdate
 
         newPeriods = overlappingIntervals
-          .flatMap { case (from, to) =>
+          .flatMap { case (from, to, oldState) =>
             val leftOverlap = CommitmentPeriod.create(from, period.fromExclusive)
             val rightOverlap = CommitmentPeriod.create(period.toInclusive, to)
-            leftOverlap.toSeq ++ rightOverlap.toSeq
+            val inbetween = CommitmentPeriod.create(period.fromExclusive, period.toInclusive)
+            leftOverlap.toSeq
+              .map((_, oldState))
+              ++ rightOverlap.toSeq
+                .map((_, oldState))
+              ++ inbetween.toSeq
+                .map((_, matchingState))
           }
           .toList
           .distinct
-          .filter(containsTick)
+          .filter(t => containsTick(t._1))
 
         _ <- DbStorage.bulkOperation_(insertQuery, newPeriods, storage.profile) { pp => newPeriod =>
+          val (period, state) = newPeriod
           pp >> domainId
-          pp >> newPeriod.fromExclusive
-          pp >> newPeriod.toInclusive
+          pp >> period.fromExclusive
+          pp >> period.toInclusive
           pp >> counterParticipant
+          pp >> state
         }
 
       } yield ()
@@ -385,26 +424,24 @@ class DbAcsCommitmentStore(
 
     markSafeQueue
       .execute(
-        {
-          for {
-            /*
+        for {
+          /*
           That could be wrong if a period is marked as outstanding between the point where we
           fetch the approximate timestamp of the topology client and the query for the sorted
           reconciliation intervals.
           Such a period would be kept as outstanding even if it contains no tick. On the other
           hand, only commitment periods around restarts could be "empty" (not contain any tick).
-             */
-            sortedReconciliationIntervals <-
-              sortedReconciliationIntervalsProvider.approximateReconciliationIntervals
-            _ <- storage.queryAndUpdate(
-              dbQueries(sortedReconciliationIntervals).transactionally.withTransactionIsolation(
-                TransactionIsolation.Serializable
-              ),
-              operationName =
-                s"commitments: mark period safe (${period.fromExclusive}, ${period.toInclusive}]",
-            )
-          } yield ()
-        },
+           */
+          sortedReconciliationIntervals <-
+            sortedReconciliationIntervalsProvider.approximateReconciliationIntervals
+          _ <- storage.queryAndUpdate(
+            dbQueries(sortedReconciliationIntervals).transactionally.withTransactionIsolation(
+              TransactionIsolation.Serializable
+            ),
+            operationName =
+              s"commitments: mark period safe (${period.fromExclusive}, ${period.toInclusive}]",
+          )
+        } yield (),
         "Run mark period safe DB query",
       )
       .onShutdown(
@@ -422,34 +459,35 @@ class DbAcsCommitmentStore(
       sqlu"delete from par_received_acs_commitments where domain_id=$domainId and to_inclusive < $before"
     val query2 =
       sqlu"delete from par_computed_acs_commitments where domain_id=$domainId and to_inclusive < $before"
+    val query3 =
+      sqlu"delete from par_outstanding_acs_commitments where domain_id=$domainId and matching_state = ${CommitmentPeriodState.Matched} and to_inclusive < $before"
     storage
       .queryAndUpdate(
-        query1.zip(query2),
+        query1.zip(query2.zip(query3)),
         operationName = "commitments: prune",
       )
-      .map(x => x._1 + x._2)
+      .map { case (q1, (q2, q3)) => q1 + q2 + q3 }
   }
 
   override def lastComputedAndSent(implicit
       traceContext: TraceContext
-  ): Future[Option[CantonTimestampSecond]] = {
+  ): Future[Option[CantonTimestampSecond]] =
     storage.query(
       sql"select ts from par_last_computed_acs_commitments where domain_id = $domainId"
         .as[CantonTimestampSecond]
         .headOption,
       functionFullName,
     )
-  }
 
   override def noOutstandingCommitments(beforeOrAt: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[Option[CantonTimestamp]] = {
+  ): Future[Option[CantonTimestamp]] =
     for {
       computed <- lastComputedAndSent
       adjustedTsOpt = computed.map(_.forgetRefinement.min(beforeOrAt))
       outstandingOpt <- adjustedTsOpt.traverse { ts =>
         storage.query(
-          sql"select from_exclusive, to_inclusive from par_outstanding_acs_commitments where domain_id=$domainId and from_exclusive < $ts"
+          sql"select from_exclusive, to_inclusive from par_outstanding_acs_commitments where domain_id=$domainId and from_exclusive < $ts and matching_state != ${CommitmentPeriodState.Matched}"
             .as[(CantonTimestamp, CantonTimestamp)]
             .withTransactionIsolation(Serializable),
           operationName = "commitments: compute no outstanding",
@@ -461,26 +499,30 @@ class DbAcsCommitmentStore(
         outstanding <- outstandingOpt
       } yield AcsCommitmentStore.latestCleanPeriod(ts, outstanding)
     }
-  }
 
   override def searchComputedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Option[ParticipantId],
+      counterParticipants: Seq[ParticipantId],
   )(implicit
       traceContext: TraceContext
   ): Future[Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.CommitmentType)]] = {
-    val query = counterParticipant match {
-      case Some(p) =>
-        sql"""select from_exclusive, to_inclusive, counter_participant, commitment
-            from par_computed_acs_commitments
-            where domain_id = $domainId and to_inclusive >= $start and from_exclusive < $end
-                and counter_participant = $p"""
-      case None =>
-        sql"""select from_exclusive, to_inclusive, counter_participant, commitment
+
+    val participantFilter: SQLActionBuilderChain = counterParticipants match {
+      case Seq() => sql""
+      case list =>
+        sql" AND counter_participant IN (" ++ list
+          .map(part => sql"$part")
+          .intercalate(sql", ") ++ sql")"
+    }
+
+    import DbStorage.Implicits.BuilderChain.*
+    val query =
+      sql"""select from_exclusive, to_inclusive, counter_participant, commitment
             from par_computed_acs_commitments
             where domain_id = $domainId and to_inclusive >= $start and from_exclusive < $end"""
-    }
+        ++ participantFilter
+
     storage.query(
       query.as[(CommitmentPeriod, ParticipantId, AcsCommitment.CommitmentType)],
       functionFullName,
@@ -490,19 +532,23 @@ class DbAcsCommitmentStore(
   override def searchReceivedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Option[ParticipantId],
+      counterParticipants: Seq[ParticipantId] = Seq.empty,
   )(implicit traceContext: TraceContext): Future[Iterable[SignedProtocolMessage[AcsCommitment]]] = {
-    val query = counterParticipant match {
-      case Some(p) =>
-        sql"""select signed_commitment
-            from par_received_acs_commitments
-            where domain_id = $domainId and to_inclusive >= $start and from_exclusive < $end
-            and sender = $p"""
-      case None =>
-        sql"""select signed_commitment
-            from par_received_acs_commitments
-            where domain_id = $domainId and to_inclusive >= $start and from_exclusive < $end"""
+
+    val participantFilter: SQLActionBuilderChain = counterParticipants match {
+      case Seq() => sql""
+      case list =>
+        sql" AND sender IN (" ++ list
+          .map(part => sql"$part")
+          .intercalate(sql", ") ++ sql")"
     }
+
+    import DbStorage.Implicits.BuilderChain.*
+    val query =
+      sql"""select signed_commitment
+            from par_received_acs_commitments
+            where domain_id = $domainId and to_inclusive >= $start and from_exclusive < $end""" ++ participantFilter
+
     storage.query(query.as[SignedProtocolMessage[AcsCommitment]], functionFullName)
 
   }
@@ -513,13 +559,12 @@ class DbAcsCommitmentStore(
   override val queue: DbCommitmentQueue =
     new DbCommitmentQueue(storage, domainId, protocolVersion, timeouts, loggerFactory)
 
-  override def onClosed(): Unit = {
+  override def onClosed(): Unit =
     Lifecycle.close(
       runningCommitments,
       queue,
       markSafeQueue,
     )(logger)
-  }
 }
 
 class DbIncrementalCommitmentStore(
@@ -541,7 +586,7 @@ class DbIncrementalCommitmentStore(
 
   override def get()(implicit
       traceContext: TraceContext
-  ): Future[(RecordTime, Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType])] = {
+  ): Future[(RecordTime, Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType])] =
     for {
       res <- storage.query(
         (for {
@@ -566,7 +611,6 @@ class DbIncrementalCommitmentStore(
         }.toMap
       }
     }
-  }
 
   override def watermark(implicit traceContext: TraceContext): Future[RecordTime] = {
     val query =
@@ -583,7 +627,7 @@ class DbIncrementalCommitmentStore(
       updates: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
       deletes: Set[SortedSet[LfPartyId]],
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    def partySetHash(parties: SortedSet[LfPartyId]): String68 = {
+    def partySetHash(parties: SortedSet[LfPartyId]): String68 =
       Hash
         .digest(
           HashPurpose.Stakeholders,
@@ -591,7 +635,6 @@ class DbIncrementalCommitmentStore(
           HashAlgorithm.Sha256,
         )
         .toLengthLimitedHexString
-    }
     def deleteCommitments(stakeholders: List[SortedSet[LfPartyId]]): DbAction.All[Unit] = {
       val deleteStatement =
         "delete from par_commitment_snapshot where domain_id = ? and stakeholders_hash = ?"
@@ -647,7 +690,7 @@ class DbIncrementalCommitmentStore(
       )(setParams)
     }
 
-    def insertRt(rt: RecordTime): DbAction.WriteOnly[Int] = {
+    def insertRt(rt: RecordTime): DbAction.WriteOnly[Int] =
       storage.profile match {
         case _: DbStorage.Profile.H2 =>
           sqlu"""merge into par_commitment_snapshot_time (domain_id, ts, tie_breaker) values ($domainId, ${rt.timestamp}, ${rt.tieBreaker})"""
@@ -664,7 +707,6 @@ class DbIncrementalCommitmentStore(
                   insert (domain_id, ts, tie_breaker) values ($domainId, ${rt.timestamp}, ${rt.tieBreaker})
                   """
       }
-    }
 
     val updateList = updates.toList
     val deleteList = deletes.toList
@@ -723,7 +765,7 @@ class DbCommitmentQueue(
     */
   override def peekThrough(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[List[AcsCommitment]] = {
+  ): Future[List[AcsCommitment]] =
     storage
       .query(
         sql"""select sender, counter_participant, from_exclusive, to_inclusive, commitment
@@ -733,7 +775,6 @@ class DbCommitmentQueue(
         operationName = NameOf.qualifiedNameOfCurrentFunc,
       )
       .map(_.toList)
-  }
 
   /** Returns all commitments whose period ends at or after the given timestamp.
     *
@@ -741,7 +782,7 @@ class DbCommitmentQueue(
     */
   override def peekThroughAtOrAfter(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[Seq[AcsCommitment]] = {
+  )(implicit traceContext: TraceContext): Future[Seq[AcsCommitment]] =
     storage
       .query(
         sql"""select sender, counter_participant, from_exclusive, to_inclusive, commitment
@@ -750,14 +791,13 @@ class DbCommitmentQueue(
           .as[AcsCommitment],
         operationName = NameOf.qualifiedNameOfCurrentFunc,
       )
-  }
 
   def peekOverlapsForCounterParticipant(
       period: CommitmentPeriod,
       counterParticipant: ParticipantId,
   )(implicit
       traceContext: TraceContext
-  ): Future[Seq[AcsCommitment]] = {
+  ): Future[Seq[AcsCommitment]] =
     storage
       .query(
         sql"""select sender, counter_participant, from_exclusive, to_inclusive, commitment
@@ -768,15 +808,13 @@ class DbCommitmentQueue(
           .as[AcsCommitment],
         operationName = NameOf.qualifiedNameOfCurrentFunc,
       )
-  }
 
   /** Deletes all commitments whose period ends at or before the given timestamp. */
   override def deleteThrough(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] =
     storage.update_(
       sqlu"delete from par_commitment_queue where domain_id = $domainId and to_inclusive <= $timestamp",
       operationName = "delete queued commitments",
     )
-  }
 }

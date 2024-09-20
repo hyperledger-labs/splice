@@ -13,8 +13,8 @@ import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.common_admin as externalHttp
 import com.daml.network.http.v0.external.common_admin.CommonAdminClient
 import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.OffsetDateTime

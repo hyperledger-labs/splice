@@ -3,10 +3,11 @@
 
 package com.digitalasset.canton.config
 
-import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
-import com.daml.metrics.api.MetricName
+import com.daml.jwt.JwtTimestampLeeway
 import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.tls.TlsVersion
+import com.daml.tracing.Telemetry
+import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.config.AdminServerConfig.defaultAddress
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, NonNegativeInt, Port}
 import com.digitalasset.canton.config.SequencerConnectionConfig.CertificateFile
@@ -53,6 +54,18 @@ trait ServerConfig extends Product with Serializable {
     */
   def sslContext: Option[SslContext]
 
+  /** If any defined, enforces token based authorization when accessing this node through the given `address` and `port`.
+    */
+  def authServices: Seq[AuthServiceConfig]
+
+  /** Leeway parameters for the jwt processing algorithms used in the authorization services
+    */
+  def jwtTimestampLeeway: Option[JwtTimestampLeeway]
+
+  /** If defined, the admin-token based authoriztion will be supported when accessing this node through the given `address` and `port`.
+    */
+  def adminToken: Option[String]
+
   /** server cert chain file if TLS is defined
     *
     * Used for domain internal GRPC sequencer connections
@@ -76,10 +89,12 @@ trait ServerConfig extends Product with Serializable {
   def instantiateServerInterceptors(
       tracingConfig: TracingConfig,
       apiLoggingConfig: ApiLoggingConfig,
-      metricsPrefix: MetricName,
-      metrics: LabeledMetricsFactory,
       loggerFactory: NamedLoggerFactory,
       grpcMetrics: GrpcServerMetrics,
+      authServices: Seq[AuthServiceConfig],
+      adminToken: Option[CantonAdminToken],
+      jwtTimestampLeeway: Option[JwtTimestampLeeway],
+      telemetry: Telemetry,
   ): CantonServerInterceptors
 
 }
@@ -88,15 +103,21 @@ trait CommunityServerConfig extends ServerConfig {
   override def instantiateServerInterceptors(
       tracingConfig: TracingConfig,
       apiLoggingConfig: ApiLoggingConfig,
-      metricsPrefix: MetricName,
-      metrics: LabeledMetricsFactory,
       loggerFactory: NamedLoggerFactory,
       grpcMetrics: GrpcServerMetrics,
+      authServices: Seq[AuthServiceConfig],
+      adminToken: Option[CantonAdminToken],
+      jwtTimestampLeeway: Option[JwtTimestampLeeway],
+      telemetry: Telemetry,
   ) = new CantonCommunityServerInterceptors(
     tracingConfig,
     apiLoggingConfig,
     loggerFactory,
     grpcMetrics,
+    authServices,
+    adminToken,
+    jwtTimestampLeeway,
+    telemetry,
   )
 }
 
@@ -132,8 +153,11 @@ final case class CommunityAdminServerConfig(
     override val address: String = defaultAddress,
     internalPort: Option[Port] = None,
     tls: Option[TlsServerConfig] = None,
+    jwtTimestampLeeway: Option[JwtTimestampLeeway] = None,
     keepAliveServer: Option[KeepAliveServerConfig] = Some(KeepAliveServerConfig()),
     maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
+    authServices: Seq[AuthServiceConfig] = Seq.empty,
+    adminToken: Option[String] = None,
 ) extends AdminServerConfig
     with CommunityServerConfig
 
@@ -199,7 +223,7 @@ sealed trait BaseTlsArguments {
       knownTlsVersions
         .find(_ == minVersion)
         .fold[Seq[String]](
-          throw new IllegalArgumentException(s"Unknown TLS protocol version ${minVersion}")
+          throw new IllegalArgumentException(s"Unknown TLS protocol version $minVersion")
         )(versionFound => knownTlsVersions.filter(_ >= versionFound))
     }
 }
@@ -273,10 +297,10 @@ object TlsServerConfig {
       "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
     )
     val logger = LoggerFactory.getLogger(TlsServerConfig.getClass)
-    val filtered = candidates.filter(x => {
+    val filtered = candidates.filter { x =>
       io.netty.handler.ssl.OpenSsl.availableOpenSslCipherSuites().contains(x) ||
       io.netty.handler.ssl.OpenSsl.availableJavaCipherSuites().contains(x)
-    })
+    }
     if (filtered.isEmpty) {
       val len = io.netty.handler.ssl.OpenSsl
         .availableOpenSslCipherSuites()

@@ -41,10 +41,10 @@ class CachingDomainTopologyClientTest extends AsyncWordSpecLike with BaseTest {
     val crypto = new TestingOwnerWithKeys(owner, loggerFactory, directExecutionContext)
     val mockTransaction = mock[GenericSignedTopologyTransaction]
 
-    val mockParent = mock[DomainTopologyClientWithInit]
-    val mockSnapshot0 = mock[TopologySnapshotLoader]
-    val mockSnapshot1 = mock[TopologySnapshotLoader]
-    val mockSnapshot2 = mock[TopologySnapshotLoader]
+    val mockParent = mock[StoreBasedDomainTopologyClient]
+    val mockSnapshot0 = mock[StoreBasedTopologySnapshot]
+    val mockSnapshot1 = mock[StoreBasedTopologySnapshot]
+    val mockSnapshot2 = mock[StoreBasedTopologySnapshot]
 
     val key1 = crypto.SigningKeys.key1
     val key2 = crypto.SigningKeys.key2
@@ -78,7 +78,7 @@ class CachingDomainTopologyClientTest extends AsyncWordSpecLike with BaseTest {
 
     when(mockParent.topologyKnownUntilTimestamp).thenReturn(ts3.plusSeconds(3))
     when(mockParent.approximateTimestamp).thenReturn(ts3)
-    when(mockParent.awaitTimestamp(any[CantonTimestamp], any[Boolean])(any[TraceContext]))
+    when(mockParent.awaitTimestamp(any[CantonTimestamp])(any[TraceContext]))
       .thenReturn(None)
     when(mockParent.trySnapshot(ts0)).thenReturn(mockSnapshot0)
     when(mockParent.trySnapshot(ts1)).thenReturn(mockSnapshot0)
@@ -103,7 +103,7 @@ class CachingDomainTopologyClientTest extends AsyncWordSpecLike with BaseTest {
       for {
         _ <- cc
           .observed(ts1, ts1, SequencerCounter(1), Seq(mockTransaction))
-          .failOnShutdown(s"at ${ts1}") // nonempty
+          .failOnShutdown(s"at $ts1") // nonempty
         sp0a <- cc.snapshot(ts0)
         sp0b <- cc.snapshot(ts1)
         _ = cc.observed(ts1.plusSeconds(10), ts1.plusSeconds(10), SequencerCounter(1), Seq())

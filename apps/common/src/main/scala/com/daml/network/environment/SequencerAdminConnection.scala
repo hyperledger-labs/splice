@@ -13,13 +13,13 @@ import com.digitalasset.canton.admin.api.client.commands.{
   StatusAdminCommands,
   TopologyAdminCommands,
 }
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatus}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
-import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.sequencing.protocol
@@ -58,10 +58,11 @@ class SequencerAdminConnection(
 
   override val serviceName = "Canton Sequencer Admin API"
 
-  override protected type Status = SequencerNodeStatus
+  override protected type Status = SequencerStatus
 
-  override protected def getStatusRequest: StatusAdminCommands.GetStatus[SequencerNodeStatus] =
-    new StatusAdminCommands.GetStatus(SequencerNodeStatus.fromProtoV30)
+  override protected def getStatusRequest
+      : StatusAdminCommands.NodeStatusCommand[SequencerStatus, _, _] =
+    SequencerAdminCommands.Health.SequencerStatusCommand()
 
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =
     getId().map(SequencerId(_))
@@ -172,7 +173,7 @@ class SequencerAdminConnection(
       member: Member,
       newTotalExtraTrafficLimit: NonNegativeLong,
       serial: PositiveInt,
-  )(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     runCmd(
       SequencerAdminCommands.SetTrafficPurchased(member, serial, newTotalExtraTrafficLimit)
     )

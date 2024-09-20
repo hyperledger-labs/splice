@@ -5,18 +5,18 @@ package com.digitalasset.canton.participant.admin.inspection
 
 import cats.Eval
 import cats.data.{EitherT, OptionT}
-import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.nameof.NameOf.functionFullName
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
+import com.digitalasset.canton.ledger.participant.state.{DomainIndex, RequestIndex}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.admin.data.ActiveContract
-import com.digitalasset.canton.participant.admin.inspection.Error.SerializationIssue
+import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection.SyncStateInspectionError
 import com.digitalasset.canton.participant.protocol.RequestJournal
-import com.digitalasset.canton.participant.store.ActiveContractStore.AcsError
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.{
   ConnectedDomainsLookup,
@@ -24,31 +24,24 @@ import com.digitalasset.canton.participant.sync.{
   UpstreamOffsetConvert,
 }
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.DomainOffset
-import com.digitalasset.canton.protocol.messages.{
-  AcsCommitment,
-  CommitmentPeriod,
-  SignedProtocolMessage,
-}
+import com.digitalasset.canton.protocol.messages.CommitmentPeriodState.fromIntValidSentPeriodState
+import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
 import com.digitalasset.canton.sequencing.PossiblyIgnoredProtocolEvent
 import com.digitalasset.canton.sequencing.handlers.EnvelopeOpener
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.store.CursorPrehead.{
-  RequestCounterCursorPrehead,
-  SequencerCounterCursorPrehead,
-}
 import com.digitalasset.canton.store.SequencedEventStore.{
   ByTimestampRange,
   PossiblyIgnoredSequencedEvent,
 }
 import com.digitalasset.canton.store.{SequencedEventRangeOverlapsWithPruning, SequencedEventStore}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{DomainAlias, LfPartyId, RequestCounter, TransferCounter}
+import com.digitalasset.canton.{DomainAlias, LfPartyId, ReassignmentCounter, RequestCounter}
 
 import java.io.OutputStream
 import java.time.Instant
@@ -57,7 +50,6 @@ import scala.concurrent.{ExecutionContext, Future}
 trait JournalGarbageCollectorControl {
   def disable(domainId: DomainId)(implicit traceContext: TraceContext): Future[Unit]
   def enable(domainId: DomainId)(implicit traceContext: TraceContext): Unit
-
 }
 
 object JournalGarbageCollectorControl {
@@ -97,7 +89,11 @@ final class SyncStateInspection(
     syncDomainPersistentStateManager.getAll.toList
       .map { case (id, state) => lookupAlias(id) -> state }
       .parTraverse { case (alias, state) =>
-        OptionT(state.requestJournalStore.preheadClean)
+        OptionT(
+          participantNodePersistentState.value.ledgerApiStore
+            .domainIndex(state.domainId.domainId)
+            .map(_.requestIndex)
+        )
           .semiflatMap(cleanRequest =>
             state.activeContractStore
               .contractSnapshot(contractIds, cleanRequest.timestamp)
@@ -108,13 +104,17 @@ final class SyncStateInspection(
       .map(_.flatten.toMap)
   }
 
-  /** returns the potentially big ACS of a given domain */
+  /** Returns the potentially large ACS of a given domain
+    * containing a map of contract IDs to tuples containing the latest activation timestamp and the contract reassignment counter
+    */
   def findAcs(
       domainAlias: DomainAlias
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, AcsError, Map[LfContractId, (CantonTimestamp, TransferCounter)]] = {
-
+  ): EitherT[Future, SyncStateInspectionError, Map[
+    LfContractId,
+    (CantonTimestamp, ReassignmentCounter),
+  ]] =
     for {
       state <- EitherT.fromEither[Future](
         syncDomainPersistentStateManager
@@ -122,11 +122,10 @@ final class SyncStateInspection(
           .toRight(SyncStateInspection.NoSuchDomain(domainAlias))
       )
 
-      snapshotO <- EitherT.right(AcsInspection.getCurrentSnapshot(state).map(_.map(_.snapshot)))
-    } yield snapshotO.fold(Map.empty[LfContractId, (CantonTimestamp, TransferCounter)])(
+      snapshotO <- EitherT.right(state.acsInspection.getCurrentSnapshot().map(_.map(_.snapshot)))
+    } yield snapshotO.fold(Map.empty[LfContractId, (CantonTimestamp, ReassignmentCounter)])(
       _.toMap
     )
-  }
 
   /** searches the pcs and returns the contract and activeness flag */
   def findContracts(
@@ -140,7 +139,7 @@ final class SyncStateInspection(
       timeouts.inspection.await("findContracts") {
         syncDomainPersistentStateManager
           .getByAlias(domain)
-          .traverse(AcsInspection.findContracts(_, filterId, filterPackage, filterTemplate, limit))
+          .traverse(_.acsInspection.findContracts(filterId, filterPackage, filterTemplate, limit))
 
       },
       domain,
@@ -151,7 +150,7 @@ final class SyncStateInspection(
       filterDomain: DomainId => Boolean,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, Error, Unit] = {
+  ): EitherT[Future, AcsInspectionError, Unit] = {
     val disabledCleaningF = Future
       .sequence(domains.collect {
         case (domainId, _) if filterDomain(domainId) =>
@@ -162,7 +161,9 @@ final class SyncStateInspection(
   }
 
   def allProtocolVersions: Map[DomainId, ProtocolVersion] =
-    syncDomainPersistentStateManager.getAll.view.mapValues(_.protocolVersion).toMap
+    syncDomainPersistentStateManager.getAll.view
+      .mapValues(_.staticDomainParameters.protocolVersion)
+      .toMap
 
   def exportAcsDumpActiveContracts(
       outputStream: OutputStream,
@@ -174,7 +175,7 @@ final class SyncStateInspection(
       partiesOffboarding: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, Error, Unit] = {
+  ): EitherT[Future, AcsInspectionError, Unit] = {
     val allDomains = syncDomainPersistentStateManager.getAll
 
     // disable journal cleaning for the duration of the dump
@@ -182,55 +183,61 @@ final class SyncStateInspection(
       MonadUtil.sequentialTraverse_(allDomains) {
         case (domainId, state) if filterDomain(domainId) =>
           val (domainIdForExport, protocolVersion) =
-            contractDomainRenames.getOrElse(domainId, (domainId, state.protocolVersion))
+            contractDomainRenames.getOrElse(
+              domainId,
+              (domainId, state.staticDomainParameters.protocolVersion),
+            )
+          val acsInspection = state.acsInspection
 
           val ret = for {
-            result <- AcsInspection
-              .forEachVisibleActiveContract(
-                domainId,
-                state,
-                parties,
-                timestamp,
-                skipCleanTimestampCheck = skipCleanTimestampCheck,
-              ) { case (contract, transferCounter) =>
-                val activeContract =
-                  ActiveContract.create(domainIdForExport, contract, transferCounter)(
-                    protocolVersion
-                  )
+            result <- acsInspection.forEachVisibleActiveContract(
+              domainId,
+              parties,
+              timestamp,
+              skipCleanTimestampCheck = skipCleanTimestampCheck,
+            ) { case (contract, reassignmentCounter) =>
+              val activeContract =
+                ActiveContract.create(domainIdForExport, contract, reassignmentCounter)(
+                  protocolVersion
+                )
 
-                activeContract.writeDelimitedTo(outputStream) match {
-                  case Left(errorMessage) =>
-                    Left(SerializationIssue(domainId, contract.contractId, errorMessage))
-                  case Right(_) =>
-                    outputStream.flush()
-                    Right(())
-                }
+              activeContract.writeDelimitedTo(outputStream) match {
+                case Left(errorMessage) =>
+                  Left(
+                    AcsInspectionError.SerializationIssue(
+                      domainId,
+                      contract.contractId,
+                      errorMessage,
+                    )
+                  )
+                case Right(_) =>
+                  outputStream.flush()
+                  Right(())
               }
+            }
 
             _ <- result match {
               case Some((allStakeholders, snapshotTs)) if partiesOffboarding =>
                 for {
                   syncDomain <- EitherT.fromOption[Future](
                     connectedDomainsLookup.get(domainId),
-                    Error.OffboardingParty(
+                    AcsInspectionError.OffboardingParty(
                       domainId,
                       s"Unable to get topology client for domain $domainId; check domain connectivity.",
                     ),
                   )
 
-                  _ <- AcsInspection
-                    .checkOffboardingSnapshot(
-                      participantId,
-                      offboardedParties = parties,
-                      allStakeholders = allStakeholders,
-                      snapshotTs = snapshotTs,
-                      topologyClient = syncDomain.topologyClient,
-                    )
-                    .leftMap[Error](err => Error.OffboardingParty(domainId, err))
+                  _ <- acsInspection.checkOffboardingSnapshot(
+                    participantId,
+                    offboardedParties = parties,
+                    allStakeholders = allStakeholders,
+                    snapshotTs = snapshotTs,
+                    topologyClient = syncDomain.topologyClient,
+                  )
                 } yield ()
 
               // Snapshot is empty or partiesOffboarding is false
-              case _ => EitherTUtil.unit[Error]
+              case _ => EitherTUtil.unit[AcsInspectionError]
             }
 
           } yield ()
@@ -253,18 +260,17 @@ final class SyncStateInspection(
 
   def contractCountInAcs(domain: DomainAlias, timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[Option[Int]] = {
+  ): Future[Option[Int]] =
     getPersistentState(domain) match {
       case None => Future.successful(None)
       case Some(state) => state.activeContractStore.contractCount(timestamp).map(Some(_))
     }
-  }
 
   def requestJournalSize(
       domain: DomainAlias,
       start: CantonTimestamp = CantonTimestamp.Epoch,
       end: Option[CantonTimestamp] = None,
-  )(implicit traceContext: TraceContext): Option[Int] = {
+  )(implicit traceContext: TraceContext): Option[Int] =
     getPersistentState(domain).map { state =>
       timeouts.inspection.await(
         s"$functionFullName from $start to $end from the journal of domain $domain"
@@ -272,14 +278,6 @@ final class SyncStateInspection(
         state.requestJournalStore.size(start, end)
       )
     }
-  }
-
-  def partyHasActiveContracts(partyId: PartyId)(implicit
-      traceContext: TraceContext
-  ): Future[Boolean] =
-    syncDomainPersistentStateManager.getAll.toList
-      .findM { case (_, store) => AcsInspection.hasActiveContracts(store, partyId) }
-      .map(_.nonEmpty)
 
   private def tryGetProtocolVersion(
       state: SyncDomainPersistentState,
@@ -351,7 +349,16 @@ final class SyncStateInspection(
     val persistentState = getPersistentState(domain)
     timeouts.inspection.await(s"$functionFullName from $start to $end on $domain")(
       getOrFail(persistentState, domain).acsCommitmentStore
-        .searchComputedBetween(start, end, counterParticipant)
+        .searchComputedBetween(start, end, counterParticipant.toList)
+    )
+  }
+
+  def findLastComputedAndSent(
+      domain: DomainAlias
+  )(implicit traceContext: TraceContext): Option[CantonTimestampSecond] = {
+    val persistentState = getPersistentState(domain)
+    timeouts.inspection.await(s"$functionFullName on $domain")(
+      getOrFail(persistentState, domain).acsCommitmentStore.lastComputedAndSent
     )
   }
 
@@ -364,20 +371,136 @@ final class SyncStateInspection(
     val persistentState = getPersistentState(domain)
     timeouts.inspection.await(s"$functionFullName from $start to $end on $domain")(
       getOrFail(persistentState, domain).acsCommitmentStore
-        .searchReceivedBetween(start, end, counterParticipant)
+        .searchReceivedBetween(start, end, counterParticipant.toList)
     )
   }
+
+  def crossDomainSentCommitmentMessages(
+      domainPeriods: Seq[DomainSearchCommitmentPeriod],
+      counterParticipants: Seq[ParticipantId],
+      states: Seq[CommitmentPeriodState],
+      verbose: Boolean,
+  )(implicit traceContext: TraceContext): Either[String, Iterable[SentAcsCommitment]] =
+    timeouts.inspection.await(functionFullName) {
+      val searchResult = domainPeriods.map { dp =>
+        for {
+          domain <- syncDomainPersistentStateManager
+            .aliasForDomainId(dp.domain.domainId)
+            .toRight(s"No domain alias found for ${dp.domain.domainId}")
+          persistentState = getPersistentState(domain)
+
+          result = for {
+            computed <- getOrFail(persistentState, domain).acsCommitmentStore
+              .searchComputedBetween(dp.fromExclusive, dp.toInclusive, counterParticipants)
+            received <-
+              if (verbose)
+                getOrFail(persistentState, domain).acsCommitmentStore
+                  .searchReceivedBetween(dp.fromExclusive, dp.toInclusive, counterParticipants)
+                  .map(iter => iter.map(rec => rec.message))
+              else Future.successful(Seq.empty)
+            outstanding <- getOrFail(persistentState, domain).acsCommitmentStore
+              .outstanding(
+                dp.fromExclusive,
+                dp.toInclusive,
+                counterParticipants,
+                includeMatchedPeriods = true,
+              )
+              .map { collection =>
+                collection
+                  .collect { case (period, participant, state) =>
+                    val converted = fromIntValidSentPeriodState(state.toInt)
+                    (period, participant, converted)
+                  }
+                  .flatMap {
+                    case (period, participant, Some(state)) => Some((period, participant, state))
+                    case _ => None
+                  }
+              }
+          } yield SentAcsCommitment
+            .compare(dp.domain.domainId, computed, received, outstanding, verbose)
+            .filter(cmt => states.isEmpty || states.contains(cmt.state))
+        } yield result
+      }
+
+      val (lefts, rights) = searchResult.partitionMap(identity)
+
+      NonEmpty.from(lefts) match {
+        case Some(leftsNe) => Future.successful(Left(leftsNe.head1))
+        case None =>
+          Future.sequence(rights).map(seqSentAcsCommitments => Right(seqSentAcsCommitments.flatten))
+      }
+    }
+
+  def crossDomainReceivedCommitmentMessages(
+      domainPeriods: Seq[DomainSearchCommitmentPeriod],
+      counterParticipants: Seq[ParticipantId],
+      states: Seq[CommitmentPeriodState],
+      verbose: Boolean,
+  )(implicit traceContext: TraceContext): Either[String, Iterable[ReceivedAcsCommitment]] =
+    timeouts.inspection.await(functionFullName) {
+      val searchResult = domainPeriods.map { dp =>
+        for {
+          domain <- syncDomainPersistentStateManager
+            .aliasForDomainId(dp.domain.domainId)
+            .toRight(s"No domain alias found for ${dp.domain.domainId}")
+          persistentState = getPersistentState(domain)
+
+          result = for {
+            computed <-
+              if (verbose)
+                getOrFail(persistentState, domain).acsCommitmentStore
+                  .searchComputedBetween(dp.fromExclusive, dp.toInclusive, counterParticipants)
+              else Future.successful(Seq.empty)
+            received <- getOrFail(persistentState, domain).acsCommitmentStore
+              .searchReceivedBetween(dp.fromExclusive, dp.toInclusive, counterParticipants)
+              .map(iter => iter.map(rec => rec.message))
+            outstanding <- getOrFail(persistentState, domain).acsCommitmentStore
+              .outstanding(
+                dp.fromExclusive,
+                dp.toInclusive,
+                counterParticipants,
+                includeMatchedPeriods = true,
+              )
+            buffered <- getOrFail(persistentState, domain).acsCommitmentStore.queue
+              .peekThrough(dp.toInclusive) // peekThrough takes an upper bound parameter
+              .collect(iter =>
+                iter.filter(cmt =>
+                  cmt.period.fromExclusive >= dp.fromExclusive && cmt.domainId == dp.domain.domainId && (counterParticipants.isEmpty ||
+                    counterParticipants
+                      .contains(cmt.sender))
+                )
+              )
+          } yield ReceivedAcsCommitment
+            .compare(dp.domain.domainId, received, computed, buffered, outstanding, verbose)
+            .filter(cmt => states.isEmpty || states.contains(cmt.state))
+        } yield result
+      }
+
+      val (lefts, rights) = searchResult.partitionMap(identity)
+
+      NonEmpty.from(lefts) match {
+        case Some(leftsNe) => Future.successful(Left(leftsNe.head1))
+        case None =>
+          Future
+            .sequence(rights)
+            .map(seqRecAcsCommitments =>
+              Right(seqRecAcsCommitments.flatten.toSet)
+            ) // toSet is done to avoid duplicates
+      }
+    }
 
   def outstandingCommitments(
       domain: DomainAlias,
       start: CantonTimestamp,
       end: CantonTimestamp,
       counterParticipant: Option[ParticipantId],
-  )(implicit traceContext: TraceContext): Iterable[(CommitmentPeriod, ParticipantId)] = {
+  )(implicit
+      traceContext: TraceContext
+  ): Iterable[(CommitmentPeriod, ParticipantId, CommitmentPeriodState)] = {
     val persistentState = getPersistentState(domain)
     timeouts.inspection.await(s"$functionFullName from $start to $end on $domain")(
       getOrFail(persistentState, domain).acsCommitmentStore
-        .outstanding(start, end, counterParticipant)
+        .outstanding(start, end, counterParticipant.toList)
     )
   }
 
@@ -400,40 +523,20 @@ final class SyncStateInspection(
     )
   }
 
-  /** Update the prehead for clean requests to the given value, bypassing all checks. Only used for testing. */
-  @deprecated(
-    "usage being removed as part of fusing MultiDomainEventLog and Ledger API Indexer",
-    "3.1",
-  )
-  def forceCleanPrehead(
-      newHead: Option[RequestCounterCursorPrehead],
-      domain: DomainAlias,
-  )(implicit
+  def lookupRequestIndex(domain: DomainAlias)(implicit
       traceContext: TraceContext
-  ): Either[String, Future[Unit]] = {
-    getPersistentState(domain)
-      .map(state => state.requestJournalStore.overridePreheadCleanForTesting(newHead))
-      .toRight(s"Unknown domain $domain")
-  }
+  ): Either[String, Future[Option[RequestIndex]]] =
+    lookupDomainLedgerEnd(domain)
+      .map(_.map(_.requestIndex))
 
-  @deprecated(
-    "usage being removed as part of fusing MultiDomainEventLog and Ledger API Indexer",
-    "3.1",
-  )
-  def forceCleanSequencerCounterPrehead(
-      newHead: Option[SequencerCounterCursorPrehead],
-      domain: DomainAlias,
-  )(implicit traceContext: TraceContext): Either[String, Future[Unit]] = {
-    getPersistentState(domain)
-      .map(state => state.sequencerCounterTrackerStore.rewindPreheadSequencerCounter(newHead))
-      .toRight(s"Unknown domain $domain")
-  }
-
-  def lookupCleanPrehead(domain: DomainAlias)(implicit
+  def lookupDomainLedgerEnd(domain: DomainAlias)(implicit
       traceContext: TraceContext
-  ): Either[String, Future[Option[RequestCounterCursorPrehead]]] =
+  ): Either[String, Future[DomainIndex]] =
     getPersistentState(domain)
-      .map(state => state.requestJournalStore.preheadClean)
+      .map(state =>
+        participantNodePersistentState.value.ledgerApiStore
+          .domainIndex(state.domainId.domainId)
+      )
       .toRight(s"Not connected to $domain")
 
   def requestStateInJournal(rc: RequestCounter, domain: DomainAlias)(implicit
@@ -446,45 +549,27 @@ final class SyncStateInspection(
   private[this] def getPersistentState(domain: DomainAlias): Option[SyncDomainPersistentState] =
     syncDomainPersistentStateManager.getByAlias(domain)
 
-  @deprecated(
-    "usage being removed as part of fusing MultiDomainEventLog and Ledger API Indexer",
-    "3.1",
-  )
-  def locateOffset(
-      numTransactions: Long
-  )(implicit traceContext: TraceContext): Future[Either[String, ParticipantOffset]] = {
-
-    if (numTransactions <= 0L)
-      throw new IllegalArgumentException(
-        s"Number of transactions needs to be positive and not $numTransactions"
-      )
-
-    participantNodePersistentState.value.multiDomainEventLog
-      .locateOffset(numTransactions - 1L)
-      .toRight(s"Participant does not contain $numTransactions transactions.")
-      .map(UpstreamOffsetConvert.toParticipantOffset)
-      .value
-  }
-
   def getOffsetByTime(
       pruneUpTo: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[Option[ParticipantOffset]] =
-    participantNodePersistentState.value.multiDomainEventLog
-      .getOffsetByTimeUpTo(pruneUpTo)
-      .map(UpstreamOffsetConvert.toParticipantOffset)
-      .value
+  )(implicit traceContext: TraceContext): Future[Option[String]] =
+    participantNodePersistentState.value.ledgerApiStore
+      .lastDomainOffsetBeforeOrAtPublicationTime(pruneUpTo)
+      .map(
+        _.map(_.offset.toHexString)
+      )
 
   def lookupPublicationTime(
-      ledgerOffset: ParticipantOffset
+      ledgerOffset: String
   )(implicit traceContext: TraceContext): EitherT[Future, String, CantonTimestamp] = for {
-    globalOffset <- EitherT.fromEither[Future](
-      UpstreamOffsetConvert.ledgerOffsetToGlobalOffset(ledgerOffset)
+    offset <- EitherT.fromEither[Future](
+      UpstreamOffsetConvert.toLedgerSyncOffset(ledgerOffset)
     )
-    res <- participantNodePersistentState.value.multiDomainEventLog
-      .lookupOffset(globalOffset)
-      .toRight(s"offset $ledgerOffset not found")
-    (_eventLogId, _localOffset, publicationTimestamp) = res
-  } yield publicationTimestamp
+    domainOffset <- EitherT(
+      participantNodePersistentState.value.ledgerApiStore
+        .domainOffset(offset)
+        .map(_.toRight(s"offset $ledgerOffset not found"))
+    )
+  } yield CantonTimestamp(domainOffset.publicationTime)
 
   def hasInFlightSubmissions(
       domain: DomainAlias
@@ -528,7 +613,7 @@ final class SyncStateInspection(
 
   def onlyForTestingMoveLedgerEndBackToScratch()(implicit traceContext: TraceContext): Unit =
     timeouts.inspection.await(functionFullName)(
-      participantNodePersistentState.value.ledgerApiStore.onlyForTestingMoveLedgerAndBackToScratch()
+      participantNodePersistentState.value.ledgerApiStore.onlyForTestingMoveLedgerEndBackToScratch()
     )
 
   def lastDomainOffset(
@@ -540,13 +625,18 @@ final class SyncStateInspection(
         participantNodePersistentState.value.ledgerApiStore.ledgerEndCache()._1,
       )
     )
+
+  def prunedUptoOffset(implicit traceContext: TraceContext): Option[GlobalOffset] =
+    timeouts.inspection.await(functionFullName)(
+      participantNodePersistentState.value.pruningStore.pruningStatus().map(_.completedO)
+    )
+
 }
 
 object SyncStateInspection {
 
-  private type DisplayOffset = String
-
-  private final case class NoSuchDomain(alias: DomainAlias) extends AcsError
+  sealed trait SyncStateInspectionError extends Product with Serializable
+  private final case class NoSuchDomain(alias: DomainAlias) extends SyncStateInspectionError
 
   private def getOrFail[T](opt: Option[T], domain: DomainAlias): T =
     opt.getOrElse(throw new IllegalArgumentException(s"no such domain [$domain]"))

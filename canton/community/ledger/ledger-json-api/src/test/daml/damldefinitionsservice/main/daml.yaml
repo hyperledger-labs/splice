@@ -1,0 +1,11 @@
+sdk-version: 3.0.0-snapshot.20240318.12913.0.v1c415c97
+build-options:
+- --target=2.1
+name: DamlDefinitionsServiceMain
+source: MainApp.daml
+version: 3.2.0
+dependencies:
+- daml-prim
+- daml-stdlib
+- daml3-script
+- ../../../../../.daml/dist/DamlDefinitionsServiceDep-current.dar

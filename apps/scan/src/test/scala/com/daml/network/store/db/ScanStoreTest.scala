@@ -88,7 +88,7 @@ abstract class ScanStoreTest
           amuletRulesContract = amuletRules()
           _ <- dummyDomain.exercise(
             amuletRulesContract,
-            interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+            interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
             Transfer.choice.name,
             mkAmuletRulesTransfer(user1, amuletAmount),
             mkTransferResult(
@@ -137,7 +137,7 @@ abstract class ScanStoreTest
           amuletContract = amulet(user1, amuletRound1, 1, holdingFee)
           _ <- dummyDomain.exercise(
             amuletContract,
-            interfaceId = Some(splice.amulet.Amulet.TEMPLATE_ID),
+            interfaceId = Some(splice.amulet.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
             AmuletExpire.choice.name,
             mkAmuletExpire(),
             mkAmuletExpireResult(
@@ -181,7 +181,7 @@ abstract class ScanStoreTest
           amuletContract = lockedAmulet(user1, amuletRound1, 1, holdingFee)
           _ <- dummyDomain.exercise(
             amuletContract,
-            interfaceId = Some(splice.amulet.LockedAmulet.TEMPLATE_ID),
+            interfaceId = Some(splice.amulet.LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID),
             LockedAmuletExpireAmulet.choice.name,
             mkLockedAmuletExpireAmulet(),
             new LockedAmulet_ExpireAmuletResult(
@@ -307,7 +307,7 @@ abstract class ScanStoreTest
             for {
               _ <- dummyDomain.exercise(
                 amuletRulesContract,
-                interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+                interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
                 Transfer.choice.name,
                 dummyTransferArg,
                 mkTransferResult(
@@ -380,7 +380,7 @@ abstract class ScanStoreTest
           amuletContract = amulet(user1, mintAmount1, 2, holdingFee)
           _ <- dummyDomain.exercise(
             amuletContract,
-            interfaceId = Some(splice.amulet.Amulet.TEMPLATE_ID),
+            interfaceId = Some(splice.amulet.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
             AmuletExpire.choice.name,
             mkAmuletExpire(),
             mkAmuletExpireResult(
@@ -395,7 +395,7 @@ abstract class ScanStoreTest
           lockedAmuletContract = lockedAmulet(user2, mintAmount2, 2, holdingFee)
           _ <- dummyDomain.exercise(
             lockedAmuletContract,
-            interfaceId = Some(splice.amulet.LockedAmulet.TEMPLATE_ID),
+            interfaceId = Some(splice.amulet.LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID),
             LockedAmuletExpireAmulet.choice.name,
             mkLockedAmuletExpireAmulet(),
             mkAmuletExpireResult(
@@ -463,7 +463,7 @@ abstract class ScanStoreTest
             case ((appAmount, validatorAmount), round) =>
               dummyDomain.exercise(
                 amuletRules(),
-                Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+                Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
                 Transfer.choice.name,
                 mkAmuletRulesTransfer(user1, 1.0),
                 mkTransferResult(
@@ -512,7 +512,7 @@ abstract class ScanStoreTest
           _ <- MonadUtil.sequentialTraverse(appRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
               amuletRules(),
-              Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+              Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
               Transfer.choice.name,
               mkAmuletRulesTransfer(user1, amount),
               mkTransferResult(
@@ -529,7 +529,7 @@ abstract class ScanStoreTest
           _ <- MonadUtil.sequentialTraverse(validatorRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
               amuletRules(),
-              Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+              Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
               Transfer.choice.name,
               mkAmuletRulesTransfer(user1, amount),
               mkTransferResult(
@@ -658,7 +658,7 @@ abstract class ScanStoreTest
         _ <- MonadUtil.sequentialTraverse(providerRewardRounds) { case (provider, amount, round) =>
           dummyDomain.exercise(
             amuletRules(),
-            Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+            Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
             Transfer.choice.name,
             mkAmuletRulesTransfer(provider, amount),
             mkTransferResultForTest(
@@ -1049,7 +1049,7 @@ abstract class ScanStoreTest
           dummyDomain
             .exercise(
               contract = amuletRulesContract,
-              interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+              interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
               choiceName = Transfer.choice.name,
               choiceArgument = mkAmuletRules_Transfer(
                 mkTransferInputOutput(
@@ -1149,7 +1149,7 @@ abstract class ScanStoreTest
             result = mkVoteRequestResult(voteRequestContract)
             _ <- dummyDomain.exercise(
               contract = dsoRules(party = dsoParty),
-              interfaceId = Some(DsoRules.TEMPLATE_ID),
+              interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
               choiceName = DsoRulesCloseVoteRequest.choice.name,
               mkCloseVoteRequest(
                 voteRequestContract.contractId
@@ -1427,8 +1427,8 @@ trait AmuletTransferUtil { self: StoreTest =>
     val amuletCreateEvent = toCreatedEvent(createdAmulet, signatories = Seq(provider, dsoParty))
     val amuletArchiveEvent = exercisedEvent(
       createdAmulet.contractId.contractId,
-      amuletCodegen.Amulet.TEMPLATE_ID,
-      Some(splice.amulet.Amulet.TEMPLATE_ID),
+      amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID,
+      Some(splice.amulet.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
       amuletCodegen.Amulet.CHOICE_Archive.name,
       consuming = true,
       new DamlRecord(),
@@ -1439,7 +1439,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       offset,
       exercisedEvent(
         amuletRulesCid,
-        splice.amuletrules.AmuletRules.TEMPLATE_ID,
+        splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
         None,
         splice.amuletrules.AmuletRules.CHOICE_AmuletRules_BuyMemberTraffic.name,
         consuming = false,
@@ -1492,7 +1492,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       offset,
       exercisedEvent(
         amuletRulesCid,
-        splice.amuletrules.AmuletRules.TEMPLATE_ID,
+        splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
         None,
         splice.amuletrules.AmuletRules.CHOICE_AmuletRules_Mint.name,
         consuming = false,
@@ -1558,7 +1558,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       svs: java.util.Map[String, dsorulesCodegen.SvInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
-    val templateId = dsorulesCodegen.DsoRules.TEMPLATE_ID
+    val templateId = dsorulesCodegen.DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID
     val newDomainId = "new-domain-id"
     val template = new dsorulesCodegen.DsoRules(
       dsoParty.toProtoPrimitive,
@@ -1610,7 +1610,7 @@ trait AmuletTransferUtil { self: StoreTest =>
     )
 
     contract(
-      AnsEntry.TEMPLATE_ID,
+      AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID,
       new AnsEntry.ContractId(nextCid()),
       template,
     )
@@ -1629,7 +1629,7 @@ trait AmuletTransferUtil { self: StoreTest =>
     )
 
     contract(
-      MemberTraffic.TEMPLATE_ID,
+      MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID,
       new MemberTraffic.ContractId(nextCid()),
       template,
     )

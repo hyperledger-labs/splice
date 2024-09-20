@@ -92,7 +92,7 @@ class DbValidatorStore(
           storeId,
           domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
-              walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
+              walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
             )} and user_party = $endUserParty""",
           orderLimit = sql"limit 1",
         ).headOption,
@@ -113,7 +113,7 @@ class DbValidatorStore(
           storeId,
           domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
-              walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
+              walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
             )} and user_name = ${lengthLimited(endUserName)}""",
           orderLimit = sql"limit 1",
         ).headOption,
@@ -134,7 +134,7 @@ class DbValidatorStore(
           storeId,
           domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
-              amuletCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID
+              amuletCodegen.FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
             )} and provider_party = ${walletKey.validatorParty}""",
           orderLimit = sql"limit 1",
         ).headOption,
@@ -159,7 +159,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
+                walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and user_name = ${lengthLimited(endUserName)}
             """,
@@ -191,7 +191,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                validatorLicenseCodegen.ValidatorLicense.COMPANION.TEMPLATE_ID
+                validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and validator_party = ${key.validatorParty}
             """,
@@ -226,7 +226,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                amuletCodegen.ValidatorRight.COMPANION.TEMPLATE_ID
+                amuletCodegen.ValidatorRight.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and user_party = $party
             """,
@@ -258,7 +258,7 @@ class DbValidatorStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID
+                appManagerCodegen.AppConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and provider_party = $provider
               """,
@@ -288,7 +288,7 @@ class DbValidatorStore(
               domainMigrationId,
               where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                  appManagerCodegen.AppConfiguration.TEMPLATE_ID
+                  appManagerCodegen.AppConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
                 and app_configuration_name = ${lengthLimited(name)}
                 """,
@@ -321,7 +321,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID
+                appManagerCodegen.AppConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and provider_party = $provider
               and app_configuration_version = $version
@@ -353,7 +353,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID
+                appManagerCodegen.AppRelease.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and provider_party = $provider
               and app_release_version = ${lengthLimited(version)}
@@ -386,7 +386,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID
+                appManagerCodegen.RegisteredApp.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and provider_party = $provider
             """,
@@ -418,7 +418,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID
+                appManagerCodegen.InstalledApp.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and provider_party = $provider
             """,
@@ -453,7 +453,7 @@ class DbValidatorStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
+                appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and provider_party = $provider""",
             orderLimit = sql"limit ${sqlLimit(limit)}",
@@ -486,7 +486,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
+                appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and provider_party = $provider
               and json_hash = $jsonHash
@@ -519,7 +519,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                topupCodegen.ValidatorTopUpState.COMPANION.TEMPLATE_ID
+                topupCodegen.ValidatorTopUpState.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and traffic_domain_id = $domainId
             """,

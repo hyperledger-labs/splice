@@ -4,8 +4,8 @@
 package com.digitalasset.canton.admin.api.client
 
 import cats.data.EitherT
+import com.daml.grpc.AuthCallCredentials
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.ledger.client.LedgerCallCredentials
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
@@ -40,7 +40,7 @@ class GrpcCtlRunner(
       .createService(channel)
       .withInterceptors(TraceContextGrpc.clientInterceptor)
 
-    val service = token.fold(baseService)(LedgerCallCredentials.authenticatingStub(baseService, _))
+    val service = token.fold(baseService)(AuthCallCredentials.authorizingStub(baseService, _))
 
     for {
       request <- EitherT.fromEither[Future](command.createRequest())

@@ -26,7 +26,7 @@ val domainParametersConfig = DomainParametersConfig(
 
 def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
-    .toStaticDomainParameters(sequencer.config.crypto, ProtocolVersion.v31)
+    .toStaticDomainParameters(sequencer.config.crypto, ProtocolVersion.v32)
     .map(StaticDomainParameters(_))
     .getOrElse(sys.error("whatever"))
 
@@ -37,9 +37,10 @@ def bootstrapOtherDomain(
 ) = {
   bootstrap.domain(
     name,
-    domainOwners = Seq(sequencer, mediator),
+    domainOwners = Seq(sequencer),
     sequencers = Seq(sequencer),
     mediators = Seq(mediator),
+    domainThreshold = PositiveInt.one,
     staticDomainParameters = staticParameters(sequencer),
   )
   // For some stupid reason bootstrap.domain does not allow changing the dynamic domain parameters

@@ -354,7 +354,7 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v31)
+        val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v32)
         val values = initialValues.tryUpdate(
           // TODO(#6055) Consider increasing topology change delay again
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),

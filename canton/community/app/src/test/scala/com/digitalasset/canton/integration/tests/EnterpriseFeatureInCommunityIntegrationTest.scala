@@ -4,9 +4,10 @@
 package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.config.CommunityStorageConfig
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{CommandFailure, InstanceReference}
-import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.integration.CommunityTests.{
   CommunityIntegrationTest,
   SharedCommunityEnvironment,
@@ -49,6 +50,7 @@ sealed trait EnterpriseFeatureInCommunityIntegrationTest
           Seq(sequencer1),
           Seq(mediator1),
           Seq[InstanceReference](sequencer1, mediator1),
+          PositiveInt.two,
           staticDomainParameters = CommunityEnvironmentDefinition.defaultStaticDomainParameters,
         )
 
@@ -100,7 +102,8 @@ sealed trait EnterpriseFeatureInCommunityIntegrationTest
       alias = DomainAlias.tryCreate(domainAlias),
     )
 
-    val startOffset = participant1.ledger_api.state.end()
+    val startOffset =
+      participant1.ledger_api.state.end()
     // Generate some data after the pruning point
     participant1.health.ping(participant1)
 

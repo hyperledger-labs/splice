@@ -7,6 +7,10 @@ import cats.data.EitherT
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.domain.sequencing.admin.data.{
+  SequencerAdminStatus,
+  SequencerHealthStatus,
+}
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
   CreateSubscriptionError,
@@ -21,7 +25,6 @@ import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
   SequencerRateLimitManager,
   SequencerTrafficStatus,
 }
-import com.digitalasset.canton.health.admin.data.{SequencerAdminStatus, SequencerHealthStatus}
 import com.digitalasset.canton.health.{AtomicHealthElement, CloseableHealthQuasiComponent}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLogging}
@@ -160,7 +163,7 @@ trait Sequencer
       domainTimeTracker: DomainTimeTracker,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TrafficControlError, CantonTimestamp]
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, Unit]
 
   /** Return the traffic state of a member at a given timestamp.
     */

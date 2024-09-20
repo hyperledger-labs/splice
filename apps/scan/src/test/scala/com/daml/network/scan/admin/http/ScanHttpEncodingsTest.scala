@@ -29,8 +29,8 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         offset = "%08d".format(99),
         root = exercisedEvent(
           contractId = validContractId(1),
-          templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
-          interfaceId = Some(amuletCodegen.Amulet.TEMPLATE_ID),
+          templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+          interfaceId = Some(amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
           choice = amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_Mint.name,
           consuming = false,
           argument = new amuletrulesCodegen.AmuletRules_Mint(

@@ -23,7 +23,6 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
-  DedupBeginOffset,
   DedupConfig,
   DedupOffset,
   IncompleteReassignmentEvent,
@@ -43,7 +42,6 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
-import com.daml.network.environment.BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
 import com.digitalasset.canton.topology.{DomainId, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -85,12 +83,17 @@ class BaseLedgerConnection(
 
   def ledgerEnd()(implicit
       traceContext: TraceContext
-  ): Future[lapi.participant_offset.ParticipantOffset.Value.Absolute] =
+  ): Future[String] =
     client.ledgerEnd()
+
+  def latestPrunedOffset()(implicit
+      traceContext: TraceContext
+  ): Future[String] =
+    client.latestPrunedOffset()
 
   def activeContracts(
       filter: IngestionFilter,
-      offset: lapi.participant_offset.ParticipantOffset.Value.Absolute,
+      offset: String,
   )(implicit tc: TraceContext): Future[
     (
         Seq[ActiveContract],
@@ -100,7 +103,7 @@ class BaseLedgerConnection(
   ] = {
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
-        activeAtOffset = offset.value,
+        activeAtOffset = offset,
         filter = Some(filter.toTransactionFilter),
       )
     )
@@ -131,7 +134,7 @@ class BaseLedgerConnection(
     client.getConnectedDomains(party)
 
   def updates(
-      beginOffset: lapi.participant_offset.ParticipantOffset,
+      beginOffset: String,
       filter: IngestionFilter,
   )(implicit tc: TraceContext): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
@@ -1011,10 +1014,6 @@ object BaseLedgerConnection {
 
   val APP_MANAGER_ISSUER: String = "app_manager"
 
-  // We use a synthetic 0 offset here. This is easier to manage than having to use ParticpantOffset
-  // in the store APIs everywhere instead of a plain string.
-  val PARTICIPANT_BEGIN_OFFSET = "0"
-
   /** In a number of places we want to use a user id in a place where a `PartyString` expected, e.g.,
     * in party id hints and in workflow ids. However, the allowed set of characters is slightly different so
     * this function can be used to perform the necessary escaping. Note that PartyString is more restrictive than
@@ -1115,13 +1114,10 @@ object SpliceLedgerConnection {
       private[SpliceLedgerConnection] val split: CmdId => (String, DedupConfig)
   )
   object SubmitDedup {
-    implicit val dedupOffset: SubmitDedup[(CommandId, String)] = SubmitDedup {
-      case (cid, PARTICIPANT_BEGIN_OFFSET) => (cid.commandIdForSubmission, DedupBeginOffset)
-      case (cid, offset) => (cid.commandIdForSubmission, DedupOffset(offset))
+    implicit val dedupOffset: SubmitDedup[(CommandId, String)] = SubmitDedup { case (cid, offset) =>
+      (cid.commandIdForSubmission, DedupOffset(offset))
     }
     implicit val dedupConfig: SubmitDedup[(CommandId, DedupConfig)] = SubmitDedup {
-      case (cid, DedupOffset(PARTICIPANT_BEGIN_OFFSET)) =>
-        (cid.commandIdForSubmission, DedupBeginOffset)
       case (cid, dc) =>
         (cid.commandIdForSubmission, dc)
     }

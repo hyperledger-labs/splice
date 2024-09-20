@@ -90,7 +90,9 @@ trait DbVotesStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLo
       acsTableName,
       storeId,
       domainMigrationId,
-      where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
+      where = (sql""" template_id_qualified_name = ${QualifiedName(
+          VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
+        )}
                           and #$trackingCidColumnName in """ ++ voteRequestTrackingCidsSql).toActionBuilder,
       orderLimit = sql"""limit ${sqlLimit(limit)}""",
     )
@@ -111,7 +113,9 @@ trait DbVotesStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLo
       acsTableName,
       storeId,
       domainMigrationId,
-      where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
+      where = (sql""" template_id_qualified_name = ${QualifiedName(
+          VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
+        )}
                        and #$trackingCidColumnName = $voteRequestCid """).toActionBuilder,
     ).headOption
   }

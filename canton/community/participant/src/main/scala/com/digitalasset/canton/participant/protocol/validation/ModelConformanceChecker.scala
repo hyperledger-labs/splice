@@ -4,7 +4,6 @@
 package com.digitalasset.canton.participant.protocol.validation
 
 import cats.data.EitherT
-import cats.implicits.toTraverseOps
 import cats.syntax.alternative.*
 import cats.syntax.bifunctor.*
 import cats.syntax.parallel.*
@@ -200,7 +199,7 @@ class ModelConformanceChecker(
       getEngineAbortStatus: GetEngineAbortStatus,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, Map[LfContractId, StoredContract]] = {
+  ): EitherT[FutureUnlessShutdown, Error, Map[LfContractId, StoredContract]] =
     view.tryFlattenToParticipantViews
       .flatMap(_.viewParticipantData.coreInputs)
       .parTraverse { case (cid, InputContract(contract, _)) =>
@@ -215,21 +214,19 @@ class ModelConformanceChecker(
       }
       .map(_.toMap)
       .mapK(FutureUnlessShutdown.outcomeK)
-  }
 
   private def buildPackageNameMap(
       packageIds: Set[PackageId]
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, Map[PackageName, PackageId]] = {
-
+  ): EitherT[FutureUnlessShutdown, Error, Map[PackageName, PackageId]] =
     EitherT(for {
       resolvedE <- packageIds.toSeq.parTraverse(pId =>
         packageResolver(pId)(traceContext)
-          .map({
+          .map {
             case None => Left(pId)
             case Some(ast) => Right((pId, ast.metadata.name))
-          })
+          }
       )
     } yield {
       for {
@@ -238,13 +235,12 @@ class ModelConformanceChecker(
           case (unresolved, _) =>
             Left(PackageNotFound(Map(participantId -> unresolved.toSet)): Error)
         }
-        resolvedNameBindings = resolved.map({ case (pId, name) => name -> pId })
+        resolvedNameBindings = resolved.map { case (pId, name) => name -> pId }
         nameBindings <- MapsUtil.toNonConflictingMap(resolvedNameBindings) leftMap { conflicts =>
           ConflictingNameBindings(Map(participantId -> conflicts))
         }
       } yield nameBindings
     }).mapK(FutureUnlessShutdown.outcomeK)
-  }
 
   private def checkView(
       view: TransactionView,
@@ -302,7 +298,7 @@ class ModelConformanceChecker(
 
       (lfTx, metadata, resolverFromReinterpretation, usedPackages) = lfTxAndMetadata
 
-      _ <- checkPackageVetting(view, topologySnapshot, usedPackages)
+      _ <- checkPackageVetting(view, topologySnapshot, usedPackages, metadata.ledgerTime)
 
       // For transaction views of protocol version 3 or higher,
       // the `resolverFromReinterpretation` is the same as the `resolverFromView`.
@@ -349,6 +345,7 @@ class ModelConformanceChecker(
       view: TransactionView,
       snapshot: TopologySnapshot,
       packageIds: Set[PackageId],
+      ledgerTime: CantonTimestamp,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Error, Unit] = {
 
     val informees = view.viewCommonData.tryUnwrap.viewConfirmationParameters.informees
@@ -358,22 +355,15 @@ class ModelConformanceChecker(
         snapshot.activeParticipantsOfParties(informees.toSeq)
       )
       informeeParticipants = informeeParticipantsByParty.values.flatten.toSet
-      unvettedResult <- informeeParticipants.toSeq
+      unvetted <- informeeParticipants.toSeq
         .parTraverse(p =>
-          snapshot.findUnvettedPackagesOrDependencies(p, packageIds).map(p -> _).value
+          snapshot
+            .findUnvettedPackagesOrDependencies(p, packageIds, ledgerTime)
+            .map(p -> _)
         )
-        .map(_.sequence)
-      unvettedPackages = unvettedResult match {
-        case Left(packageId) =>
-          // The package is not in the store and thus the package is not vetted.
-          // If the admin has tampered with the package store and the package is still vetted,
-          // we consider this participant as malicious;
-          // in that case, other participants may still commit the view.
-          Seq(participantId -> Set(packageId))
-        case Right(unvettedSeq) =>
-          unvettedSeq.filter { case (_, packageIds) => packageIds.nonEmpty }
-      }
+
     } yield {
+      val unvettedPackages = unvetted.filter { case (_, packageIds) => packageIds.nonEmpty }
       Either.cond(unvettedPackages.isEmpty, (), UnvettedPackages(unvettedPackages.toMap))
     })
   }
@@ -389,8 +379,7 @@ object ModelConformanceChecker {
       participantId: ParticipantId,
       packageResolver: PackageResolver,
       loggerFactory: NamedLoggerFactory,
-  )(implicit executionContext: ExecutionContext): ModelConformanceChecker = {
-
+  )(implicit executionContext: ExecutionContext): ModelConformanceChecker =
     new ModelConformanceChecker(
       damlE,
       validateSerializedContract(damlE),
@@ -400,7 +389,6 @@ object ModelConformanceChecker {
       packageResolver,
       loggerFactory,
     )
-  }
 
   private[validation] sealed trait ContractValidationFailure
   private[validation] final case class DAMLeFailure(error: DAMLe.ReinterpretationError)

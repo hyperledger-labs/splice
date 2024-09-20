@@ -1289,7 +1289,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
     )
     contract(
-      Confirmation.TEMPLATE_ID,
+      Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID,
       new Confirmation.ContractId(validContractId(n)),
       template,
     )
@@ -1324,7 +1324,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      DsoRules.TEMPLATE_ID,
+      DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID,
       new DsoRules.ContractId(validContractId(1)),
       template,
     )
@@ -1352,7 +1352,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      MemberTraffic.TEMPLATE_ID,
+      MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID,
       new MemberTraffic.ContractId(nextCid()),
       template,
     )
@@ -1368,7 +1368,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      ElectionRequest.TEMPLATE_ID,
+      ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
       new ElectionRequest.ContractId(nextCid()),
       template,
     )
@@ -1389,7 +1389,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      AnsEntry.TEMPLATE_ID,
+      AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID,
       new AnsEntry.ContractId(nextCid()),
       template,
     )
@@ -1406,7 +1406,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      AnsEntryContext.TEMPLATE_ID,
+      AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID,
       new AnsEntryContext.ContractId(validContractId(n, "cc")),
       template,
     )
@@ -1417,7 +1417,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       nextPaymentDueAt: Instant,
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = SubscriptionIdleState.TEMPLATE_ID
+    val templateId = SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new SubscriptionIdleState(
       new Subscription.ContractId(validContractId(n, "aa")),
       new SubscriptionData(
@@ -1460,7 +1460,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      SvOnboardingRequest.TEMPLATE_ID,
+      SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
       new SvOnboardingRequest.ContractId(nextCid()),
       template,
     )
@@ -1483,7 +1483,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      SvOnboardingConfirmed.TEMPLATE_ID,
+      SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID,
       new SvOnboardingConfirmed.ContractId(nextCid()),
       template,
     )
@@ -1553,7 +1553,7 @@ class DbSvDsoStoreTest
         )
         _ <- dummyDomain.exercise(
           contract = dsoRules(),
-          interfaceId = Some(DsoRules.TEMPLATE_ID),
+          interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
           choiceName = DsoRulesCloseVoteRequest.choice.name,
           mkCloseVoteRequest(
             voteRequestContract1.contractId
@@ -1574,7 +1574,7 @@ class DbSvDsoStoreTest
         )
         _ <- dummyDomain.exercise(
           contract = dsoRules(),
-          interfaceId = Some(DsoRules.TEMPLATE_ID),
+          interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
           choiceName = DsoRulesCloseVoteRequest.choice.name,
           mkCloseVoteRequest(
             voteRequestContract2.contractId

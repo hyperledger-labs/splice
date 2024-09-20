@@ -62,7 +62,7 @@ object UpdateToDbDto {
               requestIndex = u.domainIndex.flatMap(_.requestIndex),
               serializedTraceContext = serializedTraceContext,
               isTransaction =
-                true, // please note from usage point of view (deduplication) rejections are always used both for transactions and transfers at the moment.
+                true, // please note from usage point of view (deduplication) rejections are always used both for transactions and reassignments at the moment.
             ).copy(
               rejection_status_code = Some(u.reasonTemplate.code),
               rejection_status_message = Some(u.reasonTemplate.message),
@@ -420,6 +420,9 @@ object UpdateToDbDto {
         case u: SequencerIndexMoved =>
           // nothing to persist, this is only a synthetic DbDto to facilitate updating the StringInterning
           Iterator(DbDto.SequencerIndexMoved(u.domainId.toProtoPrimitive))
+
+        case _: CommitRepair =>
+          Iterator.empty
       }
   }
 
@@ -429,14 +432,13 @@ object UpdateToDbDto {
       status: String,
   )(implicit
       mc: MetricsContext
-  ): Unit = {
+  ): Unit =
     withExtraMetricLabels(
       IndexedUpdatesMetrics.Labels.eventType.key -> eventType,
       IndexedUpdatesMetrics.Labels.status.key -> status,
     ) { implicit mc =>
       metrics.eventsMeter.mark()
     }
-  }
   private def commandCompletion(
       offset: Offset,
       recordTime: Time.Timestamp,

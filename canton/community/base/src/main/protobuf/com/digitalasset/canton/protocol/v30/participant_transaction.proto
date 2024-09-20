@@ -11,7 +11,6 @@ import "com/digitalasset/canton/protocol/v30/common_stable.proto";
 import "com/digitalasset/canton/protocol/v30/merkle.proto";
 import "com/digitalasset/canton/protocol/v30/quorum.proto";
 import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
 import "scalapb/scalapb.proto";
 
 // Messages sent by a participant as part of the transaction protocol
@@ -63,7 +62,7 @@ message ViewCommonData {
 }
 
 message Informee {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   string party = 1;
   int32 weight = 2; // optional: only set if party is confirming
@@ -87,14 +86,14 @@ message ViewParticipantMessage {
 // InformeeMessage
 
 message InformeeMessage {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   FullInformeeTree full_informee_tree = 1;
   com.digitalasset.canton.crypto.v30.Signature submitting_participant_signature = 2;
 }
 
 message LightTransactionViewTree {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   GenTransactionTree tree = 1;
   repeated bytes subview_hashes = 2;
@@ -118,7 +117,7 @@ message InputContract {
 }
 
 message CommonMetadata {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
   // this used to contain a confirmation policy (Signatory or VIP) that no longer exists
@@ -129,7 +128,7 @@ message CommonMetadata {
 }
 
 message SubmitterMetadata {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
   repeated string act_as = 2;
@@ -156,7 +155,7 @@ message SessionKeyLookup {
 }
 
 message EncryptedViewMessage {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   bytes view_tree = 1;
 
@@ -195,7 +194,7 @@ message ActionDescription {
     bool by_key = 5;
     bytes node_seed = 6;
     bool failed = 8;
-    google.protobuf.StringValue interface_id = 9;
+    optional string interface_id = 9;
     string template_id = 10;
     repeated string package_preference = 11;
   }

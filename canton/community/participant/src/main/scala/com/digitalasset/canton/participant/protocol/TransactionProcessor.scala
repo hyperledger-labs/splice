@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.protocol
 
 import cats.data.EitherT
 import com.daml.error.*
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
@@ -119,6 +120,14 @@ class TransactionProcessor(
       futureSupervisor,
     ) {
 
+  override protected def metricsContextForSubmissionParam(
+      submissionParam: TransactionProcessingSteps.SubmissionParam
+  ): MetricsContext =
+    MetricsContext(
+      "application-id" -> submissionParam.submitterInfo.applicationId,
+      "type" -> "send-confirmation-request",
+    )
+
   def submit(
       submitterInfo: SubmitterInfo,
       transactionMeta: TransactionMeta,
@@ -154,7 +163,7 @@ object TransactionProcessor {
   }
 
   trait TransactionSubmissionError extends TransactionProcessorError with TransactionError {
-    override def pretty: Pretty[TransactionSubmissionError] = {
+    override def pretty: Pretty[TransactionSubmissionError] =
       this.prettyOfString(_ =>
         this.code.toMsg(
           cause,
@@ -164,7 +173,6 @@ object TransactionProcessor {
           context
         )
       )
-    }
   }
 
   object SubmissionErrors extends SubmissionErrorGroup {
@@ -209,7 +217,7 @@ object TransactionProcessor {
     @Explanation(
       """This error occurs if a transaction was submitted referring to a contract that
         |is not known on the domain. This can occur in case of race conditions between a transaction and
-        |an archival or transfer-out."""
+        |an archival or unassignment."""
     )
     @Resolution(
       """Check domain for submission and/or re-submit the transaction."""
@@ -236,6 +244,22 @@ object TransactionProcessor {
           ConsistencyErrors.SubmissionAlreadyInFlight.code
         )
         with TransactionSubmissionError
+
+    @Explanation(
+      """This error occurs when the sequencer refuses to accept a command due to backpressure."""
+    )
+    @Resolution("Wait a bit and retry, preferably with some backoff factor.")
+    object DomainBackpressure
+        extends ErrorCode(id = "DOMAIN_BACKPRESSURE", ErrorCategory.ContentionOnSharedResources) {
+      override def logLevel: Level = Level.INFO
+
+      final case class Rejection(reason: String)
+          extends TransactionErrorImpl(
+            cause = "The domain is overloaded.",
+            // Only reported asynchronously, so covered by submission rank guarantee
+            definiteAnswer = true,
+          )
+    }
 
     @Explanation(
       """The participant has rejected all incoming commands during a configurable grace period."""

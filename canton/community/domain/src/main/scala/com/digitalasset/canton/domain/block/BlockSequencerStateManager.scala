@@ -127,7 +127,6 @@ class BlockSequencerStateManager(
     override val maybeLowerTopologyTimestampBound: Option[CantonTimestamp],
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
-    unifiedSequencer: Boolean,
 )(implicit executionContext: ExecutionContext)
     extends BlockSequencerStateManagerBase
     with NamedLogging {
@@ -198,7 +197,7 @@ class BlockSequencerStateManager(
   private def checkBlockHeight(
       initialHeight: Long
   ): Flow[BlockEvents, Traced[BlockEvents], NotUsed] =
-    Flow[BlockEvents].statefulMapConcat(() => {
+    Flow[BlockEvents].statefulMapConcat { () =>
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var currentBlockHeight = initialHeight
       blockEvents => {
@@ -237,7 +236,7 @@ class BlockSequencerStateManager(
           Seq(Traced(blockEvents))
         }
       }
-    })
+    }
 
   private def chunkBlock(
       bug: BlockUpdateGenerator
@@ -291,7 +290,7 @@ class BlockSequencerStateManager(
             val chunkNumber = priorHead.chunk.chunkNumber + 1
             LoggerUtil.clueF(
               s"Adding block updates for chunk $chunkNumber for block $currentBlockNumber. " +
-                s"Contains ${chunk.events.size} events, ${chunk.acknowledgements.size} acks, ${chunk.newMembers.size} new members, " +
+                s"Contains ${chunk.events.size} events, ${chunk.acknowledgements.size} acks, " +
                 s"and ${chunk.inFlightAggregationUpdates.size} in-flight aggregation updates"
             )(handleChunkUpdate(priorHead, chunk, dbSequencerIntegration)(traceContext))
           case complete: CompleteBlockUpdate =>
@@ -364,7 +363,7 @@ class BlockSequencerStateManager(
       traceContext: TraceContext
   ): CreateSubscription = {
     logger.debug(
-      s"Read events for member ${member} starting at ${startingAt}"
+      s"Read events for member $member starting at $startingAt"
     )
     def checkCounterIsSupported(
         member: Member,
@@ -458,10 +457,6 @@ class BlockSequencerStateManager(
     val chunkNumber = priorState.chunkNumber + 1
     val currentBlockNumber = priorHead.block.height + 1
     assert(
-      update.newMembers.values.forall(_ >= priorState.lastTs),
-      s"newMembers in chunk $chunkNumber of block $currentBlockNumber should be assigned a timestamp after the timestamp of the previous chunk or block",
-    )
-    assert(
       update.events.view.flatMap(_.timestamps).forall(_ > priorState.lastTs),
       s"Events in chunk $chunkNumber of block $currentBlockNumber have timestamp lower than in the previous chunk or block",
     )
@@ -491,8 +486,7 @@ class BlockSequencerStateManager(
     )
 
     val lastTs =
-      (update.events.view.flatMap(_.timestamps) ++
-        update.newMembers.values).maxOption.getOrElse(priorState.lastTs)
+      update.events.view.flatMap(_.timestamps).maxOption.getOrElse(priorState.lastTs)
 
     val newState = ChunkState(
       chunkNumber,
@@ -501,14 +495,14 @@ class BlockSequencerStateManager(
       update.lastSequencerEventTimestamp.orElse(priorState.latestSequencerEventTimestamp),
     )
 
-    if (unifiedSequencer) {
-      (for {
-        _ <- dbSequencerIntegration.blockSequencerWrites(update.submissionsOutcomes.map(_.outcome))
-        _ <- EitherT.right[String](
-          dbSequencerIntegration.blockSequencerAcknowledge(update.acknowledgements)
-        )
+    (for {
+      _ <- dbSequencerIntegration.blockSequencerWrites(update.submissionsOutcomes.map(_.outcome))
+      _ <- EitherT.right[String](
+        dbSequencerIntegration.blockSequencerAcknowledge(update.acknowledgements)
+      )
 
-        _ <- EitherT.right[String](
+      _ <- EitherT.right[String](
+        performUnlessClosingF("partialBlockUpdate")(
           store.partialBlockUpdate(
             newMembers = Map.empty,
             events = Seq.empty,
@@ -517,46 +511,22 @@ class BlockSequencerStateManager(
             inFlightAggregationUpdates = update.inFlightAggregationUpdates,
           )
         )
-      } yield {
-        val newHead = priorHead.copy(chunk = newState)
-        updateHeadState(priorHead, newHead)
-        update.acknowledgements.foreach { case (member, timestamp) =>
-          resolveAcknowledgements(member, timestamp)
-        }
-        update.invalidAcknowledgements.foreach { case (member, timestamp, error) =>
-          invalidAcknowledgement(member, timestamp, error)
-        }
-        newHead
-      }).valueOr(e =>
-        ErrorUtil.internalError(new RuntimeException(s"handleChunkUpdate failed with error: $e"))
       )
-    } else {
-      // Block sequencer flow
-      for {
-        _ <- store.partialBlockUpdate(
-          newMembers = update.newMembers,
-          events = update.events.map(_.events),
-          acknowledgments = update.acknowledgements,
-          membersDisabled = Seq.empty,
-          inFlightAggregationUpdates = update.inFlightAggregationUpdates,
-        )
-      } yield {
-        // head state update must happen before member counters are updated
-        // as otherwise, if we have a registration in between counter-signalling and head-state,
-        // the dispatcher will be initialised with the old head state but not be notified about
-        // a change.
-        val newHead = priorHead.copy(chunk = newState)
-        updateHeadState(priorHead, newHead)
-        signalMemberCountersToDispatchers(newState.ephemeral)
-        resolveWaitingForMemberDisablement(newState.ephemeral)
-        update.acknowledgements.foreach { case (member, timestamp) =>
-          resolveAcknowledgements(member, timestamp)
-        }
-        update.invalidAcknowledgements.foreach { case (member, timestamp, error) =>
-          invalidAcknowledgement(member, timestamp, error)
-        }
-        newHead
+    } yield {
+      val newHead = priorHead.copy(chunk = newState)
+      updateHeadState(priorHead, newHead)
+      update.acknowledgements.foreach { case (member, timestamp) =>
+        resolveAcknowledgements(member, timestamp)
       }
+      update.invalidAcknowledgements.foreach { case (member, timestamp, error) =>
+        invalidAcknowledgement(member, timestamp, error)
+      }
+      newHead
+    }).valueOr(e =>
+      ErrorUtil.internalError(new RuntimeException(s"handleChunkUpdate failed with error: $e"))
+    ).onShutdown {
+      logger.info(s"handleChunkUpdate skipped due to shut down")
+      priorHead
     }
   }
 
@@ -586,7 +556,7 @@ class BlockSequencerStateManager(
 
   private def updateHeadState(prior: HeadState, next: HeadState)(implicit
       traceContext: TraceContext
-  ): Unit = {
+  ): Unit =
     if (!headState.compareAndSet(prior, next)) {
       // The write flow should not call this method concurrently so this situation should never happen.
       // If it does, this means that the ephemeral state has been updated since this update was generated,
@@ -594,31 +564,12 @@ class BlockSequencerStateManager(
       // throw exception to shutdown the sequencer write flow as we can not continue.
       ErrorUtil.internalError(new SequencerUnexpectedStateChange)
     }
-  }
-
-  private def signalMemberCountersToDispatchers(
-      newState: EphemeralState
-  ): Unit = {
-    dispatchers.toList.foreach { case (member, dispatcher) =>
-      newState.headCounter(member).foreach { counter =>
-        dispatcher.signalNewHead(counter + 1L)
-      }
-    }
-  }
-
-  private def resolveWaitingForMemberDisablement(newState: EphemeralState): Unit = {
-    // if any members that we're waiting to see disabled are now disabled members, complete those promises.
-    memberDisablementPromises.keys
-      .filter(newState.status.disabledMembers.contains)
-      .foreach(resolveWaitingForMemberDisablement)
-  }
 
   private def resolveWaitingForMemberDisablement(disabledMember: Member): Unit =
     memberDisablementPromises.remove(disabledMember) foreach { promise => promise.success(()) }
 
-  private def resolveSequencerPruning(timestamp: CantonTimestamp): Unit = {
+  private def resolveSequencerPruning(timestamp: CantonTimestamp): Unit =
     sequencerPruningPromises.remove(timestamp) foreach { promise => promise.success(()) }
-  }
 
   /** Resolves all outstanding acknowledgements up to the given timestamp.
     * Unlike for resolutions of other requests, we resolve also all earlier acknowledgements,
@@ -722,7 +673,7 @@ class BlockSequencerStateManager(
             SequencerCounter.Genesis
         }
       Dispatcher(
-        name = show"${sequencerId.uid.identifier.str}-$member",
+        name = show"${sequencerId.identifier.str}-$member",
         zeroIndex = SequencerCounter.Genesis - 1,
         headAtInitialization = head,
       )
@@ -768,7 +719,6 @@ object BlockSequencerStateManager {
       enableInvariantCheck: Boolean,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
-      unifiedSequencer: Boolean,
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -788,7 +738,6 @@ object BlockSequencerStateManager {
         maybeLowerTopologyTimestampBound = maybeLowerTopologyTimestampBound,
         timeouts = timeouts,
         loggerFactory = loggerFactory,
-        unifiedSequencer = unifiedSequencer,
       )
     }
 

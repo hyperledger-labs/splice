@@ -30,7 +30,7 @@ select
     when $1 = 7 then 'PartyHostingLimits'
     when $1 = 8 then 'VettedPackages'
     when $1 = 9 then 'PartyToParticipant'
-    when $1 = 10 then 'AuthorityOf'
+    -- 10 was AuthorityOf
     when $1 = 11 then 'DomainParameters'
     when $1 = 12 then 'MediatorDomainState'
     when $1 = 13 then 'SequencerDomainState'
@@ -219,7 +219,7 @@ create or replace view debug.par_active_contracts as
     change, operation,
     debug.canton_timestamp(ts) as ts,
     request_counter,
-    debug.resolve_common_static_string(remote_domain_idx) as remote_domain_idx, transfer_counter
+    debug.resolve_common_static_string(remote_domain_idx) as remote_domain_idx, reassignment_counter
   from par_active_contracts;
 
 create or replace view debug.par_fresh_submitted_transaction as
@@ -303,24 +303,24 @@ create or replace view debug.par_linearized_event_log as
     local_offset_discriminator
   from par_linearized_event_log;
 
-create or replace view debug.par_transfers as
+create or replace view debug.par_reassignments as
   select
     target_domain,
     origin_domain,
-    transfer_out_global_offset,
-    transfer_in_global_offset,
-    debug.canton_timestamp(transfer_out_timestamp) as transfer_out_timestamp,
-    transfer_out_request_counter,
-    transfer_out_request,
-    debug.canton_timestamp(transfer_out_decision_time) as transfer_out_decision_time,
+    unassignment_global_offset,
+    assignment_global_offset,
+    debug.canton_timestamp(unassignment_timestamp) as unassignment_timestamp,
+    unassignment_request_counter,
+    unassignment_request,
+    debug.canton_timestamp(unassignment_decision_time) as unassignment_decision_time,
     contract,
     creating_transaction_id,
-    transfer_out_result,
+    unassignment_result,
     submitter_lf,
     debug.canton_timestamp(time_of_completion_request_counter) as time_of_completion_request_counter,
     debug.canton_timestamp(time_of_completion_timestamp) as time_of_completion_timestamp,
     source_protocol_version
-  from par_transfers;
+  from par_reassignments;
 
 create or replace view debug.par_journal_requests as
   select
@@ -363,7 +363,8 @@ create or replace view debug.par_outstanding_acs_commitments as
     debug.resolve_common_static_string(domain_id) as domain_id,
     counter_participant,
     debug.canton_timestamp(from_exclusive) as from_exclusive,
-    debug.canton_timestamp(to_inclusive) as to_inclusive
+    debug.canton_timestamp(to_inclusive) as to_inclusive,
+    matching_state
   from par_outstanding_acs_commitments;
 
 create or replace view debug.par_last_computed_acs_commitments as
@@ -536,21 +537,6 @@ create or replace view debug.par_pruning_schedules as
     prune_internally_only
   from par_pruning_schedules;
 
-create or replace view debug.sequencer_authentication_nonces as
-  select
-    nonce,
-    member,
-    debug.canton_timestamp(generated_at_ts) as generated_at_ts,
-    debug.canton_timestamp(expire_at_ts) as expire_at_ts
-  from sequencer_authentication_nonces;
-
-create or replace view debug.sequencer_authentication_tokens as
-  select
-    token,
-    member,
-    debug.canton_timestamp(expire_at_ts) as expire_at_ts
-  from sequencer_authentication_tokens;
-
 create or replace view debug.par_in_flight_submission as
   select
     change_id_hash,
@@ -697,19 +683,29 @@ create or replace view debug.ord_availability_batch as
     batch
   from ord_availability_batch;
 
-create or replace view debug.ord_pbft_messages as
+create or replace view debug.ord_pbft_messages_in_progress as
+select
+    block_number,
+    view_number,
+    message,
+    discriminator,
+    from_sequencer_id
+from ord_pbft_messages_in_progress;
+
+create or replace view debug.ord_pbft_messages_completed as
   select
     block_number,
     message,
     discriminator,
     from_sequencer_id
-  from ord_pbft_messages;
+  from ord_pbft_messages_completed;
 
 create or replace view debug.ord_metadata_output_blocks as
   select
+    epoch_number,
     block_number,
-    bft_ts,
-    last_topology_ts
+    debug.canton_timestamp(bft_ts) as bft_ts,
+    debug.canton_timestamp(last_topology_ts) as last_topology_ts
   from ord_metadata_output_blocks;
 
 create or replace view debug.common_static_strings as

@@ -105,17 +105,17 @@ package object canton {
 
   val SequencerCounter = new CounterCompanion[SequencerCounterDiscriminator] {}
 
-  /** The counter assigned by the transaction processor to confirmation and transfer requests. */
+  /** The counter assigned by the transaction processor to confirmation and reassignment requests. */
   type RequestCounterDiscriminator
   type RequestCounter = Counter[RequestCounterDiscriminator]
 
-  /** The counter assigned to a contract to count the number of its transfers */
-  type TransferCounterDiscriminator
-  type TransferCounter = Counter[TransferCounterDiscriminator]
+  /** The counter assigned to a contract to count the number of its reassignments */
+  type ReassignmentDiscriminator
+  type ReassignmentCounter = Counter[ReassignmentDiscriminator]
 
-  object TransferCounter extends CounterCompanion[TransferCounterDiscriminator] {
-    def encodeDeterministically(transferCounter: TransferCounter): ByteString = encodeLong(
-      transferCounter.unwrap
+  object ReassignmentCounter extends CounterCompanion[ReassignmentDiscriminator] {
+    def encodeDeterministically(reassignmentCounter: ReassignmentCounter): ByteString = encodeLong(
+      reassignmentCounter.unwrap
     )
   }
 

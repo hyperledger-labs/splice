@@ -44,6 +44,7 @@ trait SequencerFactory extends FlagCloseable with HasCloseContext {
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
       runtimeReady: FutureUnlessShutdown[Unit],
+      sequencerSnapshot: Option[SequencerSnapshot],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -86,7 +87,7 @@ abstract class DatabaseSequencerFactory(
         timeouts,
         loggerFactory,
         sequencerId,
-        unifiedSequencer =
+        blockSequencerMode =
           true, // // TODO(#18401): does not affect the usage below, but should be correctly set
         // At the moment this store instance is only used for the sequencer initialization,
         // if it is retrying a db operation and the factory is closed, the store will be closed as well;
@@ -121,6 +122,7 @@ class CommunityDatabaseSequencerFactory(
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
       runtimeReady: FutureUnlessShutdown[Unit],
+      sequencerSnapshot: Option[SequencerSnapshot],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -139,7 +141,6 @@ class CommunityDatabaseSequencerFactory(
       domainSyncCryptoApi,
       metrics,
       loggerFactory,
-      nodeParameters.useUnifiedSequencer,
       runtimeReady,
     )
 

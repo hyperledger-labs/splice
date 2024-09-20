@@ -39,7 +39,6 @@ import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.{
   NotConnectedToDomain,
   NotConnectedToAnyDomain,
 }
-import com.digitalasset.canton.participant.sync.TransactionRoutingError.MalformedInputErrors.InvalidDomainId
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.{
   UnknownContractDomains,
@@ -53,7 +52,7 @@ import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.{
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.util.retry.RetryUtil.*
+import com.digitalasset.canton.util.retry.{ExceptionRetryPolicy, ErrorKind}
 import io.circe.Json
 import io.grpc.protobuf.StatusProto
 import io.grpc.Status
@@ -62,7 +61,6 @@ import io.opentelemetry.api.trace.Tracer
 import java.math.RoundingMode as JRM
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success, Try}
 
 class HttpWalletHandler(
     override protected val walletManager: UserWalletManager,
@@ -748,41 +746,40 @@ class HttpWalletHandler(
 }
 
 object HttpWalletHandler {
-  case class TapRetryable(operationName: String) extends ExceptionRetryable {
-    override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
-        implicit tc: TraceContext
-    ): ErrorKind = outcome match {
-      case Failure(ex: io.grpc.StatusRuntimeException) if isInactiveContract(ex) =>
+  case class TapRetryable(operationName: String) extends ExceptionRetryPolicy {
+    override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = exception match {
+      case ex: io.grpc.StatusRuntimeException if isInactiveContract(ex) =>
         logger.info(
           s"The operation $operationName failed with a ${InactiveContracts.id} error $ex."
         )
-        TransientErrorKind
-      case Failure(ex: io.grpc.StatusRuntimeException) if isLockedContract(ex) =>
+        ErrorKind.TransientErrorKind()
+      case ex: io.grpc.StatusRuntimeException if isLockedContract(ex) =>
         logger.info(
           s"The operation $operationName failed with a ${LockedContracts.id} error $ex."
         )
-        TransientErrorKind
+        ErrorKind.TransientErrorKind()
       // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
-      case Failure(ex: io.grpc.StatusRuntimeException) if isNonspecificInvalidArgument(ex) =>
+      case ex: io.grpc.StatusRuntimeException if isNonspecificInvalidArgument(ex) =>
         logger.info(
           s"The operation $operationName failed with a nonspecifc INVALID_ARGUMENT error $ex."
         )
-        TransientErrorKind
+        ErrorKind.TransientErrorKind()
       // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
-      case Failure(ex: io.grpc.StatusRuntimeException) if isDomainNotConnected(ex) =>
+      case ex: io.grpc.StatusRuntimeException if isDomainNotConnected(ex) =>
         logger.info(
           s"The operation $operationName failed due to the domain is not connected $ex."
         )
-        TransientErrorKind
-      case Failure(ex: io.grpc.StatusRuntimeException) if isMediatorTimeout(ex) =>
+        ErrorKind.TransientErrorKind()
+      case ex: io.grpc.StatusRuntimeException if isMediatorTimeout(ex) =>
         logger.info(
           s"The operation $operationName failed because the mediator did not receive enough confirmations in time $ex."
         )
-        TransientErrorKind
-      case Failure(ex) =>
+        ErrorKind.TransientErrorKind()
+      case ex =>
         logThrowable(ex, logger)
-        FatalErrorKind
-      case Success(_) => NoErrorKind
+        ErrorKind.FatalErrorKind
     }
   }
 
@@ -804,7 +801,6 @@ object HttpWalletHandler {
 
   private def isDomainNotConnected(ex: io.grpc.StatusRuntimeException): Boolean =
     ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-      case ErrorInfoDetail(InvalidDomainId.id, _) => true
       case ErrorInfoDetail(NotConnectedToAnyDomain.id, _) => true
       case ErrorInfoDetail(NotConnectedToDomain.id, _) => true
       case ErrorInfoDetail(UnknownContractDomain.id, _) => true

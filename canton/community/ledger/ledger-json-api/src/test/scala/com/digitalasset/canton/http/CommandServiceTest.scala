@@ -13,15 +13,9 @@ import lav2.transaction.{Transaction, TransactionTree}
 import com.digitalasset.canton.http.util.Logging as HLogging
 import com.daml.logging.LoggingContextOf
 import LoggingContextOf.{label, newLoggingContext}
-import com.daml.jwt.JwtSigner
-import com.daml.jwt.domain.{DecodedJwt, Jwt}
+import com.daml.jwt.{AuthServiceJWTCodec, AuthServiceJWTPayload, JwtSigner, StandardJWTPayload, StandardJWTTokenFormat}
+import com.daml.jwt.{DecodedJwt, Jwt}
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.ledger.api.auth.{
-  AuthServiceJWTCodec,
-  AuthServiceJWTPayload,
-  StandardJWTPayload,
-  StandardJWTTokenFormat,
-}
 import com.digitalasset.canton.tracing.NoTracing
 import org.scalatest.Inside
 import org.scalatest.matchers.should.Matchers
@@ -92,7 +86,13 @@ object CommandServiceTest extends BaseTest {
     actAs = multiPartyJwp.submitter.toList,
     readAs = multiPartyJwp.readAs,
   )
-  private val tplId = domain.ContractTypeId.Template("Foo", "Bar", "Baz")
+  private val tplId =
+    domain.ContractTypeId.Template(
+      com.digitalasset.daml.lf.data.Ref.PackageRef.assertFromString("Foo"),
+      "Bar",
+      "Baz",
+    )
+
   private[http] val applicationId: domain.ApplicationId = domain.ApplicationId("test")
 
   implicit private val ignoredLoggingContext

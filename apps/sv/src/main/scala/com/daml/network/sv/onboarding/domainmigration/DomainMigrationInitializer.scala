@@ -35,8 +35,8 @@ import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.DynamicDomainParameters

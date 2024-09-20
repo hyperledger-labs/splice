@@ -76,12 +76,11 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
   ): Assertion =
     loggerFactory.assertThrowsAndLogs[CommandFailure](
       within,
-      assertions
-        .map(assertion => { (entry: LogEntry) =>
-          assertion(entry)
-          entry.commandFailureMessage
-          succeed
-        })*
+      assertions.map { assertion => (entry: LogEntry) =>
+        assertion(entry)
+        entry.commandFailureMessage
+        succeed
+      }*
     )
 
   /** Version of [[com.digitalasset.canton.logging.SuppressingLogger.assertThrowsAndLogs]] that is specifically
@@ -95,12 +94,11 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
   ): Assertion =
     loggerFactory.assertThrowsAndLogsUnordered[CommandFailure](
       within,
-      assertions
-        .map(assertion => { (entry: LogEntry) =>
-          assertion(entry)
-          entry.commandFailureMessage
-          succeed
-        })*
+      assertions.map { assertion => (entry: LogEntry) =>
+        assertion(entry)
+        entry.commandFailureMessage
+        succeed
+      }*
     )
 
   /** Similar to [[com.digitalasset.canton.console.commands.ParticipantAdministration#ping]]

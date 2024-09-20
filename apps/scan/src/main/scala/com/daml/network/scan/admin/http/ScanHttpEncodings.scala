@@ -63,7 +63,7 @@ sealed trait ScanHttpEncodings {
             httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
-                update.offset.getOffset,
+                update.offset,
                 update.recordTime.toString,
                 httpApi.UpdateHistoryAssignment(
                   submitter.toProtoPrimitive,
@@ -87,7 +87,7 @@ sealed trait ScanHttpEncodings {
             httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
-                update.offset.getOffset,
+                update.offset,
                 update.recordTime.toString,
                 httpApi.UpdateHistoryUnassignment(
                   submitter.toProtoPrimitive,
@@ -196,7 +196,7 @@ sealed trait ScanHttpEncodings {
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
-                offset = new javaApi.ParticipantOffset.Absolute(http.offset),
+                offset = http.offset,
                 recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
                 event = ledgerApi.ReassignmentEvent.Assign(
                   submitter = PartyId.tryFromProtoPrimitive(assignment.submitter),
@@ -219,7 +219,7 @@ sealed trait ScanHttpEncodings {
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
-                offset = new javaApi.ParticipantOffset.Absolute(http.offset),
+                offset = http.offset,
                 recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
                 event = ledgerApi.ReassignmentEvent.Unassign(
                   submitter = PartyId.tryFromProtoPrimitive(unassignment.submitter),

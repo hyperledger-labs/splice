@@ -39,7 +39,7 @@ class SvOnboardingAddlIntegrationTest
       )
 
   override lazy val updateHistoryIgnoredRootCreates = Seq(
-    amuletCodegen.Amulet.TEMPLATE_ID
+    amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 
   "SVs can onboard new SVs" in { implicit env =>

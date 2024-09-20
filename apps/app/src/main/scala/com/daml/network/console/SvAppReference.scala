@@ -26,8 +26,8 @@ import com.daml.network.sv.automation.{DsoDelegateBasedAutomationService, SvDsoA
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
 import com.daml.network.util.Contract
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.console.{BaseInspection, Help}
-import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem

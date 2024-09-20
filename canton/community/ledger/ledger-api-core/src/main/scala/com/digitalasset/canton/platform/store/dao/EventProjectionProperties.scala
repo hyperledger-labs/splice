@@ -33,7 +33,7 @@ final case class EventProjectionProperties(
       Set.empty
     ), // TODO(#19364) fuse with the templateWildcardWitnesses into a templateWildcard Projection and potentially include it into the following Map
 ) {
-  def render(witnesses: Set[String], templateId: Identifier): Projection = {
+  def render(witnesses: Set[String], templateId: Identifier): Projection =
     (witnesses.iterator.map(Some(_))
       ++ Iterator(None)) // for the party-wildcard template specific projections)
       .flatMap(witnessTemplateProjections.get(_).iterator)
@@ -47,7 +47,6 @@ final case class EventProjectionProperties(
             .fold(witnesses.nonEmpty)(parties => witnesses.exists(parties)),
         )
       )(_ append _)
-  }
 }
 
 object EventProjectionProperties {
@@ -78,7 +77,7 @@ object EventProjectionProperties {
       transactionFilter: domain.TransactionFilter,
       verbose: Boolean,
       interfaceImplementedBy: Identifier => Set[Identifier],
-      resolveTemplateIds: TypeConRef => Set[Identifier],
+      resolveTypeConRef: TypeConRef => Set[Identifier],
       alwaysPopulateArguments: Boolean,
   ): EventProjectionProperties =
     EventProjectionProperties(
@@ -90,7 +89,7 @@ object EventProjectionProperties {
       witnessTemplateProjections = witnessTemplateProjections(
         transactionFilter,
         interfaceImplementedBy,
-        resolveTemplateIds,
+        resolveTypeConRef,
       ),
     )
 
@@ -150,7 +149,7 @@ object EventProjectionProperties {
   private def witnessTemplateProjections(
       domainTransactionFilter: domain.TransactionFilter,
       interfaceImplementedBy: Identifier => Set[Identifier],
-      resolveTemplateIds: TypeConRef => Set[Identifier],
+      resolveTypeConRef: TypeConRef => Set[Identifier],
   ): Map[Option[String], Map[Identifier, Projection]] = {
     val partyFilterPairs =
       domainTransactionFilter.filtersByParty.view.map { case (p, f) =>
@@ -162,14 +161,14 @@ object EventProjectionProperties {
     } yield {
       val interfaceFilterProjections = for {
         interfaceFilter <- cumulativeFilter.interfaceFilters.view
-        implementor <- interfaceImplementedBy(interfaceFilter.interfaceId).view
+        interfaceId <- resolveTypeConRef(interfaceFilter.interfaceTypeRef)
+        implementor <- interfaceImplementedBy(interfaceId).view
       } yield implementor -> Projection(
-        interfaces =
-          if (interfaceFilter.includeView) Set(interfaceFilter.interfaceId) else Set.empty,
+        interfaces = if (interfaceFilter.includeView) Set(interfaceId) else Set.empty,
         createdEventBlob = interfaceFilter.includeCreatedEventBlob,
         contractArguments = false,
       )
-      val templateProjections = getTemplateProjections(cumulativeFilter, resolveTemplateIds)
+      val templateProjections = getTemplateProjections(cumulativeFilter, resolveTypeConRef)
       val projectionsForParty =
         (interfaceFilterProjections ++ templateProjections)
           .groupMap(_._1)(_._2)
@@ -183,11 +182,11 @@ object EventProjectionProperties {
 
   private def getTemplateProjections(
       cumulativeFilter: CumulativeFilter,
-      resolveTemplateIds: TypeConRef => Set[Identifier],
+      resolveTypeConRef: TypeConRef => Set[Identifier],
   ): View[(Identifier, Projection)] =
     for {
       templateFilter <- cumulativeFilter.templateFilters.view
-      templateId <- resolveTemplateIds(templateFilter.templateTypeRef).view
+      templateId <- resolveTypeConRef(templateFilter.templateTypeRef).view
     } yield templateId -> Projection(
       interfaces = Set.empty,
       createdEventBlob = templateFilter.includeCreatedEventBlob,

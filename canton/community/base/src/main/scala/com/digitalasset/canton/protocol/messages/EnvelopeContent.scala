@@ -10,7 +10,7 @@ import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
 import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
+import com.digitalasset.canton.version.Reassignment.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 
@@ -28,7 +28,7 @@ object EnvelopeContent
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> VersionedProtoConverter(
-      ProtocolVersion.v31
+      ProtocolVersion.v32
     )(v30.EnvelopeContent)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toByteStringUnversioned,
@@ -67,12 +67,12 @@ object EnvelopeContent
           InformeeMessage.fromProtoV30(context)(messageP)
         case Content.EncryptedViewMessage(messageP) =>
           EncryptedViewMessage.fromProto(messageP)
-        case Content.TransferOutMediatorMessage(messageP) =>
-          TransferOutMediatorMessage.fromProtoV30(
+        case Content.UnassignmentMediatorMessage(messageP) =>
+          UnassignmentMediatorMessage.fromProtoV30(
             (hashOps, SourceProtocolVersion(expectedProtocolVersion))
           )(messageP)
-        case Content.TransferInMediatorMessage(messageP) =>
-          TransferInMediatorMessage.fromProtoV30(
+        case Content.AssignmentMediatorMessage(messageP) =>
+          AssignmentMediatorMessage.fromProtoV30(
             (hashOps, TargetProtocolVersion(expectedProtocolVersion))
           )(messageP)
         case Content.RootHashMessage(messageP) =>
@@ -91,7 +91,7 @@ object EnvelopeContent
       hashOps: HashOps,
   )(
       bytes: Array[Byte]
-  )(implicit cast: ProtocolMessageContentCast[M]): ParsingResult[M] = {
+  )(implicit cast: ProtocolMessageContentCast[M]): ParsingResult[M] =
     for {
       envelopeContent <- fromByteString(hashOps, protocolVersion)(ByteString.copyFrom(bytes))
       message <- cast
@@ -102,5 +102,4 @@ object EnvelopeContent
           )
         )
     } yield message
-  }
 }

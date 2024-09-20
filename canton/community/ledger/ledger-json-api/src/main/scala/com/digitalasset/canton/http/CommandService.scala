@@ -4,7 +4,7 @@
 package com.digitalasset.canton.http
 
 import com.digitalasset.canton.http.domain.{ActiveContract, Choice, Contract, ContractTypeId, CreateAndExerciseCommand, CreateCommand, ExerciseCommand, ExerciseResponse, JwtWritePayload}
-import com.daml.jwt.domain.Jwt
+import com.daml.jwt.Jwt
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes as lar
 import com.daml.ledger.api.v2 as lav2
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod
@@ -79,7 +79,7 @@ class CommandService(
         contract.payload,
         contract.signatories,
         contract.observers,
-        domain.CompletionOffset(response.completionOffset),
+        domain.CompletionOffset(response.transaction.map(_.offset).getOrElse("")),
       )
       et.run
     }
@@ -111,7 +111,7 @@ class CommandService(
             } yield ExerciseResponse(
               exerciseResult,
               contracts,
-              domain.CompletionOffset(response.completionOffset),
+              domain.CompletionOffset(response.transaction.map(_.offset).getOrElse("")),
             )
 
           et.run
@@ -139,7 +139,7 @@ class CommandService(
       } yield ExerciseResponse(
         exerciseResult,
         contracts,
-        domain.CompletionOffset(response.completionOffset),
+        domain.CompletionOffset(response.transaction.map(_.offset).getOrElse("")),
       )
       et.run
     }
@@ -187,7 +187,7 @@ class CommandService(
       case -\/((templateId, contractKey)) =>
         Commands.exerciseByKey(
           templateId = refApiIdentifier(templateId),
-          // TODO #14549 somehow pass choiceSource
+          // TODO daml-14549 somehow pass choiceSource
           contractKey = contractKey,
           choice = input.choice,
           argument = input.argument,
@@ -202,7 +202,7 @@ class CommandService(
     }
   }
 
-  // TODO #14549 somehow use the choiceInterfaceId
+  // TODO daml-14549 somehow use the choiceInterfaceId
   private def createAndExerciseCommand(
       input: CreateAndExerciseCommand.LAVResolved
   ): lav2.commands.Command.Command.CreateAndExercise =
@@ -247,13 +247,14 @@ class CommandService(
           workflowId = meta.flatMap(_.workflowId),
           meta.flatMap(_.disclosedContracts) getOrElse Seq.empty,
           meta.flatMap(_.domainId),
+          meta.flatMap(_.packageIdSelectionPreference) getOrElse Seq.empty,
         )
       }
   }
 
   private def exactlyOneActiveContract(
       response: lav2.command_service.SubmitAndWaitForTransactionResponse
-  ): Error \/ ActiveContract[ContractTypeId.Template.Resolved, lav2.value.Value] =
+  ): Error \/ ActiveContract[ContractTypeId.Template.ResolvedPkgId, lav2.value.Value] =
     activeContracts(response).flatMap {
       case Seq(x) => \/-(x)
       case xs @ _ =>
@@ -267,7 +268,7 @@ class CommandService(
 
   private def activeContracts(
       response: lav2.command_service.SubmitAndWaitForTransactionResponse
-  ): Error \/ ImmArraySeq[ActiveContract[ContractTypeId.Template.Resolved, lav2.value.Value]] =
+  ): Error \/ ImmArraySeq[ActiveContract[ContractTypeId.Template.ResolvedPkgId, lav2.value.Value]] =
     response.transaction
       .toRightDisjunction(
         InternalError(
@@ -279,10 +280,10 @@ class CommandService(
 
   private def activeContracts(
       tx: lav2.transaction.Transaction
-  ): Error \/ ImmArraySeq[ActiveContract[ContractTypeId.Template.Resolved, lav2.value.Value]] = {
+  ): Error \/ ImmArraySeq[ActiveContract[ContractTypeId.Template.ResolvedPkgId, lav2.value.Value]] = {
     Transactions
       .allCreatedEvents(tx)
-      .traverse(ActiveContract.fromLedgerApi(domain.ActiveContract.IgnoreInterface, _))
+      .traverse(ActiveContract.fromLedgerApi(domain.ActiveContract.ExtractAs.Template, _))
       .leftMap(e => InternalError(Some(Symbol("activeContracts")), e.shows))
   }
 

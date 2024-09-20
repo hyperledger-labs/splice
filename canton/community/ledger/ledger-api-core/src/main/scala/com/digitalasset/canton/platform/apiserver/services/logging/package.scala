@@ -6,11 +6,11 @@ package com.digitalasset.canton.platform.apiserver.services
 import com.daml.logging.entries.LoggingValue.OfString
 import com.daml.logging.entries.ToLoggingKey.*
 import com.daml.logging.entries.{LoggingEntries, LoggingEntry, LoggingKey, LoggingValue}
+import com.digitalasset.canton.ledger.api.domain.types.ParticipantOffset
 import com.digitalasset.canton.ledger.api.domain.{
   Commands,
   CumulativeFilter,
   EventId,
-  ParticipantOffset,
   TemplateWildcardFilter,
   TransactionFilter,
   TransactionId,
@@ -93,7 +93,7 @@ package object logging {
             filter.templateFilters.map(_.templateTypeRef)
           ),
           "interfaces" -> LoggingValue.from(
-            filter.interfaceFilters.map(_.interfaceId)
+            filter.interfaceFilters.map(_.interfaceTypeRef)
           ),
         )
           ++ (filter.templateWildcardFilter match {

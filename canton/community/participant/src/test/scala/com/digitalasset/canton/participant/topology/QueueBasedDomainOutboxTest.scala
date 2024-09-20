@@ -98,10 +98,10 @@ class QueueBasedDomainOutboxTest
       participant1.uid,
       clock,
       crypto,
+      defaultStaticDomainParameters,
       target,
       queue,
       // we don't need the validation logic to run, because we control the outcome of transactions manually
-      testedProtocolVersion,
       exitOnFatalFailures = true,
       timeouts,
       futureSupervisor,
@@ -172,7 +172,7 @@ class QueueBasedDomainOutboxTest
         batches += transactions
         val finalResult = transactions.map(_ => responses.next())
         for {
-          _ <- MonadUtil.sequentialTraverse(transactions)(x => {
+          _ <- MonadUtil.sequentialTraverse(transactions) { x =>
             logger.debug(s"Processing $x")
             val ts = CantonTimestamp.now()
             if (finalResult.forall(_ == State.Accepted))
@@ -201,7 +201,7 @@ class QueueBasedDomainOutboxTest
                     .onShutdown(())
                 )
             else Future.unit
-          })
+          }
           _ = if (buffer.length >= expect.get()) {
             promise.get().success(batches.toSeq)
           }
@@ -347,7 +347,7 @@ class QueueBasedDomainOutboxTest
       } yield {
         observed1.map(_.transaction) shouldBe slice1
         handle.buffer.map(_.transaction) shouldBe slice2
-        handle.batches should not be (empty)
+        handle.batches should not be empty
         forAll(handle.batches)(_.size shouldBe 1)
       }
     }

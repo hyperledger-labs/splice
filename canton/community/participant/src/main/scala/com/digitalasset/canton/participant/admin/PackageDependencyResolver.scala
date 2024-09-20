@@ -40,9 +40,15 @@ class PackageDependencyResolver(
 
   def packageDependencies(packageId: PackageId)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] = {
+  ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
     EitherT(dependencyCache.getUS(packageId).map(_.map(_ - packageId)))
-  }
+
+  def packageDependencies(packages: List[PackageId])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    packages
+      .parTraverse(packageDependencies)
+      .map(_.flatten.toSet -- packages)
 
   def getPackageDescription(packageId: PackageId)(implicit
       traceContext: TraceContext

@@ -7,13 +7,7 @@ import cats.data.NonEmptyList
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{
-  CreatedEvent,
-  ExercisedEvent,
-  Identifier,
-  ParticipantOffset,
-  TransactionTree,
-}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
 import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
@@ -264,7 +258,7 @@ class UpdateHistory(
           traceContext: TraceContext
       ): Future[Unit] = {
         val offset = update match {
-          case ReassignmentUpdate(reassignment) => reassignment.offset.getOffset
+          case ReassignmentUpdate(reassignment) => reassignment.offset
           case TransactionTreeUpdate(tree) => tree.getOffset
         }
         val recordTime = update match {
@@ -355,7 +349,7 @@ class UpdateHistory(
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
-    val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
+    val safeParticipantOffset = lengthLimited(reassignment.offset)
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.contractId.contractId)
     sqlu"""
@@ -383,7 +377,7 @@ class UpdateHistory(
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
-    val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
+    val safeParticipantOffset = lengthLimited(reassignment.offset)
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.createdEvent.getContractId)
     val safeEventId = lengthLimited(event.createdEvent.getEventId)
@@ -1026,7 +1020,7 @@ class UpdateHistory(
       ReassignmentUpdate(
         Reassignment[Assign](
           updateId = row.updateId,
-          offset = new ParticipantOffset.Absolute(row.participantOffset),
+          offset = row.participantOffset,
           recordTime = row.recordTime,
           event = Assign(
             submitter = row.submitter,
@@ -1067,7 +1061,7 @@ class UpdateHistory(
       ReassignmentUpdate(
         Reassignment[Unassign](
           updateId = row.updateId,
-          offset = new ParticipantOffset.Absolute(row.participantOffset),
+          offset = row.participantOffset,
           recordTime = row.recordTime,
           event = Unassign(
             submitter = row.submitter,

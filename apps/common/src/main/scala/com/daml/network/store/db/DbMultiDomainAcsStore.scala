@@ -320,7 +320,7 @@ final class DbMultiDomainAcsStore[TXE](
       limit: notOnDomainsTotalLimit.type,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
     val templateIdMap = companions
-      .map(c => QualifiedName(c.TEMPLATE_ID) -> c)
+      .map(c => QualifiedName(c.getTemplateIdWithPackageId) -> c)
       .toMap
     val templateIds = inClause(templateIdMap.keys)
     for {
@@ -775,20 +775,20 @@ final class DbMultiDomainAcsStore[TXE](
     ): Future[Unit] = {
       transfer match {
         case ReassignmentUpdate(reassignment) =>
-          ingestReassignment(reassignment.offset.getOffset, reassignment).map { summaryState =>
+          ingestReassignment(reassignment.offset, reassignment).map { summaryState =>
             state
               .getAndUpdate(s =>
                 s.withUpdate(
                   s.acsSize + summaryState.acsSizeDiff,
-                  reassignment.offset.getOffset,
+                  reassignment.offset,
                 )
               )
-              .signalOffsetChanged(reassignment.offset.getOffset)
+              .signalOffsetChanged(reassignment.offset)
             val summary =
               summaryState.toIngestionSummary(
                 updateId = None,
                 synchronizerId = Some(domain),
-                offset = reassignment.offset.getOffset,
+                offset = reassignment.offset,
                 recordTime = Some(reassignment.recordTime),
                 newAcsSize = state.get().acsSize,
                 metrics,
@@ -876,7 +876,7 @@ final class DbMultiDomainAcsStore[TXE](
                           } else {
                             DBIO.seq(
                               doIngestAcsInsert(
-                                reassignment.offset.getOffset,
+                                reassignment.offset,
                                 assign.createdEvent,
                                 stateRowDataFromAssign(assign),
                                 summary,

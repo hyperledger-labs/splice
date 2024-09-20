@@ -18,7 +18,7 @@ import com.google.protobuf.ByteString
 /** Result message that the mediator sends to all informees of a request with its verdict.
   *
   * @param domainId the domain on which the request is running
-  * @param viewType determines which processor (transaction / transfer) must process this message
+  * @param viewType determines which processor (transaction / reassignment) must process this message
   * @param requestId unique identifier of the confirmation request
   * @param rootHash hash over the contents of the request
   * @param verdict the finalized verdict on the request
@@ -99,7 +99,7 @@ object ConfirmationResultMessage
   override val name: String = "ConfirmationResultMessage"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(
       v30.ConfirmationResultMessage
     )(
       supportedProtoVersionMemoized(_)(fromProtoV30),

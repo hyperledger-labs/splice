@@ -45,9 +45,8 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
             cause = "Could not find package."
           ) {
 
-        override def resources: Seq[(ErrorResource, String)] = {
+        override def resources: Seq[(ErrorResource, String)] =
           super.resources :+ ((ErrorResource.DalfPackage, packageId))
-        }
       }
 
       final case class InterpretationReject(
@@ -163,6 +162,26 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
                   .mkString(", ")}]."
           )
     }
+
+    @Explanation(
+      "The queried type reference for the specified package name and interface qualified-name does not reference any interface uploaded on this participant"
+    )
+    @Resolution(
+      "Use a interface qualified-name referencing already uploaded interface-ids or ask the participant operator to upload the necessary packages."
+    )
+    object NoInterfaceForPackageNameAndQualifiedName
+        extends ErrorCode(
+          id = "NO_INTERFACE_FOR_PACKAGE_NAME_AND_QUALIFIED_NAME",
+          category = ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+        ) {
+      final case class Reject(noKnownReferences: Set[(Ref.PackageName, Ref.QualifiedName)])(implicit
+          contextualizedErrorLogger: ContextualizedErrorLogger
+      ) extends DamlErrorWithDefiniteAnswer(
+            cause =
+              s"The following package-name/interface qualified-name pairs do not reference any interface-id uploaded on this participant: [${noKnownReferences
+                  .mkString(", ")}]."
+          )
+    }
   }
 
   @Explanation("This rejection is given when a read request tries to access pruned data.")
@@ -209,7 +228,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
     final case class Reject(offsetType: String, requestedOffset: String, ledgerEnd: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"${offsetType} offset (${requestedOffset}) is after ledger end (${ledgerEnd})"
+          cause = s"$offsetType offset ($requestedOffset) is after ledger end ($ledgerEnd)"
         )
   }
 
@@ -236,7 +255,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
     final case class Reject(missingField: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"The submitted command is missing a mandatory field: ${missingField}",
+          cause = s"The submitted command is missing a mandatory field: $missingField",
           extraContext = Map("field_name" -> missingField),
         )
   }
@@ -250,7 +269,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
     final case class Reject(reason: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"The submitted request has invalid arguments: ${reason}"
+          cause = s"The submitted request has invalid arguments: $reason"
         )
   }
 
@@ -264,7 +283,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
           cause =
-            s"The submitted command has a field with invalid value: Invalid field ${fieldName}: ${message}"
+            s"The submitted command has a field with invalid value: Invalid field $fieldName: $message"
         )
   }
 
@@ -286,13 +305,12 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
     )(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"The submitted command had an invalid deduplication period: ${reason}"
+          cause = s"The submitted command had an invalid deduplication period: $reason"
         ) {
-      override def context: Map[String, String] = {
+      override def context: Map[String, String] =
         super.context ++ maxDeduplicationDuration
           .map(ValidMaxDeduplicationFieldKey -> _.toString)
           .toList
-      }
     }
   }
 
@@ -310,7 +328,7 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
     )(implicit
         val loggingContext: ContextualizedErrorLogger
     ) extends DamlError(
-          cause = s"Offset in ${fieldName} not specified in hexadecimal: ${offsetValue}: ${message}"
+          cause = s"Offset in $fieldName not specified in hexadecimal: $offsetValue: $message"
         )
   }
 }

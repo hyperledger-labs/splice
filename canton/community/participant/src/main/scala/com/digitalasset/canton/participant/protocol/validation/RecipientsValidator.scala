@@ -173,7 +173,7 @@ class RecipientsValidator[I](
     )
 
     val allInformees = inputs
-      .flatMap { viewOfInput(_).informees }
+      .flatMap(viewOfInput(_).informees)
       .distinct
       .toList
 
@@ -262,9 +262,7 @@ class RecipientsValidator[I](
       .parTraverse { input =>
         val view = viewOfInput(input)
         snapshot
-          .activeParticipantsOfParties(
-            view.informees.toList
-          )
+          .activeParticipantsOfParties(view.informees.toList)
           .map(view.viewPosition.position -> _)
       }
       // It is ok to remove duplicates, as the informees of a view depend only on view.viewPosition.

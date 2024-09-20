@@ -11,8 +11,8 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.{
 }
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.config.DefaultPorts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{DefaultPorts, TestingConfigInternal}
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
@@ -47,11 +47,10 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     super.beforeAll()
   }
 
-  override protected def afterAll(): Unit = {
+  override protected def afterAll(): Unit =
     try super.afterAll()
     finally
       Timed.value(testInfrastructureSuiteMetrics.pluginsAfterTests, plugins.foreach(_.afterTests()))
-  }
 
   /** Provide an environment for an individual test either by reusing an existing one or creating a new one
     * depending on the approach being used.
@@ -86,6 +85,7 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
       initialConfig: E#Config = envDef.generateConfig,
       configTransform: E#Config => E#Config = identity,
       runPlugins: EnvironmentSetupPlugin[E, TCE] => Boolean = _ => true,
+      testConfigTransform: TestingConfigInternal => TestingConfigInternal = identity,
       testName: Option[String],
   ): TCE = TraceContext.withNewTraceContext { tc =>
     logger.debug(

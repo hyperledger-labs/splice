@@ -35,7 +35,6 @@ import com.digitalasset.canton.crypto.{
   SigningPublicKey,
 }
 import com.digitalasset.canton.crypto.SigningKeyScheme.Ed25519
-import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
@@ -117,8 +116,6 @@ abstract class TopologyAdminConnection(
           memberId
         }
     }
-
-  def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[NodeStatus.Status]]
 
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean]
 
@@ -354,7 +351,7 @@ abstract class TopologyAdminConnection(
   def ensureInitialOwnerToKeyMapping(
       member: Member,
       keys: NonEmpty[Seq[PublicKey]],
-      signedBy: Fingerprint,
+      signedBy: Seq[Fingerprint],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider.ensureThatB(
@@ -371,7 +368,7 @@ abstract class TopologyAdminConnection(
   private def proposeInitialOwnerToKeyMapping(
       member: Member,
       keys: NonEmpty[Seq[PublicKey]],
-      signedBy: Fingerprint,
+      signedBy: Seq[Fingerprint],
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransaction[TopologyChangeOp, OwnerToKeyMapping]] =
@@ -379,12 +376,12 @@ abstract class TopologyAdminConnection(
       TopologyStoreId.AuthorizedStore,
       OwnerToKeyMapping(
         member,
-        domain = None,
         keys = keys,
       ),
       signedBy = signedBy,
       serial = PositiveInt.one,
       isProposal = false,
+      change = TopologyChangeOp.Replace,
     )
 
   private def listOwnerToKeyMapping(member: Member)(implicit
@@ -491,10 +488,27 @@ abstract class TopologyAdminConnection(
       isProposal: Boolean,
       change: TopologyChangeOp = TopologyChangeOp.Replace,
   )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
+    proposeMapping(
+      store,
+      mapping,
+      Seq(signedBy),
+      serial,
+      isProposal,
+      change,
+    )
+
+  def proposeMapping[M <: TopologyMapping: ClassTag](
+      store: TopologyStoreId,
+      mapping: M,
+      signedBy: Seq[Fingerprint],
+      serial: PositiveInt,
+      isProposal: Boolean,
+      change: TopologyChangeOp,
+  )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
     runCmd(
       TopologyAdminCommands.Write.Propose(
         mapping = mapping,
-        signedBy = Seq(signedBy),
+        signedBy = signedBy,
         store = store.filterName,
         serial = Some(serial),
         mustFullyAuthorize = !isProposal,
@@ -665,7 +679,6 @@ abstract class TopologyAdminConnection(
       partyId: PartyId,
       participants: Seq[ParticipantId],
       signedBy: Fingerprint,
-      domainId: Option[DomainId] = None,
       isProposal: Boolean = false,
   )(implicit
       traceContext: TraceContext
@@ -680,7 +693,6 @@ abstract class TopologyAdminConnection(
       store,
       PartyToParticipant.tryCreate(
         partyId,
-        domainId,
         Thresholds.partyToParticipantThreshold(hostingParticipants),
         hostingParticipants,
         groupAddressing = false,
@@ -769,7 +781,6 @@ abstract class TopologyAdminConnection(
         Right(
           PartyToParticipant.tryCreate(
             previous.partyId,
-            previous.domainId,
             groupAddressing = previous.groupAddressing,
             participants = newHostingParticipants,
             threshold = Thresholds
@@ -847,7 +858,6 @@ abstract class TopologyAdminConnection(
         Right(
           PartyToParticipant.tryCreate(
             previous.partyId,
-            previous.domainId,
             groupAddressing = previous.groupAddressing,
             participants = newHostingParticipants,
             threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
@@ -891,7 +901,6 @@ abstract class TopologyAdminConnection(
             val newHostingParticipants = promoteParticipantToSubmitter(previous.participants)
             PartyToParticipant.tryCreate(
               previous.partyId,
-              previous.domainId,
               groupAddressing = previous.groupAddressing,
               participants = newHostingParticipants,
               threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
@@ -1399,17 +1408,6 @@ abstract class TopologyAdminConnection(
 
   def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {
     runCmd(TopologyAdminCommands.Init.InitId(id.uid.toProtoPrimitive))
-  }
-
-  def sign(transactions: Seq[GenericSignedTopologyTransaction], signedBy: Fingerprint)(implicit
-      traceContext: TraceContext
-  ): Future[Seq[GenericSignedTopologyTransaction]] = {
-    runCmd(
-      TopologyAdminCommands.Write.SignTransactions(
-        transactions = transactions,
-        signedBy = Seq(signedBy),
-      )
-    )
   }
 
   def identity()(implicit

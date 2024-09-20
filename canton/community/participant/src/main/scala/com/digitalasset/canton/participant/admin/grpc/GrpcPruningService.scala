@@ -99,14 +99,14 @@ class GrpcPruningService(
               EitherT.leftT(
                 PruningServiceError.PruningNotSupportedInCommunityEdition.Error().asGrpcError
               )
-            case e @ Pruning.LedgerPruningNothingToPrune(ts, offset) =>
+            case e @ Pruning.LedgerPruningNothingToPrune =>
               // Let the user know that no internal canton data exists prior to the specified
               // time and offset. Return this condition as an error instead of None, so that
               // the caller can distinguish this case from LedgerPruningOffsetUnsafeDomain.
               logger.info(e.message)
               EitherT.leftT(
                 PruningServiceError.NoInternalParticipantDataBefore
-                  .Error(ts, offset)
+                  .Error(beforeOrAt, ledgerEndOffset)
                   .asGrpcError
               )
             case e @ Pruning.LedgerPruningOffsetUnsafeDomain(_) =>
@@ -277,7 +277,7 @@ object PruningServiceError extends PruningServiceErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = "No internal participant data to prune up to time " +
-            s"${beforeOrAt} and offset ${boundInclusive.unwrap.value}."
+            s"$beforeOrAt and offset ${boundInclusive.unwrap.value}."
         )
         with PruningServiceError
   }

@@ -405,7 +405,7 @@ object TxLogEntry extends StoreErrors {
       val companion: ExerciseNodeCompanion,
       val amuletOperation: Option[String],
   ) {
-    val templateId: Identifier = companion.template.TEMPLATE_ID
+    val templateId: Identifier = companion.template.getTemplateIdWithPackageId
     val choice: String = companion.choice.name
 
     def toProto: TransactionSubtype =

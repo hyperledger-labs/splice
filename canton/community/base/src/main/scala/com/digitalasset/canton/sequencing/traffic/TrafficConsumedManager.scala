@@ -34,11 +34,15 @@ class TrafficConsumedManager(
   def getTrafficConsumed: TrafficConsumed = trafficConsumed.get
 
   /** Update the traffic consumed state with the provided receipt only if it is more recent.
+    * @return true if the state was updated.
     */
   def updateWithReceipt(trafficReceipt: TrafficReceipt, timestamp: CantonTimestamp)(implicit
       metricsContext: MetricsContext
-  ): TrafficConsumed =
-    updateAndGet {
+  ): Boolean = {
+    // We need to get the traffic consumed before the update to compare its timestamp with the input
+    // timestamp and know for sure if it was updated or not. That's why we don't use "updateAndGet" here
+    // but instead trafficConsumed.getAndUpdate
+    val oldTrafficConsumed = trafficConsumed.getAndUpdate {
       case current if current.sequencingTimestamp < timestamp =>
         current.copy(
           extraTrafficConsumed = trafficReceipt.extraTrafficConsumed,
@@ -49,6 +53,20 @@ class TrafficConsumedManager(
       case current => current
     }
 
+    val trafficConsumedUpdated = oldTrafficConsumed.sequencingTimestamp < timestamp
+
+    // And then update the metrics if the state was updated
+    if (trafficConsumedUpdated) {
+      updateTrafficConsumedMetrics(
+        trafficReceipt.extraTrafficConsumed,
+        trafficReceipt.baseTrafficRemainder,
+        timestamp,
+      )
+    }
+
+    trafficConsumedUpdated
+  }
+
   /** Validate that the event cost is below the traffic limit at the provided timestamp.
     * DOES NOT debit the cost from the traffic state.
     */
@@ -57,11 +75,10 @@ class TrafficConsumedManager(
       cost: NonNegativeLong,
       timestamp: CantonTimestamp,
       trafficPurchasedO: Option[TrafficPurchased],
-  )(implicit traceContext: TraceContext): Either[NotEnoughTraffic, Unit] = {
+  )(implicit traceContext: TraceContext): Either[NotEnoughTraffic, Unit] =
     trafficConsumed
       .get()
       .canConsumeAt(params, cost, timestamp, trafficPurchasedO, logger)
-  }
 
   /** Update the traffic consumed state to the given timestamp, including updating base rate remainder,
     * ONLY if it's not already up to date.
@@ -70,13 +87,12 @@ class TrafficConsumedManager(
       implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
-  ) = {
+  ) =
     updateAndGet {
       case trafficConsumed if trafficConsumed.sequencingTimestamp < timestamp =>
         trafficConsumed.updateTimestamp(timestamp, params, logger)
       case trafficConsumed => trafficConsumed
     }
-  }
 
   /** Consume the event cost at the given timestamp if enough traffic is available.
     * This MUST be called sequentially.
@@ -89,7 +105,7 @@ class TrafficConsumedManager(
   )(implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
-  ): Either[NotEnoughTraffic, TrafficConsumed] = {
+  ): Either[NotEnoughTraffic, TrafficConsumed] =
     canConsumeAt(
       params,
       eventCost,
@@ -108,7 +124,6 @@ class TrafficConsumedManager(
         logger.debug(s"Consumed ${eventCost.value} for $member at $timestamp: new state $newState")
         Right(newState)
     }
-  }
 
   // Single point of entry to update the traffic consumed
   // Update metrics as a side effect. f itself MUST NOT have side effects.
@@ -116,16 +131,28 @@ class TrafficConsumedManager(
       f: UnaryOperator[TrafficConsumed]
   )(implicit metricsContext: MetricsContext) = {
     val newTrafficConsumed = trafficConsumed.updateAndGet(f)
+    updateTrafficConsumedMetrics(
+      newTrafficConsumed.extraTrafficConsumed,
+      newTrafficConsumed.baseTrafficRemainder,
+      newTrafficConsumed.sequencingTimestamp,
+    )
+    newTrafficConsumed
+  }
+
+  private def updateTrafficConsumedMetrics(
+      extraTrafficConsumed: NonNegativeLong,
+      baseTrafficRemainder: NonNegativeLong,
+      lastTrafficUpdateTimestamp: CantonTimestamp,
+  )(implicit metricsContext: MetricsContext): Unit = {
     metrics
       .extraTrafficConsumed(metricsContext)
-      .updateValue(newTrafficConsumed.extraTrafficConsumed.value)
+      .updateValue(extraTrafficConsumed.value)
     metrics
       .baseTrafficRemainder(metricsContext)
-      .updateValue(newTrafficConsumed.baseTrafficRemainder.value)
+      .updateValue(baseTrafficRemainder.value)
     metrics
       .lastTrafficUpdateTimestamp(metricsContext)
-      .updateValue(newTrafficConsumed.sequencingTimestamp.getEpochSecond)
-    newTrafficConsumed
+      .updateValue(lastTrafficUpdateTimestamp.getEpochSecond)
   }
 }
 

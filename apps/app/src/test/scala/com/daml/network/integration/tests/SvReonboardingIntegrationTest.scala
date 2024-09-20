@@ -24,11 +24,11 @@ import com.daml.network.sv.automation.singlesv.offboarding.{
 }
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
 import com.daml.network.validator.config.MigrateValidatorPartyConfig
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForId}
 
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.*

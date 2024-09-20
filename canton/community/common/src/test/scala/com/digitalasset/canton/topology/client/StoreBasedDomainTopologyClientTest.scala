@@ -45,7 +45,6 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
     lazy val party1participant1 = mkAdd(
       PartyToParticipant.tryCreate(
         party1,
-        None,
         PositiveInt.one,
         Seq(HostingParticipant(participant1, Confirmation)),
         groupAddressing = false,
@@ -54,7 +53,6 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
     lazy val party2participant1_2 = mkAdd(
       PartyToParticipant.tryCreate(
         party2,
-        None,
         PositiveInt.one,
         Seq(
           HostingParticipant(participant1, Submission),
@@ -81,8 +79,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
       def add(
           timestamp: CantonTimestamp,
           transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-      ): Future[Unit] = {
-
+      ): Future[Unit] =
         for {
           _ <- store.update(
             SequencedTime(timestamp),
@@ -95,14 +92,12 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
             .observed(timestamp, timestamp, SequencerCounter(1), transactions)
             .failOnShutdown(s"observe timestamp $timestamp")
         } yield ()
-      }
 
-      def advance(ts: CantonTimestamp): Unit = {
+      def advance(ts: CantonTimestamp): Unit =
         client
           .observed(SequencedTime(ts), EffectiveTime(ts), SequencerCounter(0), List())
           .failOnShutdown(s"advance to $ts")
           .futureValue
-      }
     }
 
     "waiting for snapshots" should {
@@ -125,7 +120,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
         val fixture = new Fixture()
         import fixture.*
         val tc = client
-        val wt = tc.awaitTimestamp(ts2, true)
+        val wt = tc.awaitTimestamp(ts2)
         wt match {
           case Some(fut) =>
             advance(ts1)
@@ -141,7 +136,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
         import fixture.*
         val tc = client
         advance(ts1)
-        val wt = tc.awaitTimestamp(ts1, waitForEffectiveTime = true)
+        val wt = tc.awaitTimestamp(ts1)
         wt shouldBe None
       }
 
@@ -325,7 +320,7 @@ trait DbStoreBasedTopologySnapshotTest
   this: AsyncWordSpec with BaseTest with HasExecutionContext with DbTest =>
 
   "DbStoreBasedTopologySnapshot" should {
-    behave like topologySnapshot(() => createTopologyStore())
+    behave like topologySnapshot(() => createTopologyStore(DefaultTestIdentities.domainId))
   }
 
 }

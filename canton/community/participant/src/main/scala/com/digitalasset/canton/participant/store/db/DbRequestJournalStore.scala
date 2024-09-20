@@ -186,7 +186,7 @@ class DbRequestJournalStore(
 
   override def firstRequestWithCommitTimeAfter(commitTimeExclusive: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[Option[RequestData]] = {
+  ): Future[Option[RequestData]] =
     storage.profile match {
       case _: Profile.Postgres =>
         for {
@@ -225,8 +225,6 @@ class DbRequestJournalStore(
           functionFullName,
         )
     }
-
-  }
 
   override def replace(
       rc: RequestCounter,
@@ -331,18 +329,18 @@ class DbRequestJournalStore(
 
   @VisibleForTesting
   private[store] override def pruneInternal(
-      beforeAndIncluding: CantonTimestamp
+      beforeInclusive: CantonTimestamp
   )(implicit traceContext: TraceContext): Future[Unit] =
     storage.update_(
       sqlu"""
-    delete from par_journal_requests where request_timestamp <= $beforeAndIncluding and domain_id = $domainId
+    delete from par_journal_requests where request_timestamp <= $beforeInclusive and domain_id = $domainId
   """,
       functionFullName,
     )
 
   override def size(start: CantonTimestamp, end: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
-  ): Future[Int] = {
+  ): Future[Int] =
     storage
       .query(
         {
@@ -356,7 +354,6 @@ class DbRequestJournalStore(
         functionFullName,
       )
       .map(_.size)
-  }
 
   override def deleteSince(
       fromInclusive: RequestCounter
@@ -391,6 +388,19 @@ class DbRequestJournalStore(
 
   override def onClosed(): Unit = Lifecycle.close(cleanPreheadStore)(logger)
 
+  override def lastRequestCounterWithRequestTimestampBeforeOrAt(requestTimestamp: CantonTimestamp)(
+      implicit traceContext: TraceContext
+  ): Future[Option[RequestCounter]] =
+    storage.query(
+      sql"""
+        select request_counter
+        from par_journal_requests
+        where domain_id = $domainId and request_timestamp <= $requestTimestamp
+        order by (domain_id, request_timestamp) desc
+        #${storage.limit(1)}
+        """.as[RequestCounter].headOption,
+      functionFullName,
+    )
 }
 
 object DbRequestJournalStore {

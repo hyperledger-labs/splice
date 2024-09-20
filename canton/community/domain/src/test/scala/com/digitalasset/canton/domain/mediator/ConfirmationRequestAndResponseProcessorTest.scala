@@ -9,7 +9,7 @@ import com.digitalasset.canton.config.CachingConfigs
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
-import com.digitalasset.canton.data.ViewType.{TransactionViewType, TransferInViewType}
+import com.digitalasset.canton.data.ViewType.{AssignmentViewType, TransactionViewType}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.domain.mediator.ResponseAggregation.ConsortiumVotingState
 import com.digitalasset.canton.domain.mediator.store.{
@@ -66,13 +66,13 @@ class ConfirmationRequestAndResponseProcessorTest
 
   protected val mediatorGroup: MediatorGroup = MediatorGroup(
     index = MediatorGroupIndex.zero,
-    active = NonEmpty.mk(Seq, activeMediator1, activeMediator2),
+    active = Seq(activeMediator1, activeMediator2),
     passive = Seq(passiveMediator3),
     threshold = PositiveInt.tryCreate(2),
   )
   protected val mediatorGroup2: MediatorGroup = MediatorGroup(
     index = MediatorGroupIndex.one,
-    active = NonEmpty.mk(Seq, activeMediator4),
+    active = Seq(activeMediator4),
     passive = Seq.empty,
     threshold = PositiveInt.one,
   )
@@ -80,7 +80,7 @@ class ConfirmationRequestAndResponseProcessorTest
   protected val sequencer = SequencerId(UniqueIdentifier.tryCreate("sequencer", "one"))
 
   protected val sequencerGroup =
-    SequencerGroup(active = NonEmpty.mk(Seq, sequencer), Seq.empty, PositiveInt.one)
+    SequencerGroup(active = Seq(sequencer), Seq.empty, PositiveInt.one)
 
   private lazy val mediatorId: MediatorId = activeMediator2
   private lazy val mediatorGroupRecipient: MediatorGroupRecipient = MediatorGroupRecipient(
@@ -324,7 +324,7 @@ class ConfirmationRequestAndResponseProcessorTest
             super.informeesAndConfirmationParamsByViewPosition.head
 
           override def informeesAndConfirmationParamsByViewPosition
-              : Map[ViewPosition, ViewConfirmationParameters] = {
+              : Map[ViewPosition, ViewConfirmationParameters] =
             super.informeesAndConfirmationParamsByViewPosition map {
               case (key, ViewConfirmationParameters(informees, quorums)) =>
                 (
@@ -335,7 +335,6 @@ class ConfirmationRequestAndResponseProcessorTest
                   ),
                 )
             }
-          }
         }
       val requestTimestamp = CantonTimestamp.Epoch.plusSeconds(120)
       for {
@@ -566,7 +565,7 @@ class ConfirmationRequestAndResponseProcessorTest
           domainSyncCryptoApi.pureCrypto.digest(TestHash.testHashPurpose, ByteString.EMPTY)
         )
       val correctViewType = informeeMessage.viewType
-      val wrongViewType = TransferInViewType
+      val wrongViewType = AssignmentViewType
       require(correctViewType != wrongViewType)
       val correctRootHashMessage =
         RootHashMessage(
@@ -948,11 +947,7 @@ class ConfirmationRequestAndResponseProcessorTest
                     ),
                     signatory -> ConsortiumVotingState(),
                   ),
-                  Seq(
-                    signatoryQuorum,
-                    // the new confirming party quorum is `empty`
-                    Quorum.empty,
-                  ),
+                  Seq(signatoryQuorum),
                   Nil,
                 ),
               view10Position ->
@@ -1418,12 +1413,11 @@ class ConfirmationRequestAndResponseProcessorTest
               Some(requestId.unwrap),
               Recipients.cc(mediatorGroupRecipient),
             )
-            .failOnShutdown("Unexpected shutdown."), {
-            _.shouldBeCantonError(
-              MediatorError.InvalidMessage,
-              _ shouldBe show"Received a confirmation response at ${ts.immediateSuccessor} by $participant with an unknown request id $requestId. Discarding response...",
-            )
-          },
+            .failOnShutdown("Unexpected shutdown."),
+          _.shouldBeCantonError(
+            MediatorError.InvalidMessage,
+            _ shouldBe show"Received a confirmation response at ${ts.immediateSuccessor} by $participant with an unknown request id $requestId. Discarding response...",
+          ),
         )
       } yield {
         succeed
@@ -1436,7 +1430,7 @@ class ConfirmationRequestAndResponseProcessorTest
       val requestIdTs = CantonTimestamp.Epoch
       val requestId = RequestId(requestIdTs)
 
-      def checkWrongTimestampOfSigningKeyError(logEntry: LogEntry): Assertion = {
+      def checkWrongTimestampOfSigningKeyError(logEntry: LogEntry): Assertion =
         logEntry.shouldBeCantonError(
           MediatorError.MalformedMessage,
           message =>
@@ -1444,7 +1438,6 @@ class ConfirmationRequestAndResponseProcessorTest
               "Discarding confirmation response because the topology timestamp is not set to the request id"
             ) and include(s"$requestId")),
         )
-      }
 
       val ts1 = CantonTimestamp.Epoch.plusMillis(1L)
       for {

@@ -89,7 +89,7 @@ def fromCreatedEvent(
                     ): Either[String, ScanAcsStoreRowData] = {
   // TODO(#8125) Switch to map lookups instead
   // [omitted the match and many branches, you'd add your own]
-  case t if t == QualifiedName(TheContract.TEMPLATE_ID) =>
+  case t if t == QualifiedName(TheContract.TEMPLATE_ID_WITH_PACKAGE_ID) =>
     tryToDecode(TheContract.COMPANION, createdEvent, createdEventBlob) {
       contract =>
         XXXAcsStoreRowData(

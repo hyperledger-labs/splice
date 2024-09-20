@@ -16,7 +16,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.CantonNode
-import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -29,6 +28,7 @@ import com.digitalasset.canton.time.{HasUptime, WallClock}
 import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, TracerProvider, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ReleaseVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -44,7 +44,7 @@ import org.apache.pekko.http.scaladsl.server.Directive0
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 
 import java.time
-import java.time.Instant
+import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
 import scala.annotation.nowarn
@@ -75,6 +75,9 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
     with Spanning {
 
   val name: InstanceName
+
+  // Not used for splice
+  override def adminToken = ???
 
   protected val retryProvider: RetryProvider =
     RetryProvider(
@@ -207,18 +210,17 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   protected def ports: Map[String, Port]
 
+  override type Status = NodeBase.NodeStatus
+
   // TODO(#736): fork or generalize status definition.
-  override final def status: Future[NodeStatus.Status] = {
-    val status = SimpleStatus(
+  override final def status = {
+    NodeBase.NodeStatus(
       uid = UniqueIdentifier.tryFromProtoPrimitive(s"amulet::$name"),
       uptime = uptime(),
       ports = ports,
       active = isActive,
-      topologyQueue = TopologyQueueStatus(0, 0, 0),
-      // TODO(#3859) Set this to something useful.
-      components = Seq.empty,
+      version = ReleaseVersion.tryCreate(BuildInfo.compiledVersion),
     )
-    Future.successful(status)
   }
 
   private def createLedgerClient()(implicit tc: TraceContext): Future[SpliceLedgerClient] = for {
@@ -426,5 +428,34 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
         ),
       )
     }
+  }
+}
+
+object NodeBase {
+  final case class NodeStatus(
+      uid: UniqueIdentifier,
+      uptime: Duration,
+      ports: Map[String, Port],
+      active: Boolean,
+      version: ReleaseVersion,
+  ) extends com.digitalasset.canton.health.admin.data.NodeStatus.Status {
+
+    override val components = Seq.empty
+
+    // Doesn't matter for CN but is required by the trait
+    override val topologyQueue =
+      com.digitalasset.canton.health.admin.data.TopologyQueueStatus(0, 0, 0)
+
+    override def pretty =
+      prettyOfString(_ =>
+        Seq(
+          s"CN node id: ${uid.toProtoPrimitive}",
+          show"Uptime: $uptime",
+          s"Ports: ${com.digitalasset.canton.health.admin.data.NodeStatus.portsString(ports)}",
+          s"Active: $active",
+          s"Version: $version",
+        ).mkString(System.lineSeparator())
+      )
+
   }
 }

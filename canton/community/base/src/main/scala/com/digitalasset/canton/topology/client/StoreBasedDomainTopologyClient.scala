@@ -4,8 +4,6 @@
 package com.digitalasset.canton.topology.client
 
 import cats.data.EitherT
-import cats.syntax.functor.*
-import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -46,14 +44,13 @@ trait TopologyAwaiter extends FlagCloseable {
     shutdownConditions()
   }
 
-  private def shutdownConditions(): Unit = {
+  private def shutdownConditions(): Unit =
     conditions.updateAndGet { x =>
       x.foreach(_.promise.trySuccess(UnlessShutdown.AbortedDueToShutdown).discard[Boolean])
       Seq()
     }.discard
-  }
 
-  protected def checkAwaitingConditions()(implicit traceContext: TraceContext): Unit = {
+  protected def checkAwaitingConditions()(implicit traceContext: TraceContext): Unit =
     conditions
       .get()
       .foreach(stateAwait =>
@@ -64,15 +61,14 @@ trait TopologyAwaiter extends FlagCloseable {
             stateAwait.promise.tryFailure(e).discard[Boolean]
         }
       )
-  }
 
   private class StateAwait(func: => Future[Boolean]) {
     val promise: Promise[UnlessShutdown[Boolean]] = Promise[UnlessShutdown[Boolean]]()
-    promise.future.onComplete(_ => {
+    promise.future.onComplete { _ =>
       val _ = conditions.updateAndGet(_.filterNot(_.promise.isCompleted))
-    })
+    }
 
-    def check(): Unit = {
+    def check(): Unit =
       if (!promise.isCompleted) {
         // Ok to use onComplete as any exception will be propagated to the promise.
         func.onComplete {
@@ -81,7 +77,6 @@ trait TopologyAwaiter extends FlagCloseable {
             val _ = promise.tryComplete(res.map(UnlessShutdown.Outcome(_)))
         }
       }
-    }
   }
 
   private[topology] def scheduleAwait(
@@ -138,14 +133,13 @@ class StoreBasedDomainTopologyClient(
     def update(
         newEffectiveTimestamp: EffectiveTime,
         newApproximateTimestamp: ApproximateTime,
-    ): HeadTimestamps = {
+    ): HeadTimestamps =
       HeadTimestamps(
         effectiveTimestamp =
           EffectiveTime(effectiveTimestamp.value.max(newEffectiveTimestamp.value)),
         approximateTimestamp =
           ApproximateTime(approximateTimestamp.value.max(newApproximateTimestamp.value)),
       )
-    }
   }
   private val head = new AtomicReference[HeadTimestamps](
     HeadTimestamps(
@@ -266,43 +260,15 @@ class StoreBasedDomainTopologyClient(
   override def approximateTimestamp: CantonTimestamp =
     head.get().approximateTimestamp.value.immediateSuccessor
 
-  override def awaitTimestampUS(timestamp: CantonTimestamp, waitForEffectiveTime: Boolean)(implicit
+  override def awaitTimestampUS(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Option[FutureUnlessShutdown[Unit]] =
-    if (waitForEffectiveTime)
-      this.awaitKnownTimestampUS(timestamp)
-    else
-      Some(
-        for {
-          snapshotAtTs <- awaitSnapshotUS(timestamp)
-          parametersAtTs <- performUnlessClosingF(functionFullName)(
-            snapshotAtTs.findDynamicDomainParametersOrDefault(protocolVersion)
-          )
-          epsilonAtTs = parametersAtTs.topologyChangeDelay
-          // then, wait for t+e
-          _ <- awaitKnownTimestampUS(timestamp.plus(epsilonAtTs.unwrap))
-            .getOrElse(FutureUnlessShutdown.unit)
-        } yield ()
-      )
+    this.awaitKnownTimestampUS(timestamp)
 
   override def awaitTimestamp(
-      timestamp: CantonTimestamp,
-      waitForEffectiveTime: Boolean,
-  )(implicit traceContext: TraceContext): Option[Future[Unit]] = if (waitForEffectiveTime)
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): Option[Future[Unit]] =
     this.awaitKnownTimestamp(timestamp)
-  else if (approximateTimestamp >= timestamp) None
-  else {
-    Some(
-      // first, let's wait until we can determine the epsilon for the given timestamp
-      for {
-        snapshotAtTs <- awaitSnapshot(timestamp)
-        parametersAtTs <- snapshotAtTs.findDynamicDomainParametersOrDefault(protocolVersion)
-        epsilonAtTs = parametersAtTs.topologyChangeDelay
-        // then, wait for t+e
-        _ <- awaitKnownTimestamp(timestamp.plus(epsilonAtTs.unwrap)).getOrElse(Future.unit)
-      } yield ()
-    )
-  }
 
   override protected def onClosed(): Unit = {
     expireTimeAwaiter()

@@ -38,6 +38,7 @@ import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, PekkoUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import io.grpc.Status
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.{Done, NotUsed}
@@ -61,6 +62,10 @@ class DirectSequencerClientTransport(
     with NamedLogging {
   import DirectSequencerClientTransport.*
 
+  override def logout(): EitherT[FutureUnlessShutdown, Status, Unit] =
+    // In-process connection is not authenticated
+    EitherT.pure(())
+
   private val subscriptionFactory =
     new DirectSequencerSubscriptionFactory(sequencer, timeouts, loggerFactory)
 
@@ -79,19 +84,18 @@ class DirectSequencerClientTransport(
   ): EitherT[FutureUnlessShutdown, String, Boolean] =
     sequencer
       .acknowledgeSigned(request)
-      .map { _ => true }
+      .map(_ => true)
       .mapK(FutureUnlessShutdown.outcomeK)
 
   override def getTrafficStateForMember(request: GetTrafficStateForMemberRequest)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse] = {
+  ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse] =
     sequencer
       .getTrafficStateAt(request.member, request.timestamp)
       .map { trafficStateO =>
         GetTrafficStateForMemberResponse(trafficStateO, protocolVersion)
       }
       .leftMap(_.toString)
-  }
 
   override def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
       implicit traceContext: TraceContext
@@ -115,7 +119,7 @@ class DirectSequencerClientTransport(
               case Right(event) => handler(event)
               case Left(error) =>
                 ErrorUtil.invalidState(
-                  s"Direct transport subscriptions must not trigger subscription errors such as ${error}"
+                  s"Direct transport subscriptions must not trigger subscription errors such as $error"
                 )
             },
           )
