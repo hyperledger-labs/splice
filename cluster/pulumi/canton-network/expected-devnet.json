@@ -3865,10 +3865,10 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7",
         "walletSweep": {
-          "Digital-Asset-2::12208a8fd9a6b7db352911df1e27b2f4d62ae240f2fefd0653951f02417c2006a0a9": {
+          "Digital-Asset-2::1220dcf294bffd10439167f7460b1b6926b7a87d3237b748c7de6d7367fad3e33b20": {
             "maxBalanceUSD": 3000,
             "minBalanceUSD": 100,
-            "receiver": "validator_validator_service_user::122053a24b8c980c413f927371c8ee4410e03980bec23d9f6c974c9d8fde41cc6df6"
+            "receiver": "DigitalAsset-Wallet-1::1220853d4956c10bf2a9fd08ed98c0fa2fa3c73e485aafca115069b9a92fb68f9aa0"
           }
         }
       },
