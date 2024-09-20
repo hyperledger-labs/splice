@@ -33,13 +33,196 @@
             "description": "The validator party hint to use for the validator"
           }
         }
+      },
+      "else": {
+        "required": ["decentralizedSynchronizerUrl"],
+        "properties": {
+          "decentralizedSynchronizerUrl": {
+            "type": "string"
+          }
+        }
       }
     },
     {
-      "required": ["auth", "spliceInstanceNames"],
+      "if": {
+        "properties": {
+          "topup": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["topup"],
+        "properties": {
+          "topup": {
+            "type": "object",
+            "required": ["targetThroughput", "minTopupInterval"],
+            "properties": {
+              "targetThroughput": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "minTopupInterval": {
+                "type": "string",
+                "pattern": "^[0-9]+[smh]$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "required": [
+        "auth",
+        "defaultJvmOptions",
+        "enableWallet",
+        "imageRepo",
+        "migration",
+        "nodeIdentifier",
+        "persistence",
+        "scanAddress",
+        "spliceInstanceNames"
+      ],
       "properties": {
+        "imageRepo": {
+          "type": "string"
+        },
+        "imageDigests": {
+          "type": "object"
+        },
+        "defaultJvmOptions": {
+          "type": "string"
+        },
+        "additionalJvmOptions": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": ["number", "string"]
+                },
+                "memory": {
+                  "type": ["number", "string"]
+                }
+              }
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": ["number", "string"]
+                },
+                "memory": {
+                  "type": ["number", "string"]
+                }
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "enable": {
+              "type": "boolean"
+            },
+            "release": {
+              "type": "string"
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]+[smh]$"
+            }
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "required": [
+            "databaseName",
+            "schema",
+            "host",
+            "port",
+            "user",
+            "secretName"
+          ],
+          "properties": {
+            "databaseName": {
+              "type": "string"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "integer"
+            },
+            "user": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            }
+          }
+        },
+        "migrateValidatorParty": {
+          "type": "boolean"
+        },
+        "migration": {
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "id": {
+              "description": "The migration id of the synchronizer"
+            },
+            "migrating": {
+              "type": "boolean"
+            },
+            "attachPvc": {
+              "type": "boolean"
+            }
+          }
+        },
+        "pvc": {
+          "type": "object",
+          "properties": {
+            "volumeStorageClass": {
+              "type": "string"
+            }
+          }
+        },
+        "failOnAppVersionMismatch": {
+          "type": "boolean"
+        },
+        "fixedTokens": {
+          "type": "boolean"
+        },
+        "enableWallet": {
+          "type": "boolean"
+        },
+        "enablePostgresMetrics": {
+          "type": "boolean"
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
+        },
         "auth": {
           "type": "object",
+          "required": ["audience", "ledgerApiAudience", "jwksUrl"],
           "properties": {
             "audience": {
               "type": "string",
@@ -53,6 +236,142 @@
               "type": "string",
               "pattern": "^http[s]?://.+$",
               "description": "The URL for the JWKS endpoint for the validator app API"
+            }
+          }
+        },
+        "scanAddress": {
+          "type": "string"
+        },
+        "nonSvValidatorTrustSingleScan": {
+          "type": "boolean"
+        },
+        "useSequencerConnectionsFromScan": {
+          "type": "boolean"
+        },
+        "extraDomains": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "alias": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "participantIdentitiesDumpPeriodicBackup": {
+          "type": "object",
+          "properties": {
+            "backupInterval": {
+              "type": "string",
+              "pattern": "^[0-9]+[smh]$"
+            },
+            "location": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "object",
+                  "properties": {
+                    "jsonCredentials": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "secretName": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "prefix": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "participantAddress": {
+          "type": "string"
+        },
+        "svSponsorAddress": {
+          "type": "string"
+        },
+        "nodeIdentifier": {
+          "type": "string"
+        },
+        "appDars": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validatorWalletUser": {
+          "type": "string"
+        },
+        "additionalUsers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "additionalConfig": {
+          "type": "string"
+        },
+        "cluster": {
+          "type": "object",
+          "properties": {
+            "fixedTokens": {
+              "type": "boolean"
+            }
+          }
+        },
+        "onboardingSecretFrom": {
+          "type": "object",
+          "properties": {
+            "secretKeyRef": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "optional": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "disableIngestUpdateHistoryFromParticipantBegin": {
+          "type": "boolean"
+        },
+        "contactPoint": {
+          "type": "string"
+        },
+        "livenessProbeInitialDelaySeconds": {
+          "type": "integer"
+        },
+        "participantIdentitiesDumpImport": {
+          "type": "object",
+          "properties": {
+            "newParticipantIdentifier": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
             }
           }
         },
