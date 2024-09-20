@@ -95,8 +95,6 @@ spec:
             {{- end }}
             - name: CN_APP_SV_AUTH_AUDIENCE
               value: {{ .Values.auth.audience | quote }}
-            - name: CN_APP_SV_LEDGER_API_AUTH_AUDIENCE
-              value: {{ .Values.auth.ledgerApiAudience | quote }}
             - name: CN_APP_SV_AUTH_JWKS_URL
               value: {{ .Values.auth.jwksUrl | quote }}
             {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
