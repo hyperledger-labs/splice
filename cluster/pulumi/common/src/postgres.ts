@@ -11,6 +11,8 @@ import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME } from 
 
 const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
 const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
+// default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
+const cloudSqlDbInstance = config.optionalEnv('CLOUDSQL_DB_INSTANCE') || 'db-custom-2-7680';
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -82,8 +84,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           insightsConfig: {
             queryInsightsEnabled: true,
           },
-          // tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
-          tier: 'db-custom-2-7680',
+          tier: cloudSqlDbInstance,
           ipConfiguration: {
             ipv4Enabled: false,
             privateNetwork: privateNetwork.id,
