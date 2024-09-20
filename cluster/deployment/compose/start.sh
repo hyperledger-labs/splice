@@ -32,6 +32,7 @@ function usage() {
   echo "  -m <migration_id>: The migration ID to use. Must be a non-negative integer."
   echo "  -M: Use this flag when bumping the migration ID as part of a migration."
   echo "  -i <identities_dump>: restore identities from a dump file. Requires a new participant identifier to be provided."
+  echo "  -w: Wait for the validator to be fully up and running before returning."
 
   echo ""
   echo "Testing flags:"
@@ -55,7 +56,8 @@ migrating=0
 party_hint=""
 participant_id=""
 restore_identities_dump=""
-while getopts 'has:c:t:o:n:bq:m:Mp:P:i:' arg; do
+wait=0
+while getopts 'has:c:t:o:n:bq:m:Mp:P:i:w' arg; do
   case ${arg} in
     h)
       usage
@@ -96,6 +98,9 @@ while getopts 'has:c:t:o:n:bq:m:Mp:P:i:' arg; do
       ;;
     i)
       restore_identities_dump="${OPTARG}"
+      ;;
+    w)
+      wait=1
       ;;
     ?)
       usage
@@ -210,4 +215,8 @@ if [ -n "${restore_identities_dump}" ]; then
   export VALIDATOR_NEW_PARTICIPANT_IDENTIFIER=${PARTICIPANT_IDENTIFIER}
   export VALIDATOR_PARTICIPANT_IDENTITIES_DUMP=${restore_identities_dump}
 fi
-docker compose -f "${script_dir}/compose.yaml" "${extra_compose_files[@]}" up -d
+extra_args=()
+if [ $wait -eq 1 ]; then
+  extra_args+=("--wait")
+fi
+docker compose -f "${script_dir}/compose.yaml" "${extra_compose_files[@]}" up -d "${extra_args[@]}"

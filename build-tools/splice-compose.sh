@@ -91,16 +91,34 @@ function _start_validator {
   mkdir -p "${REPO_ROOT}/log"
 
   _info "Starting validator"
+  args=( \
+    "-s" "${sv_from_docker}" \
+    "-c" "${scan}" \
+    "-q" "${sequencer}" \
+    "-o" "${secret}" \
+    "-m" "${migration_id}" \
+    "-b" \
+    "-p" "${party_hint}" \
+  )
+
   "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
-    -s "${sv_from_docker}" \
-    -c "${scan}" \
-    -q "${sequencer}" \
-    -o "${secret}" \
-    -m "${migration_id}" \
-    -b \
-    -p "${party_hint}" \
+    "${args[@]}" \
     "${extra_flags[@]}" \
       >> "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
+
+  for c in validator participant; do
+    docker logs -f compose-${c}-1 >> "${REPO_ROOT}/log/compose-${c}.clog" 2>&1 &
+  done
+
+  if [ "$wait" -eq 1 ]; then
+    # Rerunning start.sh with -w should not interfere with the deployment, only wait for it to be ready
+    _info "Waiting for the validator to be ready"
+    "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
+      "${args[@]}" \
+      "${extra_flags[@]}" \
+      "-w" \
+        >> "${REPO_ROOT}/log/compose-wait.log" 2>&1 || _error "Validator failed to become ready"
+  fi
 }
 
 function _usage {
@@ -204,23 +222,6 @@ function subcmd_start {
       exit 1
     fi
       _start_validator "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME" "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME" "https://scan.sv-2.$GCP_CLUSTER_HOSTNAME" "https://sequencer-${migration_id}.sv-2.$GCP_CLUSTER_HOSTNAME"
-  fi
-
-  for c in validator participant; do
-    docker logs -f compose-${c}-1 >> "${REPO_ROOT}/log/compose-${c}.clog" 2>&1 &
-  done
-
-  if [ $wait -eq 1 ]; then
-    _info "Waiting for the validator to be ready"
-    # shellcheck disable=SC2034
-    for i in {1..300}; do
-        curl -sf "wallet.localhost/api/validator/readyz" && break
-        echo -n "."
-        sleep 6
-    done
-    curl -sf "wallet.localhost/api/validator/readyz" || _error "Validator is not ready after 30 minutes" || exit 1
-
-    _info "Validator is ready"
   fi
 }
 function usage_start {

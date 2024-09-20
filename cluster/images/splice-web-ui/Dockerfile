@@ -23,3 +23,4 @@ COPY --from=build /usr/bin/tini /usr/bin/tini
 COPY default.conf /etc/nginx/conf.d
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/custom-docker-entrypoint.sh"]
+HEALTHCHECK CMD service nginx status || exit 1
