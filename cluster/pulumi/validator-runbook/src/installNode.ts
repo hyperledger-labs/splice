@@ -277,7 +277,6 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     auth: {
       ...validatorValuesWithOnboardingOverride.auth,
       audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-      ledgerApiAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 

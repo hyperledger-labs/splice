@@ -26,7 +26,9 @@ Upcoming
 
 * Deployment
 
-  * The chart value ``auth.audience`` was formerly optional, and is now required for the following charts. The previous default value was ``https://canton.network.global``. To continue using the default, provide it explicitly to your values. (See the sv-helm and validator-helm docs for more information on auth configuration.)
+  * The auth secrets ``splice-app-{sv,validator}-ledger-api-auth`` formerly had ``audience`` as an optional field. This is now required. The former implicit value was ``https://canton.network.global``. If you have not overridden this value before, you should add it now explicitly.
+  * It used to be possible to override the ledger-api audience value through the helm value ``auth.ledgerApiAudience`` in the sv and validator charts. This has been removed -- use the secret mentioned in the previous point.
+  * The chart value ``auth.audience`` was formerly optional, and is now required for the following charts. The previous implicit value was ``https://canton.network.global``. To continue using it, please provide it explicitly to your values. (See the sv-helm and validator-helm docs for more information on auth configuration.)
     * ``cn-sv-node``
     * ``cn-validator``
   * The chart value ``auth.jwksUrl`` was formerly optional, and is now required for the same charts above. This should already be overridden in your values file for your particular auth setup, so likely no further action is required.

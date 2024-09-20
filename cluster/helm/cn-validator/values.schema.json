@@ -222,15 +222,11 @@
         },
         "auth": {
           "type": "object",
-          "required": ["audience", "ledgerApiAudience", "jwksUrl"],
+          "required": ["audience", "jwksUrl"],
           "properties": {
             "audience": {
               "type": "string",
               "description": "The JWT audience for tokens used against the validator app API"
-            },
-            "ledgerApiAudience": {
-              "type": "string",
-              "description": "The JWT audience for tokens used against the ledger API"
             },
             "jwksUrl": {
               "type": "string",

@@ -12,6 +12,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "splitwell-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "splitwell-validator-client-id@clients",
@@ -36,6 +37,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "splitwell-client-id",
           "client-secret": "***",
           "ledger-api-user": "splitwell-client-id@clients",
@@ -60,6 +62,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv-1-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-1-client-id@clients",
@@ -84,6 +87,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv1-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv1-validator-client-id@clients",
@@ -108,6 +112,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv-2-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-2-client-id@clients",
@@ -132,6 +137,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv2-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv2-validator-client-id@clients",
@@ -156,6 +162,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv-3-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-3-client-id@clients",
@@ -180,6 +187,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv3-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv3-validator-client-id@clients",
@@ -204,6 +212,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv-4-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-4-client-id@clients",
@@ -228,6 +237,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv4-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv4-validator-client-id@clients",
@@ -252,6 +262,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "validator1-client-id",
           "client-secret": "***",
           "ledger-api-user": "validator1-client-id@clients",
@@ -1520,6 +1531,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "splitwell-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "splitwell-validator-client-id@clients",
@@ -1544,6 +1556,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "splitwell-client-id",
           "client-secret": "***",
           "ledger-api-user": "splitwell-client-id@clients",
@@ -1568,6 +1581,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv-1-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-1-client-id@clients",
@@ -1592,6 +1606,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv1-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv1-validator-client-id@clients",
@@ -1616,6 +1631,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv-2-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-2-client-id@clients",
@@ -1640,6 +1656,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv2-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv2-validator-client-id@clients",
@@ -1664,6 +1681,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv-3-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-3-client-id@clients",
@@ -1688,6 +1706,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv3-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv3-validator-client-id@clients",
@@ -1712,6 +1731,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv-4-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv-4-client-id@clients",
@@ -1736,6 +1756,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "sv4-validator-client-id",
           "client-secret": "***",
           "ledger-api-user": "sv4-validator-client-id@clients",
@@ -1760,6 +1781,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://canton.network.global",
           "client-id": "validator1-client-id",
           "client-secret": "***",
           "ledger-api-user": "validator1-client-id@clients",
@@ -2664,8 +2686,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -3637,8 +3658,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -3789,8 +3809,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -4757,8 +4776,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -4882,8 +4900,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -5843,8 +5860,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -5968,8 +5984,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -6929,8 +6944,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -7054,8 +7068,7 @@
         "appDars": [],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",
@@ -7864,8 +7877,7 @@
         ],
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://canton.network.global"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cluster": {
           "dnsName": "dev.global.canton.network.digitalasset.com",

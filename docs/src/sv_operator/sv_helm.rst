@@ -201,7 +201,7 @@ CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
 
-When first starting, it is suggested to configure all three JWT token audiences below to the same value: ``https://canton.network.global``.
+When first starting out, it is suggested to configure all three JWT token audiences below to the same value: ``https://canton.network.global``.
 
 Once you can confirm that your setup is working correctly using this (simple) default,
 we recommend that you configure dedicated audience values that match your deployment and URLs.
@@ -325,8 +325,7 @@ The following kubernetes secret will instruct the participant to create a servic
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
         "--from-literal=client-secret=${SV_CLIENT_SECRET}"
-        # Optional. uncomment it if you want to set audience for ledger API
-        # "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
+        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 The validator app backend requires the following secret.
 
@@ -337,8 +336,7 @@ The validator app backend requires the following secret.
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
-        # Optional. uncomment it if you want to set audience for ledger API
-        # "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
+        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 To setup the wallet, CNS and SV UI, create the following two secrets.
 
@@ -554,7 +552,7 @@ that. Please modify the file ``splice-node/examples/sv-helm/validator-values.yam
 
 - Replace ``TRUSTED_SCAN_URL`` with the URL of the Scan you host. If you are using the ingress configuration of this runbook, you can use ``"http://scan-app.sv:5012"``.
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
-- If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
+- If you want to configure the audience for the Ledger API, set the ``audience`` field in the `splice-app-sv-ledger-api-auth` k8s secret with the audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Replace ``YOUR_CONTACT_POINT`` by the same contact point that you used in ``sv-values.yaml``.
   this, set it to an empty string.

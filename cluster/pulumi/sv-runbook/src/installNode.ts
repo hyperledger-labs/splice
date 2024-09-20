@@ -391,7 +391,6 @@ async function installSvAndValidator(
     auth: {
       ...validatorValues.auth,
       audience: auth0Config.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-      ledgerApiAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 

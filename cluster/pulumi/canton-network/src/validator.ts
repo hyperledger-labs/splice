@@ -241,8 +241,6 @@ export async function installValidatorApp(
       auth: {
         audience:
           config.secrets.auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-        ledgerApiAudience:
-          config.secrets.auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
         jwksUrl: `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
       },
       walletSweep,
