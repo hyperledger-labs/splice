@@ -9,3 +9,6 @@ EXPOSE 5003
 EXPOSE 10013
 
 COPY app.conf bootstrap.sc pre-bootstrap.sh /app/
+
+HEALTHCHECK --start-period=10m \
+  CMD curl -f http://localhost:5003/api/validator/readyz || exit 1

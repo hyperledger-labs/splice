@@ -29,9 +29,12 @@ COPY target/monitoring.conf target/entrypoint.sh target/bootstrap-entrypoint.sc 
 
 RUN ln -s bin/canton splice-image-bin
 
+FROM fullstorydev/grpcurl:v1.9.1 AS grpcurl
+
 FROM eclipse-temurin:17-jdk-jammy
 COPY --from=build /usr/bin/tini /usr/bin/tini
 COPY --from=build /usr/bin/screen /usr/bin/screen
+COPY --from=grpcurl /bin/grpcurl /bin/grpcurl
 COPY --from=build /app/ /app/
 
 WORKDIR /app
