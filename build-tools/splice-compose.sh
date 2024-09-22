@@ -118,6 +118,17 @@ function _start_validator {
       "${extra_flags[@]}" \
       "-w" \
         >> "${REPO_ROOT}/log/compose-wait.log" 2>&1 || _error "Validator failed to become ready"
+
+    # We are also waiting here for the readiness endpoint explicitly, and not only relying on
+    # docker healthchecks, to support versions of the images that did not include the healthchecks.
+    # TODO(#14303): remove this once the images of the base version include healthchecks
+    # shellcheck disable=SC2034
+    for i in {1..60}; do
+        curl -sf "wallet.localhost/api/validator/readyz" && break
+        echo -n "."
+        sleep 10
+    done
+    curl -sf "wallet.localhost/api/validator/readyz" || _error "Validator is not ready after 30 minutes" || exit 1
   fi
 }
 
