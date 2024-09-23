@@ -2492,7 +2492,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 440000
+            "rewardWeightBps": 430000
           },
           {
             "name": "Orb-1-LP",
@@ -2503,11 +2503,6 @@
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEOxCYWSBB4hDz7O1XxJ3xswKXxJcQqsgyzBTbWjkwa+ILYXy8T2vtVMoZ+tC/Ykdp3MyFwcMIP1kzcDKCSp0qow==",
             "rewardWeightBps": 10000
-          },
-          {
-            "name": "Infstones-1",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAQhh41RwumQYb+uL9R1bM0olmAQMbOrY7uSGMRM+ygfhhfjrdNdJNkFakGYxqS9R/WlrCCJH+zCBjvtb2BY7MA==",
-            "rewardWeightBps": 0
           }
         ],
         "auth": {
