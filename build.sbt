@@ -1155,7 +1155,7 @@ lazy val bundleTask = {
       "network-health",
       "grafana-dashboards/docs",
     )
-    val dockerCompose = Seq("-r", "cluster/deployment/compose", "docker-compose")
+    val dockerCompose = Seq("-r", "cluster/compose", "docker-compose")
     val webUis =
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),

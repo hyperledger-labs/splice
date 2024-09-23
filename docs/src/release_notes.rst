@@ -45,6 +45,9 @@ Upcoming
     validators failed to submit a transaction due to lagging behind
     but also failed to catch up due to the submission failing.
 
+* Added support for a docker-compose based deployment of a single-SV network, for app developers
+  to test against without needing to connect to DevNet.
+
 0.2.1
 -----
 

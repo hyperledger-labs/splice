@@ -1,3 +1,5 @@
+name: splice-validator
+
 volumes:
   postgres-splice:
   domain-upgrade-dump:

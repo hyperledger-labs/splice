@@ -5,10 +5,14 @@
 
 .. TODO(#14303): consider reducing duplication. Some requirements & validator onboarding can be moved to a section before we choose the deployment method
 
+
+Docker-Compose Based Deployment
+===============================
+
 .. _compose_validator:
 
 Docker-Compose Based Deployment of a Validator Node
-===================================================
+---------------------------------------------------
 
 This section describes how to deploy a standalone validator node on a local machine
 using Docker-Compose. The deployment consists of the validator node along with associated
@@ -33,10 +37,10 @@ This deployment is useful for:
     in order to avoid losing out on rewards, and avoid issues with catching up on ledger state
     after significant downtime.
 
-.. _validator_helm_prerequisites:
+.. _validator_compose_prerequisites:
 
 Requirements
-------------
+++++++++++++
 
 1) Access to the following artifactory:
 
@@ -67,7 +71,7 @@ Requirements
    export MIGRATION_ID=0
 
 Preparing for Validator Onboarding
-----------------------------------
+++++++++++++++++++++++++++++++++++
 
 In order to become a validator, you need the sponsorship of an SV.
 Your SV will provide you with a required secret to authorize yourself towards their SV.
@@ -84,23 +88,23 @@ The onboarding secret is a one-time use secret that expires after 24 hours. If y
      curl -X POST |gsf_sv_url|/api/sv/v0/devnet/onboard/validator/prepare
 
 Deployment
-----------
+++++++++++
 
 1) Change to the `docker-compose`` directory inside the extracted bundle:
 
 .. code-block:: bash
 
-   cd splice-node/docker-compose
+   cd splice-node/docker-compose/validator
 
 .. TODO(#14303): get rid of the need to manually export the image tag
 
 2) Export the current version to an environment variable: |image_tag_set|
 
-3) Run the following command to start the validator node:
+3) Run the following command to start the validator node, and wait for it to become ready (could take a few minutes):
 
   .. code-block:: bash
 
-    ./start.sh -s <sponsor_sv_address> -o "<onboarding_secret>" -p <party_hint> -m $MIGRATION_ID
+    ./start.sh -s <sponsor_sv_address> -o "<onboarding_secret>" -p <party_hint> -m $MIGRATION_ID -w
 
 
   Where:
@@ -124,37 +128,18 @@ Note that the validator may be stopped with the command `./stop.sh` and restarte
 command as above. Its data will be retained between invocations.
 
 Logging into the wallet UI
---------------------------
+++++++++++++++++++++++++++
 
 The wallet UI is accessible at http://wallet.localhost in your browser. The validator administrator's
 username is `administrator`. Insert that name into the username field and click `Log in`, and
-you should see the wallet of the administrator of your wallet. If after logging in, you see only
-a spinner and not the wallet UI, your validator may still be onboarding, and you should wait a few minutes.
-
-To check the status of the validator, you can test its readiness endpoint with:
-
-.. code-block:: bash
-
-   curl -Sfi "wallet.localhost/api/validator/readyz"
-
-Once the validator is ready, this command would succeed with a 200 response code:
-
-.. code-block:: bash
-
-   % curl -Sfi "wallet.localhost/api/validator/readyz"
-   HTTP/1.1 200 OK
-   Server: nginx/1.27.1
-   Date: Thu, 12 Sep 2024 13:25:46 GMT
-   Content-Length: 0
-   Connection: keep-alive
-
+you should see the wallet of the administrator of your wallet.
 
 You can also logout of the administrator account and login as any other username. The first time a
 user logs in, they will be prompted with a message asking them to confirm whether they wish to be
 onboarded.
 
 Logging into the CNS UI
------------------------------
++++++++++++++++++++++++
 
 You can open your browser at https://ans.localhost (note that this is currently by default
 `ans` and not `cns`), and login using the same administrator user, or any other user that has been onboarded
@@ -164,7 +149,7 @@ via the wallet, in order to purchase a CNS entry for that user.
 .. _compose_validator_auth:
 
 Configuring Authentication
---------------------------
+++++++++++++++++++++++++++
 
 .. warning::
 
@@ -204,15 +189,15 @@ command, as follows:
 
 .. code-block:: bash
 
-    ./start.sh -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> -m $MIGRATION_ID -a
+    ./start.sh -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> -m $MIGRATION_ID -w -a
 
 Backup and Restore
-------------------
+++++++++++++++++++
 
 Please refer to the :ref:`backup and restore section <validator-backups>` for instructions on how to backup and restore your validator node.
 
 Re-onboard a validator and recover balances of all users it hosts
------------------------------------------------------------------
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 In the case of a catastrophic failure of the validator node, some data owned by the validator and users
 it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved
@@ -225,7 +210,7 @@ To re-onboard a validator and recover the balances of all users it hosts, type:
 
 .. code-block:: bash
 
-    ./start.sh -s <sponsor_sv_address> -o "" -p <party_hint> -m $MIGRATION_ID -i <node_identities_dump_file> -P <new_participant_id>
+    ./start.sh -s <sponsor_sv_address> -o "" -p <party_hint> -m $MIGRATION_ID -i <node_identities_dump_file> -P <new_participant_id> -w
 
 where ``<node_identities_dump_file>`` is the path to the file containing the node identities dump, and
 ``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
@@ -234,3 +219,48 @@ Note that in subsequent restarts of the validator, you should keep providing ``-
 Once the new validator is up and running, you should be able to login as the administrator
 and see its balance. Other users hosted on the validator would need to re-onboard, but their
 coin balance and CNS entries should be recovered.
+
+.. _compose_sv:
+
+Docker-Compose Based Deployment of a Super Validator Node
+---------------------------------------------------------
+
+This section describes how to deploy a standalone super validator node on a local machine
+using docker-compose. This is useful for app developers who want a complete standalone
+environment to develop against.
+
+If you have already deployed a validator against an existing network, you will need to first
+tear it down and wipe all its data, as a validator cannot be moved between networks.
+To do that, first stop the validator with `./stop.sh` from the `compose/validator` directory,
+and wipe out all its data with `docker volume rm compose_postgres-splice`.
+
+Now you can spin up a docker-compose based Super-Validator as follows:
+
+.. code-block:: bash
+
+   cd splice-node/docker-compose/sv
+   ./start.sh -w
+
+It will take a few minutes for the SV to be ready, after which you can use it to onboard a new
+validator.
+
+This is quite similar to the steps for spinning up a validator that were performed above.
+First, fetch a new onboarding secret from the SV:
+
+.. code-block:: bash
+
+   curl -X POST http://sv.localhost:8080/api/sv/v0/devnet/onboard/validator/prepare
+
+Now you can onboard a new validator to the SV:
+
+.. code-block:: bash
+
+   cd ../validator
+   ./start.sh -o "<onboarding_secret>" -p <party_hint> -l -w
+
+Note that ``-l`` automatically configures the validator with the correct configuration required
+in order for it to use the docker-compose SV created above.
+
+To tear everything down, run `./stop.sh` from both the `compose/validator` and `compose/sv`
+directories. As above, this will retain the data for reuse. In order to completely wipe out
+the network's and validator's data, also run `docker volume rm splice-validator_postgres-splice splice-sv_postgres-splice-sv`.

@@ -12,6 +12,8 @@ SCRIPTNAME=${0##*/}
 declare -A subcommand_whitelist
 
 DEFAULT_AUDIENCE="https://canton.network.global"
+VALIDATOR_DIR="${REPO_ROOT}/cluster/compose/validator"
+SV_DIR="${REPO_ROOT}/cluster/compose/sv"
 
 function _export_auth0_env_vars {
 
@@ -51,18 +53,18 @@ function _export_auth0_env_vars {
 }
 
 function _do_start_validator {
-  "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
+  "${VALIDATOR_DIR}/start.sh" \
     "$@" \
       | tee -a "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
 
   for c in validator participant; do
-    docker logs -f compose-${c}-1 >> "${REPO_ROOT}/log/compose-${c}.clog" 2>&1 &
+    docker logs -f splice-validator-${c}-1 >> "${REPO_ROOT}/log/compose-${c}.clog" 2>&1 &
   done
 
   if [ "$wait" -eq 1 ]; then
     # start.sh is idempotent, so running it again with -w should not interfere with the deployment, only wait for it to be ready
     _info "Waiting for the validator to be ready"
-    "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
+    "${VALIDATOR_DIR}/start.sh" \
       "$@" \
       "-w" \
         | tee -a "${REPO_ROOT}/log/compose-wait.log" 2>&1 || _error "Validator failed to become ready"
@@ -138,12 +140,12 @@ function _start_validator {
 
 function _stop_validator {
 
-  "$REPO_ROOT/cluster/deployment/compose/stop.sh"
+  "${VALIDATOR_DIR}/stop.sh"
 
   if [ "$delete_volumes" -eq 1 ]; then
     _info "Deleting the volume data"
-    docker volume rm compose_postgres-splice > /dev/null 2>&1 || true
-    docker volume rm compose_domain-upgrade-dump > /dev/null 2>&1 || true
+    docker volume rm splice-validator_postgres-splice > /dev/null 2>&1 || true
+    docker volume rm splice-validator_domain-upgrade-dump > /dev/null 2>&1 || true
   fi
 }
 
@@ -327,16 +329,16 @@ function subcmd_start_network {
   export IMAGE_REPO=""
 
   _info "Starting SV"
-  "${REPO_ROOT}/cluster/deployment/compose-sv/start.sh"
+  "${SV_DIR}/start.sh"
 
   for c in validator participant scan sv-app sequencer-mediator nginx; do
-    docker logs -f compose-sv-${c}-1 >> "${REPO_ROOT}/log/compose-sv-${c}.clog" 2>&1 &
+    docker logs -f splice-sv-${c}-1 >> "${REPO_ROOT}/log/compose-sv-${c}.clog" 2>&1 &
   done
 
   # We must wait for the SV to be ready before starting the validator
   # start.sh is idempotent, so running it again with -w should not interfere with the deployment, only wait for it to be ready
   _info "Waiting for the SV to be ready"
-  "${REPO_ROOT}/cluster/deployment/compose-sv/start.sh" -w
+  "${SV_DIR}/start.sh" -w
 
   get_secret_url="sv.localhost:8080/api/sv/v0/devnet/onboard/validator/prepare"
   _info "Curling $get_secret_url for the secret"
@@ -393,10 +395,10 @@ function subcmd_stop_network {
 
   _stop_validator
 
-  "$REPO_ROOT/cluster/deployment/compose-sv/stop.sh"
+  "${SV_DIR}/stop.sh"
 
   if [ $delete_volumes -eq 1 ]; then
-    docker volume rm compose-sv_postgres-splice-sv > /dev/null 2>&1 || true
+    docker volume rm splice-sv_postgres-splice-sv > /dev/null 2>&1 || true
   fi
 }
 function usage_stop_network {
@@ -413,7 +415,7 @@ function subcmd_test_before_migration {
 
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
-  TOKEN=$("$REPO_ROOT/cluster/deployment/compose/token.py" $USER)
+  TOKEN=$("${VALIDATOR_DIR}/token.py" $USER)
 
   _info "Onboarding $USER"
   curl -sS 'http://wallet.localhost/api/validator/v0/register' \
@@ -451,7 +453,7 @@ function subcmd_test_before_migration {
     echo -n "."
     # We can't use the log file because the background process that dumped the log files died with the
     # end of the previous bash step
-    if docker logs compose-validator-1 | grep -q "Wrote domain migration dump"; then
+    if docker logs splice-validator-validator-1 | grep -q "Wrote domain migration dump"; then
       done=1
       break
     fi
@@ -463,7 +465,7 @@ function subcmd_test_before_migration {
   _info "Domain migration dump was written"
 
   _info "Content of the domain migration dump directory:"
-  docker exec compose-validator-1 ls -l /domain-upgrade-dump
+  docker exec splice-validator-validator-1 ls -l /domain-upgrade-dump
 }
 
 subcommand_whitelist[test_after_migration]='test the validator after the hard domain migration'
@@ -472,7 +474,7 @@ function subcmd_test_after_migration {
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
   USER=alice
-  TOKEN=$("$REPO_ROOT/cluster/deployment/compose/token.py" $USER)
+  TOKEN=$("${VALIDATOR_DIR}/token.py" $USER)
 
   _info "Confirming user status"
   onboarded=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/user-status' \
@@ -560,9 +562,9 @@ function subcmd_backup_node {
   backup_dir=$1
   mkdir -p "$backup_dir"
 
-  docker exec -i compose-postgres-splice-1 pg_dump -U cnadmin validator > "${backup_dir}"/validator-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
-  active_participant_db=$(docker exec compose-participant-1 bash -c 'echo $CANTON_PARTICIPANT_POSTGRES_DB')
-  docker exec compose-postgres-splice-1 pg_dump -U cnadmin "${active_participant_db}" > "${backup_dir}"/"${active_participant_db}"-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
+  docker exec -i splice-validator-postgres-splice-1 pg_dump -U cnadmin validator > "${backup_dir}"/validator-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
+  active_participant_db=$(docker exec splice-validator-participant-1 bash -c 'echo $CANTON_PARTICIPANT_POSTGRES_DB')
+  docker exec splice-validator-postgres-splice-1 pg_dump -U cnadmin "${active_participant_db}" > "${backup_dir}"/"${active_participant_db}"-"$(date -u +"%Y-%m-%dT%H:%M:%S%:z")".dump
 }
 
 subcommand_whitelist[restore_node]='restore the validator node'
@@ -588,20 +590,20 @@ function subcmd_restore_node {
   export CN_APP_UI_AMULET_NAME_ACRONYM=""
   export CN_APP_UI_NAME_SERVICE_NAME=""
   export CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=""
-  docker volume rm compose_postgres-splice > /dev/null 2>&1 || true
-  docker compose -f "${REPO_ROOT}/cluster/deployment/compose/compose.yaml" up -d postgres-splice
+  docker volume rm splice-validator_postgres-splice > /dev/null 2>&1 || true
+  docker compose -f "${VALIDATOR_DIR}/compose.yaml" up -d postgres-splice
   _info "Waiting for postgres to be ready"
   # shellcheck disable=SC2034
   for i in {1..10}; do
-    docker exec compose-postgres-splice-1 pg_isready && break
+    docker exec splice-validator-postgres-splice-1 pg_isready && break
     sleep 6
   done
-  if ( ! docker exec compose-postgres-splice-1 pg_isready ); then
+  if ( ! docker exec splice-validator-postgres-splice-1 pg_isready ); then
     _error "Postgres is not ready after 1 minute"
   fi
-  docker exec -i compose-postgres-splice-1 psql -U cnadmin validator < "$validator_backup_file"
-  docker exec -i compose-postgres-splice-1 psql -U cnadmin participant-"$MIGRATION_ID" < "$participant_backup_file"
-  docker compose -f "${REPO_ROOT}/cluster/deployment/compose/compose.yaml" down
+  docker exec -i splice-validator-postgres-splice-1 psql -U cnadmin validator < "$validator_backup_file"
+  docker exec -i splice-validator-postgres-splice-1 psql -U cnadmin participant-"$MIGRATION_ID" < "$participant_backup_file"
+  docker compose -f "${VALIDATOR_DIR}/compose.yaml" down
 }
 
 subcommand_whitelist[identities_dump]='Fetch an identities dump from the validator'
@@ -616,7 +618,7 @@ function subcmd_identities_dump {
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
 
-  token=$("$REPO_ROOT/cluster/deployment/compose/token.py" administrator)
+  token=$("${VALIDATOR_DIR}/token.py" administrator)
   curl -sSLf 'http://wallet.localhost/api/validator/v0/admin/participant/identities' -H "authorization: Bearer $token" > "$output_file"
 }
 

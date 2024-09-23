@@ -1,3 +1,5 @@
+name: splice-sv
+
 volumes:
   postgres-splice-sv:
 
