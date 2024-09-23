@@ -10,6 +10,7 @@ Release Notes
 
 Upcoming
 --------
+
 * SV UI
   * The route to view the amulet price has been renamed from ``/cc-price`` to ``/amulet-price``
 
@@ -36,6 +37,13 @@ Upcoming
 * Bugfixes
 
     * Fix an issue where validators that were already deployed with an invalid ``validatorPartyHint`` were failing to start after a hard domain migration, as the already existing hint was rejected by the validator app.
+
+* Sequencer
+
+  * Fix an issue in sequencer traffic management that resulted in a
+    deadlock after a synchronizer upgrade with downtime where lagging
+    validators failed to submit a transaction due to lagging behind
+    but also failed to catch up due to the submission failing.
 
 0.2.1
 -----
