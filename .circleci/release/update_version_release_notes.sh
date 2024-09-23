@@ -7,17 +7,17 @@ set -euo pipefail
 
 # Function to display usage
 usage() {
-  echo "Usage: $0 -f <file> -r <new_version>"
+  echo "Usage: $0 -v <new_version> -f <file>"
   exit 1
 }
 
 # Parse flags
-while getopts ":f:r:" opt; do
+while getopts ":f:v:" opt; do
   case ${opt} in
     f )
       FILE=$OPTARG
       ;;
-    r )
+    v )
       NEW_VERSION=$OPTARG
       ;;
     \? )

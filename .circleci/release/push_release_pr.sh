@@ -4,19 +4,23 @@
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
-
+# This script is expected to be executed in the $REPO_ROOT directory
 # Function to display usage
 usage() {
-  echo "Usage: $0 -b <branch_name> -m <commit_message>"
+  echo "Usage: $0 -v <release_version> -b <branch_name> -m <commit_message>"
   exit 1
 }
 
 # Parse flags
+RELEASE_VERSION=""
 BRANCH_NAME=""
 COMMIT_MESSAGE=""
 
-while getopts ":b:m:" opt; do
+while getopts ":v:b:m:" opt; do
   case ${opt} in
+    v )
+      RELEASE_VERSION=$OPTARG
+      ;;
     b )
       BRANCH_NAME=$OPTARG
       ;;
@@ -30,7 +34,7 @@ while getopts ":b:m:" opt; do
 done
 
 # Check if the required arguments are provided
-if [ -z "${BRANCH_NAME-}" ] || [ -z "${COMMIT_MESSAGE-}" ]; then
+if [ -z "${RELEASE_VERSION-}" ] || [ -z "${BRANCH_NAME-}" ] || [ -z "${COMMIT_MESSAGE-}" ]; then
   usage
 fi
 
@@ -58,7 +62,11 @@ git add docs/src/release_notes.rst
 # Create a commit with the specified message and a [release] footer
 git commit -m "$COMMIT_MESSAGE" -m "[release]"
 
-# Push the commit to the specified branch
+"$REPO_ROOT"/.circleci/release/update_latest_release.sh -v "$RELEASE_VERSION"
+git add VERSION LATEST_RELEASE
+git commit -m "Updated LATEST_RELEASE to $RELEASE_VERSION and, if needed, the VERSION"
+
+# Push the changes to the specified branch
 git push --force-with-lease --set-upstream origin "$BRANCH_NAME"
 
 # Create a pull request on GitHub using the GitHub CLI
