@@ -65,20 +65,25 @@ export function initEnvConfig(): void {
 }
 
 export function extractGcpClusterFolderName(): string {
-  let gcpclusterbasename = requiredValue(
+  const gcpclusterbasename = requiredValue(
     process.env.GCP_CLUSTER_BASENAME,
     'GCP_CLUSTER_BASENAME',
     'Cluster must be specified'
   );
   if (gcpclusterbasename?.includes('scratch')) {
     // fix difference between deployment folder name and cluster name
-    gcpclusterbasename = gcpclusterbasename.replace('scratch', 'scratchnet');
+    return gcpclusterbasename.replace('scratch', 'scratchnet');
   } else {
-    if (!gcpclusterbasename?.includes('cilr')) {
-      gcpclusterbasename = gcpclusterbasename + 'net';
+    const netSuffixedClusters = ['test', 'dev', 'main'];
+    if (
+      netSuffixedClusters.some(cluster => {
+        return cluster == gcpclusterbasename;
+      })
+    ) {
+      return gcpclusterbasename + 'net';
     }
+    return gcpclusterbasename;
   }
-  return gcpclusterbasename;
 }
 
 export function clusterPath(): string {
