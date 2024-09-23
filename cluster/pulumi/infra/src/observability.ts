@@ -28,6 +28,7 @@ import {
   clusterIsBeingReset,
   enableAlertEmailToSupportTeam,
   enableAlerts,
+  enablePrometheusAlerts,
   grafanaSmtpHost,
   slackAlertNotificationChannel,
   slackToken,
@@ -124,7 +125,6 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
-const disablePrometheusAlerts = clusterIsBeingReset;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsBeingReset;
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
@@ -182,7 +182,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           enabled: true,
           config: {
             route: {
-              receiver: enableAlerts && !disablePrometheusAlerts ? 'slack' : 'null',
+              receiver: enableAlerts && enablePrometheusAlerts ? 'slack' : 'null',
               group_by: ['namespace'],
               continue: false,
               routes: [
@@ -197,7 +197,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
               {
                 name: 'null',
               },
-              ...(enableAlerts && !disablePrometheusAlerts
+              ...(enableAlerts && enablePrometheusAlerts
                 ? [
                     {
                       name: 'slack',
