@@ -113,8 +113,38 @@ function up() {
   local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
 
   for deployment_name in $deployment_names; do
+    up_one_with_retries "$namespace" "$component" "$deployment_name"
+  done
+}
+
+function up_one_with_retries() {
+  local -r namespace=$1
+  local -r component=$2
+  local -r deployment_name=$3
+  MAX_RETRIES=5
+  retry_count=0
+
+  until [ $retry_count -gt $MAX_RETRIES ]; do
     _info "Scaling up $component deployment $deployment_name"
-    kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1
+
+    # disabling exit on error to allow for retries
+    set +e
+    output=$(kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1 2>&1)
+    restore_exit_code=$?
+    set -e
+
+    if [ $restore_exit_code -ne 0 ]; then
+      _error_msg "$output"
+      retry_count=$((retry_count+1))
+      sleep 10
+    else
+      return 0
+    fi
+
+    if [ $retry_count -gt $MAX_RETRIES ]; then
+      _error "Scaling up $component deployment $deployment_name exceeded max retries"
+      return 1
+    fi
   done
 }
 
