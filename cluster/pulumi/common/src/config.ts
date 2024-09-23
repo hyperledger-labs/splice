@@ -60,13 +60,8 @@ class CnConfig {
 
   private readAndParseYaml(filePath: string): unknown {
     try {
-      if (fs.existsSync(filePath)) {
-        const fileContents = fs.readFileSync(filePath, 'utf8');
-        return yaml.load(fileContents);
-      } else {
-        console.error(`File does not exist: ${filePath}`);
-        return {};
-      }
+      const fileContents = fs.readFileSync(filePath, 'utf8');
+      return yaml.load(fileContents);
     } catch (error) {
       console.error(`Error reading or parsing YAML file: ${filePath}`, error);
       throw error;
