@@ -2565,7 +2565,7 @@
             "resources": {
               "requests": {
                 "cpu": "4",
-                "memory": "12Gi"
+                "memory": "24Gi"
               }
             },
             "retention": "1y",

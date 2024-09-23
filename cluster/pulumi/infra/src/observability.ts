@@ -272,7 +272,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             retentionSize: prometheusRetentionSize,
             resources: {
               requests: {
-                memory: '12Gi',
+                memory: '24Gi',
                 cpu: '4',
               },
             },
