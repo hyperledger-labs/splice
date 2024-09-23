@@ -16,20 +16,18 @@ import com.daml.network.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestR
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
 import com.daml.network.scan.store.TxLogEntry.EntryType
 import com.daml.network.scan.store.db.ScanTables.txLogTableName
 import com.daml.network.scan.store.{
   OpenMiningRoundTxLogEntry,
   ScanStore,
   ScanTxLogParser,
-  SortOrder,
   TxLogEntry,
   VoteRequestTxLogEntry,
 }
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
-import com.daml.network.store.{DbVotesStoreQueryBuilder, Limit, PageLimit, TxLogStore}
+import com.daml.network.store.{DbVotesStoreQueryBuilder, Limit, PageLimit, SortOrder, TxLogStore}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.caching.CaffeineCache
 import com.digitalasset.canton.caching.CaffeineCache.FutureAsyncCacheLoader
@@ -310,9 +308,9 @@ class DbScanStore(
                 )"""
       // Literal sort order since Postgres complains when trying to bind it to a parameter
       val (compareEntryNumber, orderLimit) = sortOrder match {
-        case Ascending =>
+        case SortOrder.Ascending =>
           (sql" > ", sql""" order by entry_number asc limit ${sqlLimit(limit)};""")
-        case Descending =>
+        case SortOrder.Descending =>
           (sql" < ", sql""" order by entry_number desc limit ${sqlLimit(limit)};""")
       }
 

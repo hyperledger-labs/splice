@@ -100,4 +100,22 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
 
     expect(await screen.findByText('CRARC_AddFutureAmuletConfigSchedule')).toBeDefined();
   });
+
+  test('validator licenses are displayed and paginable', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    expect(await screen.findByText('Validator Onboarding')).toBeDefined();
+    await user.click(screen.getByText('Validator Onboarding'));
+
+    expect(await screen.findByText('Validator Licenses')).toBeDefined();
+
+    expect(await screen.findByDisplayValue('validator::1')).toBeDefined();
+    expect(screen.queryByText('validator::15')).toBeNull();
+
+    expect(await screen.findByText('View More')).toBeDefined();
+    await user.click(screen.getByText('View More'));
+
+    expect(await screen.findByDisplayValue('validator::15')).toBeDefined();
+  });
 });

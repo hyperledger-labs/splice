@@ -214,16 +214,25 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertIncompleteReassignments()
       } yield succeed
     }
-    "paginate" in {
+    "paginate asc and desc" in {
       val contracts = (1 to 10).map(n => c(n))
       implicit val store: S = mkStore()
-      def paginate(after: Option[Long], acc: Seq[C]): Future[Seq[C]] = {
+      def paginate(after: Option[Long], acc: Seq[C], sortOrder: SortOrder): Future[Seq[C]] = {
         store
-          .listContractsPaginated(AppRewardCoupon.COMPANION, after, PageLimit.tryCreate(1))
+          .listContractsPaginated(
+            AppRewardCoupon.COMPANION,
+            after,
+            PageLimit.tryCreate(1),
+            sortOrder,
+          )
           .flatMap { resultsPage =>
             resultsPage.nextPageToken match {
               case Some(nextPageToken) =>
-                paginate(Some(nextPageToken), acc ++ resultsPage.resultsInPage.map(_.contract))
+                paginate(
+                  Some(nextPageToken),
+                  acc ++ resultsPage.resultsInPage.map(_.contract),
+                  sortOrder,
+                )
               case None =>
                 Future.successful(acc)
             }
@@ -233,8 +242,12 @@ abstract class MultiDomainAcsStoreTest[
         _ <- acs()
         _ <- store.ingestionSink.initialize()
         _ <- MonadUtil.sequentialTraverse(contracts)(d1.create(_))
-        paginatedResults <- paginate(None, Seq.empty)
-      } yield paginatedResults.map(_.contractId) should be(contracts.map(_.contractId))
+        paginatedResultsAsc <- paginate(None, Seq.empty, SortOrder.Ascending)
+        paginatedResultsDesc <- paginate(None, Seq.empty, SortOrder.Descending)
+      } yield {
+        paginatedResultsAsc.map(_.contractId) should be(contracts.map(_.contractId))
+        paginatedResultsDesc.map(_.contractId) should be(contracts.map(_.contractId).reverse)
+      }
     }
     "throws if the store primary party is not a stakeholder of the created event" in {
       implicit val store = mkStore()

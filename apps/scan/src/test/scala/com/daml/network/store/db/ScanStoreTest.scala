@@ -32,12 +32,11 @@ import com.daml.network.scan.store.{
   OpenMiningRoundTxLogEntry,
   ReceiverAmount,
   SenderAmount,
-  SortOrder,
   TransferTxLogEntry,
 }
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
-import com.daml.network.store.{PageLimit, StoreErrors, StoreTest}
+import com.daml.network.store.{PageLimit, SortOrder, StoreErrors, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.store.events.DsoRulesCloseVoteRequest
 import com.daml.network.util.SpliceUtil.damlDecimal
