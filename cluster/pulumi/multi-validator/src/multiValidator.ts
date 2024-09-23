@@ -42,6 +42,14 @@ export class MultiValidator extends MultiNodeDeployment {
               value: `http://scan-app.sv-1:5012`,
             },
             {
+              name: 'CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE',
+              value: 'https://canton.network.global',
+            },
+            {
+              name: 'CN_APP_VALIDATOR_AUTH_AUDIENCE',
+              value: 'https://canton.network.global',
+            },
+            {
               name: 'CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS',
               value: `http://sv-app.sv-1:5014`,
             },
