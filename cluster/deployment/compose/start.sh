@@ -21,18 +21,21 @@ function _info(){
 }
 
 function usage() {
-  echo "Usage: $0 -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> [-a] [-b] [-c <scan_address>] [-q <sequencer_address>] [-n <network_name>] [-m <migration_id>] [-M] [-i <identities_dump>] [-P <participant_id>]"
+  echo "Usage: $0 -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> [-a] [-b] [-c <scan_address>] [-C <host_scan_address>] [-q <sequencer_address>] [-n <network_name>] [-m <migration_id>] [-M] [-i <identities_dump>] [-P <participant_id>] [-w] [-l]"
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
   echo "  -o <onboarding_secret>: The onboarding secret to use. If not provided, it will be fetched from the sponsor SV (possible on DevNet only)"
   echo "  -p <party_hint>: The party hint to use for the validator operator, by default also your participant identifier."
   echo "  -P <participant_id>: The participant identifier."
   echo "  -a: Use this flag to enable authentication"
   echo "  -c <scan_address>: The full URL of a Scan app. If not provided, it will be derived from the sponsor SV address."
+  echo "  -C <host_scan_address>: An optional alternative URL of a Scan app, when accessed from the host as opposed to a container."
   echo "  -n <network_name>: The name of an existing docker network to use. If not provided, the default network will be created used."
   echo "  -m <migration_id>: The migration ID to use. Must be a non-negative integer."
   echo "  -M: Use this flag when bumping the migration ID as part of a migration."
   echo "  -i <identities_dump>: restore identities from a dump file. Requires a new participant identifier to be provided."
   echo "  -w: Wait for the validator to be fully up and running before returning."
+  echo "  -l: Connect participant and validator also to docker network compose-sv_splice-sv-public, to use an SV deployed locally on docker compose"
+  echo "      Also implies -s, -c and -C to be the defaults for such a deployment."
 
   echo ""
   echo "Testing flags:"
@@ -48,6 +51,7 @@ auth=0
 trust_single=0
 SPONSOR_SV_ADDRESS=""
 SCAN_ADDRESS=""
+host_scan_address=""
 ONBOARDING_SECRET=""
 SEQUENCER_ADDRESS=""
 network_name=""
@@ -56,8 +60,9 @@ migrating=0
 party_hint=""
 participant_id=""
 restore_identities_dump=""
+local_compose_sv=0
 wait=0
-while getopts 'has:c:t:o:n:bq:m:Mp:P:i:w' arg; do
+while getopts 'has:c:C:t:o:n:bq:m:Mp:P:i:wl' arg; do
   case ${arg} in
     h)
       usage
@@ -71,6 +76,9 @@ while getopts 'has:c:t:o:n:bq:m:Mp:P:i:w' arg; do
       ;;
     c)
       SCAN_ADDRESS="${OPTARG}"
+      ;;
+    C)
+      host_scan_address="${OPTARG}"
       ;;
     q)
       SEQUENCER_ADDRESS="${OPTARG}"
@@ -102,12 +110,31 @@ while getopts 'has:c:t:o:n:bq:m:Mp:P:i:w' arg; do
     w)
       wait=1
       ;;
+    l)
+      local_compose_sv=1
+      ;;
     ?)
       usage
       exit 1
       ;;
   esac
 done
+
+if [ "${local_compose_sv}" -eq 1 ]; then
+  extra_compose_files+=("-f" "${script_dir}/compose-local-compose-sv.yaml")
+  if [ -z "${SCAN_ADDRESS}" ]; then
+    SCAN_ADDRESS="http://scan:5012"
+    _info "Using default scan address for local docker-compose based SV: ${SCAN_ADDRESS}"
+  fi
+  if [ -z "${host_scan_address}" ]; then
+    host_scan_address="http://scan.localhost:8080"
+    _info "Using default host scan address for local docker-compose based SV: ${host_scan_address}"
+  fi
+  if [ -z "${SPONSOR_SV_ADDRESS}" ]; then
+    SPONSOR_SV_ADDRESS="http://sv-app:5014"
+    _info "Using default sponsor SV address for local docker-compose based SV: ${SPONSOR_SV_ADDRESS}"
+  fi
+fi
 
 if [ -z "${SPONSOR_SV_ADDRESS}" ]; then
   _error_msg "Please provide the sponsor SV address"
@@ -174,7 +201,11 @@ if [ -z "${IMAGE_TAG:-}" ]; then
 fi
 
 if [ -z "${SPLICE_INSTANCE_NAMES:-}" ]; then
-  splice_instance_names=$(curl -sSLf "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
+  if [ -z "${host_scan_address}" ]; then
+    splice_instance_names=$(curl -sSLf "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
+  else
+    splice_instance_names=$(curl -sSLf "${host_scan_address}/api/scan/v0/splice-instance-names")
+  fi
 else
   # TODO(#14303): remove this once the migration base version supports the splice-instance-names endpoint
   splice_instance_names=${SPLICE_INSTANCE_NAMES}
@@ -214,6 +245,9 @@ if [ -n "${restore_identities_dump}" ]; then
   extra_compose_files+=("-f" "${script_dir}/compose-restore-from-id.yaml")
   export VALIDATOR_NEW_PARTICIPANT_IDENTIFIER=${PARTICIPANT_IDENTIFIER}
   export VALIDATOR_PARTICIPANT_IDENTITIES_DUMP=${restore_identities_dump}
+fi
+if [ "${local_compose_sv}" -eq 1 ]; then
+  extra_compose_files+=("-f" "${script_dir}/compose-local-compose-sv.yaml")
 fi
 extra_args=()
 if [ $wait -eq 1 ]; then

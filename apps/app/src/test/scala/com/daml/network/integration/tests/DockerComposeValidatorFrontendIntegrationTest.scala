@@ -12,7 +12,7 @@ import java.lang.ProcessBuilder
 import java.nio.file.{Path, Paths}
 
 class DockerComposeValidatorFrontendIntegrationTest
-    extends FrontendIntegrationTest("selfhosted")
+    extends FrontendIntegrationTest("frontend")
     with FrontendLoginUtil
     with WalletFrontendTestUtil
     with AnsFrontendTestUtil {
@@ -76,7 +76,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       testDumpDir.resolve("compose-validator-backup").resolve(java.time.Instant.now.toString)
 
     withComposeValidator() {
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         actAndCheck()(
           "Login as administrator",
@@ -136,7 +136,7 @@ class DockerComposeValidatorFrontendIntegrationTest
     val identities = backupsDir.resolve("identities.json")
 
     withComposeValidator("after restoring from backup") {
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         clue("Alice can login and is already onboarded") {
           actAndCheck()(
@@ -182,7 +182,7 @@ class DockerComposeValidatorFrontendIntegrationTest
         "da-composeValidator-13",
       ),
     ) {
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         clue("Alice can onboard again") {
           actAndCheck(
@@ -213,7 +213,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       clue("Restart the validator, with the new participant ID") {
         startComposeValidator("with the new participant ID", Seq("-P", "da-composeValidator-13"))
       }
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         clue("Alice can login and is already onboarded") {
           actAndCheck()(
@@ -238,7 +238,7 @@ class DockerComposeValidatorFrontendIntegrationTest
         "GCP_CLUSTER_BASENAME" -> "cidaily" // Any cluster should work, as long as its UI auth0 apps were created with the localhost callback URLs
       ),
     ) {
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         completeAuth0LoginWithAuthorization(
           "http://wallet.localhost",

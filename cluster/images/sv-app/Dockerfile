@@ -5,6 +5,10 @@ ARG base_version
 
 FROM splice-app:${base_version}
 
+EXPOSE 5014
 EXPOSE 10013
 
 COPY app.conf /app/
+
+HEALTHCHECK --start-period=10m \
+  CMD curl -f http://localhost:5014/api/sv/readyz || exit 1

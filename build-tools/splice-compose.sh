@@ -50,6 +50,37 @@ function _export_auth0_env_vars {
   export VALIDATOR_AUTH_AUDIENCE
 }
 
+function _do_start_validator {
+  "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
+    "$@" \
+      | tee -a "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
+
+  for c in validator participant; do
+    docker logs -f compose-${c}-1 >> "${REPO_ROOT}/log/compose-${c}.clog" 2>&1 &
+  done
+
+  if [ "$wait" -eq 1 ]; then
+    # start.sh is idempotent, so running it again with -w should not interfere with the deployment, only wait for it to be ready
+    _info "Waiting for the validator to be ready"
+    "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
+      "$@" \
+      "-w" \
+        | tee -a "${REPO_ROOT}/log/compose-wait.log" 2>&1 || _error "Validator failed to become ready"
+
+    # We are also waiting here for the readiness endpoint explicitly, and not only relying on
+    # docker healthchecks, to support versions of the images that did not include the healthchecks.
+    # TODO(#14303): remove this once the images of the base version include healthchecks
+    # shellcheck disable=SC2034
+    for i in {1..60}; do
+        curl -sf "wallet.localhost/api/validator/readyz" && break
+        echo -n "."
+        sleep 10
+    done
+    curl -sf "wallet.localhost/api/validator/readyz" || _error "Validator is not ready after 30 minutes" || exit 1
+  fi
+
+}
+
 function _start_validator {
 
   sv_from_docker=$1
@@ -101,34 +132,18 @@ function _start_validator {
     "-p" "${party_hint}" \
   )
 
-  "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
-    "${args[@]}" \
-    "${extra_flags[@]}" \
-      >> "${REPO_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${REPO_ROOT}/log/compose.log for details"
+  all_args=( "${args[@]}" "${extra_flags[@]}" )
+  _do_start_validator "${all_args[@]}"
+}
 
-  for c in validator participant; do
-    docker logs -f compose-${c}-1 >> "${REPO_ROOT}/log/compose-${c}.clog" 2>&1 &
-  done
+function _stop_validator {
 
-  if [ "$wait" -eq 1 ]; then
-    # Rerunning start.sh with -w should not interfere with the deployment, only wait for it to be ready
-    _info "Waiting for the validator to be ready"
-    "${REPO_ROOT}/cluster/deployment/compose/start.sh" \
-      "${args[@]}" \
-      "${extra_flags[@]}" \
-      "-w" \
-        >> "${REPO_ROOT}/log/compose-wait.log" 2>&1 || _error "Validator failed to become ready"
+  "$REPO_ROOT/cluster/deployment/compose/stop.sh"
 
-    # We are also waiting here for the readiness endpoint explicitly, and not only relying on
-    # docker healthchecks, to support versions of the images that did not include the healthchecks.
-    # TODO(#14303): remove this once the images of the base version include healthchecks
-    # shellcheck disable=SC2034
-    for i in {1..60}; do
-        curl -sf "wallet.localhost/api/validator/readyz" && break
-        echo -n "."
-        sleep 10
-    done
-    curl -sf "wallet.localhost/api/validator/readyz" || _error "Validator is not ready after 30 minutes" || exit 1
+  if [ "$delete_volumes" -eq 1 ]; then
+    _info "Deleting the volume data"
+    docker volume rm compose_postgres-splice > /dev/null 2>&1 || true
+    docker volume rm compose_domain-upgrade-dump > /dev/null 2>&1 || true
   fi
 }
 
@@ -278,18 +293,118 @@ function subcmd_stop {
     _confirm "Are you sure you want to delete the volumes? This will delete all data stored in the database."
   fi
 
-  "$REPO_ROOT/cluster/deployment/compose/stop.sh"
-  if [ $delete_volumes -eq 1 ]; then
-    _info "Deleting the volume data"
-    docker volume rm compose_postgres-splice > /dev/null 2>&1 || true
-    docker volume rm compose_domain-upgrade-dump > /dev/null 2>&1 || true
-  fi
+  _stop_validator
 }
 function usage_stop {
   _info "    Options: [-D] [-f]"
   _info "      -D: Also delete volume data. Warning: completely nukes the validator."
   _info "      -f: When combined with -D, skips the confirmation prompt."
 }
+
+subcommand_whitelist[start_network]='Starts a full network (one SV + one validator)'
+function subcmd_start_network {
+
+  wait=0
+  while getopts 'hw' arg; do
+    case ${arg} in
+      h)
+        subcmd_help
+        exit 0
+        ;;
+      w)
+        wait=1
+        ;;
+      ?)
+        subcmd_help
+        exit 1
+        ;;
+    esac
+  done
+
+  IMAGE_TAG=$("${REPO_ROOT}/build-tools/get-snapshot-version")
+  export IMAGE_TAG
+  # Locally built images (the default when using this script)
+  export IMAGE_REPO=""
+
+  _info "Starting SV"
+  "${REPO_ROOT}/cluster/deployment/compose-sv/start.sh"
+
+  for c in validator participant scan sv-app sequencer-mediator nginx; do
+    docker logs -f compose-sv-${c}-1 >> "${REPO_ROOT}/log/compose-sv-${c}.clog" 2>&1 &
+  done
+
+  # We must wait for the SV to be ready before starting the validator
+  # start.sh is idempotent, so running it again with -w should not interfere with the deployment, only wait for it to be ready
+  _info "Waiting for the SV to be ready"
+  "${REPO_ROOT}/cluster/deployment/compose-sv/start.sh" -w
+
+  get_secret_url="sv.localhost:8080/api/sv/v0/devnet/onboard/validator/prepare"
+  _info "Curling $get_secret_url for the secret"
+  secret=""
+  # For reasons I couldn't understand, on CCI the "docker compose up --wait" seems
+  # to return before the services are actually ready, so we retry fetching the onboarding
+  # secret until it actually succeeds
+  for i in {1..30}; do
+    secret=$(curl -sfL -X POST "${get_secret_url}") && break
+    _warning "Failed to fetch secret, retrying in 10 seconds"
+    sleep 10
+  done
+  if [ -z "$secret" ]; then
+    _error "Failed to fetch secret"
+  fi
+
+  _info "Starting validator"
+  _do_start_validator -l -o "$secret" -p "local-composeValidator-1"
+
+  _info "The full network is ready"
+}
+function usage_start_network {
+  _info "    Options: [-w]"
+  _info "      -w: Wait also for the validator to be ready (for the SV we must always wait before starting the validator)"
+}
+
+subcommand_whitelist[stop_network]='Stop a full network, started with start_network'
+function subcmd_stop_network {
+
+  delete_volumes=0
+  force=0
+  while getopts 'hDf' arg; do
+    case ${arg} in
+      h)
+        subcmd_help
+        exit 0
+        ;;
+      D)
+        delete_volumes=1
+        ;;
+      f)
+        force=1
+        ;;
+      ?)
+        subcmd_help
+        exit 1
+        ;;
+    esac
+  done
+
+  if [ $delete_volumes -eq 1 ] && [ $force -eq 0 ]; then
+    _confirm "Are you sure you want to delete the volumes? This will delete all data stored in the database."
+  fi
+
+  _stop_validator
+
+  "$REPO_ROOT/cluster/deployment/compose-sv/stop.sh"
+
+  if [ $delete_volumes -eq 1 ]; then
+    docker volume rm compose-sv_postgres-splice-sv > /dev/null 2>&1 || true
+  fi
+}
+function usage_stop_network {
+  _info "    Options: [-D] [-f]"
+  _info "      -D: Also delete volume data. Warning: completely nukes the validator."
+  _info "      -f: When combined with -D, skips the confirmation prompt."
+}
+
 
 subcommand_whitelist[test_before_migration]='prepare the validator for the hard domain migration test'
 function subcmd_test_before_migration {

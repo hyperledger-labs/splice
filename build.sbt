@@ -1415,7 +1415,7 @@ printTests := {
     name.contains("SvReonboardingIntegration") ||
       name.contains("DecentralizedSynchronizerMigrationIntegrationTest")
   def isDockerBasedTest(name: String): Boolean =
-    name contains "DockerComposeValidatorFrontendIntegrationTest"
+    name contains "DockerCompose"
 
   val allTestNames =
     definedTests

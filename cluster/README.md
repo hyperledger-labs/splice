@@ -2018,12 +2018,20 @@ To build multi-arch images locally:
 Similarly to `cncluster`, we have a `splice-compose.sh` script for development purposes of
 the docker-compose validator deployment.
 
-The most useful subcommand there is `splice-compose.sh start`. It should be run from a
+The two most useful subcommand there are `splice-compose.sh start` and `splice-compose.sh start_network`.
+
+`start` starts a validator against an existing network. It should be run from a
 cluster deployment directory, and will spin up a docker-compose validator against that
 cluster. Logs from the validator and participant will be streamed to `logs/compose-validator.clog`
 and `logs/compose-participant.clog` resp.
 Use `splice-compose.sh stop` to stop it (and `splice-compose.sh stop -D` to completely
 nuke it, i.e. also delete its persistent data).
+
+`start_network` starts a full CN deployment locally, consisting of one SV node and one
+validator connected to it. Similarly to `start`, logs from the different components will
+be streamed to `logs/compose-sv-*.clog` for SV node components, and `logs/compose-*.clog`
+for those of the validator. To stop the whole network, run `splice-compose.sh stop_network`
+(with an optional `-D` as above, to also wipe all its data).
 
 ## Onboarding
 
