@@ -4591,7 +4591,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily cidaily_health_check redeploy_validator_runbook_cidaily redeploy_sv_runbook_cidaily backup_cidaily restore_sv_cidaily"
+          workflow_names: "deploy_cidaily cidaily_health_check redeploy_validator_runbook_cidaily redeploy_sv_runbook_cidaily backup_cidaily restore_sv_cidaily restore_validator_cidaily"
       - deploy_cluster:
           name: deploy_cluster_cidaily
           <<: *main-branch-only
@@ -4869,7 +4869,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily"
+          workflow_names: "deploy_cidaily backup_cidaily restore_sv_cidaily restore_validator_cidaily"
       - backup_cluster:
           filters:
             branches:
@@ -4897,7 +4897,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily cidaily_health_check redeploy_sv_runbook_cidaily "
+          workflow_names: "deploy_cidaily cidaily_health_check backup_cidaily restore_sv_cidaily"
       - restore_node:
           filters:
             branches:
@@ -4927,7 +4927,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily cidaily_health_check redeploy_validator_runbook_cidaily"
+          workflow_names: "deploy_cidaily cidaily_health_check backup_cidaily restore_validator_cidaily"
       - restore_node:
           filters:
             branches:
