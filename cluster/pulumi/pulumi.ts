@@ -38,7 +38,10 @@ export function pulumiOptsWithPrefix(prefix: string): {
   return {
     parallel: 128,
     onOutput: (output: string) => {
-      console.log(`${prefix}${output}`);
+      // do not output empty lines or lines containing just '.'
+      if (output.trim().length > 1) {
+        console.log(`${prefix}${output.trim()}`);
+      }
     },
   };
 }
