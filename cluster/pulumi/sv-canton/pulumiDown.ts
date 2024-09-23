@@ -29,7 +29,7 @@ async function downAllTheStacks() {
   }
 
   await runForAllMigrations(async (stack, migration, sv) => {
-    await downStack(migration.migrationId, sv, stack);
+    await downStack(migration.id, sv, stack);
   }, false);
   for (const migrationId of extraMigrationsToReset) {
     await Promise.all(

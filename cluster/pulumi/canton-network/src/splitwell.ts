@@ -78,7 +78,7 @@ export async function installSplitwell(
         enable: true,
       },
       migration: {
-        id: decentralizedSynchronizerMigrationConfig.active.migrationId,
+        id: decentralizedSynchronizerMigrationConfig.active.id,
       },
       scanAddress: scanAddress,
       participantHost: participant.participantAddress,

@@ -23,9 +23,10 @@ function subcmd_hard_domain_migration_prepare() {
     export CHARTS_VERSION="$1"
     shift
   fi
+  local upgrade_version
   if [ "$#" -gt 0 ]; then
     # the version of the new pods
-    export GLOBAL_DOMAIN_UPGRADE_VERSION="$1"
+    upgrade_version="$1"
     shift
   fi
 
@@ -36,8 +37,17 @@ function subcmd_hard_domain_migration_prepare() {
   # Throttle SV1's CometBFT block processing during the migration (see #13868)
   export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
 
-  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
-  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_PROVIDER=external
+  local migration_config
+  migration_config=$(cat <<EOF
+synchronizerMigration:
+  upgrade:
+    id: 1
+    provider: external
+    version: $upgrade_version
+EOF
+  )
+  _update_cluster_config "$migration_config"
+
 
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
    _pulumi_automation_run_up
@@ -77,10 +87,11 @@ function subcmd_hard_domain_migration_migrate() {
     scope="all"
   fi
 
+  local legacy_version
   # You can substitute `local` for any of those versions to use the locally built charts
   if [ "$#" -gt 0 ]; then
     # the version of the old Canton and CometBFT pods
-    export GLOBAL_DOMAIN_LEGACY_VERSION="$1"
+    legacy_version="$1"
     shift
   fi
   if [ "$#" -gt 0 ]; then
@@ -89,10 +100,21 @@ function subcmd_hard_domain_migration_migrate() {
     shift
   fi
 
-  export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
-  export GLOBAL_DOMAIN_ACTIVE_MIGRATION_PROVIDER=external
-  export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=0
-  export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
+  local migration_config
+  migration_config=$(cat <<EOF
+synchronizerMigration:
+  legacy:
+    id: 0
+    provider: internal
+    version: $legacy_version
+  active:
+    id: 1
+    provider: external
+    migrateFrom: 0
+EOF
+  )
+  _update_cluster_config "$migration_config"
+
   # Throttle SV1's CometBFT block processing during the migration (see #13868)
   export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
 
@@ -115,4 +137,21 @@ function subcmd_hard_domain_migration_migrate() {
   if [ "$scope" == "all" ] || [ "$scope" == "validator" ]; then
     subcmd_pulumi validator-runbook up "$@"
   fi
+}
+
+subcommand_whitelist[hard_domain_migration_update_active_config]='Upgrade the hard domain migration config'
+
+function subcmd_hard_domain_migration_update_active_config() {
+  local active_migration_id="$1"
+  local active_migration_canton_stack="$2"
+  local migration_config
+  migration_config=$(cat <<EOF
+synchronizerMigration:
+  active:
+    id: $active_migration_id
+    provider: $active_migration_canton_stack
+    migrateFrom: 0
+EOF
+  )
+  _update_cluster_config "$migration_config"
 }

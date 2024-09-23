@@ -28,7 +28,7 @@ export function installCanton(
   const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig
     .allMigrationInfos()
     .filter(migrationInfo => migrationInfo.provider === MigrationProvider.INTERNAL);
-  const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.migrationId;
+  const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.id;
   const participantPg = installPostgres(
     svNamespace,
     `participant-pg`,
@@ -66,7 +66,7 @@ export function installCanton(
       migration,
       canton: installCantonComponents(
         svNamespace,
-        migration.migrationId,
+        migration.id,
         auth0Client,
         {
           onboardingName,
@@ -90,7 +90,7 @@ export function installCanton(
   });
   return (
     installedMigrations.find(({ migration }) => {
-      return migration.migrationId === activeMigrationId;
+      return migration.id === activeMigrationId;
     })?.canton || {
       decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
         activeMigrationId,

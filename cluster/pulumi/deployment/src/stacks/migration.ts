@@ -1,5 +1,5 @@
 import {
-  DecentralizedSynchronizerMigrationConfig,
+  DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   externalMigrations,
 } from 'splice-pulumi-common';
@@ -8,10 +8,10 @@ import { allSvsToDeploy, svRunbookConfig } from 'splice-pulumi-common-sv';
 import { createStackCR } from './stack';
 
 export function installMigrationSpecificStacks(): void {
-  const migrations = externalMigrations(DecentralizedSynchronizerMigrationConfig.fromEnv());
+  const migrations = externalMigrations(DecentralizedSynchronizerUpgradeConfig);
   migrations.externalMigrations.forEach(migration => {
     allSvsToDeploy.forEach(sv => {
-      createStackForMigration(sv.nodeName, migration.migrationId);
+      createStackForMigration(sv.nodeName, migration.id);
     });
   });
 }

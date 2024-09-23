@@ -56,7 +56,7 @@ export function installCantonComponents(
         : 'INFO'
       : 'DEBUG';
 
-  const isActiveMigration = migrationConfig.active.migrationId === migrationId;
+  const isActiveMigration = migrationConfig.active.id === migrationId;
   const auth0Config = auth0Client.getCfg();
   const participantPg =
     dbs?.participant ||
@@ -68,7 +68,7 @@ export function installCantonComponents(
   if (migrationConfig.isStillRunning(migrationId)) {
     const migrationInfo = migrationConfig
       .allMigrationInfos()
-      .find(migration => migration.migrationId === migrationId);
+      .find(migration => migration.id === migrationId);
     if (!migrationInfo) {
       throw new Error(`Migration ${migrationId} not found in migration config`);
     }

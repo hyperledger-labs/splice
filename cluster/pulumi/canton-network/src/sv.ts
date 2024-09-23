@@ -270,7 +270,7 @@ export async function installSvNode(
         decentralizedSynchronizer: {
           migrationIds: decentralizedSynchronizerUpgradeConfig
             .allMigrationInfos()
-            .map(x => x.migrationId.toString()),
+            .map(x => x.id.toString()),
         },
       },
       cluster: {
@@ -316,12 +316,12 @@ async function installValidator(
   });
 
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.sv-2.${CLUSTER_HOSTNAME}`;
+  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;
 
   const validator = await installValidatorApp({
     xns,
     migration: {
-      id: decentralizedSynchronizerMigrationConfig.active.migrationId,
+      id: decentralizedSynchronizerMigrationConfig.active.id,
     },
     validatorWalletUser: svConfig.validatorWalletUser,
     dependencies: sv.participant.asDependencies,
@@ -390,7 +390,7 @@ function installSvApp(
         sequencerAddress: decentralizedSynchronizer.namespaceInternalSequencerAddress,
         mediatorAddress: decentralizedSynchronizer.namespaceInternalMediatorAddress,
         // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {
@@ -479,7 +479,7 @@ function installScan(
     sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
     participantAddress: participant.internalClusterAddress,
     migration: {
-      id: decentralizedSynchronizerMigrationConfig.active.migrationId,
+      id: decentralizedSynchronizerMigrationConfig.active.id,
     },
     enablePostgresMetrics: true,
     // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)

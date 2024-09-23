@@ -1,7 +1,7 @@
 // Need to import this by path and not through the module, so the module is not
 // initialized when we don't want it to (to avoid pulumi configs trying to be read here)
 import {
-  DecentralizedSynchronizerMigrationConfig,
+  DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   externalMigrations,
 } from 'splice-pulumi-common';
@@ -12,8 +12,7 @@ import { initDumpConfig } from '../common/src/dump-config-common';
 
 async function main() {
   await initDumpConfig();
-  const migrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
-  const migrations = externalMigrations(migrationConfig).externalMigrations;
+  const migrations = externalMigrations(DecentralizedSynchronizerUpgradeConfig).externalMigrations;
   /**
    * Ideally we would've outputted every migration to it's own json object (or even better, it's own file).
    * But we seem to have no control over when is the whole output written, as it's fully async so there's no easy way to manage the json output.
@@ -23,11 +22,12 @@ async function main() {
    * */
   for (let migrationIndex = 0; migrationIndex < migrations.length; migrationIndex++) {
     const migration = migrations[migrationIndex];
-    await writeMigration(migration.migrationId, allSvsToDeploy);
+    await writeMigration(migration.id, allSvsToDeploy);
   }
 }
 
 async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvConfig[]) {
+  // eslint-disable-next-line no-process-env
   process.env.SPLICE_MIGRATION_ID = migrationId.toString();
   const installNode = await import('./src/installNode');
   for (const sv of svs) {

@@ -1,0 +1,5 @@
+synchronizerMigration:
+  active:
+    id: 3
+    provider: internal
+  activeDatabaseId: 3

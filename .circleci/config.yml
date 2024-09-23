@@ -1744,15 +1744,6 @@ jobs:
       global_domain_active_migration_id:
         type: integer
         default: 0
-      global_domain_upgrade_migration_id:
-        type: integer
-        default: 0
-      global_domain_legacy_migration_id:
-        type: integer
-        default: -1
-      global_domain_migrate_from_id:
-        type: integer
-        default: -1
       force_non_devnet:
         type: boolean
         default: false
@@ -1811,17 +1802,8 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: .circleci/post-slack-message.sh "Deployment of SV runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
-            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
-            if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
-            fi
-            if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
-              export CN_INSTALL_SPLITWELL="false"
-              export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
-            fi
-            if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
-            fi
+            # || true can be removed once base version > 0.2.1
+            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
@@ -1871,15 +1853,6 @@ jobs:
       global_domain_active_migration_id:
         type: integer
         default: 0
-      global_domain_upgrade_migration_id:
-        type: integer
-        default: 0
-      global_domain_legacy_migration_id:
-        type: integer
-        default: -1
-      global_domain_migrate_from_id:
-        type: integer
-        default: -1
       force_non_devnet:
         type: boolean
         default: false
@@ -1935,17 +1908,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: .circleci/post-slack-message.sh "Deployment of Validator runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
-            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
-            if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
-            fi
-            if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
-              export CN_INSTALL_SPLITWELL="false"
-              export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
-            fi
-            if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
-            fi
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
@@ -1959,6 +1921,8 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
+            # || true can be removed once base version > 0.2.1
+            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - print_gcloud_logs_commands:
@@ -2060,15 +2024,6 @@ jobs:
       global_domain_active_migration_id:
         type: integer
         default: 0
-      global_domain_upgrade_migration_id:
-        type: integer
-        default: 0
-      global_domain_legacy_migration_id:
-        type: integer
-        default: -1
-      global_domain_migrate_from_id:
-        type: integer
-        default: -1
       cancel_workflow_on_failure:
         type: boolean
         default: false
@@ -2177,16 +2132,9 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
-            if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
-            fi
-            if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
-              export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
-            fi
-            if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
-            fi
+            # || true can be removed once base version > 0.2.1
+            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
+
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true

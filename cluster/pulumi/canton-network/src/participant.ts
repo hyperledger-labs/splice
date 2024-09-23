@@ -28,7 +28,7 @@ export function installMigrationSpecificValidatorParticipant(
     postgres.installPostgres(
       xns,
       'participant-pg',
-      `participant-${decentralizedSynchronizerMigrationConfig.active.migrationId}-pg`,
+      `participant-${decentralizedSynchronizerMigrationConfig.active.id}-pg`,
       true
     );
   return installMigrationIdSpecificComponent(

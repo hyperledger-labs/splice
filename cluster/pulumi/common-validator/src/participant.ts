@@ -46,7 +46,7 @@ export function installParticipant(
       ),
       ...loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
-        { MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString() }
+        { MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString() }
       ),
       metrics: {
         enable: true,
@@ -81,7 +81,7 @@ export function installParticipant(
           enable: true,
           migration: {
             id: migrationId,
-            active: decentralizedSynchronizerMigrationConfig.active.migrationId === migrationId,
+            active: decentralizedSynchronizerMigrationConfig.active.id === migrationId,
           },
         },
         additionalJvmOptions: jmxOptions(),

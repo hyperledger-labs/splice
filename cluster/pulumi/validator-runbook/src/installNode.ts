@@ -13,7 +13,7 @@ import {
   cnsUiSecret,
   config,
   daContactPoint,
-  DecentralizedSynchronizerMigrationConfig,
+  DecentralizedSynchronizerUpgradeConfig,
   DEFAULT_AUDIENCE,
   defaultVersion,
   exactNamespace,
@@ -61,8 +61,6 @@ const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FIL
 
 const VALIDATOR_WALLET_USER_ID =
   config.optionalEnv('VALIDATOR_WALLET_USER_ID') || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
-
-const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
@@ -170,8 +168,8 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     true
   );
   const participantAddress = installParticipant(
-    decentralizedSynchronizerMigrationConfig,
-    decentralizedSynchronizerMigrationConfig.active.migrationId,
+    DecentralizedSynchronizerUpgradeConfig,
+    DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
     validatorConfig.nodeIdentifier,
@@ -223,7 +221,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
-        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+        MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
         YOUR_VALIDATOR_NAME: validatorConfig.nodeIdentifier,
       }
@@ -234,7 +232,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     ...validatorValuesFromYamlFiles,
     migration: {
       ...validatorValuesFromYamlFiles.migration,
-      migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
+      migrating: DecentralizedSynchronizerUpgradeConfig.isRunningMigration()
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },

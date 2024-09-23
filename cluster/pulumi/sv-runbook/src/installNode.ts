@@ -39,6 +39,7 @@ import {
   daContactPoint,
   spliceInstanceNames,
   DEFAULT_AUDIENCE,
+  DecentralizedSynchronizerUpgradeConfig,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -67,7 +68,7 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
   : undefined;
 
 const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
-const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
+const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerUpgradeConfig;
 
 export async function installNode(
   auth0Client: Auth0Client,
@@ -143,7 +144,7 @@ export async function installNode(
         decentralizedSynchronizer: {
           migrationIds: decentralizedSynchronizerMigrationConfig
             .allMigrationInfos()
-            .map(x => x.migrationId.toString()),
+            .map(x => x.id.toString()),
         },
       },
     },
@@ -233,7 +234,7 @@ async function installSvAndValidator(
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
       YOUR_HOSTNAME: CLUSTER_HOSTNAME,
-      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
       YOUR_CONTACT_POINT: daContactPoint,
     }
   );
@@ -332,7 +333,7 @@ async function installSvAndValidator(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`,
     {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
     }
   );
   const scanValues: ChartValues = {
@@ -374,7 +375,7 @@ async function installSvAndValidator(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
         TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
         YOUR_SV_NAME: onboardingName,
       }
     ),

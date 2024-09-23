@@ -1,69 +1,40 @@
-import * as glob from 'glob';
-import { config as dotenvConfig } from 'dotenv';
-import { expand } from 'dotenv-expand';
+import * as fs from 'fs';
+import * as yaml from 'js-yaml';
+import * as util from 'node:util';
+import { merge } from 'lodash';
+
+import { Config, ConfigSchema } from './config/configSchema';
+import {
+  clusterPath,
+  deploymentFolderPath,
+  extracted,
+  initEnvConfig,
+  requiredValue,
+} from './config/envConfig';
 
 import Dict = NodeJS.Dict;
 
 class CnConfig {
   env: Dict<string>;
+  public readonly configuration: Config;
 
-  /*eslint no-process-env: "off"*/
   constructor() {
-    if (
-      CnConfig.extracted(
-        false,
-        process.env.CN_PULUMI_LOAD_ENV_CONFIG_FILE,
-        'CN_PULUMI_LOAD_ENV_CONFIG_FILE'
-      )
-    ) {
-      const envrcs = [`${process.env.REPO_ROOT}/.envrc.vars`].concat(
-        glob.sync(`${process.env.REPO_ROOT}/.envrc.vars.*`)
-      );
-      const result = expand(dotenvConfig({ path: envrcs }));
-      if (result.error) {
-        throw new Error(`Failed to load base config ${result.error}`);
-      }
-      let gcpclusterbasename = CnConfig.requiredValue(
-        process.env.GCP_CLUSTER_BASENAME,
-        'GCP_CLUSTER_BASENAME',
-        'Cluster must be specified'
-      );
-      if (gcpclusterbasename?.includes('scratch')) {
-        // fix difference between deployment folder name and cluster name
-        gcpclusterbasename = gcpclusterbasename.replace('scratch', 'scratchnet');
-      } else {
-        if (!gcpclusterbasename?.includes('cilr')) {
-          gcpclusterbasename = gcpclusterbasename + 'net';
-        }
-      }
-      const overrideResult = expand(
-        dotenvConfig({
-          path: `${process.env.REPO_ROOT}/cluster/deployment/${gcpclusterbasename}/.envrc.vars`,
-          override: true,
-        })
-      );
-      if (overrideResult.error) {
-        throw new Error(`Failed to load cluster config ${overrideResult.error}`);
-      }
-    }
+    initEnvConfig();
+    // eslint-disable-next-line no-process-env
     this.env = process.env;
+    this.configuration = this.loadClusterYamlConfig();
+    console.error(
+      'Loaded cluster configuration',
+      util.inspect(this.configuration, {
+        depth: null,
+        maxStringLength: null,
+      })
+    );
   }
 
   requireEnv(name: string, msg = ''): string {
     const value = this.env[name];
-    return CnConfig.requiredValue(value, name, msg);
-  }
-
-  private static requiredValue(value: string | undefined, name: string, msg: string) {
-    if (!value) {
-      console.error(
-        `FATAL: Environment variable ${name} is undefined. Shutting down.` +
-          (msg != '' ? `(should define: ${msg})` : '')
-      );
-      process.exit(1);
-    } else {
-      return value;
-    }
+    return requiredValue(value, name, msg);
   }
 
   optionalEnv(name: string): string | undefined {
@@ -74,31 +45,32 @@ class CnConfig {
 
   envFlag(flagName: string, defaultFlag = false): boolean {
     const varVal = this.env[flagName];
-    const flag = CnConfig.extracted(defaultFlag, varVal, flagName);
+    const flag = extracted(defaultFlag, varVal, flagName);
 
     console.error(`Environment Flag ${flagName} = ${flag} (${varVal})`);
 
     return flag;
   }
 
-  private static extracted(defaultFlag: boolean, varVal: string | undefined, flagName: string) {
-    let flag = defaultFlag;
+  private loadClusterYamlConfig(): Config {
+    const clusterBaseConfig = this.readAndParseYaml(`${deploymentFolderPath}/config.yaml`);
+    const clusterOverridesConfig = this.readAndParseYaml(`${clusterPath()}/config.yaml`);
+    return ConfigSchema.parse(merge({}, clusterBaseConfig, clusterOverridesConfig));
+  }
 
-    if (varVal) {
-      const val = varVal.toLowerCase();
-
-      if (val === 't' || val === 'true' || val === 'y' || val === 'yes' || val === '1') {
-        flag = true;
-      } else if (val === 'f' || val === 'false' || val === 'n' || val === 'no' || val === '0') {
-        flag = false;
+  private readAndParseYaml(filePath: string): unknown {
+    try {
+      if (fs.existsSync(filePath)) {
+        const fileContents = fs.readFileSync(filePath, 'utf8');
+        return yaml.load(fileContents);
       } else {
-        console.error(
-          `FATAL: Flag environment variable ${flagName} has unexpected value: ${varVal}.`
-        );
-        process.exit(1);
+        console.error(`File does not exist: ${filePath}`);
+        return {};
       }
+    } catch (error) {
+      console.error(`Error reading or parsing YAML file: ${filePath}`, error);
+      throw error;
     }
-    return flag;
   }
 }
 

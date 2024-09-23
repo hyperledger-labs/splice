@@ -270,3 +270,5 @@ export const autoInitValues = (
 export const splitwellDarPath = 'splice-node/dars/splitwell-current.dar';
 
 export const DeploySvRunbook = config.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false);
+
+export const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');

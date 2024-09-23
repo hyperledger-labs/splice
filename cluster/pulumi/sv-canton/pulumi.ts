@@ -3,7 +3,7 @@ import { config } from 'splice-pulumi-common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
 // as we have no pulumi runtime
 import {
-  DecentralizedSynchronizerMigrationConfig,
+  DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   externalMigrations,
   MigrationInfo,
@@ -40,7 +40,7 @@ export async function stackForMigration(
 
 const onlyRunbook = config.envFlag('SPLICE_DEPLOY_ONLY_SV_RUNBOOK');
 const dsoSize = parseInt(config.requireEnv('DSO_SIZE'));
-const migrations = externalMigrations(DecentralizedSynchronizerMigrationConfig.fromEnv());
+const migrations = externalMigrations(DecentralizedSynchronizerUpgradeConfig);
 const coreSvs = onlyRunbook ? [] : Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
 export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
 
@@ -52,11 +52,11 @@ export async function runForAllMigrations(
     `Running for migration ${JSON.stringify(migrations)} and svs ${JSON.stringify(svsToDeploy)}`
   );
   for (const migration of migrations.externalMigrations) {
-    console.log(`Running for migration ${migration.migrationId}`);
+    console.log(`Running for migration ${migration.id}`);
 
     await Promise.all(
       svsToDeploy.map(async sv => {
-        const stack = await stackForMigration(sv, migration.migrationId, requiresExistingStack);
+        const stack = await stackForMigration(sv, migration.id, requiresExistingStack);
         await runForStack(stack, migration, sv);
       })
     );

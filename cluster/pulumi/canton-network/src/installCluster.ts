@@ -5,7 +5,6 @@ import {
   bootstrapDataBucketSpec,
   BootstrappingDumpConfig,
   config,
-  DecentralizedSynchronizerMigrationConfig,
   isDevNet,
   sequencerPruningConfig,
   svValidatorTopupConfig,
@@ -16,6 +15,7 @@ import {
   preApproveValidatorRunbook,
   ApprovedSvIdentity,
   nonDevNetNonSvValidatorTopupConfig,
+  DecentralizedSynchronizerUpgradeConfig,
 } from 'splice-pulumi-common';
 import { getDsoSize } from 'splice-pulumi-common-sv';
 
@@ -60,9 +60,6 @@ type BootstrapCliConfig = {
 const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPING_CONFIG')
   ? JSON.parse(config.requireEnv('BOOTSTRAPPING_CONFIG'))
   : undefined;
-
-const decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
-  DecentralizedSynchronizerMigrationConfig.fromEnv();
 
 const mustInstallValidator1 = config.envFlag('CN_INSTALL_VALIDATOR1', true);
 
@@ -157,7 +154,7 @@ export async function installCluster(
     topupConfig: svValidatorTopupConfig,
     splitPostgresInstances,
     sequencerPruningConfig,
-    decentralizedSynchronizerUpgradeConfig,
+    decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerUpgradeConfig,
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,
   });
@@ -179,7 +176,7 @@ export async function installCluster(
       validator1Onboarding.secret,
       'auth0|63e3d75ff4114d87a2c1e4f5',
       splitPostgresInstances,
-      decentralizedSynchronizerUpgradeConfig,
+      DecentralizedSynchronizerUpgradeConfig,
       mustInstallSplitwell,
       nonSvComponentsDependencies,
       periodicBackupConfig,
@@ -200,7 +197,7 @@ export async function installCluster(
       'auth0|65de04b385816c4a38cc044f',
       splitwellOnboarding.secret,
       splitPostgresInstances,
-      decentralizedSynchronizerUpgradeConfig,
+      DecentralizedSynchronizerUpgradeConfig,
       nonSvComponentsDependencies,
       periodicBackupConfig,
       bootstrappingDumpConfig,

@@ -1458,12 +1458,11 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 
 1. Start a Slack thread on which you document the steps you take.
    Make sure there is at least one CN engineer around for a second pair of eyes.
-1. **Prepare:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that sets the following environment variables for your target cluster:
-   * `export GLOBAL_DOMAIN_UPGRADE_VERSION=` the version we're migrating to (current one in case of disaster recovery)
-   * `export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=` the migration ID we're migrating to
-   * `export DISABLE_CANTON_AUTO_INIT="true"` for a slightly faster migrate step; will be removed with [#12353](https://github.com/DACH-NY/canton-network-node/issues/12353)
-   * `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
-   * `export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"` to throttle SV1's Cometbft temporarily during the migration
+1. **Prepare:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that sets the following config for your target cluster:
+   * set in `config.yaml` under the path `synchronizerMigration.upgrade.version` the version we're migrating to (current one in case of disaster recovery)
+   * set in `config.yaml` under the path `synchronizerMigration.upgrade.id` the migration ID we're migrating to
+   * environment variable `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
+   * environment variable `export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"` to throttle SV1's Cometbft temporarily during the migration
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
@@ -1497,15 +1496,12 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
     - `cncluster take_disaster_recovery_dumps <timestamp> <new_migration_id> <output_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
     - `cncluster copy_disaster_recovery_dumps <dump_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
 1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
-1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following environment variables for your target cluster:
-   * Remove the export of `GLOBAL_DOMAIN_UPGRADE_VERSION` which was added in the "prepare" step
-   * Remove the export of `GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID` which was added in the "prepare" step
+1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following config for your target cluster:
+   * in `config.yaml` change `synchronizerMigration.active` to `synchronizerMigration.legacy`
+   * in `config.yaml` change `synchronizerMigration.upgrade` to `synchronizerMigration.active`
+   * in `config.yaml` set `synchronizerMigration.active.migrateFrom` to the migration ID we're migrating away from
    * Set the following environment variables for your target cluster:
      * `export CHARTS_VERSION=` the version we're migrating to (current one in case of disaster recovery)
-     * `export GLOBAL_DOMAIN_LEGACY_VERSION=` the old value of `CHARTS_VERSION` (current one in case of disaster recovery)
-     * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're migrating to
-     * `export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=` the migration ID we're migrating away from
-     * `export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=` the migration ID we're migrating away from
 1. Wait for the operator to apply your changes from the migrate step.
    The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
    (Check the logs of failing pods to be sure that there is no other problem.)

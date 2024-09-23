@@ -150,7 +150,7 @@ function installIngress(
     ingress: {
       splitwell: splitwell,
       decentralizedSynchronizer: {
-        activeMigrationId: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+        activeMigrationId: decentralizedSynchronizerMigrationConfig.active.id.toString(),
       },
     },
   });

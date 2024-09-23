@@ -1,6 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
-  DecentralizedSynchronizerMigrationConfig,
+  DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   exactNamespace,
 } from 'splice-pulumi-common';
@@ -45,7 +45,7 @@ export function installNode(
         isFirstSv: isFirstSv,
         isCoreSv: isCoreSv,
       },
-      DecentralizedSynchronizerMigrationConfig.fromEnv(),
+      DecentralizedSynchronizerUpgradeConfig,
       {
         nodeConfigs: {
           self: {
