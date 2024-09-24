@@ -14,6 +14,8 @@ import {
   spliceInstanceNames,
   config,
   splitwellDarPath,
+  imagePullSecret,
+  CnInput,
 } from 'splice-pulumi-common';
 
 import * as postgres from '../../common/src/postgres';
@@ -52,6 +54,7 @@ export async function installValidator1(
     defaultVersion,
     { dependsOn: [xns.ns] }
   );
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
     ? postgres.installPostgres(xns, 'postgres', 'postgres', false)
@@ -67,6 +70,10 @@ export async function installValidator1(
     auth0AppName: 'validator1',
   });
 
+  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps
+    .concat(dependsOn)
+    .concat([loopback]);
+
   const participant = installMigrationSpecificValidatorParticipant(
     decentralizedSynchronizerMigrationConfig,
     xns,
@@ -74,10 +81,12 @@ export async function installValidator1(
     'validator1',
     auth0Client.getCfg(),
     undefined,
-    dependsOn.concat([loopback])
+    participantDependsOn
   );
 
-  const extraDependsOn: pulumi.Resource[] = dependsOn.concat([validatorPostgres]);
+  const extraDependsOn: CnInput<pulumi.Resource>[] = participantDependsOn.concat([
+    validatorPostgres,
+  ]);
   const scanAddress = `http://scan-app.sv-1:5012`;
 
   const validator = await installValidatorApp({
@@ -128,7 +137,9 @@ export async function installValidator1(
       },
       defaultVersion,
       {
-        dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
+        dependsOn: imagePullDeps.concat([
+          await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
+        ]),
       }
     );
   }

@@ -55,7 +55,7 @@ type BasicValidatorConfig = {
   validatorWalletUser?: string;
   disableAllocateLedgerApiUserParty?: boolean;
   backupConfig?: ValidatorBackupConfig;
-  extraDependsOn?: pulumi.Resource[];
+  extraDependsOn?: CnInput<pulumi.Resource>[];
   scanAddress: Output<string> | string;
   persistenceConfig: PersistenceConfig;
   appDars?: string[];
@@ -68,7 +68,7 @@ type BasicValidatorConfig = {
   sweep?: SweepConfig;
   autoAcceptTransfers?: AutoAcceptTransfersConfig;
   nodeIdentifier: string;
-  dependencies: pulumi.Resource[];
+  dependencies: CnInput<pulumi.Resource>[];
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {

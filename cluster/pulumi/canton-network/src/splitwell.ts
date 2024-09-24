@@ -14,6 +14,8 @@ import {
   ValidatorTopupConfig,
   config,
   splitwellDarPath,
+  imagePullSecret,
+  CnInput,
 } from 'splice-pulumi-common';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
@@ -34,7 +36,6 @@ export async function installSplitwell(
   topupConfig?: ValidatorTopupConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell', true);
-
   const sharedPostgres = splitPostgresInstances
     ? undefined
     : postgres.installPostgres(xns, 'splitwell-pg', 'splitwell-pg', splitPostgresInstances);
@@ -52,7 +53,9 @@ export async function installSplitwell(
     { dependsOn: [xns.ns] }
   );
 
-  installIngress(xns);
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
+
+  installIngress(xns, imagePullDeps);
 
   const participant = installMigrationSpecificValidatorParticipant(
     decentralizedSynchronizerMigrationConfig,
@@ -61,7 +64,7 @@ export async function installSplitwell(
     'splitwell',
     auth0Client.getCfg(),
     undefined,
-    dependsOn.concat([loopback])
+    imagePullDeps.concat(dependsOn).concat([loopback])
   );
 
   const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', 'sw-pg', true);
@@ -93,14 +96,15 @@ export async function installSplitwell(
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
     defaultVersion,
-    { dependsOn: dependsOn }
+    { dependsOn: imagePullDeps.concat(dependsOn) }
   );
 
   const validatorPostgres =
     sharedPostgres || postgres.installPostgres(xns, 'validator-pg', 'validator-pg', true);
   const validatorDbName = 'val_splitwell';
 
-  const extraDependsOn = dependsOn
+  const extraDependsOn = imagePullDeps
+    .concat(dependsOn)
     .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'splice'))
     .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'cn'));
 
@@ -154,12 +158,15 @@ export async function installSplitwell(
   return validator;
 }
 
-function installIngress(xns: ExactNamespace) {
+function installIngress(xns: ExactNamespace, dependsOn: CnInput<pulumi.Resource>[]) {
   installSpliceHelmChart(xns, 'cluster-ingress-splitwell-uis', 'cn-cluster-ingress-runbook', {
     cluster: {
       hostname: CLUSTER_HOSTNAME,
       svNamespace: xns.logicalName,
     },
     withSvIngress: false,
+    opts: {
+      dependsOn: dependsOn,
+    },
   });
 }

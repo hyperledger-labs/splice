@@ -18,6 +18,7 @@ import {
   ExactNamespace,
   exactNamespace,
   fetchAndInstallParticipantBootstrapDump,
+  imagePullSecret,
   initialPackageConfigJson,
   initialSynchronizerFeesConfig,
   installAuth0Secret,
@@ -134,6 +135,7 @@ export async function installSvNode(
     defaultVersion,
     { dependsOn: [xns.ns] }
   );
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
     await installAuth0Secret(
@@ -204,7 +206,8 @@ export async function installSvNode(
     .concat([identitiesBackupConfigSecret])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat([loopback]);
+    .concat([loopback])
+    .concat(imagePullDeps);
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined

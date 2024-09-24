@@ -3,6 +3,7 @@ import { Output } from '@pulumi/pulumi';
 import {
   Auth0Config,
   auth0UserNameEnvVarSource,
+  CnInput,
   DecentralizedSynchronizerMigrationConfig,
   ExactNamespace,
   installMigrationIdSpecificComponent,
@@ -19,7 +20,7 @@ export function installMigrationSpecificValidatorParticipant(
   nodeIdentifier: string,
   auth0Cfg: Auth0Config,
   logLevel?: LogLevel,
-  dependsOn: pulumi.Resource[] = []
+  dependsOn: CnInput<pulumi.Resource>[] = []
 ): {
   participantAddress: Output<string>;
 } {
