@@ -9,7 +9,15 @@ export function installClusterVersion(): k8s.apiextensions.CustomResource {
   const version =
     remoteVersion ||
     // cannot be used with the operator
-    exec.execSync(`${config.requireEnv('REPO_ROOT')}/build-tools/get-snapshot-version`).toString();
+    exec
+      .execSync(`${config.requireEnv('REPO_ROOT')}/build-tools/get-snapshot-version`, {
+        env: {
+          // eslint-disable-next-line no-process-env
+          ...process.env,
+          CI_IGNORE_DIRTY_REPO: '1',
+        },
+      })
+      .toString();
   return new k8s.apiextensions.CustomResource(
     `cluster-version-virtual-service`,
     {
