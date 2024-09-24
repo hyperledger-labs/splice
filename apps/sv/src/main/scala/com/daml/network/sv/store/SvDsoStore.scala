@@ -737,7 +737,7 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[ResultsPage[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]] = {
     multiDomainAcsStore
-      .listContractsPaginated(vl.ValidatorLicense.COMPANION, after, limit)
+      .listContractsPaginated(vl.ValidatorLicense.COMPANION, after, limit, SortOrder.Descending)
       .map(_.mapResultsInPage(_.contract))
   }
 

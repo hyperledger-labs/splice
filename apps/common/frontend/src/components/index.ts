@@ -20,6 +20,7 @@ import LoginFailed from './LoginFailed';
 import PartyId from './PartyId';
 import RateDisplay from './RateDisplay';
 import TitledTable from './TitledTable';
+import ViewMoreButton from './ViewMoreButton';
 import { TransferButton, SubscriptionButton } from './WalletButtons';
 import {
   VotesHooksContext,
@@ -63,4 +64,5 @@ export {
   VotesHooks,
   useVotesHooks,
   ListVoteRequests,
+  ViewMoreButton,
 };
