@@ -58,16 +58,31 @@ export function installCantonComponents(
 
   const isActiveMigration = migrationConfig.active.id === migrationId;
   const auth0Config = auth0Client.getCfg();
+  const migrationStillRunning = migrationConfig.isStillRunning(migrationId);
   const participantPg =
     dbs?.participant ||
-    installPostgres(xns, `participant-${migrationId}-pg`, `participant-pg`, true);
+    installPostgres(
+      xns,
+      `participant-${migrationId}-pg`,
+      `participant-pg`,
+      true,
+      migrationStillRunning
+    );
   const mediatorPostgres =
-    dbs?.mediator || installPostgres(xns, `mediator-${migrationId}-pg`, `mediator-pg`, true);
+    dbs?.mediator ||
+    installPostgres(xns, `mediator-${migrationId}-pg`, `mediator-pg`, true, migrationStillRunning);
   const sequencerPostgres =
-    dbs?.sequencer || installPostgres(xns, `sequencer-${migrationId}-pg`, `sequencer-pg`, true);
-  if (migrationConfig.isStillRunning(migrationId)) {
+    dbs?.sequencer ||
+    installPostgres(
+      xns,
+      `sequencer-${migrationId}-pg`,
+      `sequencer-pg`,
+      true,
+      migrationStillRunning
+    );
+  if (migrationStillRunning) {
     const migrationInfo = migrationConfig
-      .allMigrationInfos()
+      .runningMigrations()
       .find(migration => migration.id === migrationId);
     if (!migrationInfo) {
       throw new Error(`Migration ${migrationId} not found in migration config`);

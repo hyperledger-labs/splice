@@ -29,7 +29,7 @@ export function installNode(
   );
   const nodeConfig = svConfig!;
   return auth0FetchOutput.apply(async auth0Fetch => {
-    await pulumi.log.info(`Installing node ${sv} for migration ${migrationId}`);
+    console.error(`Installing node ${sv} for migration ${migrationId}`);
     if (loadAuth0Cache) {
       await auth0Fetch.loadAuth0Cache();
     }

@@ -1,16 +1,12 @@
-import {
-  DecentralizedSynchronizerUpgradeConfig,
-  DomainMigrationIndex,
-  externalMigrations,
-} from 'splice-pulumi-common';
+import { DecentralizedSynchronizerUpgradeConfig, DomainMigrationIndex } from 'splice-pulumi-common';
 import { allSvsToDeploy, svRunbookConfig } from 'splice-pulumi-common-sv';
 
 import { GitFluxRef, gitRepoForRef } from '../flux';
 import { createStackCR } from './stack';
 
 export function installMigrationSpecificStacks(mainReference: GitFluxRef): void {
-  const migrations = externalMigrations(DecentralizedSynchronizerUpgradeConfig);
-  migrations.externalMigrations.forEach(migration => {
+  const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
+  migrations.forEach(migration => {
     const reference = migration.releaseReference
       ? gitRepoForRef(`migration-${migration.id}`, migration.releaseReference)
       : mainReference;

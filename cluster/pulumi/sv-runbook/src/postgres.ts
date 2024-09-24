@@ -14,10 +14,11 @@ export function installPostgres(
   xns: ExactNamespace,
   name: string,
   secretName: string,
-  selfHostedValuesFile: string
+  selfHostedValuesFile: string,
+  isActive: boolean = true
 ): SplicePostgres | CloudPostgres {
   if (cloudSqlEnabled) {
-    return new CloudPostgres(xns, name, name, secretName);
+    return new CloudPostgres(xns, name, name, secretName, isActive);
   } else {
     const valuesFromFile = loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`

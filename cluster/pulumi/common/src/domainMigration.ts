@@ -18,6 +18,7 @@ export class DecentralizedSynchronizerMigrationConfig {
   // used to configure  the CN apps for the migration
   migratingFromActiveId?: DomainMigrationIndex;
   activeDatabaseId?: DomainMigrationIndex;
+  public archived: MigrationInfo[];
 
   constructor(config: Config) {
     const synchronizerMigration = config.synchronizerMigration;
@@ -26,16 +27,17 @@ export class DecentralizedSynchronizerMigrationConfig {
     this.upgrade = synchronizerMigration.upgrade;
     this.migratingFromActiveId = synchronizerMigration.active.migratingFrom;
     this.activeDatabaseId = synchronizerMigration.activeDatabaseId;
+    this.archived = synchronizerMigration.archived || [];
   }
 
-  allMigrationInfos(): MigrationInfo[] {
+  runningMigrations(): MigrationInfo[] {
     return [this.active]
       .concat(this.legacy ? [this.legacy] : [])
       .concat(this.upgrade ? [this.upgrade] : []);
   }
 
   isStillRunning(id: DomainMigrationIndex): boolean {
-    return this.allMigrationInfos().some(info => info.id == id);
+    return this.runningMigrations().some(info => info.id == id);
   }
 
   isRunningMigration(): boolean {
@@ -52,6 +54,22 @@ export class DecentralizedSynchronizerMigrationConfig {
         legacyId: this.legacy?.id,
       },
     };
+  }
+
+  get allExternalMigrations(): MigrationInfo[] {
+    return this.runningMigrations()
+      .concat(this.archived)
+      .filter(migration => migration.provider === MigrationProvider.EXTERNAL);
+  }
+
+  get allInternalMigrations(): MigrationInfo[] {
+    return this.runningMigrations()
+      .concat(this.archived)
+      .filter(migration => migration.provider === MigrationProvider.INTERNAL);
+  }
+
+  get hasInternalRunningMigration(): boolean {
+    return this.allInternalMigrations.some(migration => this.isStillRunning(migration.id));
   }
 }
 
@@ -89,17 +107,6 @@ export function installMigrationIdSpecificComponent<T>(
             decentralizedSynchronizerUpgradeConfig.upgrade.version
           )
         : undefined,
-  };
-}
-
-export function externalMigrations(config: DecentralizedSynchronizerMigrationConfig): {
-  externalMigrations: MigrationInfo[];
-} {
-  const externalMigrations = config
-    .allMigrationInfos()
-    .filter(migration => migration.provider === MigrationProvider.EXTERNAL);
-  return {
-    externalMigrations,
   };
 }
 

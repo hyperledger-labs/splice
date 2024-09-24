@@ -5,7 +5,6 @@ import { config } from 'splice-pulumi-common/src/config';
 import {
   DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
-  externalMigrations,
   MigrationInfo,
 } from 'splice-pulumi-common/src/domainMigration';
 import { DeploySvRunbook } from 'splice-pulumi-common/src/utils';
@@ -40,7 +39,7 @@ export async function stackForMigration(
 
 const onlyRunbook = config.envFlag('SPLICE_DEPLOY_ONLY_SV_RUNBOOK');
 const dsoSize = parseInt(config.requireEnv('DSO_SIZE'));
-const migrations = externalMigrations(DecentralizedSynchronizerUpgradeConfig);
+const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
 const coreSvs = onlyRunbook ? [] : Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
 export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
 
@@ -51,7 +50,7 @@ export async function runForAllMigrations(
   console.log(
     `Running for migration ${JSON.stringify(migrations)} and svs ${JSON.stringify(svsToDeploy)}`
   );
-  for (const migration of migrations.externalMigrations) {
+  for (const migration of migrations) {
     console.log(`Running for migration ${migration.id}`);
 
     await Promise.all(

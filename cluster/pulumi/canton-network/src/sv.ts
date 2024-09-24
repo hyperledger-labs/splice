@@ -269,7 +269,7 @@ export async function installSvNode(
       ingress: {
         decentralizedSynchronizer: {
           migrationIds: decentralizedSynchronizerUpgradeConfig
-            .allMigrationInfos()
+            .runningMigrations()
             .map(x => x.id.toString()),
         },
       },

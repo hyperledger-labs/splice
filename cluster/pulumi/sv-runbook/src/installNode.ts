@@ -143,7 +143,7 @@ export async function installNode(
       ingress: {
         decentralizedSynchronizer: {
           migrationIds: decentralizedSynchronizerMigrationConfig
-            .allMigrationInfos()
+            .runningMigrations()
             .map(x => x.id.toString()),
         },
       },

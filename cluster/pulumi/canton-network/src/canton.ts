@@ -1,11 +1,7 @@
 import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Output } from '@pulumi/pulumi';
-import {
-  DecentralizedSynchronizerMigrationConfig,
-  ExactNamespace,
-  MigrationProvider,
-} from 'splice-pulumi-common';
+import { DecentralizedSynchronizerMigrationConfig, ExactNamespace } from 'splice-pulumi-common';
 import {
   CometBftNodeConfigs,
   CrossStackDecentralizedSynchronizerNode,
@@ -32,71 +28,76 @@ export function installCanton(
   },
   svConfig: SvConfig
 ): InstalledMigrationSpecificSv {
-  const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig
-    .allMigrationInfos()
-    .filter(migrationInfo => migrationInfo.provider === MigrationProvider.INTERNAL);
-  const databaseSuffix = decentralizedSynchronizerMigrationConfig.activeDatabaseId
-    ? `${decentralizedSynchronizerMigrationConfig.activeDatabaseId}-pg`
-    : 'pg';
-  const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.id;
-  const sequencerPostgres =
-    defaultPostgres ||
-    postgres.installPostgres(
-      xns,
-      `sequencer-${databaseSuffix}`,
-      `sequencer-${activeMigrationId}-pg`,
-      true
-    );
-  const mediatorPostgres =
-    defaultPostgres ||
-    postgres.installPostgres(
-      xns,
-      `mediator-${databaseSuffix}`,
-      `mediator-${activeMigrationId}-pg`,
-      true
-    );
-  const participantPostgres =
-    defaultPostgres ||
-    postgres.installPostgres(
-      xns,
-      `participant-${databaseSuffix}`,
-      `participant-${activeMigrationId}-pg`,
-      true
-    );
-  const installedMigrations = migrationsContainedInStack.map(migration => {
-    return {
-      migration,
-      canton: installCantonComponents(
+  const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
+  const activeMigrationId =
+    decentralizedSynchronizerMigrationConfig.activeDatabaseId ||
+    decentralizedSynchronizerMigrationConfig.active.id;
+  const externalActiveMigration = {
+    decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
+      activeMigrationId,
+      new CometBftNodeConfigs(activeMigrationId, cometbft.nodeConfigs).nodeIdentifier
+    ),
+    participant: {
+      asDependencies: [],
+      internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
+    },
+  };
+  if (migrationsContainedInStack.length > 0) {
+    const sequencerPostgres =
+      defaultPostgres ||
+      postgres.installPostgres(
         xns,
-        migration.id,
-        svConfig.auth0Client,
-        {
-          onboardingName: svConfig.onboardingName,
-          isFirstSv: svConfig.isFirstSv,
-          isCoreSv: true,
-        },
-        decentralizedSynchronizerMigrationConfig,
-        cometbft,
-        {
-          participant: participantPostgres,
-          mediator: mediatorPostgres,
-          sequencer: sequencerPostgres,
-        }
-      ),
-    };
-  });
-  return (
-    installedMigrations.find(
-      installedMigration => installedMigration.migration.id === activeMigrationId
-    )?.canton || {
-      decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
-        activeMigrationId,
-        new CometBftNodeConfigs(activeMigrationId, cometbft.nodeConfigs).nodeIdentifier
-      ),
-      participant: {
-        asDependencies: [],
-        internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
-      },
-    }
-  );
+        `sequencer-pg`,
+        `sequencer-${activeMigrationId}-pg`,
+        true,
+        decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
+      );
+    const mediatorPostgres =
+      defaultPostgres ||
+      postgres.installPostgres(
+        xns,
+        `mediator-pg`,
+        `mediator-${activeMigrationId}-pg`,
+        true,
+        decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
+      );
+    const participantPostgres =
+      defaultPostgres ||
+      postgres.installPostgres(
+        xns,
+        `participant-pg`,
+        `participant-${activeMigrationId}-pg`,
+        true,
+        decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
+      );
+    const installedMigrations = migrationsContainedInStack.map(migration => {
+      return {
+        migration,
+        canton: installCantonComponents(
+          xns,
+          migration.id,
+          svConfig.auth0Client,
+          {
+            onboardingName: svConfig.onboardingName,
+            isFirstSv: svConfig.isFirstSv,
+            isCoreSv: true,
+          },
+          decentralizedSynchronizerMigrationConfig,
+          cometbft,
+          {
+            participant: participantPostgres,
+            mediator: mediatorPostgres,
+            sequencer: sequencerPostgres,
+          }
+        ),
+      };
+    });
+    return (
+      installedMigrations.find(
+        installedMigration => installedMigration.migration.id === activeMigrationId
+      )?.canton || externalActiveMigration
+    );
+  } else {
+    return externalActiveMigration;
+  }
 }
