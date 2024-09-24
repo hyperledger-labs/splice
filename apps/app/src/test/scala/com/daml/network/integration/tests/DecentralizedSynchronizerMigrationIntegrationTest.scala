@@ -416,6 +416,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
           )(conf),
+        (_, conf) =>
+          ConfigTransforms.setGrpcDeadlineForTreasuryService(
+            Some(NonNegativeFiniteDuration.ofSeconds(10))
+          )(conf),
       )
       .withManualStart
       // TODO (#10859) remove and fix test failures
