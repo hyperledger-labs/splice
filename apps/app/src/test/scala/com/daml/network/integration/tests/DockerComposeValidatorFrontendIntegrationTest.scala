@@ -12,7 +12,7 @@ import java.lang.ProcessBuilder
 import java.nio.file.{Path, Paths}
 
 class DockerComposeValidatorFrontendIntegrationTest
-    extends FrontendIntegrationTest("selfhosted")
+    extends FrontendIntegrationTest("frontend")
     with FrontendLoginUtil
     with WalletFrontendTestUtil
     with AnsFrontendTestUtil {
@@ -76,14 +76,22 @@ class DockerComposeValidatorFrontendIntegrationTest
       testDumpDir.resolve("compose-validator-backup").resolve(java.time.Instant.now.toString)
 
     withComposeValidator() {
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         actAndCheck()(
           "Login as administrator",
           login(80, "administrator", "wallet.localhost"),
         )(
           "administrator is already onboarded",
-          _ => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
+          _ => {
+            seleniumText(find(id("logged-in-user"))) should startWith(partyHint)
+            val txs = findAll(className("tx-row")).toSeq
+            val trafficPurchases = txs.filter { txRow =>
+              txRow.childElement(className("tx-action")).text.contains("Sent") &&
+              txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
+            }
+            trafficPurchases should not be empty
+          },
         )
         actAndCheck(
           "Login as alice",
@@ -136,7 +144,7 @@ class DockerComposeValidatorFrontendIntegrationTest
     val identities = backupsDir.resolve("identities.json")
 
     withComposeValidator("after restoring from backup") {
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         clue("Alice can login and is already onboarded") {
           actAndCheck()(
@@ -182,8 +190,25 @@ class DockerComposeValidatorFrontendIntegrationTest
         "da-composeValidator-13",
       ),
     ) {
-      withFrontEnd("selfhosted") { implicit webDriver =>
-        eventuallySucceeds()(go to s"http://wallet.localhost")
+      withFrontEnd("frontend") { implicit webDriver =>
+        go to s"http://wallet.localhost"
+        actAndCheck()(
+          "Login as administrator",
+          login(80, "administrator", "wallet.localhost"),
+        )(
+          "administrator is already onboarded",
+          _ => {
+            seleniumText(find(id("logged-in-user"))) should startWith(partyHint)
+            // Wait for some traffic to be bought before proceeding, so that we don't
+            // hit a "traffic below reserved amount" error
+            val txs = findAll(className("tx-row")).toSeq
+            val trafficPurchases = txs.filter { txRow =>
+              txRow.childElement(className("tx-action")).text.contains("Sent") &&
+              txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
+            }
+            trafficPurchases should not be empty
+          },
+        )
         clue("Alice can onboard again") {
           actAndCheck(
             "Login as alice",
@@ -194,14 +219,15 @@ class DockerComposeValidatorFrontendIntegrationTest
               find(id("onboard-button")).value.text should not be empty
             },
           )
+
+          actAndCheck(
+            "onboard alice",
+            click on "onboard-button",
+          )(
+            "Alice is logged in and maintained her balance",
+            _ => aliceLoggedInAndHasBalance(),
+          )
         }
-        actAndCheck(
-          "onboard alice",
-          click on "onboard-button",
-        )(
-          "Alice is logged in and maintained her balance",
-          _ => aliceLoggedInAndHasBalance(),
-        )
         clue("Logout Alice") {
           click on find(id("logout-button")).value
         }
@@ -213,7 +239,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       clue("Restart the validator, with the new participant ID") {
         startComposeValidator("with the new participant ID", Seq("-P", "da-composeValidator-13"))
       }
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         clue("Alice can login and is already onboarded") {
           actAndCheck()(
@@ -238,7 +264,7 @@ class DockerComposeValidatorFrontendIntegrationTest
         "GCP_CLUSTER_BASENAME" -> "cidaily" // Any cluster should work, as long as its UI auth0 apps were created with the localhost callback URLs
       ),
     ) {
-      withFrontEnd("selfhosted") { implicit webDriver =>
+      withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
         completeAuth0LoginWithAuthorization(
           "http://wallet.localhost",

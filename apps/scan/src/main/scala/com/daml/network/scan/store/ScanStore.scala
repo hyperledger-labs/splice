@@ -14,6 +14,7 @@ import com.daml.network.store.{
   MiningRoundsStore,
   MultiDomainAcsStore,
   PageLimit,
+  SortOrder,
   VotesStore,
 }
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
@@ -41,12 +42,6 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import java.time.Instant
 
-sealed trait SortOrder
-
-object SortOrder {
-  case object Ascending extends SortOrder
-  case object Descending extends SortOrder
-}
 final case class ScanInfo(publicUrl: String, svName: String)
 
 /** Utility class grouping the two kinds of stores managed by the DsoApp. */

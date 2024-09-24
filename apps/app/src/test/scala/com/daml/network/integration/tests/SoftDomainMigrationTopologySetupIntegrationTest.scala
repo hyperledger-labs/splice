@@ -392,31 +392,41 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           ),
           handshakeOnly = false,
         )
-        val domainId = participant.domains.id_of(domainAlias)
-        participant.health.ping(
-          participant.id,
-          domainId = Some(domainId),
-        )
       }
     }
-    clue("Sign DSO PartToParticipant mapping") {
-      env.svs.local.foreach { sv =>
-        sv.signDsoPartyToParticipant(prefix)
-      }
-    }
+    actAndCheck(
+      "Sign DSO PartyToParticipant mapping", {
+        env.svs.local.foreach { sv =>
+          sv.signDsoPartyToParticipant(prefix)
+        }
+      },
+    )(
+      "DSO PartyToParticipant is updated on domain",
+      _ => {
+        sv1Backend.participantClient.topology.party_to_participant_mappings
+          .list(newDomainId, filterParty = dsoRules.payload.dso) should not be empty
+      },
+    )
 
     // Ensure that the scheduled time has passed.
     // This is mainly to avoid putting a stupidly large time in the eventually below.
-    env.environment.clock
-      .scheduleAt(
-        _ => (),
-        CantonTimestamp.assertFromInstant(scheduledTime.plus(500, ChronoUnit.MILLIS)),
-      )
-      .unwrap
-      .futureValue
+    clue("Waiting for scheduled time") {
+      env.environment.clock
+        .scheduleAt(
+          _ => (),
+          CantonTimestamp.assertFromInstant(scheduledTime.plus(500, ChronoUnit.MILLIS)),
+        )
+        .unwrap
+        .futureValue
+    }
 
-    eventually() {
-      sv1ScanBackend.getAmuletRules().state shouldBe ContractState.Assigned(newDomainId)
+    // It takes a pretty long time until the SVs vet the packages on the new domain
+    // and the reassignments go through.
+    eventually(40.seconds) {
+      val amuletRules = sv1ScanBackend.getAmuletRules()
+      inside(amuletRules) { case _ =>
+        amuletRules.state shouldBe ContractState.Assigned(newDomainId)
+      }
       val (openRounds, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
       forAll(openRounds) { round =>
         round.state shouldBe ContractState.Assigned(newDomainId)

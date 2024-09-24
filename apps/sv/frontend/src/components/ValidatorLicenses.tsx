@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DateDisplay, Loading, PartyId, SvClientProvider } from 'common-frontend';
+import { DateDisplay, Loading, PartyId, SvClientProvider, ViewMoreButton } from 'common-frontend';
 import React from 'react';
 
 import { Chip, Stack, Table, TableContainer, TableHead, Typography } from '@mui/material';
@@ -15,8 +15,9 @@ import { useValidatorLicenses } from '../hooks/useValidatorLicenses';
 import { useSvConfig } from '../utils';
 
 const ValidatorLicenses: React.FC = () => {
-  const validatorLicensesQuery = useValidatorLicenses();
+  const validatorLicensesQuery = useValidatorLicenses(10);
   const dsoInfosQuery = useDsoInfos();
+
   if (validatorLicensesQuery.isLoading || dsoInfosQuery.isLoading) {
     return <Loading />;
   }
@@ -25,17 +26,9 @@ const ValidatorLicenses: React.FC = () => {
     return <p>Error, something went wrong.</p>;
   }
 
-  const validatorLicenses = validatorLicensesQuery.data.sort((a, b) => {
-    const createdAtA = a.createdAt;
-    const createdAtB = b.createdAt;
-    if (createdAtA === createdAtB) {
-      return 0;
-    } else if (createdAtA < createdAtB) {
-      return 1;
-    } else {
-      return -1;
-    }
-  });
+  const loadedValidatorLicenses = validatorLicensesQuery.data.pages.flatMap(
+    page => page.validatorLicenses
+  );
 
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
@@ -52,7 +45,7 @@ const ValidatorLicenses: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {validatorLicenses.map(license => {
+            {loadedValidatorLicenses.map(license => {
               return (
                 <LicenseRow
                   key={license.contractId}
@@ -66,6 +59,18 @@ const ValidatorLicenses: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+      <ViewMoreButton
+        label={
+          validatorLicensesQuery.isFetchingNextPage
+            ? 'Loading more...'
+            : validatorLicensesQuery.hasNextPage
+            ? 'View More'
+            : 'Nothing more to load'
+        }
+        loadMore={() => validatorLicensesQuery.fetchNextPage()}
+        disabled={!validatorLicensesQuery.hasNextPage}
+        idSuffix="validator-licenses"
+      />
     </Stack>
   );
 };

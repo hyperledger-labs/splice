@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, ErrorDisplay, RateDisplay, Loading } from 'common-frontend';
+import { AmountDisplay, ErrorDisplay, RateDisplay, Loading, ViewMoreButton } from 'common-frontend';
 import formatISO from 'date-fns/formatISO';
 
 import {
@@ -14,7 +14,6 @@ import {
   InfoOutlined,
 } from '@mui/icons-material';
 import {
-  Button,
   Icon,
   Stack,
   TableBody,
@@ -103,6 +102,7 @@ const TransactionHistory: React.FC = () => {
         }
         loadMore={() => txQuery.fetchNextPage()}
         disabled={!txQuery.hasNextPage}
+        idSuffix="transactions"
       />
     </Stack>
   );
@@ -396,26 +396,6 @@ const RewardCollectedInfo: React.FC<{ transaction: Transaction }> = ({ transacti
       {!validatorRewards.isZero() && row('validator', 'Validator Rewards', validatorRewards)}
       {!svRewards.isZero() && row('sv', 'SV Rewards', svRewards)}
     </Stack>
-  );
-};
-
-interface ViewMoreButtonProps {
-  loadMore: () => void;
-  label: string;
-  disabled: boolean;
-}
-const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore, label, disabled = false }) => {
-  return (
-    <Button
-      id="view-more-transactions"
-      variant="outlined"
-      size="small"
-      color="secondary"
-      onClick={loadMore}
-      disabled={disabled}
-    >
-      {label}
-    </Button>
   );
 };
 

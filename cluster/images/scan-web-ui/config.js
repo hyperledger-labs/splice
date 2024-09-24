@@ -2,7 +2,7 @@ window.splice_config = {
   services: {
     scan: {
       // URL of scan backend.
-      url: `https://${window.location.hostname}/api/scan`,
+      url: "https://" + window.location.host + "/api/scan",
     },
   },
   spliceInstanceNames: {

@@ -30,13 +30,7 @@ import com.daml.network.http.v0.definitions.{
   MaybeCachedContractWithState,
 }
 import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.store.{
-  AcsSnapshotStore,
-  ScanHistoryBackfilling,
-  ScanStore,
-  SortOrder,
-  TxLogEntry,
-}
+import com.daml.network.scan.store.{AcsSnapshotStore, ScanHistoryBackfilling, ScanStore, TxLogEntry}
 import com.daml.network.util.{
   Codec,
   Contract,
@@ -68,7 +62,7 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
 }
 import com.daml.network.http.{HttpVotesHandler, UrlValidator}
 import com.daml.network.scan.dso.DsoAnsResolver
-import com.daml.network.store.PageLimit
+import com.daml.network.store.{PageLimit, SortOrder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.Clock
 

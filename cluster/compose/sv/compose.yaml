@@ -1,0 +1,355 @@
+name: splice-sv
+
+volumes:
+  postgres-splice-sv:
+
+networks:
+  splice-sv-private:
+    driver: bridge
+  splice-sv-public:
+    driver: bridge
+
+services:
+  postgres-splice-sv:
+    image: "postgres:${SPLICE_POSTGRES_VERSION}"
+    environment:
+      - POSTGRES_USER=${SPLICE_SV_DB_USER}
+      - POSTGRES_PASSWORD=${SPLICE_SV_DB_PASSWORD}
+      - POSTGRES_DB=postgres # not used by splice
+      # Any env vars starting with CREATE_DATABASE_ will be used to create a database
+      - CREATE_DATABASE_cantonnet=cantonnet
+      - CREATE_DATABASE_participant=participant
+      - CREATE_DATABASE_sequencer=sequencer
+      - CREATE_DATABASE_mediator=mediator
+      - CREATE_DATABASE_validator=validator
+      - CREATE_DATABASE_scan=scan
+      - CREATE_DATABASE_sv=sv
+    volumes:
+      - postgres-splice-sv:/var/lib/postgresql/data
+      - ./postgres-entrypoint.sh:/postgres-entrypoint.sh
+    entrypoint: /postgres-entrypoint.sh
+    user: "postgres"
+    command:
+      - postgres
+      - -c
+      - max_connections=8000
+    healthcheck:
+      test: "pg_isready -U ${SPLICE_SV_DB_USER} -d postgres"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    networks:
+      - splice-sv-private
+
+  sequencer-mediator:
+    image: "${IMAGE_REPO}canton-domain:${IMAGE_TAG}"
+    environment:
+      - CANTON_DOMAIN_POSTGRES_SERVER=${SPLICE_SV_DB_SERVER}
+      - CANTON_DOMAIN_POSTGRES_PORT=${SPLICE_SV_DB_PORT}
+      - CANTON_DOMAIN_POSTGRES_USER=${SPLICE_SV_DB_USER}
+      - CANTON_DOMAIN_POSTGRES_PASSWORD=${SPLICE_SV_DB_PASSWORD}
+      - CANTON_SEQUENCER_POSTGRES_DB=sequencer
+      - CANTON_DOMAIN_INITIALIZE=false
+    depends_on:
+      postgres-splice-sv:
+        condition: service_healthy
+    restart: always
+    networks:
+      - splice-sv-public
+      - splice-sv-private
+
+  participant:
+    image: "${IMAGE_REPO}canton-participant:${IMAGE_TAG}"
+    environment:
+      - CANTON_PARTICIPANT_POSTGRES_SERVER=${SPLICE_SV_DB_SERVER}
+      - CANTON_PARTICIPANT_POSTGRES_SCHEMA=participant
+      - CANTON_PARTICIPANT_POSTGRES_USER=${SPLICE_SV_DB_USER}
+      - CANTON_PARTICIPANT_POSTGRES_PASSWORD=${SPLICE_SV_DB_PASSWORD}
+      - CANTON_PARTICIPANT_POSTGRES_DB=participant
+      - CANTON_PARTICIPANT_POSTGRES_PORT=${SPLICE_SV_DB_PORT}
+      - CANTON_PARTICIPANT_ADMIN_USER_NAME=administrator
+      - AUTH_TARGET_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
+      - ADDITIONAL_CONFIG_DISABLE_AUTH=canton.participants.participant.ledger-api.auth-services=[]
+      - ADDITIONAL_CONFIG_ALLOW_INSECURE=canton.participants.participant.http-ledger-api-experimental.allow-insecure-tokens=true
+    depends_on:
+      postgres-splice-sv:
+        condition: service_healthy
+    restart: always
+    networks:
+      - splice-sv-private
+
+  validator:
+    image: "${IMAGE_REPO}validator-app:${IMAGE_TAG}"
+    environment:
+      - CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
+      - CN_APP_VALIDATOR_AUTH_AUDIENCE=${SV_AUTH_AUDIENCE}
+      - CN_APP_VALIDATOR_PARTICIPANT_ADDRESS=participant
+      - CN_APP_VALIDATOR_SCAN_ADDRESS=scan
+      - |
+        ADDITIONAL_CONFIG_NO_ONBOARDING=
+            canton.validator-apps.validator_backend.onboarding = null
+      - CN_APP_VALIDATOR_PARTICIPANT_IDENTIFIER=sv
+      - CN_APP_CONTACT_POINT=
+      - CN_APP_VALIDATOR_SV_VALIDATOR=true
+      - |
+        ADDITIONAL_CONFIG_PERSISTENCE=
+            canton.validator-apps.validator_backend.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = validator
+                  currentSchema = validator
+                  serverName = ${SPLICE_SV_DB_SERVER}
+                  portNumber = ${SPLICE_SV_DB_PORT}
+                  user = ${SPLICE_SV_DB_USER}
+                  password = ${SPLICE_SV_DB_PASSWORD}
+                }
+              }
+            }
+      - |
+        ADDITIONAL_CONFIG_APP_INSTANCES=
+          canton.validator-apps.validator_backend.app-instances={}
+      - |
+        ADDITIONAL_CONFIG_TRUST_SINGLE_SCAN=
+            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
+            canton.validator-apps.validator_backend.scan-client.url = "http://scan:5012"
+      - |
+        ADDITIONAL_CONFIG_TRUST_SINGLE_SEQUENCER=
+            canton.validator-apps.validator_backend.domains.global.url = "http://sequencer-mediator:5008"
+      - |
+        ADDITIONAL_CONFIG_MIGRATION_ID=
+            canton.validator-apps.validator_backend {
+              domain-migration-id = 0
+            }
+      - CN_APP_VALIDATOR_WALLET_USER_NAME=administrator
+      - CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME=administrator
+      - CN_APP_SV_LEDGER_API_AUTH_USER_NAME=administrator
+      - |
+        ADDITIONAL_CONFIG_DISABLE_AUTH=
+          canton.validator-apps.validator_backend {
+            auth=""
+          }
+          canton.validator-apps.validator_backend {
+            auth={
+              algorithm = "hs-256-unsafe"
+              audience = "${SV_AUTH_AUDIENCE}"
+              secret = "unsafe"
+            }
+          }
+          canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config=""
+          canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config {
+            type="none"
+          }
+    depends_on:
+      postgres-splice-sv:
+        condition: service_healthy
+    restart: always
+    networks:
+      - splice-sv-private
+
+  scan:
+    image: "${IMAGE_REPO}scan-app:${IMAGE_TAG}"
+    environment:
+      - CN_APP_SCAN_LEDGER_API_AUTH_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
+      - |
+        ADDITIONAL_CONFIG_PERSISTENCE=
+            canton.scan-apps.scan-app.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = scan
+                  currentSchema = scan
+                  serverName = ${SPLICE_SV_DB_SERVER}
+                  portNumber = ${SPLICE_SV_DB_PORT}
+                  user = ${SPLICE_SV_DB_USER}
+                  password = ${SPLICE_SV_DB_PASSWORD}
+                }
+              }
+            }
+      - |
+        ADDITIONAL_CONFIG_IS_SV1=
+            canton.scan-apps.scan-app {
+              is-first-sv = true
+            }
+      - ADDITIONAL_CONFIG_MIGRATION_ID=canton.scan-apps.scan-app.domain-migration-id = 0
+      - CN_APP_SCAN_PARTICIPANT_ADDRESS=participant
+      - CN_APP_SCAN_SEQUENCER_ADDRESS=sequencer-mediator
+      - FAIL_ON_APP_VERSION_MISMATCH=true
+      - CN_APP_UI_NETWORK_NAME=${CN_APP_UI_NETWORK_NAME}
+      - CN_APP_UI_NETWORK_FAVICON_URL=${CN_APP_UI_NETWORK_FAVICON_URL}
+      - CN_APP_UI_AMULET_NAME=${CN_APP_UI_AMULET_NAME}
+      - CN_APP_UI_AMULET_NAME_ACRONYM=${CN_APP_UI_AMULET_NAME_ACRONYM}
+      - CN_APP_UI_NAME_SERVICE_NAME=${CN_APP_UI_NAME_SERVICE_NAME}
+      - CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=${CN_APP_UI_NAME_SERVICE_NAME_ACRONYM}
+      - CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME=administrator
+      - |
+        ADDITIONAL_CONFIG_DISABLE_AUTH=
+          canton.scan-apps.scan-app.participant-client.ledger-api.auth-config = ""
+          canton.scan-apps.scan-app.participant-client {
+            ledger-api.auth-config.type = "none"
+          }
+    depends_on:
+      postgres-splice-sv:
+        condition: service_healthy
+    restart: always
+    networks:
+      - splice-sv-public
+      - splice-sv-private
+
+  sv-app:
+    image: "${IMAGE_REPO}sv-app:${IMAGE_TAG}"
+    environment:
+      - CN_APP_SV_LEDGER_API_AUTH_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
+      - CN_APP_SV_AUTH_AUDIENCE=${SV_AUTH_AUDIENCE}
+      - |
+        ADDITIONAL_CONFIG_PERSISTENCE=
+            canton.sv-apps.sv.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = sv
+                  currentSchema = sv
+                  serverName = ${SPLICE_SV_DB_SERVER}
+                  portNumber = ${SPLICE_SV_DB_PORT}
+                  user = ${SPLICE_SV_DB_USER}
+                  password = ${SPLICE_SV_DB_PASSWORD}
+                }
+              }
+            }
+      - CN_APP_SV_PARTICIPANT_ADDRESS=participant
+      - CN_APP_SV_IS_DEV_NET=${SPLICE_SV_IS_DEVNET}
+      - CN_APP_SV_ONBOARDING_TYPE=found-dso
+      - CN_APP_SV_ONBOARDING_NAME=sv
+      - CN_APP_SV_SV1_REWARD_WEIGHT=10000
+      - ADDITIONAL_CONFIG_MIGRATION_ID=canton.sv-apps.sv.domain-migration-id = 0
+      - |
+        ADDITIONAL_CONFIG_SV_DOMAIN=
+                canton.sv-apps.sv.local-synchronizer-node {
+                  sequencer {
+                    admin-api {
+                      address = sequencer-mediator
+                      port = 5009
+                    }
+                    internal-api {
+                      address = sequencer-mediator
+                      port = 5008
+                    }
+                    external-public-api-url = "http://sequencer-mediator:5008"
+                  }
+                  mediator {
+                    admin-api {
+                      address = sequencer-mediator
+                      port = 5007
+                    }
+                  }
+                }
+      - CN_APP_SV_GLOBAL_DOMAIN_URL=http://sequencer-mediator:5008
+      - CN_APP_SV_COMETBFT_ENABLED=false
+      - CN_APP_UI_NETWORK_NAME=${CN_APP_UI_NETWORK_NAME}
+      - CN_APP_UI_NETWORK_FAVICON_URL=${CN_APP_UI_NETWORK_FAVICON_URL}
+      - CN_APP_UI_AMULET_NAME=${CN_APP_UI_AMULET_NAME}
+      - CN_APP_UI_AMULET_NAME_ACRONYM=${CN_APP_UI_AMULET_NAME_ACRONYM}
+      - CN_APP_UI_NAME_SERVICE_NAME=${CN_APP_UI_NAME_SERVICE_NAME}
+      - CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=${CN_APP_UI_NAME_SERVICE_NAME_ACRONYM}
+      - |
+        ADDITIONAL_CONFIG_SCAN_PUBLIC_URL=
+            canton.sv-apps.sv.scan.public-url="http://scan:5012"
+            canton.sv-apps.sv.scan.internal-url="http://scan:5012"
+      - CN_APP_CONTACT_POINT=
+      - CN_APP_SV_PARTICIPANT_IDENTIFIER=sv
+      - CN_APP_SV_SEQUENCER_IDENTIFIER=sv
+      - CN_APP_SV_MEDIATOR_IDENTIFIER=sv
+      - CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME=administrator
+      - CN_APP_SV_LEDGER_API_AUTH_USER_NAME=administrator
+      - |
+        ADDITIONAL_CONFIG_DISABLE_AUTH=
+          canton.sv-apps.sv {
+            auth=""
+          }
+          canton.sv-apps.sv {
+            auth={
+              algorithm = "hs-256-unsafe"
+              audience = "${SV_AUTH_AUDIENCE}"
+              secret = "unsafe"
+            }
+          }
+          canton.sv-apps.sv.participant-client.ledger-api.auth-config = ""
+          canton.sv-apps.sv.participant-client {
+            ledger-api.auth-config.type = "none"
+          }
+    depends_on:
+      postgres-splice-sv:
+        condition: service_healthy
+    restart: always
+    networks:
+      - splice-sv-public
+      - splice-sv-private
+
+  wallet-web-ui:
+    image: "${IMAGE_REPO}wallet-web-ui:${IMAGE_TAG}"
+    environment:
+      - CN_APP_UI_AUTH_AUDIENCE=${SV_AUTH_AUDIENCE}
+      - SPLICE_APP_UI_UNSAFE=true
+      - SPLICE_APP_UI_UNSAFE_SECRET=unsafe
+      - SPLICE_APP_UI_HTTP_URL=true
+      - CN_APP_UI_NETWORK_NAME=${CN_APP_UI_NETWORK_NAME}
+      - CN_APP_UI_NETWORK_FAVICON_URL=${CN_APP_UI_NETWORK_FAVICON_URL}
+      - CN_APP_UI_AMULET_NAME=${CN_APP_UI_AMULET_NAME}
+      - CN_APP_UI_AMULET_NAME_ACRONYM=${CN_APP_UI_AMULET_NAME_ACRONYM}
+      - CN_APP_UI_NAME_SERVICE_NAME=${CN_APP_UI_NAME_SERVICE_NAME}
+      - CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=${CN_APP_UI_NAME_SERVICE_NAME_ACRONYM}
+    networks:
+      - splice-sv-private
+
+  sv-web-ui:
+    image: "${IMAGE_REPO}sv-web-ui:${IMAGE_TAG}"
+    environment:
+      - CN_APP_UI_AUTH_AUDIENCE=${SV_AUTH_AUDIENCE}
+      - SPLICE_APP_UI_UNSAFE=true
+      - SPLICE_APP_UI_UNSAFE_SECRET=unsafe
+      - SPLICE_APP_UI_HTTP_URL=true
+      - CN_APP_UI_NETWORK_NAME=${CN_APP_UI_NETWORK_NAME}
+      - CN_APP_UI_NETWORK_FAVICON_URL=${CN_APP_UI_NETWORK_FAVICON_URL}
+      - CN_APP_UI_AMULET_NAME=${CN_APP_UI_AMULET_NAME}
+      - CN_APP_UI_AMULET_NAME_ACRONYM=${CN_APP_UI_AMULET_NAME_ACRONYM}
+      - CN_APP_UI_NAME_SERVICE_NAME=${CN_APP_UI_NAME_SERVICE_NAME}
+      - CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=${CN_APP_UI_NAME_SERVICE_NAME_ACRONYM}
+    networks:
+      - splice-sv-private
+
+  scan-web-ui:
+    image: "${IMAGE_REPO}scan-web-ui:${IMAGE_TAG}"
+    environment:
+      - SPLICE_APP_UI_HTTP_URL=true
+      - CN_APP_UI_NETWORK_NAME=${CN_APP_UI_NETWORK_NAME}
+      - CN_APP_UI_NETWORK_FAVICON_URL=${CN_APP_UI_NETWORK_FAVICON_URL}
+      - CN_APP_UI_AMULET_NAME=${CN_APP_UI_AMULET_NAME}
+      - CN_APP_UI_AMULET_NAME_ACRONYM=${CN_APP_UI_AMULET_NAME_ACRONYM}
+      - CN_APP_UI_NAME_SERVICE_NAME=${CN_APP_UI_NAME_SERVICE_NAME}
+      - CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=${CN_APP_UI_NAME_SERVICE_NAME_ACRONYM}
+    networks:
+      - splice-sv-private
+
+  nginx:
+    image: "nginx:${NGINX_VERSION}"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 8080:80
+    depends_on:
+      - validator
+      - scan
+      - sv-app
+    restart: always
+    networks:
+      - splice-sv-private
+    healthcheck:
+      test: ["CMD", "service", "nginx", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
