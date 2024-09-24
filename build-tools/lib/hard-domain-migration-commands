@@ -121,7 +121,7 @@ EOF
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
     subcmd_pulumi canton-network up "$@"
     subcmd_pulumi_up_canton
-    # We need to redeploy infra to update the `/version` endpoint
+    # make sure infra has the latest version
     subcmd_pulumi infra up "$@"
   fi
 
