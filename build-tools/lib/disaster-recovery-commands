@@ -185,7 +185,7 @@ EOF
   active:
     id: 1
     provider: internal
-    migrateFrom: 0
+    migratingFrom: 0
 EOF
   )
   _update_cluster_config "$migration_config" "synchronizerMigration"
