@@ -170,27 +170,25 @@ function subcmd_disaster_recovery_test() {
   # Throttle SV1's CometBFT block processing during the migration (see #13868)
   export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
   migration_config=$(cat <<EOF
-synchronizerMigration:
   upgrade:
     id: 1
     provider: internal
 EOF
   )
-  _update_cluster_config "$migration_config"
+  _update_cluster_config "$migration_config" "synchronizerMigration"
 
   _cluster_apply
 
   _info "Switching to new domain"
 
   migration_config=$(cat <<EOF
-synchronizerMigration:
   active:
     id: 1
     provider: internal
     migrateFrom: 0
 EOF
   )
-  _update_cluster_config "$migration_config"
+  _update_cluster_config "$migration_config" "synchronizerMigration"
   _cluster_apply
 
   _info "Checking amulet on restored svs/validators"

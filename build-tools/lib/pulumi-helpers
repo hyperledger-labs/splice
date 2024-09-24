@@ -181,16 +181,14 @@ function _pulumi_automation_run_down() {
 # Update the cluster config file
 function _update_cluster_config() {
   local yaml_content="$1"
+  local field="$2"
   local file
   if [ -z "${TARGET_CLUSTER-}" ]; then
     file="config.yaml"
   else
     file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/config.yaml"
   fi
-
-  if [ ! -f "$file" ]; then
-    echo "$yaml_content" > "$file"
-  else
-    yq eval ". = $yaml_content" -i "$file"
-  fi
+  tmp_file=$(mktemp)
+  echo "$yaml_content" > "$tmp_file"
+  yq eval-all --inplace ".${field} = load(\"${tmp_file}\")" "$file"
 }

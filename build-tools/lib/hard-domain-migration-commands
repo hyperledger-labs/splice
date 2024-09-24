@@ -39,14 +39,13 @@ function subcmd_hard_domain_migration_prepare() {
 
   local migration_config
   migration_config=$(cat <<EOF
-synchronizerMigration:
   upgrade:
     id: 1
     provider: external
     version: $upgrade_version
 EOF
   )
-  _update_cluster_config "$migration_config"
+  _update_cluster_config "$migration_config" "synchronizerMigration"
 
 
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
@@ -102,7 +101,6 @@ function subcmd_hard_domain_migration_migrate() {
 
   local migration_config
   migration_config=$(cat <<EOF
-synchronizerMigration:
   legacy:
     id: 0
     provider: internal
@@ -113,7 +111,7 @@ synchronizerMigration:
     migrateFrom: 0
 EOF
   )
-  _update_cluster_config "$migration_config"
+  _update_cluster_config "$migration_config" "synchronizerMigration"
 
   # Throttle SV1's CometBFT block processing during the migration (see #13868)
   export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
@@ -146,12 +144,11 @@ function subcmd_hard_domain_migration_update_active_config() {
   local active_migration_canton_stack="$2"
   local migration_config
   migration_config=$(cat <<EOF
-synchronizerMigration:
   active:
     id: $active_migration_id
     provider: $active_migration_canton_stack
     migrateFrom: 0
 EOF
   )
-  _update_cluster_config "$migration_config"
+  _update_cluster_config "$migration_config" "synchronizerMigration"
 }
