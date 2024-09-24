@@ -306,8 +306,9 @@ The `pulumi/deployment` project controls the deployment of production clusters (
 #### Deployment stack configuration
 
 The pulumi operator uses a custom docker image to allow us to use a specific pulumi version and to configure the default pulumi arguments (like parallelism).
-The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the `SPLICE_DEPLOYMENT_FLUX_REF` git reference and applies that git deployment code
+The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the the migration specific git reference configured under the key `releaseReference` and applies that git deployment code
 to the cluster.
+Each migration can follow a different release that is upgraded independent of the other migrations. The key `synchronizerMigration.active.releaseReference` controls the release used for all our main deployments and the infra stack.
 The deployment uses `dotenv` to read the cluster specific env configuration files.
 The version used for the deployment is set using `CHARTS_VERSION`.
 The use of artifactory/google release artifacts can be controlled through `SPLICE_ARTIFACTS_REPOSITORY`.
@@ -328,7 +329,7 @@ through the following steps:
    For CILR this PR should be made against `main`.
    For production clusters (DevNet, TestNet, MainNet) this PR should be made against the respective deployment branch.
    Note that for production clusters, the current process is to rebase the deployment branch to the release branch of the target version via force pushing (i.e., not a PR).
-3. If the `SPLICE_DEPLOYMENT_FLUX_REF` of the corresponding cluster (configured in the respective `.envrc.vars`) is a Git tag,
+3. If the active migration configured in the `cluster.yaml` under the key `synchronizerMigration.active.releaseReference` of the corresponding cluster is a Git tag,
    e.g., `cilr` for CILR, then tag the merged commit with that tag.
 
 #### The operator

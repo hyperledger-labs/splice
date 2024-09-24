@@ -2,7 +2,6 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { CLUSTER_BASENAME, config } from 'splice-pulumi-common';
 
-import { gitRepo } from '../flux';
 import { namespace } from '../namespace';
 import { operator } from '../operator';
 
@@ -61,7 +60,9 @@ Object.keys(env).forEach(key => {
 /*https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/docs/stacks.md*/
 export function createStackCR(
   name: string,
+  projectName: string,
   supportsResetOnSameCommit: boolean,
+  ref: k8s.apiextensions.CustomResource,
   extraEnvs: { [key: string]: string } = {}
 ): pulumi.CustomResource {
   return new k8s.apiextensions.CustomResource(
@@ -102,11 +103,11 @@ export function createStackCR(
           },
           fluxSource: {
             sourceRef: {
-              apiVersion: gitRepo.apiVersion,
-              kind: gitRepo.kind,
-              name: gitRepo.metadata.name,
+              apiVersion: ref.apiVersion,
+              kind: ref.kind,
+              name: ref.metadata.name,
             },
-            dir: `cluster/pulumi/${name}`,
+            dir: `cluster/pulumi/${projectName}`,
           },
           // Do not resync the stack when the commit hash matches the last one
           continueResyncOnCommitMatch: false,

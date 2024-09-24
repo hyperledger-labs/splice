@@ -109,7 +109,7 @@
           "sourceRef": {
             "apiVersion": "source.toolkit.fluxcd.io/v1",
             "kind": "GitRepository",
-            "name": "splice-node"
+            "name": "splice-node-active"
           }
         },
         "refresh": false,
@@ -384,7 +384,7 @@
           "sourceRef": {
             "apiVersion": "source.toolkit.fluxcd.io/v1",
             "kind": "GitRepository",
-            "name": "splice-node"
+            "name": "splice-node-active"
           }
         },
         "refresh": false,
@@ -588,7 +588,7 @@
       "apiVersion": "source.toolkit.fluxcd.io/v1",
       "kind": "GitRepository",
       "metadata": {
-        "name": "splice-node",
+        "name": "splice-node-active",
         "namespace": "operator"
       },
       "spec": {
@@ -717,7 +717,7 @@
           "sourceRef": {
             "apiVersion": "source.toolkit.fluxcd.io/v1",
             "kind": "GitRepository",
-            "name": "splice-node"
+            "name": "splice-node-active"
           }
         },
         "refresh": false,
@@ -841,7 +841,7 @@
           "sourceRef": {
             "apiVersion": "source.toolkit.fluxcd.io/v1",
             "kind": "GitRepository",
-            "name": "splice-node"
+            "name": "splice-node-active"
           }
         },
         "refresh": false,

@@ -2,4 +2,5 @@ synchronizerMigration:
   active:
     id: 3
     provider: internal
+    releaseReference: "refs/tags/cilr"
   activeDatabaseId: 3

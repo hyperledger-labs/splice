@@ -26,6 +26,7 @@ export const MigrationInfoSchema = z.object({
       return parsedVersion(version, process.env.SPLICE_ARTIFACTS_REPOSITORY);
     }),
   provider: z.nativeEnum(MigrationProvider),
+  releaseReference: z.string().optional(),
 });
 
 export const SynchronizerMigrationSchema = z.object({
