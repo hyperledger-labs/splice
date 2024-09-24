@@ -40,14 +40,14 @@ export interface Postgres extends pulumi.Resource {
   readonly namespace: ExactNamespace;
 
   readonly address: pulumi.Output<string>;
-  readonly secretName: string;
+  readonly secretName: pulumi.Output<string>;
 }
 
 export class CloudPostgres extends pulumi.ComponentResource implements Postgres {
   instanceName: string;
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
-  secretName: string;
+  secretName: pulumi.Output<string>;
 
   private readonly pgSvc: gcp.sql.DatabaseInstance;
 
@@ -67,7 +67,6 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
     this.instanceName = instanceName;
     this.namespace = xns;
-    this.secretName = secretName;
 
     this.pgSvc = new gcp.sql.DatabaseInstance(
       instanceLogicalName,
@@ -126,7 +125,8 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       protect: protectCloudSql,
       aliases: [{ name: `${instanceLogicalNameAlias}-passwd` }],
     }).result;
-    const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
+    const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
+    this.secretName = passwordSecret.metadata.name;
 
     new gcp.sql.User(
       `user-${instanceLogicalName}`,
@@ -156,7 +156,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
   pg: Release;
-  secretName: string;
+  secretName: pulumi.Output<string>;
 
   constructor(
     xns: ExactNamespace,
@@ -175,7 +175,6 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
 
     this.instanceName = instanceName;
     this.namespace = xns;
-    this.secretName = secretName;
     this.address = pulumi.output(
       `${this.instanceName}.${this.namespace.logicalName}.svc.cluster.local`
     );
@@ -187,7 +186,8 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
         { name: `${logicalName}-passwd`, parent: undefined },
       ],
     }).result;
-    const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
+    const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
+    this.secretName = passwordSecret.metadata.name;
 
     // an initial database named cantonnet is created automatically (configured in the Helm chart).
     const smallDiskSize = clusterSmallDisk ? '240Gi' : undefined;
