@@ -885,7 +885,6 @@
           "chainId": "dev-3",
           "chainIdSuffix": "1"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -1070,7 +1069,6 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
         "mediator": {
           "persistence": {
@@ -1219,7 +1217,6 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "INFO",
         "metrics": {
           "enable": true,

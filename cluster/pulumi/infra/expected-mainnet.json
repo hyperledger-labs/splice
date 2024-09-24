@@ -456,7 +456,6 @@
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
             "effect": "NoSchedule",

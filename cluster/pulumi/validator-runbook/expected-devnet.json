@@ -426,7 +426,6 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
           "migration": {
@@ -523,7 +522,6 @@
         "db": {
           "volumeSize": "50Gi"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-secrets"
         },

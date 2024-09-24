@@ -113,8 +113,11 @@ function cnChartValues(
     {},
     chartDefaultValues,
     {
-      // No need to use artifactory as an image repo for our core nodes
-      imageRepo: repositories.google.dockerImages,
+      // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
+      imageRepo:
+        version.type === 'local' || artifactsRepository === 'google'
+          ? repositories.google.dockerImages
+          : undefined,
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         name: CLUSTER_NAME,
@@ -151,7 +154,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
       repositoryOpts: repositoryOpts(version),
       values: {
         ...values,
-        // Here we do want to use artifactory images, so we know this works for our partners
+        // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
         imageRepo:
           version.type === 'local' || artifactsRepository === 'google'
             ? repositories.google.dockerImages

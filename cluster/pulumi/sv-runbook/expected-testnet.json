@@ -684,7 +684,6 @@
         "db": {
           "volumeSize": "48Gi"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "apps-pg-secret"
         },
@@ -903,7 +902,6 @@
           "chainId": "test-1",
           "chainIdSuffix": "1"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -1048,7 +1046,6 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
@@ -1155,7 +1152,6 @@
         "db": {
           "volumeSize": "48Gi"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "mediator-pg-secret"
         },
@@ -1218,7 +1214,6 @@
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
@@ -1315,7 +1310,6 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "db": {},
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "participant-pg-secret"
         },
@@ -1392,7 +1386,6 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "db": {},
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "sequencer-pg-secret"
         },

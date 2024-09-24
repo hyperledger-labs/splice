@@ -271,7 +271,6 @@
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -544,7 +543,6 @@
           "chainId": "main-0",
           "chainIdSuffix": "2"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -693,7 +691,6 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
@@ -777,7 +774,6 @@
           "svNamespace": "sv-1"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -838,7 +834,6 @@
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -958,7 +953,6 @@
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
@@ -1096,7 +1090,6 @@
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isFirstSv": true,
         "metrics": {
           "enable": true
@@ -1315,7 +1308,6 @@
           },
           "prefix": "main/sv-1"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 200000,
           "baseRateBurstWindowMins": 20,
@@ -1421,7 +1413,6 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true
         },
