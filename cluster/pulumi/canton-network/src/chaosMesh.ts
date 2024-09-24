@@ -1,6 +1,10 @@
 import * as k8s from '@pulumi/kubernetes';
 import { Resource } from '@pulumi/pulumi';
-import { GCP_PROJECT, infraAffinityAndTolerations } from 'splice-pulumi-common';
+import {
+  DecentralizedSynchronizerUpgradeConfig,
+  GCP_PROJECT,
+  infraAffinityAndTolerations,
+} from 'splice-pulumi-common';
 
 export type ChaosMeshArguments = {
   dependsOn: Resource[];
@@ -185,10 +189,10 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
     }
   );
   [
-    'global-domain-0-cometbft',
-    'global-domain-0-mediator',
-    'global-domain-0-sequencer',
-    'participant-0',
+    `global-domain-${DecentralizedSynchronizerUpgradeConfig.active.id}-cometbft`,
+    `global-domain-${DecentralizedSynchronizerUpgradeConfig.active.id}-mediator`,
+    `global-domain-${DecentralizedSynchronizerUpgradeConfig.active.id}-sequencer`,
+    `participant-${DecentralizedSynchronizerUpgradeConfig.active.id}`,
     'scan-app',
     'sv-app',
     'validator-app',
