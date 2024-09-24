@@ -354,13 +354,6 @@ function subcmd_start_network {
   if [ -z "$secret" ]; then
     _error "Failed to fetch secret"
   fi
-  # And also wait for the readiness endpoint on Scan
-  for i in {1..30}; do
-    curl -sf "scan.localhost:8080/api/scan/readyz" && break
-    echo -n "."
-    sleep 10
-  done
-  curl -sf "scan.localhost:8080/api/scan/readyz" || _error "Scan is not ready after 5 minutes" || exit 1
 
   _info "Starting validator"
   _do_start_validator -l -o "$secret" -p "local-composeValidator-1"
