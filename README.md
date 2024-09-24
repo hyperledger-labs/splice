@@ -808,6 +808,11 @@ To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala
 
 ## Testing
 
+### Opting-in to CI
+
+At the moment, CI is by default being cancelled on commits, unless explicitly opted in. To enable CI for your commit,
+please include the text `[ci]` in your commit message.
+
 ### Managing Canton for Tests
 
 To speed up our tests run against a long-running Canton instance.

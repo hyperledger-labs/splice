@@ -36,6 +36,13 @@ workflow:
           # and cannot be skipped
           branch_ignores: "^(main|deployment/.*|release-line.*)$"
           max_pipeline_age_secs: 7776000  # 90 days which is the max that the CCI API allows for pipeline cancellation
+      - cancel_if_not_opt_in:
+          <<: *notify-fail
+          filters:
+            branches:
+              ignore:
+                - /release-line-.*/
+                - main
       # Linting and formatting
       - static_tests:
           <<: *notify-fail

@@ -3229,6 +3229,24 @@ jobs:
               "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
               << parameters.max_pipeline_age_secs >> cancel_pipeline
 
+  cancel_if_not_opt_in:
+    docker:
+      - image: cimg/base:2024.01
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - run:
+          name: Cancel the entire workflow if the current commit does not opt in for CI
+          command: |
+            last_commit_msg=$(git log -1 --pretty=%B)
+            if [[ "${last_commit_msg}" != *"[ci]"* ]]; then
+              echo "Cancelling the entire workflow because the current commit does not opt in for CI."
+              curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
+            else
+              echo "Current commit opts in, letting it run."
+            fi
+
   cancel_if_current_commit_is_base_version:
     docker:
       - image: cimg/base:2024.01
@@ -4386,6 +4404,13 @@ workflows:
           # and cannot be skipped
           branch_ignores: "^(main|deployment/.*|release-line.*)$"
           max_pipeline_age_secs: 7776000  # 90 days which is the max that the CCI API allows for pipeline cancellation
+      - cancel_if_not_opt_in:
+          <<: *notify-fail
+          filters:
+            branches:
+              ignore:
+                - /release-line-.*/
+                - main
       # Linting and formatting
       - static_tests:
           <<: *notify-fail
