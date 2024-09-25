@@ -21,7 +21,7 @@ export type GitFluxRef = k8s.apiextensions.CustomResource;
 // https://github.com/fluxcd/source-controller/blob/main/docs/spec/v1/gitrepositories.md
 export function gitRepoForRef(nameSuffix: string, ref: string): GitFluxRef {
   return new k8s.apiextensions.CustomResource(
-    'splice-node',
+    `splice-node-${nameSuffix}`,
     {
       apiVersion: 'source.toolkit.fluxcd.io/v1',
       kind: 'GitRepository',

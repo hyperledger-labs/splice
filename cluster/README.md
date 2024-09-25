@@ -310,7 +310,7 @@ The operator is configured using a [flux source](https://fluxcd.io/flux/componen
 to the cluster.
 Each migration can follow a different release that is upgraded independent of the other migrations. The key `synchronizerMigration.active.releaseReference` controls the release used for all our main deployments and the infra stack.
 The deployment uses `dotenv` to read the cluster specific env configuration files.
-The version used for the deployment is set using `CHARTS_VERSION`.
+The version used for the deployment is set using `synchronizerMigration.active.version` in `config.yaml` or defaults to `CHARTS_VERSION`.
 The use of artifactory/google release artifacts can be controlled through `SPLICE_ARTIFACTS_REPOSITORY`.
 
 The infra stack and the canton network stack are included by default.
@@ -1462,8 +1462,11 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. **Prepare:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that sets the following config for your target cluster:
    * set in `config.yaml` under the path `synchronizerMigration.upgrade.version` the version we're migrating to (current one in case of disaster recovery)
    * set in `config.yaml` under the path `synchronizerMigration.upgrade.id` the migration ID we're migrating to
+   * set in `config.yaml` under the path `synchronizerMigration.upgrade.provider` the type of canton deployment used. `internal` for all the canton components in the `canton-network` or `sv-runbook` stack, `external` to create canton specific stacks for each sv for the migration
+   * if using `external` as the provider, set in `config.yaml` under the path `synchronizerMigration.upgrade.releaseReference` the git tag or branch that will be used for the deployment code
    * environment variable `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
    * environment variable `export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"` to throttle SV1's Cometbft temporarily during the migration
+   * if using `external` as the provider, deploy the operator from the deployment branch to create the new stacks CRs
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
@@ -1500,9 +1503,9 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following config for your target cluster:
    * in `config.yaml` change `synchronizerMigration.active` to `synchronizerMigration.legacy`
    * in `config.yaml` change `synchronizerMigration.upgrade` to `synchronizerMigration.active`
-   * in `config.yaml` set `synchronizerMigration.active.migrateFrom` to the migration ID we're migrating away from
-   * Set the following environment variables for your target cluster:
-     * `export CHARTS_VERSION=` the version we're migrating to (current one in case of disaster recovery)
+   * in `config.yaml` set `synchronizerMigration.active.migratingFrom` to the migration ID we're migrating away from
+   * deploy the operator from the deployment branch where you updated the configuration
+   * sync the migration config found in `config.yaml` on all the branches referenced in any migrations `releaseReference` (this just ensure that some metrics are labeled as expected for still running migrations, and that it removes all the deployments for archived migrations)
 1. Wait for the operator to apply your changes from the migrate step.
    The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
    (Check the logs of failing pods to be sure that there is no other problem.)

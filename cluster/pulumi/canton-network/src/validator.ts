@@ -3,6 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { Secret } from '@pulumi/kubernetes/core/v1';
 import { Output } from '@pulumi/pulumi';
 import {
+  activeVersion,
   Auth0Client,
   BackupConfig,
   BootstrappingDumpConfig,
@@ -11,7 +12,6 @@ import {
   config,
   daContactPoint,
   DEFAULT_AUDIENCE,
-  defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
   fetchAndInstallParticipantBootstrapDump,
@@ -25,6 +25,7 @@ import {
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
+import { SweepConfig } from 'splice-pulumi-common-sv/src/config';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
@@ -92,34 +93,6 @@ export function autoAcceptTransfersConfigFromEnv(
 ): AutoAcceptTransfersConfig | undefined {
   const asJson = config.optionalEnv(`${nodeName}_AUTO_ACCEPT_TRANSFERS`);
   return asJson && JSON.parse(asJson);
-}
-
-export type SweepConfig = {
-  fromParty: string;
-  toParty: string;
-  maxBalance: number;
-  minBalance: number;
-};
-
-export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
-  const asJson = config.optionalEnv(`${nodeName}_SWEEP`);
-  return asJson && JSON.parse(asJson);
-  // const fromParty = config.optionalEnv(`${nodeName}_SWEEP_FROM`);
-  // const toParty = config.optionalEnv(`${nodeName}_SWEEP_TO`);
-  // const maxBalance = config.optionalEnv(`${nodeName}_SWEEP_MAX_BALANCE`);
-  // const minBalance = config.optionalEnv(`${nodeName}_SWEEP_MIN_BALANCE`);
-  // if (fromParty && toParty && maxBalance && minBalance) {
-  //   return {
-  //     fromParty,
-  //     toParty,
-  //     maxBalance: parseInt(maxBalance),
-  //     minBalance: parseInt(minBalance),
-  //   };
-  // }
-  // if (fromParty || toParty || maxBalance || minBalance) {
-  //   throw new Error(`All sweep config values must be set for ${nodeName}`);
-  // }
-  // return undefined;
 }
 
 type SvValidatorConfig = BasicValidatorConfig & {
@@ -192,7 +165,7 @@ export async function installValidatorApp(
     },
   };
 
-  const chartVersion = defaultVersion;
+  const chartVersion = activeVersion;
 
   return installSpliceHelmChart(
     config.xns,

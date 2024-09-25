@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { CnChartVersion } from './artifacts';
-import { config } from './config';
+import { spliceConfig } from './config/config';
 import { Config } from './config/configSchema';
 import { MigrationInfoSchema, MigrationProvider } from './config/migrationSchema';
 
@@ -111,4 +111,6 @@ export function installMigrationIdSpecificComponent<T>(
 }
 
 export const DecentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
-  new DecentralizedSynchronizerMigrationConfig(config.configuration);
+  new DecentralizedSynchronizerMigrationConfig(spliceConfig.configuration);
+
+export const activeVersion = DecentralizedSynchronizerUpgradeConfig.active.version;

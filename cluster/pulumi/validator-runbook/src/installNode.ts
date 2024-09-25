@@ -15,7 +15,7 @@ import {
   daContactPoint,
   DecentralizedSynchronizerUpgradeConfig,
   DEFAULT_AUDIENCE,
-  defaultVersion,
+  activeVersion,
   exactNamespace,
   ExactNamespace,
   fixedTokens,
@@ -64,9 +64,9 @@ const VALIDATOR_WALLET_USER_ID =
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
-    defaultVersion.type === 'local'
+    activeVersion.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${defaultVersion.version}`
+      : `Using charts from the artifactory by default, version ${activeVersion.version}`
   );
   console.error(`CLUSTER_HOSTNAME: ${CLUSTER_HOSTNAME}`);
   console.error(`Installing validator node in namespace: ${RUNBOOK_NAMESPACE}`);
@@ -84,10 +84,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const onboardingSecret = preApproveValidatorRunbook ? 'validatorsecret' : undefined;
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, defaultVersion);
+  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
-  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const validator = await installValidator({
     xns,
@@ -105,7 +105,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const ingressImagePullDeps =
-    defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
+    activeVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installSpliceRunbookHelmChartByNamespaceName(
     xns.ns.metadata.name,
     xns.logicalName,
@@ -118,7 +118,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       },
       withSvIngress: false,
     },
-    defaultVersion,
+    activeVersion,
     { dependsOn: ingressImagePullDeps.concat([validator]) }
   );
 }
@@ -174,7 +174,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     auth0Client.getCfg(),
     validatorConfig.nodeIdentifier,
     auth0UserNameEnvVarSource('validator'),
-    defaultVersion,
+    activeVersion,
     postgres,
     undefined,
     {
@@ -307,7 +307,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     'validator',
     'cn-validator',
     validatorValuesWithMaybeTopups,
-    defaultVersion,
+    activeVersion,
     { dependsOn: dependsOn }
   );
 }

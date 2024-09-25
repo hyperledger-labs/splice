@@ -2,7 +2,115 @@ import * as glob from 'glob';
 import { config as dotenvConfig } from 'dotenv';
 import { expand } from 'dotenv-expand';
 
-export function requiredValue(value: string | undefined, name: string, msg: string): string {
+import Dict = NodeJS.Dict;
+
+export class SpliceConfigContext {
+  readonly deploymentFolderPath = `${process.env.REPO_ROOT}/cluster/deployment`;
+
+  extractGcpClusterFolderName(): string {
+    const gcpclusterbasename = requiredValue(
+      process.env.GCP_CLUSTER_BASENAME,
+      'GCP_CLUSTER_BASENAME',
+      'Cluster must be specified'
+    );
+    if (gcpclusterbasename?.includes('scratch')) {
+      // fix difference between deployment folder name and cluster name
+      return gcpclusterbasename.replace('scratch', 'scratchnet');
+    } else {
+      const netSuffixedClusters = ['test', 'dev', 'main'];
+      if (
+        netSuffixedClusters.some(cluster => {
+          return cluster == gcpclusterbasename;
+        })
+      ) {
+        return gcpclusterbasename + 'net';
+      }
+      return gcpclusterbasename;
+    }
+  }
+
+  clusterPath(): string {
+    return `${this.deploymentFolderPath}/${this.extractGcpClusterFolderName()}`;
+  }
+}
+
+export class SpliceEnvConfig {
+  env: Dict<string>;
+  public readonly context: SpliceConfigContext;
+
+  constructor() {
+    this.context = new SpliceConfigContext();
+    /*eslint no-process-env: "off"*/
+    if (
+      this.extracted(
+        false,
+        process.env.CN_PULUMI_LOAD_ENV_CONFIG_FILE,
+        'CN_PULUMI_LOAD_ENV_CONFIG_FILE'
+      )
+    ) {
+      const envrcs = [`${process.env.REPO_ROOT}/.envrc.vars`].concat(
+        glob.sync(`${process.env.REPO_ROOT}/.envrc.vars.*`)
+      );
+      const result = expand(dotenvConfig({ path: envrcs }));
+      if (result.error) {
+        throw new Error(`Failed to load base config ${result.error}`);
+      }
+      const overrideResult = expand(
+        dotenvConfig({
+          path: `${this.context.clusterPath()}/.envrc.vars`,
+          override: true,
+        })
+      );
+      if (overrideResult.error) {
+        throw new Error(`Failed to load cluster config ${overrideResult.error}`);
+      }
+    }
+    // eslint-disable-next-line no-process-env
+    this.env = process.env;
+  }
+
+  requireEnv(name: string, msg = ''): string {
+    const value = this.env[name];
+    return requiredValue(value, name, msg);
+  }
+
+  optionalEnv(name: string): string | undefined {
+    const value = this.env[name];
+    console.error(`Read option env ${name} with value ${value}`);
+    return value;
+  }
+
+  envFlag(flagName: string, defaultFlag = false): boolean {
+    const varVal = this.env[flagName];
+    const flag = this.extracted(defaultFlag, varVal, flagName);
+
+    console.error(`Environment Flag ${flagName} = ${flag} (${varVal})`);
+
+    return flag;
+  }
+
+  extracted(defaultFlag: boolean, varVal: string | undefined, flagName: string): boolean {
+    let flag = defaultFlag;
+
+    if (varVal) {
+      const val = varVal.toLowerCase();
+
+      if (val === 't' || val === 'true' || val === 'y' || val === 'yes' || val === '1') {
+        flag = true;
+      } else if (val === 'f' || val === 'false' || val === 'n' || val === 'no' || val === '0') {
+        flag = false;
+      } else {
+        console.error(
+          `FATAL: Flag environment variable ${flagName} has unexpected value: ${varVal}.`
+        );
+        process.exit(1);
+      }
+    }
+    return flag;
+  }
+}
+
+function requiredValue(value: string | undefined, name: string, msg: string): string {
   if (!value) {
     console.error(
       `FATAL: Environment variable ${name} is undefined. Shutting down.` +
@@ -14,80 +122,4 @@ export function requiredValue(value: string | undefined, name: string, msg: stri
   }
 }
 
-export function extracted(
-  defaultFlag: boolean,
-  varVal: string | undefined,
-  flagName: string
-): boolean {
-  let flag = defaultFlag;
-
-  if (varVal) {
-    const val = varVal.toLowerCase();
-
-    if (val === 't' || val === 'true' || val === 'y' || val === 'yes' || val === '1') {
-      flag = true;
-    } else if (val === 'f' || val === 'false' || val === 'n' || val === 'no' || val === '0') {
-      flag = false;
-    } else {
-      console.error(
-        `FATAL: Flag environment variable ${flagName} has unexpected value: ${varVal}.`
-      );
-      process.exit(1);
-    }
-  }
-  return flag;
-}
-
-export const deploymentFolderPath = `${process.env.REPO_ROOT}/cluster/deployment`;
-
-export function initEnvConfig(): void {
-  /*eslint no-process-env: "off"*/
-  if (
-    extracted(false, process.env.CN_PULUMI_LOAD_ENV_CONFIG_FILE, 'CN_PULUMI_LOAD_ENV_CONFIG_FILE')
-  ) {
-    const envrcs = [`${process.env.REPO_ROOT}/.envrc.vars`].concat(
-      glob.sync(`${process.env.REPO_ROOT}/.envrc.vars.*`)
-    );
-    const result = expand(dotenvConfig({ path: envrcs }));
-    if (result.error) {
-      throw new Error(`Failed to load base config ${result.error}`);
-    }
-    const overrideResult = expand(
-      dotenvConfig({
-        path: `${clusterPath()}/.envrc.vars`,
-        override: true,
-      })
-    );
-    if (overrideResult.error) {
-      throw new Error(`Failed to load cluster config ${overrideResult.error}`);
-    }
-  }
-}
-
-export function extractGcpClusterFolderName(): string {
-  const gcpclusterbasename = requiredValue(
-    process.env.GCP_CLUSTER_BASENAME,
-    'GCP_CLUSTER_BASENAME',
-    'Cluster must be specified'
-  );
-  if (gcpclusterbasename?.includes('scratch')) {
-    // fix difference between deployment folder name and cluster name
-    return gcpclusterbasename.replace('scratch', 'scratchnet');
-  } else {
-    const netSuffixedClusters = ['test', 'dev', 'main'];
-    if (
-      netSuffixedClusters.some(cluster => {
-        return cluster == gcpclusterbasename;
-      })
-    ) {
-      return gcpclusterbasename + 'net';
-    }
-    return gcpclusterbasename;
-  }
-}
-
-export function clusterPath(): string {
-  return `${deploymentFolderPath}/${extractGcpClusterFolderName()}`;
-}
-
-initEnvConfig();
+export const spliceEnvConfig = new SpliceEnvConfig();

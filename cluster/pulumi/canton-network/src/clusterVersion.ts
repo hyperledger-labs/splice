@@ -1,11 +1,11 @@
 import * as k8s from '@pulumi/kubernetes';
 import exec from 'node:child_process';
-import { config, defaultVersion, exactNamespace } from 'splice-pulumi-common';
+import { activeVersion, CLUSTER_HOSTNAME, config, exactNamespace } from 'splice-pulumi-common';
 
 export function installClusterVersion(): k8s.apiextensions.CustomResource {
   const ns = exactNamespace('cluster-version', true);
-  const host = config.requireEnv('GCP_CLUSTER_HOSTNAME');
-  const remoteVersion = defaultVersion.type == 'remote' ? defaultVersion.version : undefined;
+  const host = CLUSTER_HOSTNAME;
+  const remoteVersion = activeVersion.type == 'remote' ? activeVersion.version : undefined;
   const version =
     remoteVersion ||
     // cannot be used with the operator

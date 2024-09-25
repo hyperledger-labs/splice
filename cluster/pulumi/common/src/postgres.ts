@@ -4,8 +4,8 @@ import * as random from '@pulumi/random';
 import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 
-import { defaultVersion } from './artifacts';
 import { config } from './config';
+import { activeVersion } from './domainMigration';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME } from './utils';
@@ -205,7 +205,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
           secretName: this.secretName,
         },
       }),
-      defaultVersion,
+      activeVersion,
       {
         aliases: [
           { name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' },
