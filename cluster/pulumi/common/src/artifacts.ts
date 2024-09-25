@@ -24,7 +24,10 @@ export type CnChartVersion =
       version: string;
     };
 
-export function parsedVersion(version?: string, repositoryValue?: string): CnChartVersion {
+export function parsedVersion(
+  version: string | undefined,
+  repositoryValue?: string
+): CnChartVersion {
   return version && version.length > 0 && version !== 'local'
     ? {
         type: 'remote',
@@ -47,6 +50,4 @@ function repository(repositoryValue?: string) {
 }
 
 /*eslint no-process-env: "off"*/
-export const CHARTS_VERSION = process.env.CHARTS_VERSION;
-
-export const defaultVersion: CnChartVersion = parsedVersion(CHARTS_VERSION);
+export const CHARTS_VERSION: string | undefined = process.env.CHARTS_VERSION;

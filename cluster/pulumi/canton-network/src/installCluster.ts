@@ -10,12 +10,12 @@ import {
   svValidatorTopupConfig,
   nonSvValidatorTopupConfig,
   svOnboardingPollingInterval,
-  defaultVersion,
   ExpectedValidatorOnboarding,
   preApproveValidatorRunbook,
   ApprovedSvIdentity,
   nonDevNetNonSvValidatorTopupConfig,
   DecentralizedSynchronizerUpgradeConfig,
+  activeVersion,
 } from 'splice-pulumi-common';
 import { getDsoSize } from 'splice-pulumi-common-sv';
 
@@ -102,9 +102,9 @@ export async function installCluster(
   auth0Client: Auth0Client
 ): Promise<{ dso: Dso; validator1?: Resource }> {
   console.error(
-    defaultVersion.type === 'local'
+    activeVersion.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${defaultVersion.version}`
+      : `Using charts from the artifactory by default, version ${activeVersion.version}`
   );
 
   const bootstrapBucketSpec = await bootstrapDataBucketSpec(

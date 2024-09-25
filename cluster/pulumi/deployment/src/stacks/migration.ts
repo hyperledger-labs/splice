@@ -22,7 +22,7 @@ function createStackForMigration(
   reference: GitFluxRef
 ) {
   createStackCR(
-    `${sv}-migration-${migrationId}`,
+    `sv-canton.${sv}-migration-${migrationId}`,
     'sv-canton',
     sv === svRunbookConfig.nodeName,
     reference,

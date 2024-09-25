@@ -61,6 +61,7 @@ parameters:
         backup-status-devnet,
         backup-status-testnet,
         backup-status-mainnet,
+        preview-operator,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -3659,7 +3660,7 @@ jobs:
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
-            cncluster pulumi deployment up --skip-preview
+            cncluster pulumi deployment up --skip-preview --diff
 
   preflight_check:
     parameters:
@@ -6440,6 +6441,18 @@ workflows:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
+  preview_operator:
+    when:
+      equal: [ preview-operator, << pipeline.parameters.run-job >> ]
+    jobs:
+      - preview_pulumi_changes:
+          name: Preview operator pulumi changes for << pipeline.parameters.cluster >>
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          deployment_only: true
   preview_pulumi_changes:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]

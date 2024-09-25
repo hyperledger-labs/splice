@@ -4,7 +4,6 @@ import { ComponentResource, Resource } from '@pulumi/pulumi';
 import {
   autoInitValues,
   ChartValues,
-  defaultVersion,
   domainLivenessProbeInitialDelaySeconds,
   DomainMigrationIndex,
   ExactNamespace,
@@ -94,7 +93,7 @@ export class InStackDecentralizedSynchronizerNode
     runningMigration: boolean,
     onboardingName: string,
     logLevel: LogLevel,
-    version: CnChartVersion = defaultVersion,
+    version: CnChartVersion,
     opts?: SpliceCustomResourceOptions
   ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${migrationId}`);

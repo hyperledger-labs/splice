@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, config } from 'splice-pulumi-common';
+import { CLUSTER_BASENAME, config, isMainNet } from 'splice-pulumi-common';
 
 import { namespace } from '../namespace';
 import { operator } from '../operator';
@@ -16,12 +16,11 @@ const requiredEnvs = Array.from([
   'ARTIFACTORY_USER',
   'ARTIFACTORY_PASSWORD',
 ]);
-const optionalEnvs = Array.from([
-  'K6_USERS_PASSWORD',
-  'K6_VALIDATOR_ADMIN_PASSWORD',
-  'AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET',
-  'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID',
-]);
+const optionalEnvs = Array.from(['K6_USERS_PASSWORD', 'K6_VALIDATOR_ADMIN_PASSWORD']).concat(
+  isMainNet
+    ? ['AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET', 'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID']
+    : []
+);
 
 const env: {
   [key: string]: string;
@@ -73,7 +72,7 @@ export function createStackCR(
       metadata: { name: name, namespace: namespace.logicalName },
       spec: {
         ...{
-          stack: `organization/${name}/${name}.${CLUSTER_BASENAME}`,
+          stack: `organization/${projectName}/${name}.${CLUSTER_BASENAME}`,
           backend: config.requireEnv('PULUMI_BACKEND_URL'),
           envRefs: {
             ...envRefs,

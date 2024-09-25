@@ -205,6 +205,31 @@
         "repo": "https://fluxcd-community.github.io/helm-charts"
       },
       "values": {
+        "cli": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        },
         "helmController": {
           "create": false
         },
@@ -217,10 +242,60 @@
         "kustomizeController": {
           "create": false
         },
+        "notificationController": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        },
         "prometheus": {
           "podMonitor": {
             "create": true
           }
+        },
+        "sourceController": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
         }
       },
       "version": "2.12.4"
@@ -603,7 +678,7 @@
         "url": "https://github.com/DACH-NY/canton-network-node"
       }
     },
-    "name": "splice-node",
+    "name": "splice-node-active",
     "provider": "",
     "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
   }

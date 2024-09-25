@@ -7,7 +7,7 @@ import {
   ChartValues,
   DecentralizedSynchronizerMigrationConfig,
   DEFAULT_AUDIENCE,
-  defaultVersion,
+  activeVersion,
   DomainMigrationIndex,
   ExactNamespace,
   installSpliceHelmChart,
@@ -27,7 +27,7 @@ export function installParticipant(
   auth0Config: Auth0Config,
   nodeIdentifier: string,
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
-  version: CnChartVersion = defaultVersion,
+  version: CnChartVersion = activeVersion,
   defaultPostgres?: postgres.Postgres,
   logLevel?: LogLevel,
   customOptions?: SpliceCustomResourceOptions

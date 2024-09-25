@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as random from '@pulumi/random';
 import {
-  defaultVersion,
+  activeVersion,
   ExactNamespace,
   installSpliceRunbookHelmChart,
   installPostgresPasswordSecret,
@@ -28,7 +28,7 @@ export function installPostgres(xns: ExactNamespace, name: string): k8s.helm.v3.
         limits: { memory: '20Gi' },
       },
     },
-    defaultVersion,
+    activeVersion,
     { dependsOn: [passwordSecret] }
   );
 }

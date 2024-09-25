@@ -42,20 +42,6 @@
             },
             "type": "Secret"
           },
-          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
-            "secret": {
-              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
-            },
-            "type": "Secret"
-          },
-          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
-            "secret": {
-              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
-            },
-            "type": "Secret"
-          },
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
@@ -178,8 +164,6 @@
           "ARTIFACTORY_USER": "art_user",
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": "mgmt",
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
-          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": "mgmt",
-          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
           "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": "mgmt",
           "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
           "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": "mgmt",
@@ -205,6 +189,31 @@
         "repo": "https://fluxcd-community.github.io/helm-charts"
       },
       "values": {
+        "cli": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        },
         "helmController": {
           "create": false
         },
@@ -217,10 +226,60 @@
         "kustomizeController": {
           "create": false
         },
+        "notificationController": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        },
         "prometheus": {
           "podMonitor": {
             "create": true
           }
+        },
+        "sourceController": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
         }
       },
       "version": "2.12.4"
@@ -313,20 +372,6 @@
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
-              "name": "env"
-            },
-            "type": "Secret"
-          },
-          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": {
-            "secret": {
-              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID",
-              "name": "env"
-            },
-            "type": "Secret"
-          },
-          "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET": {
-            "secret": {
-              "key": "AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET",
               "name": "env"
             },
             "type": "Secret"
@@ -603,7 +648,7 @@
         "url": "https://github.com/DACH-NY/canton-network-node"
       }
     },
-    "name": "splice-node",
+    "name": "splice-node-active",
     "provider": "",
     "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
   }

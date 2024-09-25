@@ -112,3 +112,5 @@ export function installMigrationIdSpecificComponent<T>(
 
 export const DecentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
   new DecentralizedSynchronizerMigrationConfig(config.configuration);
+
+export const activeVersion = DecentralizedSynchronizerUpgradeConfig.active.version;
