@@ -83,8 +83,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: .circleci/post-slack-message.sh "Deployment of SV runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
-            # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
               export COMETBFT_STABLE_CHAIN_ID=true
@@ -93,6 +91,8 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
+            # || true can be removed once base version > 0.2.1
+            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
