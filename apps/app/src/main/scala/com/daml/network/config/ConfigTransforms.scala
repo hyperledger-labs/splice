@@ -277,6 +277,17 @@ object ConfigTransforms {
       )
     )
 
+  def setGrpcDeadlineForTreasuryService(
+      grpcDeadline: Option[NonNegativeFiniteDuration]
+  ): ConfigTransform =
+    ConfigTransforms.updateAllValidatorAppConfigs_(c =>
+      c.copy(treasury =
+        c.treasury.copy(
+          grpcDeadline = grpcDeadline
+        )
+      )
+    )
+
   def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
   ): ConfigTransform =

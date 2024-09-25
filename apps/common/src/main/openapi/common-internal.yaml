@@ -82,11 +82,30 @@ components:
           type: string
 
     NodeKey:
+      oneOf:
+        - $ref: "#/components/schemas/KeyPair"
+        - $ref: "#/components/schemas/KmsKeyId"
+
+    KeyPair:
       type: object
       required:
         - keyPair
       properties:
         keyPair:
+          type: string
+        name:
+          type: string
+
+    KmsKeyId:
+      type: object
+      required:
+        - type
+        - keyId
+      properties:
+        type:
+          type: string
+          enum: [ "signing", "encryption" ]
+        keyId:
           type: string
         name:
           type: string
