@@ -1,0 +1,7 @@
+services:
+  validator:
+    environment:
+      - |
+        ADDITIONAL_CONFIG_TOPUPS=
+          canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.target-throughput = ${TARGET_TRAFFIC_THROUGHPUT}
+          canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.min-topup-interval = ${MIN_TRAFFIC_TOPUP_INTERVAL}

@@ -354,6 +354,13 @@ function subcmd_start_network {
   if [ -z "$secret" ]; then
     _error "Failed to fetch secret"
   fi
+  # And also wait for the readiness endpoint on Scan
+  for i in {1..30}; do
+    curl -sf "scan.localhost:8080/api/scan/readyz" && break
+    echo -n "."
+    sleep 10
+  done
+  curl -sf "scan.localhost:8080/api/scan/readyz" || _error "Scan is not ready after 5 minutes" || exit 1
 
   _info "Starting validator"
   _do_start_validator -l -o "$secret" -p "local-composeValidator-1"
@@ -417,18 +424,28 @@ function subcmd_test_before_migration {
   export VALIDATOR_AUTH_AUDIENCE
   TOKEN=$("${VALIDATOR_DIR}/token.py" $USER)
 
-  _info "Onboarding $USER"
-  curl -sS 'http://wallet.localhost/api/validator/v0/register' \
-    -X 'POST' \
-    -H "Authorization: Bearer $TOKEN" \
-    -H 'Content-Type: application/json' \
-    -o /dev/null
+  onboarded=0
+  # Onboard user, with retries because we need to wait for traffic to be available in order for it to succeed
+  for i in {1..30}; do
+    _info "Onboarding $USER"
+    curl -sS 'http://wallet.localhost/api/validator/v0/register' \
+      -X 'POST' \
+      -H "Authorization: Bearer $TOKEN" \
+      -H 'Content-Type: application/json' \
+      -o /dev/null
 
-  _info "Confirming user status"
-  onboarded=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/user-status' \
-    -H "Authorization: Bearer $TOKEN" | jq '.user_onboarded')
-  if [ "$onboarded" != "true" ]; then
-    _error "User is not onboarded"
+    _info "Confirming user status"
+    onboarded=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/user-status' \
+      -H "Authorization: Bearer $TOKEN" | jq '.user_onboarded')
+    if [ "$onboarded" == "true" ]; then
+      onboarded=1
+      break
+    fi
+    _info "Onboarding failed, sleeping for 10 seconds and retrying"
+    sleep 10
+  done
+  if [ "$onboarded" -eq 0 ]; then
+    _error "Onboarding failed"
   fi
 
   _info "Tap some amulet"
@@ -476,11 +493,21 @@ function subcmd_test_after_migration {
   USER=alice
   TOKEN=$("${VALIDATOR_DIR}/token.py" $USER)
 
-  _info "Confirming user status"
-  onboarded=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/user-status' \
-    -H "Authorization: Bearer $TOKEN" | jq '.user_onboarded')
-  if [ "$onboarded" != "true" ]; then
-    _error "User is not onboarded"
+  onboarded=0
+    # Wait until alice gets re-onboarded, which requires traffic to be available in order for it to succeed
+  for i in {1..30}; do
+    _info "Confirming user status"
+    onboarded=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/user-status' \
+      -H "Authorization: Bearer $TOKEN" | jq '.user_onboarded')
+    if [ "$onboarded" == "true" ]; then
+      onboarded=1
+      break
+    fi
+    _info "Alice not yet re-onboarded, sleeping for 10 seconds and retrying"
+    sleep 10
+  done
+  if [ "$onboarded" -eq 0 ]; then
+    _error "Onboarding failed"
   fi
 
   _info "Check the balance"

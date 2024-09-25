@@ -29,7 +29,7 @@ class DockerComposeFullNetworkFrontendIntegrationTest
 
       clue("Test validator") {
         withFrontEnd("frontend") { implicit webDriver =>
-          eventuallySucceeds()(go to s"http://wallet.localhost")
+          eventuallySucceeds()(go to "http://wallet.localhost")
           actAndCheck()(
             "Login as administrator",
             login(80, "administrator", "wallet.localhost"),
@@ -37,6 +37,10 @@ class DockerComposeFullNetworkFrontendIntegrationTest
             "administrator is already onboarded",
             _ => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
           )
+          // Wait for some traffic to be bought before proceeding, so that we don't
+          // hit a "traffic below reserved amount" error
+          waitForTrafficPurchase()
+          go to "http://wallet.localhost"
           actAndCheck(
             "Login as alice",
             loginOnCurrentPage(80, "alice", "wallet.localhost"),
