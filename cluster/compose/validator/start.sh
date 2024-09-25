@@ -249,7 +249,6 @@ fi
 if [ "${local_compose_sv}" -eq 1 ]; then
   extra_compose_files+=("-f" "${script_dir}/compose-local-compose-sv.yaml")
 fi
-extra_compose_files+=("-f" "${script_dir}/compose-traffic-topups.yaml")
 extra_args=()
 if [ $wait -eq 1 ]; then
   extra_args+=("--wait")

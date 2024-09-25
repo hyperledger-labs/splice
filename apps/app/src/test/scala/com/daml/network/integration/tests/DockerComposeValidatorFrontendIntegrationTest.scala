@@ -83,15 +83,7 @@ class DockerComposeValidatorFrontendIntegrationTest
           login(80, "administrator", "wallet.localhost"),
         )(
           "administrator is already onboarded",
-          _ => {
-            seleniumText(find(id("logged-in-user"))) should startWith(partyHint)
-            val txs = findAll(className("tx-row")).toSeq
-            val trafficPurchases = txs.filter { txRow =>
-              txRow.childElement(className("tx-action")).text.contains("Sent") &&
-              txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
-            }
-            trafficPurchases should not be empty
-          },
+          _ => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
         actAndCheck(
           "Login as alice",
@@ -191,24 +183,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       ),
     ) {
       withFrontEnd("frontend") { implicit webDriver =>
-        go to s"http://wallet.localhost"
-        actAndCheck()(
-          "Login as administrator",
-          login(80, "administrator", "wallet.localhost"),
-        )(
-          "administrator is already onboarded",
-          _ => {
-            seleniumText(find(id("logged-in-user"))) should startWith(partyHint)
-            // Wait for some traffic to be bought before proceeding, so that we don't
-            // hit a "traffic below reserved amount" error
-            val txs = findAll(className("tx-row")).toSeq
-            val trafficPurchases = txs.filter { txRow =>
-              txRow.childElement(className("tx-action")).text.contains("Sent") &&
-              txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
-            }
-            trafficPurchases should not be empty
-          },
-        )
+        eventuallySucceeds()(go to s"http://wallet.localhost")
         clue("Alice can onboard again") {
           actAndCheck(
             "Login as alice",
@@ -219,15 +194,14 @@ class DockerComposeValidatorFrontendIntegrationTest
               find(id("onboard-button")).value.text should not be empty
             },
           )
-
-          actAndCheck(
-            "onboard alice",
-            click on "onboard-button",
-          )(
-            "Alice is logged in and maintained her balance",
-            _ => aliceLoggedInAndHasBalance(),
-          )
         }
+        actAndCheck(
+          "onboard alice",
+          click on "onboard-button",
+        )(
+          "Alice is logged in and maintained her balance",
+          _ => aliceLoggedInAndHasBalance(),
+        )
         clue("Logout Alice") {
           click on find(id("logout-button")).value
         }

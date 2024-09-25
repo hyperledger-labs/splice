@@ -3,6 +3,8 @@
 
 package com.daml.network.wallet.config
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+
 /** Config for the treasury service for executing amulet-balance-manipulating operations
   *
   * The service executes them in a sequential, batched fashion to avoid contention.
@@ -20,4 +22,13 @@ package com.daml.network.wallet.config
 case class TreasuryConfig(
     batchSize: Int = 10,
     queueSize: Int = 20,
+
+    /** maximum amount of time to wait for grpc calls to complete for wallet operation
+      *
+      * This is used to set the deadline for grpc calls to the participant.
+      * If the call takes longer than this, it will be cancelled and retried.
+      * This is only intended for testing purposes.
+      * TODO(#11501) block and unblock submissions on domain reconnect
+      */
+    grpcDeadline: Option[NonNegativeFiniteDuration] = None,
 )
