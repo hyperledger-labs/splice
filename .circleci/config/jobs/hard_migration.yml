@@ -304,7 +304,7 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Persist the migration dump to a CCI workspace
           cluster: << parameters.cluster >>
-          cmd: build-tools/splice-compose.sh dump_volume compose_domain-upgrade-dump workspace/domain-upgrade-dump.tar
+          cmd: build-tools/splice-compose.sh dump_volume splice-validator_domain-upgrade-dump workspace/domain-upgrade-dump.tar
       - persist_to_workspace:
           root: workspace
           paths:
@@ -367,7 +367,7 @@ jobs:
           at: workspace
       - run_bash_command_in_nix:
           cmd_name: Restore the migration dump into a docker volume
-          cmd: build-tools/splice-compose.sh restore_volume compose_domain-upgrade-dump workspace/domain-upgrade-dump.tar
+          cmd: build-tools/splice-compose.sh restore_volume splice-validator_domain-upgrade-dump workspace/domain-upgrade-dump.tar
       - docker_login_internal
       - run_bash_command_in_nix:
           cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
