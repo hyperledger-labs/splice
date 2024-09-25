@@ -69,7 +69,6 @@ function _cluster_reset() {
     bg_down_stack multi-validator
     bg_down_stack sv-runbook
     bg_down_stack validator-runbook
-    bg_down_stack deployment
 
     # Wait for all background jobs and capture their exit statuses
     for pid in "${pids[@]}"; do

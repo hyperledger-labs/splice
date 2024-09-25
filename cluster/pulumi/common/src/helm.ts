@@ -5,9 +5,8 @@ import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
-import { CnChartVersion, repositories } from './artifacts';
+import { CnChartVersion, defaultVersion, repositories } from './artifacts';
 import { config } from './config';
-import { activeVersion } from './domainMigration';
 import {
   artifactsRepository,
   ChartValues,
@@ -51,7 +50,7 @@ function installSpliceHelmChartByNamespaceName(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  version: CnChartVersion = activeVersion,
+  version: CnChartVersion = defaultVersion,
   opts?: SpliceCustomResourceOptions,
   includeNamespaceInName = true,
   affinityAndTolerations = appsAffinityAndTolerations,
@@ -80,7 +79,7 @@ export function installSpliceHelmChart(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  version: CnChartVersion = activeVersion,
+  version: CnChartVersion = defaultVersion,
   opts?: SpliceCustomResourceOptions,
   includeNamespaceInName = true,
   affinityAndTolerations = appsAffinityAndTolerations,
@@ -141,7 +140,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
   name: string,
   chartName: string,
   values: ChartValues,
-  version: CnChartVersion = activeVersion,
+  version: CnChartVersion = defaultVersion,
   opts?: SpliceCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {
@@ -175,7 +174,7 @@ export function installSpliceRunbookHelmChart(
   name: string,
   chartName: string,
   values: ChartValues,
-  version: CnChartVersion = activeVersion,
+  version: CnChartVersion = defaultVersion,
   opts?: SpliceCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {

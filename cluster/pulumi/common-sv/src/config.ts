@@ -1,4 +1,5 @@
 import { SvOnboarding } from 'canton-network-pulumi-deployment/src/sv';
+import { SweepConfig } from 'canton-network-pulumi-deployment/src/validator';
 import {
   ApprovedSvIdentity,
   Auth0Client,
@@ -13,13 +14,6 @@ import {
   StaticCometBftConfig,
   StaticCometBftConfigWithNodeName,
 } from './synchronizer/cometbftConfig';
-
-export type SweepConfig = {
-  fromParty: string;
-  toParty: string;
-  maxBalance: number;
-  minBalance: number;
-};
 
 export interface StaticSvConfig {
   nodeName: string;

@@ -4,7 +4,7 @@ import {
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_HOSTNAME,
-  activeVersion,
+  defaultVersion,
   ExactNamespace,
   exactNamespace,
   DecentralizedSynchronizerMigrationConfig,
@@ -51,10 +51,10 @@ export async function installValidator1(
         hostname: CLUSTER_HOSTNAME,
       },
     },
-    activeVersion,
+    defaultVersion,
     { dependsOn: [xns.ns] }
   );
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
     ? postgres.installPostgres(xns, 'postgres', 'postgres', false)
@@ -135,7 +135,7 @@ export async function installValidator1(
         },
         clusterUrl: CLUSTER_HOSTNAME,
       },
-      activeVersion,
+      defaultVersion,
       {
         dependsOn: imagePullDeps.concat([
           await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),

@@ -33,7 +33,7 @@ import {
   ValidatorTopupConfig,
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
-  activeVersion,
+  defaultVersion,
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   approvedSvIdentities,
   daContactPoint,
@@ -78,9 +78,9 @@ export async function installNode(
   resolveValidator1PartyId?: () => Promise<string>
 ): Promise<void> {
   console.error(
-    activeVersion.type === 'local'
+    defaultVersion.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${activeVersion.version}`
+      : `Using charts from the artifactory by default, version ${defaultVersion.version}`
   );
   console.error(`CLUSTER_BASENAME: ${CLUSTER_BASENAME}`);
   console.error(`Installing SV node in namespace: ${svNamespaceStr}`);
@@ -100,10 +100,10 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
+  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, defaultVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const svKey = svKeyFromSecret('sv');
 
@@ -129,7 +129,7 @@ export async function installNode(
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const ingressImagePullDeps =
-    activeVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
+    defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installSpliceRunbookHelmChartByNamespaceName(
     xns.logicalName,
     xns.logicalName,
@@ -148,7 +148,7 @@ export async function installNode(
         },
       },
     },
-    activeVersion,
+    defaultVersion,
     { dependsOn: ingressImagePullDeps.concat([sv, validator]) }
   );
 }
@@ -240,9 +240,9 @@ async function installSvAndValidator(
   );
 
   const supportsBeneficiariesWeight =
-    activeVersion.type == 'local' ||
-    (activeVersion.type == 'remote' && activeVersion.version.startsWith('0.1.13')) ||
-    semver.gt(activeVersion.version, '0.1.13');
+    defaultVersion.type == 'local' ||
+    (defaultVersion.type == 'remote' && defaultVersion.version.startsWith('0.1.13')) ||
+    semver.gt(defaultVersion.version, '0.1.13');
 
   const extraBeneficiaries = resolveValidator1PartyId
     ? [
@@ -318,7 +318,7 @@ async function installSvAndValidator(
     'sv-app',
     'cn-sv-node',
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
-    activeVersion,
+    defaultVersion,
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
@@ -355,7 +355,7 @@ async function installSvAndValidator(
     `scan`,
     'cn-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
-    activeVersion,
+    defaultVersion,
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
@@ -415,7 +415,7 @@ async function installSvAndValidator(
     'validator',
     'cn-validator',
     validatorValuesWithMaybeTopups,
-    activeVersion,
+    defaultVersion,
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)

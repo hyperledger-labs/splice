@@ -1,11 +1,9 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as semver from 'semver';
-import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
 import {
-  activeVersion,
   appsAffinityAndTolerations,
   BackupConfig,
   btoa,
@@ -16,6 +14,7 @@ import {
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
   DEFAULT_AUDIENCE,
+  defaultVersion,
   ExactNamespace,
   exactNamespace,
   fetchAndInstallParticipantBootstrapDump,
@@ -42,9 +41,10 @@ import {
 } from 'splice-pulumi-common-sv';
 import { SvConfig } from 'splice-pulumi-common-sv/src/config';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
-import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
+import * as postgres from '../../common/src/postgres';
+import { Postgres } from '../../common/src/postgres';
 import { installCanton } from './canton';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
@@ -132,10 +132,10 @@ export async function installSvNode(
         hostname: CLUSTER_HOSTNAME,
       },
     },
-    activeVersion,
+    defaultVersion,
     { dependsOn: [xns.ns] }
   );
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
     await installAuth0Secret(
@@ -282,7 +282,7 @@ export async function installSvNode(
         svIngressName: config.ingressName,
       },
     },
-    activeVersion,
+    defaultVersion,
     { dependsOn: [xns.ns] }
   );
 
@@ -444,7 +444,7 @@ function installSvApp(
     `sv-app`,
     'cn-sv-node',
     svValues,
-    activeVersion,
+    defaultVersion,
     {
       dependsOn: dependsOn
         .concat([postgres])
@@ -488,7 +488,7 @@ function installScan(
     // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
     clusterUrl: CLUSTER_HOSTNAME,
   };
-  const scan = installSpliceHelmChart(xns, `scan`, 'cn-scan', scanValues, activeVersion, {
+  const scan = installSpliceHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
     dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
   });
   return scan;
@@ -496,6 +496,6 @@ function installScan(
 
 // TODO (#13845) remove when ciperiodic version >= 0.1.18
 const supportsRenamedFounder =
-  activeVersion.type == 'local' ||
-  activeVersion.version.startsWith('0.1.18') ||
-  semver.gt(activeVersion.version, '0.1.18');
+  defaultVersion.type == 'local' ||
+  defaultVersion.version.startsWith('0.1.18') ||
+  semver.gt(defaultVersion.version, '0.1.18');

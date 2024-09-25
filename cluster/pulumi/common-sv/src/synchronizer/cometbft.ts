@@ -2,18 +2,18 @@ import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
 import {
-  activeVersion,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
   clusterSmallDisk,
+  SpliceCustomResourceOptions,
   config,
+  defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
   installSpliceHelmChart,
   isDevNet,
   loadYamlFromFile,
   REPO_ROOT,
-  SpliceCustomResourceOptions,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
@@ -42,7 +42,7 @@ export function installCometBftNode(
   isActiveDomain: boolean,
   isRunningMigration: boolean,
   logLevel: string,
-  version: CnChartVersion = activeVersion,
+  version: CnChartVersion = defaultVersion,
   syncSource?: Resource,
   opts?: SpliceCustomResourceOptions
 ): Cometbft {

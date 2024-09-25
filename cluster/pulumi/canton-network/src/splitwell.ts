@@ -5,6 +5,7 @@ import {
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_HOSTNAME,
+  defaultVersion,
   exactNamespace,
   ExactNamespace,
   DecentralizedSynchronizerMigrationConfig,
@@ -15,7 +16,6 @@ import {
   splitwellDarPath,
   imagePullSecret,
   CnInput,
-  activeVersion,
 } from 'splice-pulumi-common';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
@@ -49,11 +49,11 @@ export async function installSplitwell(
         hostname: CLUSTER_HOSTNAME,
       },
     },
-    activeVersion,
+    defaultVersion,
     { dependsOn: [xns.ns] }
   );
 
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   installIngress(xns, imagePullDeps);
 
@@ -95,7 +95,7 @@ export async function installSplitwell(
       },
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
-    activeVersion,
+    defaultVersion,
     { dependsOn: imagePullDeps.concat(dependsOn) }
   );
 

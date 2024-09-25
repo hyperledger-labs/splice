@@ -3,7 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
-  activeVersion,
+  defaultVersion,
   ExactNamespace,
   infraAffinityAndTolerations,
   installSpliceHelmChart,
@@ -382,7 +382,7 @@ function configureGateway(
         basename: clusterBasename,
       },
     },
-    activeVersion,
+    defaultVersion,
     {
       dependsOn: [gwSvc, publicGwSvc],
     },

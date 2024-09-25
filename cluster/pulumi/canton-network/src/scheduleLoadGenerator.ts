@@ -1,8 +1,8 @@
 import { Resource } from '@pulumi/pulumi';
 import {
-  activeVersion,
   Auth0Client,
   CLUSTER_HOSTNAME,
+  defaultVersion,
   config,
   exactNamespace,
   generatePortSequence,
@@ -28,7 +28,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           hostname: CLUSTER_HOSTNAME,
         },
       },
-      activeVersion,
+      defaultVersion,
       { dependsOn: [xns.ns] }
     );
 
@@ -90,7 +90,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           },
         }),
       },
-      activeVersion,
+      defaultVersion,
       { dependsOn: dependencies.concat([loopback]) }
     );
   } else {
