@@ -147,7 +147,6 @@ function subcmd_hard_domain_migration_update_active_config() {
   active:
     id: $active_migration_id
     provider: $active_migration_canton_stack
-    migratingFrom: 0
 EOF
   )
   _update_cluster_config "$migration_config" "synchronizerMigration"
