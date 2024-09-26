@@ -3167,9 +3167,14 @@ jobs:
       - run:
           name: "Wait for previous pipeline"
           command: |
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> << parameters.wait_type >>
+            .circleci/wait_for_or_cancel_pipelines.sh \
+              --current_pipeline_number << pipeline.number >> \
+              --workflow_names "<< parameters.workflow_names >>" \
+              --branch_filter "<< parameters.branch_filter >>" \
+              --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
+              --branch_ignores "<< parameters.branch_ignores >>" \
+              --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              << parameters.wait_type >>
 
   cancel_if_previous_pipeline:
     docker:
@@ -3206,9 +3211,14 @@ jobs:
             else
               action="cancel_self_if_found"
             fi
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> $action
+            .circleci/wait_for_or_cancel_pipelines.sh \
+              --current_pipeline_number << pipeline.number >> \
+              --workflow_names "<< parameters.workflow_names >>" \
+              --branch_filter "<< parameters.branch_filter >>" \
+              --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
+              --branch_ignores "<< parameters.branch_ignores >>" \
+              --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              $action
 
   cancel_previous_pipelines:
     docker:
@@ -3236,9 +3246,14 @@ jobs:
       - run:
           name: "Cancel previous pipelines"
           command: |
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> cancel_pipeline
+            .circleci/wait_for_or_cancel_pipelines.sh \
+              --current_pipeline_number << pipeline.number >> \
+              --workflow_names "<< parameters.workflow_names >>" \
+              --branch_filter "<< parameters.branch_filter >>" \
+              --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
+              --branch_ignores "<< parameters.branch_ignores >>" \
+              --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              cancel_pipeline
 
   cancel_if_not_opt_in:
     docker:

@@ -1,0 +1,5 @@
+# We list pip requirements here, and not rely on nix, so that we can run python scripts in cci
+# without having to wait for the whole nix download.
+
+marshmallow-dataclass
+requests
