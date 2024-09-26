@@ -247,6 +247,19 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     amountO.map(Tap(date, _))
   }
 
+  protected def waitForTrafficPurchase()(implicit driver: WebDriverType) = {
+    clue("Waitig for a traffic purchase") {
+      eventually(1.minute) {
+        val txs = findAll(className("tx-row")).toSeq
+        val trafficPurchases = txs.filter { txRow =>
+          txRow.childElement(className("tx-action")).text.contains("Sent") &&
+          txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
+        }
+        trafficPurchases should not be empty
+      }
+    }
+  }
+
   private def readDateFromRow(transactionRow: Element): String =
     transactionRow
       .childElement(className("tx-row-cell-date"))

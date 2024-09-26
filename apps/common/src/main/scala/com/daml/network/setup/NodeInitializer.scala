@@ -225,7 +225,14 @@ class NodeInitializer(
       s"Uploading node keys ${dump.keys.map(_.name)} from dump for id ${dump.id}, new node id: $expectedId"
     )
     // this is idempotent
-    dump.keys.traverse_(key => connection.importKeyPair(key.keyPair.toArray, key.name))
+    dump.keys.traverse_ {
+      case NodeIdentitiesDump.NodeKey.KeyPair(keyPair, name) =>
+        connection.importKeyPair(keyPair.toArray, name)
+      case NodeIdentitiesDump.NodeKey.KmsKeyId(_, _, _) =>
+        // it is not possible for now unless someone manually creates dump with key ids
+        // TODO(#14916): We should support key ids when we consume the change (DACH-NY/canton#21429) from Canton
+        throw new UnsupportedOperationException("KMS keys are not supported")
+    }
   }
 
   private def importAuthorizedStoreSnapshot(

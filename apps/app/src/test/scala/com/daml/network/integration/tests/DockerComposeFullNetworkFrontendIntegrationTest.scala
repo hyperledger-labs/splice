@@ -35,18 +35,11 @@ class DockerComposeFullNetworkFrontendIntegrationTest
             login(80, "administrator", "wallet.localhost"),
           )(
             "administrator is already onboarded",
-            _ => {
-              seleniumText(find(id("logged-in-user"))) should startWith(partyHint)
-              // Wait for some traffic to be bought before proceeding, so that we don't
-              // hit a "traffic below reserved amount" error
-              val txs = findAll(className("tx-row")).toSeq
-              val trafficPurchases = txs.filter { txRow =>
-                txRow.childElement(className("tx-action")).text.contains("Sent") &&
-                txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
-              }
-              trafficPurchases should not be empty
-            },
+            _ => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
           )
+          // Wait for some traffic to be bought before proceeding, so that we don't
+          // hit a "traffic below reserved amount" error
+          waitForTrafficPurchase()
           go to "http://wallet.localhost"
           actAndCheck(
             "Login as alice",

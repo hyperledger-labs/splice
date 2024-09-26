@@ -52,6 +52,7 @@ import com.daml.network.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
 }
+import com.daml.network.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import com.digitalasset.canton.{BaseTest, DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
@@ -208,10 +209,8 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     )
     // TODO(#14419) Remove this once the retries cover all required errors
     setTriggersWithin(triggersToPauseAtStart =
-      Seq(
-        aliceValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
-        bobValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
-        splitwellValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
+      Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend).map(
+        _.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger]
       )
     ) {
       clue("Setup splitwell") {
@@ -281,17 +280,24 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       },
     )("amulet config vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
-    clue(s"sv2-4 accept amulet config vote request") {
-      Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
-        eventuallySucceeds() {
-          sv.castVote(
-            voteRequest.contractId,
-            true,
-            "url",
-            "description",
-          )
-        }
+    // TODO(#8300) No need to pause once we can't get a timeout on a concurrent sequencer connection change anymore
+    setTriggersWithin(triggersToPauseAtStart =
+      Seq(sv2Backend, sv3Backend, sv4Backend).map(
+        _.dsoAutomation.trigger[LocalSequencerConnectionsTrigger]
       )
+    ) {
+      clue(s"sv2-4 accept amulet config vote request") {
+        Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+          eventuallySucceeds() {
+            sv.castVote(
+              voteRequest.contractId,
+              true,
+              "url",
+              "description",
+            )
+          }
+        )
+      }
     }
 
     eventually() {
