@@ -691,7 +691,7 @@ commands:
             run_sbt() {
                export << parameters.extra_env_vars >>
                # Define sbt command
-               SBT_CMD=(sbt -verbose)
+               SBT_CMD=(sbt)
 
                # Add extra parameters
                SBT_CMD+=(<< parameters.extra_parameters >>)
@@ -1015,13 +1015,6 @@ commands:
       test_names_file:
         type: string
     steps:
-      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
-      - execute_sbt_command:
-          cmd: "update"
-          cmd_retry_count: 3
-      - execute_sbt_command:
-          cmd: "Test/compile printTests"
-          fail_on_error_in_output: false
       - run:
           name: Splitting tests
           command: |
@@ -1116,7 +1109,11 @@ commands:
       - run_bash_command_in_nix:
           cmd_name: "Wait for canton to be ready before running tests"
           cmd: |
-            ./wait-for-canton.sh << parameters.start_canton_options >>
+            if [[ "<< parameters.start_canton_options >>" == *"-w"* ]]; then
+              ./wait-for-canton.sh -w
+            elif [[ "<< parameters.start_canton_options >>" == *"-s"* ]]; then
+              ./wait-for-canton.sh -s
+            fi
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: |
@@ -2738,6 +2735,11 @@ jobs:
           cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile lint"
+      - execute_sbt_command:
+          cmd: "Test/compile printTests"
+      - run_bash_command_in_nix:
+          cmd_name: Verify no changes in sbt test files
+          cmd: git diff --exit-code test*.log
       - cleanup_sbt_test_job
 
   # We put our Daml tests in their own job for more parallelization

@@ -24,6 +24,11 @@ jobs:
           cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile lint"
+      - execute_sbt_command:
+          cmd: "Test/compile printTests"
+      - run_bash_command_in_nix:
+          cmd_name: Verify no changes in sbt test files
+          cmd: git diff --exit-code test*.log
       - cleanup_sbt_test_job
 
   # We put our Daml tests in their own job for more parallelization

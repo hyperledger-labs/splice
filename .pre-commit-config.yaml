@@ -16,6 +16,13 @@ repos:
         require_serial: true
         entry: "bash -c 'sbt --client \"scalafmtOnly $@\"' bash"
         types: [scala]
+      - id: sbt_tests
+        name: sbt_tests
+        language: system
+        require_serial: true
+        pass_filenames: false
+        entry: "bash -c 'git diff --staged --diff-filter=AD --name-only --exit-code -- '**/test/**/*.scala' || sbt --client \"printTests\"' bash"
+        always_run: true
       - id: dars_lock
         name: dars_lock
         language: system

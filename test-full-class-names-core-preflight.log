@@ -1,0 +1,2 @@
+com.daml.network.integration.tests.runbook.CometBftPreflightIntegrationTest
+com.daml.network.integration.tests.runbook.DsoPreflightIntegrationTest

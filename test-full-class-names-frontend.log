@@ -1,0 +1,13 @@
+com.daml.network.integration.tests.AnsAuth0FrontendIntegrationTest
+com.daml.network.integration.tests.AnsFrontendIntegrationTest
+com.daml.network.integration.tests.SplitwellFrontendIntegrationTest
+com.daml.network.integration.tests.SplitwellUpgradeFrontendIntegrationTest
+com.daml.network.integration.tests.SvFrontendIntegrationTest
+com.daml.network.integration.tests.SvFrontendNoDevNetIntegrationTest
+com.daml.network.integration.tests.WalletAuth0FrontendIntegrationTest
+com.daml.network.integration.tests.WalletFrontendIntegrationTest
+com.daml.network.integration.tests.WalletNoDevNetFrontendIntegrationTest
+com.daml.network.integration.tests.WalletPaymentFrontendIntegrationTest
+com.daml.network.integration.tests.WalletSubscriptionsFrontendIntegrationTest
+com.daml.network.integration.tests.WalletTransactionHistoryFrontendIntegrationTest
+com.daml.network.integration.tests.WalletTransfersFrontendIntegrationTest
