@@ -400,6 +400,7 @@ class TreasuryService(
           readAsParties,
           cmd,
           priority = batch.priority,
+          deadline = treasuryConfig.grpcDeadline,
         )
         .withDisclosedContracts(disclosedContracts)
         // The only operation that is not self-conflicting is Tap, therefore

@@ -83,16 +83,9 @@ class DockerComposeValidatorFrontendIntegrationTest
           login(80, "administrator", "wallet.localhost"),
         )(
           "administrator is already onboarded",
-          _ => {
-            seleniumText(find(id("logged-in-user"))) should startWith(partyHint)
-            val txs = findAll(className("tx-row")).toSeq
-            val trafficPurchases = txs.filter { txRow =>
-              txRow.childElement(className("tx-action")).text.contains("Sent") &&
-              txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
-            }
-            trafficPurchases should not be empty
-          },
+          _ => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
+        waitForTrafficPurchase()
         actAndCheck(
           "Login as alice",
           loginOnCurrentPage(80, "alice", "wallet.localhost"),
@@ -197,18 +190,11 @@ class DockerComposeValidatorFrontendIntegrationTest
           login(80, "administrator", "wallet.localhost"),
         )(
           "administrator is already onboarded",
-          _ => {
-            seleniumText(find(id("logged-in-user"))) should startWith(partyHint)
-            // Wait for some traffic to be bought before proceeding, so that we don't
-            // hit a "traffic below reserved amount" error
-            val txs = findAll(className("tx-row")).toSeq
-            val trafficPurchases = txs.filter { txRow =>
-              txRow.childElement(className("tx-action")).text.contains("Sent") &&
-              txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
-            }
-            trafficPurchases should not be empty
-          },
+          _ => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
+        // Wait for some traffic to be bought before proceeding, so that we don't
+        // hit a "traffic below reserved amount" error
+        waitForTrafficPurchase()
         clue("Alice can onboard again") {
           actAndCheck(
             "Login as alice",
