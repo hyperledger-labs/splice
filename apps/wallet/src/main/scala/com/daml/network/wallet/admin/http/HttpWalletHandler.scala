@@ -4,8 +4,6 @@
 package com.daml.network.wallet.admin.http
 
 import org.apache.pekko.stream.Materializer
-import com.daml.error.utils.ErrorDetails
-import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
@@ -23,6 +21,8 @@ import com.daml.network.codegen.java.splice.wallet.{
 }
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{CommandPriority, RetryProvider}
+import com.daml.network.environment.SpliceLedgerConnection.CommandId
+import com.daml.network.environment.ledger.api.DedupDuration
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
@@ -31,38 +31,20 @@ import com.daml.network.util.{SpliceUtil, Codec, ContractWithState}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
+import TreasuryService.AmuletOperationDedupConfig
 import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
-import com.digitalasset.canton.error.MediatorError.Timeout
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.UnknownContractDomain
-import com.digitalasset.canton.participant.sync.SyncServiceInjectionError.{
-  NotConnectedToDomain,
-  NotConnectedToAnyDomain,
-}
-import com.digitalasset.canton.participant.sync.TransactionRoutingError.MalformedInputErrors.InvalidDomainId
-import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
-import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.{
-  UnknownContractDomains,
-  UnknownInformees,
-  UnknownSubmitters,
-}
-import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.{
-  InactiveContracts,
-  LockedContracts,
-}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.util.retry.RetryUtil.*
 import io.circe.Json
-import io.grpc.protobuf.StatusProto
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.UUID
 import java.math.RoundingMode as JRM
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success, Try}
 
 class HttpWalletHandler(
     override protected val walletManager: UserWalletManager,
@@ -581,26 +563,41 @@ class HttpWalletHandler(
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.tap") { _ => _ =>
       val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
-      // Note that we're passing a custom retryable here because blindly retrying
-      // on failed taps would be incorrect (tap is not idempotent).
-      retryProvider.retryForClientCalls(
-        "tap",
-        "Tap",
-        for {
-          (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()
-          openRound = SpliceUtil.selectLatestOpenMiningRound(walletManager.clock.now, openRounds)
-          result <- exerciseWalletAmuletAction(
-            new amuletoperation.CO_Tap(
-              amount.divide(openRound.payload.amuletPrice, JRM.CEILING)
-            ),
-            user,
-            (outcome: amuletoperationoutcome.COO_Tap) =>
-              d0.TapResponse(Codec.encodeContractId(outcome.contractIdValue)),
-          )
-        } yield result,
-        logger,
-        HttpWalletHandler.TapRetryable(_),
-      )
+      for {
+        userStore <- getUserStore(user)
+        commandId = CommandId(
+          "com.daml.network.wallet.tap",
+          Seq(userStore.key.endUserParty),
+          request.commandId.getOrElse(UUID.randomUUID().toString),
+        )
+        r <- retryProvider.retryForClientCalls(
+          "tap",
+          "Tap",
+          for {
+            (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()
+            openRound = SpliceUtil.selectLatestOpenMiningRound(walletManager.clock.now, openRounds)
+            result <- exerciseWalletAmuletAction[amuletoperationoutcome.COO_Tap, d0.TapResponse](
+              operation = new amuletoperation.CO_Tap(
+                amount.divide(openRound.payload.amuletPrice, JRM.CEILING)
+              ),
+              user = user,
+              processResponse = (outcome: amuletoperationoutcome.COO_Tap) =>
+                d0.TapResponse(Codec.encodeContractId(outcome.contractIdValue)),
+              dedupConfig = Some(
+                AmuletOperationDedupConfig(
+                  commandId,
+                  // Dedup for 24h which seems good enough for tap as a devnet feature and is easier
+                  // to implement than looking through the history to identify an offset.
+                  DedupDuration(
+                    com.google.protobuf.Duration.newBuilder().setSeconds(60 * 60 * 24).build()
+                  ),
+                )
+              ),
+            )
+          } yield result,
+          logger,
+        )
+      } yield r
     }
   }
 
@@ -706,11 +703,12 @@ class HttpWalletHandler(
       operation: installCodegen.AmuletOperation,
       user: String,
       processResponse: ExpectedCOO => R,
+      dedupConfig: Option[AmuletOperationDedupConfig] = None,
   )(implicit tc: TraceContext): Future[R] =
     for {
       userTreasury <- getUserTreasury(user)
       res <- userTreasury
-        .enqueueAmuletOperation(operation)
+        .enqueueAmuletOperation(operation, dedup = dedupConfig)
         .map(processCOO[ExpectedCOO, R](processResponse))
     } yield res
 
@@ -744,88 +742,5 @@ class HttpWalletHandler(
           s"expected to receive a amulet operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"
         )
     }
-  }
-}
-
-object HttpWalletHandler {
-  case class TapRetryable(operationName: String) extends ExceptionRetryable {
-    override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
-        implicit tc: TraceContext
-    ): ErrorKind = outcome match {
-      case Failure(ex: io.grpc.StatusRuntimeException) if isInactiveContract(ex) =>
-        logger.info(
-          s"The operation $operationName failed with a ${InactiveContracts.id} error $ex."
-        )
-        TransientErrorKind
-      case Failure(ex: io.grpc.StatusRuntimeException) if isLockedContract(ex) =>
-        logger.info(
-          s"The operation $operationName failed with a ${LockedContracts.id} error $ex."
-        )
-        TransientErrorKind
-      // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
-      case Failure(ex: io.grpc.StatusRuntimeException) if isNonspecificInvalidArgument(ex) =>
-        logger.info(
-          s"The operation $operationName failed with a nonspecifc INVALID_ARGUMENT error $ex."
-        )
-        TransientErrorKind
-      // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
-      case Failure(ex: io.grpc.StatusRuntimeException) if isDomainNotConnected(ex) =>
-        logger.info(
-          s"The operation $operationName failed due to the domain is not connected $ex."
-        )
-        TransientErrorKind
-      case Failure(ex: io.grpc.StatusRuntimeException) if isMediatorTimeout(ex) =>
-        logger.info(
-          s"The operation $operationName failed because the mediator did not receive enough confirmations in time $ex."
-        )
-        TransientErrorKind
-      case Failure(ex) =>
-        logThrowable(ex, logger)
-        FatalErrorKind
-      case Success(_) => NoErrorKind
-    }
-  }
-
-  private def isInactiveContract(ex: io.grpc.StatusRuntimeException): Boolean = {
-    ex.getStatus.getCode == Status.Code.NOT_FOUND &&
-    ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-      case ErrorInfoDetail(InactiveContracts.id, _) => true
-      case _ => false
-    }
-  }
-
-  private def isLockedContract(ex: io.grpc.StatusRuntimeException): Boolean = {
-    ex.getStatus.getCode == Status.Code.ABORTED &&
-    ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-      case ErrorInfoDetail(LockedContracts.id, _) => true
-      case _ => false
-    }
-  }
-
-  private def isDomainNotConnected(ex: io.grpc.StatusRuntimeException): Boolean =
-    ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-      case ErrorInfoDetail(InvalidDomainId.id, _) => true
-      case ErrorInfoDetail(NotConnectedToAnyDomain.id, _) => true
-      case ErrorInfoDetail(NotConnectedToDomain.id, _) => true
-      case ErrorInfoDetail(UnknownContractDomain.id, _) => true
-      case ErrorInfoDetail(UnknownContractDomains.id, _) => true
-      case ErrorInfoDetail(UnknownSubmitters.id, _) => true
-      case ErrorInfoDetail(SubmissionDomainNotReady.id, _) => true
-      case ErrorInfoDetail(UnknownInformees.id, _) => true
-      case _ => false
-    }
-
-  private def isMediatorTimeout(ex: io.grpc.StatusRuntimeException): Boolean = {
-    (ex.getStatus.getCode == Status.Code.ABORTED) &&
-    ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-      case ErrorInfoDetail(Timeout.id, _) => true
-      case _ => false
-    }
-  }
-
-  private def isNonspecificInvalidArgument(ex: io.grpc.StatusRuntimeException): Boolean = {
-    ex.getStatus.getCode == Status.Code.INVALID_ARGUMENT && ex.getStatus.getDescription.contains(
-      "An error occurred. Please contact the operator and inquire about the request"
-    )
   }
 }

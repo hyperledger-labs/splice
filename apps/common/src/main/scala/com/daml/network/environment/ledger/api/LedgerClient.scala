@@ -30,7 +30,7 @@ import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.ledger.client.{GrpcChannel, LedgerCallCredentials}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
@@ -47,15 +47,36 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 
-sealed abstract class DedupConfig
+sealed abstract class DedupConfig extends PrettyPrinting {}
 
-final case object NoDedup extends DedupConfig
+final case object NoDedup extends DedupConfig {
+  override def pretty = prettyOfObject[this.type]
+}
 
-final case class DedupOffset(offset: String) extends DedupConfig
+final case class DedupOffset(offset: String) extends DedupConfig {
+  override def pretty = prettyOfClass(
+    param("offset", _.offset.unquoted)
+  )
+}
 
-final case object DedupBeginOffset extends DedupConfig
+final case object DedupBeginOffset extends DedupConfig {
+  override def pretty = prettyOfObject[this.type]
+}
 
-final case class DedupDuration(duration: Duration) extends DedupConfig
+final case class DedupDuration(duration: Duration) extends DedupConfig {
+  override def pretty = {
+    import com.digitalasset.canton.ledger.api.util.DurationConversion
+    prettyOfClass(
+      param(
+        "duration",
+        p =>
+          DurationConversion.fromProto(
+            com.google.protobuf.duration.Duration.fromJavaProto(p.duration)
+          ),
+      )
+    )
+  }
+}
 
 /** Ledger client built on top of the Java bindings. The Java equivalent of
   * com.daml.ledger.client.LedgerClient.

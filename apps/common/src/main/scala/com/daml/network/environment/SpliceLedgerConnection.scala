@@ -1073,8 +1073,12 @@ object SpliceLedgerConnection {
     *                      e.g., "digitalasset.cn" in case of deduplicating directory entry requests relating to directory name "digitalasset.cn". Beware of naive concatenation
     *                      strings for discriminators. Always ensure that the encoding is injective.
     */
-  case class CommandId(methodName: String, parties: Seq[PartyId], discriminator: String = "") {
+  case class CommandId(methodName: String, parties: Seq[PartyId], discriminator: String = "")
+      extends PrettyPrinting {
     require(!methodName.contains('_'))
+
+    override def pretty: Pretty[this.type] =
+      prettyOfString(_.commandIdForSubmission)
 
     // NOTE: avoid changing this computation, as otherwise some commands might not get properly deduplicated
     // on an app upgrade.
