@@ -98,8 +98,9 @@ workflow:
           cluster_version: << pipeline.parameters.base-version >>
           check_cluster_version: false
           requires:
-            - prepare_cluster_for_migration
-            - prepare_sv_runbook_for_migration
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
       - hard_migration:
           name: "migrate_cluster"
           context:
@@ -219,7 +220,7 @@ workflow:
           global_domain_active_migration_id: 1
           reset_cluster: true # it's the default, but to make it explicit
           requires:
-            - restore_node
+            - preflight_sv_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           context:
@@ -240,5 +241,6 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
+            - restore_node
             - preflight_sv_check_redeployed
             - post_migration_compose_validator
