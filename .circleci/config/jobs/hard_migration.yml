@@ -321,8 +321,8 @@ jobs:
           cmd_name: Store logs
           when: on_fail
           cmd: |
-            docker logs compose-validator-1 > log/compose-validator-1.clog 2>&1 || true
-            docker logs compose-participant-1 > log/compose-participant-1.clog 2>&1 || true
+            docker logs splice-validator-validator-1 | gzip > log/splice-validator-validator-1.clog.gz 2>&1 || true
+            docker logs splice-validator-participant-1 | gzip > log/splice-validator-participant-1.clog.gz 2>&1 || true
       - store_artifacts:
           name: Store logs
           path: log
@@ -396,8 +396,8 @@ jobs:
           cmd_name: Store logs
           when: on_fail
           cmd: |
-            docker logs compose-validator-1 > log/compose-validator-1.clog 2>&1 || true
-            docker logs compose-participant-1 > log/compose-participant-1.clog 2>&1 || true
+            docker logs splice-validator-validator-1 | gzip > log/splice-validator-validator-1.clog.gz 2>&1 || true
+            docker logs splice-validator-participant-1 | gzip > log/splice-validator-participant-1.clog.gz 2>&1 || true
       - store_artifacts:
           name: Store logs
           path: log
