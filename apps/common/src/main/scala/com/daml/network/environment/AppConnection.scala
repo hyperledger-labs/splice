@@ -3,32 +3,39 @@
 
 package com.daml.network.environment
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, Uri}
-import org.apache.pekko.stream.Materializer
+import com.daml.network.admin.api.client.TraceContextPropagation.*
+import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.admin.api.client.{
   ApiClientRequestLogger,
   GrpcClientMetrics,
   GrpcMetricsClientInterceptor,
+  HttpAdminAppClient,
 }
-import com.daml.network.admin.api.client.HttpAdminAppClient
-import com.daml.network.admin.api.client.TraceContextPropagation.*
-import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.http.HttpClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
+  CustomClientTimeout,
+  DefaultBoundedTimeout,
+  DefaultUnboundedTimeout,
+  ServerEnforcedTimeout,
+}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{CallCredentials, Status}
+import io.grpc.{CallCredentials, Deadline, Status}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, Uri}
+import org.apache.pekko.stream.Materializer
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
@@ -125,9 +132,27 @@ abstract class AppConnection(
       case None => dso
     }
 
+    val timeout = cmd.timeoutType match {
+      case ServerEnforcedTimeout =>
+        None
+      case CustomClientTimeout(timeout) =>
+        Some(timeout)
+      case DefaultBoundedTimeout =>
+        Some(timeouts.default)
+      case DefaultUnboundedTimeout =>
+        Some(timeouts.unbounded)
+    }
+    val withDeadline = timeout.map(_.duration) match {
+      case Some(finite: FiniteDuration) =>
+        dsoAuth.withDeadline(Deadline.after(finite.length, finite.unit))
+      case _ => dsoAuth
+    }
+
     for {
       req <- toFuture(cmd.createRequest())
-      response <- TraceContextGrpc.withGrpcContext(traceContext)(cmd.submitRequest(dsoAuth, req))
+      response <- TraceContextGrpc.withGrpcContext(traceContext)(
+        cmd.submitRequest(withDeadline, req)
+      )
       result <- toFuture(cmd.handleResponse(response))
     } yield result
   }

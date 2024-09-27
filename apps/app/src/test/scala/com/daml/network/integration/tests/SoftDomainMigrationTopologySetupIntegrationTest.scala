@@ -450,30 +450,6 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       sv1ScanBackend.getDsoInfo().dsoRules.domainId.value shouldBe newDomainId.toProtoPrimitive
     }
 
-    p2pTransfer(
-      aliceWalletClient,
-      bobWalletClient,
-      bob,
-      42.0,
-      timeUntilSuccess = 40.seconds,
-    )
-
-    val aliceAmulets = aliceWalletClient.list().amulets
-    aliceAmulets should not be empty
-    forAll(aliceAmulets) {
-      _.contract.state shouldBe ContractState.Assigned(newDomainId)
-    }
-
-    // Eventually to allow merging to also reassign
-    // any other contracts.
-    eventually() {
-      val bobAmulets = bobWalletClient.list().amulets
-      bobAmulets should not be empty
-      forAll(bobAmulets) {
-        _.contract.state shouldBe ContractState.Assigned(newDomainId)
-      }
-    }
-
     clue("Alice validator tops up its traffic on new domain") {
       eventually() {
         aliceValidatorBackend.participantClient.traffic_control
@@ -519,6 +495,30 @@ class SoftDomainMigrationTopologySetupIntegrationTest
             .loneElement
             .extraTrafficPurchased shouldBe NonNegativeLong.maxValue
         }
+      }
+    }
+
+    p2pTransfer(
+      aliceWalletClient,
+      bobWalletClient,
+      bob,
+      42.0,
+      timeUntilSuccess = 40.seconds,
+    )
+
+    val aliceAmulets = aliceWalletClient.list().amulets
+    aliceAmulets should not be empty
+    forAll(aliceAmulets) {
+      _.contract.state shouldBe ContractState.Assigned(newDomainId)
+    }
+
+    // Eventually to allow merging to also reassign
+    // any other contracts.
+    eventually() {
+      val bobAmulets = bobWalletClient.list().amulets
+      bobAmulets should not be empty
+      forAll(bobAmulets) {
+        _.contract.state shouldBe ContractState.Assigned(newDomainId)
       }
     }
 
