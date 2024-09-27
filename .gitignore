@@ -22,6 +22,8 @@ _build/
 !.idea/runConfigurations
 .vscode/*
 !.vscode/settings.json
+# Make sure test files are checkedin
+!test-*.log
 target
 .bsp
 !canton/community/participant/src/test/resources/daml/illformed.dar
