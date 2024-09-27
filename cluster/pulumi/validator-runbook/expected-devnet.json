@@ -155,7 +155,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -254,7 +254,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "loopback",
     "provider": "",
@@ -387,7 +387,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
-      "name": "participant-3",
+      "name": "participant-0",
       "namespace": "validator",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -424,15 +424,17 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": true,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 3
+            "id": 0
           }
         },
+        "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -441,7 +443,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_3",
+          "databaseName": "participant_0",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -455,9 +457,9 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
-    "name": "validator-participant-3",
+    "name": "validator-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -533,7 +535,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -603,10 +605,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "3"
+          "id": "0"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-0",
         "persistence": {
           "host": "postgres",
           "postgresName": "postgres",
@@ -637,7 +639,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator",
     "provider": "",
