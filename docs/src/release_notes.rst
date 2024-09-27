@@ -8,8 +8,10 @@
 Release Notes
 =============
 
-0.2.2
+0.2.3
 -----
+
+Note: 0.2.2 was skipped due to an error in the publishing process.
 
 * SV UI
   * The route to view the amulet price has been renamed from ``/cc-price`` to ``/amulet-price``
