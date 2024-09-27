@@ -26,7 +26,12 @@ import com.digitalasset.canton.admin.api.client.data.topology.{
   ListOwnerToKeyMappingResult,
   ListVettedPackagesResult,
 }
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{
+  ApiLoggingConfig,
+  ClientConfig,
+  NonNegativeDuration,
+  NonNegativeFiniteDuration,
+}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
@@ -130,13 +135,14 @@ abstract class TopologyAdminConnection(
   def getDomainTimeLowerBound(
       domainId: DomainId,
       maxDomainTimeLag: NonNegativeFiniteDuration,
+      timeout: NonNegativeDuration = retryProvider.timeouts.default,
   )(implicit traceContext: TraceContext): Future[FetchTimeResponse] =
     runCmd(
       DomainTimeCommands.FetchTime(
         Some(domainId),
         freshnessBound =
           com.digitalasset.canton.time.NonNegativeFiniteDuration.fromConfig(maxDomainTimeLag),
-        timeout = retryProvider.timeouts.default,
+        timeout = timeout,
       )
     )
 

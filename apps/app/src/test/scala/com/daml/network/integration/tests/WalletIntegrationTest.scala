@@ -84,6 +84,15 @@ class WalletIntegrationTest
         .setScale(0, java.math.RoundingMode.DOWN)
     }
 
+    "tap deduplicates" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(50.0, Some("dedup-test"))
+      assertThrowsAndLogsCommandFailures(
+        aliceWalletClient.tap(50.0, Some("dedup-test")),
+        _.errorMessage should include("DUPLICATE_COMMAND"),
+      )
+    }
+
     "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 

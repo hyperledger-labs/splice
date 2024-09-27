@@ -36,6 +36,8 @@ import com.daml.network.codegen.java.splice.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
+import SpliceLedgerConnection.CommandId
+import com.daml.network.environment.ledger.api.DedupConfig
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.PageLimit
 import com.daml.network.util.PrettyInstances.*
@@ -108,8 +110,10 @@ class TreasuryService(
       .batchWeighted(
         treasuryConfig.batchSize.toLong,
         operation =>
-          if (operation.priority == CommandPriority.High) treasuryConfig.batchSize.toLong + 1L
-          else 1L,
+          if (operation.priority == CommandPriority.High || operation.dedup.isDefined) {
+            // Setting the weight > batch size ensures they go in a batch of their own
+            treasuryConfig.batchSize.toLong + 1L
+          } else 1L,
         operation => AmuletOperationBatch(operation),
       )((batch, operation) => batch.addCOToBatch(operation))
       // Execute the batches sequentially to avoid contention
@@ -167,12 +171,13 @@ class TreasuryService(
   def enqueueAmuletOperation[T](
       operation: installCodegen.AmuletOperation,
       priority: CommandPriority = CommandPriority.Low,
+      dedup: Option[AmuletOperationDedupConfig] = None,
   )(implicit tc: TraceContext): Future[installCodegen.AmuletOperationOutcome] = {
     val p = Promise[installCodegen.AmuletOperationOutcome]()
     logger.debug(
       show"Received operation (queue size before adding this: ${queue.size()}): $operation"
     )
-    queue.offer(EnqueuedAmuletOperation(operation, p, tc, priority)) match {
+    queue.offer(EnqueuedAmuletOperation(operation, p, tc, priority, dedup)) match {
       case Enqueued =>
         logger.debug(show"Operation $operation enqueued successfully")
         p.future
@@ -291,6 +296,7 @@ class TreasuryService(
       filteredNonMergeOperations
         .filter(_.isDefined)
         .map(_.getOrElse(throw new RuntimeException("Unexpected None value"))),
+      unfilteredBatch.dedup,
     )
 
   private def filterAndExecuteBatch(
@@ -393,20 +399,21 @@ class TreasuryService(
           Seq(walletManager.store.walletKey.validatorParty),
           userStore.key.endUserParty +: readAs.toSeq,
         )
+    val baseSubmission = connection
+      .submit(
+        actAsParties,
+        readAsParties,
+        cmd,
+        priority = batch.priority,
+        deadline = treasuryConfig.grpcDeadline,
+      )
+      .withDisclosedContracts(disclosedContracts)
     for {
-      (offset, result) <- connection
-        .submit(
-          actAsParties,
-          readAsParties,
-          cmd,
-          priority = batch.priority,
-          deadline = treasuryConfig.grpcDeadline,
-        )
-        .withDisclosedContracts(disclosedContracts)
-        // The only operation that is not self-conflicting is Tap, therefore
-        // batch execution w/o command dedup is safe.
-        .noDedup
-        .yieldResultAndOffset()
+      (offset, result) <- batch.dedup match {
+        case None => baseSubmission.noDedup.yieldResultAndOffset()
+        case Some(dedup) =>
+          baseSubmission.withDedup(dedup.commandId, dedup.config).yieldResultAndOffset()
+      }
 
       // wait for store to ingest the new amulet holdings, then return all outcomes to the callers
       _ <- waitForIngestion(offset, result).map(_ =>
@@ -802,7 +809,13 @@ object TreasuryService {
   private case class AmuletOperationBatch(
       mergeOperationOpt: Option[EnqueuedAmuletOperation],
       nonMergeOperations: Seq[EnqueuedAmuletOperation],
+      dedup: Option[AmuletOperationDedupConfig],
   ) extends PrettyPrinting {
+    require(
+      !(dedup.isDefined && (mergeOperationOpt.toList.size + nonMergeOperations.size) > 1),
+      "Operations requiring dedup are in their own batch",
+    )
+
     override def pretty: Pretty[AmuletOperationBatch.this.type] = prettyOfClass(
       paramIfDefined("mergeOperationOpt", _.mergeOperationOpt),
       paramIfNonEmpty("nonMergeOperations", _.nonMergeOperations),
@@ -833,16 +846,33 @@ object TreasuryService {
       if (
         (mergeOperationOpt.isEmpty && nonMergeOperations.isEmpty) || priority == operation.priority
       ) {
+        if (dedup.isDefined) {
+          throw new IllegalArgumentException(
+            s"Batch specifies dedup config, cannot contain more than one element"
+          )
+        }
+        if (
+          operation.dedup.isDefined && (mergeOperationOpt.isDefined || !nonMergeOperations.isEmpty)
+        ) {
+          throw new IllegalArgumentException(
+            s"Operation specifies dedup config, must be in a batch on its own"
+          )
+        }
         val isMergeOp = operation.isCO_MergeTransferInputs
         mergeOperationOpt match {
-          case None if isMergeOp => AmuletOperationBatch(Some(operation), nonMergeOperations)
+          case None if isMergeOp =>
+            AmuletOperationBatch(Some(operation), nonMergeOperations, operation.dedup)
           case Some(_) if isMergeOp =>
             // if we already have a merge operation in this batch; complete the new one immediately and
             // don't add it to the batch
             operation.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
             this
           case _ =>
-            AmuletOperationBatch(mergeOperationOpt, nonMergeOperations :+ operation)
+            AmuletOperationBatch(
+              mergeOperationOpt,
+              nonMergeOperations :+ operation,
+              operation.dedup,
+            )
         }
       } else sys.error("Cannot mix operations of different priorities in batch")
     }
@@ -878,7 +908,7 @@ object TreasuryService {
 
   private object AmuletOperationBatch {
     def apply(operation: EnqueuedAmuletOperation): AmuletOperationBatch = {
-      AmuletOperationBatch(None, Seq.empty).addCOToBatch(operation)
+      AmuletOperationBatch(None, Seq.empty, None).addCOToBatch(operation)
     }
   }
 
@@ -886,13 +916,16 @@ object TreasuryService {
       operation: installCodegen.AmuletOperation,
       outcomePromise: Promise[installCodegen.AmuletOperationOutcome],
       submittedFrom: TraceContext,
-      priority: CommandPriority = CommandPriority.Low,
+      priority: CommandPriority,
+      dedup: Option[AmuletOperationDedupConfig],
   ) extends PrettyPrinting {
     override def pretty: Pretty[EnqueuedAmuletOperation.this.type] =
       prettyNode(
         "AmuletOperation",
         param("from", _.submittedFrom.showTraceId),
         param("op", _.operation.toValue),
+        param("priority", _.priority),
+        paramIfDefined("dedup", _.dedup),
       )
 
     lazy val isCO_MergeTransferInputs: Boolean =
@@ -906,5 +939,13 @@ object TreasuryService {
         case _: amuletoperation.CO_Tap => true
         case _ => false
       }
+  }
+
+  final case class AmuletOperationDedupConfig(
+      commandId: CommandId,
+      config: DedupConfig,
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[AmuletOperationDedupConfig.this.type] =
+      prettyNode("DedupConfig", param("commandId", _.commandId), param("config", _.config))
   }
 }
