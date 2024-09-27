@@ -8,15 +8,16 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.2.2
+-----
 
 * SV UI
   * The route to view the amulet price has been renamed from ``/cc-price`` to ``/amulet-price``
 
 * The docker-compose validator now supports recovering from a node identities dump in case of a complete disaster.
 
-* Add new ``initialPackageConfigJson`` value to the SV helm chart to allow for setting the daml package version when bootstrapping a DSO.
+* Add new ``initialPackageConfigJson`` value to the SV helm chart to allow for setting the daml package version when bootstrapping a network.
+  This is useful to ensure that the Daml versions do not change on a network reset. Only the first SV needs to set this.
 
 * SV app
 
@@ -27,12 +28,12 @@ Upcoming
 
 * Deployment
 
-  * The auth secrets ``splice-app-{sv,validator}-ledger-api-auth`` formerly had ``audience`` as an optional field. This is now required. The former implicit value was ``https://canton.network.global``. If you have not overridden this value before, you should add it now explicitly.
+  * **Breaking**: The auth secrets ``splice-app-{sv,validator}-ledger-api-auth`` formerly had ``audience`` as an optional field. This is now required. The former implicit value was ``https://canton.network.global``. If you have not overridden this value before, you should add it now explicitly.
   * It used to be possible to override the ledger-api audience value through the helm value ``auth.ledgerApiAudience`` in the sv and validator charts. This has been removed -- use the secret mentioned in the previous point.
-  * The chart value ``auth.audience`` was formerly optional, and is now required for the following charts. The previous implicit value was ``https://canton.network.global``. To continue using it, please provide it explicitly to your values. (See the sv-helm and validator-helm docs for more information on auth configuration.)
+  * **Breaking** The chart value ``auth.audience`` was formerly optional, and is now required for the following charts. The previous implicit value was ``https://canton.network.global``. To continue using it, please provide it explicitly to your values. (See the sv-helm and validator-helm docs for more information on auth configuration.)
     * ``cn-sv-node``
     * ``cn-validator``
-  * The chart value ``auth.jwksUrl`` was formerly optional, and is now required for the same charts above. This should already be overridden in your values file for your particular auth setup, so likely no further action is required.
+  * **Breaking** The chart value ``auth.jwksUrl`` was formerly optional, and is now required for the same charts above. This should already be overridden in your values file for your particular auth setup, so likely no further action is required.
 
 * Bugfixes
 
