@@ -40,11 +40,11 @@ com.daml.network.integration.tests.SvStateManagementIntegrationTest
 com.daml.network.integration.tests.UpdateHistoryIntegrationTest
 com.daml.network.integration.tests.ValidatorIntegrationTest
 com.daml.network.integration.tests.ValidatorReonboardingIntegrationTest
-com.daml.network.integration.tests.WalletAmuletMetricsTest
 com.daml.network.integration.tests.WalletBuyTrafficRequestIntegrationTest
 com.daml.network.integration.tests.WalletExpirationsIntegrationTest
 com.daml.network.integration.tests.WalletIntegrationTest
 com.daml.network.integration.tests.WalletManualRoundsIntegrationTest
+com.daml.network.integration.tests.WalletMetricsTest
 com.daml.network.integration.tests.WalletPaymentIntegrationTest
 com.daml.network.integration.tests.WalletSubscriptionsIntegrationTest
 com.daml.network.integration.tests.WalletSurviveCantonRestartIntegrationTest

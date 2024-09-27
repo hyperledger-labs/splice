@@ -44,6 +44,8 @@ class WalletSweepTrigger(
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[WalletSweepTrigger.Task] {
 
+  override protected def extraMetricLabels = Seq("party" -> store.key.endUserParty.toString)
+
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[WalletSweepTrigger.Task]] = {

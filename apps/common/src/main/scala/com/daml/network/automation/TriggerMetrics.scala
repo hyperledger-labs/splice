@@ -23,6 +23,16 @@ class TriggerMetrics(
     )
   )
 
+  val iterations: Meter = metricsFactory.meter(
+    MetricInfo(
+      name = prefix :+ "iterations",
+      summary = "How often a polling trigger was run",
+      description =
+        "This metric measures the number of individual polling iterations processed by the trigger.",
+      qualification = Traffic,
+    )
+  )(MetricsContext.Empty)
+
   val completed: Meter = metricsFactory.meter(
     MetricInfo(
       name = prefix :+ "completed",
