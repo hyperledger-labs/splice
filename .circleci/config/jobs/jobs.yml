@@ -383,21 +383,13 @@ jobs:
            make cluster/helm/write-digests
            make cluster/helm/build -j
 
-           git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-           RELEASE_TAG=$(get-snapshot-version)
-           BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-
-           if [[ "$BRANCH_NAME" != *"$RELEASE_TAG"* && "$RELEASE_TAG" != *"snapshot"* ]]; then
-              echo "Release tag '$RELEASE_TAG' is not contained in the branch name '$BRANCH_NAME'."
-              echo "You are probably publishing the wrong version."
-              exit 1
-           fi
-
            for chart in cluster/helm/target/*.tgz; do
              artifactory_url="https://digitalasset.jfrog.io/artifactory"
              publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
            done
 
+           git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+           RELEASE_TAG=$(get-snapshot-version)
            if [ $(git tag -l "${RELEASE_TAG}") ]; then
              echo "tag ${RELEASE_TAG} already exists. not tagging"
            else
