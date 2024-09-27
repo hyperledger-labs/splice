@@ -60,9 +60,9 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
   Mint,
   Transfer,
 }
-import com.daml.network.http.{HttpVotesHandler, UrlValidator}
+import com.daml.network.http.{HttpValidatorLicensesHandler, HttpVotesHandler, UrlValidator}
 import com.daml.network.scan.dso.DsoAnsResolver
-import com.daml.network.store.{PageLimit, SortOrder}
+import com.daml.network.store.{AppStore, PageLimit, SortOrder, VotesStore}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.Clock
 
@@ -82,9 +82,12 @@ class HttpScanHandler(
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
 ) extends v0.ScanHandler[TraceContext]
-    with HttpVotesHandler {
-  protected val workflowId = this.getClass.getSimpleName
-  protected val votesStore = store
+    with HttpVotesHandler
+    with HttpValidatorLicensesHandler {
+
+  override protected val workflowId: String = this.getClass.getSimpleName
+  override protected val votesStore: VotesStore = store
+  override protected val validatorLicensesStore: AppStore = store
 
   def getDsoPartyId(
       response: v0.ScanResource.GetDsoPartyIdResponse.type
@@ -551,6 +554,16 @@ class HttpScanHandler(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
         )
     }
+  }
+
+  override def listValidatorLicenses(
+      respond: ScanResource.ListValidatorLicensesResponse.type
+  )(after: Option[Long], limit: Option[Int])(
+      extracted: TraceContext
+  ): Future[ScanResource.ListValidatorLicensesResponse] = {
+    this
+      .listValidatorLicenses(after, limit)(extracted, ec)
+      .map(ScanResource.ListValidatorLicensesResponse.OK)
   }
 
   // TODO: (#7809) Add caching for sequencers per domain

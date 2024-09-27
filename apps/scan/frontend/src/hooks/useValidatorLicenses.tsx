@@ -3,20 +3,19 @@
 import { UseInfiniteQueryResult, useInfiniteQuery } from '@tanstack/react-query';
 import { ValidatorLicensesPage } from 'common-frontend';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
+import { useScanClient } from 'common-frontend/scan-api';
 
 import { ValidatorLicense } from '@daml.js/splice-amulet/lib/Splice/ValidatorLicense/module';
-
-import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
 export const useValidatorLicenses = (
   limit: number
 ): UseInfiniteQueryResult<ValidatorLicensesPage> => {
-  const { listValidatorLicenses } = useSvAdminClient();
+  const scanClient = useScanClient();
   return useInfiniteQuery({
     refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listValidatorLicenses', limit],
     queryFn: async ({ pageParam }) => {
-      const page = await listValidatorLicenses(limit, pageParam);
+      const page = await scanClient.listValidatorLicenses(pageParam, limit);
       const validatorLicenses = page.validator_licenses.map(c =>
         Contract.decodeOpenAPI(c, ValidatorLicense)
       );

@@ -1,6 +1,7 @@
 {
   "workspaces": [
     "common/frontend-test-utils",
+    "common/frontend-test-vite-utils",
     "common/frontend-typeface-termina",
     "common/frontend",
     "common/frontend/utils",

@@ -169,8 +169,10 @@ function wait_for_workspace_build() {
   done
 }
 
+# listen & auto-rebuild common-test-vite-utils code when its src changes
+wait_for_workspace_build "common-test-vite-utils" "common/frontend-test-vite-utils/lib/cjs/package.json"
 # listen & auto-rebuild common-test-utils code when its src changes
-wait_for_workspace_build "common-test-utils" "common/frontend-test-utils/lib/cjs/package.json"
+wait_for_workspace_build "common-test-utils" "common/frontend-test-utils/lib/index.js"
 # listen & auto-rebuild common-frontend code when its src changes
 wait_for_workspace_build "common-frontend" "common/frontend/lib/index.js"
 # likewise for common-frontend-utils
