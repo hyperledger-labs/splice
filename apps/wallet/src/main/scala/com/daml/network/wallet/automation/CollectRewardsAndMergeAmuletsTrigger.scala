@@ -36,6 +36,8 @@ class CollectRewardsAndMergeAmuletsTrigger(
     val mat: Materializer,
 ) extends PollingTrigger {
 
+  override protected def extraMetricLabels = Seq("party" -> store.key.endUserParty.toString)
+
   override def isRewardOperationTrigger: Boolean = true
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =

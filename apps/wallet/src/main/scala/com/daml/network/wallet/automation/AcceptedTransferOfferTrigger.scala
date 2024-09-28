@@ -46,6 +46,10 @@ class AcceptedTransferOfferTrigger(
       transferOffersCodegen.AcceptedTransferOffer.COMPANION,
     ) {
 
+  override protected def extraMetricLabels = Seq(
+    "party" -> store.key.endUserParty.toString
+  )
+
   // Override the default source, as we can only auto-complete accepted offers if we are the sender
   override protected def source(implicit traceContext: TraceContext): Source[AssignedContract[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
