@@ -27,6 +27,8 @@ class AssignTrigger(
       store
     ) {
 
+  override protected def extraMetricLabels = Seq("party" -> partyId.toString)
+
   override protected def completeTask(
       unassign: ReassignmentEvent.Unassign
   )(implicit tc: TraceContext): Future[TaskOutcome] =

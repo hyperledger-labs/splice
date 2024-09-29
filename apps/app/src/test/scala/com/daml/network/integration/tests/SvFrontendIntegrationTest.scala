@@ -30,7 +30,8 @@ class SvFrontendIntegrationTest
     with SvFrontendTestUtil
     with FrontendLoginUtil
     with WalletTestUtil
-    with VotesFrontendTestUtil {
+    with VotesFrontendTestUtil
+    with ValidatorLicensesFrontendTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
@@ -172,7 +173,7 @@ class SvFrontendIntegrationTest
           },
         )
 
-        val licenseRows = findAll(className("validator-licenses-table-row")).toList
+        val licenseRows = getLicensesTableRows
         val newValidatorParty = allocateRandomSvParty("validatorX")
 
         actAndCheck(
@@ -185,19 +186,11 @@ class SvFrontendIntegrationTest
         )(
           "a new validator row is added",
           _ => {
-            val newLicenseRows = findAll(className("validator-licenses-table-row")).toList
-            newLicenseRows should have size (licenseRows.size + 1L)
-            val row: Element = inside(newLicenseRows) { case row :: _ =>
-              row
-            }
-            val sponsor =
-              seleniumText(row.childElement(className("validator-licenses-sponsor")))
-
-            val validator =
-              seleniumText(row.childElement(className("validator-licenses-validator")))
-
-            sponsor shouldBe sv1Backend.getDsoInfo().svParty.toProtoPrimitive
-            validator shouldBe newValidatorParty.toProtoPrimitive
+            checkLastValidatorLicenseRow(
+              licenseRows.size.toLong,
+              sv1Backend.getDsoInfo().svParty,
+              newValidatorParty,
+            )
           },
         )
       }

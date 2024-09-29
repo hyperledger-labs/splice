@@ -23,6 +23,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: `${config.spliceInstanceNames.amuletName} Activity`, path: '/' },
             { name: 'Network Info', path: '/dso' },
             { name: 'Governance', path: '/governance' },
+            { name: 'Validators', path: '/validator-licenses' },
           ]}
         />
       </Container>
