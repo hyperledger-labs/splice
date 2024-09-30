@@ -415,9 +415,8 @@ export function getDsoSize(): number {
 
 export const dsoSize = getDsoSize();
 
-export const allSvsToDeploy = svConfigs
-  .slice(0, dsoSize)
-  .concat(DeploySvRunbook ? [svRunbookConfig] : []);
+export const coreSvsToDeploy = svConfigs.slice(0, dsoSize);
+export const allSvsToDeploy = coreSvsToDeploy.concat(DeploySvRunbook ? [svRunbookConfig] : []);
 
 export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
   const asJson = config.optionalEnv(`${nodeName}_SWEEP`);

@@ -6,6 +6,7 @@ import {
 } from 'splice-pulumi-common';
 import {
   Auth0ClientType,
+  coreSvsToDeploy,
   getAuth0Config,
   installCantonComponents,
   sv1Config,
@@ -58,7 +59,7 @@ export function installNode(
           },
           peers:
             isCoreSv && !isFirstSv
-              ? svConfigs
+              ? coreSvsToDeploy
                   .filter(config => config.nodeName !== nodeConfig.nodeName)
                   .map(config => {
                     return {
