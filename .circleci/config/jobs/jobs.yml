@@ -28,7 +28,7 @@ jobs:
           cmd: "Test/compile printTests"
       - run_bash_command_in_nix:
           cmd_name: Verify no changes in sbt test files
-          cmd: git diff --exit-code test*.log
+          cmd: git add . && git diff --staged --exit-code test*.log
       - cleanup_sbt_test_job
 
   # We put our Daml tests in their own job for more parallelization
