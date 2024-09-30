@@ -41,12 +41,15 @@ import {
   SvParticipant,
 } from 'splice-pulumi-common-sv';
 import { SvConfig } from 'splice-pulumi-common-sv/src/config';
+import {
+  installValidatorApp,
+  installValidatorSecrets,
+} from 'splice-pulumi-common-validator/src/validator';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import { installCanton } from './canton';
-import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export function installSvKeySecret(
   xns: ExactNamespace,

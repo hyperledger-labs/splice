@@ -1,4 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
+import * as postgres from 'splice-pulumi-common/src/postgres';
 import {
   Auth0Client,
   BackupConfig,
@@ -7,24 +8,22 @@ import {
   activeVersion,
   ExactNamespace,
   exactNamespace,
-  DecentralizedSynchronizerMigrationConfig,
   installAuth0UISecret,
   installSpliceHelmChart,
-  ValidatorTopupConfig,
   spliceInstanceNames,
-  config,
   splitwellDarPath,
   imagePullSecret,
   CnInput,
+  DecentralizedSynchronizerMigrationConfig,
+  ValidatorTopupConfig,
 } from 'splice-pulumi-common';
-
-import * as postgres from '../../common/src/postgres';
-import { installMigrationSpecificValidatorParticipant } from './participant';
+import { installMigrationSpecificValidatorParticipant } from 'splice-pulumi-common-validator/src/migrationSpecificParticipant';
 import {
   AutoAcceptTransfersConfig,
   installValidatorApp,
   installValidatorSecrets,
-} from './validator';
+} from 'splice-pulumi-common-validator/src/validator';
+import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 export async function installValidator1(
   auth0Client: Auth0Client,
@@ -34,7 +33,6 @@ export async function installValidator1(
   splitPostgresInstances: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   installSplitwell: boolean,
-  dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig,
@@ -70,9 +68,7 @@ export async function installValidator1(
     auth0AppName: 'validator1',
   });
 
-  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps
-    .concat(dependsOn)
-    .concat([loopback]);
+  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat([loopback]);
 
   const participant = installMigrationSpecificValidatorParticipant(
     decentralizedSynchronizerMigrationConfig,
@@ -96,7 +92,7 @@ export async function installValidator1(
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     appDars: [splitwellDarPath],
     // TODO(#14199) Remove this with the next reset
-    validatorPartyHint: config.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
+    validatorPartyHint: spliceEnvConfig.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
       ? `${name}_validator_service_user`
       : `digitalasset-${name}-1`,
     svSponsorAddress: `http://sv-app.sv-1:5014`,

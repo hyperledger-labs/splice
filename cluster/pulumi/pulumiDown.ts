@@ -1,23 +1,17 @@
-import * as automation from '@pulumi/pulumi/automation';
+import { mustInstallValidator1 } from 'splice-pulumi-common-validator/src/validators';
 
-import { pulumiOptsWithPrefix, stack } from './pulumi';
+import { downStack, stack } from './pulumi';
 
-async function runMainStackDown() {
+async function runCoreStackDown() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
-  try {
-    await mainStack.destroy(pulumiOptsWithPrefix(`[canton-network]`));
-  } catch (e) {
-    if (e instanceof automation.ConcurrentUpdateError) {
-      console.error(e);
-      console.log('Stack is locked. Attempting to cancel the lock...');
-      await mainStack.cancel();
-      console.log('Lock canceled. Retrying destroy...');
-      await mainStack.destroy(pulumiOptsWithPrefix(`[canton-network]`));
-    }
+  await downStack(mainStack);
+  if (mustInstallValidator1) {
+    const validator1 = await stack('validator1', 'validator1', true, {});
+    await downStack(validator1);
   }
 }
 
-runMainStackDown().catch(e => {
+runCoreStackDown().catch(e => {
   console.error(e);
   process.exit(1);
 });

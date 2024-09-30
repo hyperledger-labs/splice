@@ -119,7 +119,7 @@ EOF
   # pulumi will show a preview and ask us to confirm each deployment step
 
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
-    subcmd_pulumi canton-network up "$@"
+    _pulumi_automation_run_up
     subcmd_pulumi_up_canton
     # make sure infra has the latest version
     subcmd_pulumi infra up "$@"

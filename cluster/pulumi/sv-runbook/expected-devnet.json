@@ -1172,7 +1172,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enablePostgresMetrics": true,
         "logLevel": "INFO",
         "mediator": {
@@ -1412,7 +1412,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "logLevel": "INFO",

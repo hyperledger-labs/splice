@@ -71,7 +71,7 @@ function latest_full_backup_run_id_gcloud() {
   for component in $expected_components; do
     local full_component_instance="$namespace-$component-pg"
     local cloudsql_id
-    cloudsql_id=$(get_cloudsql_id "$full_component_instance")
+    cloudsql_id=$(get_cloudsql_id "$full_component_instance" "canton-network")
     # We always create backups with a description field while this field could be missing for automated backups done by Google Cloud.
     # So we filter those out while looking for the most recent backup.
     mapfile -t run_ids < <(gcloud sql backups list --instance "$cloudsql_id" --filter=type="ON_DEMAND" --format=json | jq -r '.[] | select(has("description")) | .description')
@@ -124,7 +124,7 @@ function main() {
           ;;
   esac
 
-  type=$(get_postgres_type "$full_instance")
+  type=$(get_postgres_type "$full_instance" "canton-network")
   # We only check the postgres type of one component and assume other components have the same type.
   if [ "$type" == "canton:network:postgres" ]; then
     backup_run_id=$(latest_full_backup_run_id_kube "$namespace" "$migration_id" "$is_sv" "$expected_components")

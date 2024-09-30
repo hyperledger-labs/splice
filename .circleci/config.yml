@@ -6304,17 +6304,18 @@ workflows:
           requires:
             - prepare_sv_runbook_for_migration
             - migrate_cluster
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: << pipeline.parameters.cluster >>
-          cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
-          requires:
-            - migrate_cluster
+      # Re-enable once latest release is > 0.2.3
+      #      - preflight_sv_check:
+      #          name: "preflight_sv_check_migrated"
+      #          context:
+      #            - artifactory
+      #            - canton-network-vpn
+      #            - slack-context
+      #          cluster: << pipeline.parameters.cluster >>
+      #          cluster_version: << pipeline.parameters.upgrade-version >>
+      #          migration_id: 1
+      #          requires:
+      #            - migrate_cluster
       - hard_migration:
           name: "migrate_validator_runbook"
           context:
@@ -6358,7 +6359,8 @@ workflows:
             - canton-network-vpn
             - slack-context
           requires:
-            - preflight_sv_check_migrated
+            # Re-enable once latest release is > 0.2.3
+            #            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - restore_node:
@@ -6380,9 +6382,11 @@ workflows:
           cluster: << pipeline.parameters.cluster >>
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
-          reset_cluster: true # it's the default, but to make it explicit
+#          reset_cluster: true # it's the default, but to make it explicit
           requires:
-            - preflight_sv_check_migrated
+            - migrate_sv_runbook
+#          # Re-enable once latest release is > 0.2.3
+      #            - preflight_sv_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           context:

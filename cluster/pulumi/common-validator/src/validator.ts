@@ -21,6 +21,7 @@ import {
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
+  PersistenceConfig,
   spliceInstanceNames,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
@@ -28,8 +29,6 @@ import {
 import { SweepConfig } from 'splice-pulumi-common-sv/src/config';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
-
-import { PersistenceConfig } from '../../common';
 
 export type ExtraDomain = {
   alias: string;

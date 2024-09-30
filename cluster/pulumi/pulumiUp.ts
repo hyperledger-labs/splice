@@ -1,11 +1,17 @@
-import { pulumiOptsWithPrefix, stack } from './pulumi';
+import { mustInstallValidator1 } from 'splice-pulumi-common-validator/src/validators';
 
-async function runMainStackUp() {
+import { stack, upStack } from './pulumi';
+
+async function runCoreStacksUp() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
-  await mainStack.up(pulumiOptsWithPrefix(`[canton-network]`));
+  await upStack(mainStack);
+  if (mustInstallValidator1) {
+    const validator1 = await stack('validator1', 'validator1', true, {});
+    await upStack(validator1);
+  }
 }
 
-runMainStackUp().catch(e => {
+runCoreStacksUp().catch(e => {
   console.error(e);
   process.exit(1);
 });

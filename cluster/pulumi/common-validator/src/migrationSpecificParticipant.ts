@@ -1,4 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
+import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Output } from '@pulumi/pulumi';
 import {
   Auth0Config,
@@ -9,9 +10,8 @@ import {
   installMigrationIdSpecificComponent,
   LogLevel,
 } from 'splice-pulumi-common';
-import { installParticipant } from 'splice-pulumi-common-validator';
 
-import * as postgres from '../../common/src/postgres';
+import { installParticipant } from './participant';
 
 export function installMigrationSpecificValidatorParticipant(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,

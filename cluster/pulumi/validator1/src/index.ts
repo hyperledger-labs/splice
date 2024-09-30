@@ -1,16 +1,12 @@
 import { Auth0Fetch } from 'splice-pulumi-common';
 import { Auth0ClientType, getAuth0Config } from 'splice-pulumi-common-sv';
 
-import { installClusterVersion } from './clusterVersion';
-import { installCluster } from './installCluster';
-import { scheduleLoadGenerator } from './scheduleLoadGenerator';
+import { installNode } from './installNode';
 
 async function auth0CacheAndInstallCluster(auth0Fetch: Auth0Fetch) {
   await auth0Fetch.loadAuth0Cache();
 
-  installClusterVersion();
-
-  const cluster = await installCluster(auth0Fetch);
+  const cluster = await installNode(auth0Fetch);
 
   await auth0Fetch.saveAuth0Cache();
 
@@ -23,10 +19,10 @@ async function main() {
   auth0FetchOutput.apply(async auth0Fetch => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     await auth0CacheAndInstallCluster(auth0Fetch);
-
-    scheduleLoadGenerator(auth0Fetch, []);
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-main();
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});

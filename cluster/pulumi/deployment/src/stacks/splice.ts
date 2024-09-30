@@ -1,4 +1,5 @@
 import { config, DeploySvRunbook } from 'splice-pulumi-common';
+import { mustInstallValidator1 } from 'splice-pulumi-common-validator/src/validators';
 
 import { GitFluxRef } from '../flux';
 import { createStackCR } from './stack';
@@ -23,7 +24,9 @@ export function installSpliceStacks(reference: GitFluxRef): void {
       reference
     );
   }
-
+  if (mustInstallValidator1) {
+    createStackCR('validator1', 'validator1', false, reference);
+  }
   createStackCR('infra', 'infra', false, reference);
   createStackCR('canton-network', 'canton-network', false, reference);
 }

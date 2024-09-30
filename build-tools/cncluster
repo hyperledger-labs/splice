@@ -1531,8 +1531,6 @@ function _get_ledger_api_auth_token_from_auth0() {
 function _get_preflight_test_names() {
   hint="${1-}"
 
-  cd "${REPO_ROOT}" && sbt printTests 1>&2
-
   if (env-bool IS_DEVNET); then
     tests_filename="test-full-class-names-$hint-preflight.log"
   else

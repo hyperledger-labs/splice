@@ -1,11 +1,13 @@
 function get_postgres_type() {
   local instance=$1
+  local stack=$2
 
-  cncluster pulumi canton-network stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*canton:.*:postgres::${instance}\")) | .type"
+  cncluster pulumi "$stack" stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*canton:.*:postgres::${instance}\")) | .type"
 }
 
 function get_cloudsql_id() {
   local instance=$1
+  local stack=$2
 
-  cncluster pulumi canton-network stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
+  cncluster pulumi "$stack" stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
 }

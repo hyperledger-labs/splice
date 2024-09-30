@@ -1,0 +1,947 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://canton.network.global",
+          "client-id": "validator1-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator1-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-validator1-validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-cns-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-validator1-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-splitwell-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-splitwell-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-validator1-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-validator1-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-participant-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldDI="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-validator",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "validator-pg-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-validator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "projects/test-project/global/networks/default",
+    "inputs": {},
+    "name": "default",
+    "provider": "",
+    "type": "gcp:compute/network:Network"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "enableServerSideApply": "true"
+    },
+    "name": "k8s-imgpull-validator1",
+    "provider": "",
+    "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.dev",
+    "inputs": {
+      "name": "organization/infra/infra.dev"
+    },
+    "name": "organization/infra/infra.dev",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://canton.network.global",
+          "client-id": "validator1-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator1-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-validator1-validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-cns-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-splitwell-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-splitwell-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-wallet-ui-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-validator1-participant-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-validator1-validator-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-cluster-ingress-runbook",
+      "compat": "true",
+      "name": "cluster-ingress-validator1",
+      "namespace": "validator1",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
+      "timeout": 480,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "dev.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "dev.global.canton.network.digitalasset.com",
+          "name": "cn-devnet",
+          "svNamespace": "validator1"
+        },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "ingress": {
+          "decentralizedSynchronizer": {
+            "activeMigrationId": "0"
+          },
+          "splitwell": true
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
+        "withSvIngress": false
+      },
+      "version": "0.1.19"
+    },
+    "name": "validator1-cluster-ingress-validator1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "validator1-db-participant-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "validator1-db-validator-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "validator1"
+      }
+    },
+    "name": "validator1-default",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-validator1::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "docker-reg-cred",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "validator1-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-cluster-loopback-gateway",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "validator1",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
+      "timeout": 480,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "dev.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "dev.global.canton.network.digitalasset.com",
+          "name": "cn-devnet"
+        },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.1.19"
+    },
+    "name": "validator1-loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-participant",
+      "compat": "true",
+      "name": "participant-0",
+      "namespace": "validator1",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
+      "timeout": 480,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "dnsName": "dev.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "dev.global.canton.network.digitalasset.com",
+          "name": "cn-devnet"
+        },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "disableAutoInit": false,
+        "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
+        "metrics": {
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 0
+          }
+        },
+        "nodeIdentifier": "validator1",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "splice-app-validator-ledger-api-auth",
+            "optional": false
+          }
+        },
+        "persistence": {
+          "databaseName": "participant_0",
+          "postgresName": "participant-pg",
+          "schema": "participant",
+          "secretName": "participant-pg-secrets"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.1.19"
+    },
+    "name": "validator1-participant-0",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-participant",
+      "compat": "true",
+      "name": "participant-1",
+      "namespace": "validator1",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
+      "timeout": 480,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "dnsName": "dev.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "dev.global.canton.network.digitalasset.com",
+          "name": "cn-devnet"
+        },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
+        "metrics": {
+          "enable": true,
+          "migration": {
+            "active": false,
+            "id": 1
+          }
+        },
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "splice-app-validator-ledger-api-auth",
+            "optional": false
+          }
+        },
+        "persistence": {
+          "databaseName": "participant_1",
+          "postgresName": "participant-pg",
+          "schema": "participant",
+          "secretName": "participant-pg-secrets"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.2.3"
+    },
+    "name": "validator1-participant-1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-participant-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-participant-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": true,
+      "region": "us-central1",
+      "settings": {
+        "activationPolicy": "ALWAYS",
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "databaseFlags": [
+          {
+            "name": "temp_file_limit",
+            "value": "100000000"
+          }
+        ],
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "dev"
+        }
+      }
+    },
+    "name": "validator1-participant-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-splitwell-web-ui",
+      "compat": "true",
+      "name": "splitwell-web-ui",
+      "namespace": "validator1",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
+      "timeout": 480,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "audience": "https://canton.network.global"
+        },
+        "cluster": {
+          "dnsName": "dev.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "dev.global.canton.network.digitalasset.com",
+          "name": "cn-devnet"
+        },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "spliceInstanceNames": {
+          "amuletName": "Canton Coin",
+          "amuletNameAcronym": "CC",
+          "nameServiceName": "Canton Name Service",
+          "nameServiceNameAcronym": "CNS",
+          "networkFaviconUrl": "https://www.canton.network/hubfs/cn-favicon-05%201-1.png",
+          "networkName": "Canton Network"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.1.19"
+    },
+    "name": "validator1-splitwell-web-ui",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-validator-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-validator-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": true,
+      "region": "us-central1",
+      "settings": {
+        "activationPolicy": "ALWAYS",
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "databaseFlags": [
+          {
+            "name": "temp_file_limit",
+            "value": "100000000"
+          }
+        ],
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "us-central1-a"
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "dev"
+        }
+      }
+    },
+    "name": "validator1-validator-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "cn-validator",
+      "compat": "true",
+      "name": "validator-validator1",
+      "namespace": "validator1",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
+      "timeout": 480,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "additionalUsers": [],
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "appDars": [
+          "splice-node/dars/splitwell-current.dar"
+        ],
+        "auth": {
+          "audience": "https://canton.network.global",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
+        "cluster": {
+          "dnsName": "dev.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "dev.global.canton.network.digitalasset.com",
+          "name": "cn-devnet"
+        },
+        "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "contactPoint": "sv-support@digitalasset.com",
+        "enablePostgresMetrics": true,
+        "failOnAppVersionMismatch": true,
+        "metrics": {
+          "enable": true
+        },
+        "migration": {
+          "id": 0,
+          "migrating": false
+        },
+        "nodeIdentifier": "validator1",
+        "onboardingSecretFrom": {
+          "secretKeyRef": {
+            "key": "secret",
+            "name": "splice-app-validator-onboarding-validator",
+            "optional": false
+          }
+        },
+        "participantAddress": "participant-0",
+        "persistence": {
+          "databaseName": "validator1",
+          "port": 5432,
+          "postgresName": "validator-pg",
+          "schema": "validator1",
+          "secretName": "validator-pg-secrets",
+          "user": "cnadmin"
+        },
+        "scanAddress": "http://scan-app.sv-1:5012",
+        "spliceInstanceNames": {
+          "amuletName": "Canton Coin",
+          "amuletNameAcronym": "CC",
+          "nameServiceName": "Canton Name Service",
+          "nameServiceNameAcronym": "CNS",
+          "networkFaviconUrl": "https://www.canton.network/hubfs/cn-favicon-05%201-1.png",
+          "networkName": "Canton Network"
+        },
+        "svSponsorAddress": "http://sv-app.sv-1:5014",
+        "svValidator": false,
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
+        "topup": {
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 1000000
+        },
+        "useSequencerConnectionsFromScan": true,
+        "validatorPartyHint": "digitalasset-validator1-1",
+        "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
+      },
+      "version": "0.1.19"
+    },
+    "name": "validator1-validator-validator1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
+        "name": "validator1"
+      }
+    },
+    "name": "validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  }
+]

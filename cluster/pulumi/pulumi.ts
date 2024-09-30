@@ -1,5 +1,6 @@
 import * as automation from '@pulumi/pulumi/automation';
 import fs from 'fs';
+import util from 'node:util';
 import os from 'os';
 import path from 'path';
 import { config } from 'splice-pulumi-common/src/config';
@@ -75,4 +76,21 @@ export async function stack(
   return stackMustAlreadyExist
     ? await automation.LocalWorkspace.selectStack(stackOpts, workspaceOpts)
     : await automation.LocalWorkspace.createOrSelectStack(stackOpts, workspaceOpts);
+}
+
+export async function downStack(stack: automation.Stack): Promise<void> {
+  const name = stack.name;
+  console.log(`${name} - Making sure stack is not locked`);
+  await stack.cancel();
+  console.log(`${name} - Refreshing stack`);
+  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`));
+  console.log(`${name} - Destroying stack`);
+  await stack.destroy(pulumiOptsWithPrefix(`[${name}]`));
+}
+
+export async function upStack(stack: automation.Stack): Promise<void> {
+  const name = stack.name;
+  const result = await stack.up(pulumiOptsWithPrefix(`[${name}]`));
+  console.log(`${name} stack up result:`);
+  console.log(util.inspect(result, { colors: true, depth: null, maxStringLength: null }));
 }

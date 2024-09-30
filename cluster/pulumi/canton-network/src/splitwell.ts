@@ -17,11 +17,11 @@ import {
   CnInput,
   activeVersion,
 } from 'splice-pulumi-common';
+import { installMigrationSpecificValidatorParticipant } from 'splice-pulumi-common-validator/src/migrationSpecificParticipant';
+import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
-import { installMigrationSpecificValidatorParticipant } from './participant';
-import { installValidatorApp } from './validator';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,
