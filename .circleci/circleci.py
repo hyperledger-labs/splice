@@ -45,6 +45,7 @@ class PipelinesResponse:
 class Workflow:
   id: str
   name: str
+  pipeline_number: int
   status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "failed", "error", "failing", "on_hold", "canceled", "unauthorized"])})
   class Meta:
     unknown = EXCLUDE

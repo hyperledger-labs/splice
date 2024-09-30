@@ -24,11 +24,12 @@ def parse_args():
   # The default channel is #team-canton-network-internal-ci
   parser.add_argument('--slack_channel', default="C05DT77QF5M")
   parser.add_argument('--branch_pattern', default=".*")
+  parser.add_argument('--dry_run', action='store_true')
   return parser.parse_args()
 
 def build_msg():
   workflow = fetch_workflow(FAILED_WORKFLOW_ID)
-  circleci_url=f"https://app.circleci.com/pipelines/github/{PROJECT_USERNAME}/{PROJECT_REPONAME}/{FAILED_PIPELINE_ID}/workflows/{FAILED_WORKFLOW_ID}/jobs/{FAILED_JOB_NUM}/parallel-runs/{FAILED_PARALLEL_RUN_IDX}"
+  circleci_url=f"https://app.circleci.com/pipelines/github/{PROJECT_USERNAME}/{PROJECT_REPONAME}/{workflow.pipeline_number}/workflows/{FAILED_WORKFLOW_ID}/jobs/{FAILED_JOB_NUM}/parallel-runs/{FAILED_PARALLEL_RUN_IDX}"
 
   repo = Repo(search_parent_directories=True)
   commit_msg = repo.head.commit.summary
@@ -57,12 +58,13 @@ def main(args):
 
   print(f"Notification: {json.dumps(msg)}")
 
-  requests.post(
-    "https://slack.com/api/chat.postMessage",
-    json=msg,
-    headers={
-      "Authorization": f"Bearer {os.environ.get('SLACK_ACCESS_TOKEN')}",
-      "Content-Type": "application/json"})
+  if not args.dry_run:
+    requests.post(
+      "https://slack.com/api/chat.postMessage",
+      json=msg,
+      headers={
+        "Authorization": f"Bearer {os.environ.get('SLACK_ACCESS_TOKEN')}",
+        "Content-Type": "application/json"})
 
 if __name__ == "__main__":
   args = parse_args()
