@@ -189,11 +189,6 @@ workflow:
           # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
           # because the branch is not yet updated.
           workflow_names: "deploy_cidaily"
-      - artifacts_push:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       - deploy_sv_runbook:
           filters:
             branches:
@@ -204,11 +199,10 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "cidaily"
-          use_published_artifacts: false
+          use_published_artifacts: true
           silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
-            - artifacts_push
       - preflight_sv_check:
           filters:
             branches:
@@ -248,11 +242,6 @@ workflow:
           # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
           # because the branch is not yet updated.
           workflow_names: "deploy_cidaily"
-      - artifacts_push:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       - deploy_validator_runbook:
           filters:
             branches:
@@ -262,7 +251,7 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cidaily"
-          use_published_artifacts: false
+          use_published_artifacts: true
           silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
