@@ -152,6 +152,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
 
   // TODO(#14679): Remove the override once ciperiodic has been bumped to 0.2.0
   const postgresPvcSizeOverride = config.optionalEnv('VALIDATOR_RUNBOOK_POSTGRES_PVC_SIZE');
+  const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
   const postgresValues: ChartValues = _.merge(
     loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
@@ -165,7 +166,8 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     `postgres`,
     'postgres-secrets',
     postgresValues,
-    true
+    true,
+    supportsValidatorRunbookReset
   );
   const participantAddress = installParticipant(
     DecentralizedSynchronizerUpgradeConfig,

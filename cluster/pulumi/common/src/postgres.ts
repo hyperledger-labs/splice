@@ -56,12 +56,13 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     instanceName: string,
     alias: string,
     secretName: string,
-    active: boolean = true
+    active: boolean = true,
+    disableProtection?: boolean
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
     const baseOpts = {
-      protect: protectCloudSql,
+      protect: disableProtection ? false : protectCloudSql,
       aliases: [{ name: instanceLogicalNameAlias }],
     };
     super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
@@ -72,7 +73,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       instanceLogicalName,
       {
         databaseVersion: 'POSTGRES_14',
-        deletionProtection: protectCloudSql,
+        deletionProtection: disableProtection ? false : protectCloudSql,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
           activationPolicy: active ? 'ALWAYS' : 'NEVER',
@@ -115,14 +116,14 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       {
         parent: this,
         deletedWith: this.pgSvc,
-        protect: protectCloudSql,
+        protect: disableProtection ? false : protectCloudSql,
         aliases: [{ name: `${this.namespace.logicalName}-db-${alias}-cantonnet` }],
       }
     );
 
     const password = generatePassword(`${instanceLogicalName}-passwd`, {
       parent: this,
-      protect: protectCloudSql,
+      protect: disableProtection ? false : protectCloudSql,
       aliases: [{ name: `${instanceLogicalNameAlias}-passwd` }],
     }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
@@ -139,7 +140,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         parent: this,
         deletedWith: pgDB,
         dependsOn: [passwordSecret],
-        protect: protectCloudSql,
+        protect: disableProtection ? false : protectCloudSql,
         aliases: [{ name: `user-${instanceLogicalNameAlias}` }],
       }
     );
@@ -164,12 +165,13 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     alias: string,
     secretName: string,
     values?: ChartValues,
-    overrideDbSizeFromValues?: boolean
+    overrideDbSizeFromValues?: boolean,
+    disableProtection?: boolean
   ) {
     const logicalName = xns.logicalName + '-' + instanceName;
     const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
     super('canton:network:postgres', logicalName, [], {
-      protect: protectCloudSql,
+      protect: disableProtection ? false : protectCloudSql,
       aliases: [{ name: logicalNameAlias, type: 'canton:network:postgres' }],
     });
 
