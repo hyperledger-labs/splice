@@ -7,4 +7,4 @@ set -eou pipefail
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 "${SCRIPT_DIR}/install-deps.sh"
-"${SCRIPT_DIR}/wait_for_or_cancel_pipelines.py" "$@"
+"${SCRIPT_DIR}/slack_notification.py" "$@"

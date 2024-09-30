@@ -4,7 +4,9 @@
 
 set -eou pipefail
 
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+if ! (which pip > /dev/null 2>&1); then
+  sudo apt-get update
+  sudo apt-get install python3-pip -y
+fi
 
-"${SCRIPT_DIR}/install-deps.sh"
-"${SCRIPT_DIR}/wait_for_or_cancel_pipelines.py" "$@"
+python3 -m pip install -r .circleci/requirements.txt

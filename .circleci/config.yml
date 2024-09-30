@@ -913,21 +913,10 @@ commands:
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
     steps:
-      - run_bash_command_in_nix:
-          cmd_name: Notify on slack
-          additional_nix_args: "--keep CIRCLE_PROJECT_USERNAME \
-                                --keep CIRCLE_PROJECT_REPONAME \
-                                --keep CIRCLECI_TOKEN \
-                                --keep CIRCLE_PIPELINE_ID \
-                                --keep CIRCLE_WORKFLOW_ID \
-                                --keep CIRCLE_JOB \
-                                --keep CIRCLE_BUILD_NUM \
-                                --keep CIRCLE_NODE_INDEX \
-                                --keep CIRCLE_BRANCH \
-                                --keep SLACK_ACCESS_TOKEN"
-          when: always
-          cmd: |
-            ${REPO_ROOT}/.circleci/slack_notification.py \
+      - run:
+          name: Notify on slack
+          command: |
+            ${REPO_ROOT}/.circleci/slack_notification.sh \
               --cluster << parameters.cluster >> \
               --slack_channel << parameters.channel_notify >> \
               --branch_pattern "(deployment\\/.*|main|release-line.*)"
