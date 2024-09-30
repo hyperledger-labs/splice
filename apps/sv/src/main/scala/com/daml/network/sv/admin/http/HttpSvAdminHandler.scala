@@ -14,11 +14,11 @@ import com.daml.network.environment.{
   SequencerAdminConnection,
   SpliceStatus,
 }
-import com.daml.network.http.HttpVotesHandler
+import com.daml.network.http.{HttpValidatorLicensesHandler, HttpVotesHandler}
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import com.daml.network.http.v0.sv_admin.SvAdminResource
-import com.daml.network.store.{AppStoreWithIngestion, PageLimit}
+import com.daml.network.store.{AppStore, AppStoreWithIngestion, VotesStore}
 import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -62,15 +62,17 @@ class HttpSvAdminHandler(
     protected val tracer: Tracer,
     templateJsonDecoder: TemplateJsonDecoder,
 ) extends v0.SvAdminHandler[TracedUser]
-    with HttpVotesHandler {
+    with HttpVotesHandler
+    with HttpValidatorLicensesHandler {
 
   implicit private val loggingContext: ErrorLoggingContext =
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
 
-  protected val workflowId = this.getClass.getSimpleName
+  override protected val workflowId: String = this.getClass.getSimpleName
   private val svStore = svStoreWithIngestion.store
   private val dsoStore = dsoStoreWithIngestion.store
-  protected val votesStore = dsoStore
+  override protected val votesStore: VotesStore = dsoStore
+  override protected val validatorLicensesStore: AppStore = dsoStore
 
   def listOngoingValidatorOnboardings(
       respond: v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse.type
@@ -92,20 +94,9 @@ class HttpSvAdminHandler(
   )(after: Option[Long], limit: Option[Int])(
       tuser: TracedUser
   ): Future[SvAdminResource.ListValidatorLicensesResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.listValidatorLicenses") { _ => _ =>
-      for {
-        resultsInPage <- dsoStore.listValidatorLicenses(
-          limit.fold(PageLimit.Max)(PageLimit.tryCreate),
-          after,
-        )
-      } yield {
-        definitions.ListValidatorLicensesResponse(
-          resultsInPage.resultsInPage.map(_.toHttp).toVector,
-          resultsInPage.nextPageToken,
-        )
-      }
-    }
+    this
+      .listValidatorLicenses(after, limit)(tuser.traceContext, ec)
+      .map(SvAdminResource.ListValidatorLicensesResponse.OK)
   }
 
   def prepareValidatorOnboarding(

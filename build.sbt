@@ -738,6 +738,12 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
+              "common-test-vite-utils",
+              log,
+            )
+            BuildCommon.TS.runWorkspaceCommand(
+              npmRootDir.value,
+              "build",
               "common-test-utils",
               log,
             )
@@ -771,7 +777,14 @@ lazy val `apps-common-frontend` = {
         val log = streams.value.log
         (Test / compile).value
         npmInstall.value
-        for (workspace <- Seq("common-frontend-utils", "common-frontend", "common-test-utils"))
+        for (
+          workspace <- Seq(
+            "common-test-vite-utils",
+            "common-frontend-utils",
+            "common-frontend",
+            "common-test-utils",
+          )
+        )
           BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", workspace, log)
         runCommand(
           Seq("npm", "run", "test:sbt", "--workspaces", "--if-present"),
