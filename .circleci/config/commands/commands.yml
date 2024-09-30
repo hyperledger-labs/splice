@@ -749,6 +749,7 @@ commands:
     steps:
       - run:
           name: Notify on slack
+          when: on_fail
           command: |
             .circleci/slack_notification.sh \
               --cluster << parameters.cluster >> \
