@@ -59,6 +59,7 @@ in pkgs.mkShell {
                                              doCheck = false;
                                              doInstallCheck = false;
                                      }))
+    python3Packages.GitPython
     python3Packages.marshmallow-dataclass
     python3Packages.polib
     python3Packages.pyjwt

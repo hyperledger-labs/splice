@@ -747,21 +747,24 @@ commands:
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
     steps:
-      - set-failed-parallel-run-url
-      - run:
-          name: Dump input sent to slack/notify
+      - run_bash_command_in_nix:
+          cmd_name: Notify on slack
+          additional_nix_args: "--keep CIRCLE_PROJECT_USERNAME \
+                                --keep CIRCLE_PROJECT_REPONAME \
+                                --keep CIRCLECI_TOKEN \
+                                --keep CIRCLE_PIPELINE_ID \
+                                --keep CIRCLE_WORKFLOW_ID \
+                                --keep CIRCLE_JOB \
+                                --keep CIRCLE_BUILD_NUM \
+                                --keep CIRCLE_NODE_INDEX \
+                                --keep CIRCLE_BRANCH \
+                                --keep SLACK_ACCESS_TOKEN"
           when: always
-          command: |
-            echo "Sending the following as input to slack/notify"
-            echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
-      # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
-      # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
-      - slack/notify:
-          channel: << parameters.channel_notify >>
-          branch_pattern: (deployment\/.*|main|release-line.*)
-          event: fail
-          custom: |
-            { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
+          cmd: |
+            ${REPO_ROOT}/.circleci/slack_notification.py \
+              --cluster << parameters.cluster >> \
+              --slack_channel << parameters.channel_notify >> \
+              --branch_pattern "(deployment\\/.*|main|release-line.*)"
 
   # TODO(#14750): consider creating a custom image that already has this configured
   docker_prep_build:

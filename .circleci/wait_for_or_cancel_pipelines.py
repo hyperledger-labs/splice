@@ -6,65 +6,15 @@
 import argparse
 import os
 import re
-import requests
 from datetime import datetime, timezone, timedelta
 import time
-from dataclasses import field
-from marshmallow_dataclass import dataclass
-from marshmallow import EXCLUDE
-import marshmallow.validate
 
-BASE_CCI_API_URL = "https://circleci.com/api/v2"
-BRANCH=os.environ.get('CIRCLE_BRANCH')
-PROJECT_USERNAME = os.environ.get('CIRCLE_PROJECT_USERNAME')
-PROJECT_REPONAME = os.environ.get('CIRCLE_PROJECT_REPONAME')
-TOKEN = os.environ.get('CIRCLECI_TOKEN')
-if (not TOKEN):
-  raise AttributeError("Missing CIRCLECI_TOKEN environment variable")
-HEADERS = {"Circle-Token": TOKEN, "Content-Type": "application/json"}
+from circleci import *
+
 START_TIME = datetime.now()
 MAX_TIMEOUT=timedelta(hours=8)
 SELF_WORKFLOW_ID = os.environ.get('CIRCLE_WORKFLOW_ID')
-
-@dataclass
-class VCS:
-  branch: str | None
-  class Meta:
-    unknown = EXCLUDE
-
-@dataclass
-class Pipeline:
-  id: str
-  number: int
-  created_at: datetime
-  vcs: VCS | None
-  class Meta:
-    unknown = EXCLUDE
-
-@dataclass
-class PipelinesResponse:
-  next_page_token: str | None
-  items: list[Pipeline]
-  class Meta:
-    unknown = EXCLUDE
-
-@dataclass
-class Workflow:
-  id: str
-  name: str
-  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "failed", "error", "failing", "on_hold", "canceled", "unauthorized"])})
-  class Meta:
-    unknown = EXCLUDE
-
-  def is_complete(self):
-    return self.status not in ["running", "failing"]
-
-@dataclass
-class WorkflowsResponse:
-  next_page_token: str | None
-  items: list[Workflow]
-  class Meta:
-    unknown = EXCLUDE
+CURRENT_BRANCH=os.environ.get('CIRCLE_BRANCH')
 
 @dataclass
 class Job:
@@ -95,7 +45,7 @@ def parse_args():
   parser = argparse.ArgumentParser()
   parser.add_argument('--current_pipeline_number', required=True, type=int)
   parser.add_argument('--workflow_names', required=True)
-  parser.add_argument('--branch_filter', required=False, default=BRANCH)
+  parser.add_argument('--branch_filter', required=False, default=CURRENT_BRANCH)
   parser.add_argument('--branch_filter_is_regex', required=False, default=False, type=str2bool)
   parser.add_argument('--branch_ignores', required=False, default="^$")
   parser.add_argument('--max_age_seconds', required=False, default=0, type=int)
@@ -115,70 +65,15 @@ def parse_args():
     parser.error("Must provide a non-zero value for MAX_AGE_SECONDS if using a regex as the branch filter")
 
   if (args.branch_filter == ""):
-    args.branch_filter = BRANCH
+    args.branch_filter = CURRENT_BRANCH
 
-  if (re.match(args.branch_ignores, BRANCH)):
+  if (re.match(args.branch_ignores, CURRENT_BRANCH)):
     print("Skipping execution because branch is ignored")
     exit(0)
 
   print(f"Running with arguments: {args}")
 
   return args
-
-
-def fetch_previous_pipelines(current_pipeline_number: int, branch_filter: str, branch_filter_is_regex: bool, max_age_seconds: int) -> list[Pipeline]:
-  cutoff_date = (datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)) if max_age_seconds > 0 else datetime.fromtimestamp(0)
-  url = f"{BASE_CCI_API_URL}/project/github/{PROJECT_USERNAME}/{PROJECT_REPONAME}/pipeline"
-
-  if branch_filter_is_regex:
-    params = {}
-  else:
-    params = {"branch": branch_filter}
-
-  pipelines: list[Pipeline] = []
-  next_page_token = None
-
-  while True:
-    request_params = params | ({"page-token": next_page_token} if next_page_token else {})
-    print(f"Request params: {request_params}")
-    raw_response = requests.get(url, params = request_params, headers = HEADERS)
-    raw_response.raise_for_status()
-    response: PipelinesResponse = PipelinesResponse.Schema().load(raw_response.json())
-    next_page_token = response.next_page_token
-    pipelines += response.items
-    earliest_date = min(response.items, key=lambda x: x.created_at).created_at
-    print(f"Earliest date in page: {earliest_date}")
-    print(f"Largest number in page: {max(response.items, key=lambda x: x.number).number}")
-    print(f"Smallest number in page: {min(response.items, key=lambda x: x.number).number}")
-    if earliest_date.timestamp() < cutoff_date.timestamp():
-      print(f"Earliest date is older than cutoff date ({cutoff_date}), stopping")
-      break
-    if not next_page_token:
-      break
-
-  pipelines = [x for x in pipelines if x.created_at.timestamp() > cutoff_date.timestamp()]
-  pipelines = [x for x in pipelines if x.number < current_pipeline_number]
-
-  if branch_filter_is_regex:
-    pipelines = [x for x in pipelines if x.vcs and x.vcs.branch and re.match(branch_filter, x.vcs.branch)]
-
-  return pipelines
-
-def fetch_workflows(pipeline_id: str) -> list[Workflow]:
-  url = f"{BASE_CCI_API_URL}/pipeline/{pipeline_id}/workflow"
-  workflows: list[Workflow] = []
-  next_page_token = None
-  while True:
-    params = ({"page-token": next_page_token} if next_page_token else {})
-    raw_response = requests.get(url, params = params, headers = HEADERS)
-    raw_response.raise_for_status()
-    response: WorkflowsResponse = WorkflowsResponse.Schema().load(raw_response.json())
-    next_page_token = response.next_page_token
-    workflows += response.items
-    if not next_page_token:
-      break
-
-  return workflows
 
 def pipeline_workflows_complete(pipeline: Pipeline):
   return all([workflow.is_complete() for workflow in fetch_workflows(pipeline.id)])
@@ -191,19 +86,7 @@ def wait_for_pipeline_to_complete(pipeline: Pipeline):
       raise TimeoutError(f"Timed out after {MAX_TIMEOUT}")
 
 def cancel_if_waiting_or_wait_workflow(pipeline: Pipeline, workflow: Workflow, waiting_job_name: str):
-  url = f"{BASE_CCI_API_URL}/workflow/{workflow.id}/job"
-  jobs: list[Job] = []
-  next_page_token = None
-  while True:
-    params = ({"page-token": next_page_token} if next_page_token else {})
-    raw_response = requests.get(url, params = params, headers = HEADERS)
-    raw_response.raise_for_status()
-    response: JobsResponse = JobsResponse.Schema().load(raw_response.json())
-    next_page_token = response.next_page_token
-    jobs += response.items
-    if not next_page_token:
-      break
-
+  jobs = fetch_jobs(workflow)
   status = [x for x in jobs if x.name == waiting_job_name][0].status
   if status == "running" or status == "not_run":
     print(f"Workflow {workflow.name} ({workflow.id}) is waiting (the waiting job is in status {status}), cancelling it")
@@ -221,11 +104,6 @@ def wait_for_workflow_to_complete(pipeline: Pipeline, workflow: Workflow):
     time.sleep(5)
     if datetime.now() - START_TIME > MAX_TIMEOUT:
       raise TimeoutError(f"Timed out after {MAX_TIMEOUT}")
-
-def cancel_workflow(workflow_id: str):
-  url = f"{BASE_CCI_API_URL}/workflow/{workflow_id}/cancel"
-  raw_response = requests.post(url, headers = HEADERS)
-  raw_response.raise_for_status()
 
 def cancel_self_if_pipeline_running(pipeline: Pipeline):
   if not pipeline_workflows_complete(pipeline):
