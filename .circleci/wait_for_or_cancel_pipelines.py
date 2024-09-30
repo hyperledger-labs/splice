@@ -14,7 +14,6 @@ from marshmallow_dataclass import dataclass
 from marshmallow import EXCLUDE
 import marshmallow.validate
 
-MAX_TIMEOUT_MINUTES = 480
 BASE_CCI_API_URL = "https://circleci.com/api/v2"
 BRANCH=os.environ.get('CIRCLE_BRANCH')
 PROJECT_USERNAME = os.environ.get('CIRCLE_PROJECT_USERNAME')
@@ -67,6 +66,21 @@ class WorkflowsResponse:
   class Meta:
     unknown = EXCLUDE
 
+@dataclass
+class Job:
+  id: str
+  name: str
+  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "failed", "error", "failing", "on_hold", "canceled", "unauthorized", "blocked"])})
+  class Meta:
+    unknown = EXCLUDE
+
+@dataclass
+class JobsResponse:
+  next_page_token: str | None
+  items: list[Job]
+  class Meta:
+    unknown = EXCLUDE
+
 def str2bool(v):
     if isinstance(v, bool):
         return v
@@ -85,10 +99,12 @@ def parse_args():
   parser.add_argument('--branch_filter_is_regex', required=False, default=False, type=str2bool)
   parser.add_argument('--branch_ignores', required=False, default="^$")
   parser.add_argument('--max_age_seconds', required=False, default=0, type=int)
+  parser.add_argument('--waiting_job_name', required=False, default="wait_for_previous_pipeline")
   parser.add_argument('operation',
                       choices=[
                         'wait',
                         'wait_workflow',
+                        'cancel_waiting_and_wait_workflow',
                         'cancel_self',
                         'cancel_self_if_found',
                         'cancel_pipeline']
@@ -111,7 +127,7 @@ def parse_args():
 
 
 def fetch_previous_pipelines(current_pipeline_number: int, branch_filter: str, branch_filter_is_regex: bool, max_age_seconds: int) -> list[Pipeline]:
-  cutoff_date = (datetime.now() - timedelta(seconds=max_age_seconds)) if max_age_seconds > 0 else datetime.fromtimestamp(0)
+  cutoff_date = (datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)) if max_age_seconds > 0 else datetime.fromtimestamp(0)
   url = f"{BASE_CCI_API_URL}/project/github/{PROJECT_USERNAME}/{PROJECT_REPONAME}/pipeline"
 
   if branch_filter_is_regex:
@@ -174,6 +190,28 @@ def wait_for_pipeline_to_complete(pipeline: Pipeline):
     if datetime.now() - START_TIME > MAX_TIMEOUT:
       raise TimeoutError(f"Timed out after {MAX_TIMEOUT}")
 
+def cancel_if_waiting_or_wait_workflow(pipeline: Pipeline, workflow: Workflow, waiting_job_name: str):
+  url = f"{BASE_CCI_API_URL}/workflow/{workflow.id}/job"
+  jobs: list[Job] = []
+  next_page_token = None
+  while True:
+    params = ({"page-token": next_page_token} if next_page_token else {})
+    raw_response = requests.get(url, params = params, headers = HEADERS)
+    raw_response.raise_for_status()
+    response: JobsResponse = JobsResponse.Schema().load(raw_response.json())
+    next_page_token = response.next_page_token
+    jobs += response.items
+    if not next_page_token:
+      break
+
+  status = [x for x in jobs if x.name == waiting_job_name][0].status
+  if status == "running" or status == "not_run":
+    print(f"Workflow {workflow.name} ({workflow.id}) is waiting (the waiting job is in status {status}), cancelling it")
+    cancel_workflow(workflow.id)
+  else:
+    print(f"Workflow {workflow.name} ({workflow.id}) is already running, waiting for it to complete")
+    wait_for_workflow_to_complete(pipeline, workflow)
+
 def workflow_complete(pipeline: Pipeline, workflow: Workflow):
   return [x for x in fetch_workflows(pipeline.id) if x.id == workflow.id][0].is_complete()
 
@@ -213,20 +251,21 @@ def main(args):
     print(f"Pipeline {pipeline_number}, id {pipeline_id}, created at {pipeline.created_at} ({ago.total_seconds()} seconds ago)")
 
     workflows = fetch_workflows(pipeline_id)
-    # print(f"Found {len(workflows)} workflows: {workflows}")
     for workflow in workflows:
       if not workflow.name in args.workflow_names.split(" "):
-        # print(f"Skipping workflow {workflow.name}, not in workflow_names")
         continue
       print(f"Workflow {workflow.name}, id {workflow.id}, in workflow_names")
 
       match args.operation:
         case 'wait':
-          print(f"Pipline {pipeline_number} contains workflow {workflow.name}, waiting for the pipeline to complete")
+          print(f"Pipeline {pipeline_number} contains workflow {workflow.name}, waiting for the pipeline to complete")
           wait_for_pipeline_to_complete(pipeline)
         case 'wait_workflow':
-          print(f"Pipline {pipeline_number} contains workflow {workflow.name}, waiting for the workflow to complete")
+          print(f"Pipeline {pipeline_number} contains workflow {workflow.name}, waiting for the workflow to complete")
           wait_for_workflow_to_complete(pipeline, workflow)
+        case 'cancel_waiting_and_wait_workflow':
+          print(f"Pipeline {pipeline_number} contains workflow {workflow.name}, checking if it is also waiting, or already running")
+          cancel_if_waiting_or_wait_workflow(pipeline, workflow, args.waiting_job_name)
         case 'cancel_self':
           print(f"Pipeline contains workflow {workflow.name}, cancelling current workflow if pipeline is still running...")
           cancel_self_if_pipeline_running(pipeline)

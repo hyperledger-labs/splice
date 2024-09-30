@@ -463,6 +463,7 @@ jobs:
               --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
               --branch_ignores "<< parameters.branch_ignores >>" \
               --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              --waiting_job_name "wait_for_previous_pipeline" \
               << parameters.wait_type >>
 
   cancel_if_previous_pipeline:

@@ -3175,6 +3175,7 @@ jobs:
               --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
               --branch_ignores "<< parameters.branch_ignores >>" \
               --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              --waiting_job_name "wait_for_previous_pipeline" \
               << parameters.wait_type >>
 
   cancel_if_previous_pipeline:
@@ -5065,7 +5066,7 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_cimain"
-          wait_type: "wait_workflow"
+          wait_type: "cancel_waiting_and_wait_workflow"
       - deploy_cluster:
           <<: *main-branch-only
           context:
@@ -6619,7 +6620,7 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_upgrade"
-          wait_type: "wait_workflow"
+          wait_type: "cancel_waiting_and_wait_workflow"
           branch_filter: << pipeline.parameters.branch-filter >>
       - autoscaler_prevent_scaledown:
           cluster: << pipeline.parameters.cluster >>
