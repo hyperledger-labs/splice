@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Bugfixes
+
+    * Fix an issue where the ordering of stakeholders (signatories and observers) would be inconsistent across SVs
+      when calling the `/v0/updates` and `/v0/updates/{update_id}` endpoints on the Scan API.
+
 0.2.3
 -----
 
