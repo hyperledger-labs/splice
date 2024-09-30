@@ -750,7 +750,7 @@ commands:
       - run:
           name: Notify on slack
           command: |
-            ${REPO_ROOT}/.circleci/slack_notification.sh \
+            .circleci/slack_notification.sh \
               --cluster << parameters.cluster >> \
               --slack_channel << parameters.channel_notify >> \
               --branch_pattern "(deployment\\/.*|main|release-line.*)"
