@@ -4,3 +4,4 @@ synchronizerMigration:
     provider: internal
     releaseReference: "refs/tags/cilr"
   activeDatabaseId: 3
+persistentSequencerHeapDumps: true

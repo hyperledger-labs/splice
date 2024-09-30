@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
-defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8
+defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 cometbftPorts:
   nodes: 10
   domains: 5
