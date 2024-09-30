@@ -38,6 +38,8 @@ class ExpireAcceptedTransferOfferTrigger(
       transferOffersCodegen.AcceptedTransferOffer.COMPANION,
     ) {
 
+  override protected def extraMetricLabels = Seq("party" -> store.key.endUserParty.toString)
+
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
         AssignedContract[
