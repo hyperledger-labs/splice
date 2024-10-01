@@ -1331,6 +1331,7 @@ components:
         offset:
           description: |
             The ledger offset of the event.
+            Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
           type: string
         date:
           description: |
@@ -1433,6 +1434,7 @@ components:
         offset:
           description: |
             The absolute offset.
+            Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
           type: string
         record_time:
           description: |
@@ -1567,6 +1569,7 @@ components:
         offset:
           description: |
             The absolute offset.
+            Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
           type: string
         root_event_ids:
           description: |
@@ -1964,6 +1967,7 @@ components:
         offset:
           description: |
             The ledger offset of the event.
+            Note that this field may not be the same across nodes, and therefore should not be compared between SVs.
           type: string
         date:
           description: |
