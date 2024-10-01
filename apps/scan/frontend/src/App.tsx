@@ -23,7 +23,6 @@ import AppLeaderboard from './routes/appLeaderboard';
 import SynchronizerFeesLeaderboard from './routes/domainFeesLeaderboard';
 import DsoWithContexts from './routes/dso';
 import Root from './routes/root';
-import ScanValidatorLicenses from './routes/scanValidatorLicenses';
 import ValidatorFaucetsLeaderboard from './routes/validatorFaucetsLeaderboard';
 import ValidatorLeaderboard from './routes/validatorLeaderboard';
 import { useScanConfig } from './utils';
@@ -61,7 +60,6 @@ const router = createBrowserRouter(
       </Route>
       <Route path="/dso" element={<DsoWithContexts />} />
       <Route path="/governance" element={<ScanListVoteRequests />} />
-      <Route path="/validator-licenses" element={<ScanValidatorLicenses />} />
     </Route>
   )
 );

@@ -24,10 +24,6 @@ class AmuletMetricsTrigger(
     mat: Materializer,
 ) extends PollingTrigger {
 
-  override protected def extraMetricLabels = Seq(
-    "party" -> userWalletStore.key.endUserParty.toString
-  )
-
   val amuletMetrics = new AmuletMetrics(userWalletStore.key.endUserParty, context.metricsFactory)
 
   override def performWorkIfAvailable()(implicit

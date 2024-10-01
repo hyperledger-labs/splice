@@ -30,7 +30,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   private implicit val mc: MetricsContext = MetricsContext(
     "trigger_name" -> this.getClass.getSimpleName,
     "trigger_type" -> "polling",
-  ).withExtraLabels(extraMetricLabels*)
+  )
 
   protected def isRewardOperationTrigger: Boolean = false
 
@@ -68,7 +68,6 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           runningTaskFinishedVar = Some(Promise())
           // TODO(#8526) refactor for better latency reporting
           val latencyTimer = metrics.latency.startAsync()
-          metrics.iterations.mark()
           waitForReadyToWork()
             .flatMap(_ => performWorkIfAvailable())
             .transform { performedWork =>

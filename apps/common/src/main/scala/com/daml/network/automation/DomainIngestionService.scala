@@ -22,8 +22,6 @@ class DomainIngestionService(
       quiet = true,
     ) {
 
-  override protected def extraMetricLabels = Seq("party" -> sink.ingestionFilter.toString)
-
   override def completeTask(
       task: PeriodicTaskTrigger.PeriodicTask
   )(implicit tc: TraceContext): Future[TaskOutcome] =

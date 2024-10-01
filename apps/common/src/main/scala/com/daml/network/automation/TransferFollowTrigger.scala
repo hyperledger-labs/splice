@@ -36,8 +36,6 @@ class TransferFollowTrigger(
       LubTask
     ] {
 
-  override protected def extraMetricLabels = Seq("party" -> partyId.toString)
-
   override def retrieveTasks()(implicit tc: TraceContext) = retrieve(tc)
 
   override protected def completeTask(

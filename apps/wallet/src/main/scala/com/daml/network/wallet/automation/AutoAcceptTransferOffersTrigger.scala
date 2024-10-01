@@ -40,10 +40,6 @@ class AutoAcceptTransferOffersTrigger(
       transferOffersCodegen.TransferOffer,
     ](store, transferOffersCodegen.TransferOffer.COMPANION) {
 
-  override protected def extraMetricLabels = Seq(
-    "party" -> store.key.endUserParty.toString
-  )
-
   override protected def completeTask(
       transferOffer: AssignedContract[
         transferOffersCodegen.TransferOffer.ContractId,

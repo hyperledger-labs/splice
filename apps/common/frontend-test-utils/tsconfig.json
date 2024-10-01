@@ -3,8 +3,8 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "lib",
-    "isolatedModules": false,
-    "types": ["node", "vite/client"]
+    "moduleResolution": "node",
+    "module": "esnext"
   },
   "include": ["src"]
 }

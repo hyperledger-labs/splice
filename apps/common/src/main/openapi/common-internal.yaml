@@ -221,18 +221,3 @@ components:
           type: array
           items:
             type: object
-
-    ListValidatorLicensesResponse:
-      type: object
-      required:
-        - validator_licenses
-      properties:
-        validator_licenses:
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        next_page_token:
-          type: integer
-          format: int64
-          description: |
-            When requesting the next page of results, pass this as URL query parameter `after`.

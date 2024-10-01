@@ -43,10 +43,6 @@ class CompleteBuyTrafficRequestTrigger(
       trafficRequestCodegen.BuyTrafficRequest.COMPANION,
     ) {
 
-  override protected def extraMetricLabels = Seq(
-    "party" -> store.key.endUserParty.toString
-  )
-
   override def completeTask(
       trafficRequest: AssignedContract[
         trafficRequestCodegen.BuyTrafficRequest.ContractId,

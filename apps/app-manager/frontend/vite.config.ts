@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react';
-import { vitest_common_conf } from 'common-test-vite-utils';
+import { vitest_common_conf } from 'common-test-utils';
 import { defineConfig, loadEnv, mergeConfig } from 'vite';
 import viteTsconfigPaths from 'vite-tsconfig-paths';
 

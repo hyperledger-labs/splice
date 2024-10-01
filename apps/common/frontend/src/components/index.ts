@@ -20,7 +20,6 @@ import LoginFailed from './LoginFailed';
 import PartyId from './PartyId';
 import RateDisplay from './RateDisplay';
 import TitledTable from './TitledTable';
-import ValidatorLicenses, { ValidatorLicensesPage } from './ValidatorLicenses';
 import ViewMoreButton from './ViewMoreButton';
 import { TransferButton, SubscriptionButton } from './WalletButtons';
 import {
@@ -66,6 +65,4 @@ export {
   useVotesHooks,
   ListVoteRequests,
   ViewMoreButton,
-  ValidatorLicenses,
-  ValidatorLicensesPage,
 };
