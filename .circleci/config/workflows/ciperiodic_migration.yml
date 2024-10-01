@@ -91,7 +91,7 @@ workflow:
           base_version: << pipeline.parameters.base-version >>
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
-            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-only
