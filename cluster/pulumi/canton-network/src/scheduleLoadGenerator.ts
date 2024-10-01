@@ -6,6 +6,7 @@ import {
   config,
   exactNamespace,
   generatePortSequence,
+  imagePullSecret,
   installSpliceHelmChart,
   isDevNet,
   numInstances,
@@ -15,6 +16,8 @@ import {
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
   if (config.envFlag('K6_ENABLE_LOAD_GENERATOR')) {
     const xns = exactNamespace('load-tester', true);
+
+    const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
     const clusterHostname = `${CLUSTER_HOSTNAME}`;
 
@@ -91,7 +94,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
         }),
       },
       activeVersion,
-      { dependsOn: dependencies.concat([loopback]) }
+      { dependsOn: imagePullDeps.concat(dependencies).concat([loopback]) }
     );
   } else {
     console.log('K6 load test is disabled for this cluster. Skipping...');
