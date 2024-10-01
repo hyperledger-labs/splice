@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+0.2.4
+-----
+
+* Sequencer
+
+  Fix a rare bug where a lagging participant trying to submit a
+  topology transaction resulted in the sequencer deadlocking and not
+  processing any new events.
+
 0.2.3
 -----
 
