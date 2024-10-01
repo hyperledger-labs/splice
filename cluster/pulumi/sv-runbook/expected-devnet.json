@@ -626,7 +626,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
+      "deletionProtection": false,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -1334,7 +1334,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
+      "deletionProtection": false,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -1558,7 +1558,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
+      "deletionProtection": false,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
@@ -1618,7 +1618,7 @@
     "id": "",
     "inputs": {
       "databaseVersion": "POSTGRES_14",
-      "deletionProtection": true,
+      "deletionProtection": false,
       "region": "us-central1",
       "settings": {
         "activationPolicy": "ALWAYS",
