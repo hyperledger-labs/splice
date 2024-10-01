@@ -16,6 +16,15 @@ Upcoming
     * Fix an issue where the ordering of stakeholders (signatories and observers) would be inconsistent across SVs
       when calling the `/v0/updates` and `/v0/updates/{update_id}` endpoints on the Scan API.
 
+0.2.4
+-----
+
+* Sequencer
+
+  Fix a rare bug where a lagging participant trying to submit a
+  topology transaction resulted in the sequencer deadlocking and not
+  processing any new events.
+
 0.2.3
 -----
 
