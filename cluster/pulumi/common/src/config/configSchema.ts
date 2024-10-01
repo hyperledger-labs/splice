@@ -7,6 +7,8 @@ export const ConfigSchema = z.object({
     active: defaultActiveMigration,
   }),
   persistentSequencerHeapDumps: z.boolean().default(false),
+  // TODO(#15135) Remove this again
+  sequencerVeryHighResources: z.boolean().default(false),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
