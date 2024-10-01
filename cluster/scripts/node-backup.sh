@@ -170,7 +170,7 @@ function backup_postgres() {
   if [ "$type" == "canton:network:postgres" ]; then
     backup_pvc_postgres "$description" "$namespace" "$instance" "$migration_id"
   elif [ "$type" == "canton:cloud:postgres" ]; then
-    backup_cloudsql "$description" "$full_instance"
+    backup_cloudsql "$description" "$full_instance" "$stack"
   elif [ -z "$type" ]; then
     _error "No postgres instance $full_instance found. Is the cluster deployed with split DB instances?"
   else
