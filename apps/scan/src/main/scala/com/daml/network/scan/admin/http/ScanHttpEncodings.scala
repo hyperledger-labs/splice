@@ -152,8 +152,8 @@ sealed trait ScanHttpEncodings {
         event.getPackageName,
         encodeContractPayload(event),
         event.getCreatedAt.atOffset(ZoneOffset.UTC),
-        event.getSignatories.asScala.toVector,
-        event.getObservers.asScala.toVector,
+        event.getSignatories.asScala.toVector.sorted,
+        event.getObservers.asScala.toVector.sorted,
       )
   }
 
