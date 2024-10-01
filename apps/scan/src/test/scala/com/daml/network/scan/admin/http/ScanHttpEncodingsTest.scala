@@ -12,11 +12,17 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
+import com.daml.network.http.v0.definitions.TreeEvent.members.CreatedEvent as HttpCreatedEvent
+import com.daml.network.http.v0.definitions.UpdateHistoryItem
+import com.daml.network.http.v0.definitions.UpdateHistoryItem.members.UpdateHistoryTransaction as HttpUpdateHistoryTx
 import com.daml.network.store.{StoreTest, TreeUpdateWithMigrationId}
 import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.DomainId
 import org.scalatest.matchers.should.Matchers
+
+import java.time.Instant
+import scala.util.Random
 
 class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers {
 
@@ -129,6 +135,44 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val decoded = LosslessScanHttpEncodings.httpToLapiUpdate(encoded)
 
     decoded shouldBe original
+  }
+
+  "return observers and signatories sorted" in {
+    val signatories = ('a' to 'd').map(c => mkPartyId(c.toString))
+    val observers = ('c' to 'f').map(c => mkPartyId(c.toString))
+    val tree = TreeUpdateWithMigrationId(
+      update = LedgerClient.GetTreeUpdatesResponse(
+        update = TransactionTreeUpdate(
+          mkCreateTx(
+            "000a",
+            Seq(
+              amulet(mkPartyId("Alice"), 42.0, 13L, 2.0)
+            ),
+            Instant.now(),
+            createdEventSignatories = Random.shuffle(signatories),
+            dummyDomain,
+            "",
+            createdEventObservers = Random.shuffle(observers),
+          )
+        ),
+        domainId = dummyDomain,
+      ),
+      migrationId = 42L,
+    )
+
+    def check(item: UpdateHistoryItem) = {
+      inside(item) { case HttpUpdateHistoryTx(tx) =>
+        inside(tx.eventsById(tx.rootEventIds.loneElement)) { case HttpCreatedEvent(value) =>
+          value.signatories should be(signatories.map(_.toProtoPrimitive))
+          value.observers should be(observers.map(_.toProtoPrimitive))
+        }
+      }
+    }
+
+    val encodedLossless = LosslessScanHttpEncodings.lapiToHttpUpdate(tree)
+    check(encodedLossless)
+    val encodedLossy = LossyScanHttpEncodings.lapiToHttpUpdate(tree)
+    check(encodedLossy)
   }
 
 }

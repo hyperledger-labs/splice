@@ -68,3 +68,4 @@ apps/splitwell/src/test/resources/splitwell-bundle*.tar.gz
 .ignore
 
 **/SingletonCookie
+__pycache__/
