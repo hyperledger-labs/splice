@@ -2542,7 +2542,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
@@ -9230,7 +9230,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": true,
+        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {

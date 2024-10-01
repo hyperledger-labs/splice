@@ -86,7 +86,14 @@ export function installParticipant(
         },
         additionalJvmOptions: jmxOptions(),
         enablePostgresMetrics: true,
-        ...autoInitValues('cn-participant', version, nodeIdentifier),
+        ...autoInitValues(
+          'cn-participant',
+          version,
+          nodeIdentifier,
+          // TODO(#13665) Remove this once base version is upgraded to 0.2.x
+          // We always enable auto init for the validator runbook
+          false
+        ),
       },
       version,
       {

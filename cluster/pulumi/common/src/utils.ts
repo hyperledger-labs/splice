@@ -249,7 +249,8 @@ const withoutAutoInit = (version: CnChartVersion) =>
 export const autoInitValues = (
   chartName: string,
   version: CnChartVersion,
-  nodeIdentifier: string
+  nodeIdentifier: string,
+  disableAutoInit: boolean = true
 ): ChartValues => {
   const versionStr =
     version.type === 'local' ? 'local charts' : `remote charts version ${version.version}`;
@@ -261,7 +262,7 @@ export const autoInitValues = (
       `Chart ${chartName} for ${nodeIdentifier} is using ${versionStr}, setting auto init values`
     );
     return {
-      disableAutoInit: true,
+      disableAutoInit,
       nodeIdentifier,
     };
   }
