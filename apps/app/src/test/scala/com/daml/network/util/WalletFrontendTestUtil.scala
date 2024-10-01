@@ -46,6 +46,11 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
               case Some(errDetails) if errDetails.contains("UNABLE_TO_GET_TOPOLOGY_SNAPSHOT") =>
                 tap()
                 fail("Tapping again due to UNABLE_TO_GET_TOPOLOGY_SNAPSHOT error")
+              case Some(errDetails)
+                  if errDetails.contains("Traffic balance below reserved traffic amount") =>
+                // Wait for traffic topup trigger to do its thing
+                tap()
+                fail("Tapping again due to Traffic balance below reserved traffic amount error")
               case errDetails => errDetails
             },
           )
