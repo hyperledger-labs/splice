@@ -42,7 +42,6 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
-import com.daml.network.environment.BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.topology.{DomainId, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId

@@ -1,6 +1,5 @@
 package com.daml.network.util
 
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
@@ -30,7 +29,7 @@ import org.scalatest.Assertion
 trait UpdateHistoryTestUtil extends TestCommon {
 
   def updateHistoryFromParticipant(
-      beginExclusive: ParticipantOffset,
+      beginExclusive: String,
       partyId: PartyId,
       participant: ParticipantClientReference,
   ): Seq[GetTreeUpdatesResponse] = {
@@ -40,8 +39,8 @@ trait UpdateHistoryTestUtil extends TestCommon {
       .trees(
         partyIds = Set(partyId),
         completeAfter = Int.MaxValue,
-        beginOffset = beginExclusive,
-        endOffset = Some(ledgerEnd),
+        beginOffsetExclusive = beginExclusive,
+        endOffsetInclusive = ledgerEnd,
         verbose = false,
       )
       .map {
@@ -66,7 +65,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
   def compareHistory(
       participant: ParticipantClientReference,
       updateHistory: UpdateHistory,
-      ledgerBegin: ParticipantOffset,
+      ledgerBegin: String,
       mustIncludeReassignments: Boolean = false,
   ): Assertion = {
     val actualUpdates =
@@ -136,7 +135,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
   }
 
   def compareHistoryViaScanApi(
-      ledgerBegin: ParticipantOffset,
+      ledgerBegin: String,
       svAppBackend: SvAppBackendReference,
       scanClient: ScanAppClientReference,
   ): Assertion = {

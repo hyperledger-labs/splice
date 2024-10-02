@@ -36,7 +36,7 @@ import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf.ByteString
+import com.google.protobuf.{ByteString, Duration}
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
@@ -236,6 +236,8 @@ private[environment] class LedgerClient(
         if (!offset.isEmpty) {
           commandsBuilder.setDeduplicationOffset(offset)
         }
+      case DedupDuration(duration) =>
+        commandsBuilder.setDeduplicationDuration(duration)
       case NoDedup =>
     }
 
