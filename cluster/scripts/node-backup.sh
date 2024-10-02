@@ -253,13 +253,10 @@ function main() {
   local requested_component="${4:-}"
 
   # TODO(#9361): support multiple domains / non-default-ID'd ones
-
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
   if [ "$1" == "validator" ]; then
     _info "Backing up validator $namespace"
-    local stack="$namespace"
-    if [ "$namespace" == "splitwell" ]; then
-      stack="canton-network"
-    fi
     backup_component "$namespace" "validator" "$requested_component" "$migration_id" "$stack"
     wait_for_backup "$namespace" "validator" "$requested_component" "$migration_id" "$stack"
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
@@ -268,20 +265,20 @@ function main() {
   elif [ "$1" == "sv" ]; then
     _info "Backing up SV node $namespace"
 
-    backup_component "$namespace" "cn-apps" "$requested_component" "$migration_id" "canton-network"
-    backup_component "$namespace" "mediator" "$requested_component" "$migration_id" "canton-network"
-    backup_component "$namespace" "sequencer" "$requested_component" "$migration_id" "canton-network"
-    backup_component "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id" "canton-network"
+    backup_component "$namespace" "cn-apps" "$requested_component" "$migration_id" "$stack"
+    backup_component "$namespace" "mediator" "$requested_component" "$migration_id" "$stack"
+    backup_component "$namespace" "sequencer" "$requested_component" "$migration_id" "$stack"
+    backup_component "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id" "$stack"
 
-    wait_for_backup "$namespace" "cn-apps" "$requested_component" "$migration_id" "canton-network"
+    wait_for_backup "$namespace" "cn-apps" "$requested_component" "$migration_id" "$stack"
 
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant" "$requested_component" "$migration_id" "canton-network"
+    backup_component "$namespace" "participant" "$requested_component" "$migration_id" "$stack"
 
-    wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id" "canton-network"
-    wait_for_backup "$namespace" "mediator" "$requested_component" "$migration_id" "canton-network"
-    wait_for_backup "$namespace" "sequencer" "$requested_component" "$migration_id" "canton-network"
-    wait_for_backup "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id" "canton-network"
+    wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id" "$stack"
+    wait_for_backup "$namespace" "mediator" "$requested_component" "$migration_id" "$stack"
+    wait_for_backup "$namespace" "sequencer" "$requested_component" "$migration_id" "$stack"
+    wait_for_backup "$namespace" "cometbft-$migration_id" "$requested_component" "$migration_id" "$stack"
   else
     usage
     exit 1

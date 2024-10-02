@@ -188,7 +188,9 @@ function restore_cloudsql_postgres() {
   MAX_RETRIES=20
   retry_count=0
 
-  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "canton-network")
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
+  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
   backup_id=$(gcloud sql backups list --instance "$cloudsql_id" --filter="description=\"$run_id\"" --format=json | jq -r '.[].id')
 
   _warning "This operation will restore the CloudSQL DB instance $cloudsql_id from backup, overwriting its current data."
@@ -238,6 +240,8 @@ function restore_component() {
   local -r migration_id=$3
   local -r run_id=$4
   local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
 
   if [ "$component" == "cometbft" ]; then
     _info "Restoring cometbft"
@@ -246,7 +250,7 @@ function restore_component() {
     kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=1
   else
     _info "Restoring $component"
-    type=$(get_postgres_type "$namespace-$component-pg" "canton-network")
+    type=$(get_postgres_type "$namespace-$component-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         restore_pvc_postgres "$namespace" "$component" "$run_id"
@@ -265,7 +269,9 @@ function wait_cloudsql_restore() {
   local -r namespace=$1
   local -r component=$2
 
-  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "canton-network")
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
+  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
 
   local -i i=0
   _info "Waiting for restore of $component to finish..."
@@ -286,11 +292,13 @@ function wait_cloudsql_restore() {
 function wait_restore_component() {
   local -r namespace=$1
   local -r component=$2
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
 
   if [ "$component" == "cometbft" ]; then
     _info "Nothing to do, cometbft restore is currently synchronous"
   else
-    type=$(get_postgres_type "$namespace-$component-pg" "canton-network")
+    type=$(get_postgres_type "$namespace-$component-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         _info "Nothing to do, self-hosted postgres restore is currently synchronous"

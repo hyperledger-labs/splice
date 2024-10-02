@@ -11,3 +11,18 @@ function get_cloudsql_id() {
 
   cncluster pulumi "$stack" stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
 }
+
+function get_stack_for_namespace() {
+  local namespace=$1
+
+  local stack=""
+  if [[ "${namespace}" =~ sv.* ]]; then
+    stack="canton-network"
+  elif [ "$namespace" == "splitwell" ]; then
+      stack="canton-network"
+  else
+      stack="$namespace"
+  fi
+
+  echo $stack
+}
