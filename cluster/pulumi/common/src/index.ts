@@ -17,3 +17,5 @@ export * from './spliceInstanceNames';
 export * from './utils';
 export * from './packageConfig';
 export * from './stackReferences';
+export * from './artifacts';
+export * from './config/migrationSchema';

@@ -5,7 +5,7 @@ runForAllMigrations(async (stack, migration, sv) => {
     parallel: 128,
     diff: true,
   });
-  console.log(`[migration=${migration.migrationId}]Previewing stack for ${sv}`);
+  console.log(`[migration=${migration.id}]Previewing stack for ${sv}`);
   console.error(preview.stderr);
   console.log(preview.stdout);
   console.log(JSON.stringify(preview.changeSummary));

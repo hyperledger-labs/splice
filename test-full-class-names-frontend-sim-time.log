@@ -1,0 +1,4 @@
+com.daml.network.integration.tests.ScanFrontendTimeBasedIntegrationTest
+com.daml.network.integration.tests.SvFrontendTimeBasedIntegrationTest
+com.daml.network.integration.tests.WalletFrontendTimeBasedIntegrationTest
+com.daml.network.integration.tests.WalletTransactionHistoryFrontendTimeBasedIntegrationTest

@@ -138,6 +138,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       companion: C,
       after: Option[Long],
       limit: Limit,
+      sortOrder: SortOrder,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,

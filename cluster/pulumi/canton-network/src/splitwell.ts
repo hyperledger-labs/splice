@@ -5,7 +5,6 @@ import {
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_HOSTNAME,
-  defaultVersion,
   exactNamespace,
   ExactNamespace,
   DecentralizedSynchronizerMigrationConfig,
@@ -14,12 +13,15 @@ import {
   ValidatorTopupConfig,
   config,
   splitwellDarPath,
+  imagePullSecret,
+  CnInput,
+  activeVersion,
 } from 'splice-pulumi-common';
+import { installMigrationSpecificValidatorParticipant } from 'splice-pulumi-common-validator/src/migrationSpecificParticipant';
+import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import * as postgres from '../../common/src/postgres';
-import { installMigrationSpecificValidatorParticipant } from './participant';
-import { installValidatorApp } from './validator';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,
@@ -34,7 +36,6 @@ export async function installSplitwell(
   topupConfig?: ValidatorTopupConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell', true);
-
   const sharedPostgres = splitPostgresInstances
     ? undefined
     : postgres.installPostgres(xns, 'splitwell-pg', 'splitwell-pg', splitPostgresInstances);
@@ -48,21 +49,22 @@ export async function installSplitwell(
         hostname: CLUSTER_HOSTNAME,
       },
     },
-    defaultVersion,
+    activeVersion,
     { dependsOn: [xns.ns] }
   );
 
-  installIngress(xns);
+  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+
+  installIngress(xns, imagePullDeps);
 
   const participant = installMigrationSpecificValidatorParticipant(
     decentralizedSynchronizerMigrationConfig,
     xns,
     sharedPostgres,
-    participantBootstrapDump,
     'splitwell',
     auth0Client.getCfg(),
     undefined,
-    dependsOn.concat([loopback])
+    imagePullDeps.concat(dependsOn).concat([loopback])
   );
 
   const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', 'sw-pg', true);
@@ -79,10 +81,10 @@ export async function installSplitwell(
         enable: true,
       },
       migration: {
-        id: decentralizedSynchronizerMigrationConfig.active.migrationId,
+        id: decentralizedSynchronizerMigrationConfig.active.id,
       },
       scanAddress: scanAddress,
-      participantHost: participant.name,
+      participantHost: participant.participantAddress,
       persistence: {
         host: swPostgres.address,
         databaseName: pulumi.Output.create(splitwellDbName),
@@ -93,22 +95,23 @@ export async function installSplitwell(
       },
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
-    defaultVersion,
-    { dependsOn: dependsOn.concat([participant]) }
+    activeVersion,
+    { dependsOn: imagePullDeps.concat(dependsOn) }
   );
 
   const validatorPostgres =
     sharedPostgres || postgres.installPostgres(xns, 'validator-pg', 'validator-pg', true);
   const validatorDbName = 'val_splitwell';
 
-  const extraDependsOn = dependsOn
+  const extraDependsOn = imagePullDeps
+    .concat(dependsOn)
     .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'splice'))
     .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'cn'));
 
   const validator = await installValidatorApp({
     xns,
     extraDependsOn,
-    dependencies: [participant],
+    dependencies: [],
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     additionalUsers: [
       auth0UserNameEnvVar('splitwell'),
@@ -126,7 +129,7 @@ export async function installSplitwell(
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     svSponsorAddress: `http://sv-app.sv-1:5014`,
     participantBootstrapDump,
-    participantAddress: participant.name,
+    participantAddress: participant.participantAddress,
     topupConfig: topupConfig,
     svValidator: false,
     persistenceConfig: {
@@ -155,12 +158,15 @@ export async function installSplitwell(
   return validator;
 }
 
-function installIngress(xns: ExactNamespace) {
+function installIngress(xns: ExactNamespace, dependsOn: CnInput<pulumi.Resource>[]) {
   installSpliceHelmChart(xns, 'cluster-ingress-splitwell-uis', 'cn-cluster-ingress-runbook', {
     cluster: {
       hostname: CLUSTER_HOSTNAME,
       svNamespace: xns.logicalName,
     },
     withSvIngress: false,
+    opts: {
+      dependsOn: dependsOn,
+    },
   });
 }

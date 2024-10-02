@@ -38,6 +38,8 @@ class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Contrac
       companion,
     ) {
 
+  override protected def extraMetricLabels = Seq("party" -> partyId.toString)
+
   override protected def completeTask(
       task: AssignedContract[
         TCid,

@@ -12,6 +12,7 @@ images := \
 	\
 	splice-app \
 	splice-debug \
+	splice-web-ui \
 	sv-app \
 	sv-web-ui \
 	scan-app \
@@ -32,6 +33,7 @@ images := \
 
 canton-image := cluster/images/canton
 splice-image := cluster/images/splice-app
+splice-ui-image := cluster/images/splice-web-ui
 
 ifdef CI
     # never use the cache in CI on the master branch

@@ -55,9 +55,12 @@ abstract class WalletAppReference(
     "This function will only be available in the devnet. It allows creating amulets for testing purposes." +
       "Returns the contract ID of the created contract. "
   )
-  def tap(usdAmount: BigDecimal): amuletCodegen.Amulet.ContractId = {
+  def tap(
+      usdAmount: BigDecimal,
+      commandId: Option[String] = None,
+  ): amuletCodegen.Amulet.ContractId = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.Tap(usdAmount))
+      httpCommand(HttpWalletAppClient.Tap(usdAmount, commandId))
     }
   }
 

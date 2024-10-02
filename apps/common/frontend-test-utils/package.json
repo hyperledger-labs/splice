@@ -2,14 +2,9 @@
   "name": "common-test-utils",
   "version": "0.1.0",
   "private": true,
-  "types": "./lib/types/index.d.ts",
+  "types": ".lib/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./lib/types/index.d.ts",
-      "import": "./lib/esm/index.js",
-      "require": "./lib/cjs/index.js",
-      "default": "./lib/esm/index.js"
-    }
+    ".": "./lib/index.js"
   },
   "devDependencies": {
     "@trivago/prettier-plugin-sort-imports": "4.0.0",
@@ -21,14 +16,13 @@
     "typescript": "4.9.5"
   },
   "scripts": {
-    "build": "npm run build:tsc && node ./write-package-jsons.js",
-    "build:tsc": "tsc -b ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
+    "build": "tsc",
     "check": "npm run format:check && npm run lint:check",
     "fix": "npm run format:fix && npm run lint:fix",
     "format:check": "prettier --check -- src",
     "format:fix": "prettier --write -- src",
     "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
     "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
-    "start": "nodemon -V -e ts,json -i lib/ -x \"npm run build\""
+    "start": "tsc --watch"
   }
 }

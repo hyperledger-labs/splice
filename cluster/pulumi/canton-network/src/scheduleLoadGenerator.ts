@@ -1,11 +1,12 @@
 import { Resource } from '@pulumi/pulumi';
 import {
+  activeVersion,
   Auth0Client,
   CLUSTER_HOSTNAME,
-  defaultVersion,
   config,
   exactNamespace,
   generatePortSequence,
+  imagePullSecret,
   installSpliceHelmChart,
   isDevNet,
   numInstances,
@@ -15,6 +16,8 @@ import {
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
   if (config.envFlag('K6_ENABLE_LOAD_GENERATOR')) {
     const xns = exactNamespace('load-tester', true);
+
+    const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
     const clusterHostname = `${CLUSTER_HOSTNAME}`;
 
@@ -28,12 +31,13 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           hostname: CLUSTER_HOSTNAME,
         },
       },
-      defaultVersion,
+      activeVersion,
       { dependsOn: [xns.ns] }
     );
 
     const oauthDomain = `https://${auth0Client.getCfg().auth0Domain}`;
     const oauthClientId = auth0Client.getCfg().namespaceToUiToClientId?.validator1?.wallet;
+    const audience = config.requireEnv('OIDC_AUTHORITY_VALIDATOR_AUDIENCE');
     const usersPassword = config.requireEnv('K6_USERS_PASSWORD');
 
     // use internal cluster hostnames for the prometheus endpoint
@@ -46,6 +50,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
         kind: 'oauth',
         oauthDomain,
         oauthClientId,
+        audience,
         usersPassword,
         managementApi: {
           clientId: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
@@ -64,7 +69,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
         auth: {
           kind: 'self-signed',
           user: `validator-user-${validator}`,
-          audience: 'https://canton.network.global',
+          audience,
           secret: 'test',
         },
       }))
@@ -88,8 +93,8 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           },
         }),
       },
-      defaultVersion,
-      { dependsOn: dependencies.concat([loopback]) }
+      activeVersion,
+      { dependsOn: imagePullDeps.concat(dependencies).concat([loopback]) }
     );
   } else {
     console.log('K6 load test is disabled for this cluster. Skipping...');

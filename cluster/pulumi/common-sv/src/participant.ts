@@ -5,6 +5,7 @@ import {
   Auth0Config,
   autoInitValues,
   ChartValues,
+  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
   installSpliceHelmChart,
@@ -60,7 +61,8 @@ export function installSvParticipant(
     },
     auth: {
       ...participantValues.auth,
-      targetAudience: auth0Config.appToApiAudience['participant'],
+      targetAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      jwksUrl: `https://${auth0Config.auth0Domain}/.well-known/jwks.json`,
     },
   };
 

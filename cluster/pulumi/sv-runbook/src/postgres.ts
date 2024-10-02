@@ -9,15 +9,17 @@ import {
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
 const cloudSqlEnabled = config.envFlag('SV_RUNBOOK_ENABLE_CLOUD_SQL', false);
+const supportsSvRunbookReset = config.envFlag('SUPPORTS_SV_RUNBOOK_RESET', false);
 
 export function installPostgres(
   xns: ExactNamespace,
   name: string,
   secretName: string,
-  selfHostedValuesFile: string
+  selfHostedValuesFile: string,
+  isActive: boolean = true
 ): SplicePostgres | CloudPostgres {
   if (cloudSqlEnabled) {
-    return new CloudPostgres(xns, name, name, secretName);
+    return new CloudPostgres(xns, name, name, secretName, isActive, supportsSvRunbookReset);
   } else {
     const valuesFromFile = loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`

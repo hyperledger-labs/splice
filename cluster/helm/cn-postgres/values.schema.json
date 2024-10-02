@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "required": ["db", "persistence"],
+  "properties": {
+    "imageRepo": {
+      "type": "string"
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["number", "string"]
+            },
+            "memory": {
+              "type": ["number", "string"]
+            }
+          }
+        },
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["number", "string"]
+            },
+            "memory": {
+              "type": ["number", "string"]
+            }
+          }
+        }
+      }
+    },
+    "db": {
+      "type": "object",
+      "required": [
+        "volumeSize",
+        "volumeStorageClass",
+        "pvcTemplateName",
+        "maxConnections"
+      ],
+      "properties": {
+        "volumeSize": {
+          "type": "string"
+        },
+        "volumeStorageClass": {
+          "type": "string"
+        },
+        "pvcTemplateName": {
+          "type": "string"
+        },
+        "maxConnections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxWalSize": {
+          "type": "string"
+        }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "required": ["secretName"],
+      "properties": {
+        "databaseName": {
+          "type": "string"
+        },
+        "secretName": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      }
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    }
+  }
+}

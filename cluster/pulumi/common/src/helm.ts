@@ -5,9 +5,11 @@ import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
-import { artifactsRepository, CnChartVersion, parsedVersion, repositories } from './artifacts';
+import { CnChartVersion, repositories } from './artifacts';
 import { config } from './config';
+import { activeVersion } from './domainMigration';
 import {
+  artifactsRepository,
   ChartValues,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
@@ -27,10 +29,6 @@ export type SpliceCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'de
 // pulumi.Input<T> allows Promise<T>, which can cause issues with our deployment scripts (i.e. auth0 token cache)
 // if not awaited. this custom type is a subset that excludes promises, which gives us some type safety
 export type CnInput<T> = T | pulumi.OutputInstance<T>;
-
-export const CHARTS_VERSION = config.optionalEnv('CHARTS_VERSION');
-
-export const defaultVersion: CnChartVersion = parsedVersion(CHARTS_VERSION);
 
 const versionsFile: string | undefined = config.optionalEnv('IMAGE_VERSIONS_FILE');
 const versionsFromFile: undefined | { [key: string]: { [key: string]: string } } =
@@ -53,7 +51,7 @@ function installSpliceHelmChartByNamespaceName(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  version: CnChartVersion = defaultVersion,
+  version: CnChartVersion = activeVersion,
   opts?: SpliceCustomResourceOptions,
   includeNamespaceInName = true,
   affinityAndTolerations = appsAffinityAndTolerations,
@@ -82,7 +80,7 @@ export function installSpliceHelmChart(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  version: CnChartVersion = defaultVersion,
+  version: CnChartVersion = activeVersion,
   opts?: SpliceCustomResourceOptions,
   includeNamespaceInName = true,
   affinityAndTolerations = appsAffinityAndTolerations,
@@ -116,8 +114,11 @@ function cnChartValues(
     {},
     chartDefaultValues,
     {
-      // No need to use artifactory as an image repo for our core nodes
-      imageRepo: repositories.google.dockerImages,
+      // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
+      imageRepo:
+        version.type === 'local' || artifactsRepository === 'google'
+          ? repositories.google.dockerImages
+          : undefined,
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         name: CLUSTER_NAME,
@@ -140,7 +141,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
   name: string,
   chartName: string,
   values: ChartValues,
-  version: CnChartVersion = defaultVersion,
+  version: CnChartVersion = activeVersion,
   opts?: SpliceCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {
@@ -154,7 +155,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
       repositoryOpts: repositoryOpts(version),
       values: {
         ...values,
-        // Here we do want to use artifactory images, so we know this works for our partners
+        // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
         imageRepo:
           version.type === 'local' || artifactsRepository === 'google'
             ? repositories.google.dockerImages
@@ -174,7 +175,7 @@ export function installSpliceRunbookHelmChart(
   name: string,
   chartName: string,
   values: ChartValues,
-  version: CnChartVersion = defaultVersion,
+  version: CnChartVersion = activeVersion,
   opts?: SpliceCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): k8s.helm.v3.Release {

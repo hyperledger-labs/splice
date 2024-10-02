@@ -3,18 +3,13 @@
 
 package com.daml.network.store
 
-import cats.kernel.Semigroup
 import com.daml.network.store.HistoryBackfilling.Outcome.{
   BackfillingIsComplete,
   MoreWorkAvailableLater,
   MoreWorkAvailableNow,
 }
-import com.daml.network.store.HistoryBackfilling.{
-  DestinationHistory,
-  DomainRecordTimeRange,
-  Outcome,
-  SourceHistory,
-}
+import com.daml.network.store.HistoryBackfilling.{DestinationHistory, Outcome, SourceHistory}
+import com.daml.network.util.DomainRecordTimeRange
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
@@ -252,14 +247,6 @@ object HistoryBackfilling {
       */
     final case object BackfillingIsComplete extends Outcome
   }
-
-  final case class DomainRecordTimeRange(
-      min: CantonTimestamp,
-      max: CantonTimestamp,
-  )
-  implicit def domainTimeRangeSemigroupUnion: Semigroup[DomainRecordTimeRange] =
-    (x: DomainRecordTimeRange, y: DomainRecordTimeRange) =>
-      DomainRecordTimeRange(x.min min y.min, x.max max y.max)
 
   final case class MigrationInfo(
       previousMigrationId: Option[Long],

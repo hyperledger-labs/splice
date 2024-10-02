@@ -1,9 +1,11 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as semver from 'semver';
+import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
 import {
+  activeVersion,
   appsAffinityAndTolerations,
   BackupConfig,
   btoa,
@@ -13,10 +15,11 @@ import {
   CnInput,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
-  defaultVersion,
+  DEFAULT_AUDIENCE,
   ExactNamespace,
   exactNamespace,
   fetchAndInstallParticipantBootstrapDump,
+  imagePullSecret,
   initialPackageConfigJson,
   initialSynchronizerFeesConfig,
   installAuth0Secret,
@@ -38,13 +41,15 @@ import {
   SvParticipant,
 } from 'splice-pulumi-common-sv';
 import { SvConfig } from 'splice-pulumi-common-sv/src/config';
+import {
+  installValidatorApp,
+  installValidatorSecrets,
+} from 'splice-pulumi-common-validator/src/validator';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
+import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
-import * as postgres from '../../common/src/postgres';
-import { Postgres } from '../../common/src/postgres';
 import { installCanton } from './canton';
-import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export function installSvKeySecret(
   xns: ExactNamespace,
@@ -130,9 +135,10 @@ export async function installSvNode(
         hostname: CLUSTER_HOSTNAME,
       },
     },
-    defaultVersion,
+    activeVersion,
     { dependsOn: [xns.ns] }
   );
+  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
     await installAuth0Secret(
@@ -203,7 +209,8 @@ export async function installSvNode(
     .concat([identitiesBackupConfigSecret])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat([loopback]);
+    .concat([loopback])
+    .concat(imagePullDeps);
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
@@ -268,8 +275,8 @@ export async function installSvNode(
       ingress: {
         decentralizedSynchronizer: {
           migrationIds: decentralizedSynchronizerUpgradeConfig
-            .allMigrationInfos()
-            .map(x => x.migrationId.toString()),
+            .runningMigrations()
+            .map(x => x.id.toString()),
         },
       },
       cluster: {
@@ -278,7 +285,7 @@ export async function installSvNode(
         svIngressName: config.ingressName,
       },
     },
-    defaultVersion,
+    activeVersion,
     { dependsOn: [xns.ns] }
   );
 
@@ -315,12 +322,12 @@ async function installValidator(
   });
 
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.sv-2.${CLUSTER_HOSTNAME}`;
+  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;
 
   const validator = await installValidatorApp({
     xns,
     migration: {
-      id: decentralizedSynchronizerMigrationConfig.active.migrationId,
+      id: decentralizedSynchronizerMigrationConfig.active.id,
     },
     validatorWalletUser: svConfig.validatorWalletUser,
     dependencies: sv.participant.asDependencies,
@@ -389,7 +396,7 @@ function installSvApp(
         sequencerAddress: decentralizedSynchronizer.namespaceInternalSequencerAddress,
         mediatorAddress: decentralizedSynchronizer.namespaceInternalMediatorAddress,
         // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {
@@ -422,7 +429,7 @@ function installSvApp(
     onboardingPollingInterval: config.onboardingPollingInterval,
     enablePostgresMetrics: true,
     auth: {
-      audience: config.auth0Client.getCfg().appToApiAudience['sv'],
+      audience: config.auth0Client.getCfg().appToApiAudience['sv'] || DEFAULT_AUDIENCE,
       jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
     },
     contactPoint: daContactPoint,
@@ -440,7 +447,7 @@ function installSvApp(
     `sv-app`,
     'cn-sv-node',
     svValues,
-    defaultVersion,
+    activeVersion,
     {
       dependsOn: dependsOn
         .concat([postgres])
@@ -478,13 +485,13 @@ function installScan(
     sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
     participantAddress: participant.internalClusterAddress,
     migration: {
-      id: decentralizedSynchronizerMigrationConfig.active.migrationId,
+      id: decentralizedSynchronizerMigrationConfig.active.id,
     },
     enablePostgresMetrics: true,
     // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
     clusterUrl: CLUSTER_HOSTNAME,
   };
-  const scan = installSpliceHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
+  const scan = installSpliceHelmChart(xns, `scan`, 'cn-scan', scanValues, activeVersion, {
     dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
   });
   return scan;
@@ -492,6 +499,6 @@ function installScan(
 
 // TODO (#13845) remove when ciperiodic version >= 0.1.18
 const supportsRenamedFounder =
-  defaultVersion.type == 'local' ||
-  defaultVersion.version.startsWith('0.1.18') ||
-  semver.gt(defaultVersion.version, '0.1.18');
+  activeVersion.type == 'local' ||
+  activeVersion.version.startsWith('0.1.18') ||
+  semver.gt(activeVersion.version, '0.1.18');

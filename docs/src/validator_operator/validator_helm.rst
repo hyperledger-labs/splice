@@ -201,7 +201,8 @@ CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-validator-auth-secrets-config` and :ref:`helm-validator-install`.
 
-By default, all audience values are configured to be ``https://canton.network.global``.
+When first starting out, it is suggested to configure both JWT token audiences below to the same value: ``https://canton.network.global``.
+
 Once you can confirm that your setup is working correctly using this (simple) default,
 we recommend that you configure dedicated audience values that match your deployment and URLs.
 You can configure audiences of your choice for the participant ledger API and the validator backend API.
@@ -307,8 +308,7 @@ The validator app backend requires the following secret.
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
-        # Optional. uncomment it if you want to set audience for ledger API
-        # "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
+        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 To setup the wallet and CNS UI, create the following two secrets.
 
@@ -339,7 +339,7 @@ version of the Helm charts necessary to connect to this environment:
 
 Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` as follows:
 
-- If you want to configure the audience for the participant, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``.
+- Replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``. If you are not ready to use a custom audience, you can use the suggested default ``https://canton.network.global``.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
@@ -356,7 +356,7 @@ To configure the validator app, please modify the file ``splice-node/examples/sv
 - Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, e.g., ``https://scan.sv-1.TARGET_CLUSTER.global.canton.network.sync.global``
   (This Scan instance will be used for obtaining additional Scan URLs for BFT Scan reads.)
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
-- If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
+- If you want to configure the audience for the Ledger API, set the ``audience`` field in the `splice-app-validator-ledger-api-auth` k8s secret with the audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.

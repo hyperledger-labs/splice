@@ -113,8 +113,38 @@ function up() {
   local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
 
   for deployment_name in $deployment_names; do
+    up_one_with_retries "$namespace" "$component" "$deployment_name"
+  done
+}
+
+function up_one_with_retries() {
+  local -r namespace=$1
+  local -r component=$2
+  local -r deployment_name=$3
+  MAX_RETRIES=5
+  retry_count=0
+
+  until [ $retry_count -gt $MAX_RETRIES ]; do
     _info "Scaling up $component deployment $deployment_name"
-    kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1
+
+    # disabling exit on error to allow for retries
+    set +e
+    output=$(kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1 2>&1)
+    restore_exit_code=$?
+    set -e
+
+    if [ $restore_exit_code -ne 0 ]; then
+      _error_msg "$output"
+      retry_count=$((retry_count+1))
+      sleep 10
+    else
+      return 0
+    fi
+
+    if [ $retry_count -gt $MAX_RETRIES ]; then
+      _error "Scaling up $component deployment $deployment_name exceeded max retries"
+      return 1
+    fi
   done
 }
 
@@ -158,7 +188,9 @@ function restore_cloudsql_postgres() {
   MAX_RETRIES=20
   retry_count=0
 
-  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg")
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
+  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
   backup_id=$(gcloud sql backups list --instance "$cloudsql_id" --filter="description=\"$run_id\"" --format=json | jq -r '.[].id')
 
   _warning "This operation will restore the CloudSQL DB instance $cloudsql_id from backup, overwriting its current data."
@@ -208,6 +240,8 @@ function restore_component() {
   local -r migration_id=$3
   local -r run_id=$4
   local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
 
   if [ "$component" == "cometbft" ]; then
     _info "Restoring cometbft"
@@ -216,7 +250,7 @@ function restore_component() {
     kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=1
   else
     _info "Restoring $component"
-    type=$(get_postgres_type "$namespace-$component-pg")
+    type=$(get_postgres_type "$namespace-$component-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         restore_pvc_postgres "$namespace" "$component" "$run_id"
@@ -235,7 +269,9 @@ function wait_cloudsql_restore() {
   local -r namespace=$1
   local -r component=$2
 
-  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg")
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
+  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
 
   local -i i=0
   _info "Waiting for restore of $component to finish..."
@@ -256,11 +292,13 @@ function wait_cloudsql_restore() {
 function wait_restore_component() {
   local -r namespace=$1
   local -r component=$2
+  local stack
+  stack=$(get_stack_for_namespace "$namespace")
 
   if [ "$component" == "cometbft" ]; then
     _info "Nothing to do, cometbft restore is currently synchronous"
   else
-    type=$(get_postgres_type "$namespace-$component-pg")
+    type=$(get_postgres_type "$namespace-$component-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         _info "Nothing to do, self-hosted postgres restore is currently synchronous"

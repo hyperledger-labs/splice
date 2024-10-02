@@ -222,10 +222,11 @@ jobs:
           steps:
             - cancel_entire_workflow_if_this_job_failed
 
-  # TODO(#14303): Consider using backup&restore to split this job into two separate jobs,
-  # so that we make the dependencies such that the migration depends on onboarding of the
-  # validator to complete. At the moment, it's quick enough compared to the other things
-  # running in parallel that it doesn't seem to be a problem.
+  # This job spins up a validator, and then waits until migration has been initiated and a
+  # migration dump has been created. Ideally, we'd split it into two jobs, so that triggering
+  # the migration depends on the validator being up, but that would add more complexity to the
+  # workflow, so instead we're just relying on the docker-compose validator being much faster
+  # to spin up than other things that are happening in parallel.
   pre_migration_compose_validator:
     machine:
       image: ubuntu-2204:2024.01.1
@@ -292,7 +293,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd: |
             # TODO(#14646): once we deploy from base_version we can remove the -t parameter
-            build-tools/splice-compose.sh start -d -w -n onvpn -t $(cat /tmp/base-version)
+            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1" -t $(cat /tmp/base-version)
           cmd_retry_count: << parameters.deploy_retry_count >>
       - run_bash_command_in_nix:
           cmd_name: Run pre-migration steps, and wait for a migration dump to be available
@@ -303,7 +304,7 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Persist the migration dump to a CCI workspace
           cluster: << parameters.cluster >>
-          cmd: build-tools/splice-compose.sh dump_volume compose_domain-upgrade-dump workspace/domain-upgrade-dump.tar
+          cmd: build-tools/splice-compose.sh dump_volume splice-validator_domain-upgrade-dump workspace/domain-upgrade-dump.tar
       - persist_to_workspace:
           root: workspace
           paths:
@@ -320,8 +321,8 @@ jobs:
           cmd_name: Store logs
           when: on_fail
           cmd: |
-            docker logs compose-validator-1 > log/compose-validator-1.clog 2>&1 || true
-            docker logs compose-participant-1 > log/compose-participant-1.clog 2>&1 || true
+            docker logs splice-validator-validator-1 | gzip > log/splice-validator-validator-1.clog.gz 2>&1 || true
+            docker logs splice-validator-participant-1 | gzip > log/splice-validator-participant-1.clog.gz 2>&1 || true
       - store_artifacts:
           name: Store logs
           path: log
@@ -366,7 +367,7 @@ jobs:
           at: workspace
       - run_bash_command_in_nix:
           cmd_name: Restore the migration dump into a docker volume
-          cmd: build-tools/splice-compose.sh restore_volume compose_domain-upgrade-dump workspace/domain-upgrade-dump.tar
+          cmd: build-tools/splice-compose.sh restore_volume splice-validator_domain-upgrade-dump workspace/domain-upgrade-dump.tar
       - docker_login_internal
       - run_bash_command_in_nix:
           cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
@@ -375,9 +376,9 @@ jobs:
           cluster: << parameters.cluster >>
           cmd: |
             if [ -z "<< parameters.upgrade_version >>" ]; then
-              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn
+              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -p "da-composeValidator-1"
             else
-              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -t << parameters.upgrade_version >>
+              build-tools/splice-compose.sh start -m 1 -M -d -w -n onvpn -p "da-composeValidator-1" -t << parameters.upgrade_version >>
             fi
           cmd_retry_count: << parameters.deploy_retry_count >>
       - run_bash_command_in_nix:
@@ -395,8 +396,8 @@ jobs:
           cmd_name: Store logs
           when: on_fail
           cmd: |
-            docker logs compose-validator-1 > log/compose-validator-1.clog 2>&1 || true
-            docker logs compose-participant-1 > log/compose-participant-1.clog 2>&1 || true
+            docker logs splice-validator-validator-1 | gzip > log/splice-validator-validator-1.clog.gz 2>&1 || true
+            docker logs splice-validator-participant-1 | gzip > log/splice-validator-participant-1.clog.gz 2>&1 || true
       - store_artifacts:
           name: Store logs
           path: log

@@ -33,11 +33,13 @@ import {
   ValidatorTopupConfig,
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
-  defaultVersion,
+  activeVersion,
   SV_APP_HELM_CHART_TIMEOUT_SEC,
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
+  DEFAULT_AUDIENCE,
+  DecentralizedSynchronizerUpgradeConfig,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -66,9 +68,7 @@ const bootstrappingConfig: BootstrapCliConfig = config.optionalEnv('BOOTSTRAPPIN
   : undefined;
 
 const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FILE');
-const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
-
-const DEFAULT_AUDIENCE = 'https://canton.network.global';
+const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerUpgradeConfig;
 
 export async function installNode(
   auth0Client: Auth0Client,
@@ -78,9 +78,9 @@ export async function installNode(
   resolveValidator1PartyId?: () => Promise<string>
 ): Promise<void> {
   console.error(
-    defaultVersion.type === 'local'
+    activeVersion.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${defaultVersion.version}`
+      : `Using charts from the artifactory by default, version ${activeVersion.version}`
   );
   console.error(`CLUSTER_BASENAME: ${CLUSTER_BASENAME}`);
   console.error(`Installing SV node in namespace: ${svNamespaceStr}`);
@@ -100,10 +100,10 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, defaultVersion);
+  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
-  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const svKey = svKeyFromSecret('sv');
 
@@ -129,7 +129,7 @@ export async function installNode(
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const ingressImagePullDeps =
-    defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
+    activeVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installSpliceRunbookHelmChartByNamespaceName(
     xns.logicalName,
     xns.logicalName,
@@ -143,12 +143,12 @@ export async function installNode(
       ingress: {
         decentralizedSynchronizer: {
           migrationIds: decentralizedSynchronizerMigrationConfig
-            .allMigrationInfos()
-            .map(x => x.migrationId.toString()),
+            .runningMigrations()
+            .map(x => x.id.toString()),
         },
       },
     },
-    defaultVersion,
+    activeVersion,
     { dependsOn: ingressImagePullDeps.concat([sv, validator]) }
   );
 }
@@ -234,15 +234,15 @@ async function installSvAndValidator(
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Config.auth0Domain,
       YOUR_HOSTNAME: CLUSTER_HOSTNAME,
-      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
       YOUR_CONTACT_POINT: daContactPoint,
     }
   );
 
   const supportsBeneficiariesWeight =
-    defaultVersion.type == 'local' ||
-    (defaultVersion.type == 'remote' && defaultVersion.version.startsWith('0.1.13')) ||
-    semver.gt(defaultVersion.version, '0.1.13');
+    activeVersion.type == 'local' ||
+    (activeVersion.type == 'remote' && activeVersion.version.startsWith('0.1.13')) ||
+    semver.gt(activeVersion.version, '0.1.13');
 
   const extraBeneficiaries = resolveValidator1PartyId
     ? [
@@ -318,7 +318,7 @@ async function installSvAndValidator(
     'sv-app',
     'cn-sv-node',
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
-    defaultVersion,
+    activeVersion,
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
@@ -333,7 +333,7 @@ async function installSvAndValidator(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`,
     {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
     }
   );
   const scanValues: ChartValues = {
@@ -355,7 +355,7 @@ async function installSvAndValidator(
     `scan`,
     'cn-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
-    defaultVersion,
+    activeVersion,
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
@@ -375,7 +375,7 @@ async function installSvAndValidator(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
         TARGET_HOSTNAME: CLUSTER_HOSTNAME,
-        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
         YOUR_SV_NAME: onboardingName,
       }
     ),
@@ -392,7 +392,6 @@ async function installSvAndValidator(
     auth: {
       ...validatorValues.auth,
       audience: auth0Config.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-      ledgerApiAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 
@@ -416,7 +415,7 @@ async function installSvAndValidator(
     'validator',
     'cn-validator',
     validatorValuesWithMaybeTopups,
-    defaultVersion,
+    activeVersion,
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)

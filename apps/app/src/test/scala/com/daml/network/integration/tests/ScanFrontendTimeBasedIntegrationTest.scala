@@ -26,7 +26,9 @@ class ScanFrontendTimeBasedIntegrationTest
     with TimeTestUtil
     with SynchronizerFeesTestUtil
     with TriggerTestUtil
-    with VotesFrontendTestUtil {
+    with VotesFrontendTestUtil
+    with ValidatorLicensesFrontendTestUtil
+    with SvTestUtil {
 
   val amuletPrice = 2
 
@@ -588,6 +590,44 @@ class ScanFrontendTimeBasedIntegrationTest
                   .convertTo[String] should be(newMaxNumInputs.toString)
               }
             }
+          },
+        )
+      }
+    }
+
+    "see the validator licenses" in { implicit env =>
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to Scan UI main page",
+          go to s"http://localhost:${scanUIPort}",
+        )(
+          "Switch to the validator licenses tab",
+          _ => {
+            inside(find(id("navlink-/validator-licenses"))) { case Some(navlink) =>
+              navlink.underlying.click()
+            }
+          },
+        )
+
+        val licenseRows = getLicensesTableRows
+        val newValidatorParty = allocateRandomSvParty("validatorX")
+        val newSecret = sv1Backend.devNetOnboardValidatorPrepare()
+
+        actAndCheck(
+          "onboard new validator using the secret",
+          sv1Backend.onboardValidator(
+            newValidatorParty,
+            newSecret,
+            s"${newValidatorParty.uid.identifier}@example.com",
+          ),
+        )(
+          "a new validator row is added",
+          _ => {
+            checkLastValidatorLicenseRow(
+              licenseRows.size.toLong,
+              sv1Backend.getDsoInfo().svParty,
+              newValidatorParty,
+            )
           },
         )
       }

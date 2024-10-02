@@ -5,7 +5,11 @@ imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 
 enableHealthProbes: true
 
-defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8
+# -- Annotations for the participant pod
+pod:
+  annotations: {}
+
+defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 resources:
   limits:
     cpu: "4"
@@ -13,10 +17,6 @@ resources:
   requests:
     cpu: "1"
     memory: 16Gi
-
-auth:
-  jwksUrl: "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
-  targetAudience: "https://canton.network.global"
 
 participantAdminUserNameFrom:
   secretKeyRef:
@@ -33,7 +33,6 @@ persistence:
   secretName: "postgres-secrets"
   databaseName: cantonnet_participant
   port: 5432
-
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

@@ -1,0 +1,3 @@
+com.daml.network.integration.tests.runbook.RunbookSvCometBftPreflightIntegrationTest
+com.daml.network.integration.tests.runbook.RunbookSvPreflightIntegrationTest
+com.daml.network.integration.tests.runbook.RunbookSvSequencerInfoPreflightIntegrationTest

@@ -8,6 +8,12 @@
       key: ledger-api-user
       name: "splice-app-{{ $keyName }}-ledger-api-auth"
       optional: false
+- name: "CN_APP_{{ $app | upper }}_LEDGER_API_AUTH_AUDIENCE"
+  valueFrom:
+    secretKeyRef:
+      key: audience
+      name: "splice-app-{{ $keyName }}-ledger-api-auth"
+      optional: false
 {{- if .fixedTokens }}
 - name: ADDITIONAL_CONFIG_AUTH
   value: |
@@ -41,12 +47,6 @@
       key: client-secret
       name: "splice-app-{{ $keyName }}-ledger-api-auth"
       optional: false
-- name: "CN_APP_{{ $app | upper }}_LEDGER_API_AUTH_AUDIENCE"
-  valueFrom:
-    secretKeyRef:
-      key: audience
-      name: "splice-app-{{ $keyName }}-ledger-api-auth"
-      optional: true
 {{- end }}
 {{- end -}}
 {{- define "cn-util-lib.auth0-user-env-var" -}}

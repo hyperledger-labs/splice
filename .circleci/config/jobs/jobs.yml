@@ -24,6 +24,11 @@ jobs:
           cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile lint"
+      - execute_sbt_command:
+          cmd: "Test/compile printTests"
+      - run_bash_command_in_nix:
+          cmd_name: Verify no changes in sbt test files
+          cmd: git add . && git diff --staged --exit-code test*.log
       - cleanup_sbt_test_job
 
   # We put our Daml tests in their own job for more parallelization
@@ -366,7 +371,8 @@ jobs:
          cmd_name: Push Helm charts and tag git accordingly
          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD \
-           --keep GITHUB_TOKEN"
+           --keep GITHUB_TOKEN \
+           --keep CIRCLE_BRANCH"
          cmd: |
            publish () {
              source=$1
@@ -378,13 +384,20 @@ jobs:
            make cluster/helm/write-digests
            make cluster/helm/build -j
 
+           git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+           RELEASE_TAG=$(get-snapshot-version)
+
+           if [[ "${CIRCLE_BRANCH}" != *"$RELEASE_TAG"* && "$RELEASE_TAG" != *"snapshot"* ]]; then
+              echo "Release tag '$RELEASE_TAG' is not contained in the branch name '${CIRCLE_BRANCH}'."
+              echo "You are probably publishing the wrong version."
+              exit 1
+           fi
+
            for chart in cluster/helm/target/*.tgz; do
              artifactory_url="https://digitalasset.jfrog.io/artifactory"
              publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
            done
 
-           git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-           RELEASE_TAG=$(get-snapshot-version)
            if [ $(git tag -l "${RELEASE_TAG}") ]; then
              echo "tag ${RELEASE_TAG} already exists. not tagging"
            else
@@ -443,9 +456,15 @@ jobs:
       - run:
           name: "Wait for previous pipeline"
           command: |
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> << parameters.wait_type >>
+            .circleci/wait_for_or_cancel_pipelines.sh \
+              --current_pipeline_number << pipeline.number >> \
+              --workflow_names "<< parameters.workflow_names >>" \
+              --branch_filter "<< parameters.branch_filter >>" \
+              --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
+              --branch_ignores "<< parameters.branch_ignores >>" \
+              --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              --waiting_job_name "wait_for_previous_pipeline" \
+              << parameters.wait_type >>
 
   cancel_if_previous_pipeline:
     docker:
@@ -482,9 +501,14 @@ jobs:
             else
               action="cancel_self_if_found"
             fi
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> $action
+            .circleci/wait_for_or_cancel_pipelines.sh \
+              --current_pipeline_number << pipeline.number >> \
+              --workflow_names "<< parameters.workflow_names >>" \
+              --branch_filter "<< parameters.branch_filter >>" \
+              --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
+              --branch_ignores "<< parameters.branch_ignores >>" \
+              --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              $action
 
   cancel_previous_pipelines:
     docker:
@@ -512,9 +536,32 @@ jobs:
       - run:
           name: "Cancel previous pipelines"
           command: |
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> cancel_pipeline
+            .circleci/wait_for_or_cancel_pipelines.sh \
+              --current_pipeline_number << pipeline.number >> \
+              --workflow_names "<< parameters.workflow_names >>" \
+              --branch_filter "<< parameters.branch_filter >>" \
+              --branch_filter_is_regex "<< parameters.branch_filter_is_regex >>" \
+              --branch_ignores "<< parameters.branch_ignores >>" \
+              --max_age_seconds << parameters.max_pipeline_age_secs >> \
+              cancel_pipeline
+
+  cancel_if_not_opt_in:
+    docker:
+      - image: cimg/base:2024.01
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - run:
+          name: Cancel the entire workflow if the current commit does not opt in for CI
+          command: |
+            last_commit_msg=$(git log -1 --pretty=%B)
+            if [[ "${last_commit_msg}" != *"[ci]"* ]]; then
+              echo "Cancelling the entire workflow because the current commit does not opt in for CI."
+              curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
+            else
+              echo "Current commit opts in, letting it run."
+            fi
 
   cancel_if_current_commit_is_base_version:
     docker:
@@ -789,7 +836,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - clone_and_update_oss
+      - clone_and_update_open_source
       # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           working_dir: "/home/circleci/oss"
@@ -798,6 +845,15 @@ jobs:
           cmd_retry_count: 3
       - execute_sbt_command:
           working_dir: "/home/circleci/oss"
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: "bundle"
+      - execute_sbt_command:
+          working_dir: "/home/circleci/splice"
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: "update"
+          cmd_retry_count: 3
+      - execute_sbt_command:
+          working_dir: "/home/circleci/splice"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "bundle"
 
@@ -809,14 +865,19 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - clone_and_update_oss
+      - clone_and_update_open_source
       - run_bash_command_in_nix:
           cmd_name: Push changes to DA OSS
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/oss
+      - run_bash_command_in_nix:
+          cmd_name: Push changes to Splice
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
+          cmd: |
+            .circleci/create-splice-pr.sh /home/circleci/splice
 
-  # TODO(#14303): Currently, building the repo on arm fails, so we cannot run the docker compose
+  # TODO(#14845): Currently, building the repo on arm fails, so we cannot run the docker compose
   #               preflight there. We therefore for now only spin up the validator and check that
   #               it succeeds.
   deploy_arm_compose_validator:
@@ -854,7 +915,7 @@ jobs:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
-            build-tools/splice-compose.sh start -d -w -n onvpn
+            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidatorArm-1"
           cmd_retry_count: 3
       - store_artifacts:
           name: Store logs

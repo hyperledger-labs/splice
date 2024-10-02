@@ -15,6 +15,8 @@ import { ExactNamespace, fixedTokens } from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
+export const DEFAULT_AUDIENCE = 'https://canton.network.global';
+
 /* Access tokens deployed into a cluster need to have a lifetime at
  * least as long as the cluster is expected to run. This means that
  * cached tokens set to expire during the expected lifetime of an
@@ -192,7 +194,7 @@ export class Auth0Fetch implements Auth0Client {
       }
     }
 
-    const aud = audience || 'https://canton.network.global';
+    const aud = audience || DEFAULT_AUDIENCE;
 
     await pulumi.log.debug(
       'Querying access token for Auth0 client: ' + clientId + ' with audience ' + aud
@@ -283,7 +285,7 @@ async function auth0Secret(
 ): Promise<{ [key: string]: string }> {
   const cfg = auth0Client.getCfg();
   const clientSecrets = lookupClientSecrets(allSecrets, cfg.appToClientId, clientName);
-  const audience = cfg.appToClientAudience[clientName];
+  const audience: string = cfg.appToClientAudience[clientName] || DEFAULT_AUDIENCE;
 
   const clientId = clientSecrets.client_id;
   const clientSecret = clientSecrets.client_secret;
@@ -291,16 +293,17 @@ async function auth0Secret(
   if (fixedTokens()) {
     const accessToken = await auth0Client.getClientAccessToken(clientId, clientSecret, audience);
     return {
+      audience,
       token: accessToken,
       'ledger-api-user': clientId + '@clients',
     };
   } else {
     return {
+      audience,
       url: `https://${cfg.auth0Domain}/.well-known/openid-configuration`,
       'client-id': clientId,
       'client-secret': clientSecret,
       'ledger-api-user': clientId + '@clients',
-      ...(audience && { audience: audience }),
     };
   }
 }

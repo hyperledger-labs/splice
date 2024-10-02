@@ -46,6 +46,11 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
               case Some(errDetails) if errDetails.contains("UNABLE_TO_GET_TOPOLOGY_SNAPSHOT") =>
                 tap()
                 fail("Tapping again due to UNABLE_TO_GET_TOPOLOGY_SNAPSHOT error")
+              case Some(errDetails)
+                  if errDetails.contains("Traffic balance below reserved traffic amount") =>
+                // Wait for traffic topup trigger to do its thing
+                tap()
+                fail("Tapping again due to Traffic balance below reserved traffic amount error")
               case errDetails => errDetails
             },
           )
@@ -245,6 +250,19 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
         )
       } else None
     amountO.map(Tap(date, _))
+  }
+
+  protected def waitForTrafficPurchase()(implicit driver: WebDriverType) = {
+    clue("Waitig for a traffic purchase") {
+      eventually(1.minute) {
+        val txs = findAll(className("tx-row")).toSeq
+        val trafficPurchases = txs.filter { txRow =>
+          txRow.childElement(className("tx-action")).text.contains("Sent") &&
+          txRow.childElement(className("tx-subtype")).text.contains("Extra Traffic Purchase")
+        }
+        trafficPurchases should not be empty
+      }
+    }
   }
 
   private def readDateFromRow(transactionRow: Element): String =

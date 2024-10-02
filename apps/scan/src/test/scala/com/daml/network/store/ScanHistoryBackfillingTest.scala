@@ -2,9 +2,10 @@ package com.daml.network.store
 
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.scan.store.ScanHistoryBackfilling
+import com.daml.network.util.DomainRecordTimeRange
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.scan.admin.api.client.BackfillingScanConnection
-import com.daml.network.store.HistoryBackfilling.{DomainRecordTimeRange, MigrationInfo}
+import com.daml.network.store.HistoryBackfilling.MigrationInfo
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,8 +28,16 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
           0
         )
         // Check that the updates are the same
-        updatesA <- testData.sourceHistory.getUpdates(None, PageLimit.tryCreate(1000))
-        updatesB <- testData.destinationHistory.getUpdates(None, PageLimit.tryCreate(1000))
+        updatesA <- testData.sourceHistory.getUpdates(
+          None,
+          includeImportUpdates = true,
+          PageLimit.tryCreate(1000),
+        )
+        updatesB <- testData.destinationHistory.getUpdates(
+          None,
+          includeImportUpdates = true,
+          PageLimit.tryCreate(1000),
+        )
       } yield {
         backfillingTerminated shouldBe true
         backfillingComplete shouldBe true
@@ -65,8 +74,16 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
           )
 
         // Check that the updates are the same
-        updatesA <- testData.sourceHistory.getUpdates(None, PageLimit.tryCreate(1000))
-        updatesB <- testData.destinationHistory.getUpdates(None, PageLimit.tryCreate(1000))
+        updatesA <- testData.sourceHistory.getUpdates(
+          None,
+          includeImportUpdates = true,
+          PageLimit.tryCreate(1000),
+        )
+        updatesB <- testData.destinationHistory.getUpdates(
+          None,
+          includeImportUpdates = true,
+          PageLimit.tryCreate(1000),
+        )
       } yield {
         backfillingTerminated1 shouldBe false
         backfillingComplete1 shouldBe false

@@ -11,24 +11,20 @@ trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
     EnvironmentImpl,
     SpliceTestConsoleEnvironment,
   ] & TestCommon =>
-  private val sv1ClientId = "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn"
-  private val sv2ClientId = "rv4bllgKWAiW9tBtdvURMdHW42MAXghz"
-  private val sv3ClientId = "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk"
-  private val sv4ClientId = "CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN"
   val clientIds = Map(
-    "sv1" -> sv1ClientId,
-    "sv2" -> sv2ClientId,
-    "sv3" -> sv3ClientId,
-    "sv4" -> sv4ClientId,
-    "sv1_validator" -> "7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov",
-    "sv2_validator" -> "5N2kwYLOqrHtnnikBqw8A7foa01kui7h",
-    "sv3_validator" -> "V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh",
-    "sv4_validator" -> "FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL",
-    "validator1" -> "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
-    "splitwell_validator" -> "hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW",
+    "sv1" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV1"),
+    "sv2" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV2"),
+    "sv3" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV3"),
+    "sv4" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV4"),
+    "sv1_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV1_VALIDATOR"),
+    "sv2_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV2_VALIDATOR"),
+    "sv3_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV3_VALIDATOR"),
+    "sv4_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SV4_VALIDATOR"),
+    "validator1" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_VALIDATOR1"),
+    "splitwell_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SPLITWELL_VALIDATOR"),
   )
 
-  lazy val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
+  lazy val auth0 = auth0UtilFromEnvVars("dev")
   protected def svClientWithToken(
       name: String
   )(implicit env: SpliceTestConsoleEnvironment): SvAppClientReference = {
@@ -36,7 +32,7 @@ trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
     val token = eventuallySucceeds() {
       getAuth0ClientCredential(
         clientId,
-        "https://canton.network.global",
+        sys.env("OIDC_AUTHORITY_SV_AUDIENCE"),
         auth0,
       )(noTracingLogger)
     }

@@ -1,24 +1,34 @@
-import {
-  DecentralizedSynchronizerMigrationConfig,
-  DomainMigrationIndex,
-  externalMigrations,
-} from 'splice-pulumi-common';
+import { DecentralizedSynchronizerUpgradeConfig, DomainMigrationIndex } from 'splice-pulumi-common';
 import { allSvsToDeploy, svRunbookConfig } from 'splice-pulumi-common-sv';
 
+import { GitFluxRef, gitRepoForRef } from '../flux';
 import { createStackCR } from './stack';
 
-export function installMigrationSpecificStacks(): void {
-  const migrations = externalMigrations(DecentralizedSynchronizerMigrationConfig.fromEnv());
-  migrations.externalMigrations.forEach(migration => {
+export function installMigrationSpecificStacks(mainReference: GitFluxRef): void {
+  const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
+  migrations.forEach(migration => {
+    const reference = migration.releaseReference
+      ? gitRepoForRef(`migration-${migration.id}`, migration.releaseReference)
+      : mainReference;
     allSvsToDeploy.forEach(sv => {
-      createStackForMigration(sv.nodeName, migration.migrationId);
+      createStackForMigration(sv.nodeName, migration.id, reference);
     });
   });
 }
 
-function createStackForMigration(sv: string, migrationId: DomainMigrationIndex) {
-  createStackCR(`${sv}-migration-${migrationId}`, sv === svRunbookConfig.nodeName, {
-    SPLICE_MIGRATION_ID: migrationId.toString(),
-    SPLICE_SV: sv,
-  });
+function createStackForMigration(
+  sv: string,
+  migrationId: DomainMigrationIndex,
+  reference: GitFluxRef
+) {
+  createStackCR(
+    `sv-canton.${sv}-migration-${migrationId}`,
+    'sv-canton',
+    sv === svRunbookConfig.nodeName,
+    reference,
+    {
+      SPLICE_MIGRATION_ID: migrationId.toString(),
+      SPLICE_SV: sv,
+    }
+  );
 }

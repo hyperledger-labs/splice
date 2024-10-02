@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "required": [
+    "auth",
+    "defaultJvmOptions",
+    "imageRepo",
+    "participantAdminUserNameFrom",
+    "persistence"
+  ],
+  "properties": {
+    "imageRepo": {
+      "type": "string"
+    },
+    "imageDigests": {
+      "type": "object"
+    },
+    "defaultJvmOptions": {
+      "type": "string"
+    },
+    "additionalJvmOptions": {
+      "type": "string"
+    },
+    "additonalEnvVars": {
+      "type": "object"
+    },
+    "enableHealthProbes": {
+      "type": "boolean"
+    },
+    "enablePostgresMetrics": {
+      "type": "boolean"
+    },
+    "livenessProbeInitialDelaySeconds": {
+      "type": "integer"
+    },
+    "pod": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "type": "object"
+        }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "required": ["host", "schema", "secretName"],
+      "properties": {
+        "databaseName": {
+          "type": "string"
+        },
+        "secretName": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      }
+    },
+    "participantAdminUserNameFrom": {
+      "type": "object",
+      "required": ["secretKeyRef"],
+      "properties": {
+        "secretKeyRef": {
+          "type": "object",
+          "required": ["name", "key"],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            },
+            "optional": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "required": ["jwksUrl", "targetAudience"],
+      "properties": {
+        "jwksUrl": {
+          "type": "string"
+        },
+        "targetAudience": {
+          "type": "string"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "enable": {
+          "type": "boolean"
+        },
+        "release": {
+          "type": "string"
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+[smh]$"
+        },
+        "migration": {
+          "type": "object",
+          "properties": {
+            "active": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["number", "string"]
+            },
+            "memory": {
+              "type": ["number", "string"]
+            }
+          }
+        },
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["number", "string"]
+            },
+            "memory": {
+              "type": ["number", "string"]
+            }
+          }
+        }
+      }
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "affinity": {
+      "type": "object"
+    }
+  }
+}

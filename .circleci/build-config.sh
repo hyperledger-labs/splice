@@ -30,7 +30,12 @@ fi
     echo '#'
     cat "${REPO_ROOT}/.circleci/config/prelude.yml"
     echo
-    cat "${REPO_ROOT}/.circleci/config/commands.yml"
+    echo "commands:"
+    # sed 1d for all the files in the jobs directory
+    for file in "${REPO_ROOT}"/.circleci/config/commands/*.yml; do
+        sed '1d' "${file}"
+        echo
+    done
     echo "jobs:"
     # sed 1d for all the files in the jobs directory
     for file in "${REPO_ROOT}"/.circleci/config/jobs/*.yml; do

@@ -3,6 +3,10 @@
 
 imageRepo: digitalasset-canton-network-docker.jfrog.io/digitalasset
 
+# -- Annotations for the comebft pods
+pod:
+  annotations: {}
+
 # Node names use as a moniker to identify the node in the CometBFT network
 nodeName: ""
 

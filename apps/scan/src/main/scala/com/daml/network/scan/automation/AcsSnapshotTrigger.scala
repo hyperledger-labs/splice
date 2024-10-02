@@ -68,6 +68,7 @@ class AcsSnapshotTrigger(
             updateHistory
               .getUpdates(
                 Some((store.migrationId, task.snapshotRecordTime)),
+                includeImportUpdates = true,
                 PageLimit.tryCreate(1),
               )
               .map(_.headOption)
@@ -122,6 +123,7 @@ class AcsSnapshotTrigger(
             CantonTimestamp.MinValue.plusSeconds(1L),
           )
         ),
+        includeImportUpdates = true,
         PageLimit.tryCreate(1),
       )
       .map(_.headOption)

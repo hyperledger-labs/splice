@@ -1,22 +1,20 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { RestHandler, rest } from 'msw';
+import { validatorLicensesHandler, dsoInfoHandler } from 'common-test-utils';
+import { rest, RestHandler } from 'msw';
 import {
   ErrorResponse,
-  GetDsoInfoResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
 } from 'sv-openapi';
 
-import { dsoInfo, voteResults } from '../constants';
+import { voteResults } from '../constants';
 
 export const buildSvMock = (svUrl: string): RestHandler[] => [
   rest.get(`${svUrl}/v0/admin/authorization`, (_, res, ctx) => {
     return res(ctx.status(200));
   }),
-  rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-    return res(ctx.json<GetDsoInfoResponse>(dsoInfo));
-  }),
+  dsoInfoHandler(svUrl),
   rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
     return res(
       ctx.json<ListDsoRulesVoteRequestsResponse>({
@@ -52,4 +50,5 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       })
     );
   }),
+  validatorLicensesHandler(svUrl),
 ];
