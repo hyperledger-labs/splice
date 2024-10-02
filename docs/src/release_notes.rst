@@ -10,12 +10,63 @@ Release Notes
 
 Upcoming
 --------
+
+* Bugfixes
+
+    * Fix an issue where the ordering of stakeholders (signatories and observers) would be inconsistent across SVs
+      when calling the `/v0/updates` and `/v0/updates/{update_id}` endpoints on the Scan API.
+
+0.2.4
+-----
+
+* Sequencer
+
+  Fix a rare bug where a lagging participant trying to submit a
+  topology transaction resulted in the sequencer deadlocking and not
+  processing any new events.
+
+0.2.3
+-----
+
+Note: 0.2.2 was skipped due to an error in the publishing process.
+
 * SV UI
   * The route to view the amulet price has been renamed from ``/cc-price`` to ``/amulet-price``
 
 * The docker-compose validator now supports recovering from a node identities dump in case of a complete disaster.
 
-* Add new ``initialPackageConfigJson`` value to the SV helm chart to allow for setting the daml package version when bootstrapping a DSO.
+* Add new ``initialPackageConfigJson`` value to the SV helm chart to allow for setting the daml package version when bootstrapping a network.
+  This is useful to ensure that the Daml versions do not change on a network reset. Only the first SV needs to set this.
+
+* SV app
+
+  * Fix a bug where sequencer pruning treated nodes that have not
+    joined after a synchronizer migration with downtime as lagging
+    even when the pruning interval has not yet passed and disabled
+    them preventing them from connecting to the sequencer.
+
+* Deployment
+
+  * **Breaking**: The auth secrets ``splice-app-{sv,validator}-ledger-api-auth`` formerly had ``audience`` as an optional field. This is now required. The former implicit value was ``https://canton.network.global``. If you have not overridden this value before, you should add it now explicitly.
+  * It used to be possible to override the ledger-api audience value through the helm value ``auth.ledgerApiAudience`` in the sv and validator charts. This has been removed -- use the secret mentioned in the previous point.
+  * **Breaking** The chart value ``auth.audience`` was formerly optional, and is now required for the following charts. The previous implicit value was ``https://canton.network.global``. To continue using it, please provide it explicitly to your values. (See the sv-helm and validator-helm docs for more information on auth configuration.)
+    * ``cn-sv-node``
+    * ``cn-validator``
+  * **Breaking** The chart value ``auth.jwksUrl`` was formerly optional, and is now required for the same charts above. This should already be overridden in your values file for your particular auth setup, so likely no further action is required.
+
+* Bugfixes
+
+    * Fix an issue where validators that were already deployed with an invalid ``validatorPartyHint`` were failing to start after a hard domain migration, as the already existing hint was rejected by the validator app.
+
+* Sequencer
+
+  * Fix an issue in sequencer traffic management that resulted in a
+    deadlock after a synchronizer upgrade with downtime where lagging
+    validators failed to submit a transaction due to lagging behind
+    but also failed to catch up due to the submission failing.
+
+* Added support for a docker-compose based deployment of a single-SV network, for app developers
+  to test against without needing to connect to DevNet.
 
 0.2.1
 -----
@@ -26,11 +77,14 @@ Upcoming
 
   * Fix an issue in the holdings and holding summary endpoint where it failed to decode contracts when the
     splice-amulet version the contract was created in did not match the latest supported version by the Scan release.
+  * Modified ``getUpdateHistory`` Scan API to exclude updates resulting from ACS imports (those with workflow id starting with ``canton-network-acs-import``).
+    Additionally, the ``getUpdateHistory`` endpoint now also fails on scans that did not yet replicate history from before their SV node joined the network.
 
 * Sequencer
 
   * Fix a bug that prevented initialization during a hard domain migration if there was a proposal in the topology state
     on the old migration id.
+
 
 0.2.0
 -----

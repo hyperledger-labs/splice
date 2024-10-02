@@ -101,4 +101,7 @@ Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:particip
 The operation 'insert block' has failed with an exception
 Now retrying operation 'insert block'
 
+# TODO(#13874): investigate why it happens and remove if possible
+Failed to send commitment message batch for period CommitmentPeriod.*RequestRefused\(UnknownRecipients
+
 # Make sure to have a trailing newline

@@ -30,7 +30,7 @@ import com.daml.network.http.v0.definitions.{
   MaybeCachedContractWithState,
 }
 import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.store.{AcsSnapshotStore, ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.scan.store.{AcsSnapshotStore, ScanHistoryBackfilling, ScanStore, TxLogEntry}
 import com.daml.network.util.{
   Codec,
   Contract,
@@ -60,9 +60,9 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
   Mint,
   Transfer,
 }
-import com.daml.network.http.{HttpVotesHandler, UrlValidator}
+import com.daml.network.http.{HttpValidatorLicensesHandler, HttpVotesHandler, UrlValidator}
 import com.daml.network.scan.dso.DsoAnsResolver
-import com.daml.network.store.PageLimit
+import com.daml.network.store.{AppStore, PageLimit, SortOrder, VotesStore}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.Clock
 
@@ -82,9 +82,12 @@ class HttpScanHandler(
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
 ) extends v0.ScanHandler[TraceContext]
-    with HttpVotesHandler {
-  protected val workflowId = this.getClass.getSimpleName
-  protected val votesStore = store
+    with HttpVotesHandler
+    with HttpValidatorLicensesHandler {
+
+  override protected val workflowId: String = this.getClass.getSimpleName
+  override protected val votesStore: VotesStore = store
+  override protected val validatorLicensesStore: AppStore = store
 
   def getDsoPartyId(
       response: v0.ScanResource.GetDsoPartyIdResponse.type
@@ -553,6 +556,16 @@ class HttpScanHandler(
     }
   }
 
+  override def listValidatorLicenses(
+      respond: ScanResource.ListValidatorLicensesResponse.type
+  )(after: Option[Long], limit: Option[Int])(
+      extracted: TraceContext
+  ): Future[ScanResource.ListValidatorLicensesResponse] = {
+    this
+      .listValidatorLicenses(after, limit)(extracted, ec)
+      .map(ScanResource.ListValidatorLicensesResponse.OK)
+  }
+
   // TODO: (#7809) Add caching for sequencers per domain
   override def listDsoSequencers(
       respond: v0.ScanResource.ListDsoSequencersResponse.type
@@ -677,8 +690,29 @@ class HttpScanHandler(
       updateHistory
         .getUpdates(
           afterO,
+          includeImportUpdates = false,
           PageLimit.tryCreate(request.pageSize),
         )
+        .flatMap { txs =>
+          // TODO(#14076: replace this with a better check for whether this scan instance has replicated all data)
+          if (
+            afterO.isEmpty && txs.headOption.exists(u =>
+              !ScanHistoryBackfilling
+                .isFoundingTransactionTreeUpdate(u.update, store.key.dsoParty.toProtoPrimitive)
+            )
+          ) {
+            logger.debug(s"Expected founding transaction, found ${txs.headOption}")
+            Future.failed(
+              Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"This scan instance has not yet replicated all data. Wait before retrying, or connect to a different scan instance."
+                )
+                .asRuntimeException()
+            )
+          } else {
+            Future.successful(txs)
+          }
+        }
         .map { txs =>
           {
             val lossless = request.lossless.getOrElse(false)

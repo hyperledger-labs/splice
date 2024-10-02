@@ -56,6 +56,7 @@ parameters:
         backup-status-devnet,
         backup-status-testnet,
         backup-status-mainnet,
+        preview-operator,
       ]
     default: build
   # Whether the cluster should be reset before deploying.

@@ -20,6 +20,8 @@ spec:
     type: "Recreate"
   template:
     metadata:
+      annotations:
+        {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
         app: {{ $appIdentifier }}
         migration: {{ .Values.migration.id | quote }}
@@ -91,14 +93,10 @@ spec:
             - name: CN_APP_SV_INITIAL_HOLDING_FEE
               value: {{ .Values.initialHoldingFee | quote }}
             {{- end }}
-            {{ if ((.Values.auth).audience) }}
             - name: CN_APP_SV_AUTH_AUDIENCE
               value: {{ .Values.auth.audience | quote }}
-            {{ end }}
-            {{ if ((.Values.auth).jwksUrl) }}
             - name: CN_APP_SV_AUTH_JWKS_URL
               value: {{ .Values.auth.jwksUrl | quote }}
-            {{ end }}
             {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
             - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_INGESTION
               value: |

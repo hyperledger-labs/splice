@@ -306,10 +306,11 @@ The `pulumi/deployment` project controls the deployment of production clusters (
 #### Deployment stack configuration
 
 The pulumi operator uses a custom docker image to allow us to use a specific pulumi version and to configure the default pulumi arguments (like parallelism).
-The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the `SPLICE_DEPLOYMENT_FLUX_REF` git reference and applies that git deployment code
+The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the the migration specific git reference configured under the key `releaseReference` and applies that git deployment code
 to the cluster.
+Each migration can follow a different release that is upgraded independent of the other migrations. The key `synchronizerMigration.active.releaseReference` controls the release used for all our main deployments and the infra stack.
 The deployment uses `dotenv` to read the cluster specific env configuration files.
-The version used for the deployment is set using `CHARTS_VERSION`.
+The version used for the deployment is set using `synchronizerMigration.active.version` in `config.yaml` or defaults to `CHARTS_VERSION`.
 The use of artifactory/google release artifacts can be controlled through `SPLICE_ARTIFACTS_REPOSITORY`.
 
 The infra stack and the canton network stack are included by default.
@@ -328,7 +329,7 @@ through the following steps:
    For CILR this PR should be made against `main`.
    For production clusters (DevNet, TestNet, MainNet) this PR should be made against the respective deployment branch.
    Note that for production clusters, the current process is to rebase the deployment branch to the release branch of the target version via force pushing (i.e., not a PR).
-3. If the `SPLICE_DEPLOYMENT_FLUX_REF` of the corresponding cluster (configured in the respective `.envrc.vars`) is a Git tag,
+3. If the active migration configured in the `cluster.yaml` under the key `synchronizerMigration.active.releaseReference` of the corresponding cluster is a Git tag,
    e.g., `cilr` for CILR, then tag the merged commit with that tag.
 
 #### The operator
@@ -1458,12 +1459,14 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 
 1. Start a Slack thread on which you document the steps you take.
    Make sure there is at least one CN engineer around for a second pair of eyes.
-1. **Prepare:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that sets the following environment variables for your target cluster:
-   * `export GLOBAL_DOMAIN_UPGRADE_VERSION=` the version we're migrating to (current one in case of disaster recovery)
-   * `export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=` the migration ID we're migrating to
-   * `export DISABLE_CANTON_AUTO_INIT="true"` for a slightly faster migrate step; will be removed with [#12353](https://github.com/DACH-NY/canton-network-node/issues/12353)
-   * `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
-   * `export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"` to throttle SV1's Cometbft temporarily during the migration
+1. **Prepare:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that sets the following config for your target cluster:
+   * set in `config.yaml` under the path `synchronizerMigration.upgrade.version` the version we're migrating to (current one in case of disaster recovery)
+   * set in `config.yaml` under the path `synchronizerMigration.upgrade.id` the migration ID we're migrating to
+   * set in `config.yaml` under the path `synchronizerMigration.upgrade.provider` the type of canton deployment used. `internal` for all the canton components in the `canton-network` or `sv-runbook` stack, `external` to create canton specific stacks for each sv for the migration
+   * if using `external` as the provider, set in `config.yaml` under the path `synchronizerMigration.upgrade.releaseReference` the git tag or branch that will be used for the deployment code
+   * environment variable `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
+   * environment variable `export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"` to throttle SV1's Cometbft temporarily during the migration
+   * if using `external` as the provider, deploy the operator from the deployment branch to create the new stacks CRs
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
@@ -1497,15 +1500,12 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
     - `cncluster take_disaster_recovery_dumps <timestamp> <new_migration_id> <output_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
     - `cncluster copy_disaster_recovery_dumps <dump_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
 1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
-1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following environment variables for your target cluster:
-   * Remove the export of `GLOBAL_DOMAIN_UPGRADE_VERSION` which was added in the "prepare" step
-   * Remove the export of `GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID` which was added in the "prepare" step
-   * Set the following environment variables for your target cluster:
-     * `export CHARTS_VERSION=` the version we're migrating to (current one in case of disaster recovery)
-     * `export GLOBAL_DOMAIN_LEGACY_VERSION=` the old value of `CHARTS_VERSION` (current one in case of disaster recovery)
-     * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're migrating to
-     * `export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=` the migration ID we're migrating away from
-     * `export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=` the migration ID we're migrating away from
+1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following config for your target cluster:
+   * in `config.yaml` change `synchronizerMigration.active` to `synchronizerMigration.legacy`
+   * in `config.yaml` change `synchronizerMigration.upgrade` to `synchronizerMigration.active`
+   * in `config.yaml` set `synchronizerMigration.active.migratingFrom` to the migration ID we're migrating away from
+   * deploy the operator from the deployment branch where you updated the configuration
+   * sync the migration config found in `config.yaml` on all the branches referenced in any migrations `releaseReference` (this just ensure that some metrics are labeled as expected for still running migrations, and that it removes all the deployments for archived migrations)
 1. Wait for the operator to apply your changes from the migrate step.
    The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
    (Check the logs of failing pods to be sure that there is no other problem.)
@@ -2022,12 +2022,20 @@ To build multi-arch images locally:
 Similarly to `cncluster`, we have a `splice-compose.sh` script for development purposes of
 the docker-compose validator deployment.
 
-The most useful subcommand there is `splice-compose.sh start`. It should be run from a
+The two most useful subcommand there are `splice-compose.sh start` and `splice-compose.sh start_network`.
+
+`start` starts a validator against an existing network. It should be run from a
 cluster deployment directory, and will spin up a docker-compose validator against that
 cluster. Logs from the validator and participant will be streamed to `logs/compose-validator.clog`
 and `logs/compose-participant.clog` resp.
 Use `splice-compose.sh stop` to stop it (and `splice-compose.sh stop -D` to completely
 nuke it, i.e. also delete its persistent data).
+
+`start_network` starts a full CN deployment locally, consisting of one SV node and one
+validator connected to it. Similarly to `start`, logs from the different components will
+be streamed to `logs/compose-sv-*.clog` for SV node components, and `logs/compose-*.clog`
+for those of the validator. To stop the whole network, run `splice-compose.sh stop_network`
+(with an optional `-D` as above, to also wipe all its data).
 
 ## Onboarding
 

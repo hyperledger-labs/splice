@@ -7,6 +7,7 @@ import { load } from 'js-yaml';
 
 import { CnChartVersion } from './artifacts';
 import { config } from './config';
+import { spliceConfig } from './config/config';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 480;
@@ -74,6 +75,7 @@ export const sequencerPruningConfig = enableSequencerPruning
   : { enabled: false };
 
 const lowResourceSequencer = config.envFlag('SEQUENCER_LOW_RESOURCES', false);
+const veryHighResourceSequencer = spliceConfig.configuration.sequencerVeryHighResources;
 export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceRequirements } =
   lowResourceSequencer
     ? {
@@ -88,9 +90,26 @@ export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceR
           },
         },
       }
-    : {};
+    : veryHighResourceSequencer
+      ? {
+          resources: {
+            limits: {
+              cpu: '4',
+              memory: '12Gi',
+            },
+            requests: {
+              cpu: '3',
+              memory: '4Gi',
+            },
+          },
+        }
+      : {};
 export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
+);
+
+export const domainLivenessProbeInitialDelaySeconds: string | undefined = config.optionalEnv(
+  'DOMAIN_LIVENESS_PROBE_INITIAL_DELAY_SECONDS'
 );
 
 export const svOnboardingPollingInterval = config.optionalEnv('SV_ONBOARDING_POLLING_INTERVAL');
@@ -257,7 +276,7 @@ export const autoInitValues = (
       `Chart ${chartName} for ${nodeIdentifier} is using ${versionStr}, setting auto init values`
     );
     return {
-      disableAutoInit: true,
+      disableAutoInit: false,
       nodeIdentifier,
     };
   }
@@ -266,3 +285,12 @@ export const autoInitValues = (
 export const splitwellDarPath = 'splice-node/dars/splitwell-current.dar';
 
 export const DeploySvRunbook = config.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false);
+
+export const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
+
+// This flag determines whether to split postgres instances per app, or have one per namespace.
+// By default, we split instances on CloudSQL (where we expect longer-living environments, thus want to support backup&recovery),
+// but not on k8s-deployed postgres (where we optimize for faster deployment).
+// One can force splitting them by setting SPLIT_POSTGRES_INSTANCES to true.
+export const SplitPostgresInstances =
+  config.envFlag('SPLIT_POSTGRES_INSTANCES') || config.envFlag('ENABLE_CLOUD_SQL');

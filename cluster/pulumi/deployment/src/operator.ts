@@ -76,6 +76,10 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
         name: 'CN_PULUMI_LOAD_ENV_CONFIG_FILE',
         value: 'true',
       },
+      {
+        name: 'SPLICE_OPERATOR_DEPLOYMENT',
+        value: 'true',
+      },
     ],
     extraVolumeMounts: [
       {

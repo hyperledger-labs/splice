@@ -1,10 +1,17 @@
 import * as pulumi from '@pulumi/pulumi';
-import { defaultVersion, exactNamespace, installSpliceHelmChart } from 'splice-pulumi-common';
+import {
+  activeVersion,
+  exactNamespace,
+  imagePullSecret,
+  installSpliceHelmChart,
+} from 'splice-pulumi-common';
 
 export function installDocs(): pulumi.Resource {
   const xns = exactNamespace('docs');
 
-  const dependsOn = [xns.ns];
+  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
-  return installSpliceHelmChart(xns, 'docs', 'cn-docs', {}, defaultVersion, { dependsOn });
+  const dependsOn = imagePullDeps.concat([xns.ns]);
+
+  return installSpliceHelmChart(xns, 'docs', 'cn-docs', {}, activeVersion, { dependsOn });
 }

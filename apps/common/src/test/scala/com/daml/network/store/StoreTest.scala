@@ -475,6 +475,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contract: Contract[?, ?],
       signatories: Seq[PartyId] = Seq.empty,
       packageName: String = dummyPackageName,
+      observers: Seq[PartyId] = Seq.empty,
   ): CreatedEvent = {
     new CreatedEvent(
       Seq.empty[String].asJava,
@@ -488,7 +489,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       new java.util.HashMap(),
       None.toJava,
       signatories.map(_.toProtoPrimitive).asJava,
-      Seq.empty.asJava,
+      observers.map(_.toProtoPrimitive).asJava,
       contract.createdAt,
     )
   }
@@ -695,9 +696,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
       packageName: String = dummyPackageName,
+      createdEventObservers: Seq[PartyId] = Seq.empty,
   ) = mkTx(
     offset,
-    createRequests.map[TreeEvent](toCreatedEvent(_, createdEventSignatories, packageName)),
+    createRequests.map[TreeEvent](
+      toCreatedEvent(_, createdEventSignatories, packageName, createdEventObservers)
+    ),
     domainId,
     effectiveAt,
     workflowId,

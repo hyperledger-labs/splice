@@ -29,7 +29,7 @@ abstract class TaskbasedTrigger[T: Pretty](
   private implicit val mc: MetricsContext = MetricsContext(
     "trigger_name" -> this.getClass.getSimpleName(),
     "trigger_type" -> "taskbased",
-  )
+  ).withExtraLabels(extraMetricLabels*)
 
   /** How to complete a task.
     *

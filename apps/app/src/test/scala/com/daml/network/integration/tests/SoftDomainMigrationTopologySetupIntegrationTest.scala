@@ -43,7 +43,7 @@ import com.daml.network.util.{
   ConfigScheduleUtil,
   SplitwellTestUtil,
   TriggerTestUtil,
-  UpdateHistoryComparator,
+  UpdateHistoryTestUtil,
   WalletTestUtil,
 }
 import com.daml.network.validator.automation.ReconcileSequencerConnectionsTrigger
@@ -52,7 +52,8 @@ import com.daml.network.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
 }
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.daml.network.sv.automation.singlesv.LocalSequencerConnectionsTrigger
+import com.digitalasset.canton.{BaseTest, DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -75,7 +76,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     with SplitwellTestUtil
     with TriggerTestUtil
     with WalletTestUtil
-    with UpdateHistoryComparator {
+    with UpdateHistoryTestUtil {
 
   // Does not currently handle multiple synchronizers.
   override def runUpdateHistorySanityCheck = false
@@ -208,10 +209,8 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     )
     // TODO(#14419) Remove this once the retries cover all required errors
     setTriggersWithin(triggersToPauseAtStart =
-      Seq(
-        aliceValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
-        bobValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
-        splitwellValidatorBackend.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger],
+      Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend).map(
+        _.validatorAutomation.trigger[ReconcileSequencerConnectionsTrigger]
       )
     ) {
       clue("Setup splitwell") {
@@ -281,17 +280,24 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       },
     )("amulet config vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
-    clue(s"sv2-4 accept amulet config vote request") {
-      Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
-        eventuallySucceeds() {
-          sv.castVote(
-            voteRequest.contractId,
-            true,
-            "url",
-            "description",
-          )
-        }
+    // TODO(#8300) No need to pause once we can't get a timeout on a concurrent sequencer connection change anymore
+    setTriggersWithin(triggersToPauseAtStart =
+      Seq(sv2Backend, sv3Backend, sv4Backend).map(
+        _.dsoAutomation.trigger[LocalSequencerConnectionsTrigger]
       )
+    ) {
+      clue(s"sv2-4 accept amulet config vote request") {
+        Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+          eventuallySucceeds() {
+            sv.castVote(
+              voteRequest.contractId,
+              true,
+              "url",
+              "description",
+            )
+          }
+        )
+      }
     }
 
     eventually() {
@@ -437,35 +443,11 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     }
 
     clue("Round can be advanced") {
-      advanceRoundsByOneTickViaAutomation
+      advanceRoundsByOneTickViaAutomation(BaseTest.DefaultEventuallyTimeUntilSuccess * 2)
     }
     eventually() {
       sv1ScanBackend.getAmuletRules().state shouldBe ContractState.Assigned(newDomainId)
       sv1ScanBackend.getDsoInfo().dsoRules.domainId.value shouldBe newDomainId.toProtoPrimitive
-    }
-
-    p2pTransfer(
-      aliceWalletClient,
-      bobWalletClient,
-      bob,
-      42.0,
-      timeUntilSuccess = 40.seconds,
-    )
-
-    val aliceAmulets = aliceWalletClient.list().amulets
-    aliceAmulets should not be empty
-    forAll(aliceAmulets) {
-      _.contract.state shouldBe ContractState.Assigned(newDomainId)
-    }
-
-    // Eventually to allow merging to also reassign
-    // any other contracts.
-    eventually() {
-      val bobAmulets = bobWalletClient.list().amulets
-      bobAmulets should not be empty
-      forAll(bobAmulets) {
-        _.contract.state shouldBe ContractState.Assigned(newDomainId)
-      }
     }
 
     clue("Alice validator tops up its traffic on new domain") {
@@ -513,6 +495,30 @@ class SoftDomainMigrationTopologySetupIntegrationTest
             .loneElement
             .extraTrafficPurchased shouldBe NonNegativeLong.maxValue
         }
+      }
+    }
+
+    p2pTransfer(
+      aliceWalletClient,
+      bobWalletClient,
+      bob,
+      42.0,
+      timeUntilSuccess = 40.seconds,
+    )
+
+    val aliceAmulets = aliceWalletClient.list().amulets
+    aliceAmulets should not be empty
+    forAll(aliceAmulets) {
+      _.contract.state shouldBe ContractState.Assigned(newDomainId)
+    }
+
+    // Eventually to allow merging to also reassign
+    // any other contracts.
+    eventually() {
+      val bobAmulets = bobWalletClient.list().amulets
+      bobAmulets should not be empty
+      forAll(bobAmulets) {
+        _.contract.state shouldBe ContractState.Assigned(newDomainId)
       }
     }
 

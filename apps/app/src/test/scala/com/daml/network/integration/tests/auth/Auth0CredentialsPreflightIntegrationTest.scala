@@ -29,7 +29,9 @@ class Auth0CredentialsPreflightIntegrationTest
   // TODO(#10352) consider merging this secret with the FIXED_TOKENS cache created in Pulumi.
   "Refresh auth0 credentials" in { _ =>
     clientIds.foreach { case (_, id) =>
-      getAuth0ClientCredential(id, "https://canton.network.global", auth0)(noTracingLogger)
+      getAuth0ClientCredential(id, sys.env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE"), auth0)(
+        noTracingLogger
+      )
     }
   }
 }

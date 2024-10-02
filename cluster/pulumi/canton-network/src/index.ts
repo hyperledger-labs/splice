@@ -22,9 +22,9 @@ async function main() {
 
   auth0FetchOutput.apply(async auth0Fetch => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    const cluster = await auth0CacheAndInstallCluster(auth0Fetch);
+    await auth0CacheAndInstallCluster(auth0Fetch);
 
-    scheduleLoadGenerator(auth0Fetch, cluster.validator1 ? [cluster.validator1] : []);
+    scheduleLoadGenerator(auth0Fetch, []);
   });
 }
 

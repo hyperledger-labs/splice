@@ -1,0 +1,12 @@
+networks:
+  splice-sv_splice-sv-public:
+    external: true
+
+services:
+  validator:
+    networks:
+      - splice-sv_splice-sv-public
+
+  participant:
+    networks:
+      - splice-sv_splice-sv-public

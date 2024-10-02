@@ -1,15 +1,23 @@
 import * as k8s from '@pulumi/kubernetes';
 import exec from 'node:child_process';
-import { config, defaultVersion, exactNamespace } from 'splice-pulumi-common';
+import { activeVersion, CLUSTER_HOSTNAME, config, exactNamespace } from 'splice-pulumi-common';
 
 export function installClusterVersion(): k8s.apiextensions.CustomResource {
   const ns = exactNamespace('cluster-version', true);
-  const host = config.requireEnv('GCP_CLUSTER_HOSTNAME');
-  const remoteVersion = defaultVersion.type == 'remote' ? defaultVersion.version : undefined;
+  const host = CLUSTER_HOSTNAME;
+  const remoteVersion = activeVersion.type == 'remote' ? activeVersion.version : undefined;
   const version =
     remoteVersion ||
     // cannot be used with the operator
-    exec.execSync(`${config.requireEnv('REPO_ROOT')}/build-tools/get-snapshot-version`).toString();
+    exec
+      .execSync(`${config.requireEnv('REPO_ROOT')}/build-tools/get-snapshot-version`, {
+        env: {
+          // eslint-disable-next-line no-process-env
+          ...process.env,
+          CI_IGNORE_DIRTY_REPO: '1',
+        },
+      })
+      .toString();
   return new k8s.apiextensions.CustomResource(
     `cluster-version-virtual-service`,
     {

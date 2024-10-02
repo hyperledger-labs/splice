@@ -1,9 +1,6 @@
 {
   "root": true,
   "parser": "@typescript-eslint/parser",
-  "ignorePatterns": [
-    "dump-config.ts"
-  ],
   "parserOptions": {
     "project": [
       "./tsconfig.json"

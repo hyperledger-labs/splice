@@ -314,13 +314,21 @@ trait CommonAppInstanceReferences {
         env.scans.remote
           .filter(sv => sv.name == "sv1Scan")
           .headOption
-          .getOrElse {
+          .map(_.getSpliceInstanceNames())
+          .getOrElse(
             env.scans.remote.headOption
+              .map(_.getSpliceInstanceNames())
               .getOrElse(
-                sys.error("No SV or remote scan reference to get splice instance names from")
+                new SpliceInstanceNamesConfig(
+                  "Splice",
+                  "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+                  "Amulet",
+                  "AMT",
+                  "Amulet Name Service",
+                  "ANS",
+                )
               )
-          }
-          .getSpliceInstanceNames()
+          )
       }
   }
 

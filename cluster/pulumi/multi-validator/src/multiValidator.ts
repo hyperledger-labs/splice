@@ -5,6 +5,7 @@ import {
   daContactPoint,
   generatePortSequence,
   numNodesPerInstance,
+  DecentralizedSynchronizerUpgradeConfig,
 } from 'splice-pulumi-common';
 
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
@@ -16,7 +17,7 @@ interface MultiValidatorArgs extends BaseMultiNodeArgs {
 }
 
 const decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
-  DecentralizedSynchronizerMigrationConfig.fromEnv();
+  DecentralizedSynchronizerUpgradeConfig;
 
 export class MultiValidator extends MultiNodeDeployment {
   constructor(name: string, args: MultiValidatorArgs, opts?: pulumi.ComponentResourceOptions) {
@@ -40,6 +41,14 @@ export class MultiValidator extends MultiNodeDeployment {
             {
               name: 'CN_APP_VALIDATOR_SCAN_URL',
               value: `http://scan-app.sv-1:5012`,
+            },
+            {
+              name: 'CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE',
+              value: 'https://canton.network.global',
+            },
+            {
+              name: 'CN_APP_VALIDATOR_AUTH_AUDIENCE',
+              value: 'https://canton.network.global',
             },
             {
               name: 'CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS',
@@ -73,7 +82,7 @@ export class MultiValidator extends MultiNodeDeployment {
             },
             {
               name: 'CN_APP_VALIDATOR_MIGRATION_ID',
-              value: decentralizedSynchronizerUpgradeConfig.active.migrationId.toString(),
+              value: decentralizedSynchronizerUpgradeConfig.active.id.toString(),
             },
             {
               name: 'CN_APP_CONTACT_POINT',

@@ -6,6 +6,7 @@ const oAuthSchema = z.object({
   kind: z.literal('oauth'),
   oauthDomain: z.string().min(1),
   oauthClientId: z.string().min(1),
+  audience: z.string().min(1),
   managementApi: z.object({
     clientId: z.string().min(1),
     clientSecret: z.string().min(1),

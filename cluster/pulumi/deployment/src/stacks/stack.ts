@@ -1,8 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, config } from 'splice-pulumi-common';
+import { CLUSTER_BASENAME, config, isMainNet } from 'splice-pulumi-common';
 
-import { gitRepo } from '../flux';
 import { namespace } from '../namespace';
 import { operator } from '../operator';
 
@@ -17,12 +16,11 @@ const requiredEnvs = Array.from([
   'ARTIFACTORY_USER',
   'ARTIFACTORY_PASSWORD',
 ]);
-const optionalEnvs = Array.from([
-  'K6_USERS_PASSWORD',
-  'K6_VALIDATOR_ADMIN_PASSWORD',
-  'AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET',
-  'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID',
-]);
+const optionalEnvs = Array.from(['K6_USERS_PASSWORD', 'K6_VALIDATOR_ADMIN_PASSWORD']).concat(
+  isMainNet
+    ? ['AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET', 'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID']
+    : []
+);
 
 const env: {
   [key: string]: string;
@@ -61,7 +59,9 @@ Object.keys(env).forEach(key => {
 /*https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/docs/stacks.md*/
 export function createStackCR(
   name: string,
+  projectName: string,
   supportsResetOnSameCommit: boolean,
+  ref: k8s.apiextensions.CustomResource,
   extraEnvs: { [key: string]: string } = {}
 ): pulumi.CustomResource {
   return new k8s.apiextensions.CustomResource(
@@ -72,7 +72,7 @@ export function createStackCR(
       metadata: { name: name, namespace: namespace.logicalName },
       spec: {
         ...{
-          stack: `organization/${name}/${name}.${CLUSTER_BASENAME}`,
+          stack: `organization/${projectName}/${name}.${CLUSTER_BASENAME}`,
           backend: config.requireEnv('PULUMI_BACKEND_URL'),
           envRefs: {
             ...envRefs,
@@ -102,11 +102,11 @@ export function createStackCR(
           },
           fluxSource: {
             sourceRef: {
-              apiVersion: gitRepo.apiVersion,
-              kind: gitRepo.kind,
-              name: gitRepo.metadata.name,
+              apiVersion: ref.apiVersion,
+              kind: ref.kind,
+              name: ref.metadata.name,
             },
-            dir: `cluster/pulumi/${name}`,
+            dir: `cluster/pulumi/${projectName}`,
           },
           // Do not resync the stack when the commit hash matches the last one
           continueResyncOnCommitMatch: false,

@@ -684,7 +684,6 @@
         "db": {
           "volumeSize": "48Gi"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "apps-pg-secret"
         },
@@ -747,7 +746,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
-            "rewardWeightBps": 440000
+            "rewardWeightBps": 430000
           },
           {
             "name": "Digital-Asset-1",
@@ -777,7 +776,7 @@
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPuCFe1z5+ZzVb9y78ewt9yYm7KjGlCk36nF5ZrkkoO+lZvAXmr0IEWEgtBHxienC2IIDGT49aQM6M8ukvbxYLA==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -903,7 +902,6 @@
           "chainId": "main-0",
           "chainIdSuffix": "2"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -1048,7 +1046,6 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
@@ -1155,7 +1152,6 @@
         "db": {
           "volumeSize": "48Gi"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "mediator-pg-secret"
         },
@@ -1218,7 +1214,6 @@
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
@@ -1315,7 +1310,6 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "participant-pg-secret"
         },
@@ -1392,7 +1386,6 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "sequencer-pg-secret"
         },
@@ -1461,7 +1454,7 @@
         "auth": {
           "audience": "https://validator.example.com/api",
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "https://ledger_api.example.com"
+          "ledgerApiAudience": "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",

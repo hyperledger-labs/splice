@@ -4,7 +4,7 @@ window.splice_config = {
   auth: {
     algorithm: 'hs-256-unsafe',
     secret: 'test',
-    token_audience: 'https://canton.network.global',
+    token_audience: 'https://ledger_api.example.com',
     token_scope: 'daml_ledger_api',
   },
   // OIDC client configuration, see https://authts.github.io/oidc-client-ts/interfaces/UserManagerSettings.html
@@ -12,7 +12,7 @@ window.splice_config = {
   //     algorithm: 'rs-256',
   //     authority: "",
   //     client_id: "",
-  //     token_audience: 'https://canton.network.global',
+  //     token_audience: 'https://ledger_api.example.com',
   //     token_scope: 'daml_ledger_api',
   //   },
   spliceInstanceNames: {

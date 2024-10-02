@@ -73,7 +73,7 @@ curl -s -u "${CIRCLECI_TOKEN}": -H "Content-Type: application/json" \
       "$ARTIFACTS_URL" | grep -o "${regex}" > "$BASE_TARGET_DIRECTORY/artifacts.txt"
 
 while read -r p; do
-  if [[ $p = *.log.gz ]] || [[ $p = *.clog.gz ]]; then
+  if [[ $p = *.log ]] || [[ $p = *.log.gz ]] || [[ $p = *.clog.gz ]]; then
     PARALLEL_RUN="$(echo "$p" | sed -e 's?.*\/artifacts\/??' | sed -e 's?\/.*??')"
     if [ -z "$PARALLEL_RUN" ]; then
       TARGET_DIRECTORY="$BASE_TARGET_DIRECTORY/logs"

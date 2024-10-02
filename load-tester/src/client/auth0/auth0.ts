@@ -43,7 +43,7 @@ export class Auth0Manager {
 
   private clientId: string;
   private walletUri: string;
-  private cnAudience: string = 'https://canton.network.global';
+  private tokenAudience: string;
 
   private codeVerifier: string =
     'acodeverifieracodeverifieracodeverifieracodeverifieracodeverifier';
@@ -61,12 +61,14 @@ export class Auth0Manager {
   constructor(
     auth0Tenant: string,
     clientId: string,
+    audience: string,
     walletUri: string,
     managementApi: ClientCredentials,
   ) {
     this.httpClient = new HttpClient(auth0Tenant, true);
     this.auth0Tenant = auth0Tenant;
     this.clientId = clientId;
+    this.tokenAudience = audience;
     this.walletUri = walletUri;
     this.managementApiToken = this.clientCredentialsGrant(
       managementApi.clientId,
@@ -92,7 +94,7 @@ export class Auth0Manager {
     const prompt = 'login';
 
     const url = encodeURI(
-      `${this.auth0Tenant}/authorize?client_id=${this.clientId}&redirect_uri=${redirectUri}&response_type=${responseType}&scope=${scope}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=${codeChallengeMethod}&response_mode=${responseMode}&prompt=${prompt}&audience=${this.cnAudience}`,
+      `${this.auth0Tenant}/authorize?client_id=${this.clientId}&redirect_uri=${redirectUri}&response_type=${responseType}&scope=${scope}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=${codeChallengeMethod}&response_mode=${responseMode}&prompt=${prompt}&audience=${this.tokenAudience}`,
     );
 
     const headers = {

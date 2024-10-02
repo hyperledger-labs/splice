@@ -2,6 +2,10 @@
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
   "properties": {
+    "auth": {
+      "type": "object",
+      "description": "The authentication configuration for the application"
+    },
     "spliceInstanceNames": {
       "type": "object",
       "description": "The names unique for the splice instance, must be specified as provided in the docs"
@@ -9,10 +13,22 @@
   },
   "allOf": [
     {
-      "required": [
-        "spliceInstanceNames"
-      ],
+      "required": ["auth", "spliceInstanceNames"],
       "properties": {
+        "auth": {
+          "type": "object",
+          "properties": {
+            "audience": {
+              "type": "string",
+              "description": "The JWT audience for tokens used against the SV app API"
+            },
+            "jwksUrl": {
+              "type": "string",
+              "pattern": "^http[s]?://.+$",
+              "description": "The URL for the JWKS endpoint for the SV app API"
+            }
+          }
+        },
         "spliceInstanceNames": {
           "type": "object",
           "properties": {

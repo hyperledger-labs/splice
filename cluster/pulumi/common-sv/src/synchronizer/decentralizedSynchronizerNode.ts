@@ -4,7 +4,7 @@ import { ComponentResource, Resource } from '@pulumi/pulumi';
 import {
   autoInitValues,
   ChartValues,
-  defaultVersion,
+  domainLivenessProbeInitialDelaySeconds,
   DomainMigrationIndex,
   ExactNamespace,
   installSpliceHelmChart,
@@ -18,6 +18,7 @@ import {
   SpliceCustomResourceOptions,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
@@ -93,7 +94,7 @@ export class InStackDecentralizedSynchronizerNode
     runningMigration: boolean,
     onboardingName: string,
     logLevel: LogLevel,
-    version: CnChartVersion = defaultVersion,
+    version: CnChartVersion,
     opts?: SpliceCustomResourceOptions
   ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${migrationId}`);
@@ -174,7 +175,14 @@ export class InStackDecentralizedSynchronizerNode
               active: active,
             },
           },
+          livenessProbeInitialDelaySeconds: domainLivenessProbeInitialDelaySeconds,
           additionalJvmOptions: jmxOptions(),
+          pvc: spliceConfig.configuration.persistentSequencerHeapDumps
+            ? {
+                size: '10Gi',
+                volumeStorageClass: 'standard-rwo',
+              }
+            : undefined,
         },
       },
       version,

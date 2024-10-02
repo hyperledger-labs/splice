@@ -192,14 +192,14 @@ object HttpWalletAppClient {
     }
   }
 
-  case class Tap(amount: BigDecimal)
+  case class Tap(amount: BigDecimal, commandId: Option[String] = None)
       extends InternalBaseCommand[http.TapResponse, amuletCodegen.Amulet.ContractId] {
 
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.TapResponse] =
-      client.tap(definitions.TapRequest(Codec.encode(amount)), headers = headers)
+      client.tap(definitions.TapRequest(Codec.encode(amount), commandId), headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder

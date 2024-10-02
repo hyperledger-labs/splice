@@ -8,6 +8,7 @@ import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
+import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
@@ -20,9 +21,9 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.HistoryBackfilling.DomainRecordTimeRange
 import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
+import com.daml.network.util.DomainRecordTimeRange
 import com.daml.network.util.ValueJsonCodecProtobuf as ProtobufCodec
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
@@ -645,8 +646,9 @@ class UpdateHistory(
       sql"""order by migration_id, record_time, domain_id limit ${limit.limit}"""
   }
 
-  def getTxUpdates(
+  private def getTxUpdates(
       afterO: Option[(Long, CantonTimestamp)],
+      includeImportUpdates: Boolean,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
@@ -665,6 +667,11 @@ class UpdateHistory(
       from update_history_transactions
       where
         history_id = $historyId and """ ++ afterFilter ++
+        (if (!includeImportUpdates) {
+           sql""" and workflow_id != ${lengthLimited(IMPORT_ACS_WORKFLOW_ID_PREFIX)}"""
+         } else {
+           sql""
+         }) ++
         sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
     }
 
@@ -775,11 +782,11 @@ class UpdateHistory(
 
   def getUpdates(
       afterO: Option[(Long, CantonTimestamp)],
+      includeImportUpdates: Boolean,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
-
     for {
-      txs <- getTxUpdates(afterO, limit)
+      txs <- getTxUpdates(afterO, includeImportUpdates, limit)
       assignments <- getAssignmentUpdates(afterO, limit)
       unassignments <- getUnassignmentUpdates(afterO, limit)
     } yield {
@@ -1169,26 +1176,45 @@ class UpdateHistory(
       )
     }
 
-  private def getRecordTimeRange(
+  /** Returns the record time range of sequenced events excluding ACS imports after a HDM.
+    */
+  def getRecordTimeRange(
       migrationId: Long
   )(implicit tc: TraceContext): Future[Map[DomainId, DomainRecordTimeRange]] = {
-    import HistoryBackfilling.domainTimeRangeSemigroupUnion
-
+    // This query is rather tricky, there are two parts we need to tackle:
+    // 1. get the list of distinct domain ids
+    // 2. for each of them get the min and max record time
+    // A naive group by does not hit an index for either of them.
+    // To get the list of domain ids we simulate a loose index scan as describe in https://wiki.postgresql.org/wiki/Loose_indexscan.
+    // We then exploit a lateral join to get the record time range as described in https://www.timescale.com/blog/select-the-most-recent-record-of-many-items-with-postgresql/.
+    // This relies on the number of domain ids being reasonably small to perform well which is a valid assumption.
     def range(table: String): Future[Map[DomainId, DomainRecordTimeRange]] = {
       storage
         .query(
           sql"""
-             select domain_id, min(record_time), max(record_time)
-             from #$table
-             where history_id = $historyId and migration_id = $migrationId
-             group by domain_id
+            with recursive domains AS (
+              select min(domain_id) AS domain_id FROM #$table where history_id = $historyId and migration_id = $migrationId
+              union ALL
+              select (select min(domain_id) FROM #$table WHERE history_id = $historyId and migration_id = $migrationId and domain_id > domains.domain_id)
+              FROM domains where domain_id is not null
+            )
+            select domain_id, min_record_time, max_record_time
+            from domains
+            inner join lateral (select min(record_time) as min_record_time, max(record_time) as max_record_time from #$table where history_id = $historyId and migration_id = $migrationId and domain_id = domains.domain_id and record_time > ${CantonTimestamp.MinValue}) time_range
+            on true
+            where domain_id is not null
            """
-            .as[(DomainId, CantonTimestamp, CantonTimestamp)],
+            .as[(DomainId, Option[CantonTimestamp], Option[CantonTimestamp])],
           s"getRecordTimeRange.$table",
         )
         .map(row =>
           row.view
-            .map(row => row._1 -> DomainRecordTimeRange(row._2, row._3))
+            .flatMap(row =>
+              for {
+                min <- row._2
+                max <- row._3
+              } yield row._1 -> DomainRecordTimeRange(min, max)
+            )
             .toMap
         )
     }
@@ -1197,7 +1223,9 @@ class UpdateHistory(
       rangeTransactions <- range("update_history_transactions")
       rangeAssignments <- range("update_history_assignments")
       rangeUnassignments <- range("update_history_unassignments")
-    } yield (rangeTransactions |+| rangeUnassignments) |+| rangeAssignments
+    } yield {
+      rangeTransactions |+| rangeUnassignments |+| rangeAssignments
+    }
   }
 
   private def getIsBackfillingComplete(

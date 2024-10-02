@@ -15,22 +15,27 @@ const githubSecret = new k8s.core.v1.Secret('github', {
     password: config.requireEnv('GITHUB_TOKEN'),
   },
 });
+
+export type GitFluxRef = k8s.apiextensions.CustomResource;
+
 // https://github.com/fluxcd/source-controller/blob/main/docs/spec/v1/gitrepositories.md
-export const gitRepo = new k8s.apiextensions.CustomResource(
-  'splice-node',
-  {
-    apiVersion: 'source.toolkit.fluxcd.io/v1',
-    kind: 'GitRepository',
-    metadata: { name: 'splice-node', namespace: namespace.logicalName },
-    spec: {
-      interval: '5m',
-      url: 'https://github.com/DACH-NY/canton-network-node',
-      ref: {
-        name: config.requireEnv('SPLICE_DEPLOYMENT_FLUX_REF'),
+export function gitRepoForRef(nameSuffix: string, ref: string): GitFluxRef {
+  return new k8s.apiextensions.CustomResource(
+    `splice-node-${nameSuffix}`,
+    {
+      apiVersion: 'source.toolkit.fluxcd.io/v1',
+      kind: 'GitRepository',
+      metadata: { name: `splice-node-${nameSuffix}`, namespace: namespace.logicalName },
+      spec: {
+        interval: '5m',
+        url: 'https://github.com/DACH-NY/canton-network-node',
+        ref: {
+          name: ref,
+        },
+        secretRef: { name: githubSecret.metadata.name },
+        recurseSubmodules: true,
       },
-      secretRef: { name: githubSecret.metadata.name },
-      recurseSubmodules: true,
     },
-  },
-  { dependsOn: [flux] }
-);
+    { dependsOn: [flux] }
+  );
+}

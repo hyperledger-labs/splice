@@ -8,7 +8,7 @@ window.splice_config = {
   auth: {
     algorithm: 'hs-256-unsafe',
     secret: 'test',
-    token_audience: 'https://canton.network.global',
+    token_audience: 'https://sv.example.com',
   },
 
   services: {

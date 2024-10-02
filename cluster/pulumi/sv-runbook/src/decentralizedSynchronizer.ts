@@ -4,7 +4,6 @@ import {
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
   ExactNamespace,
-  MigrationProvider,
 } from 'splice-pulumi-common';
 import {
   CometBftNodeConfigs,
@@ -25,31 +24,8 @@ export function installCanton(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependencies: CnInput<Resource>[]
 ): InstalledMigrationSpecificSv {
-  const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig
-    .allMigrationInfos()
-    .filter(migrationInfo => migrationInfo.provider === MigrationProvider.INTERNAL);
-  const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.migrationId;
-  const participantPg = installPostgres(
-    svNamespace,
-    `participant-pg`,
-    'participant-pg-secret',
-    'postgres-values-participant.yaml'
-  );
-
-  const sequencerPg = installPostgres(
-    svNamespace,
-    `sequencer-pg`,
-    'sequencer-pg-secret',
-    'postgres-values-sequencer.yaml'
-  );
-  const mediatorPg = installPostgres(
-    svNamespace,
-    `mediator-pg`,
-    'mediator-pg-secret',
-    'postgres-values-mediator.yaml'
-  );
-
-  installCometbftKeys(svNamespace);
+  const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
+  const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.id;
   const nodeConfigs = {
     self: {
       ...svRunbookConfig.cometBft,
@@ -61,45 +37,74 @@ export function installCanton(
     },
     peers: [],
   };
-  const installedMigrations = migrationsContainedInStack.map(migration => {
-    return {
-      migration,
-      canton: installCantonComponents(
-        svNamespace,
-        migration.migrationId,
-        auth0Client,
-        {
-          onboardingName,
-          isFirstSv: false,
-          isCoreSv: false,
-        },
-        decentralizedSynchronizerMigrationConfig,
-        {
-          nodeConfigs: nodeConfigs,
-        },
-        {
-          participant: participantPg,
-          mediator: mediatorPg,
-          sequencer: sequencerPg,
-        },
-        {
-          dependsOn: dependencies,
-        }
-      ),
-    };
-  });
-  return (
-    installedMigrations.find(({ migration }) => {
-      return migration.migrationId === activeMigrationId;
-    })?.canton || {
-      decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
-        activeMigrationId,
-        new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier
-      ),
-      participant: {
-        asDependencies: [],
-        internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
-      },
-    }
-  );
+  const externalActiveMigration = {
+    decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
+      activeMigrationId,
+      new CometBftNodeConfigs(activeMigrationId, nodeConfigs).nodeIdentifier
+    ),
+    participant: {
+      asDependencies: [],
+      internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
+    },
+  };
+  if (migrationsContainedInStack.length > 0) {
+    const participantPg = installPostgres(
+      svNamespace,
+      `participant-pg`,
+      'participant-pg-secret',
+      'postgres-values-participant.yaml',
+      decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
+    );
+
+    const sequencerPg = installPostgres(
+      svNamespace,
+      `sequencer-pg`,
+      'sequencer-pg-secret',
+      'postgres-values-sequencer.yaml',
+      decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
+    );
+    const mediatorPg = installPostgres(
+      svNamespace,
+      `mediator-pg`,
+      'mediator-pg-secret',
+      'postgres-values-mediator.yaml',
+      decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
+    );
+
+    installCometbftKeys(svNamespace);
+    const installedMigrations = migrationsContainedInStack.map(migration => {
+      return {
+        migration,
+        canton: installCantonComponents(
+          svNamespace,
+          migration.id,
+          auth0Client,
+          {
+            onboardingName,
+            isFirstSv: false,
+            isCoreSv: false,
+          },
+          decentralizedSynchronizerMigrationConfig,
+          {
+            nodeConfigs: nodeConfigs,
+          },
+          {
+            participant: participantPg,
+            mediator: mediatorPg,
+            sequencer: sequencerPg,
+          },
+          {
+            dependsOn: dependencies,
+          }
+        ),
+      };
+    });
+    return (
+      installedMigrations.find(({ migration }) => {
+        return migration.id === activeMigrationId;
+      })?.canton || externalActiveMigration
+    );
+  } else {
+    return externalActiveMigration;
+  }
 }

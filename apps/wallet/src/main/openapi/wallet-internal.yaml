@@ -583,6 +583,9 @@ components:
       properties:
         amount:
           type: string
+        command_id:
+          description: Command id used for deduplication, if not specified a random UUID is used
+          type: string
 
     TapResponse:
       type: object

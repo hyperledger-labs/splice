@@ -21,6 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.{GetResult, JdbcProfile}
 
+import java.util.concurrent.Semaphore
 import scala.concurrent.{ExecutionContext, Future}
 
 class AcsSnapshotStore(
@@ -62,20 +63,26 @@ class AcsSnapshotStore(
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
-    val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
-    val previousSnapshotDataFiler = lastSnapshot match {
-      case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId)) =>
-        sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
-      case None =>
-        sql"where false"
-    }
-    storage.update(
-      (sql"""
+    Future {
+      scala.concurrent.blocking {
+        AcsSnapshotStore.PreventConcurrentSnapshotsSemaphore.acquire()
+      }
+    }.flatMap { _ =>
+      val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
+      val previousSnapshotDataFiler = lastSnapshot match {
+        case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId)) =>
+          sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
+        case None =>
+          sql"where false"
+      }
+      storage.update(
+        (sql"""
         with inserted_rows as (
             with previous_snapshot_data as (select contract_id
                                             from acs_snapshot_data snapshot
                                                      join update_history_creates creates on snapshot.create_id = creates.row_id
-                                            """ ++ previousSnapshotDataFiler ++ sql"""),
+                                            """ ++ previousSnapshotDataFiler ++
+          sql"""),
                 transactions_in_snapshot as not materialized ( -- materialized yields a worse plan
                     select row_id
                     from update_history_transactions txs
@@ -126,8 +133,11 @@ class AcsSnapshotStore(
         from inserted_rows
         having min(row_id) is not null;
              """).toActionBuilder.asUpdate,
-      "insertNewSnapshot",
-    )
+        "insertNewSnapshot",
+      )
+    }.andThen { _ =>
+      AcsSnapshotStore.PreventConcurrentSnapshotsSemaphore.release()
+    }
   }
 
   def queryAcsSnapshot(
@@ -294,6 +304,9 @@ class AcsSnapshotStore(
 }
 
 object AcsSnapshotStore {
+
+  // Only relevant for tests, in production this is already guaranteed.
+  private val PreventConcurrentSnapshotsSemaphore = new Semaphore(1)
 
   case class AcsSnapshot(
       snapshotRecordTime: CantonTimestamp,

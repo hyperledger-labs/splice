@@ -1,19 +1,15 @@
-import { config, DeploySvRunbook } from 'splice-pulumi-common';
+import { DecentralizedSynchronizerUpgradeConfig } from 'splice-pulumi-common';
 
+import { gitRepoForRef } from './flux';
 import { installMigrationSpecificStacks } from './stacks/migration';
-import { createStackCR } from './stacks/stack';
+import { installSpliceStacks } from './stacks/splice';
 
-if (DeploySvRunbook) {
-  createStackCR('sv-runbook', config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'));
-}
-if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
-  createStackCR('multi-validator', false);
-}
-if (config.envFlag('SPLICE_DEPLOY_VALIDATOR_RUNBOOK', false)) {
-  createStackCR('validator-runbook', config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET'));
-}
+if (DecentralizedSynchronizerUpgradeConfig.active.releaseReference) {
+  const mainReference = DecentralizedSynchronizerUpgradeConfig.active.releaseReference;
+  const mainStackReference = gitRepoForRef('active', mainReference);
 
-export const infraStack = createStackCR('infra', false);
-export const cantonNetworkStack = createStackCR('canton-network', false);
-
-installMigrationSpecificStacks();
+  installSpliceStacks(mainStackReference);
+  installMigrationSpecificStacks(mainStackReference);
+} else {
+  throw new Error('No valid reference found for active migration');
+}

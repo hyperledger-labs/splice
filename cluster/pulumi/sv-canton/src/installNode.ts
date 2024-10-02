@@ -1,11 +1,12 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
-  DecentralizedSynchronizerMigrationConfig,
+  DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   exactNamespace,
 } from 'splice-pulumi-common';
 import {
   Auth0ClientType,
+  coreSvsToDeploy,
   getAuth0Config,
   installCantonComponents,
   sv1Config,
@@ -29,7 +30,7 @@ export function installNode(
   );
   const nodeConfig = svConfig!;
   return auth0FetchOutput.apply(async auth0Fetch => {
-    await pulumi.log.info(`Installing node ${sv} for migration ${migrationId}`);
+    console.error(`Installing node ${sv} for migration ${migrationId}`);
     if (loadAuth0Cache) {
       await auth0Fetch.loadAuth0Cache();
     }
@@ -45,7 +46,7 @@ export function installNode(
         isFirstSv: isFirstSv,
         isCoreSv: isCoreSv,
       },
-      DecentralizedSynchronizerMigrationConfig.fromEnv(),
+      DecentralizedSynchronizerUpgradeConfig,
       {
         nodeConfigs: {
           self: {
@@ -58,7 +59,7 @@ export function installNode(
           },
           peers:
             isCoreSv && !isFirstSv
-              ? svConfigs
+              ? coreSvsToDeploy
                   .filter(config => config.nodeName !== nodeConfig.nodeName)
                   .map(config => {
                     return {

@@ -16,6 +16,13 @@ repos:
         require_serial: true
         entry: "bash -c 'sbt --client \"scalafmtOnly $@\"' bash"
         types: [scala]
+      - id: sbt_tests
+        name: sbt_tests
+        language: system
+        require_serial: true
+        pass_filenames: false
+        entry: "bash -c 'git diff --staged --diff-filter=AD --name-only --exit-code -- '**/test/**/*.scala' || sbt --client \"printTests\"' bash"
+        always_run: true
       - id: dars_lock
         name: dars_lock
         language: system
@@ -44,34 +51,11 @@ repos:
         entry: "scripts/fix-ts.py"
         types_or: [javascript, jsx, ts, tsx]
         exclude: "/[.]prettierrc[.]cjs$"
-      - id: pulumi_infra
-        name: check pulumi infra config
+      - id: pulumi_config
+        name: check pulumi configs
         language: system
-        entry: "make cluster/pulumi/infra/test"
-        files: '^cluster/pulumi/infra/.*[.]ts$'
-        pass_filenames: false
-      - id: pulumi_cn
-        name: check pulumi canton-network config
-        language: system
-        entry: "make cluster/pulumi/canton-network/test"
-        files: '^cluster/pulumi/canton-network/.*[.]ts$'
-        pass_filenames: false
-      - id: pulumi_sv
-        name: check pulumi sv-runbook config
-        language: system
-        entry: "make cluster/pulumi/sv-runbook/test"
-        files: '^cluster/pulumi/sv-runbook/.*[.]ts$'
-      - id: pulumi_validator
-        name: check pulumi validator-runbook config
-        language: system
-        entry: "make cluster/pulumi/validator-runbook/test"
-        files: '^cluster/pulumi/validator-runbook/.*[.]ts$'
-        pass_filenames: false
-      - id: pulumi_sv_canton
-        name: check pulumi sv-canton config
-        language: system
-        entry: "make cluster/pulumi/sv-canton/test"
-        files: '^cluster/pulumi/sv-canton/.*[.]ts$'
+        entry: "make cluster/pulumi/test -j"
+        files: '^cluster/pulumi/.*[.]ts$'
         pass_filenames: false
       - id: circleci_config
         name: check circleci config is updated

@@ -8,7 +8,7 @@ window.splice_config = {
   },
   services: {
     sv: {
-      url: "https://" + window.location.hostname + "/api/sv",
+      url: "https://" + window.location.host + "/api/sv",
     },
   },
   spliceInstanceNames: {

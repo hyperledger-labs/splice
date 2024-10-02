@@ -1,50 +1,51 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as random from '@pulumi/random';
 import _ from 'lodash';
 import {
   Auth0Client,
+  auth0UserNameEnvVarSource,
   BackupConfig,
   ChartValues,
+  CLUSTER_BASENAME,
+  CLUSTER_HOSTNAME,
+  clusterSmallDisk,
   CnInput,
   cnsUiSecret,
+  config,
+  daContactPoint,
+  DecentralizedSynchronizerUpgradeConfig,
+  DEFAULT_AUDIENCE,
+  activeVersion,
   exactNamespace,
   ExactNamespace,
   fixedTokens,
-  DecentralizedSynchronizerMigrationConfig,
   imagePullSecret,
   imagePullSecretByNamespaceName,
+  installLoopback,
   installSpliceRunbookHelmChart,
   installSpliceRunbookHelmChartByNamespaceName,
-  installLoopback,
-  installPostgresPasswordSecret,
   installValidatorOnboardingSecret,
-  loadYamlFromFile,
-  REPO_ROOT,
-  CLUSTER_BASENAME,
-  CLUSTER_HOSTNAME,
-  setupBootstrapping,
-  validatorSecrets,
   isDevNet,
-  ValidatorTopupConfig,
-  nonSvValidatorTopupConfig,
+  loadYamlFromFile,
   nonDevNetNonSvValidatorTopupConfig,
-  defaultVersion,
+  nonSvValidatorTopupConfig,
   participantBootstrapDumpSecretName,
-  config,
   preApproveValidatorRunbook,
-  clusterSmallDisk,
-  daContactPoint,
+  REPO_ROOT,
+  setupBootstrapping,
   spliceInstanceNames,
-  autoInitValues,
+  validatorSecrets,
+  ValidatorTopupConfig,
 } from 'splice-pulumi-common';
+import { installParticipant } from 'splice-pulumi-common-validator';
+import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import {
-  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
-  VALIDATOR_PARTY_HINT,
   VALIDATOR_MIGRATE_PARTY,
+  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
   VALIDATOR_NEW_PARTICIPANT_ID,
+  VALIDATOR_PARTY_HINT,
 } from './utils';
 
 type BootstrapCliConfig = {
@@ -60,15 +61,12 @@ const participantIdentitiesFile = config.optionalEnv('PARTICIPANT_IDENTITIES_FIL
 
 const VALIDATOR_WALLET_USER_ID =
   config.optionalEnv('VALIDATOR_WALLET_USER_ID') || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
-const DEFAULT_AUDIENCE = 'https://canton.network.global';
-
-const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
-    defaultVersion.type === 'local'
+    activeVersion.type === 'local'
       ? 'Using locally built charts by default'
-      : `Using charts from the artifactory by default, version ${defaultVersion.version}`
+      : `Using charts from the artifactory by default, version ${activeVersion.version}`
   );
   console.error(`CLUSTER_HOSTNAME: ${CLUSTER_HOSTNAME}`);
   console.error(`Installing validator node in namespace: ${RUNBOOK_NAMESPACE}`);
@@ -86,17 +84,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const onboardingSecret = preApproveValidatorRunbook ? 'validatorsecret' : undefined;
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, defaultVersion);
+  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
-  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
-
-  const password = new random.RandomPassword(`${xns.logicalName}-postgres-passwd`, {
-    length: 16,
-    overrideSpecial: '_%@',
-    special: true,
-  }).result;
-  const passwordSecret = installPostgresPasswordSecret(xns, password, 'postgres-secrets');
+  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const validator = await installValidator({
     xns,
@@ -108,13 +99,13 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     backupConfigSecret,
     backupConfig,
     topupConfig: isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig,
-    otherDeps: [passwordSecret],
+    otherDeps: [],
     nodeIdentifier: 'validator-runbook',
   });
 
   // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
   const ingressImagePullDeps =
-    defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
+    activeVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installSpliceRunbookHelmChartByNamespaceName(
     xns.ns.metadata.name,
     xns.logicalName,
@@ -127,7 +118,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       },
       withSvIngress: false,
     },
-    defaultVersion,
+    activeVersion,
     { dependsOn: ingressImagePullDeps.concat([validator]) }
   );
 }
@@ -152,9 +143,8 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     onboardingSecret,
     participantBootstrapDumpSecret,
     auth0Client,
-    imagePullDeps,
-    otherDeps,
     loopback,
+    imagePullDeps,
     backupConfigSecret,
     backupConfig,
     topupConfig,
@@ -162,58 +152,44 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
 
   // TODO(#14679): Remove the override once ciperiodic has been bumped to 0.2.0
   const postgresPvcSizeOverride = config.optionalEnv('VALIDATOR_RUNBOOK_POSTGRES_PVC_SIZE');
+  const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
   const postgresValues: ChartValues = _.merge(
     loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
     ),
-    { db: { volumeSize: postgresPvcSizeOverride || (clusterSmallDisk ? '240Gi' : undefined) } }
+    { db: { volumeSize: postgresPvcSizeOverride } }
   );
-  const postgres = installSpliceRunbookHelmChart(
+  const postgres = new SplicePostgres(
     xns,
     'postgres',
-    'cn-postgres',
+    // can be removed once base version > 0.2.1
+    `postgres`,
+    'postgres-secrets',
     postgresValues,
-    defaultVersion,
-    {
-      dependsOn: otherDeps,
-    }
+    true,
+    supportsValidatorRunbookReset
   );
-
-  const participantValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
-      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-    }),
-    ...loadYamlFromFile(
-      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
-      { MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString() }
-    ),
-    metrics: {
-      enable: true,
-    },
-  };
-
-  const participantValuesWithSpecifiedAud: ChartValues = {
-    ...participantValues,
-    auth: {
-      ...participantValues.auth,
-      targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
-    },
-    persistence: {
-      ...participantValues.persistence,
-      postgresName: 'postgres',
-    },
-    enablePostgresMetrics: true,
-    ...autoInitValues('cn-participant', defaultVersion, validatorConfig.nodeIdentifier),
-  };
-
-  const participant = installSpliceRunbookHelmChart(
+  const participantAddress = installParticipant(
+    DecentralizedSynchronizerUpgradeConfig,
+    DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
-    'participant',
-    'cn-participant',
-    participantValuesWithSpecifiedAud,
-    defaultVersion,
-    { dependsOn: imagePullDeps.concat([postgres]).concat(loopback !== null ? loopback : []) }
-  );
+    auth0Client.getCfg(),
+    validatorConfig.nodeIdentifier,
+    auth0UserNameEnvVarSource('validator'),
+    activeVersion,
+    postgres,
+    undefined,
+    {
+      dependsOn: [postgres],
+      // aliases and ignore can be removed once base version > 0.2.1
+      aliases: [
+        {
+          name: 'participant',
+        },
+      ],
+      ignoreChanges: ['name'],
+    }
+  ).participantAddress;
 
   const fixedTokensValue: ChartValues = {
     cluster: {
@@ -247,7 +223,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
-        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+        MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
         YOUR_VALIDATOR_NAME: validatorConfig.nodeIdentifier,
       }
@@ -258,13 +234,14 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     ...validatorValuesFromYamlFiles,
     migration: {
       ...validatorValuesFromYamlFiles.migration,
-      migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
+      migrating: DecentralizedSynchronizerUpgradeConfig.isRunningMigration()
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },
     metrics: {
       enable: true,
     },
+    participantAddress,
     participantIdentitiesDumpPeriodicBackup: backupConfig,
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
     validatorPartyHint: VALIDATOR_PARTY_HINT || 'digitalasset-testValidator-1',
@@ -300,7 +277,6 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     auth: {
       ...validatorValuesWithOnboardingOverride.auth,
       audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-      ledgerApiAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 
@@ -319,7 +295,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     throw new Error('No validator ui client id in auth0 config');
   }
   const dependsOn = imagePullDeps
-    .concat([participant])
+    .concat(loopback ? [loopback] : [])
     .concat([validatorAppSecret, validatorUISecret])
     .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
@@ -333,7 +309,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     'validator',
     'cn-validator',
     validatorValuesWithMaybeTopups,
-    defaultVersion,
+    activeVersion,
     { dependsOn: dependsOn }
   );
 }

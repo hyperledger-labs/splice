@@ -14,3 +14,7 @@ export function slackToken(): string {
 }
 
 export const clusterIsBeingReset = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
+export const enablePrometheusAlerts = config.envFlag(
+  'ENABLE_PROMETHEUS_ALERTS',
+  !clusterIsBeingReset
+);

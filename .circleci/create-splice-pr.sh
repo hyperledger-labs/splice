@@ -34,8 +34,8 @@ cd "$splice_dir"
 # ssh is not in the path in nix in CCI, so helping git find it
 export GIT_SSH_COMMAND="/usr/bin/ssh"
 
-git config user.email "circleci@circleci.com"
-git config user.name "CircleCI"
+git config user.email "splice-maintainers@digitalasset.com"
+git config user.name "DA Automation"
 
 branch="splice-cci-update-$(date +%s)"
 base_branch="$CIRCLE_BRANCH"
@@ -50,7 +50,7 @@ fi
 
 git checkout -b "$branch"
 git add .
-git commit -m "Update Splice from CCI" --allow-empty
+git commit -s -m "Update Splice from CCI" --allow-empty
 
 push_with_retries
 

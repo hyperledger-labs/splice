@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { validatorLicensesHandler, dsoInfoHandler } from 'common-test-utils';
 import { RestHandler, rest } from 'msw';
 import {
   ErrorResponse,
@@ -20,6 +21,7 @@ import { config } from '../../setup/config';
 const amuletNameServiceAcronym = config.spliceInstanceNames.nameServiceNameAcronym;
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [
+  dsoInfoHandler(scanUrl),
   rest.get(`${scanUrl}/v0/dso-party-id`, (_, res, ctx) => {
     return res(
       ctx.json<GetDsoPartyIdResponse>({
@@ -273,4 +275,5 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
       }
     }
   ),
+  validatorLicensesHandler(scanUrl),
 ];

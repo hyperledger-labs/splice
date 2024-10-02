@@ -56,21 +56,6 @@ workflow:
           deploy_version: << pipeline.parameters.base-version >>
           requires:
             - deploy_cluster_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          wait_for_sv: false
-          cluster_version: << pipeline.parameters.base-version >>
-          check_cluster_version: false
-          requires:
-            - prepare_cluster_for_migration
-            - prepare_sv_runbook_for_migration
       - pre_migration_compose_validator:
           context:
             - artifactory
@@ -93,8 +78,6 @@ workflow:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
       - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
           name: "prepare_sv_runbook_for_migration"
           <<: *main-branch-only
@@ -108,9 +91,22 @@ workflow:
           base_version: << pipeline.parameters.base-version >>
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
+            - deploy_sv_runbook_for_migration
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          wait_for_sv: false
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false
+          requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
-            - deploy_validator_runbook_for_migration
       - hard_migration:
           name: "migrate_cluster"
           <<: *main-branch-only
@@ -152,18 +148,19 @@ workflow:
           requires:
             - prepare_sv_runbook_for_migration
             - migrate_cluster
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "ciperiodic"
-          cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
-          requires:
-            - migrate_cluster
+      # Re-enable once latest release is > 0.2.3
+#      - preflight_sv_check:
+#          name: "preflight_sv_check_migrated"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          cluster: "ciperiodic"
+#          cluster_version: << pipeline.parameters.upgrade-version >>
+#          migration_id: 1
+#          requires:
+#            - migrate_cluster
       - hard_migration:
           name: "migrate_validator_runbook"
           context:
@@ -207,7 +204,8 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
-            - preflight_sv_check_migrated
+            # Re-enable once latest release is > 0.2.3
+#            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - restore_node:
@@ -233,7 +231,9 @@ workflow:
           global_domain_active_migration_id: 1
           reset_cluster: true # it's the default, but to make it explicit
           requires:
-            - restore_node
+            - migrate_sv_runbook
+      #          # Re-enable once latest release is > 0.2.3
+      #            - preflight_sv_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           <<: *main-branch-only
@@ -255,9 +255,13 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
+            - restore_node
             - preflight_sv_check_redeployed
+            - post_migration_compose_validator
       - autoscaler_allow_scaledown:
           <<: *main-branch-only
           cluster: "ciperiodic"
           requires:
+            - restore_node
             - preflight_sv_check_redeployed
+            - post_migration_compose_validator

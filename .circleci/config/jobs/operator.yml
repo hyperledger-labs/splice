@@ -52,4 +52,4 @@ jobs:
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
-            cncluster pulumi deployment up --skip-preview
+            cncluster pulumi deployment up --skip-preview --diff

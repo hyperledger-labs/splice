@@ -1,4 +1,4 @@
-import { config } from './config';
+import { spliceEnvConfig } from './config/envConfig';
 
 export type Repository = {
   dockerImages: string;
@@ -14,17 +14,6 @@ export const repositories = {
     helm: 'https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm',
   },
 };
-export const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
-let repository: Repository;
-if (artifactsRepository === undefined) {
-  repository = repositories.artifactory;
-} else if (artifactsRepository === 'google') {
-  repository = repositories.google;
-} else if (artifactsRepository === 'artifactory') {
-  repository = repositories.artifactory;
-} else {
-  throw new Error(`Unknown artifacts repository: ${artifactsRepository}`);
-}
 
 export type CnChartVersion =
   | { type: 'local'; repository: { dockerImages: string } }
@@ -34,12 +23,29 @@ export type CnChartVersion =
       version: string;
     };
 
-export function parsedVersion(version?: string): CnChartVersion {
-  return version && version !== 'local'
+export function parsedVersion(
+  version: string | undefined,
+  repositoryValue?: string
+): CnChartVersion {
+  return version && version.length > 0 && version !== 'local'
     ? {
         type: 'remote',
         version: version,
-        repository: repository,
+        repository: repository(repositoryValue),
       }
     : { type: 'local', repository: { dockerImages: repositories.google.dockerImages } };
 }
+
+function repository(repositoryValue?: string) {
+  if (repositoryValue === undefined) {
+    return repositories.artifactory;
+  } else if (repositoryValue === 'google') {
+    return repositories.google;
+  } else if (repositoryValue === 'artifactory') {
+    return repositories.artifactory;
+  } else {
+    throw new Error(`Unknown artifacts repository: ${repositoryValue}`);
+  }
+}
+
+export const CHARTS_VERSION: string | undefined = spliceEnvConfig.optionalEnv('CHARTS_VERSION');
