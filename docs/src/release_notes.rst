@@ -11,6 +11,11 @@ Release Notes
 Upcoming
 --------
 
+* SV UI
+
+    * Configuration changes for AmuletRules and DsoRules are diffed against the configuration it will replace and the in-flights proposals.
+      This makes it easier to see what changes are being proposed and what the current configuration is.
+
 * Bugfixes
 
     * Fix an issue where the ordering of stakeholders (signatories and observers) would be inconsistent across SVs

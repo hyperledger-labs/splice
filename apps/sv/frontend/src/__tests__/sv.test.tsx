@@ -61,7 +61,6 @@ describe('SV user can', () => {
     const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
     await user.click(checkBox);
 
-    expect(screen.queryByText('nextScheduledSynchronizerUpgrade')).toBeNull();
     expect(await screen.findByText('nextScheduledSynchronizerUpgrade.time')).toBeDefined();
   });
 });

@@ -3,9 +3,13 @@
 import { QueryClient, UseQueryResult, useQuery, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
+import { theme } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
+import { checkAmuletRulesExpectedConfigDiffsHTML } from 'common-test-utils';
 import React from 'react';
 import { test, expect, describe } from 'vitest';
+
+import { ThemeProvider } from '@mui/material';
 
 import {
   VoteRequest,
@@ -15,6 +19,7 @@ import { ContractId } from '@daml/types';
 
 import * as constants from '../mocks/constants';
 import { ListVoteRequests } from '../../components';
+import { getExpectedAmuletRulesConfigDiffsHTML } from '../mocks/constants';
 
 const queryClient = new QueryClient();
 // The linter wants me to add the constants.X in the queryKey,
@@ -92,15 +97,16 @@ const provider: VotesHooks = {
 
 const TestVotes: React.FC<{ showActionNeeded: boolean }> = ({ showActionNeeded }) => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <VotesHooksContext.Provider value={provider}>
-        <ListVoteRequests showActionNeeded={showActionNeeded} />
-      </VotesHooksContext.Provider>
-    </QueryClientProvider>
+    <ThemeProvider theme={theme}>
+      <QueryClientProvider client={queryClient}>
+        <VotesHooksContext.Provider value={provider}>
+          <ListVoteRequests showActionNeeded={showActionNeeded} />
+        </VotesHooksContext.Provider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 
-// TODO(#14439): these tests should check that the diff in the opened modal (click on the row) are correct
 describe('Votes list should', () => {
   test('Show votes requiring action, when that is enabled', async () => {
     render(<TestVotes showActionNeeded />);
@@ -108,7 +114,7 @@ describe('Votes list should', () => {
     const actionNeeded = await screen.findByText('Action Needed');
     expect(actionNeeded).toBeDefined();
     fireEvent.click(actionNeeded);
-
+    // TODO(#15151): Test diffs for SRARC_UpdateSvRewardWeight
     const actionNeededRows = await screen.findAllByText('SRARC_UpdateSvRewardWeight');
     expect(actionNeededRows).toHaveLength(1);
   });
@@ -127,6 +133,12 @@ describe('Votes list should', () => {
 
     const plannedRows = await screen.findAllByText('CRARC_AddFutureAmuletConfigSchedule');
     expect(plannedRows).toHaveLength(1);
+
+    const action = plannedRows[0]; // Use the first element from the array
+    fireEvent.click(action);
+
+    const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('0.005', '0.006');
+    checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
   });
 
   test('Show votes that are executed', async () => {

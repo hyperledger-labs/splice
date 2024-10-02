@@ -27,8 +27,9 @@ import { ContractId, Party } from '@daml/types';
 
 import { Reason } from '../../models';
 import ActionView from './ActionView';
+import { VoteRequestResultTableType } from './VoteResultsFilterTable';
 
-interface VoteRequestModalProps {
+interface VoteModalProps {
   voteRequestContractId: ContractId<VoteRequest>;
   actionReq: ActionRequiringConfirmation;
   requester: Party;
@@ -36,15 +37,16 @@ interface VoteRequestModalProps {
   voteBefore: Date;
   rejectedVotes: SvVote[];
   acceptedVotes: SvVote[];
-  handleClose: () => void;
   voteForm?: (
     voteRequestContractId: ContractId<VoteRequest>,
     currentSvVote: SvVote | undefined
   ) => React.ReactNode;
   curSvVote?: SvVote;
+  tableType?: VoteRequestResultTableType;
+  effectiveAt?: string;
 }
 
-const VoteModalContent: React.FC<VoteRequestModalProps> = ({
+const VoteModalContent: React.FC<VoteModalProps> = ({
   voteRequestContractId,
   actionReq,
   requester,
@@ -52,9 +54,10 @@ const VoteModalContent: React.FC<VoteRequestModalProps> = ({
   voteBefore,
   rejectedVotes,
   acceptedVotes,
-  handleClose,
   voteForm,
   curSvVote,
+  tableType,
+  effectiveAt,
 }) => {
   const votesHooks = useVotesHooks();
 
@@ -73,7 +76,7 @@ const VoteModalContent: React.FC<VoteRequestModalProps> = ({
       <CardContent sx={{ paddingX: '64px' }}>
         <Stack direction="column" mb={4} spacing={1}>
           <Typography variant="h5">Requested Action</Typography>
-          <ActionView action={actionReq} />
+          <ActionView action={actionReq} tableType={tableType} expiresAt={effectiveAt} />
         </Stack>
         <Stack direction="column" mb={4} spacing={1}>
           <Typography variant="h5">Request Information</Typography>

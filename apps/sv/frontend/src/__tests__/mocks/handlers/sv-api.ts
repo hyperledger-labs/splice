@@ -6,9 +6,11 @@ import {
   ErrorResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
+  ListVoteRequestByTrackingCidResponse,
+  LookupDsoRulesVoteRequestResponse,
 } from 'sv-openapi';
 
-import { voteResults } from '../constants';
+import { voteRequest, voteRequests, voteResults } from '../constants';
 
 export const buildSvMock = (svUrl: string): RestHandler[] => [
   rest.get(`${svUrl}/v0/admin/authorization`, (_, res, ctx) => {
@@ -16,15 +18,28 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
   dsoInfoHandler(svUrl),
   rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
+    return res(ctx.json<ListDsoRulesVoteRequestsResponse>(voteRequests));
+  }),
+  rest.get(`${svUrl}/v0/admin/sv/voterequests/:id`, (req, res, ctx) => {
+    const { id } = req.params;
     return res(
-      ctx.json<ListDsoRulesVoteRequestsResponse>({
-        dso_rules_vote_requests: [],
+      ctx.json<LookupDsoRulesVoteRequestResponse>({
+        dso_rules_vote_request: voteRequests.dso_rules_vote_requests.filter(
+          vr => vr.contract_id === id
+        )[0],
       })
     );
   }),
-  rest.post(`${svUrl}/v0/admin/sv/voteresults`, (_, res, ctx) => {
-    console.log(voteResults);
-    return res(ctx.json<ListDsoRulesVoteResultsResponse>(voteResults));
+  rest.post(`${svUrl}/v0/admin/sv/voterequest`, (_, res, ctx) => {
+    return res(ctx.json<ListVoteRequestByTrackingCidResponse>(voteRequest));
+  }),
+  rest.post(`${svUrl}/v0/admin/sv/voteresults`, (req, res, ctx) => {
+    return req.json().then(data => {
+      if (data.actionName === 'SRARC_SetConfig') {
+        return res(ctx.json<ListDsoRulesVoteResultsResponse>({ dso_rules_vote_results: [] }));
+      }
+      return res(ctx.json<ListDsoRulesVoteResultsResponse>(voteResults));
+    });
   }),
   rest.get(`${svUrl}/v0/admin/domain/cometbft/debug`, (_, res, ctx) => {
     return res(

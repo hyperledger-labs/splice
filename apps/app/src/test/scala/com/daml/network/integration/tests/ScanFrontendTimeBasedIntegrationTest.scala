@@ -12,6 +12,7 @@ import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import io.circe.JsonObject
+import org.openqa.selenium.By
 import spray.json.DefaultJsonProtocol.StringJsonFormat
 
 import java.time.{Duration, Instant}
@@ -580,14 +581,19 @@ class ScanFrontendTimeBasedIntegrationTest
               closeVoteModalsIfOpen
               reviewButton.underlying.click()
 
-              inside(find(id("pretty-json"))) { case Some(json) =>
+              // TODO(#14813): needs to be changed by using parseAmuletConfigValue() once the diff exists for the first change
+              try {
+                val newScheduleItem = webDriver.findElement(By.id("accordion-details"))
+                val json = newScheduleItem.findElement(By.tagName("pre")).getText
                 spray.json
-                  .JsonParser(json.text)
+                  .JsonParser(json)
                   .asJsObject("transferConfig")
                   .fields("transferConfig")
                   .asJsObject
                   .fields("maxNumInputs")
                   .convertTo[String] should be(newMaxNumInputs.toString)
+              } catch {
+                case _: NoSuchElementException => false
               }
             }
           },

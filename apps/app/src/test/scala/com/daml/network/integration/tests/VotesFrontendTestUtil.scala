@@ -28,4 +28,16 @@ trait VotesFrontendTestUtil { self: FrontendIntegrationTestWithSharedEnvironment
     scala.util.Try(click on "vote-result-modal-close-button")
   }
 
+  def parseAmuletConfigValue(key: String, replacement: Boolean = true)(implicit
+      webDriver: WebDriverType
+  ) = {
+    val headElement = webDriver.findElement(By.cssSelector(s"li[data-key='$key']"))
+    val value = if (replacement) {
+      headElement.findElement(By.cssSelector("div.jsondiffpatch-right-value"))
+    } else {
+      headElement.findElement(By.cssSelector("div.jsondiffpatch-left-value"))
+    }
+    value.findElement(By.tagName("pre")).getText.replace("\"", "")
+  }
+
 }

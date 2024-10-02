@@ -11,16 +11,17 @@ import {
   ActionRequiringConfirmation,
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
-import { ContractId } from '@daml/types';
+
+import { VoteRequestModalState } from './ListVoteRequests';
 
 interface ListVoteRequestsTableProps {
   voteRequests: Contract<VoteRequest>[];
   getAction: (action: ActionRequiringConfirmation) => string;
-  openModalWithVoteRequest: (voteRequestContractId: ContractId<VoteRequest>) => void;
+  openModalWithVoteRequest: (voteRequestModalState: VoteRequestModalState) => void;
   tableBodyId: string;
 }
 
-export const ListVoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
+export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
   voteRequests,
   getAction,
   openModalWithVoteRequest,
@@ -102,7 +103,11 @@ export const ListVoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> =
   }));
 
   const handleRowClick: GridEventListener<'rowClick'> = (params: GridRowParams) => {
-    openModalWithVoteRequest(params.row.trackingCid);
+    openModalWithVoteRequest({
+      open: true,
+      voteRequestContractId: params.row.trackingCid,
+      effectiveAt: params.row.expiresAt.toISOString(),
+    });
   };
 
   return (
