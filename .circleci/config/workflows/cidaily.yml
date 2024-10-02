@@ -255,7 +255,6 @@ workflow:
           silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
-            - artifacts_push
       - preflight_validator_check:
           filters:
             branches:
