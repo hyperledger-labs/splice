@@ -1,15 +1,15 @@
 {
-    "name": "DevNet Validator Runbook Preflight",
-    "description": "DevNet Validator Runbook Preflight Tests run 1 Hour after every Runbook Reset",
+    "name": "DevNet Validator Runbook Reset",
+    "description": "DevNet Validator Runbook Periodic Reset every 6 hours",
     "attribution-actor": "system",
     "parameters" : {
-      "branch": "release-line-0.2.3",
-      "run-job": "healthcheck-validator-runbook-devnet"
+      "branch": "release-line-0.2.4",
+      "run-job": "reset-validator-runbook-devnet"
     },
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
-        1, 7, 11, 18
+        0, 6, 12, 18
       ],
       "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],
