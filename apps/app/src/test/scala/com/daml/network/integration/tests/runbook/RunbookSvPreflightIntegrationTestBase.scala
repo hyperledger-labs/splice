@@ -108,7 +108,8 @@ abstract class RunbookSvPreflightIntegrationTestBase
     }
   }
 
-  "The SV rewards are claimed by the SV, with 33.33% going to validator1" in { implicit env =>
+  // TODO (#15162): re-enable after base version is 0.2.5
+  "The SV rewards are claimed by the SV, with 33.33% going to validator1" ignore { implicit env =>
     val svClient = sv_client("sv")
     val sv1ScanClient = scancl("sv1Scan")
 

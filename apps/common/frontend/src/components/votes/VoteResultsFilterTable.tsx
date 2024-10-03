@@ -25,6 +25,8 @@ import {
   DsoRules_CloseVoteRequestResult,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
+import { VoteResultModalState } from './ListVoteRequests';
+
 dayjs.extend(utc);
 
 export type VoteRequestResultTableType = 'Executed' | 'Planned' | 'Rejected';
@@ -33,7 +35,7 @@ interface ListVoteResultsTableProps {
   getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
   tableBodyId: string;
   tableType: VoteRequestResultTableType;
-  openModalWithVoteResult: (voteResult: DsoRules_CloseVoteRequestResult) => void;
+  openModalWithVoteResult: (voteResultModalState: VoteResultModalState) => void;
   accepted: boolean;
   effectiveFrom?: string;
   effectiveTo?: string;
@@ -47,7 +49,7 @@ type VoteRequestResultRow = {
   expiresAt: Date;
   effectiveAt: Date;
   idx: number;
-  voteResult?: DsoRules_CloseVoteRequestResult;
+  voteResult: DsoRules_CloseVoteRequestResult;
   expired: boolean;
   voteStatus: string[][];
 };
@@ -233,13 +235,11 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
             tableType === 'Planned'
           ) {
             return true;
-          } else if (
-            ['VRO_Rejected', 'VRO_Expired'].includes(result.outcome.tag) &&
-            tableType === 'Rejected'
-          ) {
-            return true;
           } else {
-            return false;
+            return (
+              ['VRO_Rejected', 'VRO_Expired'].includes(result.outcome.tag) &&
+              tableType === 'Rejected'
+            );
           }
         })
       : [];
@@ -292,7 +292,12 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   }
 
   const handleRowClick: GridEventListener<'rowClick'> = (params: GridRowParams) => {
-    openModalWithVoteResult(params.row.voteResult);
+    openModalWithVoteResult({
+      open: true,
+      voteResult: params.row.voteResult,
+      tableType: tableType,
+      effectiveAt: params.row.effectiveAt,
+    });
   };
 
   return (
