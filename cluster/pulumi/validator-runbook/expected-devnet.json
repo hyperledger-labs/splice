@@ -591,8 +591,7 @@
         },
         "auth": {
           "audience": "https://validator.example.com/api",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
