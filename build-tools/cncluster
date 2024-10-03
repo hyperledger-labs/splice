@@ -1940,6 +1940,32 @@ function subcmd_request_pam() {
     fi
 }
 
+###
+subcommand_whitelist[dump_identities]="Dump all node identities to a file"
+function subcmd_dump_identities() {
+    _cluster_must_exist
+
+    all='{}'
+    for i in sv-1 sv-2 sv-3 sv-4; do
+        if [ "$i" == "sv-1" ]; then
+            domain="sv-2"
+        else
+            domain="$i-eng"
+        fi
+        token=$(subcmd_get_token $i)
+        full_identities=$(curl -sSLf -H "authorization: Bearer $token" "https://sv.${domain}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump")
+        identities=$(echo "$full_identities" | jq "{\"$i\": {participant: .identities.participant.id, sequencer: .identities.sequencer.id, mediator: .identities.mediator.id}}")
+        all=$(echo "$all" "$identities" | jq -s add)
+    done
+
+    token=$(subcmd_get_token validator)
+    full_identities=$(curl -sSLf -H "authorization: Bearer $token" "https://wallet.validator.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities")
+    identities=$(echo "$full_identities" | jq '{"validator": {participant: .id}}')
+    all=$(echo "$all" "$identities" | jq -s add)
+
+    echo "$all" | jq -S .
+}
+
 ################################
 ### Main
 ################################

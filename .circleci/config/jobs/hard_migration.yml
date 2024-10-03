@@ -402,3 +402,78 @@ jobs:
           name: Store logs
           path: log
           destination: log
+
+  pre_migration_dump_identities:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Dump identities before the migration
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            mkdir -p workspace
+            cncluster dump_identities > workspace/identities-before.json
+      - persist_to_workspace:
+          root: workspace
+          paths:
+            - identities-before.json
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+
+  post_migration_verify_identities:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - attach_workspace:
+          at: workspace
+      - run_bash_command_in_nix:
+          cmd_name: Dump identities after the migration, and compare
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster dump_identities > workspace/identities-after.json
+
+            diff -u workspace/identities-before.json workspace/identities-after.json || exit 1
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
