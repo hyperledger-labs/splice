@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
+import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenResponse } from 'auth0';
 
 import type {
@@ -10,8 +11,11 @@ import type {
   Auth0ClientSecret,
   ClientIdMap,
   Auth0Config,
+  Auth0ClusterConfig,
 } from './auth0types';
-import { ExactNamespace, fixedTokens } from './utils';
+import { config } from './config';
+import { infraStack } from './stackReferences';
+import { ExactNamespace, fixedTokens, isMainNet } from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
@@ -414,4 +418,50 @@ export function auth0UserNameEnvVarSource(
       optional: false,
     },
   };
+}
+
+export enum Auth0ClientType {
+  RUNBOOK,
+  MAINSTACK,
+}
+
+export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> {
+  const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
+  switch (clientType) {
+    case Auth0ClientType.RUNBOOK:
+      if (!auth0ClusterCfg.svRunbook) {
+        throw new Error('missing sv runbook auth0 output');
+      }
+      return auth0ClusterCfg.svRunbook.apply(cfg => {
+        if (!cfg) {
+          throw new Error('missing sv runbook auth0 output');
+        }
+        cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET');
+        return new Auth0Fetch(cfg);
+      });
+    case Auth0ClientType.MAINSTACK:
+      if (isMainNet) {
+        if (!auth0ClusterCfg.mainnet) {
+          throw new Error('missing mainNet auth0 output');
+        }
+        return auth0ClusterCfg.mainnet.apply(cfg => {
+          if (!cfg) {
+            throw new Error('missing mainNet auth0 output');
+          }
+          cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET');
+          return new Auth0Fetch(cfg);
+        });
+      } else {
+        if (!auth0ClusterCfg.cantonNetwork) {
+          throw new Error('missing cantonNetwork auth0 output');
+        }
+        return auth0ClusterCfg.cantonNetwork.apply(cfg => {
+          if (!cfg) {
+            throw new Error('missing cantonNetwork auth0 output');
+          }
+          cfg.auth0MgtClientSecret = config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET');
+          return new Auth0Fetch(cfg);
+        });
+      }
+  }
 }

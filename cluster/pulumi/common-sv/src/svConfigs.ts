@@ -7,8 +7,9 @@ import {
   SvCometBftKeys,
   svCometBftKeysFromSecret,
 } from 'splice-pulumi-common';
+import { SweepConfig } from 'splice-pulumi-common-validator';
 
-import { StaticSvConfig, SweepConfig } from './config';
+import { StaticSvConfig } from './config';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
 const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet

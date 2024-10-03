@@ -26,9 +26,10 @@ import {
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
-import { SweepConfig } from 'splice-pulumi-common-sv/src/config';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
+
+import { SweepConfig } from './sweep';
 
 export type ExtraDomain = {
   alias: string;
