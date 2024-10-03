@@ -197,8 +197,8 @@ function findAmuletRulesScheduleItemToCompareAgainst(
 export const ActionView: React.FC<{
   action: ActionRequiringConfirmation;
   tableType?: VoteRequestResultTableType;
-  expiresAt?: string;
-}> = ({ action, tableType, expiresAt }) => {
+  effectiveAt?: string;
+}> = ({ action, tableType, effectiveAt }) => {
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
 
@@ -263,7 +263,7 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             dsoAction={dsoAction}
-            expiresAt={expiresAt}
+            effectiveAt={effectiveAt}
             tableType={tableType}
           />
         );
@@ -610,9 +610,9 @@ const SetConfigValueTable: React.FC<{
   dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
   actionType: string;
   dsoAction: { tag: 'SRARC_SetConfig'; value: DsoRules_SetConfig };
-  expiresAt?: string;
-  tableType?: VoteRequestResultTableType;
-}> = ({ votesHooks, dsoInfosQuery, actionType, dsoAction, expiresAt, tableType }) => {
+  effectiveAt?: string;
+  tableType?: VoteRequestResultTableType; // tableType is only defined for the Planned, Executed and Rejected tabs
+}> = ({ votesHooks, dsoInfosQuery, actionType, dsoAction, effectiveAt, tableType }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
   if (voteRequests.isLoading) {
@@ -627,18 +627,24 @@ const SetConfigValueTable: React.FC<{
     return <p>no VoteRequest contractId is specified</p>;
   }
 
-  // 1... we need to pass the schedule time or adapt findLatestVoteResult to SetConfig
-  const latestConfig = findLatestVoteResult(
-    expiresAt || dayjs().toString(),
-    'SRARC_SetConfig',
-    votesHooks,
-    tableType
-  );
+  // TODO(#15180): Implement effectivity on all actions
+  // we need to subtract 1 second because the effectiveAt differs slightly from the completedAt in DsoRules-based actions
+  const latestConfig =
+    effectiveAt && tableType
+      ? findLatestVoteResult(
+          dayjs(effectiveAt).subtract(1, 'seconds').toISOString(),
+          'SRARC_SetConfig',
+          votesHooks,
+          tableType
+        )
+      : undefined;
 
   const dsoConfigToCompareWith: [string, DsoRulesConfig] = !latestConfig
     ? [
         'initial',
-        DsoRulesConfig.encode(dsoInfosQuery.data.dsoRules.payload.config) as DsoRulesConfig,
+        tableType
+          ? dsoAction.value.newConfig
+          : (DsoRulesConfig.encode(dsoInfosQuery.data.dsoRules.payload.config) as DsoRulesConfig),
       ]
     : [
         latestConfig.request.voteBefore,
@@ -659,7 +665,7 @@ const SetConfigValueTable: React.FC<{
             DsoRulesConfig
           ];
         })
-        .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
+        .filter(v => !dayjs(v[0]).isSame(dayjs(effectiveAt)))
     : [];
 
   return (
@@ -667,7 +673,7 @@ const SetConfigValueTable: React.FC<{
       actionType={actionType}
       actionName={dsoAction.tag}
       valuesMap={{
-        'Effective Time': <DateOrTextDisplay datetime={expiresAt} />,
+        'Effective Time': <DateOrTextDisplay datetime={effectiveAt} />,
       }}
       accordionList={{
         unfoldedAccordions: [

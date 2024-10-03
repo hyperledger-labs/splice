@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as jtv from '@mojotech/json-type-validation';
-import { dsoInfo, getAmuletConfig } from 'common-test-utils';
+import { dsoInfo, getAmuletConfig, getDsoConfig } from 'common-test-utils';
 import {
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
@@ -133,7 +133,7 @@ export const voteRequestsSetConfig: LookupDsoRulesVoteRequestResponse = {
   dso_rules_vote_request: voteRequests.dso_rules_vote_requests[1],
 };
 
-export const voteResults: ListDsoRulesVoteResultsResponse = {
+export const voteResultsAmuletRules: ListDsoRulesVoteResultsResponse = {
   dso_rules_vote_results: [
     {
       request: {
@@ -252,6 +252,47 @@ export const voteResults: ListDsoRulesVoteResultsResponse = {
       },
       offboardedVoters: [],
     },
+  ],
+};
+
+export const voteResultsDsoRules: ListDsoRulesVoteResultsResponse = {
+  dso_rules_vote_results: [
+    {
+      request: {
+        dso: 'DSO::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c39',
+        votes: [
+          [
+            'Digital-Asset-2',
+            {
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              accept: true,
+              reason: {
+                url: '',
+                body: 'I accept, as I requested the vote.',
+              },
+            },
+          ],
+        ],
+        voteBefore: '2024-10-01T20:10:01.157168Z',
+        requester: 'Digital-Asset-2',
+        reason: {
+          url: '',
+          body: 'd',
+        },
+        trackingCid: null,
+        action: getDsoAction('2200'),
+      },
+      completedAt: '2024-10-01T22:10:01.253341Z',
+      abstainingSvs: [],
+      outcome: {
+        tag: 'VRO_Accepted',
+        value: {
+          effectiveAt: '2024-10-01T22:10:01.253341Z',
+        },
+      },
+      offboardedVoters: [],
+    },
+
     {
       request: {
         dso: 'DSO::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
@@ -289,7 +330,7 @@ export const voteResults: ListDsoRulesVoteResultsResponse = {
     },
     {
       request: {
-        dso: 'DSO::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
+        dso: 'DSO::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c38',
         votes: [
           [
             'Digital-Asset-2',
@@ -349,53 +390,7 @@ function getDsoAction(acsCommitmentReconciliationInterval: string) {
       dsoAction: {
         tag: 'SRARC_SetConfig',
         value: {
-          newConfig: {
-            numMemberTrafficContractsThreshold: '5',
-            dsoDelegateInactiveTimeout: {
-              microseconds: '70000000',
-            },
-            svOnboardingRequestTimeout: {
-              microseconds: '3600000000',
-            },
-            nextScheduledSynchronizerUpgrade: null,
-            actionConfirmationTimeout: {
-              microseconds: '3600000000',
-            },
-            maxTextLength: '1024',
-            voteRequestTimeout: {
-              microseconds: '604800000000',
-            },
-            decentralizedSynchronizer: {
-              synchronizers: [
-                [
-                  'global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
-                  {
-                    state: 'DS_Operational',
-                    cometBftGenesisJson:
-                      'TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config.',
-                    acsCommitmentReconciliationInterval: acsCommitmentReconciliationInterval,
-                  },
-                ],
-              ],
-              lastSynchronizerId:
-                'global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
-              activeSynchronizerId:
-                'global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
-            },
-            numUnclaimedRewardsThreshold: '4410',
-            svOnboardingConfirmedTimeout: {
-              microseconds: '3600000000',
-            },
-            synchronizerNodeConfigLimits: {
-              cometBft: {
-                maxNumSequencingKeys: '2',
-                maxNodeIdLength: '50',
-                maxNumCometBftNodes: '2',
-                maxPubKeyLength: '256',
-                maxNumGovernanceKeys: '2',
-              },
-            },
-          },
+          newConfig: getDsoConfig(acsCommitmentReconciliationInterval),
         },
       },
     },
@@ -409,9 +404,9 @@ export function getExpectedDsoRulesConfigDiffsHTML(
   return (
     '<div class="jsondiffpatch-delta jsondiffpatch-node jsondiffpatch-child-node-type-object"><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"><li data-key="actionConfirmationTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">actionConfirmationTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
     '  "microseconds": "3600000000"\n' +
-    `}</pre></div></li><li data-key="decentralizedSynchronizer" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">decentralizedSynchronizer</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="activeSynchronizerId" class="jsondiffpatch-textdiff"><div class="jsondiffpatch-property-name">activeSynchronizerId</div><div class="jsondiffpatch-value"><ul class="jsondiffpatch-textdiff"></ul></div></li><li><div class="jsondiffpatch-textdiff-location"><span class="jsondiffpatch-textdiff-line-number">4</span><span class="jsondiffpatch-textdiff-char">86</span></div><div class="jsondiffpatch-textdiff-line"><span class="jsondiffpatch-textdiff-context">bal-</span><span class="jsondiffpatch-textdiff-deleted">synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca</span><span class="jsondiffpatch-textdiff-added">domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37</span></div></li></ul></div><li data-key="lastSynchronizerId" class="jsondiffpatch-textdiff"><div class="jsondiffpatch-property-name">lastSynchronizerId</div><div class="jsondiffpatch-value"><ul class="jsondiffpatch-textdiff"></ul></div></li><li><div class="jsondiffpatch-textdiff-location"><span class="jsondiffpatch-textdiff-line-number">4</span><span class="jsondiffpatch-textdiff-char">86</span></div><div class="jsondiffpatch-textdiff-line"><span class="jsondiffpatch-textdiff-context">bal-</span><span class="jsondiffpatch-textdiff-deleted">synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca</span><span class="jsondiffpatch-textdiff-added">domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37</span></div></li><li data-key="synchronizers" class="jsondiffpatch-node jsondiffpatch-child-node-type-array"><div class="jsondiffpatch-property-name">synchronizers</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-array"></ul></li><li data-key="0" class="jsondiffpatch-node jsondiffpatch-child-node-type-array"><div class="jsondiffpatch-property-name">0</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-array"></ul></li><li data-key="0" class="jsondiffpatch-deleted"><div class="jsondiffpatch-property-name">0</div><div class="jsondiffpatch-value"><pre>"global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca"</pre></div></li><li data-key="0" class="jsondiffpatch-added"><div class="jsondiffpatch-property-name">0</div><div class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li data-key="1" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">1</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="acsCommitmentReconciliationInterval" class="jsondiffpatch-modified"><div class="jsondiffpatch-property-name">acsCommitmentReconciliationInterval</div><div class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalAcsCommitmentReconciliationInterval}"</pre></div><div class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementAcsCommitmentReconciliationInterval}"</pre></div></li><li data-key="cometBftGenesisJson" class="jsondiffpatch-textdiff"><div class="jsondiffpatch-property-name">cometBftGenesisJson</div><div class="jsondiffpatch-value"><ul class="jsondiffpatch-textdiff"></ul></div></li><li><div class="jsondiffpatch-textdiff-location"><span class="jsondiffpatch-textdiff-line-number">41</span><span class="jsondiffpatch-textdiff-char">24</span></div><div class="jsondiffpatch-textdiff-line"><span class="jsondiffpatch-textdiff-context"> of </span><span class="jsondiffpatch-textdiff-deleted">founding SV node</span><span class="jsondiffpatch-textdiff-added">sv1</span><span class="jsondiffpatch-textdiff-context"> via</span></div></li><li data-key="state" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">state</div><div class="jsondiffpatch-value"><pre>"DS_Operational"</pre></div></li><li data-key="dsoDelegateInactiveTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">dsoDelegateInactiveTimeout</div><div class="jsondiffpatch-value"><pre>{\n` +
+    `}</pre></div></li><li data-key="decentralizedSynchronizer" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">decentralizedSynchronizer</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="activeSynchronizerId" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">activeSynchronizerId</div><div class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li data-key="lastSynchronizerId" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">lastSynchronizerId</div><div class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li data-key="synchronizers" class="jsondiffpatch-node jsondiffpatch-child-node-type-array"><div class="jsondiffpatch-property-name">synchronizers</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-array"></ul></li><li data-key="0" class="jsondiffpatch-node jsondiffpatch-child-node-type-array"><div class="jsondiffpatch-property-name">0</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-array"></ul></li><li data-key="0" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">0</div><div class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li data-key="1" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">1</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="acsCommitmentReconciliationInterval" class="jsondiffpatch-modified"><div class="jsondiffpatch-property-name">acsCommitmentReconciliationInterval</div><div class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalAcsCommitmentReconciliationInterval}"</pre></div><div class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementAcsCommitmentReconciliationInterval}"</pre></div></li><li data-key="cometBftGenesisJson" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">cometBftGenesisJson</div><div class="jsondiffpatch-value"><pre>"TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config."</pre></div></li><li data-key="state" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">state</div><div class="jsondiffpatch-value"><pre>"DS_Operational"</pre></div></li></ul><li data-key="dsoDelegateInactiveTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">dsoDelegateInactiveTimeout</div><div class="jsondiffpatch-value"><pre>{\n` +
     '  "microseconds": "70000000"\n' +
-    '}</pre></div></li><li data-key="maxTextLength" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxTextLength</div><div class="jsondiffpatch-value"><pre>"1024"</pre></div></li><li data-key="nextScheduledSynchronizerUpgrade" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">nextScheduledSynchronizerUpgrade</div><div class="jsondiffpatch-value"><pre>null</pre></div></li><li data-key="numMemberTrafficContractsThreshold" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">numMemberTrafficContractsThreshold</div><div class="jsondiffpatch-value"><pre>"5"</pre></div></li><li data-key="numUnclaimedRewardsThreshold" class="jsondiffpatch-modified"><div class="jsondiffpatch-property-name">numUnclaimedRewardsThreshold</div><div class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"10"</pre></div><div class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"4410"</pre></div></li><li data-key="svOnboardingConfirmedTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">svOnboardingConfirmedTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '}</pre></div></li><li data-key="maxTextLength" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxTextLength</div><div class="jsondiffpatch-value"><pre>"1024"</pre></div></li><li data-key="nextScheduledSynchronizerUpgrade" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">nextScheduledSynchronizerUpgrade</div><div class="jsondiffpatch-value"><pre>null</pre></div></li><li data-key="numMemberTrafficContractsThreshold" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">numMemberTrafficContractsThreshold</div><div class="jsondiffpatch-value"><pre>"5"</pre></div></li><li data-key="numUnclaimedRewardsThreshold" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">numUnclaimedRewardsThreshold</div><div class="jsondiffpatch-value"><pre>"10"</pre></div></li><li data-key="svOnboardingConfirmedTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">svOnboardingConfirmedTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
     '  "microseconds": "3600000000"\n' +
     '}</pre></div></li><li data-key="svOnboardingRequestTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">svOnboardingRequestTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
     '  "microseconds": "3600000000"\n' +
@@ -425,7 +420,7 @@ export function getExpectedDsoRulesConfigDiffsHTML(
     '  }\n' +
     '}</pre></div></li><li data-key="voteRequestTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">voteRequestTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
     '  "microseconds": "604800000000"\n' +
-    '}</pre></div></li>\n'.trim()
+    '}</pre></div></li></div>'.trim()
   );
 }
 

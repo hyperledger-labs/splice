@@ -130,53 +130,7 @@ export const dsoInfo = {
           ],
         ],
         offboardedSvs: [],
-        config: {
-          svOnboardingRequestTimeout: {
-            microseconds: '3600000000',
-          },
-          numUnclaimedRewardsThreshold: '10',
-          actionConfirmationTimeout: {
-            microseconds: '3600000000',
-          },
-          dsoDelegateInactiveTimeout: {
-            microseconds: '70000000',
-          },
-          voteRequestTimeout: {
-            microseconds: '604800000000',
-          },
-          synchronizerNodeConfigLimits: {
-            cometBft: {
-              maxNumSequencingKeys: '2',
-              maxNodeIdLength: '50',
-              maxNumCometBftNodes: '2',
-              maxPubKeyLength: '256',
-              maxNumGovernanceKeys: '2',
-            },
-          },
-          numMemberTrafficContractsThreshold: '5',
-          initialTrafficGrant: '1000000',
-          svOnboardingConfirmedTimeout: {
-            microseconds: '3600000000',
-          },
-          decentralizedSynchronizer: {
-            synchronizers: [
-              [
-                'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
-                {
-                  state: 'DS_Operational',
-                  cometBftGenesisJson:
-                    'TODO(#4900): share CometBFT genesis.json of founding SV node via DsoRules config.',
-                  acsCommitmentReconciliationInterval: '1600',
-                },
-              ],
-            ],
-            lastSynchronizerId:
-              'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
-            activeSynchronizerId:
-              'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
-          },
-          maxTextLength: '1024',
-        },
+        config: getDsoConfig('1600'),
         dsoDelegate:
           'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
         isDevNet: true,
@@ -535,6 +489,57 @@ export function getAmuletConfig(createFee: string) {
           },
         },
       ],
+    },
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function getDsoConfig(acsCommitmentReconciliationInterval: string) {
+  return {
+    numMemberTrafficContractsThreshold: '5',
+    dsoDelegateInactiveTimeout: {
+      microseconds: '70000000',
+    },
+    svOnboardingRequestTimeout: {
+      microseconds: '3600000000',
+    },
+    nextScheduledSynchronizerUpgrade: null,
+    actionConfirmationTimeout: {
+      microseconds: '3600000000',
+    },
+    maxTextLength: '1024',
+    voteRequestTimeout: {
+      microseconds: '604800000000',
+    },
+    decentralizedSynchronizer: {
+      synchronizers: [
+        [
+          'global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
+          {
+            state: 'DS_Operational',
+            cometBftGenesisJson:
+              'TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config.',
+            acsCommitmentReconciliationInterval: acsCommitmentReconciliationInterval,
+          },
+        ],
+      ],
+      lastSynchronizerId:
+        'global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
+      activeSynchronizerId:
+        'global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37',
+    },
+    numUnclaimedRewardsThreshold: '10',
+    svOnboardingConfirmedTimeout: {
+      microseconds: '3600000000',
+    },
+    synchronizerNodeConfigLimits: {
+      cometBft: {
+        maxNumSequencingKeys: '2',
+        maxNodeIdLength: '50',
+        maxNumCometBftNodes: '2',
+        maxPubKeyLength: '256',
+        maxNumGovernanceKeys: '2',
+      },
     },
   };
 }

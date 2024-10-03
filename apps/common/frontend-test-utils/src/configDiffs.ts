@@ -18,9 +18,12 @@ export function checkAmuletRulesExpectedConfigDiffsHTML(
 
 export function checkDsoRulesExpectedConfigDiffsHTML(
   mockHtmlContent: string,
-  expectedNumberOfInFlightDiffs: number = 0
+  expectedNumberOfInFlightDiffs: number = 0,
+  stringified: boolean = false
 ): void {
-  const htmlContents = screen.getAllByTestId('config-diffs-display');
+  const htmlContents = stringified
+    ? screen.getAllByTestId('stringify-display')
+    : screen.getAllByTestId('config-diffs-display');
   if (expectedNumberOfInFlightDiffs > 0) {
     expect(screen.getAllByTestId('folded-accordion')).toHaveLength(expectedNumberOfInFlightDiffs);
   } else {

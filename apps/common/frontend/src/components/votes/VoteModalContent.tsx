@@ -76,7 +76,7 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
       <CardContent sx={{ paddingX: '64px' }}>
         <Stack direction="column" mb={4} spacing={1}>
           <Typography variant="h5">Requested Action</Typography>
-          <ActionView action={actionReq} tableType={tableType} expiresAt={effectiveAt} />
+          <ActionView action={actionReq} tableType={tableType} effectiveAt={effectiveAt} />
         </Stack>
         <Stack direction="column" mb={4} spacing={1}>
           <Typography variant="h5">Request Information</Typography>

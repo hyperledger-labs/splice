@@ -157,13 +157,26 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Executed', 'SRARC_SetConfig', user);
+    await goToGovernanceTabAndClickOnAction('Executed', 'SRARC_SetConfig', user, 0);
 
-    // when an action is executed, the AmuletConfigSchedule is updated and actualized to now, therefore the diff is empty
-    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1600', '1800');
-    checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent);
+    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1800', '2200');
+
+    checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
     // current comparison against vote result
+    checkNumberNumberOfDiffs(1);
+  });
+
+  test('of a SetConfig vote result in the executed section 2.', async () => {
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
+
+    await goToGovernanceTabAndClickOnAction('Executed', 'SRARC_SetConfig', user, 1);
+
+    const mockJsonContent = getMockJsonContentForDsoRules('1800');
+
+    checkDsoRulesExpectedConfigDiffsHTML(mockJsonContent, 0, true);
+
     checkNumberNumberOfDiffs(1);
   });
 
@@ -173,10 +186,10 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
     await goToGovernanceTabAndClickOnAction('Rejected', action, user);
 
-    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1600', '2000');
-    checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent);
+    const mockHtmlContent = getMockJsonContentForDsoRules('2000');
 
-    // current comparison against vote result
+    checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0, true);
+
     checkNumberNumberOfDiffs(1);
   });
 });
@@ -192,7 +205,8 @@ function checkNumberNumberOfDiffs(expected: number): void {
 async function goToGovernanceTabAndClickOnAction(
   tableType: string,
   action: string,
-  user: ReturnType<typeof userEvent.setup>
+  user: ReturnType<typeof userEvent.setup>,
+  index: number = 0
 ): Promise<void> {
   expect(await screen.findByText('Governance')).toBeDefined();
   await user.click(screen.getByText('Governance'));
@@ -204,5 +218,54 @@ async function goToGovernanceTabAndClickOnAction(
   await user.click(screen.getByText(tableType));
 
   expect(await screen.findAllByText(action)).toBeDefined();
-  await user.click(screen.getAllByText(action)[0]);
+  await user.click(screen.getAllByText(action)[index]);
+}
+
+function getMockJsonContentForDsoRules(acsCommitmentReconciliationInterval: string): string {
+  return (
+    '{\n' +
+    '  "numUnclaimedRewardsThreshold": "10",\n' +
+    '  "numMemberTrafficContractsThreshold": "5",\n' +
+    '  "actionConfirmationTimeout": {\n' +
+    '    "microseconds": "3600000000"\n' +
+    '  },\n' +
+    '  "svOnboardingRequestTimeout": {\n' +
+    '    "microseconds": "3600000000"\n' +
+    '  },\n' +
+    '  "svOnboardingConfirmedTimeout": {\n' +
+    '    "microseconds": "3600000000"\n' +
+    '  },\n' +
+    '  "voteRequestTimeout": {\n' +
+    '    "microseconds": "604800000000"\n' +
+    '  },\n' +
+    '  "dsoDelegateInactiveTimeout": {\n' +
+    '    "microseconds": "70000000"\n' +
+    '  },\n' +
+    '  "synchronizerNodeConfigLimits": {\n' +
+    '    "cometBft": {\n' +
+    '      "maxNumCometBftNodes": "2",\n' +
+    '      "maxNumGovernanceKeys": "2",\n' +
+    '      "maxNumSequencingKeys": "2",\n' +
+    '      "maxNodeIdLength": "50",\n' +
+    '      "maxPubKeyLength": "256"\n' +
+    '    }\n' +
+    '  },\n' +
+    '  "maxTextLength": "1024",\n' +
+    '  "decentralizedSynchronizer": {\n' +
+    '    "synchronizers": [\n' +
+    '      [\n' +
+    '        "global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37",\n' +
+    '        {\n' +
+    '          "state": "DS_Operational",\n' +
+    '          "cometBftGenesisJson": "TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config.",\n' +
+    `          "acsCommitmentReconciliationInterval": "${acsCommitmentReconciliationInterval}"\n` +
+    '        }\n' +
+    '      ]\n' +
+    '    ],\n' +
+    '    "lastSynchronizerId": "global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37",\n' +
+    '    "activeSynchronizerId": "global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"\n' +
+    '  },\n' +
+    '  "nextScheduledSynchronizerUpgrade": null\n' +
+    '}'
+  );
 }
