@@ -65,7 +65,7 @@ For avoiding conflicts across migrations, we use the concept of a migration ID:
 
 - The migration ID is 0 during the initial bootstrapping of a network and incremented after each synchronizer upgrade with downtime.
 - The validator app is aware of the migration ID and uses it for ensuring the consistency of its internal stores and avoiding connections to nodes on the "wrong" synchronizer.
-- The validator Canton participant is **not** directly aware of the mirefgration ID.
+- The validator Canton participant is **not** directly aware of the migration ID.
   As part of :ref:`validator-upgrades-deploying`, the validator app will initialize a fresh participant
   (a fresh participant needs to be deployed to upgrade across non-backwards-compatible changes to the Canton software)
   based on the migration ID configured in the validator app.
