@@ -205,6 +205,10 @@ paths:
       responses:
         "200":
           description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SubmitTransferPreapprovalSendResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
@@ -1336,9 +1340,12 @@ components:
       type: object
       required:
         - transfer_preapproval_contract_id
+        - update_id
       properties:
         transfer_preapproval_contract_id:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        update_id:
+          type: string
 
     ExternalPartyBalanceResponse:
       type: object
@@ -1416,6 +1423,14 @@ components:
       properties:
         submission:
           "$ref": "#/components/schemas/ExternalPartySubmission"
+
+    SubmitTransferPreapprovalSendResponse:
+      type: object
+      required:
+        - update_id
+      properties:
+        update_id:
+          type: string
 
     ExternalPartySubmission:
       type: object

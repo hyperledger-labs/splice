@@ -215,7 +215,7 @@ abstract class ValidatorAppReference(
       transaction: String,
       signature: String,
       publicKey: String,
-  ): TransferPreapproval.ContractId = {
+  ): (TransferPreapproval.ContractId, String) = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.SubmitAcceptExternalPartySetupProposal(
@@ -251,7 +251,7 @@ abstract class ValidatorAppReference(
       transaction: String,
       signature: String,
       publicKey: String,
-  ): Unit = {
+  ): String = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.SubmitTransferPreapprovalSend(

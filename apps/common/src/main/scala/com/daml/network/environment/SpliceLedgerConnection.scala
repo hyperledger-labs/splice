@@ -962,11 +962,14 @@ class SpliceLedgerConnection(
     )
   }
 
+  /** Execute a signed submission and wait for it to either get commited or fail.
+    * Returns the update id of the resulting transaction if it succeeds.
+    */
   def executeSubmissionAndWait(
       submitter: PartyId,
       preparedTransaction: ByteString,
       partySignatures: Map[PartyId, LedgerClient.Signature],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[String] = {
     // TODO(#14156) Consider deduplicating this with `submitReassignmentAndWaitNoDedup`
     val commandIdSubmissionIdPromise: Promise[(String, String)] = Promise()
     ledgerEnd().flatMap { ledgerEnd =>
@@ -1012,9 +1015,9 @@ class SpliceLedgerConnection(
 
       retryProvider
         .waitUnlessShutdown(completion)
-        .flatMap { case ((offset, _), ()) =>
+        .flatMap { case ((offset, completion), ()) =>
           FutureUnlessShutdown.outcomeF(
-            completionOffsetCallback(offset).map(_ => ())
+            completionOffsetCallback(offset).map(_ => completion.updateId)
           )
         }
         .onShutdown {
@@ -1022,7 +1025,9 @@ class SpliceLedgerConnection(
             s"shutting down while awaiting completion of executeSubmission"
           )
           ks.shutdown()
-          ()
+          throw Status.UNAVAILABLE
+            .withDescription("Shutting down while awaiting completion of executeSubmission")
+            .asRuntimeException()
         }
     }
   }

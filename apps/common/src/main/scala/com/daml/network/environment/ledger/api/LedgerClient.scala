@@ -846,6 +846,7 @@ object LedgerClient {
       applicationId: String,
       commandId: String,
       submissionId: String,
+      updateId: String,
       status: GrpcStatus,
       errorDetails: Seq[ErrorDetail],
   ) {
@@ -866,6 +867,7 @@ object LedgerClient {
         applicationId = spb.applicationId,
         commandId = spb.commandId,
         submissionId = spb.submissionId,
+        updateId = spb.updateId,
         status = grpcStatus,
         errorDetails = errors,
       )

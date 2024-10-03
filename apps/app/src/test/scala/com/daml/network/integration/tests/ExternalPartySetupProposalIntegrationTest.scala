@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.transferpreapproval.TransferPreapproval
+import com.daml.network.http.v0.definitions
 import com.daml.network.integration.tests.SpliceTests.IntegrationTest
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.HasExecutionContext
@@ -55,7 +56,7 @@ class ExternalPartySetupProposalIntegrationTest
       onboardExternalParty(aliceValidatorBackend)
     aliceValidatorBackend.participantClient.parties
       .hosted(filterParty = aliceParty.filterString) should not be empty
-    val cid = createAndAcceptExternalPartySetupProposal(onboardingAlice)
+    val (cid, _) = createAndAcceptExternalPartySetupProposal(onboardingAlice)
     aliceValidatorBackend.listTransferPreapprovals().loneElement.contractId shouldBe cid
 
     // Transfer 40.0 to Alice
@@ -73,7 +74,7 @@ class ExternalPartySetupProposalIntegrationTest
       onboardExternalParty(aliceValidatorBackend)
     aliceValidatorBackend.participantClient.parties
       .hosted(filterParty = bobParty.filterString) should not be empty
-    val cidBob = createAndAcceptExternalPartySetupProposal(onboardingBob)
+    val (cidBob, _) = createAndAcceptExternalPartySetupProposal(onboardingBob)
     aliceValidatorBackend
       .listTransferPreapprovals()
       .map(tp => tp.contract.contractId) contains cidBob
@@ -81,7 +82,7 @@ class ExternalPartySetupProposalIntegrationTest
     // Transfer 10.0 from Alice to Bob (with OutputFees: 6.1, SenderChangeFee: 6.0)
     val prepareSend =
       aliceValidatorBackend.prepareTransferPreapprovalSend(aliceParty, bobParty, BigDecimal(10.0))
-    aliceValidatorBackend.submitTransferPreapprovalSend(
+    val updateId = aliceValidatorBackend.submitTransferPreapprovalSend(
       aliceParty,
       prepareSend.transaction,
       HexString.toHexString(
@@ -101,11 +102,25 @@ class ExternalPartySetupProposalIntegrationTest
     aliceValidatorBackend
       .getExternalPartyBalance(bobParty)
       .totalUnlockedCoin shouldBe "10.0000000000"
+
+    val update = eventuallySucceeds() {
+      sv1ScanBackend.getUpdate(updateId)
+    }
+    inside(update) {
+      case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(transaction) =>
+        forExactly(1, transaction.eventsById) {
+          case (_, definitions.TreeEvent.members.ExercisedEvent(ev)) =>
+            ev.choice shouldBe "AmuletRules_Transfer"
+          case _ => fail()
+        }
+    }
   }
 
   private def createAndAcceptExternalPartySetupProposal(
       onboarding: OnboardingResult
-  )(implicit env: SpliceTests.SpliceTestConsoleEnvironment): TransferPreapproval.ContractId = {
+  )(implicit
+      env: SpliceTests.SpliceTestConsoleEnvironment
+  ): (TransferPreapproval.ContractId, String) = {
     val proposal = aliceValidatorBackend.createExternalPartySetupProposal(onboarding.party)
     aliceValidatorBackend
       .listExternalPartySetupProposal()

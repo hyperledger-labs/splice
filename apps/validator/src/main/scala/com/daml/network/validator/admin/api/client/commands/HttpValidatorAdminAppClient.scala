@@ -319,7 +319,7 @@ object HttpValidatorAdminAppClient {
       publicKey: String,
   ) extends BaseCommand[
         http.SubmitAcceptExternalPartySetupProposalResponse,
-        transferPreapprovalCodegen.TransferPreapproval.ContractId,
+        (transferPreapprovalCodegen.TransferPreapproval.ContractId, String),
       ] {
 
     override def submitRequest(
@@ -344,9 +344,11 @@ object HttpValidatorAdminAppClient {
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.SubmitAcceptExternalPartySetupProposalResponse.OK(response) =>
-      Codec.decodeJavaContractId(transferPreapprovalCodegen.TransferPreapproval.COMPANION)(
-        response.transferPreapprovalContractId
-      )
+      Codec
+        .decodeJavaContractId(transferPreapprovalCodegen.TransferPreapproval.COMPANION)(
+          response.transferPreapprovalContractId
+        )
+        .map(cid => (cid, response.updateId))
     }
   }
 
@@ -447,7 +449,7 @@ object HttpValidatorAdminAppClient {
       publicKey: String,
   ) extends BaseCommand[
         http.SubmitTransferPreapprovalSendResponse,
-        Unit,
+        String,
       ] {
 
     override def submitRequest(
@@ -471,7 +473,7 @@ object HttpValidatorAdminAppClient {
 
     override protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.SubmitTransferPreapprovalSendResponse.OK => Right(()) }
+    ) = { case http.SubmitTransferPreapprovalSendResponse.OK(response) => Right(response.updateId) }
   }
 
 }

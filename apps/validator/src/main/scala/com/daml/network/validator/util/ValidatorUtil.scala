@@ -336,7 +336,7 @@ private[validator] object ValidatorUtil {
   def submitAsExternalParty(
       connection: SpliceLedgerConnection,
       submission: ExternalPartySubmission,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[String] = {
     val senderParty = PartyId.tryFromProtoPrimitive(submission.partyId)
     val signedTxHash = HexString.parseToByteString(submission.signedTxHash) match {
       case Some(hash) => hash
@@ -344,7 +344,7 @@ private[validator] object ValidatorUtil {
     }
     val publicKey = signingPublicKeyFromHexEd25119(submission.publicKey)
     for {
-      _ <- connection.executeSubmissionAndWait(
+      updateId <- connection.executeSubmissionAndWait(
         senderParty,
         ByteString.copyFrom(Base64.getDecoder.decode(submission.transaction)),
         Map(
@@ -355,7 +355,7 @@ private[validator] object ValidatorUtil {
             )
         ),
       )
-    } yield ()
+    } yield updateId
   }
 
   def signingPublicKeyFromHexEd25119(publicKey: String): SigningPublicKey = {

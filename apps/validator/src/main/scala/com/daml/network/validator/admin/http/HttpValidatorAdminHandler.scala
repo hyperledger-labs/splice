@@ -546,7 +546,10 @@ class HttpValidatorAdminHandler(
     implicit val TracedUser(_, tracedContext) = tuser
     val userParty = PartyId.tryFromProtoPrimitive(body.submission.partyId)
     for {
-      _ <- ValidatorUtil.submitAsExternalParty(storeWithIngestion.connection, body.submission)
+      updateId <- ValidatorUtil.submitAsExternalParty(
+        storeWithIngestion.connection,
+        body.submission,
+      )
       result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(userParty).flatMap {
         case QueryResult(_, Some(c)) =>
           Future.successful(c.contractId)
@@ -558,7 +561,7 @@ class HttpValidatorAdminHandler(
             .asRuntimeException()
       }
     } yield ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse.OK(
-      definitions.SubmitAcceptExternalPartySetupProposalResponse(result.contractId)
+      definitions.SubmitAcceptExternalPartySetupProposalResponse(result.contractId, updateId)
     )
   }
 
@@ -654,8 +657,13 @@ class HttpValidatorAdminHandler(
   ): Future[ValidatorAdminResource.SubmitTransferPreapprovalSendResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
     for {
-      _ <- ValidatorUtil.submitAsExternalParty(storeWithIngestion.connection, body.submission)
-    } yield ValidatorAdminResource.SubmitTransferPreapprovalSendResponseOK
+      updateId <- ValidatorUtil.submitAsExternalParty(
+        storeWithIngestion.connection,
+        body.submission,
+      )
+    } yield v0.ValidatorAdminResource.SubmitTransferPreapprovalSendResponseOK(
+      definitions.SubmitTransferPreapprovalSendResponse(updateId)
+    )
   }
 
   def getExternalPartyAmulets(partyId: PartyId)(implicit tc: TraceContext): Future[
