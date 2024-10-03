@@ -26,6 +26,7 @@ class AcsSnapshotTrigger(
     store: AcsSnapshotStore,
     updateHistory: UpdateHistory,
     snapshotPeriodHours: Int,
+    updateHistoryBackfillEnabled: Boolean,
     protected val context: TriggerContext,
 )(implicit
     ec: ExecutionContext,
@@ -42,46 +43,64 @@ class AcsSnapshotTrigger(
     if (!updateHistory.isReady) {
       Future.successful(Seq.empty)
     } else {
-      val now = context.clock.now
-      for {
-        lastSnapshot <- store.lookupSnapshotBefore(store.migrationId, CantonTimestamp.MaxValue)
-        possibleTask <- lastSnapshot match {
-          case None =>
-            firstSnapshotForMigrationIdTask()
-          case Some(lastSnapshot) => // new snapshot should be created, if ACS for it is complete
-            val newSnapshotRecordTime =
-              lastSnapshot.snapshotRecordTime.plus(Duration.ofHours(snapshotPeriodHours.toLong))
-            Future.successful(
-              Some(AcsSnapshotTrigger.Task(newSnapshotRecordTime, Some(lastSnapshot)))
-            )
+      val isBackfilled: Future[Boolean] = {
+        if (updateHistoryBackfillEnabled) {
+          updateHistory.sourceHistory.migrationInfo(store.migrationId).map(_.exists(_.complete))
+        } else {
+          Future.successful(true)
         }
-        task <- possibleTask match {
-          case None =>
-            logger.info("No snapshots to take.")
-            Future.successful(None)
-          case Some(task) if task.snapshotRecordTime > now =>
-            logger.info(
-              s"Still not time to take a snapshot. Now: ${now}. Next snapshot time: ${task.snapshotRecordTime}."
-            )
-            Future.successful(None)
-          case Some(task) =>
-            updateHistory
-              .getUpdates(
-                Some((store.migrationId, task.snapshotRecordTime)),
-                includeImportUpdates = true,
-                PageLimit.tryCreate(1),
-              )
-              .map(_.headOption)
-              .map {
-                case None =>
-                  logger.info("There might still be updates pending. Skipping snapshot creation.")
-                  None
-                case Some(_) =>
-                  Some(task)
-              }
+      }
+
+      isBackfilled.flatMap { backfilled =>
+        if (backfilled) {
+          retrieveTask().map(_.toList)
+        } else {
+          Future.successful(Seq.empty)
         }
-      } yield task.toList
+      }
     }
+  }
+
+  private def retrieveTask()(implicit tc: TraceContext) = {
+    val now = context.clock.now
+    for {
+      lastSnapshot <- store.lookupSnapshotBefore(store.migrationId, CantonTimestamp.MaxValue)
+      possibleTask <- lastSnapshot match {
+        case None =>
+          firstSnapshotForMigrationIdTask()
+        case Some(lastSnapshot) => // new snapshot should be created, if ACS for it is complete
+          val newSnapshotRecordTime =
+            lastSnapshot.snapshotRecordTime.plus(Duration.ofHours(snapshotPeriodHours.toLong))
+          Future.successful(
+            Some(AcsSnapshotTrigger.Task(newSnapshotRecordTime, Some(lastSnapshot)))
+          )
+      }
+      task <- possibleTask match {
+        case None =>
+          logger.info("No snapshots to take.")
+          Future.successful(None)
+        case Some(task) if task.snapshotRecordTime > now =>
+          logger.info(
+            s"Still not time to take a snapshot. Now: ${now}. Next snapshot time: ${task.snapshotRecordTime}."
+          )
+          Future.successful(None)
+        case Some(task) =>
+          updateHistory
+            .getUpdates(
+              Some((store.migrationId, task.snapshotRecordTime)),
+              includeImportUpdates = true,
+              PageLimit.tryCreate(1),
+            )
+            .map(_.headOption)
+            .map {
+              case None =>
+                logger.info("There might still be updates pending. Skipping snapshot creation.")
+                None
+              case Some(_) =>
+                Some(task)
+            }
+      }
+    } yield task
   }
 
   override protected def completeTask(task: AcsSnapshotTrigger.Task)(implicit

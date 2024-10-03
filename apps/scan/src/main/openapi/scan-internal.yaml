@@ -928,6 +928,48 @@ paths:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListValidatorLicensesResponse"
 
+  /v0/backfilling/migration-info:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getMigrationInfo"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetMigrationInfoRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetMigrationInfoResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+  /v0/backfilling/updates-before:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getUpdatesBefore"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetUpdatesBeforeRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetUpdatesBeforeResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
 components:
   schemas:
     GetSpliceInstanceNamesResponse:
@@ -2364,3 +2406,81 @@ components:
           type: string
         mediator_domain_state:
           type: string
+
+    GetMigrationInfoRequest:
+      type: object
+      required:
+        - migration_id
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+
+    GetMigrationInfoResponse:
+      type: object
+      required:
+          - record_time_range
+          - complete
+      properties:
+        previous_migration_id:
+          description: |
+            The migration id that was active before the given migration id, if any.
+          type: integer
+          format: int64
+        record_time_range:
+          description: |
+            All domains for which there are updates in the given migration id,
+            along with the record time of the newest and oldest update associated with each domain
+          type: array
+          items:
+            $ref: "#/components/schemas/RecordTimeRange"
+        complete:
+          description: |
+            True if this scan has all updates for given migration id
+          type: boolean
+
+    RecordTimeRange:
+        type: object
+        required:
+          - synchronizer_id
+          - min
+          - max
+        properties:
+          synchronizer_id:
+            type: string
+          min:
+            type: string
+            format: date-time
+          max:
+            type: string
+            format: date-time
+
+    GetUpdatesBeforeRequest:
+      type: object
+      required:
+        - migration_id
+        - synchronizer_id
+        - before
+        - count
+      properties:
+        migration_id:
+          type: integer
+          format: int64
+        synchronizer_id:
+          type: string
+        before:
+          type: string
+          format: date-time
+        count:
+          type: integer
+          format: int32
+
+    GetUpdatesBeforeResponse:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpdateHistoryItem"

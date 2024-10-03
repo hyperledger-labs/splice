@@ -168,6 +168,7 @@ class ScanApp(
         acsSnapshotStore,
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,
+        serviceUserPrimaryParty,
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(

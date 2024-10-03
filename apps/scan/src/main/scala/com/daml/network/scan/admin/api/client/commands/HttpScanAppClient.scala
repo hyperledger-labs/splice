@@ -19,6 +19,7 @@ import com.daml.network.codegen.java.splice.round.{
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.SpliceInstanceNamesConfig
+import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
@@ -27,12 +28,15 @@ import com.daml.network.http.v0.scan.{
   GetDateOfMostRecentSnapshotBeforeResponse,
   ScanClient,
 }
+import com.daml.network.scan.admin.http.LosslessScanHttpEncodings
 import com.daml.network.scan.store.db.ScanAggregator
+import com.daml.network.store.HistoryBackfilling.SourceMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.util.{
   Codec,
   Contract,
   ContractWithState,
+  DomainRecordTimeRange,
   PackageQualifiedName,
   TemplateJsonDecoder,
 }
@@ -1039,6 +1043,86 @@ object HttpScanAppClient {
             nameServiceName = response.nameServiceName,
             nameServiceNameAcronym = response.nameServiceNameAcronym,
           )
+        )
+    }
+  }
+
+  case class GetMigrationInfo(migrationId: Long)
+      extends InternalBaseCommand[
+        http.GetMigrationInfoResponse,
+        Option[SourceMigrationInfo],
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetMigrationInfoResponse] = {
+      client.getMigrationInfo(
+        definitions.GetMigrationInfoRequest(migrationId),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetMigrationInfoResponse.OK(response) =>
+        for {
+          recordTimeRange <- response.recordTimeRange
+            .foldLeft[Either[String, Map[DomainId, DomainRecordTimeRange]]](
+              Right(Map.empty)
+            )((res, row) =>
+              for {
+                result <- res
+                domainId <- Codec.decode(Codec.DomainId)(row.synchronizerId)
+                min <- CantonTimestamp.fromInstant(row.min.toInstant)
+                max <- CantonTimestamp.fromInstant(row.max.toInstant)
+              } yield result + (domainId -> DomainRecordTimeRange(min, max))
+            )
+        } yield Some(
+          SourceMigrationInfo(
+            previousMigrationId = response.previousMigrationId,
+            recordTimeRange = recordTimeRange,
+            complete = response.complete,
+          )
+        )
+      case http.GetMigrationInfoResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class GetUpdatesBefore(
+      migrationId: Long,
+      domainId: DomainId,
+      before: CantonTimestamp,
+      count: Int,
+  ) extends InternalBaseCommand[
+        http.GetUpdatesBeforeResponse,
+        Seq[LedgerClient.GetTreeUpdatesResponse],
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetUpdatesBeforeResponse] = {
+      client.getUpdatesBefore(
+        definitions
+          .GetUpdatesBeforeRequest(
+            migrationId,
+            domainId.toProtoPrimitive,
+            before.toInstant.atOffset(java.time.ZoneOffset.UTC),
+            count,
+          ),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetUpdatesBeforeResponse.OK(response) =>
+        Right(
+          response.transactions.map(http => LosslessScanHttpEncodings.httpToLapiUpdate(http).update)
         )
     }
   }

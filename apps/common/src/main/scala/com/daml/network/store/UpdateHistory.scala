@@ -3,7 +3,7 @@
 
 package com.daml.network.store
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -27,6 +27,7 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.migration.DomainMigrationInfo
+import com.daml.network.store.HistoryBackfilling.{DestinationBackfillingInfo, SourceMigrationInfo}
 import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
 import com.daml.network.util.DomainRecordTimeRange
@@ -53,7 +54,7 @@ import scala.jdk.OptionConverters.*
 
 class UpdateHistory(
     storage: DbStorage,
-    domainMigrationInfo: DomainMigrationInfo,
+    val domainMigrationInfo: DomainMigrationInfo,
     storeName: String,
     participantId: ParticipantId,
     val updateStreamParty: PartyId,
@@ -628,6 +629,59 @@ class UpdateHistory(
     storage.update(action, "deleteRolledBackUpdateHistory")
   }
 
+  /** Deletes all updates on the given domain with a record time before the given time,
+    * by moving them to a different history id.
+    */
+  def deleteUpdatesBefore(
+      domainId: DomainId,
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    logger.info(
+      s"Deleting updates before $recordTime on domain $domainId from store $storeName with id $historyId"
+    )
+    val filterCondition = sql"""
+      domain_id = $domainId and
+      migration_id = $migrationId and
+      history_id = $historyId and
+      record_time < $recordTime"""
+
+    val deleteAction = for {
+      numCreates <- (
+        sql"delete from update_history_creates where update_row_id in (" ++
+          sql"select row_id from update_history_transactions where" ++ filterCondition ++
+          sql")"
+      ).toActionBuilder.asUpdate
+      numExercises <- (
+        sql"delete from update_history_exercises where update_row_id in (" ++
+          sql"select row_id from update_history_transactions where" ++ filterCondition ++
+          sql")"
+      ).toActionBuilder.asUpdate
+      numTransactions <- (
+        sql"delete from update_history_transactions where " ++ filterCondition
+      ).toActionBuilder.asUpdate
+      numAssignments <- (
+        sql"delete from update_history_assignments where " ++ filterCondition
+      ).toActionBuilder.asUpdate
+      numUnassignments <- (
+        sql"delete from update_history_unassignments where " ++ filterCondition
+      ).toActionBuilder.asUpdate
+    } yield (numCreates, numExercises, numTransactions, numAssignments, numUnassignments)
+
+    for {
+      (numCreates, numExercises, numTransactions, numAssignments, numUnassignments) <- storage
+        .update(
+          deleteAction.transactionally,
+          "deleteUpdatesForTable",
+        )
+    } yield (
+      logger.info(
+        s"Deleted $numCreates creates, $numExercises exercises, $numTransactions transactions, $numAssignments assignments, " +
+          s"and $numUnassignments unassignments from store $storeName with id $historyId"
+      )
+    )
+  }
+
   private def updatesQuery(
       afterO: Option[(Long, CantonTimestamp)],
       limit: PageLimit,
@@ -674,7 +728,9 @@ class UpdateHistory(
       where
         history_id = $historyId and """ ++ afterFilter ++
         (if (!includeImportUpdates) {
-           sql""" and workflow_id != ${lengthLimited(IMPORT_ACS_WORKFLOW_ID_PREFIX)}"""
+           sql""" and not starts_with(workflow_id, ${lengthLimited(
+               IMPORT_ACS_WORKFLOW_ID_PREFIX
+             )})"""
          } else {
            sql""
          }) ++
@@ -1234,18 +1290,114 @@ class UpdateHistory(
     }
   }
 
-  private def getIsBackfillingComplete(
-      migrationId: Long
-  )(implicit tc: TraceContext): Future[Boolean] = storage
-    .query(
-      sql"""
-             select complete
-             from update_history_backfilling
-             where history_id = $historyId and migration_id = $migrationId
-           """.as[Boolean].headOption,
-      "getIsBackfillingComplete",
+  private[this] def getPreviousMigrationId(migrationId: Long)(implicit
+      tc: TraceContext
+  ): Future[Option[Long]] = {
+    def previousId(table: String) = {
+      storage.query(
+        sql"""
+             select max(migration_id)
+             from #$table
+             where history_id = $historyId and migration_id < $migrationId
+           """.as[Option[Long]].head,
+        s"getPreviousMigrationId.$table",
+      )
+    }
+
+    for {
+      transactions <- previousId("update_history_transactions")
+      assignments <- previousId("update_history_assignments")
+      unassignments <- previousId("update_history_unassignments")
+    } yield {
+      List(
+        transactions,
+        assignments,
+        unassignments,
+      ).flatten.minOption
+    }
+  }
+
+  private[this] def getFirstMigrationId()(implicit
+      tc: TraceContext
+  ): Future[Option[Long]] = {
+    def previousId(table: String) = {
+      storage.query(
+        sql"""
+             select min(migration_id)
+             from #$table
+             where history_id = $historyId
+           """.as[Option[Long]].head,
+        s"getFirstMigrationId.$table",
+      )
+    }
+
+    for {
+      transactions <- previousId("update_history_transactions")
+      assignments <- previousId("update_history_assignments")
+      unassignments <- previousId("update_history_unassignments")
+    } yield {
+      List(
+        transactions,
+        assignments,
+        unassignments,
+      ).flatten.minOption
+    }
+  }
+  def getBackfillingState()(implicit
+      tc: TraceContext
+  ): Future[Option[BackfillingState]] =
+    storage
+      .query(
+        sql"""
+          select complete
+          from update_history_backfilling
+          where history_id = $historyId
+        """.as[Boolean].headOption,
+        "getBackfillingState",
+      )
+      .map(_.map(BackfillingState))
+
+  private[this] def setBackfillingComplete()(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    storage
+      .update(
+        sqlu"""
+          update update_history_backfilling
+          set complete = true
+          where history_id = $historyId
+        """,
+        "setBackfillingComplete",
+      )
+      .map(_ => ())
+
+  def initializeBackfilling(
+      joiningMigrationId: Long,
+      joiningDomainId: DomainId,
+      joiningUpdateId: String,
+      complete: Boolean,
+  )(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    logger.info(
+      s"Initializing backfilling for history $historyId with joiningMigrationId=$joiningMigrationId, joiningDomainId=$joiningDomainId, joiningUpdateId=$joiningUpdateId, and complete=$complete"
     )
-    .map(_.getOrElse(false))
+    val safeUpdateId = lengthLimited(joiningUpdateId)
+    storage
+      .update(
+        sqlu"""
+          insert into update_history_backfilling (history_id, joining_migration_id, joining_domain_id, joining_update_id, complete)
+          values ($historyId, $joiningMigrationId, $joiningDomainId, $safeUpdateId, $complete)
+          on conflict (history_id) do update set
+            joining_migration_id = $joiningMigrationId,
+            joining_domain_id = $joiningDomainId,
+            joining_update_id = $safeUpdateId,
+            complete = $complete
+        """,
+        "initializeBackfilling",
+      )
+      .map(_ => ())
+  }
 
   lazy val sourceHistory: HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] =
     new HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] {
@@ -1254,21 +1406,21 @@ class UpdateHistory(
         .historyId
         .isDefined
 
-      override def previousMigrationId(
+      override def migrationInfo(
           migrationId: Long
-      )(implicit tc: TraceContext): Future[Option[Long]] = storage.query(
-        sql"""
-             select max(migration_id)
-             from update_history_last_ingested_offsets
-             where history_id = $historyId and migration_id < $migrationId
-           """.as[Option[Long]].head,
-        "previousMigrationId",
+      )(implicit tc: TraceContext): Future[Option[SourceMigrationInfo]] = for {
+        previousMigrationId <- getPreviousMigrationId(migrationId)
+        recordTimeRange <- getRecordTimeRange(migrationId)
+        state <- getBackfillingState()
+      } yield state.flatMap(state =>
+        Option.when(recordTimeRange.nonEmpty)(
+          SourceMigrationInfo(
+            previousMigrationId = previousMigrationId,
+            recordTimeRange = recordTimeRange,
+            complete = state.complete,
+          )
+        )
       )
-
-      override def recordTimeRange(
-          migrationId: Long
-      )(implicit tc: TraceContext): Future[Map[DomainId, DomainRecordTimeRange]] =
-        getRecordTimeRange(migrationId)
 
       override def items(
           migrationId: Long,
@@ -1283,12 +1435,6 @@ class UpdateHistory(
           limit = PageLimit.tryCreate(count),
         ).map(_.map(_.update))
       }
-
-      override def isBackfillingComplete(migrationId: Long)(implicit
-          tc: TraceContext
-      ): Future[Boolean] = {
-        getIsBackfillingComplete(migrationId)
-      }
     }
 
   lazy val destinationHistory
@@ -1299,45 +1445,16 @@ class UpdateHistory(
         .historyId
         .isDefined
 
-      override def migrationIdRange(implicit tc: TraceContext): Future[Option[(Long, Long)]] = {
-        def range(table: String) = {
-          storage.query(
-            sql"""
-             select min(migration_id), max(migration_id)
-             from #$table
-             where history_id = $historyId
-           """.as[(Option[Long], Option[Long])].head,
-            s"migrationIdRange.$table",
-          )
-        }
-
-        for {
-          transactions <- range("update_history_transactions")
-          assignments <- range("update_history_assignments")
-          unassignments <- range("update_history_unassignments")
-        } yield {
-          val minO = List(
-            transactions._1,
-            assignments._1,
-            unassignments._1,
-          ).flatten.minOption
-          val maxO = List(
-            transactions._2,
-            assignments._2,
-            unassignments._2,
-          ).flatten.maxOption
-          (minO, maxO) match {
-            case (Some(min), Some(max)) => Some((min, max))
-            case _ => None
-          }
-        }
-      }
-
-      override def recordTimeRange(migrationId: Long)(implicit
+      override def backfillingInfo(implicit
           tc: TraceContext
-      ): Future[Map[DomainId, DomainRecordTimeRange]] = {
-        getRecordTimeRange(migrationId)
-      }
+      ): Future[Option[DestinationBackfillingInfo]] = (for {
+        _ <- OptionT(getBackfillingState())
+        migrationId <- OptionT(getFirstMigrationId())
+        recordTimeRange <- OptionT.liftF(getRecordTimeRange(migrationId))
+      } yield DestinationBackfillingInfo(
+        migrationId = migrationId,
+        backfilledAt = recordTimeRange.view.mapValues(_.min).toMap,
+      )).value
 
       override def insert(
           migrationId: Long,
@@ -1395,26 +1512,9 @@ class UpdateHistory(
           .map(_ => ())
       }
 
-      override def isBackfillingComplete(migrationId: Long)(implicit
+      override def markBackfillingComplete()(implicit
           tc: TraceContext
-      ): Future[Boolean] = {
-        getIsBackfillingComplete(migrationId)
-      }
-
-      override def markBackfillingComplete(migrationId: Long)(implicit
-          tc: TraceContext
-      ): Future[Unit] = {
-        storage
-          .update(
-            sqlu"""
-             insert into update_history_backfilling (history_id, migration_id, complete)
-             values ($historyId, $migrationId, true)
-             on conflict (history_id, migration_id) do update set complete = true
-           """,
-            "destinationHistory.markBackfillingComplete",
-          )
-          .map(_ => ())
-      }
+      ): Future[Unit] = setBackfillingComplete()
     }
 }
 
@@ -1426,6 +1526,10 @@ object UpdateHistory {
   object State {
     def empty(): State = State(None)
   }
+
+  case class BackfillingState(
+      complete: Boolean
+  )
 
   private case class SelectFromTransactions(
       rowId: Long,

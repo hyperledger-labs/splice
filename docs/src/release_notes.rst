@@ -16,10 +16,16 @@ Upcoming
     * Configuration changes for AmuletRules and DsoRules are diffed against the configuration it will replace and the in-flights proposals.
       This makes it easier to see what changes are being proposed and what the current configuration is.
 
-* Bugfixes
+* Scan
 
+  * Modified the `/v0/updates` and `/v0/updates/{update_id}` Scan API endpoints to make sure they consistently returns the same history across SVs:
+
+    * The `/v0/updates` endpoint now fails on scans that have not yet replicated history from before their SV node joined the network.
+    * The `/v0/updates` endpoint now excludes updates resulting from ACS imports (those with workflow id starting with ``canton-network-acs-import``).
     * Fix an issue where the ordering of stakeholders (signatories and observers) would be inconsistent across SVs
       when calling the `/v0/updates` and `/v0/updates/{update_id}` endpoints on the Scan API.
+
+* Add a new index to Splice application databases. Scan and validator apps might take a while to start after the upgrade.
 
 0.2.4
 -----
@@ -82,8 +88,6 @@ Note: 0.2.2 was skipped due to an error in the publishing process.
 
   * Fix an issue in the holdings and holding summary endpoint where it failed to decode contracts when the
     splice-amulet version the contract was created in did not match the latest supported version by the Scan release.
-  * Modified ``getUpdateHistory`` Scan API to exclude updates resulting from ACS imports (those with workflow id starting with ``canton-network-acs-import``).
-    Additionally, the ``getUpdateHistory`` endpoint now also fails on scans that did not yet replicate history from before their SV node joined the network.
 
 * Sequencer
 

@@ -196,6 +196,7 @@ object ConfigTransforms {
       withPausedSvDomainComponentsOffboardingTriggers(),
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
+      enableScanHistoryBackfilling,
     )
   }
 
@@ -733,6 +734,28 @@ object ConfigTransforms {
         else config
       }
     )
+
+  def enableScanHistoryBackfilling: ConfigTransform = config => {
+    config.scanApps
+      .find { case (_, scanConfig) =>
+        scanConfig.isFirstSv
+      }
+      .fold(config)(firstScan =>
+        ConfigTransforms.updateAllScanAppConfigs((scanName, scanConfig) =>
+          if (scanName == firstScan._1.unwrap)
+            scanConfig.copy(
+              updateHistoryBackfillEnabled = true
+            )
+          else
+            scanConfig.copy(
+              updateHistoryBackfillEnabled = true,
+              updateHistoryBackfillFromScanURL =
+                Some(s"http://${firstScan._2.adminApi.address}:${firstScan._2.adminApi.port}"),
+              updateHistoryBackfillBatchSize = 2,
+            )
+        )(config)
+      )
+  }
 
   def modifyAllANStorageConfigs(
       storageConfigModifier: (

@@ -30,7 +30,7 @@ import com.daml.network.http.v0.definitions.{
   MaybeCachedContractWithState,
 }
 import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.store.{AcsSnapshotStore, ScanHistoryBackfilling, ScanStore, TxLogEntry}
+import com.daml.network.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
 import com.daml.network.util.{
   Codec,
   Contract,
@@ -41,7 +41,7 @@ import com.daml.network.util.{
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
@@ -62,6 +62,10 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
 }
 import com.daml.network.http.{HttpValidatorLicensesHandler, HttpVotesHandler, UrlValidator}
 import com.daml.network.scan.dso.DsoAnsResolver
+import com.daml.network.scan.store.ScanHistoryBackfilling.{
+  FoundingTransactionTreeUpdate,
+  InitialTransactionTreeUpdate,
+}
 import com.daml.network.store.{AppStore, PageLimit, SortOrder, VotesStore}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.Clock
@@ -687,44 +691,48 @@ class HttpScanHandler(
             ),
         )
       }
-      updateHistory
-        .getUpdates(
+      for {
+        txs <- updateHistory.getUpdates(
           afterO,
-          includeImportUpdates = false,
+          includeImportUpdates = true,
           PageLimit.tryCreate(request.pageSize),
         )
-        .flatMap { txs =>
-          // TODO(#14076: replace this with a better check for whether this scan instance has replicated all data)
-          if (
-            afterO.isEmpty && txs.headOption.exists(u =>
-              !ScanHistoryBackfilling
-                .isFoundingTransactionTreeUpdate(u.update, store.key.dsoParty.toProtoPrimitive)
+      } yield {
+        // TODO(#14270): instead of the below `if`, wait until UpdateHistory.getBackfillingState() says the history is complete
+        // This needs to be done after backfilling is enabled by default, otherwise this endpoint won't even work on
+        // the founding SV.
+        if (
+          afterO.isEmpty && txs.headOption.exists(firstTx => {
+            InitialTransactionTreeUpdate
+              .fromTreeUpdate(
+                dsoParty = store.key.dsoParty,
+                svParty = svParty,
+              )
+              .lift(firstTx) match {
+              case Some(FoundingTransactionTreeUpdate(_, _)) =>
+                false
+              case _ =>
+                true
+            }
+          })
+        ) {
+
+          throw Status.UNAVAILABLE
+            .withDescription(
+              s"This scan instance has not yet replicated all data. Wait until replication is complete, or connect to a different scan instance."
             )
-          ) {
-            logger.debug(s"Expected founding transaction, found ${txs.headOption}")
-            Future.failed(
-              Status.FAILED_PRECONDITION
-                .withDescription(
-                  s"This scan instance has not yet replicated all data. Wait before retrying, or connect to a different scan instance."
-                )
-                .asRuntimeException()
-            )
-          } else {
-            Future.successful(txs)
-          }
+            .asRuntimeException()
         }
-        .map { txs =>
-          {
-            val lossless = request.lossless.getOrElse(false)
-            val encodings: ScanHttpEncodings =
-              if (lossless) LosslessScanHttpEncodings else LossyScanHttpEncodings
-            definitions.UpdateHistoryResponse(
-              txs
-                .map(encodings.lapiToHttpUpdate(_))
-                .toVector
-            )
-          }
-        }
+
+        val lossless = request.lossless.getOrElse(false)
+        val encodings: ScanHttpEncodings =
+          if (lossless) LosslessScanHttpEncodings else LossyScanHttpEncodings
+        definitions.UpdateHistoryResponse(
+          txs
+            .map(encodings.lapiToHttpUpdate(_))
+            .toVector
+        )
+      }
     }
   }
 
@@ -1420,5 +1428,59 @@ class HttpScanHandler(
     this
       .lookupDsoRulesVoteRequest(voteRequestContractId)
       .map(ScanResource.LookupDsoRulesVoteRequestResponse.OK)
+  }
+
+  override def getMigrationInfo(respond: ScanResource.GetMigrationInfoResponse.type)(
+      body: definitions.GetMigrationInfoRequest
+  )(extracted: TraceContext): Future[ScanResource.GetMigrationInfoResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getMigrationInfo") { _ => _ =>
+      val sourceHistory = store.updateHistory.sourceHistory
+      for {
+        infoO <- sourceHistory.migrationInfo(body.migrationId)
+      } yield infoO match {
+        case Some(info) =>
+          ScanResource.GetMigrationInfoResponse.OK(
+            definitions.GetMigrationInfoResponse(
+              previousMigrationId = info.previousMigrationId,
+              complete = info.complete,
+              recordTimeRange = info.recordTimeRange.iterator.map { case (domainId, range) =>
+                definitions.RecordTimeRange(
+                  synchronizerId = domainId.toProtoPrimitive,
+                  min = java.time.OffsetDateTime.ofInstant(range.min.toInstant, ZoneOffset.UTC),
+                  max = java.time.OffsetDateTime.ofInstant(range.max.toInstant, ZoneOffset.UTC),
+                )
+              }.toVector,
+            )
+          )
+        case None =>
+          ScanResource.GetMigrationInfoResponse.NotFound(
+            definitions.ErrorResponse(s"No data for migration ${body.migrationId}")
+          )
+      }
+    }
+  }
+
+  override def getUpdatesBefore(respond: ScanResource.GetUpdatesBeforeResponse.type)(
+      body: definitions.GetUpdatesBeforeRequest
+  )(extracted: TraceContext): Future[ScanResource.GetUpdatesBeforeResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getUpdatesBefore") { _ => _ =>
+      val updateHistory = store.updateHistory
+      updateHistory
+        .getUpdatesBefore(
+          migrationId = body.migrationId,
+          domainId = DomainId.tryFromString(body.synchronizerId),
+          beforeRecordTime = CantonTimestamp.assertFromInstant(body.before.toInstant),
+          limit = PageLimit.tryCreate(body.count),
+        )
+        .map { txs =>
+          definitions.GetUpdatesBeforeResponse(
+            txs
+              .map(LosslessScanHttpEncodings.lapiToHttpUpdate)
+              .toVector
+          )
+        }
+    }
   }
 }

@@ -9,7 +9,8 @@ import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.UpgradesConfig
-import com.daml.network.environment.{SpliceLedgerClient, HttpAppConnection, RetryProvider}
+import com.daml.network.environment.ledger.api.LedgerClient
+import com.daml.network.environment.{HttpAppConnection, RetryProvider, SpliceLedgerClient}
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.commands.{
@@ -18,11 +19,12 @@ import com.daml.network.scan.admin.api.client.commands.{
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.scan.store.db.ScanAggregator
+import com.daml.network.store.HistoryBackfilling.SourceMigrationInfo
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
@@ -54,6 +56,7 @@ class SingleScanConnection private[client] (
       outerLoggerFactory.append("scan-connection", config.adminApi.url.toString),
     )
     with ScanConnection
+    with BackfillingScanConnection
     with HasUrl {
   def url = config.adminApi.url
 
@@ -385,6 +388,32 @@ class SingleScanConnection private[client] (
       config.adminApi.url,
       HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerBootstrappingTransactions(
         domainIdPrefix
+      ),
+    )
+
+  override def getMigrationInfo(migrationId: Long)(implicit
+      tc: TraceContext
+  ): Future[Option[SourceMigrationInfo]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetMigrationInfo(
+        migrationId
+      ),
+    )
+
+  override def getUpdatesBefore(
+      migrationId: Long,
+      domainId: DomainId,
+      before: CantonTimestamp,
+      count: Int,
+  )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetUpdatesBefore(
+        migrationId,
+        domainId,
+        before,
+        count,
       ),
     )
 }

@@ -49,6 +49,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainS
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellDomains, SplitwellSynchronizerConfig}
+import com.daml.network.store.{PageLimit, TreeUpdateWithMigrationId}
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.automation.singlesv.SvNamespaceMembershipTrigger
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
@@ -957,6 +958,25 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     .votes should have size 1
                 },
             )
+
+            withClueAndLog("Backfilled history includes ACS import") {
+              eventually() {
+                sv1ScanLocalBackend.appState.store.updateHistory.sourceHistory
+                  .migrationInfo(1L)
+                  .futureValue
+                  .exists(_.complete) should be(true)
+              }
+
+              val backfilledUpdates =
+                sv1ScanLocalBackend.appState.store.updateHistory
+                  .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
+                  .futureValue
+              backfilledUpdates.collect {
+                case TreeUpdateWithMigrationId(tree, migrationId)
+                    if tree.update.recordTime == CantonTimestamp.MinValue && migrationId == 1L =>
+                  tree
+              } should not be empty
+            }
 
             withClueAndLog("ACS snapshot includes the ACS import") {
               val dsoInfo = sv1ScanLocalBackend.getDsoInfo()
