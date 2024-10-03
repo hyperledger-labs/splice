@@ -17,16 +17,18 @@ interface VoteRequestModalProps {
     voteRequestContractId: ContractId<VoteRequest>,
     currentSvVote: SvVote | undefined
   ) => React.ReactNode;
+  effectiveAt?: string;
 }
 
 const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
   voteRequestContractId,
   handleClose,
   voteForm,
+  effectiveAt,
 }) => {
   const votesHooks = useVotesHooks();
   const voteRequestQuery = votesHooks.useVoteRequest(voteRequestContractId);
-
+  const voteRequests = votesHooks.useListDsoRulesVoteRequests();
   const votesQuery = votesHooks.useListVotes([voteRequestContractId]);
 
   // allVotes being empty means that the vote request has been executed, as the initiator of the request must vote on his proposition. Therefore, we can close the modal.
@@ -39,15 +41,15 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
   const dsoInfosQuery = votesHooks.useDsoInfos();
   const svPartyId = dsoInfosQuery.data?.svPartyId;
 
-  if (voteRequestQuery.isLoading) {
+  if (voteRequestQuery.isLoading || voteRequests.isLoading) {
     return <Loading />;
   }
 
-  if (voteRequestQuery.isError) {
+  if (voteRequestQuery.isError || voteRequests.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
-  if (!voteRequestQuery.data) {
+  if (!voteRequestQuery.data || !voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
 
@@ -65,7 +67,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
 
   const curSvVote: SvVote | undefined = votesQuery.data.find(v => v.voter === svPartyId);
 
-  const allVotes = votesQuery.data.sort((a, b) => {
+  const allVotes = [...votesQuery.data].sort((a, b) => {
     return b.expiresAt.valueOf() - a.expiresAt.valueOf();
   });
 
@@ -81,9 +83,9 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
       voteBefore={dayjs(voteRequestQuery.data.payload.voteBefore).toDate()}
       rejectedVotes={rejectedVotes}
       acceptedVotes={acceptedVotes}
-      handleClose={handleClose}
       voteForm={voteForm}
       curSvVote={curSvVote}
+      effectiveAt={effectiveAt}
     />
   );
 };

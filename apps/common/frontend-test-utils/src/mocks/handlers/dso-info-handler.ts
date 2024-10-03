@@ -96,10 +96,6 @@ export const dsoInfo = {
               _1: '2024-03-15T08:35:00Z',
               _2: getAmuletConfig('4815162342'),
             },
-            {
-              _1: '2524-03-19T08:35:00Z',
-              _2: getAmuletConfig('0.03'),
-            },
           ],
         },
         isDevNet: true,
@@ -170,6 +166,7 @@ export const dsoInfo = {
                   state: 'DS_Operational',
                   cometBftGenesisJson:
                     'TODO(#4900): share CometBFT genesis.json of founding SV node via DsoRules config.',
+                  acsCommitmentReconciliationInterval: '1600',
                 },
               ],
             ],
@@ -401,112 +398,140 @@ export const dsoInfo = {
   sv_node_states: [], // TODO(tech-debt): add better mock data
 };
 
-function getAmuletConfig(createFee: string) {
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function getAmuletConfig(createFee: string) {
   return {
     packageConfig: {
-      amulet: '0.1.0',
-      walletPayments: '0.1.0',
-      dsoGovernance: '0.1.0',
-      validatorLifecycle: '0.1.0',
-      amuletNameService: '0.1.0',
-      wallet: '0.1.0',
+      amuletNameService: '0.1.5',
+      walletPayments: '0.1.5',
+      dsoGovernance: '0.1.8',
+      validatorLifecycle: '0.1.1',
+      amulet: '0.1.5',
+      wallet: '0.1.5',
     },
-    tickDuration: { microseconds: '150000000' },
-    transferConfig: {
-      holdingFee: { rate: '0.0000048225' },
-      extraFeaturedAppRewardAmount: '1.0',
-      maxNumInputs: '100',
-      lockHolderFee: { fee: '0.005' },
-      createFee: { fee: createFee },
-      maxNumLockHolders: '50',
-      transferFee: {
-        initialRate: '0.01',
-        steps: [
-          { _1: '100.0', _2: '0.001' },
-          { _1: '1000.0', _2: '0.0001' },
-          { _1: '1000000.0', _2: '0.00001' },
-        ],
-      },
-      maxNumOutputs: '100',
+    tickDuration: {
+      microseconds: '600000000',
     },
     decentralizedSynchronizer: {
       requiredSynchronizers: {
         map: [
           [
-            'global-synchronizer::1220d12352e0839d9aac0a1c0c05b0eaaeb44f0aa19958cca2db37ae22c7817949a7',
+            'global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81',
             {},
           ],
         ],
       },
       activeSynchronizer:
-        'global-synchronizer::1220d12352e0839d9aac0a1c0c05b0eaaeb44f0aa19958cca2db37ae22c7817949a7',
+        'global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81',
       fees: {
         baseRateTrafficLimits: {
-          burstAmount: '2000000',
-          burstWindow: { microseconds: '600000000' },
+          burstAmount: '400000',
+          burstWindow: {
+            microseconds: '1200000000',
+          },
         },
-        extraTrafficPrice: '1.0',
+        extraTrafficPrice: '16.67',
         readVsWriteScalingFactor: '4',
-        minTopupAmount: '10000000',
+        minTopupAmount: '200000',
       },
+    },
+    transferConfig: {
+      holdingFee: {
+        rate: '0.0000190259',
+      },
+      extraFeaturedAppRewardAmount: '1.0',
+      maxNumInputs: '100',
+      lockHolderFee: {
+        fee: '0.005',
+      },
+      createFee: {
+        fee: createFee,
+      },
+      maxNumLockHolders: '50',
+      transferFee: {
+        initialRate: '0.01',
+        steps: [
+          {
+            _1: '100.0',
+            _2: '0.001',
+          },
+          {
+            _1: '1000.0',
+            _2: '0.0001',
+          },
+          {
+            _1: '1000000.0',
+            _2: '0.00001',
+          },
+        ],
+      },
+      maxNumOutputs: '100',
     },
     issuanceCurve: {
       initialValue: {
-        validatorRewardPercentage: '0.5',
-        amuletToIssuePerYear: '40000000000.0',
+        validatorRewardPercentage: '0.05',
         unfeaturedAppRewardCap: '0.6',
         appRewardPercentage: '0.15',
         featuredAppRewardCap: '100.0',
+        amuletToIssuePerYear: '40000000000.0',
         validatorRewardCap: '0.2',
-        optValidatorFaucetCap: null,
+        optValidatorFaucetCap: '2.85',
       },
       futureValues: [
         {
-          _1: { microseconds: '15768000000000' },
+          _1: {
+            microseconds: '15768000000000',
+          },
           _2: {
             validatorRewardPercentage: '0.12',
-            amuletToIssuePerYear: '20000000000.0',
             unfeaturedAppRewardCap: '0.6',
             appRewardPercentage: '0.4',
             featuredAppRewardCap: '100.0',
+            amuletToIssuePerYear: '20000000000.0',
             validatorRewardCap: '0.2',
-            optValidatorFaucetCap: null,
+            optValidatorFaucetCap: '2.85',
           },
         },
         {
-          _1: { microseconds: '47304000000000' },
+          _1: {
+            microseconds: '47304000000000',
+          },
           _2: {
             validatorRewardPercentage: '0.18',
-            amuletToIssuePerYear: '10000000000.0',
             unfeaturedAppRewardCap: '0.6',
             appRewardPercentage: '0.62',
             featuredAppRewardCap: '100.0',
+            amuletToIssuePerYear: '10000000000.0',
             validatorRewardCap: '0.2',
-            optValidatorFaucetCap: null,
+            optValidatorFaucetCap: '2.85',
           },
         },
         {
-          _1: { microseconds: '157680000000000' },
+          _1: {
+            microseconds: '157680000000000',
+          },
           _2: {
             validatorRewardPercentage: '0.21',
-            amuletToIssuePerYear: '5000000000.0',
             unfeaturedAppRewardCap: '0.6',
             appRewardPercentage: '0.69',
             featuredAppRewardCap: '100.0',
+            amuletToIssuePerYear: '5000000000.0',
             validatorRewardCap: '0.2',
-            optValidatorFaucetCap: null,
+            optValidatorFaucetCap: '2.85',
           },
         },
         {
-          _1: { microseconds: '315360000000000' },
+          _1: {
+            microseconds: '315360000000000',
+          },
           _2: {
             validatorRewardPercentage: '0.2',
-            amuletToIssuePerYear: '2500000000.0',
             unfeaturedAppRewardCap: '0.6',
             appRewardPercentage: '0.75',
             featuredAppRewardCap: '100.0',
+            amuletToIssuePerYear: '2500000000.0',
             validatorRewardCap: '0.2',
-            optValidatorFaucetCap: null,
+            optValidatorFaucetCap: '2.85',
           },
         },
       ],

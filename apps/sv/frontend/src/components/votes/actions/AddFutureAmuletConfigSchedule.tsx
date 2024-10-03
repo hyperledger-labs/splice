@@ -87,7 +87,15 @@ const AddFutureAmuletConfigSchedule: React.FC<{
           value={date}
           minDateTime={dayjs()}
           readOnly={false}
-          onChange={(newValue: Dayjs | null) => setDate(newValue)}
+          onChange={(newValue: Dayjs | null) => {
+            try {
+              newValue?.toISOString();
+              setDate(newValue);
+            } catch (error) {
+              console.log('Invalid date', error);
+              return;
+            }
+          }}
           slotProps={{
             textField: {
               id: 'datetime-picker-amulet-configuration',

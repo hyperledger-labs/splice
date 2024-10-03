@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder';
 import { useMutation } from '@tanstack/react-query';
-import { DisableConditionally, SvClientProvider } from 'common-frontend';
+import { ActionView, DisableConditionally, SvClientProvider } from 'common-frontend';
 import { getUTCWithOffset } from 'common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
@@ -55,7 +55,7 @@ export function actionFromFormIsError(
   return !!(action as { formError: DecoderError }).formError;
 }
 
-const VoteRequest: React.FC = () => {
+export const CreateVoteRequest: React.FC = () => {
   // States related to vote requests
   const [actionName, setActionName] = useState('SRARC_OffboardSv');
   const [summary, setSummary] = useState<string>('');
@@ -121,7 +121,12 @@ const VoteRequest: React.FC = () => {
   const [action, setAction] = useState<ActionFromForm | undefined>(undefined);
   const chooseAction = useCallback(
     (action: ActionFromForm) => {
-      setAction(action);
+      try {
+        ActionRequiringConfirmation.encode(action as ActionRequiringConfirmation);
+        setAction(action);
+      } catch (error) {
+        console.log('Caught expected DecoderError in case of null values: ', error);
+      }
       const max = (time1: Dayjs, time2: Dayjs) => (time1 > time2 ? time1 : time2);
       if (!actionFromFormIsError(action)) {
         if (action.tag === 'ARC_AmuletRules') {
@@ -223,6 +228,14 @@ const VoteRequest: React.FC = () => {
     },
   });
 
+  // used and valid only for dsoRules-based actions
+  let expiresAt;
+  try {
+    expiresAt = expiration?.toISOString();
+  } catch (error) {
+    expiresAt = undefined;
+  }
+
   // TODO (#4966): add a popup to ask confirmation
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
@@ -319,33 +332,49 @@ const VoteRequest: React.FC = () => {
               closeOnSelect
             />
           </Stack>
+          {action && (
+            <Stack direction="column" mb={4} spacing={1}>
+              <Typography variant="h5">Review vote request</Typography>
+              <ActionView
+                action={
+                  ActionRequiringConfirmation.encode(
+                    action as ActionRequiringConfirmation
+                  ) as ActionRequiringConfirmation
+                }
+                expiresAt={expiresAt}
+              />
+            </Stack>
+          )}
           <Alerting alertState={alertMessage} />
-          <DisableConditionally
-            conditions={[
-              { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
-              {
-                disabled: !action || actionFromFormIsError(action),
-                reason: !action
-                  ? 'No action'
-                  : `Action is not valid: ${
-                      actionFromFormIsError(action) && JSON.stringify(action.formError)
-                    }`,
-              },
-              { disabled: summary === '', reason: 'No summary' },
-            ]}
-          >
-            <Button
-              id="create-voterequest-submit-button"
-              fullWidth
-              type={'submit'}
-              size="large"
-              onClick={() => {
-                createVoteRequestMutation.mutate();
-              }}
+
+          <Stack direction="column" mb={4} spacing={1}>
+            <DisableConditionally
+              conditions={[
+                { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
+                {
+                  disabled: !action || actionFromFormIsError(action),
+                  reason: !action
+                    ? 'No action'
+                    : `Action is not valid: ${
+                        actionFromFormIsError(action) && JSON.stringify(action.formError)
+                      }`,
+                },
+                { disabled: summary === '', reason: 'No summary' },
+              ]}
             >
-              Send request to collective
-            </Button>
-          </DisableConditionally>
+              <Button
+                id="create-voterequest-submit-button"
+                fullWidth
+                type={'submit'}
+                size="large"
+                onClick={() => {
+                  createVoteRequestMutation.mutate();
+                }}
+              >
+                Send request to collective
+              </Button>
+            </DisableConditionally>
+          </Stack>
         </CardContent>
       </Card>
     </Stack>
@@ -354,9 +383,10 @@ const VoteRequest: React.FC = () => {
 
 const VoteRequestWithContexts: React.FC = () => {
   const config = useSvConfig();
+
   return (
     <SvClientProvider url={config.services.sv.url}>
-      <VoteRequest />
+      <CreateVoteRequest />
       <SvListVoteRequests />
     </SvClientProvider>
   );

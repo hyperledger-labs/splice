@@ -29,9 +29,11 @@ import {
   VotesHooks,
   useVotesHooks,
   ListVoteRequests,
+  ActionView,
 } from './votes';
 
 export {
+  ActionView,
   AmountDisplay,
   AuthProvider,
   AnsEntry,

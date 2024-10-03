@@ -10,20 +10,24 @@ import {
 import { ContractId } from '@daml/types';
 
 import { SvVote } from '../../models';
+import { VoteResultModalState } from './ListVoteRequests';
 import VoteModalContent from './VoteModalContent';
 
-interface VoteResultModalProps {
-  handleClose: () => void;
-  voteResult?: DsoRules_CloseVoteRequestResult;
+interface VoteResultModalStateInterface {
+  voteResultModalState: VoteResultModalState;
 }
 
-export const VoteResultModalContent: React.FC<VoteResultModalProps> = ({
-  handleClose,
-  voteResult,
+export const VoteResultModalContent: React.FC<VoteResultModalStateInterface> = ({
+  voteResultModalState,
 }) => {
-  if (!voteResult) {
-    return <>no voteResult defined</>;
+  if (!voteResultModalState.open) {
+    return <>no voteResultModalState defined</>;
   }
+
+  const { voteResult, tableType, effectiveAt } = voteResultModalState;
+  const encodedResult = DsoRules_CloseVoteRequestResult.encode(
+    voteResult
+  ) as DsoRules_CloseVoteRequestResult;
 
   const allVotes = voteResult.request.votes.entriesArray();
 
@@ -48,16 +52,15 @@ export const VoteResultModalContent: React.FC<VoteResultModalProps> = ({
 
   return (
     <VoteModalContent
-      voteRequestContractId={voteResult.request.trackingCid as ContractId<VoteRequest>}
-      actionReq={voteResult.request.action}
-      requester={voteResult.request.requester}
-      reason={voteResult.request.reason}
-      voteBefore={dayjs(voteResult.request.voteBefore).toDate()}
+      voteRequestContractId={encodedResult.request.trackingCid as ContractId<VoteRequest>}
+      actionReq={encodedResult.request.action}
+      requester={encodedResult.request.requester}
+      reason={encodedResult.request.reason}
+      voteBefore={dayjs(encodedResult.request.voteBefore).toDate()}
       rejectedVotes={rejectedVotes}
       acceptedVotes={acceptedVotes}
-      handleClose={handleClose}
+      tableType={tableType}
+      effectiveAt={effectiveAt}
     />
   );
 };
-
-export default VoteResultModalContent;

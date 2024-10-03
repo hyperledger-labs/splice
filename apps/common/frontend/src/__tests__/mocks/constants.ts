@@ -288,45 +288,45 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
               _2: {
                 transferConfig: {
                   createFee: {
-                    fee: '0.0300000000',
+                    fee: '0.03',
                   },
                   holdingFee: {
                     rate: '0.0000190259',
                   },
                   transferFee: {
-                    initialRate: '0.0100000000',
+                    initialRate: '0.01',
                     steps: [
                       {
-                        _1: '100.0000000000',
-                        _2: '0.0010000000',
+                        _1: '100.0',
+                        _2: '0.001',
                       },
                       {
-                        _1: '1000.0000000000',
-                        _2: '0.0001000000',
+                        _1: '1000.0',
+                        _2: '0.0001',
                       },
                       {
-                        _1: '1000000.0000000000',
-                        _2: '0.0000100000',
+                        _1: '1000000.0',
+                        _2: '0.00001',
                       },
                     ],
                   },
                   lockHolderFee: {
-                    fee: '0.0060000000',
+                    fee: '0.006',
                   },
-                  extraFeaturedAppRewardAmount: '1.0000000000',
+                  extraFeaturedAppRewardAmount: '1.0',
                   maxNumInputs: '100',
                   maxNumOutputs: '100',
                   maxNumLockHolders: '50',
                 },
                 issuanceCurve: {
                   initialValue: {
-                    amuletToIssuePerYear: '40000000000.0000000000',
-                    validatorRewardPercentage: '0.0500000000',
-                    appRewardPercentage: '0.1500000000',
-                    validatorRewardCap: '0.2000000000',
-                    featuredAppRewardCap: '100.0000000000',
-                    unfeaturedAppRewardCap: '0.6000000000',
-                    optValidatorFaucetCap: '2.8500000000',
+                    amuletToIssuePerYear: '40000000000.0',
+                    validatorRewardPercentage: '0.05',
+                    appRewardPercentage: '0.15',
+                    validatorRewardCap: '0.2',
+                    featuredAppRewardCap: '100.0',
+                    unfeaturedAppRewardCap: '0.6',
+                    optValidatorFaucetCap: '2.85',
                   },
                   futureValues: [
                     {
@@ -334,13 +334,13 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         microseconds: '15768000000000',
                       },
                       _2: {
-                        amuletToIssuePerYear: '20000000000.0000000000',
-                        validatorRewardPercentage: '0.1200000000',
-                        appRewardPercentage: '0.4000000000',
-                        validatorRewardCap: '0.2000000000',
-                        featuredAppRewardCap: '100.0000000000',
-                        unfeaturedAppRewardCap: '0.6000000000',
-                        optValidatorFaucetCap: '2.8500000000',
+                        amuletToIssuePerYear: '20000000000.0',
+                        validatorRewardPercentage: '0.12',
+                        appRewardPercentage: '0.4',
+                        validatorRewardCap: '0.2',
+                        featuredAppRewardCap: '100.0',
+                        unfeaturedAppRewardCap: '0.6',
+                        optValidatorFaucetCap: '2.85',
                       },
                     },
                     {
@@ -348,13 +348,13 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         microseconds: '47304000000000',
                       },
                       _2: {
-                        amuletToIssuePerYear: '10000000000.0000000000',
-                        validatorRewardPercentage: '0.1800000000',
-                        appRewardPercentage: '0.6200000000',
-                        validatorRewardCap: '0.2000000000',
-                        featuredAppRewardCap: '100.0000000000',
-                        unfeaturedAppRewardCap: '0.6000000000',
-                        optValidatorFaucetCap: '2.8500000000',
+                        amuletToIssuePerYear: '10000000000.0',
+                        validatorRewardPercentage: '0.18',
+                        appRewardPercentage: '0.62',
+                        validatorRewardCap: '0.2',
+                        featuredAppRewardCap: '100.0',
+                        unfeaturedAppRewardCap: '0.6',
+                        optValidatorFaucetCap: '2.85',
                       },
                     },
                     {
@@ -362,13 +362,13 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         microseconds: '157680000000000',
                       },
                       _2: {
-                        amuletToIssuePerYear: '5000000000.0000000000',
-                        validatorRewardPercentage: '0.2100000000',
-                        appRewardPercentage: '0.6900000000',
-                        validatorRewardCap: '0.2000000000',
-                        featuredAppRewardCap: '100.0000000000',
-                        unfeaturedAppRewardCap: '0.6000000000',
-                        optValidatorFaucetCap: '2.8500000000',
+                        amuletToIssuePerYear: '5000000000.0',
+                        validatorRewardPercentage: '0.21',
+                        appRewardPercentage: '0.69',
+                        validatorRewardCap: '0.2',
+                        featuredAppRewardCap: '100.0',
+                        unfeaturedAppRewardCap: '0.6',
+                        optValidatorFaucetCap: '2.85',
                       },
                     },
                     {
@@ -376,13 +376,13 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         microseconds: '315360000000000',
                       },
                       _2: {
-                        amuletToIssuePerYear: '2500000000.0000000000',
-                        validatorRewardPercentage: '0.2000000000',
-                        appRewardPercentage: '0.7500000000',
-                        validatorRewardCap: '0.2000000000',
-                        featuredAppRewardCap: '100.0000000000',
-                        unfeaturedAppRewardCap: '0.6000000000',
-                        optValidatorFaucetCap: '2.8500000000',
+                        amuletToIssuePerYear: '2500000000.0',
+                        validatorRewardPercentage: '0.2',
+                        appRewardPercentage: '0.75',
+                        validatorRewardCap: '0.2',
+                        featuredAppRewardCap: '100.0',
+                        unfeaturedAppRewardCap: '0.6',
+                        optValidatorFaucetCap: '2.85',
                       },
                     },
                   ],
@@ -405,7 +405,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         microseconds: '1200000000',
                       },
                     },
-                    extraTrafficPrice: '16.6700000000',
+                    extraTrafficPrice: '16.67',
                     readVsWriteScalingFactor: '4',
                     minTopupAmount: '200000',
                   },
@@ -612,3 +612,130 @@ export const unvotedRequest = {
     'CgMyLjESuQYKRQC7CjH8IFTbA2XHBj25PMQ8/J/Xn3C8eNr/ZWqb1vk3D8oQEiCtmA06+NVO1cqJJ+4KLqplpAM+Y8mmRvyg8FRGZ2dIyxIVc3BsaWNlLWRzby1nb3Zlcm5hbmNlGmEKQDE3OTBhMTE0ZjgzZDVmMjkwMjYxZmFlMWU3ZTQ2ZmJhNzVhODYxYTNkZDYwM2M2YjRlZjZiNjdiNDkwNTM5NDgSBlNwbGljZRIIRHNvUnVsZXMaC1ZvdGVSZXF1ZXN0IvUDavIDCk0KSzpJRFNPOjoxMjIwNThmZDYxYTU2NGYwMzgyM2JjMWUyN2YxNmRlNTE5Y2FiY2QzNjgxZmMzMWFiNTIzZjRlZjY5OGRjNmI2YzNhYgoTChFCD0RpZ2l0YWwtQXNzZXQtMgqmAQqjAXKgAQoMQVJDX0Rzb1J1bGVzEo8BaowBCokBCoYBcoMBChpTUkFSQ19VcGRhdGVTdlJld2FyZFdlaWdodBJlamMKWQpXOlVkaWdpdGFsLWFzc2V0LTI6OjEyMjBhMTUwNGQ4NzQ1MWNlNmE0YTEzNTVkNzFjNGYyNjY3N2Q2M2RiNWU2Mjk4ZDA0YjBkMTg2NWZkOTcxNDMyYTQxCgYKBBjAzyQKFgoUahIKBAoCQgAKCgoIQgZUZXN0IDMKCwoJKUTLwa3nIQYACrcBCrQBYrEBCq4BChFCD0RpZ2l0YWwtQXNzZXQtMhKYAWqVAQpZClc6VWRpZ2l0YWwtYXNzZXQtMjo6MTIyMGExNTA0ZDg3NDUxY2U2YTRhMTM1NWQ3MWM0ZjI2Njc3ZDYzZGI1ZTYyOThkMDRiMGQxODY1ZmQ5NzE0MzJhNDEKBAoCEAEKMgowai4KBAoCQgAKJgokQiJJIGFjY2VwdCwgYXMgSSByZXF1ZXN0ZWQgdGhlIHZvdGUuCgQKAlIAKklEU086OjEyMjA1OGZkNjFhNTY0ZjAzODIzYmMxZTI3ZjE2ZGU1MTljYWJjZDM2ODFmYzMxYWI1MjNmNGVmNjk4ZGM2YjZjM2FiOTSmQN1aIQYAQioKJgokCAESIHFq7Tf1rU33ywG032I92KCzsnvbFh0BH8vZPb2kb3FfEB4=',
   createdAt: '2024-09-05T08:13:23.038772Z',
 };
+
+export function getExpectedAmuletRulesConfigDiffsHTML(
+  originalLockHolderFee: string,
+  replacementLockHolderFee: string
+): string {
+  return (
+    '<div class="jsondiffpatch-delta jsondiffpatch-node jsondiffpatch-child-node-type-object"><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"><li data-key="decentralizedSynchronizer" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">decentralizedSynchronizer</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '  "requiredSynchronizers": {\n' +
+    '    "map": [\n' +
+    '      [\n' +
+    '        "global-domain::122058fd61a564f03823bc1e27f16de519cabcd3681fc31ab523f4ef698dc6b6c3ab",\n' +
+    '        {}\n' +
+    '      ]\n' +
+    '    ]\n' +
+    '  },\n' +
+    '  "activeSynchronizer": "global-domain::122058fd61a564f03823bc1e27f16de519cabcd3681fc31ab523f4ef698dc6b6c3ab",\n' +
+    '  "fees": {\n' +
+    '    "baseRateTrafficLimits": {\n' +
+    '      "burstAmount": "400000",\n' +
+    '      "burstWindow": {\n' +
+    '        "microseconds": "1200000000"\n' +
+    '      }\n' +
+    '    },\n' +
+    '    "extraTrafficPrice": "16.67",\n' +
+    '    "readVsWriteScalingFactor": "4",\n' +
+    '    "minTopupAmount": "200000"\n' +
+    '  }\n' +
+    '}</pre></div></li><li data-key="issuanceCurve" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">issuanceCurve</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '  "initialValue": {\n' +
+    '    "amuletToIssuePerYear": "40000000000.0",\n' +
+    '    "validatorRewardPercentage": "0.05",\n' +
+    '    "appRewardPercentage": "0.15",\n' +
+    '    "validatorRewardCap": "0.2",\n' +
+    '    "featuredAppRewardCap": "100.0",\n' +
+    '    "unfeaturedAppRewardCap": "0.6",\n' +
+    '    "optValidatorFaucetCap": "2.85"\n' +
+    '  },\n' +
+    '  "futureValues": [\n' +
+    '    {\n' +
+    '      "_1": {\n' +
+    '        "microseconds": "15768000000000"\n' +
+    '      },\n' +
+    '      "_2": {\n' +
+    '        "amuletToIssuePerYear": "20000000000.0",\n' +
+    '        "validatorRewardPercentage": "0.12",\n' +
+    '        "appRewardPercentage": "0.4",\n' +
+    '        "validatorRewardCap": "0.2",\n' +
+    '        "featuredAppRewardCap": "100.0",\n' +
+    '        "unfeaturedAppRewardCap": "0.6",\n' +
+    '        "optValidatorFaucetCap": "2.85"\n' +
+    '      }\n' +
+    '    },\n' +
+    '    {\n' +
+    '      "_1": {\n' +
+    '        "microseconds": "47304000000000"\n' +
+    '      },\n' +
+    '      "_2": {\n' +
+    '        "amuletToIssuePerYear": "10000000000.0",\n' +
+    '        "validatorRewardPercentage": "0.18",\n' +
+    '        "appRewardPercentage": "0.62",\n' +
+    '        "validatorRewardCap": "0.2",\n' +
+    '        "featuredAppRewardCap": "100.0",\n' +
+    '        "unfeaturedAppRewardCap": "0.6",\n' +
+    '        "optValidatorFaucetCap": "2.85"\n' +
+    '      }\n' +
+    '    },\n' +
+    '    {\n' +
+    '      "_1": {\n' +
+    '        "microseconds": "157680000000000"\n' +
+    '      },\n' +
+    '      "_2": {\n' +
+    '        "amuletToIssuePerYear": "5000000000.0",\n' +
+    '        "validatorRewardPercentage": "0.21",\n' +
+    '        "appRewardPercentage": "0.69",\n' +
+    '        "validatorRewardCap": "0.2",\n' +
+    '        "featuredAppRewardCap": "100.0",\n' +
+    '        "unfeaturedAppRewardCap": "0.6",\n' +
+    '        "optValidatorFaucetCap": "2.85"\n' +
+    '      }\n' +
+    '    },\n' +
+    '    {\n' +
+    '      "_1": {\n' +
+    '        "microseconds": "315360000000000"\n' +
+    '      },\n' +
+    '      "_2": {\n' +
+    '        "amuletToIssuePerYear": "2500000000.0",\n' +
+    '        "validatorRewardPercentage": "0.2",\n' +
+    '        "appRewardPercentage": "0.75",\n' +
+    '        "validatorRewardCap": "0.2",\n' +
+    '        "featuredAppRewardCap": "100.0",\n' +
+    '        "unfeaturedAppRewardCap": "0.6",\n' +
+    '        "optValidatorFaucetCap": "2.85"\n' +
+    '      }\n' +
+    '    }\n' +
+    '  ]\n' +
+    '}</pre></div></li><li data-key="packageConfig" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">packageConfig</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '  "amulet": "0.1.5",\n' +
+    '  "amuletNameService": "0.1.5",\n' +
+    '  "dsoGovernance": "0.1.8",\n' +
+    '  "validatorLifecycle": "0.1.1",\n' +
+    '  "wallet": "0.1.5",\n' +
+    '  "walletPayments": "0.1.5"\n' +
+    '}</pre></div></li><li data-key="tickDuration" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">tickDuration</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '  "microseconds": "600000000"\n' +
+    '}</pre></div></li><li data-key="transferConfig" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">transferConfig</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="createFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">createFee</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '  "fee": "0.03"\n' +
+    '}</pre></div></li><li data-key="extraFeaturedAppRewardAmount" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">extraFeaturedAppRewardAmount</div><div class="jsondiffpatch-value"><pre>"1.0"</pre></div></li><li data-key="holdingFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">holdingFee</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '  "rate": "0.0000190259"\n' +
+    `}</pre></div></li><li data-key="lockHolderFee" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">lockHolderFee</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="fee" class="jsondiffpatch-modified"><div class="jsondiffpatch-property-name">fee</div><div class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalLockHolderFee}"</pre></div><div class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementLockHolderFee}"</pre></div></li></ul><li data-key="maxNumInputs" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxNumInputs</div><div class="jsondiffpatch-value"><pre>"100"</pre></div></li><li data-key="maxNumLockHolders" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxNumLockHolders</div><div class="jsondiffpatch-value"><pre>"50"</pre></div></li><li data-key="maxNumOutputs" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxNumOutputs</div><div class="jsondiffpatch-value"><pre>"100"</pre></div></li><li data-key="transferFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">transferFee</div><div class="jsondiffpatch-value"><pre>{\n` +
+    '  "initialRate": "0.01",\n' +
+    '  "steps": [\n' +
+    '    {\n' +
+    '      "_1": "100.0",\n' +
+    '      "_2": "0.001"\n' +
+    '    },\n' +
+    '    {\n' +
+    '      "_1": "1000.0",\n' +
+    '      "_2": "0.0001"\n' +
+    '    },\n' +
+    '    {\n' +
+    '      "_1": "1000000.0",\n' +
+    '      "_2": "0.00001"\n' +
+    '    }\n' +
+    '  ]\n' +
+    '}</pre></div></li></div>'.trim()
+  );
+}
