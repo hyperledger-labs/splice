@@ -179,7 +179,6 @@ workflow:
           requires:
             - migrate_cluster
       - post_migration_verify_identities:
-          <<: *main-branch-never
           context:
             - artifactory
             - slack-context
