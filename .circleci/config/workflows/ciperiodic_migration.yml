@@ -59,6 +59,7 @@ workflow:
           requires:
             - deploy_cluster_for_migration
             - deploy_validator_runbook_for_migration
+            - deploy_sv_runbook_for_migration
       - pre_migration_compose_validator:
           context:
             - artifactory
@@ -181,6 +182,7 @@ workflow:
             - pre_migration_dump_identities
             - migrate_cluster
             - migrate_validator_runbook
+            - migrate_sv_runbook
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           context:
