@@ -4439,8 +4439,8 @@ jobs:
               export VALIDATOR_MIGRATE_PARTY='true'
             fi
             if [[ << parameters.restore_identity_from_sv_runbook >> == true ]]; then
-              echo "restoring identity from sv runbook's validator"
-              token=$(cncluster get_token sv-validator)
+              echo "restoring identity from sv runbook"
+              token=$(cncluster get_token sv)
               id=$(curl -s "https://wallet.sv.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities" -H "authorization: Bearer ${token}")
               echo "$id" > id.json
               export PARTICIPANT_IDENTITIES_FILE=$(readlink -f id.json)
@@ -5291,7 +5291,6 @@ workflows:
           requires:
             - deploy_cluster_for_migration
             - deploy_validator_runbook_for_migration
-            - deploy_sv_runbook_for_migration
       - pre_migration_compose_validator:
           context:
             - artifactory
@@ -5414,7 +5413,6 @@ workflows:
             - pre_migration_dump_identities
             - migrate_cluster
             - migrate_validator_runbook
-            - migrate_sv_runbook
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           context:
@@ -6293,7 +6291,6 @@ workflows:
           requires:
             - deploy_cluster_for_migration
             - deploy_validator_runbook_for_migration
-            - deploy_sv_runbook_for_migration
       - pre_migration_compose_validator:
           context:
             - artifactory
@@ -6365,7 +6362,6 @@ workflows:
             - prepare_cluster_for_migration
             - trigger_global_domain_migration
             - pre_migration_compose_validator
-            - pre_migration_dump_identities
       - preflight_check:
           name: "preflight_check_migrated"
           context:
@@ -6428,7 +6424,6 @@ workflows:
             - pre_migration_dump_identities
             - migrate_cluster
             - migrate_validator_runbook
-            - migrate_sv_runbook
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           context:

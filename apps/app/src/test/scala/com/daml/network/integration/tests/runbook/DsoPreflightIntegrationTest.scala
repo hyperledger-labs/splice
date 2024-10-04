@@ -23,11 +23,8 @@ class DsoPreflightIntegrationTest
       this.getClass.getSimpleName()
     )
 
-  private def nonSvRunbookSvs(implicit env: FixtureParam) =
-    env.svs.remote.filter(_.name != "svTest")
-
   "SVs 1-4 are online and reachable via their public HTTP API" in { implicit env =>
-    nonSvRunbookSvs.foreach(sv =>
+    env.svs.remote.foreach(sv =>
       clue(s"Checking SV at ${sv.httpClientConfig.url}") {
         eventuallySucceeds(timeUntilSuccess = 2.minutes) {
           sv.getDsoInfo()
@@ -36,7 +33,7 @@ class DsoPreflightIntegrationTest
     )
   }
 
-  "The Web UIs of SVs 1-4 are reachable and working as expected" in { implicit env =>
+  "The Web UIs of SVs 1-4 are reachable and working as expected" in { env =>
     // we put many checks in one test case to reduce testing time (logging in is slow)
     for (i <- (1 to 4)) {
       val ingressName = if (i == 1) "sv-2" else s"sv-$i-eng"
@@ -45,13 +42,11 @@ class DsoPreflightIntegrationTest
       val svUsername = s"admin@sv$i-dev.com";
       // our current practice is to use the same password for all SVs
       val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
-      val sv = nonSvRunbookSvs.find(sv => sv.name == s"sv$i").value
+      val sv = env.svs.remote.find(sv => sv.name == s"sv$i").value
       val svInfo = eventuallySucceeds() { sv.getDsoInfo() }
 
       val votedSvParties =
-        nonSvRunbookSvs
-          .filter(_ != sv)
-          .map(sv_ => eventuallySucceeds() { sv_.getDsoInfo().svParty })
+        env.svs.remote.filter(_ != sv).map(sv_ => eventuallySucceeds() { sv_.getDsoInfo().svParty })
 
       withFrontEnd("sv") { implicit webDriver =>
         testSvUi(

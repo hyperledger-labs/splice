@@ -282,31 +282,18 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
   "Key API endpoints are reachable and functional" in { implicit env =>
     val auth0 = auth0UtilFromEnvVars("sv")
-    val validator_token = eventuallySucceeds() {
+    val token = eventuallySucceeds() {
       getAuth0ClientCredential(
-        sys.env("SPLICE_OAUTH_SV_TEST_CLIENT_ID_SV_VALIDATOR"),
+        sys.env("SPLICE_OAUTH_SV_TEST_CLIENT_ID_VALIDATOR"),
         "https://validator.example.com/api",
         auth0,
       )(noTracingLogger)
     }
-    val sv_token = eventuallySucceeds() {
-      getAuth0ClientCredential(
-        sys.env("SPLICE_OAUTH_SV_TEST_CLIENT_ID_SV"),
-        "https://sv.example.com/api",
-        auth0,
-      )(noTracingLogger)
-    }
-    val svValidatorClient = vc("svTestValidator").copy(token = Some(validator_token))
-    val svSvAppClient = sv_client("svTest").copy(token = Some(sv_token))
+    val svValidatorClient = vc("svTestValidator").copy(token = Some(token))
     val svScanClient = scancl("svTestScan")
     val sv1ScanClient = scancl("sv1Scan")
     val participantId = clue("Can dump participant identities from SV validator") {
       svValidatorClient.dumpParticipantIdentities().id
-    }
-    clue("Can get identities dump from SV app, and participant IDs are the same") {
-      val participantIdFromSv = svSvAppClient.getSynchronizerNodeIdentitiesDump().participant.id
-      participantId should equal(participantIdFromSv)
-
     }
     val activeSynchronizer = clue("Can get active domain from Scan") {
       val svActiveDomain = DomainId.tryFromString(

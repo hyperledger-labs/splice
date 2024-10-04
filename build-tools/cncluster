@@ -906,10 +906,8 @@ function subcmd_get_token() {
   configType="cantonNetwork"
   if [ "$node" == "sv" ]; then
     configType="svRunbook"
-  elif [ "$node" == "sv-validator" ]; then
-    configType="svRunbook"
-    node="validator"
-  elif [ "$node" == "validator" ]; then
+  fi
+  if [ "$node" == "validator" ]; then
     configType="validatorRunbook"
   fi
 
@@ -1948,11 +1946,9 @@ function subcmd_dump_identities() {
     _cluster_must_exist
 
     all='{}'
-    for i in sv-1 sv-2 sv-3 sv-4 sv; do
+    for i in sv-1 sv-2 sv-3 sv-4; do
         if [ "$i" == "sv-1" ]; then
             domain="sv-2"
-        elif [ "$i" == "sv" ]; then
-            domain="sv"
         else
             domain="$i-eng"
         fi
@@ -1966,10 +1962,6 @@ function subcmd_dump_identities() {
     full_identities=$(curl -sSLf -H "authorization: Bearer $token" "https://wallet.validator.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities")
     identities=$(echo "$full_identities" | jq '{"validator": {participant: .id}}')
     all=$(echo "$all" "$identities" | jq -s add)
-
-    # TODO(#15165): We don't currently include validator1 and splitwell here becuase we actually reset them in the
-    # prepare & migrate steps due to the pulumi changes not being in the base version. Once they are, we should
-    # include them here as well.
 
     echo "$all" | jq -S .
 }
