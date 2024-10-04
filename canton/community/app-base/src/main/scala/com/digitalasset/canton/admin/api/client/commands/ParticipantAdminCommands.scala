@@ -12,6 +12,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
 import com.digitalasset.canton.admin.api.client.commands.StatusAdminCommands.NodeStatusCommand
 import com.digitalasset.canton.admin.api.client.data.{
   DarMetadata,
+  InFlightCount,
   ListConnectedDomainsResult,
   NodeStatus,
   ParticipantPruningSchedule,
@@ -676,6 +677,32 @@ object ParticipantAdminCommands {
       override def handleResponse(response: UnignoreEventsResponse): Either[String, Unit] =
         Right(())
     }
+
+    final case class RollbackUnassignment(unassignId: String, source: DomainId, target: DomainId)
+        extends GrpcAdminCommand[RollbackUnassignmentRequest, RollbackUnassignmentResponse, Unit] {
+      override type Svc = ParticipantRepairServiceStub
+
+      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
+        ParticipantRepairServiceGrpc.stub(channel)
+
+      override def createRequest(): Either[String, RollbackUnassignmentRequest] =
+        Right(
+          RollbackUnassignmentRequest(
+            unassignId = unassignId,
+            source = source.toProtoPrimitive,
+            target = target.toProtoPrimitive,
+          )
+        )
+
+      override def submitRequest(
+          service: ParticipantRepairServiceStub,
+          request: RollbackUnassignmentRequest,
+      ): Future[RollbackUnassignmentResponse] =
+        service.rollbackUnassignment(request)
+
+      override def handleResponse(response: RollbackUnassignmentResponse): Either[String, Unit] =
+        Right(())
+    }
   }
 
   object Ping {
@@ -979,34 +1006,6 @@ object ParticipantAdminCommands {
         InspectionServiceGrpc.stub(channel)
     }
 
-    final case class LookupContractDomain(contractIds: Set[LfContractId])
-        extends Base[
-          v30.LookupContractDomain.Request,
-          v30.LookupContractDomain.Response,
-          Map[LfContractId, String],
-        ] {
-      override def createRequest() = Right(
-        v30.LookupContractDomain.Request(contractIds.toSeq.map(_.coid))
-      )
-
-      override def submitRequest(
-          service: InspectionServiceStub,
-          request: v30.LookupContractDomain.Request,
-      ): Future[v30.LookupContractDomain.Response] =
-        service.lookupContractDomain(request)
-
-      override def handleResponse(
-          response: v30.LookupContractDomain.Response
-      ): Either[String, Map[LfContractId, String]] = Right(
-        response.results.map { case (id, domain) =>
-          LfContractId.assertFromString(id) -> domain
-        }
-      )
-
-      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
-
-    }
-
     final case class LookupOffsetByTime(ts: Timestamp)
         extends Base[v30.LookupOffsetByTime.Request, v30.LookupOffsetByTime.Response, String] {
       override def createRequest() = Right(v30.LookupOffsetByTime.Request(Some(ts)))
@@ -1040,7 +1039,7 @@ object ParticipantAdminCommands {
           .Request(
             AcsCommitment.commitmentTypeToProto(commitment),
             domainId.toProtoPrimitive,
-            computedForCounterParticipant.uid.toProtoPrimitive,
+            computedForCounterParticipant.toProtoPrimitive,
             Some(toInclusive.toProtoTimestamp),
           )
       )
@@ -1096,7 +1095,6 @@ object ParticipantAdminCommands {
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
     }
 
-    // TODO(#18451) R5: The code below should be sufficient.
     final case class LookupReceivedAcsCommitments(
         domainTimeRanges: Seq[DomainTimeRange],
         counterParticipants: Seq[ParticipantId],
@@ -1221,7 +1219,6 @@ object ParticipantAdminCommands {
         state,
       )
 
-    // TODO(#18451) R5: The code below should be sufficient.
     final case class LookupSentAcsCommitments(
         domainTimeRanges: Seq[DomainTimeRange],
         counterParticipants: Seq[ParticipantId],
@@ -1467,6 +1464,37 @@ object ParticipantAdminCommands {
             asOf.toInstant,
           )
         }.sequence
+    }
+
+    final case class CountInFlight(domainId: DomainId)
+        extends Base[
+          v30.CountInFlight.Request,
+          v30.CountInFlight.Response,
+          InFlightCount,
+        ] {
+
+      override def createRequest(): Either[String, v30.CountInFlight.Request] =
+        Right(v30.CountInFlight.Request(domainId.toProtoPrimitive))
+
+      override def submitRequest(
+          service: InspectionServiceStub,
+          request: v30.CountInFlight.Request,
+      ): Future[v30.CountInFlight.Response] =
+        service.countInFlight(request)
+
+      override def handleResponse(
+          response: v30.CountInFlight.Response
+      ): Either[String, InFlightCount] =
+        for {
+          pendingSubmissions <- ProtoConverter
+            .parseNonNegativeInt("CountInFlight.pending_submissions", response.pendingSubmissions)
+            .leftMap(_.toString)
+          pendingTransactions <- ProtoConverter
+            .parseNonNegativeInt("CountInFlight.pending_transactions", response.pendingTransactions)
+            .leftMap(_.toString)
+        } yield {
+          InFlightCount(pendingSubmissions, pendingTransactions)
+        }
     }
 
   }

@@ -69,10 +69,17 @@ class UpdateIngestionService(
                 } yield participantBegin
               } else
                 for {
-                  acsOffset <- connection.ledgerEnd()
-                  _ = logger.debug(s"Starting ingestion from ledger end: $acsOffset")
-                  _ <- ingestAcsAndInFlight(acsOffset)
-                } yield acsOffset
+                  acsOffsetO <- connection.ledgerEnd()
+                  _ = logger.debug(s"Starting ingestion from ledger end: $acsOffsetO")
+                  _ <- acsOffsetO match {
+                    case None =>
+                      // Not specifying an offset to the acs endpoint is not equivalent to ledger begin but to ledger end
+                      // which may have changed at this point already so we manually handle this here.
+                      ingestionSink.ingestAcs(None, Seq.empty, Seq.empty, Seq.empty)
+                    case Some(acsOffset) =>
+                      ingestAcsAndInFlight(acsOffset)
+                  }
+                } yield acsOffsetO
           } yield offset
         case Some(offset) =>
           logger.debug(s"Resuming ingestion from offset: $offset")
@@ -90,13 +97,13 @@ class UpdateIngestionService(
   )(implicit traceContext: TraceContext) = ingestionSink.ingestUpdate(msg.domainId, msg.update)
 
   private def ingestAcsAndInFlight(
-      offset: String
+      offset: Long
   )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       // TODO(#5534): stream contracts instead of ingesting them as a single Seq
       (acs, incompleteOut, incompleteIn) <- connection.activeContracts(filter, offset)
       _ <- ingestionSink.ingestAcs(
-        offset,
+        Some(offset),
         acs,
         incompleteOut,
         incompleteIn,

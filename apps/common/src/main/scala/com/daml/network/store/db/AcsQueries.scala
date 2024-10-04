@@ -21,6 +21,7 @@ import com.daml.network.util.{
 }
 import slick.jdbc.{GetResult, PositionedResult, SetParameter}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -144,7 +145,7 @@ trait AcsQueries extends AcsJdbcTypes {
     val storeIdFromAcsRow = pp.<<[Option[Int]]
     val migrationIdFromAcsRow = pp.<<[Option[Long]]
     AcsQueries.SelectFromAcsTableResultWithOffset(
-      pp.<<,
+      ApiOffset.assertFromStringToLongO(pp.<<[String]),
       for {
         storeId <- storeIdFromAcsRow
         migration_id <- migrationIdFromAcsRow
@@ -210,7 +211,7 @@ trait AcsQueries extends AcsJdbcTypes {
       val storeIdFromAcsRow = pp.<<[Option[Int]]
       val migrationIdFromAcsRow = pp.<<[Option[Long]]
       AcsQueries.SelectFromAcsTableResultWithStateAndOffset(
-        pp.<<,
+        ApiOffset.assertFromStringToLongO(pp.<<[String]),
         for {
           storeId <- storeIdFromAcsRow
           migrationId <- migrationIdFromAcsRow
@@ -384,12 +385,12 @@ object AcsQueries {
   }
 
   case class SelectFromAcsTableResultWithOffset(
-      offset: String,
+      offset: Option[Long],
       row: Option[SelectFromAcsTableResult],
   )
 
   case class SelectFromAcsTableResultWithStateAndOffset(
-      offset: String,
+      offset: Option[Long],
       row: Option[SelectFromAcsTableWithStateResult],
   )
 }

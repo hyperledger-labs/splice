@@ -16,7 +16,7 @@ import com.daml.network.sv.automation.singlesv.ReconcileSynchronizerFeesConfigTr
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AmuletConfigSchedule
-import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
+import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.tracing.TraceContext
@@ -101,8 +101,8 @@ class ReconcileDynamicDomainParametersTrigger(
               NonNegativeLong.tryCreate(domainFeesConfig.baseRateTrafficLimits.burstAmount),
             readVsWriteScalingFactor =
               PositiveInt.tryCreate(domainFeesConfig.readVsWriteScalingFactor.toInt),
-            maxBaseTrafficAccumulationDuration = NonNegativeFiniteDuration.tryOfMicros(
-              domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds
+            maxBaseTrafficAccumulationDuration = PositiveSeconds.tryOfSeconds(
+              domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds / 1000_000
             ),
           )
         },

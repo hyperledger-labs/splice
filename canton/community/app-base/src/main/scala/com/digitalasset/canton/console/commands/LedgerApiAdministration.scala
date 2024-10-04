@@ -14,6 +14,10 @@ import com.daml.ledger.api.v2.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
+import com.daml.ledger.api.v2.interactive_submission_service.{
+  ExecuteSubmissionResponse as ExecuteResponseProto,
+  PrepareSubmissionResponse as PrepareResponseProto,
+}
 import com.daml.ledger.api.v2.reassignment.Reassignment as ReassignmentProto
 import com.daml.ledger.api.v2.state_service.{
   ActiveContract,
@@ -64,6 +68,7 @@ import com.digitalasset.canton.console.{
   ParticipantReference,
   RemoteParticipantReference,
 }
+import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{
@@ -82,6 +87,7 @@ import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.{LfPackageId, LfPartyId, config}
 import com.digitalasset.daml.lf.data.Ref
+import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.StreamObserver
@@ -399,6 +405,79 @@ trait BaseLedgerApiAdministration extends NoTracing {
             )
           )
         })
+    }
+
+    @Help.Summary("Interactive submission", FeatureFlag.Testing)
+    @Help.Group("Interactive Submission")
+    object interactive_submission extends Helpful {
+
+      @Help.Summary(
+        "Prepare a transaction for interactive submission"
+      )
+      @Help.Description(
+        """Prepare a transaction for interactive submission.
+          |Similar to submit, except instead of submitting the transaction to the network,
+          |a serialized version of the transaction will be returned, along with a hash.
+          |This allows non-hosted parties to sign the hash with they private key before submitting it via the
+          |execute command. If you wish to directly submit a command instead without the external signing step,
+          |use submit instead."""
+      )
+      def prepare(
+          actAs: Seq[PartyId],
+          commands: Seq[Command],
+          domainId: Option[DomainId] = None,
+          commandId: String = UUID.randomUUID().toString,
+          minLedgerTimeAbs: Option[Instant] = None,
+          readAs: Seq[PartyId] = Seq.empty,
+          disclosedContracts: Seq[DisclosedContract] = Seq.empty,
+          applicationId: String = applicationId,
+          userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
+      ): PrepareResponseProto =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.InteractiveSubmissionService.PrepareCommand(
+              actAs.map(_.toLf),
+              readAs.map(_.toLf),
+              commands,
+              commandId,
+              minLedgerTimeAbs,
+              disclosedContracts,
+              domainId,
+              applicationId,
+              userPackageSelectionPreference,
+            )
+          )
+        }
+
+      @Help.Summary(
+        "Execute a prepared submission"
+      )
+      @Help.Description(
+        """
+          preparedTransaction: the prepared transaction bytestring, typically obtained from the preparedTransaction field of the [[prepare]] response.
+          transactionSignatures: the signatures of the hash of the transaction. The hash is typically obtained from the preparedTransactionHash field of the [[prepare]] response.
+          """
+      )
+      def execute(
+          preparedTransaction: ByteString,
+          transactionSignatures: Map[PartyId, Seq[Signature]],
+          submissionId: String,
+          applicationId: String = applicationId,
+          workflowId: String = "",
+          deduplicationPeriod: Option[DeduplicationPeriod] = None,
+      ): ExecuteResponseProto =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.InteractiveSubmissionService.ExecuteCommand(
+              preparedTransaction,
+              transactionSignatures,
+              submissionId = submissionId,
+              applicationId = applicationId,
+              workflowId = workflowId,
+              deduplicationPeriod = deduplicationPeriod,
+            )
+          )
+        }
     }
 
     @Help.Summary("Submit commands", FeatureFlag.Testing)
@@ -1432,6 +1511,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           primaryParty: the optional party that should be linked to this user by default
           readAs: the set of parties this user is allowed to read as
           participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api
+          identityProviderAdmin: flag (default false) indicating if the user is allowed to manage users and parties assigned to the same identity provider
           isActive: flag (default true) indicating if the user is active
           annotations: the set of key-value pairs linked to this user
           identityProviderId: identity provider id
@@ -1444,6 +1524,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           primaryParty: Option[PartyId] = None,
           readAs: Set[PartyId] = Set(),
           participantAdmin: Boolean = false,
+          identityProviderAdmin: Boolean = false,
           isActive: Boolean = true,
           annotations: Map[String, String] = Map.empty,
           identityProviderId: String = "",
@@ -1457,6 +1538,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               primaryParty = primaryParty.map(_.toLf),
               readAs = readAs.map(_.toLf),
               participantAdmin = participantAdmin,
+              identityProviderAdmin = identityProviderAdmin,
               isDeactivated = !isActive,
               annotations = annotations,
               identityProviderId = identityProviderId,
@@ -1620,6 +1702,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           actAs: the set of parties this user is allowed to act as
           readAs: the set of parties this user is allowed to read as
           participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api
+          identityProviderAdmin: flag (default false) indicating if the user is allowed to manage users and parties assigned to the same identity provider
           identityProviderId: identity provider id
           readAsAnyParty: flag (default false) indicating if the user is allowed to read as any party
           """)
@@ -1628,6 +1711,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             actAs: Set[PartyId],
             readAs: Set[PartyId] = Set(),
             participantAdmin: Boolean = false,
+            identityProviderAdmin: Boolean = false,
             identityProviderId: String = "",
             readAsAnyParty: Boolean = false,
         ): UserRights =
@@ -1638,6 +1722,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 actAs = actAs.map(_.toLf),
                 readAs = readAs.map(_.toLf),
                 participantAdmin = participantAdmin,
+                identityProviderAdmin = identityProviderAdmin,
                 identityProviderId = identityProviderId,
                 readAsAnyParty = readAsAnyParty,
               )
@@ -1650,6 +1735,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           actAs: the set of parties this user should not be allowed to act as
           readAs: the set of parties this user should not be allowed to read as
           participantAdmin: if set to true, the participant admin rights will be removed
+          identityProviderAdmin: if set to true, the identity provider admin rights will be removed
           identityProviderId: identity provider id
           readAsAnyParty: flag (default false) indicating if the user is allowed to read as any party
           """)
@@ -1658,6 +1744,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             actAs: Set[PartyId],
             readAs: Set[PartyId] = Set(),
             participantAdmin: Boolean = false,
+            identityProviderAdmin: Boolean = false,
             identityProviderId: String = "",
             readAsAnyParty: Boolean = false,
         ): UserRights =
@@ -1668,6 +1755,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 actAs = actAs.map(_.toLf),
                 readAs = readAs.map(_.toLf),
                 participantAdmin = participantAdmin,
+                identityProviderAdmin = identityProviderAdmin,
                 identityProviderId = identityProviderId,
                 readAsAnyParty = readAsAnyParty,
               )
@@ -1763,6 +1851,48 @@ trait BaseLedgerApiAdministration extends NoTracing {
     @Help.Summary("Group of commands that utilize java bindings", FeatureFlag.Testing)
     @Help.Group("Ledger Api (Java bindings)")
     object javaapi extends Helpful {
+
+      @Help.Summary("Interactive submission", FeatureFlag.Testing)
+      @Help.Group("Interactive Submission")
+      object interactive_submission extends Helpful {
+
+        @Help.Summary(
+          "Prepare a transaction for interactive submission"
+        )
+        @Help.Description(
+          "Prepare a transaction for interactive submission"
+        )
+        def prepare(
+            actAs: Seq[PartyId],
+            commands: Seq[javab.data.Command],
+            domainId: Option[DomainId] = None,
+            workflowId: String = "",
+            commandId: String = "",
+            deduplicationPeriod: Option[DeduplicationPeriod] = None,
+            submissionId: String = "",
+            minLedgerTimeAbs: Option[Instant] = None,
+            readAs: Seq[PartyId] = Seq.empty,
+            disclosedContracts: Seq[javab.data.DisclosedContract] = Seq.empty,
+            applicationId: String = applicationId,
+            userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
+        ): PrepareResponseProto =
+          consoleEnvironment.run {
+            ledgerApiCommand(
+              LedgerApiCommands.InteractiveSubmissionService.PrepareCommand(
+                actAs.map(_.toLf),
+                readAs.map(_.toLf),
+                commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
+                commandId,
+                minLedgerTimeAbs,
+                disclosedContracts.map(c => DisclosedContract.fromJavaProto(c.toProto)),
+                domainId,
+                applicationId,
+                userPackageSelectionPreference,
+              )
+            )
+          }
+      }
+
       @Help.Summary("Submit commands (Java bindings)", FeatureFlag.Testing)
       @Help.Group("Command Submission (Java bindings)")
       object commands extends Helpful {
@@ -2147,6 +2277,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           @Help.Description(
             """This function can be used for contracts with a code-generated Java model.
               |You can refine your search using the `filter` function argument.
+              |You can restrict search to a domain by specifying the optional domain id.
               |The command will wait until the contract appears or throw an exception once it times out."""
           )
           def await[
@@ -2156,18 +2287,21 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ](companion: javab.data.codegen.ContractCompanion[TC, TCid, T])(
               partyId: PartyId,
               predicate: TC => Boolean = (_: TC) => true,
+              domainFilter: Option[DomainId] = None,
               timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           ): TC = check(FeatureFlag.Testing)({
             val result = new AtomicReference[Option[TC]](None)
             ConsoleMacros.utils.retry_until_true(timeout) {
-              val tmp = filter(companion)(partyId, predicate)
+              val tmp = filter(companion)(partyId, predicate, domainFilter)
               result.set(tmp.headOption)
               tmp.nonEmpty
             }
             consoleEnvironment.runE {
               result
                 .get()
-                .toRight(s"Failed to find contract of type ${companion.TEMPLATE_ID} after $timeout")
+                .toRight(
+                  s"Failed to find contract of type ${companion.getTemplateIdWithPackageId} after $timeout"
+                )
             }
           })
 
@@ -2177,7 +2311,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
           )
           @Help.Description(
             """To use this function, ensure a code-generated Java model for the target template exists.
-              |You can refine your search using the `predicate` function argument."""
+              |You can refine your search using the `predicate` function argument.
+              |You can restrict search to a domain by specifying the optional domain id."""
           )
           def filter[
               TC <: javab.data.codegen.Contract[TCid, T],
@@ -2186,23 +2321,31 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ](templateCompanion: javab.data.codegen.ContractCompanion[TC, TCid, T])(
               partyId: PartyId,
               predicate: TC => Boolean = (_: TC) => true,
+              domainFilter: Option[DomainId] = None,
           ): Seq[TC] = check(FeatureFlag.Testing) {
-            val javaTemplateId = templateCompanion.TEMPLATE_ID
+            val javaTemplateId = templateCompanion.getTemplateIdWithPackageId
             val templateId = TemplateId(
-              javaTemplateId.getPackageId,
+              templateCompanion.PACKAGE.id,
               javaTemplateId.getModuleName,
               javaTemplateId.getEntityName,
             )
+
+            def domainPredicate(entry: WrappedContractEntry) =
+              domainFilter match {
+                case Some(_domainId) => entry.domainId == domainFilter
+                case None => true
+              }
+
             ledger_api.state.acs
               .of_party(partyId, filterTemplates = Seq(templateId))
-              .map(_.event)
-              .flatMap(ev =>
+              .collect { case entry if domainPredicate(entry) => entry.event }
+              .flatMap { ev =>
                 JavaDecodeUtil
                   .decodeCreated(templateCompanion)(
                     javab.data.CreatedEvent.fromProto(CreatedEvent.toJavaProto(ev))
                   )
                   .toList
-              )
+              }
               .filter(predicate)
           }
         }

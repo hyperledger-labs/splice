@@ -1416,7 +1416,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       round: Long,
       extraTraffic: Long,
       ccSpent: Double,
-  )(offset: String) = {
+  )(offset: Long) = {
     // This is a non-consuming choice, the store should not mind that some of the referenced contracts don't exist
     val amuletRulesCid = nextCid()
 
@@ -1479,7 +1479,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       ratePerRound: BigDecimal,
       amuletPrice: Double = 1.0,
   )(
-      offset: String
+      offset: Long
   ) = {
     val amuletContract = amulet(receiver, amount, round, ratePerRound)
 
@@ -1682,7 +1682,7 @@ class DbScanStoreTest
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(Some(nextOffset()), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )

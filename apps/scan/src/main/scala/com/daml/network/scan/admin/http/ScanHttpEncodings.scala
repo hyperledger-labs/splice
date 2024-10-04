@@ -12,6 +12,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.ByteString
 import io.circe.Json
@@ -63,7 +64,7 @@ sealed trait ScanHttpEncodings {
             httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
-                update.offset,
+                ApiOffset.fromLong(update.offset),
                 update.recordTime.toString,
                 httpApi.UpdateHistoryAssignment(
                   submitter.toProtoPrimitive,
@@ -87,7 +88,7 @@ sealed trait ScanHttpEncodings {
             httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
-                update.offset,
+                ApiOffset.fromLong(update.offset),
                 update.recordTime.toString,
                 httpApi.UpdateHistoryUnassignment(
                   submitter.toProtoPrimitive,
@@ -196,7 +197,7 @@ sealed trait ScanHttpEncodings {
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
-                offset = http.offset,
+                offset = ApiOffset.assertFromStringToLong(http.offset),
                 recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
                 event = ledgerApi.ReassignmentEvent.Assign(
                   submitter = PartyId.tryFromProtoPrimitive(assignment.submitter),
@@ -219,7 +220,7 @@ sealed trait ScanHttpEncodings {
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
-                offset = http.offset,
+                offset = ApiOffset.assertFromStringToLong(http.offset),
                 recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
                 event = ledgerApi.ReassignmentEvent.Unassign(
                   submitter = PartyId.tryFromProtoPrimitive(unassignment.submitter),

@@ -27,6 +27,21 @@ object ApiOffset {
 
   def assertFromString(s: String): Offset = tryFromString(s).fold(throw _, identity)
 
+  // TODO(#21363) remove converter as it should be unused
+  def assertFromStringToLongO(s: String): Option[Long] =
+    Option.unless(s.isEmpty)(assertFromString(s).toLong)
+
+  def assertFromStringToLong(s: String): Long =
+    assertFromStringToLongO(s).getOrElse(throw new IllegalArgumentException("Expected non-empty offset but offset was empty"))
+
+  // TODO(#21363) remove converter as it should be unused
+  def fromLongO(longO: Option[Long]): String =
+    longO.map(fromLong).getOrElse("")
+
+  // TODO(#21363) remove converter as it should be unused
+  def fromLong(l: Long): String =
+    Offset.fromLong(l).toHexString
+
   def toApiString(offset: Offset): Ref.HexString =
     offset.toHexString
 

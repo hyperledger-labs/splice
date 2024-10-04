@@ -234,7 +234,7 @@ class SequencerAggregatorPekko(
     ): Source[OrdinarySerializedEvent, (KillSwitch, Future[Done], HealthComponent)] = {
       val prior = priorElement.collect { case event @ OrdinarySequencedEvent(_) => event }
       val eventValidator = createEventValidator(
-        SequencerClient.loggerFactoryWithSequencerConnection(loggerFactory, sequencerId)
+        SequencerClient.loggerFactoryWithSequencerId(loggerFactory, sequencerId)
       )
       val subscription = eventValidator
         .validatePekko(config.subscriptionFactory.create(exclusiveStart + 1L), prior, sequencerId)
@@ -284,7 +284,7 @@ object SequencerAggregatorPekko {
       contentHash: Hash,
       representativeProtocolVersion: RepresentativeProtocolVersion[SignedContent.type],
   ) extends PrettyPrinting {
-    override def pretty: Pretty[Bucket] =
+    override protected def pretty: Pretty[Bucket] =
       prettyOfClass(
         param("sequencer counter", _.sequencerCounter),
         param("content hash", _.contentHash),
@@ -349,7 +349,7 @@ object SequencerAggregatorPekko {
           refreshFromDependencies()(TraceContext.empty)
       }
 
-    override def pretty: Pretty[SequencerAggregatorHealth] = prettyOfClass(
+    override protected def pretty: Pretty[SequencerAggregatorHealth] = prettyOfClass(
       param("domain id", _.domainId),
       param("state", _.getState),
     )

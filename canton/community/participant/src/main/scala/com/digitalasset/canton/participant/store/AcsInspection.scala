@@ -251,6 +251,9 @@ class AcsInspection(
       allStakeholders <- EitherT.fromEither[Future](stakeholdersE)
     } yield allStakeholders
   }
+
+  def pruningStatus()(implicit traceContext: TraceContext): Future[Option[PruningStatus]] =
+    activeContractStore.pruningStatus
 }
 
 object AcsInspection {
@@ -291,7 +294,7 @@ object AcsInspection {
   }
 }
 
-sealed abstract class AcsInspectionError extends Product with Serializable with HasDomainId {}
+sealed abstract class AcsInspectionError extends Product with Serializable with HasDomainId
 
 object AcsInspectionError {
   final case class TimestampAfterPrehead(

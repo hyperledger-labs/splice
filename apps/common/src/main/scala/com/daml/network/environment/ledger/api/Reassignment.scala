@@ -7,17 +7,18 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.daml.ledger.api.v2.reassignment as multidomain
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.platform.ApiOffset
 
 final case class Reassignment[+E](
     updateId: String,
-    offset: String,
+    offset: Long,
     recordTime: CantonTimestamp,
     event: E & ReassignmentEvent,
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(
       param("updateId", (x: this.type) => x.updateId)(PrettyInstances.prettyString),
-      param("offset", (x: this.type) => x.offset)(PrettyInstances.prettyString),
+      param("offset", _.offset),
       param("event", _.event),
     )
 }
@@ -50,7 +51,7 @@ object Reassignment {
       )
     Reassignment(
       proto.updateId,
-      proto.offset,
+      ApiOffset.assertFromStringToLong(proto.offset),
       recordTime,
       event,
     )

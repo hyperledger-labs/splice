@@ -40,6 +40,7 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -175,13 +176,13 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           result <- store.getLatestTransferOfferEventByTrackingId("nope")
         } yield {
-          result.offset should be(acsOffset)
+          result.offset.value should be(acsOffset)
           result.value should be(None)
         }
       }
 
       "return None after ingesting unrelated entries only" in {
-        def mkUnrelatedEntry()(offset: String) = {
+        def mkUnrelatedEntry()(offset: Long) = {
           mintTransaction(user1, 11.0, 1L, 1.0)(offset)
         }
         for {
@@ -194,7 +195,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       }
 
       "return entry stored by multiple stores" in {
-        def mkSharedTx()(offset: String) = {
+        def mkSharedTx()(offset: Long) = {
           mkTransferOfferTx(offset, "trackingId", user1, user2, nextCid())
         }
 
@@ -216,10 +217,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         val goodAcceptedTransferOfferCid = nextCid()
         val badTransferOfferCid = nextCid()
 
-        def mkTransferOffer(trackingId: String, cid: String)(offset: String) = {
+        def mkTransferOffer(trackingId: String, cid: String)(offset: Long) = {
           mkTransferOfferTx(offset, trackingId, user1, user2, cid)
         }
-        def mkAcceptTransfer(trackingId: String, cid: String)(offset: String) = {
+        def mkAcceptTransfer(trackingId: String, cid: String)(offset: Long) = {
           mkAcceptTransferTx(offset, trackingId, user1, user2, cid)
         }
 
@@ -238,7 +239,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store.getLatestTransferOfferEventByTrackingId("good")
         } yield {
-          result.offset should be(acceptedTree.getOffset)
+          result.offset.value should be(ApiOffset.assertFromStringToLong(acceptedTree.getOffset))
           result.value.map(_.status) should be(
             Some(
               TransferOfferTxLogEntry.Status.Accepted(
@@ -261,13 +262,13 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           result <- store.getLatestBuyTrafficRequestEventByTrackingId("nope")
         } yield {
-          result.offset should be(acsOffset)
+          result.offset.value should be(acsOffset)
           result.value should be(None)
         }
       }
 
       "return None after ingesting unrelated entries only" in {
-        def mkUnrelatedEntry()(offset: String) = {
+        def mkUnrelatedEntry()(offset: Long) = {
           mintTransaction(user1, 11.0, 1L, 1.0)(offset)
         }
 
@@ -286,11 +287,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         def mkBuyTrafficRequest(
             trackingId: String,
             cid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
-        )(offset: String) = {
+        )(offset: Long) = {
           mkBuyTrafficRequestTx(offset, trackingId, user1, participantId, dummyDomain, cid)
         }
         def mkCancelTrafficRequest(trackingId: String, reason: String, cid: String)(
-            offset: String
+            offset: Long
         ) = {
           mkCancelTrafficRequestTx(offset, trackingId, user1, reason, cid)
         }
@@ -312,7 +313,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
         } yield {
-          result.offset should be(cancelledTree.getOffset)
+          result.offset.value should be(ApiOffset.assertFromStringToLong(cancelledTree.getOffset))
           result.value.map(_.status) should be(
             Some(
               BuyTrafficRequestTxLogEntry.Status.Rejected(
@@ -811,7 +812,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       }
 
       "return entries in correct order" in {
-        def mkMint(amount: Double)(offset: String) = {
+        def mkMint(amount: Double)(offset: Long) = {
           mintTransaction(user1, amount, 1, 1)(offset)
         }
 
@@ -1272,7 +1273,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       ratePerRound: Double,
       amuletPrice: Double = 1.0,
   )(
-      offset: String
+      offset: Long
   ) = {
     val amuletContract = amulet(receiver, amount, round, ratePerRound)
 
@@ -1307,7 +1308,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def mkTransferOfferTx(
-      offset: String,
+      offset: Long,
       trackingId: String,
       sender: PartyId,
       receiver: PartyId,
@@ -1357,7 +1358,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def mkAcceptTransferTx(
-      offset: String,
+      offset: Long,
       trackingId: String,
       sender: PartyId,
       receiver: PartyId,
@@ -1397,7 +1398,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def mkBuyTrafficRequestTx(
-      offset: String,
+      offset: Long,
       trackingId: String,
       buyer: PartyId,
       memberId: Member,
@@ -1446,7 +1447,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def mkCancelTrafficRequestTx(
-      offset: String,
+      offset: Long,
       trackingId: String,
       buyer: PartyId,
       reason: String,
@@ -1516,7 +1517,7 @@ class DbUserWalletStoreTest
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(Some(acsOffset), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )

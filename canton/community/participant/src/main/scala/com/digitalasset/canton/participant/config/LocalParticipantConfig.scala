@@ -9,8 +9,7 @@ import com.daml.tls.{TlsConfiguration, TlsVersion}
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.*
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.http.HttpApiConfig
+import com.digitalasset.canton.http.JsonApiConfig
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
 import com.digitalasset.canton.participant.config.LedgerApiServerConfig.DefaultRateLimit
@@ -22,6 +21,7 @@ import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
   IndexServiceConfig as LedgerIndexServiceConfig,
+  InteractiveSubmissionServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
@@ -56,7 +56,7 @@ trait LocalParticipantConfig extends BaseParticipantConfig with LocalNodeConfig 
     * Configuring this key will enable the HTTP JSON API server.
     * NOTE: This feature is experimental and MUST NOT be used in production code.
     */
-  def httpLedgerApiExperimental: Option[HttpApiConfig]
+  def httpLedgerApiExperimental: Option[JsonApiConfig]
 
   /** parameters of the interface used to administrate the participant */
   def adminApi: AdminServerConfig
@@ -112,7 +112,7 @@ final case class CommunityParticipantConfig(
     override val init: ParticipantInitConfig = ParticipantInitConfig(),
     override val crypto: CommunityCryptoConfig = CommunityCryptoConfig(),
     override val ledgerApi: LedgerApiServerConfig = LedgerApiServerConfig(),
-    override val httpLedgerApiExperimental: Option[HttpApiConfig] = None,
+    override val httpLedgerApiExperimental: Option[JsonApiConfig] = None,
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     override val testingTime: Option[TestingTimeServiceConfig] = None,
@@ -177,6 +177,7 @@ final case class RemoteParticipantConfig(
   *                                  as the ledger api server uses java.time.duration that does not support infinite scala durations.
   * @param enableCommandInspection   enable command inspection service over the ledger api
   * @param identityProviderManagement configurations pertaining to the ledger api server's "identity provider management service"
+  * @param interactiveSubmissionServiceConfig config for interactive submission service over the ledger api
   */
 final case class LedgerApiServerConfig(
     address: String = "127.0.0.1",
@@ -202,6 +203,8 @@ final case class LedgerApiServerConfig(
     enableCommandInspection: Boolean = true,
     identityProviderManagement: IdentityProviderManagementConfig =
       LedgerApiServerConfig.DefaultIdentityProviderManagementConfig,
+    interactiveSubmissionService: InteractiveSubmissionServiceConfig =
+      InteractiveSubmissionServiceConfig.Default,
 ) extends CommunityServerConfig // We can't currently expose enterprise server features at the ledger api anyway
     {
 
@@ -233,55 +236,6 @@ object LedgerApiServerConfig {
       maxUsedHeapSpacePercentage = 100,
       minFreeHeapSpaceBytes = 0,
     )
-
-  /** the following case class match will help us detect any additional configuration options added.
-    * If the below match fails because there are more config options, add them to our "LedgerApiServerConfig".
-    */
-  private def _completenessCheck(
-      managementServiceTimeout: config.NonNegativeFiniteDuration,
-      tlsConfiguration: Option[TlsConfiguration],
-  ): Unit = {
-
-    def fromClientAuth(clientAuth: ClientAuth): ServerAuthRequirementConfig = {
-      import ServerAuthRequirementConfig.*
-      clientAuth match {
-        case ClientAuth.REQUIRE =>
-          None // not passing "require" as we need adminClientCerts in this case which are not available here
-        case ClientAuth.OPTIONAL => Optional
-        case ClientAuth.NONE => None
-      }
-    }
-
-    val tlsConfig = tlsConfiguration match {
-      case Some(
-            TlsConfiguration(
-              true,
-              Some(keyCertChainFile),
-              Some(keyFile),
-              trustCertCollectionFile,
-              authRequirement,
-              enableCertRevocationChecking,
-              optTlsVersion,
-            )
-          ) =>
-        Some(
-          TlsServerConfig(
-            certChainFile = ExistingFile.tryCreate(keyCertChainFile),
-            privateKeyFile = ExistingFile.tryCreate(keyFile),
-            trustCollectionFile = trustCertCollectionFile.map(x => ExistingFile.tryCreate(x)),
-            clientAuth = fromClientAuth(authRequirement),
-            minimumServerProtocolVersion = optTlsVersion.map(_.version),
-            enableCertRevocationChecking = enableCertRevocationChecking,
-          )
-        )
-      case _ => None
-    }
-
-    LedgerApiServerConfig(
-      tls = tlsConfig,
-      managementServiceTimeout = managementServiceTimeout,
-    ).discard
-  }
 
   def ledgerApiServerTlsConfigFromCantonServerConfig(
       tlsCantonConfig: TlsServerConfig

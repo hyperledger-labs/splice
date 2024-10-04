@@ -701,7 +701,6 @@ abstract class TopologyAdminConnection(
         partyId,
         Thresholds.partyToParticipantThreshold(hostingParticipants),
         hostingParticipants,
-        groupAddressing = false,
       ),
       signedBy = signedBy,
       serial = PositiveInt.one,
@@ -787,7 +786,6 @@ abstract class TopologyAdminConnection(
         Right(
           PartyToParticipant.tryCreate(
             previous.partyId,
-            groupAddressing = previous.groupAddressing,
             participants = newHostingParticipants,
             threshold = Thresholds
               .partyToParticipantThreshold(newHostingParticipants),
@@ -864,7 +862,6 @@ abstract class TopologyAdminConnection(
         Right(
           PartyToParticipant.tryCreate(
             previous.partyId,
-            groupAddressing = previous.groupAddressing,
             participants = newHostingParticipants,
             threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
           )
@@ -907,7 +904,6 @@ abstract class TopologyAdminConnection(
             val newHostingParticipants = promoteParticipantToSubmitter(previous.participants)
             PartyToParticipant.tryCreate(
               previous.partyId,
-              groupAddressing = previous.groupAddressing,
               participants = newHostingParticipants,
               threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
             )

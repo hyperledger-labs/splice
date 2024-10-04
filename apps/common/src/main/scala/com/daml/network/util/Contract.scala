@@ -22,7 +22,7 @@ import com.daml.network.http.v0.definitions as http
 import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.util.JavaDecodeUtil
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
+import com.digitalasset.canton.ledger.api.validation.ValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
@@ -118,7 +118,7 @@ object Contract {
   def javaValueToLfValue(v: Value)(implicit elc: ErrorLoggingContext): lf.Value =
     // Disabling logging and instead logging the result
     // because LF uses a different logging library.
-    NoLoggingValueValidator
+    ValueValidator
       .validateValue(scalaValue.Value.fromJavaProto(v.toProto))
       .valueOr(err => ErrorUtil.internalError(err))
 

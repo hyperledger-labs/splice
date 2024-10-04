@@ -182,7 +182,6 @@ class ParticipantPartyMigrator(
                   threshold = PositiveInt.one,
                   participants =
                     Seq(HostingParticipant(participantId, ParticipantPermission.Submission)),
-                  groupAddressing = false,
                 )
               ),
             signedBy = participantId.uid.namespace.fingerprint,

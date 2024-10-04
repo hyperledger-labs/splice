@@ -33,6 +33,7 @@ import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ErrorUtil
@@ -54,9 +55,9 @@ final case object NoDedup extends DedupConfig {
   override def pretty = prettyOfObject[this.type]
 }
 
-final case class DedupOffset(offset: String) extends DedupConfig {
+final case class DedupOffset(offset: Option[Long]) extends DedupConfig {
   override def pretty = prettyOfClass(
-    param("offset", _.offset.unquoted)
+    param("offset", _.offset)
   )
 }
 
@@ -153,7 +154,7 @@ private[environment] class LedgerClient(
 
   def ledgerEnd()(implicit
       traceContext: TraceContext
-  ): Future[String] = {
+  ): Future[Option[Long]] = {
     val req = lapi.state_service.GetLedgerEndRequest()
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
@@ -163,7 +164,7 @@ private[environment] class LedgerClient(
 
   def latestPrunedOffset()(implicit
       traceContext: TraceContext
-  ): Future[String] = {
+  ): Future[Option[Long]] = {
     val req = lapi.state_service.GetLatestPrunedOffsetsRequest()
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
@@ -230,11 +231,11 @@ private[environment] class LedgerClient(
       }
       .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
     deduplicationConfig match {
-      case DedupOffset(offset) =>
+      case DedupOffset(offsetO) =>
         // Canton does not allow an empty offset (ledger begin) so just go for
         // not specfying anything which means max deduplication duration.
-        if (!offset.isEmpty) {
-          commandsBuilder.setDeduplicationOffset(offset)
+        offsetO.foreach { offset =>
+          commandsBuilder.setDeduplicationOffset(ApiOffset.fromLong(offset))
         }
       case DedupDuration(duration) =>
         commandsBuilder.setDeduplicationDuration(duration)
@@ -509,7 +510,7 @@ private[environment] class LedgerClient(
   def completions(
       applicationId: String,
       parties: Seq[PartyId],
-      begin: String,
+      begin: Option[Long],
   )(implicit tc: TraceContext): Source[CompletionStreamResponse, NotUsed] =
     toSource(
       for {
@@ -613,8 +614,10 @@ object LedgerClient {
     import com.daml.ledger.api.v2.CommandServiceOuterClass as CSOC
     import com.daml.ledger.javaapi.data as jdata
 
-    val CompletionOffset: SubmitAndWaitFor[String] =
-      impl((_: CSOC.SubmitAndWaitForUpdateIdResponse).getCompletionOffset)(
+    val CompletionOffset: SubmitAndWaitFor[Long] =
+      impl((r: CSOC.SubmitAndWaitForUpdateIdResponse) =>
+        ApiOffset.assertFromStringToLong(r.getCompletionOffset)
+      )(
         { case (stub, r, ec) =>
           stub
             .submitAndWaitForUpdateId(command_service.SubmitAndWaitRequest.fromJavaProto(r))
@@ -771,16 +774,16 @@ object LedgerClient {
     }
   }
 
-  final case class CompletionStreamResponse(laterOffset: String, completion: Completion)
+  final case class CompletionStreamResponse(laterOffset: Long, completion: Completion)
 
   object CompletionStreamResponse {
     def fromProto(
         spb: lapi.command_completion_service.CompletionStreamResponse
     ): CompletionStreamResponse = {
-      val offset = spb.completionResponse match {
+      val offset: Long = spb.completionResponse match {
         case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse
               .Completion(completion) =>
-          completion.offset
+          ApiOffset.assertFromStringToLong(completion.offset)
         case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse
               .OffsetCheckpoint(checkpoint) =>
           checkpoint.offset

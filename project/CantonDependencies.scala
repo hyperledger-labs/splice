@@ -6,14 +6,13 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.2.0-snapshot.20240903.13262.0.v3aa75f32"
+  val version: String = "3.2.0-snapshot.20240930.13323.0.v244737e7"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
-  // fixme
-  val daml_java_codegen_version = "3.2.0-snapshot.20240905.13269.0.va692a472"
+  val daml_java_codegen_version = version
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =

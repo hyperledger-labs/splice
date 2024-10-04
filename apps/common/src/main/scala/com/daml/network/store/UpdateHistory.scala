@@ -29,6 +29,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -149,7 +150,9 @@ class UpdateHistory(
         storage.queryAndUpdate(action.transactionally, "issue12777Workaround")
       }
 
-      override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] = {
+      override def initialize()(implicit
+          traceContext: TraceContext
+      ): Future[Option[Option[Long]]] = {
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         // Notes:
@@ -210,6 +213,7 @@ class UpdateHistory(
             .getOrRaise(
               new RuntimeException(s"No row for $newHistoryId found, which was just inserted!")
             )
+            .map(_.map(ApiOffset.assertFromStringToLongO(_)))
 
           _ <- cleanUpDataAfterDomainMigration(newHistoryId)
         } yield {
@@ -233,7 +237,7 @@ class UpdateHistory(
         s"UpdateHistory(party=$updateStreamParty, participantId=$participantId, migrationId=$domainMigrationId, historyId=$historyId)"
 
       override def ingestAcs(
-          offset: String,
+          offset: Option[Long],
           acs: Seq[ActiveContract],
           incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
           incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
@@ -258,9 +262,9 @@ class UpdateHistory(
       override def ingestUpdate(domain: DomainId, update: TreeUpdate)(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
-        val offset = update match {
+        val offset: Long = update match {
           case ReassignmentUpdate(reassignment) => reassignment.offset
-          case TransactionTreeUpdate(tree) => tree.getOffset
+          case TransactionTreeUpdate(tree) => ApiOffset.assertFromStringToLong(tree.getOffset)
         }
         val recordTime = update match {
           case ReassignmentUpdate(reassignment) => reassignment.recordTime
@@ -302,14 +306,14 @@ class UpdateHistory(
         storage.queryAndUpdate(action, "ingestUpdate")
       }
 
-      private def updateOffset(offset: String): DBIOAction[?, NoStream, Effect.Write] =
+      private def updateOffset(offset: Long): DBIOAction[?, NoStream, Effect.Write] =
         sqlu"""
         update update_history_last_ingested_offsets
-        set last_ingested_offset = ${lengthLimited(offset)}
+        set last_ingested_offset = ${lengthLimited(ApiOffset.fromLong(offset))}
         where history_id = $historyId and migration_id = $domainMigrationId
       """
 
-      private def readOffset(): DBIOAction[Option[String], NoStream, Effect.Read] =
+      private def readOffset(): DBIOAction[Option[Long], NoStream, Effect.Read] =
         sql"""
         select last_ingested_offset
         from update_history_last_ingested_offsets
@@ -317,6 +321,7 @@ class UpdateHistory(
       """
           .as[Option[String]]
           .head
+          .map(_.map(ApiOffset.assertFromStringToLong(_)))
     }
 
   private def ingestUpdate_(
@@ -350,7 +355,7 @@ class UpdateHistory(
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
-    val safeParticipantOffset = lengthLimited(reassignment.offset)
+    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(reassignment.offset))
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.contractId.contractId)
     sqlu"""
@@ -378,7 +383,7 @@ class UpdateHistory(
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
-    val safeParticipantOffset = lengthLimited(reassignment.offset)
+    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(reassignment.offset))
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.createdEvent.getContractId)
     val safeEventId = lengthLimited(event.createdEvent.getEventId)
@@ -1135,7 +1140,7 @@ class UpdateHistory(
         (
           <<[String],
           <<[CantonTimestamp],
-          <<[String],
+          ApiOffset.assertFromStringToLong(<<[String]),
           <<[DomainId],
           <<[Long],
           <<[Long],
@@ -1164,7 +1169,7 @@ class UpdateHistory(
         (
           <<[String],
           <<[CantonTimestamp],
-          <<[String],
+          ApiOffset.assertFromStringToLong(<<[String]),
           <<[DomainId],
           <<[Long],
           <<[Long],
@@ -1518,7 +1523,7 @@ object UpdateHistory {
   private case class SelectFromAssignments(
       updateId: String,
       recordTime: CantonTimestamp,
-      participantOffset: String,
+      participantOffset: Long,
       domainId: DomainId,
       migrationId: Long,
       reassignmentCounter: Long,
@@ -1541,7 +1546,7 @@ object UpdateHistory {
   private case class SelectFromUnassignments(
       updateId: String,
       recordTime: CantonTimestamp,
-      participantOffset: String,
+      participantOffset: Long,
       domainId: DomainId,
       migrationId: Long,
       reassignmentCounter: Long,

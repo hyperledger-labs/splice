@@ -329,8 +329,8 @@ class SV1Initializer(
       sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount,
       sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor,
       // have to convert canton.config.NonNegativeDuration to canton.time.NonNegativeDuration
-      NonNegativeFiniteDuration.tryOfMillis(
-        sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toMillis
+      PositiveSeconds.tryOfSeconds(
+        sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toSeconds
       ),
     )
   }

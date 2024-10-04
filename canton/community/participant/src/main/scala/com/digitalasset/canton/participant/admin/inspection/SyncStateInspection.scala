@@ -4,18 +4,21 @@
 package com.digitalasset.canton.participant.admin.inspection
 
 import cats.Eval
-import cats.data.{EitherT, OptionT}
-import cats.syntax.parallel.*
+import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.ledger.participant.state.{DomainIndex, RequestIndex}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.admin.data.ActiveContract
-import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection.SyncStateInspectionError
+import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection.{
+  InFlightCount,
+  SyncStateInspectionError,
+}
 import com.digitalasset.canton.participant.protocol.RequestJournal
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.{
@@ -27,6 +30,7 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.Domain
 import com.digitalasset.canton.protocol.messages.CommitmentPeriodState.fromIntValidSentPeriodState
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
+import com.digitalasset.canton.pruning.PruningStatus
 import com.digitalasset.canton.sequencing.PossiblyIgnoredProtocolEvent
 import com.digitalasset.canton.sequencing.handlers.EnvelopeOpener
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -37,9 +41,8 @@ import com.digitalasset.canton.store.SequencedEventStore.{
 import com.digitalasset.canton.store.{SequencedEventRangeOverlapsWithPruning, SequencedEventStore}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
+import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{DomainAlias, LfPartyId, ReassignmentCounter, RequestCounter}
 
@@ -73,36 +76,6 @@ final class SyncStateInspection(
     extends NamedLogging {
 
   import SyncStateInspection.getOrFail
-
-  /** For a set of contracts lookup which domain they are currently in.
-    * If a contract is not found in a available ACS it will be omitted from the response.
-    */
-  def lookupContractDomain(
-      contractIds: Set[LfContractId]
-  )(implicit traceContext: TraceContext): Future[Map[LfContractId, DomainAlias]] = {
-    def lookupAlias(domainId: DomainId): DomainAlias =
-      // am assuming that an alias can't be missing once registered
-      syncDomainPersistentStateManager
-        .aliasForDomainId(domainId)
-        .getOrElse(sys.error(s"missing alias for domain [$domainId]"))
-
-    syncDomainPersistentStateManager.getAll.toList
-      .map { case (id, state) => lookupAlias(id) -> state }
-      .parTraverse { case (alias, state) =>
-        OptionT(
-          participantNodePersistentState.value.ledgerApiStore
-            .domainIndex(state.domainId.domainId)
-            .map(_.requestIndex)
-        )
-          .semiflatMap(cleanRequest =>
-            state.activeContractStore
-              .contractSnapshot(contractIds, cleanRequest.timestamp)
-              .map(_.keySet.map(_ -> alias))
-          )
-          .getOrElse(List.empty[(LfContractId, DomainAlias)])
-      }
-      .map(_.flatten.toMap)
-  }
 
   /** Returns the potentially large ACS of a given domain
     * containing a map of contract IDs to tuples containing the latest activation timestamp and the contract reassignment counter
@@ -140,6 +113,19 @@ final class SyncStateInspection(
         syncDomainPersistentStateManager
           .getByAlias(domain)
           .traverse(_.acsInspection.findContracts(filterId, filterPackage, filterTemplate, limit))
+
+      },
+      domain,
+    )
+
+  def acsPruningStatus(
+      domain: DomainAlias
+  )(implicit traceContext: TraceContext): Option[PruningStatus] =
+    getOrFail(
+      timeouts.inspection.await("acsPruningStatus") {
+        syncDomainPersistentStateManager
+          .getByAlias(domain)
+          .traverse(_.acsInspection.pruningStatus())
 
       },
       domain,
@@ -279,6 +265,49 @@ final class SyncStateInspection(
       )
     }
 
+  def activeContractsStakeholdersFilter(
+      domain: DomainId,
+      timestamp: CantonTimestamp,
+      parties: Set[LfPartyId],
+  )(implicit traceContext: TraceContext): Future[Set[(LfContractId, ReassignmentCounter)]] =
+    for {
+      state <- syncDomainPersistentStateManager.get(domain) match {
+        case Some(state) => Future.successful(state)
+        case None =>
+          Future.failed(new IllegalArgumentException(s"Unable to find contract store for $domain."))
+      }
+
+      snapshot <- state.activeContractStore.snapshot(timestamp)
+
+      // check that the active contract store has not been pruned up to timestamp, otherwise the snapshot is inconsistent.
+      pruningStatus <- state.activeContractStore.pruningStatus
+      _ <-
+        if (pruningStatus.exists(_.timestamp > timestamp)) {
+          Future.failed(
+            new IllegalStateException(
+              s"Active contract store for domain $domain has been pruned up to ${pruningStatus
+                  .map(_.lastSuccess)}, which is after the requested timestamp $timestamp"
+            )
+          )
+        } else Future.unit
+
+      contracts <- state.contractStore
+        .lookupManyExistingUncached(snapshot.keys.toSeq)
+        .valueOr { missingContractId =>
+          ErrorUtil.invalidState(
+            s"Contract id $missingContractId is in the active contract store but its contents is not in the contract store"
+          )
+        }
+
+      contractsWithTransferCounter = contracts.map(c => c -> snapshot(c.contractId)._2)
+
+      filteredByParty = contractsWithTransferCounter.collect {
+        case (contract, transferCounter)
+            if parties.intersect(contract.contract.metadata.stakeholders).nonEmpty =>
+          (contract.contractId, transferCounter)
+      }
+    } yield filteredByParty.toSet
+
   private def tryGetProtocolVersion(
       state: SyncDomainPersistentState,
       domain: DomainAlias,
@@ -287,6 +316,21 @@ final class SyncStateInspection(
       .await(functionFullName)(state.parameterStore.lastParameters)
       .getOrElse(throw new IllegalStateException(s"No static domain parameters found for $domain"))
       .protocolVersion
+
+  def getProtocolVersion(
+      domain: DomainAlias
+  )(implicit traceContext: TraceContext): Future[ProtocolVersion] =
+    for {
+      param <- syncDomainPersistentStateManager
+        .getByAlias(domain)
+        .traverse(_.parameterStore.lastParameters)
+    } yield {
+      getOrFail(param, domain)
+        .map(_.protocolVersion)
+        .getOrElse(
+          throw new IllegalStateException(s"No static domain parameters found for $domain")
+        )
+    }
 
   def findMessages(
       domain: DomainAlias,
@@ -385,8 +429,8 @@ final class SyncStateInspection(
       val searchResult = domainPeriods.map { dp =>
         for {
           domain <- syncDomainPersistentStateManager
-            .aliasForDomainId(dp.domain.domainId)
-            .toRight(s"No domain alias found for ${dp.domain.domainId}")
+            .aliasForDomainId(dp.indexedDomain.domainId)
+            .toRight(s"No domain alias found for ${dp.indexedDomain.domainId}")
           persistentState = getPersistentState(domain)
 
           result = for {
@@ -417,7 +461,7 @@ final class SyncStateInspection(
                   }
               }
           } yield SentAcsCommitment
-            .compare(dp.domain.domainId, computed, received, outstanding, verbose)
+            .compare(dp.indexedDomain.domainId, computed, received, outstanding, verbose)
             .filter(cmt => states.isEmpty || states.contains(cmt.state))
         } yield result
       }
@@ -441,8 +485,8 @@ final class SyncStateInspection(
       val searchResult = domainPeriods.map { dp =>
         for {
           domain <- syncDomainPersistentStateManager
-            .aliasForDomainId(dp.domain.domainId)
-            .toRight(s"No domain alias found for ${dp.domain.domainId}")
+            .aliasForDomainId(dp.indexedDomain.domainId)
+            .toRight(s"No domain alias found for ${dp.indexedDomain.domainId}")
           persistentState = getPersistentState(domain)
 
           result = for {
@@ -465,13 +509,13 @@ final class SyncStateInspection(
               .peekThrough(dp.toInclusive) // peekThrough takes an upper bound parameter
               .collect(iter =>
                 iter.filter(cmt =>
-                  cmt.period.fromExclusive >= dp.fromExclusive && cmt.domainId == dp.domain.domainId && (counterParticipants.isEmpty ||
+                  cmt.period.fromExclusive >= dp.fromExclusive && cmt.domainId == dp.indexedDomain.domainId && (counterParticipants.isEmpty ||
                     counterParticipants
                       .contains(cmt.sender))
                 )
               )
           } yield ReceivedAcsCommitment
-            .compare(dp.domain.domainId, received, computed, buffered, outstanding, verbose)
+            .compare(dp.indexedDomain.domainId, received, computed, buffered, outstanding, verbose)
             .filter(cmt => states.isEmpty || states.contains(cmt.state))
         } yield result
       }
@@ -571,28 +615,26 @@ final class SyncStateInspection(
     )
   } yield CantonTimestamp(domainOffset.publicationTime)
 
-  def hasInFlightSubmissions(
+  def countInFlight(
       domain: DomainAlias
-  )(implicit traceContext: TraceContext): EitherT[Future, String, Boolean] = for {
-    domainId <- EitherT.fromEither[Future](
-      getPersistentState(domain).toRight(s"Unknown domain $domain").map(_.domainId.domainId)
-    )
-    earliestInFlightO <-
-      EitherT.right[String](
-        participantNodePersistentState.value.inFlightSubmissionStore.lookupEarliest(domainId)
-      )
-  } yield earliestInFlightO.isDefined
-
-  def hasDirtyRequests(
-      domain: DomainAlias
-  )(implicit traceContext: TraceContext): EitherT[Future, String, Boolean] =
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, String, InFlightCount] =
     for {
       state <- EitherT.fromEither[Future](
         getPersistentState(domain)
           .toRight(s"Unknown domain $domain")
       )
-      count <- EitherT.right[String](state.requestJournalStore.totalDirtyRequests())
-    } yield count > 0
+      domainId = state.domainId.domainId
+      unsequencedSubmissions <- EitherT.right[String](
+        participantNodePersistentState.value.inFlightSubmissionStore
+          .lookupUnsequencedUptoUnordered(domainId, CantonTimestamp.now())
+      )
+      pendingSubmissions = NonNegativeInt.tryCreate(unsequencedSubmissions.size)
+      pendingTransactions <- EitherT.right[String](state.requestJournalStore.totalDirtyRequests())
+    } yield {
+      InFlightCount(pendingSubmissions, pendingTransactions)
+    }
 
   def verifyLapiStoreIntegrity()(implicit traceContext: TraceContext): Unit =
     timeouts.inspection.await(functionFullName)(
@@ -640,5 +682,12 @@ object SyncStateInspection {
 
   private def getOrFail[T](opt: Option[T], domain: DomainAlias): T =
     opt.getOrElse(throw new IllegalArgumentException(s"no such domain [$domain]"))
+
+  final case class InFlightCount(
+      pendingSubmissions: NonNegativeInt,
+      pendingTransactions: NonNegativeInt,
+  ) {
+    def exists: Boolean = pendingSubmissions.unwrap > 0 || pendingTransactions.unwrap > 0
+  }
 
 }

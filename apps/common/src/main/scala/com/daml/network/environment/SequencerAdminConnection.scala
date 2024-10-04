@@ -8,7 +8,6 @@ import com.daml.network.admin.api.client.GrpcClientMetrics
 import com.daml.network.environment.SequencerAdminConnection.TrafficState
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.digitalasset.canton.admin.api.client.commands.{
-  EnterpriseSequencerAdminCommands,
   SequencerAdminCommands,
   StatusAdminCommands,
   TopologyAdminCommands,
@@ -86,7 +85,7 @@ class SequencerAdminConnection(
     val responseObserver =
       new ByteStringStreamObserver[OnboardingStateResponse](_.onboardingStateForSequencer)
     runCmd(
-      EnterpriseSequencerAdminCommands.OnboardingState(responseObserver, Left(sequencerId))
+      SequencerAdminCommands.OnboardingState(responseObserver, Left(sequencerId))
     ).flatMap(_ => responseObserver.resultBytes)
   }
 
@@ -97,7 +96,7 @@ class SequencerAdminConnection(
       domainParameters: StaticDomainParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      EnterpriseSequencerAdminCommands.InitializeFromGenesisState(
+      SequencerAdminCommands.InitializeFromGenesisState(
         // TODO(#10953) Stop doing that.
         topologySnapshot.toByteString(domainParameters.protocolVersion),
         domainParameters,
@@ -111,7 +110,7 @@ class SequencerAdminConnection(
       domainParameters: StaticDomainParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      EnterpriseSequencerAdminCommands.InitializeFromGenesisState(
+      SequencerAdminCommands.InitializeFromGenesisState(
         genesisState,
         domainParameters,
       )
@@ -121,7 +120,7 @@ class SequencerAdminConnection(
       onboardingState: ByteString
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      EnterpriseSequencerAdminCommands.InitializeFromOnboardingState(
+      SequencerAdminCommands.InitializeFromOnboardingState(
         onboardingState
       )
     )
@@ -274,13 +273,13 @@ class SequencerAdminConnection(
       traceContext: TraceContext
   ): Future[String] =
     runCmd(
-      EnterpriseSequencerAdminCommands.Prune(ts)
+      SequencerAdminCommands.Prune(ts)
     )
 
   def disableMember(member: Member)(implicit
       traceContext: TraceContext
   ): Future[Unit] = runCmd(
-    EnterpriseSequencerAdminCommands.DisableMember(member)
+    SequencerAdminCommands.DisableMember(member)
   )
 
   override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =

@@ -66,7 +66,7 @@ trait UserWalletStore extends AppStore with NamedLogging {
     ct <- lookupInstall()
   } yield assignedOrNotFound(installCodegen.WalletAppInstall.COMPANION)(ct)
 
-  def signalWhenIngestedOrShutdown(offset: String)(implicit
+  def signalWhenIngestedOrShutdown(offset: Long)(implicit
       tc: TraceContext
   ): Future[Unit] = multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)
 

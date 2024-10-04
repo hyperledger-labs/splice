@@ -43,6 +43,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.{DomainId, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -84,17 +85,17 @@ class BaseLedgerConnection(
 
   def ledgerEnd()(implicit
       traceContext: TraceContext
-  ): Future[String] =
+  ): Future[Option[Long]] =
     client.ledgerEnd()
 
   def latestPrunedOffset()(implicit
       traceContext: TraceContext
-  ): Future[String] =
+  ): Future[Option[Long]] =
     client.latestPrunedOffset()
 
   def activeContracts(
       filter: IngestionFilter,
-      offset: String,
+      offset: Long,
   )(implicit tc: TraceContext): Future[
     (
         Seq[ActiveContract],
@@ -104,7 +105,7 @@ class BaseLedgerConnection(
   ] = {
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
-        activeAtOffset = offset,
+        activeAtOffset = ApiOffset.fromLong(offset),
         filter = Some(filter.toTransactionFilter),
       )
     )
@@ -135,11 +136,11 @@ class BaseLedgerConnection(
     client.getConnectedDomains(party)
 
   def updates(
-      beginOffset: String,
+      beginOffset: Option[Long],
       filter: IngestionFilter,
   )(implicit tc: TraceContext): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
-      .updates(LedgerClient.GetUpdatesRequest(beginOffset, None, filter))
+      .updates(LedgerClient.GetUpdatesRequest(ApiOffset.fromLongO(beginOffset), None, filter))
 
   def getOptionalPrimaryParty(
       user: String,
@@ -607,7 +608,7 @@ class SpliceLedgerConnection(
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
     contractDowngradeErrorCallbacks: AtomicReference[Seq[() => Unit]],
     trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
-    completionOffsetCallback: String => Future[Unit],
+    completionOffsetCallback: Long => Future[Unit],
     packageIdResolver: PackageIdResolver,
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends BaseLedgerConnection(
@@ -632,7 +633,7 @@ class SpliceLedgerConnection(
 
   private def callCallbacksOnCompletion[T, U](
       result: Future[T]
-  )(getOffsetAndResult: T => (Option[String], U)): Future[U] = {
+  )(getOffsetAndResult: T => (Option[Long], U)): Future[U] = {
     import TraceContext.Implicits.Empty.*
     def callCallbacksInternal(result: Try[T]): Unit =
       LoggerUtil.logOnThrow { // in case the callbacks throw.
@@ -670,7 +671,7 @@ class SpliceLedgerConnection(
 
   private def callCallbacksOnCompletionAndWaitForOffset[T, U](
       result: Future[T]
-  )(getOffsetAndResult: T => (String, U)): Future[U] =
+  )(getOffsetAndResult: T => (Long, U)): Future[U] =
     callCallbacksOnCompletion(result)(x => {
       val (offset, result) = getOffsetAndResult(x)
       (Some(offset), result)
@@ -782,9 +783,9 @@ class SpliceLedgerConnection(
         deadline,
       )
 
-    def withDedup(commandId: CommandId, deduplicationOffset: String)(implicit
+    def withDedup(commandId: CommandId, deduplicationOffset: Option[Long])(implicit
         cid: DedupNotSpecifiedYet
-    ): submit[C, (CommandId, String), DomId] =
+    ): submit[C, (CommandId, Option[Long]), DomId] =
       copy(
         commandIdDeduplicationOffset = (commandId, deduplicationOffset)
       )
@@ -851,8 +852,8 @@ class SpliceLedgerConnection(
         dedup: SubmitDedup[CmdId],
         commandOut: SubmitCommands[C],
         pickT: YieldResult[C, Z],
-        result: SubmitResult[C, (String, Z)],
-    ): Future[(String, Z)] =
+        result: SubmitResult[C, (Long, Z)],
+    ): Future[(Long, Z)] =
       go()
 
     private[this] def go[Z]()(implicit
@@ -868,7 +869,7 @@ class SpliceLedgerConnection(
           import SubmitResult.*, LedgerClient.SubmitAndWaitFor as WF
           val (commandId, deduplicationConfig) = dedup.split(commandIdDeduplicationOffset)
 
-          def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (String, U)): Future[U] =
+          def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (Long, U)): Future[U] =
             callCallbacksOnCompletionAndWaitForOffset(
               client.submitAndWait(
                 domainId = disclosedContracts.overwriteDomain(domainId).toProtoPrimitive,
@@ -890,12 +891,16 @@ class SpliceLedgerConnection(
               case _: Ignored =>
                 clientSubmit(WF.CompletionOffset)(offset => (offset, (): Z0))
               case _: JustTransaction =>
-                clientSubmit(WF.Transaction)(tx => (tx.getOffset, tx))
+                clientSubmit(WF.Transaction)(tx =>
+                  (ApiOffset.assertFromStringToLong(tx.getOffset), tx)
+                )
               case k: ResultAndOffset[t, Z0] =>
                 for {
-                  tree <- clientSubmit(WF.TransactionTree)(tx => (tx.getOffset, tx))
+                  tree <- clientSubmit(WF.TransactionTree)(tx =>
+                    (ApiOffset.assertFromStringToLong(tx.getOffset), tx)
+                  )
                 } yield k.continue(
-                  tree.getOffset,
+                  ApiOffset.assertFromStringToLong(tree.getOffset),
                   decodeExerciseResult(update, tree),
                 )
               case wrapper: Contramap[C0, u, Z0] =>
@@ -964,7 +969,7 @@ class SpliceLedgerConnection(
   )(implicit
       traceContext: TraceContext
   ): Sink[LedgerClient.CompletionStreamResponse, Future[
-    (String, LedgerClient.Completion)
+    (Long, LedgerClient.Completion)
   ]] = {
     import io.grpc.Status.{DEADLINE_EXCEEDED, UNAVAILABLE}
     val howLongToWait = timeouts.network.asFiniteApproximation
@@ -985,7 +990,7 @@ class SpliceLedgerConnection(
       .wireTap(cpl => logger.debug(s"selected completion for $commandId: $cpl"))
       .toMat(
         Sink
-          .headOption[(String, LedgerClient.Completion)]
+          .headOption[(Long, LedgerClient.Completion)]
           .mapMaterializedValue(_ map (_ map { case result @ (_, completion) =>
             if (completion.status.isOk) result
             else throw completion.status.asRuntimeException()
@@ -1140,8 +1145,9 @@ object SpliceLedgerConnection {
       private[SpliceLedgerConnection] val split: CmdId => (String, DedupConfig)
   )
   object SubmitDedup {
-    implicit val dedupOffset: SubmitDedup[(CommandId, String)] = SubmitDedup { case (cid, offset) =>
-      (cid.commandIdForSubmission, DedupOffset(offset))
+    implicit val dedupOffset: SubmitDedup[(CommandId, Option[Long])] = SubmitDedup {
+      case (cid, offset) =>
+        (cid.commandIdForSubmission, DedupOffset(offset))
     }
     implicit val dedupConfig: SubmitDedup[(CommandId, DedupConfig)] = SubmitDedup {
       case (cid, dc) =>
@@ -1215,14 +1221,14 @@ object SpliceLedgerConnection {
     private[SpliceLedgerConnection] final class JustTransaction
         extends SubmitResult[Any, Transaction]
     implicit val JustTransaction: SubmitResult[Any, Transaction] = new JustTransaction
-    implicit def resultAndOffset[T]: SubmitResult[Update[T], (String, T)] = new ResultAndOffset()
+    implicit def resultAndOffset[T]: SubmitResult[Update[T], (Long, T)] = new ResultAndOffset()
     implicit def onlyResult[T]: SubmitResult[Update[T], T] = new ResultAndOffset((_, t) => t)
     implicit def exercising[T, Z](implicit
         rec: SubmitResult[Update[T], Z]
     ): SubmitResult[Contract.Exercising[Any, T], Z] = new Contramap(_.update, rec)
 
     private[SpliceLedgerConnection] final class ResultAndOffset[T, +Z](
-        val continue: (String, T) => Z = (_: String, _: T)
+        val continue: (Long, T) => Z = (_: Long, _: T)
     ) extends SubmitResult[Update[T], Z]
 
     private[SpliceLedgerConnection] final class Contramap[-C, U, +Z](

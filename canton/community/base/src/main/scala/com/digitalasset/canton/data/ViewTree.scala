@@ -36,7 +36,7 @@ trait ViewTree extends PrettyPrinting {
   /** The mediator group that is responsible for coordinating this request */
   def mediator: MediatorGroupRecipient
 
-  override def pretty: Pretty[this.type]
+  override protected def pretty: Pretty[this.type]
 }
 
 /** Supertype of [[FullUnassignmentTree]] and [[FullAssignmentTree]]
@@ -44,7 +44,10 @@ trait ViewTree extends PrettyPrinting {
 trait ReassignmentViewTree extends ViewTree {
   def submitterMetadata: ReassignmentSubmitterMetadata
 
-  def isReassigningParticipant(participantId: ParticipantId): Boolean
+  def reassigningParticipants: Set[ParticipantId]
+
+  def isReassigningParticipant(participantId: ParticipantId): Boolean =
+    reassigningParticipants.contains(participantId)
 
   val viewPosition: ViewPosition =
     ViewPosition.root // Use a dummy value, as there is only one view.

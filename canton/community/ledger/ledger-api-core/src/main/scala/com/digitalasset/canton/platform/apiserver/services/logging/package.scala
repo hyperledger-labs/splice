@@ -62,11 +62,11 @@ package object logging {
   private[services] def offset(offset: String): LoggingEntry =
     "offset" -> offset
 
+  private[services] def offset(offset: Long): LoggingEntry =
+    "offset" -> offset.toString
+
   private[services] def commandId(id: String): LoggingEntry =
     "commandId" -> id
-
-  private[services] def eventSequentialId(seqId: Option[Long]): LoggingEntry =
-    "eventSequentialId" -> OfString(seqId.map(_.toString).getOrElse("<empty-sequential-id>"))
 
   private[services] def eventId(id: EventId): LoggingEntry =
     "eventId" -> OfString(id.unwrap)

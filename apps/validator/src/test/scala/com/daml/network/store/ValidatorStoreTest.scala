@@ -625,7 +625,7 @@ class DbValidatorStoreTest
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(Some(nextOffset()), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )

@@ -29,10 +29,14 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDe
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidation.*
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.{
+  AssignmentSubmitterMustBeStakeholder,
   NoReassignmentSubmissionPermission,
   ParsedReassignmentRequest,
   StakeholdersMismatch,
-  SubmittingPartyMustBeStakeholderIn,
+}
+import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMessageFactory.{
+  ViewHashAndRecipients,
+  ViewKeyData,
 }
 import com.digitalasset.canton.participant.protocol.submission.{
   EncryptedViewMessageFactory,
@@ -48,16 +52,21 @@ import com.digitalasset.canton.participant.store.{
   SyncDomainPersistentState,
 }
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
-import com.digitalasset.canton.protocol.ExampleTransactionFactory.{submitter, submittingParticipant}
+import com.digitalasset.canton.protocol.ExampleTransactionFactory.submitter
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
-import com.digitalasset.canton.store.{IndexedDomain, SessionKeyStore}
+import com.digitalasset.canton.store.{
+  ConfirmationRequestSessionKeyStore,
+  IndexedDomain,
+  SessionKeyStoreWithInMemoryCache,
+}
 import com.digitalasset.canton.time.{DomainTimeTracker, TimeProofTestUtil, WallClock}
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import com.digitalasset.canton.topology.transaction.ParticipantPermission.Confirmation
 import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.version.Reassignment.{SourceProtocolVersion, TargetProtocolVersion}
 import org.scalatest.wordspec.AsyncWordSpec
@@ -88,6 +97,9 @@ class AssignmentProcessingStepsTest
   private lazy val party2: LfPartyId = PartyId(
     UniqueIdentifier.tryFromProtoPrimitive("party2::party")
   ).toLf
+  private lazy val party3: LfPartyId = PartyId(
+    UniqueIdentifier.tryFromProtoPrimitive("party3::party")
+  ).toLf
 
   private lazy val participant = ParticipantId(
     UniqueIdentifier.tryFromProtoPrimitive("bothdomains::participant")
@@ -114,14 +126,19 @@ class AssignmentProcessingStepsTest
   private lazy val identityFactory = TestingTopology()
     .withDomains(sourceDomain.unwrap)
     .withReversedTopology(
-      Map(submittingParticipant -> Map(party1 -> ParticipantPermission.Submission))
+      Map(
+        participant -> Map(
+          party1 -> ParticipantPermission.Submission,
+          party2 -> Confirmation,
+        )
+      )
     )
     .withSimpleParticipants(participant) // required such that `participant` gets a signing key
     .build(crypto, loggerFactory)
 
   private lazy val cryptoSnapshot =
     identityFactory
-      .forOwnerAndDomain(submittingParticipant, sourceDomain.unwrap)
+      .forOwnerAndDomain(participant, sourceDomain.unwrap)
       .currentSnapshotApproximation
 
   private lazy val assignmentProcessingSteps =
@@ -247,7 +264,7 @@ class AssignmentProcessingStepsTest
     "fail when a receiving party has no participant on the domain" in {
       val unassignmentRequest = UnassignmentRequest(
         submitterInfo(party1),
-        Set(party1, party2), // Party 2 is a stakeholder and therefore a receiving party
+        Set(party1, party3), // party3 is a stakeholder and therefore a receiving party
         Set.empty,
         ReassignmentStoreTest.transactionId1,
         ReassignmentStoreTest.contract,
@@ -298,7 +315,7 @@ class AssignmentProcessingStepsTest
         )("prepare submission did not return a left")
       } yield {
         inside(preparedSubmission) { case NoParticipantForReceivingParty(_, p) =>
-          assert(p == party2)
+          p shouldBe party3
         }
       }
     }
@@ -345,7 +362,8 @@ class AssignmentProcessingStepsTest
           )
         )("prepare submission did not return a left")
       } yield {
-        preparedSubmission should matchPattern { case SubmittingPartyMustBeStakeholderIn(_, _, _) =>
+        preparedSubmission should matchPattern {
+          case AssignmentSubmitterMustBeStakeholder(_, _, _) =>
         }
       }
     }
@@ -354,7 +372,7 @@ class AssignmentProcessingStepsTest
 
       val failingTopology = TestingTopology(domains = Set(sourceDomain.unwrap))
         .withReversedTopology(
-          Map(submittingParticipant -> Map(party1 -> ParticipantPermission.Observation))
+          Map(participant -> Map(party1 -> ParticipantPermission.Observation))
         )
         .build(loggerFactory)
       val cryptoSnapshot2 = failingTopology
@@ -421,7 +439,7 @@ class AssignmentProcessingStepsTest
       ReassignmentResultHelpers.unassignmentResult(
         sourceDomain,
         cryptoSnapshot,
-        submittingParticipant,
+        participant,
       )
     val inTree =
       makeFullAssignmentTree(
@@ -435,9 +453,10 @@ class AssignmentProcessingStepsTest
       )
 
     "succeed without errors" in {
-      val sessionKeyStore = SessionKeyStore(CachingConfigs.defaultSessionKeyCacheConfig)
+      val sessionKeyStore =
+        new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig)
       for {
-        inRequest <- encryptFullAssignmentTree(inTree, sessionKeyStore)
+        inRequest <- encryptFullAssignmentTree(inTree, RecipientsTest.testInstance, sessionKeyStore)
         envelopes = NonEmpty(
           Seq,
           OpenEnvelope(inRequest, RecipientsTest.testInstance)(testedProtocolVersion),
@@ -533,7 +552,7 @@ class AssignmentProcessingStepsTest
       ReassignmentResultHelpers.unassignmentResult(
         sourceDomain,
         cryptoSnapshot,
-        submittingParticipant,
+        participant,
       )
 
     "fail when wrong stakeholders given" in {
@@ -679,7 +698,7 @@ class AssignmentProcessingStepsTest
 
     new AssignmentProcessingSteps(
       targetDomain,
-      submittingParticipant,
+      participant,
       damle,
       TestReassignmentCoordination.apply(
         Set(),
@@ -722,15 +741,35 @@ class AssignmentProcessingStepsTest
         uuid,
         SourceProtocolVersion(testedProtocolVersion),
         TargetProtocolVersion(testedProtocolVersion),
+        reassigningParticipants = Set.empty,
       )
     )("Failed to create FullAssignmentTree")
   }
 
   private def encryptFullAssignmentTree(
       tree: FullAssignmentTree,
-      sessionKeyStore: SessionKeyStore,
+      recipients: Recipients,
+      sessionKeyStore: ConfirmationRequestSessionKeyStore,
   ): Future[EncryptedViewMessage[AssignmentViewType]] =
-    EncryptedViewMessageFactory
-      .create(AssignmentViewType)(tree, cryptoSnapshot, sessionKeyStore, testedProtocolVersion)
-      .valueOrFailShutdown("cannot encrypt assignment request")
+    for {
+      viewsToKeyMap <- EncryptedViewMessageFactory
+        .generateKeysFromRecipients(
+          Seq((ViewHashAndRecipients(tree.viewHash, recipients), tree.informees.toList)),
+          parallel = true,
+          crypto.pureCrypto,
+          cryptoSnapshot,
+          sessionKeyStore,
+          testedProtocolVersion,
+        )
+        .valueOrFailShutdown("cannot generate encryption key for transfer-in request")
+      ViewKeyData(_, viewKey, viewKeyMap) = viewsToKeyMap(tree.viewHash)
+      encryptedTree <- EncryptedViewMessageFactory
+        .create(AssignmentViewType)(
+          tree,
+          (viewKey, viewKeyMap),
+          cryptoSnapshot,
+          testedProtocolVersion,
+        )
+        .valueOrFailShutdown("cannot encrypt assignment request")
+    } yield encryptedTree
 }

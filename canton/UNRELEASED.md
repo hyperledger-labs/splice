@@ -3,6 +3,64 @@
 Canton CANTON_VERSION has been released on RELEASE_DATE. You can download the Daml Open Source edition from the Daml Connect [Github Release Section](https://github.com/digital-asset/daml/releases/tag/vCANTON_VERSION). The Enterprise edition is available on [Artifactory](https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-CANTON_VERSION.zip).
 Please also consult the [full documentation of this release](https://docs.daml.com/CANTON_VERSION/canton/about.html).
 
+## Until 2024-10-02 (Exclusive)
+
+- Removed party-level group addressing.
+- `parallel_indexer` metrics have been renamed to simply `indexer`, i.e.
+```daml_participant_api_parallel_indexer_inputmapping_batch_size_bucket```
+becomes
+```daml_participant_api_indexer_inputmapping_batch_size_bucket```
+- Completely removed leftovers in the code of Oracle support. 
+
+## Until 2024-09-26 (Exclusive)
+
+- Pruning and scheduled pruning along with pruning configuration have moved from enterprise to community. One slight caveat is scheduled sequencer pruning which is currently only wired up in the enterprise database sequencer.
+
+## Until 2024-09-20 (Exclusive)
+
+- Sequencer types `type = external` and `type = BFT` can now configure the underlying block sequencer in the config section `canton.sequencers.<sequencer>.block` and uses the same `reader` and `writer` configuration as the `type = database` sequencer.
+
+```hocon
+canton {
+  sequencers {
+    sequencer1 {
+      type = external
+      config = {
+        // config for external sequencer (eg CometBFT)
+      }
+      block {
+        writer.checkpoint-interval = "10s"
+        reader.read-batch-size = 50
+      }
+    }
+  }
+}
+```
+
+## Until 2024-09-18 (Exclusive)
+
+- Improve organization and layout of Ledger API Reference docs.
+
+## Until 2024-09-17 (Exclusive)
+
+### Integer Offset in ledger api
+In the ledger api protobufs we used strings to represent the offset of a participant.
+The integer approach replaces string representation in:
+- OffsetCheckpoint message: with int64
+- CompletionStreamRequest message of command completion service: with optional int64.
+  - If specified, it must be a valid absolute offset (positive integer).
+  - If not set, the ledger uses the ledger begin offset instead.
+- GetLedgerEndResponse message: with optional int64
+  - If specified, it is a valid absolute offset (positive integer).
+  - If not set, it denotes the participant begin offset (there are no transactions yet).
+- GetLatestPrunedOffsetsResponse message: with optional int64
+  - If specified, it is a valid absolute offset (positive integer).
+  - If not set, no pruning has happened yet.
+
+## Until 2024-09-16 (Exclusive)
+
+- Re-onboarding members results in a rejection of the `DomainTrustCertificate`, `SequencerDomainState`, or `MediatorDomainState` with the error `MEMBER_CANNOT_REJOIN_DOMAIN`.
+
 ## Until 2024-09-06 (Exclusive)
 
 - Console.bootstrap.domain has new parameter domainThreshold, the minimum number of domain owners that need to authorize on behalf of the domain's namespace.

@@ -38,6 +38,7 @@ import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTr
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
+  InteractiveSubmissionServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
@@ -100,6 +101,7 @@ object ApiServiceOwner {
       loggerFactory: NamedLoggerFactory,
       authenticateContract: AuthenticateContract,
       dynParamGetter: DynamicDomainParameterGetter,
+      interactiveSubmissionServiceConfig: InteractiveSubmissionServiceConfig,
   )(implicit
       actorSystem: ActorSystem,
       materializer: Materializer,
@@ -124,7 +126,6 @@ object ApiServiceOwner {
       telemetry = telemetry,
       loggerFactory = loggerFactory,
     )
-    // TODO(i12283) LLP: Consider fusing the index health check with the indexer health check
     val healthChecksWithIndexService = healthChecks + ("index" -> indexService)
 
     val identityProviderConfigLoader = new IdentityProviderConfigLoader {
@@ -174,6 +175,7 @@ object ApiServiceOwner {
         loggerFactory = loggerFactory,
         authenticateContract = authenticateContract,
         dynParamGetter = dynParamGetter,
+        interactiveSubmissionServiceConfig = interactiveSubmissionServiceConfig,
       )(materializer, executionSequencerFactory, tracer)
         .map(_.withServices(otherServices))
       apiService <- new LedgerApiService(

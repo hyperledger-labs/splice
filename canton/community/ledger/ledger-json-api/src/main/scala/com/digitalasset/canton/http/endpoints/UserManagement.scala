@@ -193,7 +193,7 @@ final class UserManagement(
     }
   }
 
-  private def getUserIdFromToken(jwt: Jwt)(implicit traceContext: TraceContext): ET[UserId] =
+  private def getUserIdFromToken(jwt: Jwt): ET[UserId] =
     decodeAndParseUserIdFromToken(jwt, decodeJwt).leftMap(identity[Error])
 }
 

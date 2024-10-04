@@ -14,7 +14,7 @@ import com.typesafe.scalalogging.Logger
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Predicate
-import scala.concurrent.{ExecutionContext, blocking}
+import scala.concurrent.{ExecutionContextExecutor, blocking}
 
 /** Factories and utilities for dealing with threading.
   */
@@ -246,7 +246,7 @@ object Threading {
     }
   }
 
-  def directExecutionContext(logger: Logger): ExecutionContext = DirectExecutionContext(
+  def directExecutionContext(logger: Logger): ExecutionContextExecutor = DirectExecutionContext(
     logger
   )
 

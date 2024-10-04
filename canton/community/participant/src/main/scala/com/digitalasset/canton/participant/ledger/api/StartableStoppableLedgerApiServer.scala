@@ -321,6 +321,7 @@ class StartableStoppableLedgerApiServer(
         loggerFactory = loggerFactory,
         authenticateContract = authenticateContract,
         dynParamGetter = config.syncService.dynamicDomainParameterGetter,
+        interactiveSubmissionServiceConfig = config.serverConfig.interactiveSubmissionService,
       )
       _ <- startHttpApiIfEnabled(timedWriteService)
       _ <- config.serverConfig.userManagementService.additionalAdminUserId
@@ -429,6 +430,7 @@ class StartableStoppableLedgerApiServer(
         (config.serverConfig.indexService.offsetCheckpointCacheUpdateInterval + config.serverConfig.indexService.idleStreamOffsetCheckpointTimeout).toProtoPrimitive
       )
     ),
+    interactiveSubmissionService = config.serverConfig.interactiveSubmissionService.enabled,
   )
 
   private def startHttpApiIfEnabled(writeService: WriteService): ResourceOwner[Unit] =
@@ -439,7 +441,14 @@ class StartableStoppableLedgerApiServer(
             .forReleasable(() =>
               ClientChannelBuilder.createChannelToTrustedServer(config.serverConfig.clientConfig)
             )(channel => Future(channel.shutdown().discard))
-          _ <- HttpApiServer(jsonApiConfig, channel, writeService, loggerFactory)(
+          _ <- HttpApiServer(
+            jsonApiConfig,
+            config.serverConfig.tls
+              .map(LedgerApiServerConfig.ledgerApiServerTlsConfigFromCantonServerConfig),
+            channel,
+            writeService,
+            loggerFactory,
+          )(
             config.jsonApiMetrics
           )
         } yield ()

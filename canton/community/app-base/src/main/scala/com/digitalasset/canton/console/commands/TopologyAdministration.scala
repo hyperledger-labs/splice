@@ -1310,28 +1310,25 @@ class TopologyAdministrationGroup(
     ): SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant] = {
 
       val currentO = findCurrent(party, store)
-      val (existingPermissions, newSerial, threshold, groupAddressing) = currentO match {
+      val (existingPermissions, newSerial, threshold) = currentO match {
         case Some(current) if current.context.operation == TopologyChangeOp.Remove =>
           (
             // if the existing mapping was REMOVEd, we start from scratch
             Map.empty[ParticipantId, ParticipantPermission],
             Some(current.context.serial.increment),
             current.item.threshold,
-            current.item.groupAddressing,
           )
         case Some(current) =>
           (
             current.item.participants.map(p => p.participantId -> p.permission).toMap,
             Some(current.context.serial.increment),
             current.item.threshold,
-            current.item.groupAddressing,
           )
         case None =>
           (
             Map.empty[ParticipantId, ParticipantPermission],
             Some(PositiveInt.one),
             PositiveInt.one,
-            false,
           )
       }
 
@@ -1353,7 +1350,6 @@ class TopologyAdministrationGroup(
           operation = TopologyChangeOp.Replace,
           serial = newSerial,
           synchronize = synchronize,
-          groupAddressing = groupAddressing,
           mustFullyAuthorize = mustFullyAuthorize,
           store = store,
           forceFlags = force,
@@ -1369,7 +1365,6 @@ class TopologyAdministrationGroup(
           operation = TopologyChangeOp.Remove,
           serial = newSerial,
           synchronize = synchronize,
-          groupAddressing = groupAddressing,
           mustFullyAuthorize = mustFullyAuthorize,
           store = store,
           forceFlags = force,
@@ -1395,7 +1390,6 @@ class TopologyAdministrationGroup(
                  When removing a mapping, use TopologyChangeOp.Remove and pass the same values as the currently effective mapping.
                  The default value is TopologyChangeOp.Replace.
       synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
-      groupAddressing: If true, Daml transactions are sent to the consortium party rather than the hosting participants.
       mustFullyAuthorize: When set to true, the proposal's previously received signatures and the signature of this node must be
                           sufficient to fully authorize the topology transaction. If this is not the case, the request fails.
                           When set to false, the proposal retains the proposal status until enough signatures are accumulated to
@@ -1416,7 +1410,6 @@ class TopologyAdministrationGroup(
         synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
-        groupAddressing: Boolean = false,
         mustFullyAuthorize: Boolean = false,
         store: String = AuthorizedStore.filterName,
         forceFlags: ForceFlags = ForceFlags.none,
@@ -1426,7 +1419,6 @@ class TopologyAdministrationGroup(
           partyId = party,
           threshold = threshold,
           participants = newParticipants.map((HostingParticipant.apply _) tupled),
-          groupAddressing = groupAddressing,
         ),
         signedBy = signedBy.toList,
         serial = serial,
@@ -1453,7 +1445,7 @@ class TopologyAdministrationGroup(
                    TimeQuery.Range(fromO, toO): Time-range of when the transaction was added to the store
         operation: Optionally, what type of operation the transaction should have.
         filterParty: Filter for parties starting with the given filter string.
-        filterParticipant: If non-empty, returns only parties that are hosted on this participants.
+        filterParticipant: If non-empty, returns only parties that are hosted on this participant.
         filterSigningKey: Filter for transactions that are authorized with a key that starts with the given filter string.
         protocolVersion: Export the topology transactions in the optional protocol version.
         |"""

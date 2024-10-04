@@ -226,13 +226,13 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   /** Signal when the store has finished ingesting ledger data from the given offset
     * or a larger one or node-level shutdown was initiated
     */
-  def signalWhenIngestedOrShutdown(offset: String)(implicit
+  def signalWhenIngestedOrShutdown(offset: Long)(implicit
       tc: TraceContext
   ): Future[Unit] = {
     metrics.signalWhenIngestedLatency.timeFuture(signalWhenIngestedOrShutdownImpl(offset))
   }
 
-  protected def signalWhenIngestedOrShutdownImpl(offset: String)(implicit
+  protected def signalWhenIngestedOrShutdownImpl(offset: Long)(implicit
       tc: TraceContext
   ): Future[Unit]
 
@@ -439,7 +439,7 @@ object MultiDomainAcsStore {
 
   /** A query result computed as-of a specific set of per-domain ledger API offset. */
   final case class QueryResult[+A](
-      offset: String,
+      offset: Option[Long],
       value: A,
   ) {
     def map[B](f: A => B): QueryResult[B] = copy(value = f(value))
@@ -452,7 +452,7 @@ object MultiDomainAcsStore {
     implicit def prettyQueryResult[T <: PrettyPrinting]: Pretty[QueryResult[T]] = {
       import com.digitalasset.canton.logging.pretty.PrettyUtil.*
       prettyOfClass(
-        param("offset", _.offset.unquoted),
+        param("offset", _.offset),
         param("value", _.value),
       )
     }
@@ -588,10 +588,10 @@ object MultiDomainAcsStore {
     def ingestionFilter: IngestionFilter
 
     /** Must be the first method called. Returns the last ingested offset, if any. */
-    def initialize()(implicit traceContext: TraceContext): Future[Option[String]]
+    def initialize()(implicit traceContext: TraceContext): Future[Option[Option[Long]]]
 
     def ingestAcs(
-        offset: String,
+        offset: Option[Long],
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],

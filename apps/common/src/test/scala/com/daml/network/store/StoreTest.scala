@@ -38,6 +38,7 @@ import com.daml.network.environment.ledger.api.{
 import com.daml.network.util.{SpliceUtil, Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
@@ -677,18 +678,18 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def mkValidatorRewardCoupon(i: Int) = validatorRewardCoupon(i, userParty(i))
 
-  private var offsetCounter = 1
+  private var offsetCounter: Long = 1L
 
-  protected def nextOffset(): String = blocking {
+  protected def nextOffset(): Long = blocking {
     synchronized {
-      val offset = "%08d".format(offsetCounter)
+      val offset = offsetCounter
       offsetCounter += 1
       offset
     }
   }
 
   protected def mkCreateTx[TCid <: ContractId[T], T](
-      offset: String,
+      offset: Long,
       createRequests: Seq[Contract[TCid, T]],
       effectiveAt: Instant,
       createdEventSignatories: Seq[PartyId],
@@ -712,7 +713,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       acs: Seq[(Contract[?, ?], DomainId, Long)] = Seq.empty,
       incompleteOut: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
       incompleteIn: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
-      acsOffset: String = nextOffset(),
+      acsOffset: Option[Long] = Some(nextOffset()),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.initialize()
     _ <- store.testIngestionSink.ingestAcs(
@@ -785,7 +786,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     override def initialize()(implicit traceContext: TraceContext) =
       underlying.initialize()
     override def ingestAcs(
-        offset: String,
+        offset: Option[Long],
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
@@ -811,7 +812,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
     def create[TCid <: ContractId[T], T, Sink](
         c: Contract[TCid, T],
-        offset: String = nextOffset(),
+        offset: Long = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
@@ -837,7 +838,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
     def createMulti[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
-        offset: String = nextOffset(),
+        offset: Long = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
@@ -880,7 +881,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
 
     def ingest(
-        makeTx: String => TransactionTree
+        makeTx: Long => TransactionTree
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = makeTx(nextOffset())
       store.testIngestionSink
@@ -894,7 +895,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
 
     def ingestMulti(
-        makeTx: String => TransactionTree
+        makeTx: Long => TransactionTree
     )(implicit stores: Seq[HasIngestionSink]): Future[TransactionTree] = {
       val tx = makeTx(nextOffset())
       val txUpdate = TransactionTreeUpdate(tx)
@@ -967,7 +968,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         choiceName: String,
         choiceArgument: damlValue,
         exerciseResult: damlValue,
-        offset: String = nextOffset(),
+        offset: Long = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         recordTime: Instant = defaultEffectiveAt,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
@@ -990,7 +991,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   private def nextUpdateId(): String = java.util.UUID.randomUUID().toString.replace("-", "")
 
   protected def mkTx(
-      offset: String,
+      offset: Long,
       events: Seq[TreeEvent],
       domainId: DomainId,
       effectiveAt: Instant = defaultEffectiveAt,
@@ -1009,7 +1010,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       commandId,
       workflowId,
       effectiveAt,
-      offset,
+      ApiOffset.fromLong(offset),
       eventsById.asJava,
       rootEventIds.asJava,
       domainId.toProtoPrimitive,
@@ -1019,7 +1020,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def mkExerciseTx(
-      offset: String,
+      offset: Long,
       root: ExercisedEvent,
       children: Seq[TreeEvent],
       domainId: DomainId,
@@ -1038,7 +1039,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       "",
       "",
       effectiveAt,
-      offset,
+      ApiOffset.fromLong(offset),
       eventsById.asJava,
       rootEventIds.asJava,
       domainId.toProtoPrimitive,
@@ -1048,7 +1049,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def mkReassignment[T <: ReassignmentEvent](
-      offset: String,
+      offset: Long,
       event: T,
       recordTime: CantonTimestamp = CantonTimestamp.Epoch,
   ): Reassignment[T] =
@@ -1196,7 +1197,7 @@ object StoreTest {
     }
 
     override def error(
-        offset: String,
+        offset: Long,
         eventId: String,
         domainId: DomainId,
     ): Option[TestTxLogEntry] = None

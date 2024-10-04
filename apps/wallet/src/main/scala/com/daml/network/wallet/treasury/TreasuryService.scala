@@ -423,7 +423,7 @@ class TreasuryService(
   }
 
   private def waitForIngestion(
-      offset: String,
+      offset: Long,
       outcomes: Exercised[WalletAppInstall_ExecuteBatchResult],
   )(implicit tc: TraceContext): Future[Unit] =
     if (outcomes.exerciseResult.outcomes.asScala.forall(isErrorOutcome)) {
@@ -432,7 +432,7 @@ class TreasuryService(
       // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
       Future.unit
     } else {
-      logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
+      logger.debug(show"Waiting for store to ingest offset ${offset}")
       userStore.signalWhenIngestedOrShutdown(offset)
     }
 

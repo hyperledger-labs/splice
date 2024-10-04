@@ -14,7 +14,6 @@ import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.crypto.{DomainSyncCryptoClient, HashPurpose, SyncCryptoApi}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.domain.block.data.BlockUpdateEphemeralState
 import com.digitalasset.canton.domain.block.update.SubmissionRequestValidator.*
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.InFlightAggregation.AggregationBySender
@@ -77,7 +76,7 @@ private[update] final class SubmissionRequestValidator(
     * is too old or after the `sequencingTime`.
     */
   def validateAndGenerateSequencedEvents(
-      state: BlockUpdateEphemeralState,
+      inFlightAggregations: InFlightAggregations,
       sequencingTimestamp: CantonTimestamp,
       signedOrderingRequest: SignedOrderingRequest,
       topologyOrSequencingSnapshot: SyncCryptoApi,
@@ -96,27 +95,26 @@ private[update] final class SubmissionRequestValidator(
       .flatMap { groupToMembers =>
         finalizeProcessing(
           groupToMembers,
-          state,
+          inFlightAggregations,
           sequencingTimestamp,
           signedOrderingRequest.submissionRequest,
         ).mapK(validationFUSK)
           // Use the traffic updated ephemeral state in the response even if the rest of the processing stopped
           .recover { errorSubmissionOutcome =>
             SubmissionRequestValidationResult(
-              state,
+              inFlightAggregations,
               errorSubmissionOutcome,
               None,
             )
           }
       }
       .leftMap { errorSubmissionOutcome =>
-        SubmissionRequestValidationResult(state, errorSubmissionOutcome, None)
+        SubmissionRequestValidationResult(inFlightAggregations, errorSubmissionOutcome, None)
       }
       .merge
 
     trafficControlValidator.applyTrafficControl(
       processingResult,
-      state,
       signedOrderingRequest,
       sequencingTimestamp,
       latestSequencerEventTimestamp,
@@ -245,13 +243,6 @@ private[update] final class SubmissionRequestValidator(
       EitherT.rightT(Map.empty)
     else
       for {
-        participantsOfPartyToMembers <-
-          expandParticipantGroupRecipients(
-            submissionRequest,
-            sequencingTimestamp,
-            groupRecipients,
-            topologyOrSequencingSnapshot,
-          )
         mediatorGroupsToMembers <-
           expandMediatorGroupRecipients(
             submissionRequest,
@@ -271,7 +262,7 @@ private[update] final class SubmissionRequestValidator(
             topologyOrSequencingSnapshot,
             groupRecipients,
           )
-      } yield participantsOfPartyToMembers ++ mediatorGroupsToMembers ++ sequencersOfDomainToMembers ++ allMembersOfDomainToMembers
+      } yield mediatorGroupsToMembers ++ sequencersOfDomainToMembers ++ allMembersOfDomainToMembers
   }
 
   private def expandSequencersOfDomainGroupRecipients(
@@ -380,40 +371,6 @@ private[update] final class SubmissionRequestValidator(
           )
         }
       } yield GroupAddressResolver.asGroupRecipientsToMembers(groups)
-  }.mapK(FutureUnlessShutdown.outcomeK)
-
-  private def expandParticipantGroupRecipients(
-      submissionRequest: SubmissionRequest,
-      sequencingTimestamp: CantonTimestamp,
-      groupRecipients: Set[GroupRecipient],
-      topologyOrSequencingSnapshot: SyncCryptoApi,
-  )(implicit
-      executionContext: ExecutionContext,
-      traceContext: TraceContext,
-  ): EitherT[FutureUnlessShutdown, SubmissionRequestOutcome, Map[GroupRecipient, Set[Member]]] = {
-    val parties = groupRecipients.collect { case ParticipantsOfParty(party) =>
-      party.toLf
-    }
-    if (parties.isEmpty)
-      EitherT.rightT[Future, SubmissionRequestOutcome](Map.empty[GroupRecipient, Set[Member]])
-    else
-      for {
-        _ <- topologyOrSequencingSnapshot.ipsSnapshot
-          .allHaveActiveParticipants(parties)
-          .leftMap(parties =>
-            // TODO(#14322): review if still applicable and consider an error code (SequencerDeliverError)
-            invalidSubmissionRequest(
-              submissionRequest,
-              sequencingTimestamp,
-              SequencerErrors.SubmissionRequestRefused(
-                s"The following parties do not have active participants $parties"
-              ),
-            )
-          )
-        mapping <- EitherT.right[SubmissionRequestOutcome](
-          topologyOrSequencingSnapshot.ipsSnapshot.activeParticipantsOfParties(parties.toSeq)
-        )
-      } yield GroupAddressResolver.asGroupRecipientsToMembers(mapping)
   }.mapK(FutureUnlessShutdown.outcomeK)
 
   private def checkClosedEnvelopesSignatures(
@@ -568,7 +525,7 @@ private[update] final class SubmissionRequestValidator(
   // If this succeeds, it will produce a SubmissionRequestOutcome containing DeliverEvents
   private def finalizeProcessing(
       groupToMembers: Map[GroupRecipient, Set[Member]],
-      state: BlockUpdateEphemeralState,
+      inFlightAggregations: InFlightAggregations,
       sequencingTimestamp: CantonTimestamp,
       submissionRequest: SubmissionRequest,
   )(implicit
@@ -593,7 +550,7 @@ private[update] final class SubmissionRequestValidator(
       aggregationOutcome <-
         aggregationIdO
           .traverse { aggregationId =>
-            val inFlightAggregation = state.inFlightAggregations.get(aggregationId)
+            val inFlightAggregation = inFlightAggregations.get(aggregationId)
             validateAggregationRuleAndUpdateInFlightAggregation(
               submissionRequest,
               sequencingTimestamp,
@@ -653,7 +610,7 @@ private[update] final class SubmissionRequestValidator(
         Option.when(isThisSequencerAddressed(groupToMembers))(sequencingTimestamp)
 
     } yield SubmissionRequestValidationResult(
-      state,
+      inFlightAggregations,
       SubmissionRequestOutcome(
         Map.empty,
         aggregationUpdate,
@@ -887,7 +844,7 @@ private[update] object SubmissionRequestValidator {
   final case class TrafficConsumption(consume: Boolean)
 
   final case class SubmissionRequestValidationResult(
-      ephemeralState: BlockUpdateEphemeralState,
+      inFlightAggregations: InFlightAggregations,
       outcome: SubmissionRequestOutcome,
       latestSequencerEventTimestamp: Option[CantonTimestamp],
   ) {

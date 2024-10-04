@@ -67,6 +67,11 @@ object PruningError {
     override def message: String =
       s"Could not prune at [$requestedTimestamp] as the earliest safe pruning point is [$safeTimestamp]"
   }
+
+  /* TODO(#15987): Block sequencer does not yet support scheduled pruning */
+  object ScheduledPruningNotSupported {
+    lazy val message: String = "This sequencer does not support scheduled pruning"
+  }
 }
 
 /** Interface for sequencer operations.
@@ -137,7 +142,9 @@ trait Sequencer
     * For a non-bootstrapped sequencer, this can be [[com.digitalasset.canton.GenesisSequencerCounter]].
     * This is sound as pruning ensures that we never
     */
-  private[sequencing] def firstSequencerCounterServeableForSequencer: SequencerCounter
+  private[sequencing] def firstSequencerCounterServeableForSequencer(implicit
+      traceContext: TraceContext
+  ): Future[SequencerCounter]
 
   /** Return the latest known status of the specified members, either at wall clock time of this sequencer or
     * latest known sequenced event, whichever is the most recent.

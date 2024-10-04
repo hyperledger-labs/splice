@@ -5,6 +5,7 @@ package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.jdk.CollectionConverters.*
@@ -63,7 +64,7 @@ object TxLogStore {
     /** Returns a TxLog entry to be stored in case this parser failed to parse the given daml transaction.
       * Must not throw an error.
       */
-    def error(offset: String, eventId: String, domainId: DomainId): Option[TXE]
+    def error(offset: Long, eventId: String, domainId: DomainId): Option[TXE]
 
     final def parse(tx: TransactionTree, domain: DomainId, logger: TracedLogger)(implicit
         tc: TraceContext
@@ -72,7 +73,9 @@ object TxLogStore {
         .recoverWith { case e: Throwable =>
           logger.error(s"Failed to parse transaction: ${e.getMessage}", e)
           val firstRootEventId = tx.getRootEventIds.asScala.headOption.getOrElse("")
-          Try(error(tx.getOffset, firstRootEventId, domain).toList)
+          Try(
+            error(ApiOffset.assertFromStringToLong(tx.getOffset), firstRootEventId, domain).toList
+          )
         }
         .fold(
           e => {
@@ -88,7 +91,7 @@ object TxLogStore {
       override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
           tc: TraceContext
       ) = Seq.empty
-      override def error(offset: String, eventId: String, domainId: DomainId) = None
+      override def error(offset: Long, eventId: String, domainId: DomainId) = None
     }
   }
 

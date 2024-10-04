@@ -5,7 +5,7 @@ package com.daml.network.environment
 
 import com.daml.network.admin.api.client.GrpcClientMetrics
 import com.digitalasset.canton.admin.api.client.commands.{
-  EnterpriseMediatorAdministrationCommands,
+  MediatorAdministrationCommands,
   MediatorAdminCommands,
   StatusAdminCommands,
 }
@@ -58,7 +58,7 @@ class MediatorAdminConnection(
       sequencerConnection: SequencerConnection,
   )(implicit traceContext: TraceContext): Future[Unit] =
     runCmd(
-      EnterpriseMediatorAdministrationCommands.Initialize(
+      MediatorAdministrationCommands.Initialize(
         domainId,
         SequencerConnections.single(sequencerConnection),
         // TODO(#10985) Consider enabling this.

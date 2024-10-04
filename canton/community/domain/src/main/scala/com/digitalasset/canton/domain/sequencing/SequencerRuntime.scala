@@ -30,6 +30,7 @@ import com.digitalasset.canton.domain.sequencing.authentication.{
 import com.digitalasset.canton.domain.sequencing.config.SequencerNodeParameters
 import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.domain.sequencing.service.*
+import com.digitalasset.canton.domain.sequencing.service.channel.GrpcSequencerChannelService
 import com.digitalasset.canton.health.HealthListener
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.lifecycle.{
@@ -48,7 +49,10 @@ import com.digitalasset.canton.protocol.{
   StaticDomainParameters,
 }
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencer.admin.v30.SequencerAdministrationServiceGrpc
+import com.digitalasset.canton.sequencer.admin.v30.{
+  SequencerAdministrationServiceGrpc,
+  SequencerPruningAdministrationServiceGrpc,
+}
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.sequencing.handlers.{
   DiscardIgnoredEvents,
@@ -123,7 +127,6 @@ class SequencerRuntime(
     storage: Storage,
     clock: Clock,
     authenticationConfig: SequencerAuthenticationConfig,
-    additionalAdminServiceFactory: Sequencer => Option[ServerServiceDefinition],
     staticMembersToRegister: Seq[Member],
     futureSupervisor: FutureSupervisor,
     memberAuthenticationServiceFactory: MemberAuthenticationServiceFactory,
@@ -203,6 +206,16 @@ class SequencerRuntime(
     loggerFactory,
   )
 
+  private val sequencerChannelServiceO = Option.when(
+    localNodeParameters.unsafeEnableOnlinePartyReplication
+  )(
+    new GrpcSequencerChannelService(
+      authenticationConfig.check,
+      localNodeParameters.processingTimeouts,
+      loggerFactory,
+    )
+  )
+
   sequencer
     .registerOnHealthChange(new HealthListener {
       override def name: String = "SequencerRuntime"
@@ -217,6 +230,12 @@ class SequencerRuntime(
           FutureUtil.doNotAwait(
             Future(sequencerService.disconnectAllMembers()),
             "Failed to disconnect members",
+          )
+          sequencerChannelServiceO.foreach(channelService =>
+            FutureUtil.doNotAwait(
+              Future(channelService.disconnectAllMembers()),
+              "Failed to disconnect members from sequencer channels",
+            )
           )
         } else {
           logger.info(s"Sequencer is healthy")
@@ -239,7 +258,10 @@ class SequencerRuntime(
       // immediately and notice it is unauthenticated, which will cause it to also start reauthenticating
       // it's important to disconnect the member AFTER we expired the token, as otherwise, the member
       // can still re-subscribe with the token just before we removed it
-      Traced.lift(sequencerService.disconnectMember(_)(_)),
+      Traced.lift { case (member, tc) =>
+        sequencerService.disconnectMember(member)(tc)
+        sequencerChannelServiceO.foreach(_.disconnectMember(member)(tc))
+      },
       runtimeReadyPromise.future.map(_ =>
         ()
       ), // on shutdown, MemberAuthenticationStore will be closed via closeContext
@@ -278,12 +300,16 @@ class SequencerRuntime(
   def registerAdminGrpcServices(
       register: ServerServiceDefinition => Unit
   ): Unit = {
-    // hook for registering enterprise administration service if in an appropriate environment
-    additionalAdminServiceFactory(sequencer).foreach(register)
     sequencer.adminServices.foreach(register)
     register(
       SequencerAdministrationServiceGrpc.bindService(
         sequencerAdministrationService,
+        executionContext,
+      )
+    )
+    register(
+      SequencerPruningAdministrationServiceGrpc.bindService(
+        new GrpcSequencerPruningAdministrationService(sequencer, loggerFactory),
         executionContext,
       )
     )
@@ -298,42 +324,46 @@ class SequencerRuntime(
     )
   }
 
-  def sequencerServices(implicit ec: ExecutionContext): Seq[ServerServiceDefinition] = Seq(
-    ServerInterceptors.intercept(
-      v30.SequencerConnectServiceGrpc.bindService(
-        new GrpcSequencerConnectService(
-          domainId,
-          sequencerId,
-          staticDomainParameters,
-          domainTopologyManager,
-          syncCrypto,
-          loggerFactory,
-        )(
-          ec
-        ),
-        executionContext,
-      ),
-      new SequencerConnectServerInterceptor(loggerFactory),
-    ),
-    v30.SequencerAuthenticationServiceGrpc
-      .bindService(authenticationServices.sequencerAuthenticationService, ec), {
+  def sequencerServices(implicit ec: ExecutionContext): Seq[ServerServiceDefinition] = {
+    def interceptAuthentication(svcDef: ServerServiceDefinition) = {
       import scala.jdk.CollectionConverters.*
 
       // use the auth service interceptor if available
       val interceptors = List(authenticationServices.authenticationInterceptor).asJava
 
+      ServerInterceptors.intercept(svcDef, interceptors)
+    }
+
+    Seq(
       ServerInterceptors.intercept(
-        v30.SequencerServiceGrpc.bindService(sequencerService, ec),
-        interceptors,
-      )
-    },
-    ApiInfoServiceGrpc.bindService(
-      new GrpcApiInfoService(
-        CantonGrpcUtil.ApiName.SequencerPublicApi
+        v30.SequencerConnectServiceGrpc.bindService(
+          new GrpcSequencerConnectService(
+            domainId,
+            sequencerId,
+            staticDomainParameters,
+            domainTopologyManager,
+            syncCrypto,
+            loggerFactory,
+          )(
+            ec
+          ),
+          executionContext,
+        ),
+        new SequencerConnectServerInterceptor(loggerFactory),
       ),
-      executionContext,
-    ),
-  )
+      v30.SequencerAuthenticationServiceGrpc
+        .bindService(authenticationServices.sequencerAuthenticationService, ec),
+      interceptAuthentication(v30.SequencerServiceGrpc.bindService(sequencerService, ec)),
+      ApiInfoServiceGrpc.bindService(
+        new GrpcApiInfoService(
+          CantonGrpcUtil.ApiName.SequencerPublicApi
+        ),
+        executionContext,
+      ),
+    ) :++ sequencerChannelServiceO
+      .map(svc => interceptAuthentication(v30.SequencerChannelServiceGrpc.bindService(svc, ec)))
+      .toList
+  }
 
   @VisibleForTesting
   protected[canton] val topologyManagerSequencerCounterTrackerStore =
@@ -444,6 +474,7 @@ class SequencerRuntime(
       topologyProcessor,
       topologyManagerSequencerCounterTrackerStore,
       sequencerService,
+      Lifecycle.toCloseableOption(sequencerChannelServiceO),
       authenticationServices.memberAuthenticationService,
       sequencer,
     )(logger)

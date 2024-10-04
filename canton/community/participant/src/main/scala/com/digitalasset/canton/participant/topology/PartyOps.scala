@@ -70,7 +70,6 @@ class PartyOps(
                   threshold = PositiveInt.one,
                   participants =
                     Seq(HostingParticipant(participantId, ParticipantPermission.Submission)),
-                  groupAddressing = false,
                 )
             )
             .bimap(
@@ -94,7 +93,6 @@ class PartyOps(
                   participantId,
                   ParticipantPermission.Submission,
                 ),
-                existingPtpTx.mapping.groupAddressing,
               )
             )
             .bimap(
@@ -112,7 +110,7 @@ class PartyOps(
             ParticipantTopologyManagerError.IdentityManagerParentError(
               InconsistentTopologySnapshot
                 .MultipleEffectiveMappingsPerUniqueKey(
-                  multiple.groupBy(_.mapping.uniqueKey)
+                  Seq("multiple effective transactions at the same time" -> multiple)
                 )
             )
           )

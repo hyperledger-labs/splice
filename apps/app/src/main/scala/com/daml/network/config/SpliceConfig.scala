@@ -455,18 +455,24 @@ object SpliceConfig {
     implicit val approvedSvIdentityConfigReader: ConfigReader[ApprovedSvIdentityConfig] =
       deriveReader[ApprovedSvIdentityConfig]
     implicit val cometBftConfigReader: ConfigReader[CometBftConfig] = deriveReader
-    implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] =
-      deriveReader[SvSequencerConfig].emap { sequencerConfig =>
-        UrlValidator
-          .isValid(sequencerConfig.externalPublicApiUrl)
-          .bimap(
-            invalidUrl =>
-              ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl"),
-            _ => sequencerConfig,
-          )
-      }
     implicit val sequencerPruningConfig: ConfigReader[SequencerPruningConfig] =
       deriveReader[SequencerPruningConfig]
+    implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] = {
+      // Somehow the implicit search seems to have trouble finding the sequencer pruning config implicit.
+      // Redefining it here works though.
+      @nowarn("cat=unused")
+      implicit val sequencerPruningConfig2 = sequencerPruningConfig
+      deriveReader[SvSequencerConfig]
+        .emap { sequencerConfig =>
+          UrlValidator
+            .isValid(sequencerConfig.externalPublicApiUrl)
+            .bimap(
+              invalidUrl =>
+                ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl"),
+              _ => sequencerConfig,
+            )
+        }
+    }
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =
       deriveReader[SvMediatorConfig]
     implicit val svScanConfig: ConfigReader[SvScanConfig] =

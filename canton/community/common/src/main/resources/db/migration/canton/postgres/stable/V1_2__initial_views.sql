@@ -154,7 +154,7 @@ create or replace view debug.common_crypto_public_keys as
 
 create or replace view debug.par_contracts as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     contract_id,
     instance,
     metadata,
@@ -165,30 +165,6 @@ create or replace view debug.par_contracts as
     template_id,
     contract_salt
   from par_contracts;
-
-create or replace view debug.seq_state_manager_members as
-  select
-    member,
-    debug.canton_timestamp(added_at) as added_at,
-    enabled,
-    debug.canton_timestamp(latest_acknowledgement) as latest_acknowledgement
-  from seq_state_manager_members;
-
-create or replace view debug.seq_state_manager_events as
-  select
-    member,
-    counter,
-    debug.canton_timestamp(ts) as ts,
-    content,
-    trace_context
-  from seq_state_manager_events;
-
-create or replace view debug.seq_state_manager_lower_bound as
-  select
-    single_row_lock,
-    debug.canton_timestamp(ts) as ts,
-    debug.canton_timestamp(ts_initial_topology) as ts_initial_topology
-  from seq_state_manager_lower_bound;
 
 create or replace view debug.common_node_id as
   select
@@ -214,17 +190,18 @@ create or replace view debug.common_topology_dispatching as
 
 create or replace view debug.par_active_contracts as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     contract_id,
     change, operation,
     debug.canton_timestamp(ts) as ts,
     request_counter,
-    debug.resolve_common_static_string(remote_domain_idx) as remote_domain_idx, reassignment_counter
+    debug.resolve_common_static_string(remote_domain_idx) as remote_domain_idx,
+    reassignment_counter
   from par_active_contracts;
 
 create or replace view debug.par_fresh_submitted_transaction as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     root_hash_hex,
     debug.canton_timestamp(request_id) as request_id,
     debug.canton_timestamp(max_sequencing_time) as max_sequencing_time
@@ -232,7 +209,7 @@ create or replace view debug.par_fresh_submitted_transaction as
 
 create or replace view debug.par_fresh_submitted_transaction_pruning as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     phase,
     debug.canton_timestamp(ts) as ts,
     debug.canton_timestamp(succeeded) as succeeded
@@ -249,7 +226,7 @@ create or replace view debug.med_response_aggregations as
 
 create or replace view debug.common_sequenced_events as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     sequenced_event,
     type,
     debug.canton_timestamp(ts) as ts,
@@ -260,7 +237,7 @@ create or replace view debug.common_sequenced_events as
 
 create or replace view debug.sequencer_client_pending_sends as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     message_id,
     debug.canton_timestamp(max_sequencing_time) as max_sequencing_time
   from sequencer_client_pending_sends;
@@ -279,29 +256,6 @@ create or replace view debug.par_domains as
     domain_id,
     status
   from par_domains;
-
-create or replace view debug.par_event_log as
-  select
-    log_id,
-    debug.canton_timestamp(ts) as ts,
-    request_sequencer_counter,
-    event_id,
-    debug.resolve_common_static_string(associated_domain) as associated_domain,
-    local_offset_tie_breaker,
-    debug.canton_timestamp(local_offset_effective_time) as local_offset_effective_time,
-    local_offset_discriminator,
-    content, trace_context
-  from par_event_log;
-
-create or replace view debug.par_linearized_event_log as
-  select
-    global_offset,
-    log_id,
-    local_offset_tie_breaker,
-    debug.canton_timestamp(publication_time) as publication_time,
-    debug.canton_timestamp(local_offset_effective_time) as local_offset_effective_time,
-    local_offset_discriminator
-  from par_linearized_event_log;
 
 create or replace view debug.par_reassignments as
   select
@@ -324,7 +278,7 @@ create or replace view debug.par_reassignments as
 
 create or replace view debug.par_journal_requests as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     request_counter,
     request_state_index,
     debug.canton_timestamp(request_timestamp) as request_timestamp,
@@ -332,16 +286,9 @@ create or replace view debug.par_journal_requests as
     repair_context
   from par_journal_requests;
 
-create or replace view debug.par_head_clean_counters as
-  select
-    debug.resolve_common_static_string(domain_id) as domain_id,
-    prehead_counter,
-    debug.canton_timestamp(ts) as ts
-  from par_head_clean_counters;
-
 create or replace view debug.par_computed_acs_commitments as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     counter_participant,
     debug.canton_timestamp(from_exclusive) as from_exclusive,
     debug.canton_timestamp(to_inclusive) as to_inclusive,
@@ -351,7 +298,7 @@ create or replace view debug.par_computed_acs_commitments as
 
 create or replace view debug.par_received_acs_commitments as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     sender,
     debug.canton_timestamp(from_exclusive) as from_exclusive,
     debug.canton_timestamp(to_inclusive) as to_inclusive,
@@ -360,7 +307,7 @@ create or replace view debug.par_received_acs_commitments as
 
 create or replace view debug.par_outstanding_acs_commitments as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     counter_participant,
     debug.canton_timestamp(from_exclusive) as from_exclusive,
     debug.canton_timestamp(to_inclusive) as to_inclusive,
@@ -369,13 +316,13 @@ create or replace view debug.par_outstanding_acs_commitments as
 
 create or replace view debug.par_last_computed_acs_commitments as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     debug.canton_timestamp(ts) as ts
   from par_last_computed_acs_commitments;
 
 create or replace view debug.par_commitment_snapshot as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     stakeholders_hash,
     stakeholders,
     commitment
@@ -383,14 +330,14 @@ create or replace view debug.par_commitment_snapshot as
 
 create or replace view debug.par_commitment_snapshot_time as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     debug.canton_timestamp(ts) as ts,
     tie_breaker
   from par_commitment_snapshot_time;
 
 create or replace view debug.par_commitment_queue as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     sender,
     counter_participant,
     debug.canton_timestamp(from_exclusive) as from_exclusive,
@@ -419,15 +366,9 @@ create or replace view debug.seq_block_height as
     debug.canton_timestamp(latest_sequencer_event_ts) as latest_sequencer_event_ts
   from seq_block_height;
 
-create or replace view debug.seq_initial_state as
-  select
-    member,
-    counter
-  from seq_initial_state;
-
 create or replace view debug.par_active_contract_pruning as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     phase,
     debug.canton_timestamp(ts) as ts,
     debug.canton_timestamp(succeeded) as succeeded
@@ -435,7 +376,7 @@ create or replace view debug.par_active_contract_pruning as
 
 create or replace view debug.par_commitment_pruning as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     phase,
     debug.canton_timestamp(ts) as ts,
     debug.canton_timestamp(succeeded) as succeeded
@@ -443,7 +384,7 @@ create or replace view debug.par_commitment_pruning as
 
 create or replace view debug.par_contract_key_pruning as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     phase,
     debug.canton_timestamp(ts) as ts,
     debug.canton_timestamp(succeeded) as succeeded
@@ -451,7 +392,7 @@ create or replace view debug.par_contract_key_pruning as
 
 create or replace view debug.common_sequenced_event_store_pruning as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     phase,
     debug.canton_timestamp(ts) as ts,
     debug.canton_timestamp(succeeded) as succeeded
@@ -467,7 +408,7 @@ create or replace view debug.mediator_domain_configuration as
 
 create or replace view debug.common_head_sequencer_counters as
   select
-    debug.resolve_common_static_string(domain_id) as domain_id,
+    debug.resolve_common_static_string(domain_idx) as domain_idx,
     prehead_counter,
     debug.canton_timestamp(ts) as ts
   from common_head_sequencer_counters;
@@ -541,7 +482,7 @@ create or replace view debug.par_in_flight_submission as
   select
     change_id_hash,
     submission_id,
-    submission_domain,
+    submission_domain_id,
     message_id,
     debug.canton_timestamp(sequencing_timeout) as sequencing_timeout,
     sequencer_counter,
@@ -664,18 +605,14 @@ create or replace view debug.seq_traffic_control_initial_timestamp as
     debug.canton_timestamp(initial_timestamp) as initial_timestamp
   from seq_traffic_control_initial_timestamp;
 
-create or replace view debug.ord_completed_epochs as
+create or replace view debug.ord_epochs as
   select
     epoch_number,
     start_block_number,
-    epoch_length
-  from ord_completed_epochs;
-
-create or replace view debug.ord_active_epoch as
-  select
-    epoch_number,
-    block_number
-  from ord_active_epoch;
+    epoch_length,
+    debug.canton_timestamp(topology_ts) as topology_ts,
+    in_progress
+  from ord_epochs;
 
 create or replace view debug.ord_availability_batch as
   select
@@ -686,6 +623,7 @@ create or replace view debug.ord_availability_batch as
 create or replace view debug.ord_pbft_messages_in_progress as
 select
     block_number,
+    epoch_number,
     view_number,
     message,
     discriminator,
@@ -695,6 +633,7 @@ from ord_pbft_messages_in_progress;
 create or replace view debug.ord_pbft_messages_completed as
   select
     block_number,
+    epoch_number,
     message,
     discriminator,
     from_sequencer_id
@@ -714,3 +653,9 @@ create or replace view debug.common_static_strings as
     string,
     source
   from common_static_strings;
+
+create or replace view debug.ord_p2p_endpoints as
+  select
+    host,
+    port
+  from ord_p2p_endpoints;

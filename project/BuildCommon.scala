@@ -222,7 +222,6 @@ object BuildCommon {
   lazy val cantonWarts = Seq(
     wartremoverErrors += Wart.custom("com.digitalasset.canton.DiscardedFuture"),
     wartremoverErrors += Wart.custom("com.digitalasset.canton.RequireBlocking"),
-    wartremoverErrors += Wart.custom("com.digitalasset.canton.SlickString"),
     wartremover.WartRemover.dependsOnLocalProjectWarts(
       `canton-wartremover-extension`
     ),

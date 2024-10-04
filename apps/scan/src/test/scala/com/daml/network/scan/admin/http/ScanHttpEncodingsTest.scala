@@ -32,7 +32,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
       val javaTree = mkExerciseTx(
-        offset = "%08d".format(99),
+        offset = 99,
         root = exercisedEvent(
           contractId = validContractId(1),
           templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
@@ -78,7 +78,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
     val lapiAssignment = mkReassignment(
-      offset = "%08d".format(98),
+      offset = 98,
       event = ReassignmentEvent.Assign(
         unassignId = "unassignId",
         submitter = receiver,
@@ -111,7 +111,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
     val lapiAssignment = mkReassignment(
-      offset = "%08d".format(97),
+      offset = 97,
       event = ReassignmentEvent.Unassign(
         unassignId = "unassignId",
         contractId = amuletContract.contractId,
@@ -144,7 +144,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       update = LedgerClient.GetTreeUpdatesResponse(
         update = TransactionTreeUpdate(
           mkCreateTx(
-            "000a",
+            10,
             Seq(
               amulet(mkPartyId("Alice"), 42.0, 13L, 2.0)
             ),
