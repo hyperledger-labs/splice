@@ -906,8 +906,10 @@ function subcmd_get_token() {
   configType="cantonNetwork"
   if [ "$node" == "sv" ]; then
     configType="svRunbook"
-  fi
-  if [ "$node" == "validator" ]; then
+  elif [ "$node" == "sv-validator" ]; then
+    configType="svRunbook"
+    node="validator"
+  elif [ "$node" == "validator" ]; then
     configType="validatorRunbook"
   fi
 
