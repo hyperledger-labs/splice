@@ -341,7 +341,7 @@ export const CreateVoteRequest: React.FC = () => {
                     action as ActionRequiringConfirmation
                   ) as ActionRequiringConfirmation
                 }
-                expiresAt={expiresAt}
+                effectiveAt={expiresAt}
               />
             </Stack>
           )}

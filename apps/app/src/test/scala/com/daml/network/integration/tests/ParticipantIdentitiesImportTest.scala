@@ -74,6 +74,8 @@ abstract class ParticipantIdentitiesImportTestBase extends IntegrationTest with 
           }(config),
       )
       .withAllocatedUsers()
+      // A short polling interval is required by UpdateHistorySanityCheckPlugin
+      .addConfigTransform((_, config) => ConfigTransforms.reducePollingInterval(config))
       .withManualStart
 
   // TODO(tech-debt) Consider removing this method in favor of making `useSelfSignedTokensForLedgerApiAuth` take an `ignore` parameter
