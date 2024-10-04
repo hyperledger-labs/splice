@@ -16,6 +16,8 @@ Upcoming
     * Configuration changes for AmuletRules and DsoRules are diffed against the configuration it will replace and the in-flights proposals.
       This makes it easier to see what changes are being proposed and what the current configuration is.
 
+    * When creating validator onboarding secrets through the SV UI, they will now have an expiration time of 48 hours.
+
 * Scan
 
   * Modified the `/v0/updates` and `/v0/updates/{update_id}` Scan API endpoints to make sure they consistently returns the same history across SVs:
