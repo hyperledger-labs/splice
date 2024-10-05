@@ -7,10 +7,15 @@ import com.daml.network.automation.{TriggerContext, TriggerEnabledSynchronizatio
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TreeUpdate}
+import com.daml.network.environment.ledger.api.{LedgerClient, TransactionTreeUpdate, TreeUpdate}
 import com.daml.network.scan.store.AcsSnapshotStore
 import com.daml.network.scan.store.AcsSnapshotStore.AcsSnapshot
-import com.daml.network.store.{PageLimit, TreeUpdateWithMigrationId, UpdateHistory}
+import com.daml.network.store.{
+  HistoryBackfilling,
+  PageLimit,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
@@ -33,7 +38,7 @@ class AcsSnapshotTriggerTest
 
     "when there's a previous snapshot" should {
 
-      "do nothing if the next task is not yet due" in new AcsSnapshotTriggerTestScope {
+      "do nothing if the next task is not yet due" in new AcsSnapshotTriggerTestScope(false) {
         def snapshotPeriodHours = 1
 
         previousSnapshot(now.minusSeconds(60L))
@@ -41,7 +46,9 @@ class AcsSnapshotTriggerTest
         trigger.retrieveTasks().futureValue should be(Seq.empty)
       }
 
-      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope {
+      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         def snapshotPeriodHours = 1
 
         // The snapshot was taken more than an hour ago, so the next snapshot is due
@@ -60,7 +67,9 @@ class AcsSnapshotTriggerTest
         trigger.retrieveTasks().futureValue should be(Seq.empty)
       }
 
-      "return the new task when due and no updates pending" in new AcsSnapshotTriggerTestScope {
+      "return the new task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         def snapshotPeriodHours = 1
 
         // The snapshot was taken more than an hour ago, so the next snapshot is due
@@ -96,7 +105,7 @@ class AcsSnapshotTriggerTest
     }
 
     "when there's no previous snapshot" should {
-      "do nothing if only an ACS import is present" in new AcsSnapshotTriggerTestScope {
+      "do nothing if only an ACS import is present" in new AcsSnapshotTriggerTestScope(false) {
         def snapshotPeriodHours = 1
 
         noPreviousSnapshot()
@@ -112,7 +121,9 @@ class AcsSnapshotTriggerTest
         trigger.retrieveTasks().futureValue should be(Seq.empty)
       }
 
-      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope {
+      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         def snapshotPeriodHours = 1
 
         noPreviousSnapshot()
@@ -149,7 +160,9 @@ class AcsSnapshotTriggerTest
         trigger.retrieveTasks().futureValue should be(Seq.empty)
       }
 
-      "return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope {
+      "when not backfilling: return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         def snapshotPeriodHours = 1
 
         noPreviousSnapshot()
@@ -198,7 +211,102 @@ class AcsSnapshotTriggerTest
         )
       }
 
-      "return the first task when due and no updates pending between 23:00 and 00:00" in new AcsSnapshotTriggerTestScope {
+      "when backfilling incomplete: return no task" in new AcsSnapshotTriggerTestScope(
+        true
+      ) {
+        def snapshotPeriodHours = 1
+
+        noPreviousSnapshot()
+
+        // data after ACS
+        when(
+          updateHistory.getUpdates(
+            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+            eqTo(true),
+            eqTo(PageLimit.tryCreate(1)),
+          )(any[TraceContext])
+        ).thenReturn(
+          Future.successful(
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
+                1L,
+              )
+            )
+          )
+        )
+
+        when(updateHistory.sourceHistory.migrationInfo(eqTo(migrationId))(any[TraceContext]))
+          .thenReturn(
+            Future.successful(
+              Some(HistoryBackfilling.SourceMigrationInfo(None, Map.empty, complete = false))
+            )
+          )
+
+        trigger.retrieveTasks().futureValue should be(empty)
+      }
+
+      "when backfilling complete: return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
+        true
+      ) {
+        def snapshotPeriodHours = 1
+
+        noPreviousSnapshot()
+
+        // data after ACS
+        when(
+          updateHistory.getUpdates(
+            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+            eqTo(true),
+            eqTo(PageLimit.tryCreate(1)),
+          )(any[TraceContext])
+        ).thenReturn(
+          Future.successful(
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
+                1L,
+              )
+            )
+          )
+        )
+
+        when(updateHistory.sourceHistory.migrationInfo(eqTo(migrationId))(any[TraceContext]))
+          .thenReturn(
+            Future.successful(
+              Some(HistoryBackfilling.SourceMigrationInfo(None, Map.empty, complete = true))
+            )
+          )
+
+        val firstSnapshotTime =
+          CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T10:00:00.00Z"))
+
+        // no updates pending
+        when(
+          updateHistory.getUpdates(
+            eqTo(Some((migrationId, firstSnapshotTime))),
+            eqTo(true),
+            eqTo(PageLimit.tryCreate(1)),
+          )(any[TraceContext])
+        ).thenReturn(
+          Future.successful(
+            Seq(
+              TreeUpdateWithMigrationId(
+                GetTreeUpdatesResponse(treeUpdate(now.plusSeconds(1800L)), dummyDomain),
+                1L,
+              )
+            )
+          )
+        )
+
+        trigger.retrieveTasks().futureValue should be(
+          Seq(AcsSnapshotTrigger.Task(firstSnapshotTime, None))
+        )
+      }
+
+      "return the first task when due and no updates pending between 23:00 and 00:00" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         override def now =
           CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T23:15:30.00Z"))
         def snapshotPeriodHours = 1
@@ -259,7 +367,7 @@ class AcsSnapshotTriggerTest
 
   }
 
-  trait AcsSnapshotTriggerTestScope {
+  abstract class AcsSnapshotTriggerTestScope(updateHistoryBackfillEnabled: Boolean) {
     def snapshotPeriodHours: Int
 
     val clock = new SimClock(loggerFactory = loggerFactory)
@@ -300,7 +408,16 @@ class AcsSnapshotTriggerTest
     when(store.migrationId).thenReturn(migrationId)
     val updateHistory: UpdateHistory = mock[UpdateHistory]
     when(updateHistory.isReady).thenReturn(true)
-    val trigger = new AcsSnapshotTrigger(store, updateHistory, snapshotPeriodHours, triggerContext)
+    when(updateHistory.sourceHistory).thenReturn(
+      mock[HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse]]
+    )
+    val trigger = new AcsSnapshotTrigger(
+      store,
+      updateHistory,
+      snapshotPeriodHours,
+      updateHistoryBackfillEnabled = updateHistoryBackfillEnabled,
+      triggerContext,
+    )
 
     def noPreviousSnapshot(): Unit = {
       when(
