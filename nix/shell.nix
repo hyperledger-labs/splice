@@ -60,12 +60,14 @@ in pkgs.mkShell {
                                              doInstallCheck = false;
                                      }))
     python3Packages.GitPython
+    python3Packages.gql
     python3Packages.marshmallow-dataclass
     python3Packages.polib
     python3Packages.pyjwt
     python3Packages.pyyaml
     python3Packages.regex
     python3Packages.requests
+    python3Packages.requests_toolbelt
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
     git-search-replace

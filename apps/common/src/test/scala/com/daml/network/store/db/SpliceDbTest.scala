@@ -88,7 +88,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
     val dbLockPort: Int = 54321
     implicit val tc: TraceContext = TraceContext.empty
     logger.info("Acquiring SpliceDbTest lock")
-    val lockTimeout = 5.minutes // expectation: Db tests won't take longer than 5m
+    val lockTimeout = 10.minutes // expectation: Db tests won't take longer than 5m
     dbLockSocket = BaseTest.eventually(lockTimeout)(
       Try(new ServerSocket(dbLockPort))
         .fold(
