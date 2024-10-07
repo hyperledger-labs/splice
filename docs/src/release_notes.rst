@@ -29,6 +29,10 @@ Upcoming
 
 * Add a new index to Splice application databases. Scan and validator apps might take a while to start after the upgrade.
 
+* Canton
+
+  * Enabled slow future logging for all components to better debug stuck nodes.
+
 0.2.4
 -----
 
