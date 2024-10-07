@@ -152,7 +152,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "loopback",
     "provider": "",
@@ -290,7 +290,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
@@ -716,7 +716,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
@@ -1142,7 +1142,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
@@ -1568,7 +1568,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
@@ -1994,7 +1994,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
@@ -2429,7 +2429,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "0"
+                    "value": "1"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -2456,7 +2456,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
@@ -2808,7 +2808,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "0"
+                    "value": "1"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -2835,7 +2835,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
@@ -3187,7 +3187,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "0"
+                    "value": "1"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -3214,7 +3214,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
@@ -3566,7 +3566,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "0"
+                    "value": "1"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -3593,7 +3593,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
@@ -3945,7 +3945,7 @@
                   },
                   {
                     "name": "CN_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "0"
+                    "value": "1"
                   },
                   {
                     "name": "CN_APP_CONTACT_POINT",
@@ -3972,7 +3972,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.1.19",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
@@ -4325,7 +4325,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "postgres-0",
     "provider": "",
@@ -4386,7 +4386,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "postgres-1",
     "provider": "",
@@ -4447,7 +4447,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "postgres-2",
     "provider": "",
@@ -4508,7 +4508,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "postgres-3",
     "provider": "",
@@ -4569,7 +4569,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "postgres-4",
     "provider": "",

@@ -344,7 +344,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "0"
+            "activeMigrationId": "1"
           },
           "splitwell": true
         },
@@ -357,7 +357,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -471,7 +471,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -526,7 +526,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -606,7 +606,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -754,7 +754,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -874,7 +874,8 @@
           "enable": true
         },
         "migration": {
-          "id": 0,
+          "id": 1,
+          "legacyId": 0,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -885,7 +886,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,
@@ -921,7 +922,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator1-validator-validator1",
     "provider": "",
