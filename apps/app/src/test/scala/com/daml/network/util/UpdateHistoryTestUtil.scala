@@ -15,6 +15,7 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
+import com.daml.network.http.v0.definitions
 import com.daml.network.integration.tests.SpliceTests.TestCommon
 import com.daml.network.scan.admin.http.{LosslessScanHttpEncodings, LossyScanHttpEncodings}
 import com.daml.network.store.UpdateHistoryTestBase.{LostInScanApi, LostInStoreIngestion}
@@ -181,5 +182,26 @@ trait UpdateHistoryTestUtil extends TestCommon {
     }
 
     succeed
+  }
+
+  // Minimal, human-readable description of an update
+  def shortDebugDescription(e: definitions.TreeEvent): String = e match {
+    case definitions.TreeEvent.members.CreatedEvent(http) =>
+      s"Created(${http.templateId}, ${http.contractId})"
+    case definitions.TreeEvent.members.ExercisedEvent(http) =>
+      s"Exercised(${http.choice}, ${http.contractId})"
+  }
+  def shortDebugDescription(u: definitions.UpdateHistoryItem): String = {
+    u match {
+      case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(http) =>
+        s"Transaction(${http.updateId}, ${http.recordTime}, '${http.workflowId}', ${http.rootEventIds
+            .map(i => shortDebugDescription(http.eventsById(i)))
+            .mkString(", ")})"
+      case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(http) =>
+        s"Reassignment(${http.updateId}, ${http.recordTime})"
+    }
+  }
+  def shortDebugDescription(u: Seq[definitions.UpdateHistoryItem]): String = {
+    u.map(shortDebugDescription).mkString("[\n", ",\n", "\n]")
   }
 }

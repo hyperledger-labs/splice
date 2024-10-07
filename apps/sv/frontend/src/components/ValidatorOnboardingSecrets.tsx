@@ -20,7 +20,7 @@ import { useValidatorOnboardings } from '../hooks/useValidatorOnboardings';
 import { useSvConfig } from '../utils';
 
 const ValidatorOnboardingSecrets: React.FC = () => {
-  const ONBOARDING_SECRET_EXPIRY_IN_SECOND = 86400; // We allow validator to be onboarded in 24 hours
+  const ONBOARDING_SECRET_EXPIRY_IN_SECOND = 172800; // We allow validator to be onboarded in 48 hours
   const { prepareValidatorOnboarding } = useSvAdminClient();
   const validatorOnboardingsQuery = useValidatorOnboardings();
 
