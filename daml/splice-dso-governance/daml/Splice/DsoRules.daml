@@ -16,6 +16,7 @@ import DA.Time
 
 import Splice.Amulet
 import Splice.AmuletRules
+import Splice.ExternalPartyAmuletRules
 
 import Splice.Round
 import Splice.Types
@@ -104,6 +105,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Voted action to change the `DsoRulesConfig`. Not idempotent.
   | SRARC_UpdateSvRewardWeight DsoRules_UpdateSvRewardWeight
     -- ^ Voted action to update the reward weight of an SV.
+  | SRARC_CreateExternalPartyAmuletRules DsoRules_CreateExternalPartyAmuletRules
+    -- ^ Create ExternalPartyAmuletRules contract if it has not been created as part of network bootstrapping.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -254,6 +257,16 @@ data DsoRules_MergeSvRewardStateResult = DsoRules_MergeSvRewardStateResult with
 
 data DsoRules_PruneAmuletConfigScheduleResult = DsoRules_PruneAmuletConfigScheduleResult with
     amuletRulesCid : ContractId AmuletRules
+
+data DsoRules_CreateExternalPartyAmuletRulesResult = DsoRules_CreateExternalPartyAmuletRulesResult
+  with
+    externalPartyAmuletRulesCid : ContractId ExternalPartyAmuletRules
+  deriving (Show, Eq)
+
+data DsoRules_TransferCommand_SendResult = DsoRules_TransferCommand_SendResult
+  with
+    result : TransferCommandResult
+  deriving (Show, Eq)
 
 
 -- Workflow templates
@@ -1208,6 +1221,27 @@ template DsoRules with
              newAmuletRules <- create amuletRules with configSchedule = newSchedule
              pure $ DsoRules_PruneAmuletConfigScheduleResult newAmuletRules
 
+    -- external party
+    -----------------
+    nonconsuming choice DsoRules_CreateExternalPartyAmuletRules : DsoRules_CreateExternalPartyAmuletRulesResult
+      controller dso
+      do cid <- create ExternalPartyAmuletRules with dso
+         pure (DsoRules_CreateExternalPartyAmuletRulesResult cid)
+
+    nonconsuming choice DsoRules_TransferCommand_Send : DsoRules_TransferCommand_SendResult
+      with
+        transferCommandCid : ContractId TransferCommand
+        context : PaymentTransferContext
+        inputs : [TransferInput]
+        transferPreapprovalCid : ContractId TransferPreapproval2
+      controller dsoDelegate
+      do _ <- fetchChecked (ForDso dso) transferCommandCid
+         TransferCommand_SendResult result <- exercise transferCommandCid TransferCommand_Send with
+           context
+           inputs
+           transferPreapprovalCid
+         pure (DsoRules_TransferCommand_SendResult result)
+
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
    case reverse past of
@@ -1259,6 +1293,7 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
       SRARC_RevokeFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_SetConfig choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_UpdateSvRewardWeight choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. ->
     case ansEntryContextAction of
       ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg

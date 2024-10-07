@@ -197,6 +197,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
         ),
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
+        java.util.Optional.empty(),
       )
 
     // tap before the migration

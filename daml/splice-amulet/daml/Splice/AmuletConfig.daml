@@ -9,7 +9,9 @@ import Splice.Issuance
 import Splice.Schedule
 import DA.Time
 
+-- TODO(#14972): Get rid of the unused Amulet data type
 data Amulet = Amulet deriving (Show, Eq)
+-- ^ Deprecated type for specifying amounts and fees in units of Amulet. Use Splice.Amulet.Amulet directly instead.
 data USD = USD deriving (Show, Eq)
 
 -- | Configuration determining the fees and limits for Amulet transfers granted by
@@ -18,7 +20,7 @@ data USD = USD deriving (Show, Eq)
 -- See Splice.Scripts.Parameters for concrete values.
 data TransferConfig unit = TransferConfig with
     createFee : FixedFee -- ^ Fee to create a new amulet.
-    holdingFee : RatePerRound -- ^ Fee for keeping a amulet around
+    holdingFee : RatePerRound -- ^ Fee for keeping an amulet around.
     transferFee : SteppedRate -- ^ Fee for transferring some amount of amulet to a new owner.
     lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked amulet.
     extraFeaturedAppRewardAmount : Decimal -- ^ Extra $-amount of reward for featured apps.
@@ -39,7 +41,12 @@ data AmuletConfig unit = AmuletConfig with
     packageConfig : PackageConfig
       -- ^ Configuration determining the version of each package
       -- that should be used for command submissions.
+    transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
   deriving (Eq, Show)
+
+-- $1/year specified as a daily rate
+defaultTransferPreapprovalFee : Decimal
+defaultTransferPreapprovalFee = 0.00274
 
 -- Check constraints on config params on which the implementation of the choices rely.
 validAmuletConfig : AmuletConfig unit -> Bool

@@ -1,0 +1,40 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.Wallet.TestExternalParty where
+
+import Daml.Script
+import Splice.AmuletRules
+import Splice.Scripts.Util
+import Splice.TransferPreapproval
+import Splice.Wallet.ExternalParty
+
+test = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  externalParty <- allocateParty "externalParty"
+
+  -- This would be submitted by the CSSP
+  proposalCid <- submit aliceValidator.primaryParty $ createCmd ExternalPartySetupProposal with
+    validator = aliceValidator.primaryParty
+    user = externalParty
+    dso = app.dso
+
+  -- Externally signed transaction to enable receiving.
+  ExternalPartySetupProposal_AcceptResult{..} <- submit externalParty $ exerciseCmd proposalCid ExternalPartySetupProposal_Accept
+  context <- getPaymentTransferContext app bob
+
+  amuletCid <- tap app bob 50.0
+
+  -- Externally signed transaction (or not if bob is not also externally hosted, like for a sweep) to send
+  submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
+    with
+      sender = bob.primaryParty
+      context
+      inputs = [InputAmulet amuletCid]
+      amount = 42.0
+
+  -- User can cancel preapproval
+  submit externalParty $ exerciseCmd transferPreapprovalCid (TransferPreapproval_ArchiveAsStakeholder externalParty)
+
+  pure ()

@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { ContractId, emptyMap } from '@daml/types';
 
-import { AmuletRules } from '../../../daml.js/splice-amulet-0.1.5/lib/Splice/AmuletRules';
+import { AmuletRules } from '../../../daml.js/splice-amulet-0.1.6/lib/Splice/AmuletRules';
 import {
   SynchronizerConfig,
   SynchronizerNodeConfig,
-} from '../../../daml.js/splice-dso-governance-0.1.8/lib/Splice/DSO/DecentralizedSynchronizer';
-import { SvNodeState } from '../../../daml.js/splice-dso-governance-0.1.8/lib/Splice/DSO/SvState';
+} from '../../../daml.js/splice-dso-governance-0.1.9/lib/Splice/DSO/DecentralizedSynchronizer';
+import { SvNodeState } from '../../../daml.js/splice-dso-governance-0.1.9/lib/Splice/DSO/SvState';
 import {
   DsoRules,
   DsoRules_CloseVoteRequestResult,
@@ -15,7 +15,7 @@ import {
   TrafficState,
   Vote,
   VoteRequest,
-} from '../../../daml.js/splice-dso-governance-0.1.8/lib/Splice/DsoRules';
+} from '../../../daml.js/splice-dso-governance-0.1.9/lib/Splice/DsoRules';
 import { Contract } from '../../../utils';
 import { DsoInfo } from '../../components';
 import { SvVote } from '../../models';
@@ -143,6 +143,7 @@ export const dsoInfo: DsoInfo = {
               },
             ],
           },
+          transferPreapprovalFee: null,
         },
         futureValues: [],
       },
@@ -421,6 +422,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                   wallet: '0.1.5',
                   walletPayments: '0.1.5',
                 },
+                transferPreapprovalFee: null,
               },
             },
           },

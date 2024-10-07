@@ -8,6 +8,7 @@ import DA.Time
 
 import Splice.AmuletConfig
 import Splice.AmuletRules
+import Splice.ExternalPartyAmuletRules
 import Splice.Schedule
 import Splice.Types
 
@@ -46,6 +47,7 @@ template DsoBootstrap with
             initialValue = amuletConfig
             futureValues = []
           isDevNet
+        _ <- create ExternalPartyAmuletRules with dso
         _ <- create AnsRules with
           dso
           config = ansRulesConfig

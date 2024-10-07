@@ -345,7 +345,7 @@ lazy val `splice-wallet-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`splice-amulet-daml` / Compile / damlBuild).value ++ (`splice-wallet-payments-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-amulet-daml` / Compile / damlBuild).value ++ (`splice-wallet-payments-daml` / Compile / damlBuild).value ++ (`splice-amulet-name-service-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 

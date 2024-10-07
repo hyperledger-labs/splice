@@ -1,0 +1,122 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.ExternalPartyAmuletRules where
+
+import Splice.AmuletRules
+import Splice.Types
+import Splice.Util
+
+import DA.Exception
+
+-- | Rules contract that can be used in transactions that require signatures
+-- from an external party. This is intended to get archived and recreated as rarely as possible
+-- to support long delays between preparing and signing a transaction.
+template ExternalPartyAmuletRules
+  with
+    dso : Party
+  where
+    signatory dso
+
+    -- This choice is not guarded by any resource consumption other than the traffic required to pay for the submission of the exercising of this choice.
+    -- If this is being abused the DSO party can blacklist (or rate limit) the submitting participant node.
+    nonconsuming choice ExternalPartyAmuletRules_CreateTransferCommand : ExternalPartyAmuletRules_CreateTransferCommandResult
+      with
+        sender : Party
+        receiver : Party
+        amount : Decimal
+        trackingId : Text
+        expiresAt : Time
+      controller sender
+      do cmd <- create TransferCommand with
+           dso
+           sender
+           receiver
+           amount
+           trackingId
+           -- We cannot enforce a max expiry as we cannot call getTime.
+           expiresAt
+         pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
+
+data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
+  with
+    transferCommandCid : ContractId TransferCommand
+  deriving (Show, Eq)
+
+-- | One-time delegation to execute a transfer to the given receiver
+-- for the given amount.
+--
+-- We externally sign this instead of the transfer itself to support a longer delay between
+-- prepare/execute which would be prevented by signing the transfer directly as that one pins
+-- down the mining rounds that are relatively short lived and relies on `getTime` which
+-- means it would fail due to the max allowed skew between ledger effective time and record
+-- time.
+template TransferCommand
+  with
+    dso : Party
+    sender : Party
+    receiver : Party
+    amount : Decimal
+    trackingId : Text -- ^ Tracking id that can be used for deduplication and for querying the status
+    expiresAt : Time -- ^ Expiry of the command until when TransferCommand_Send must be called
+  where
+    -- The DSO party is a signatory to make sure
+    -- that the external signature
+    -- is visible to the SVs.
+    signatory sender, dso
+
+    choice TransferCommand_Send : TransferCommand_SendResult
+      with
+        context : PaymentTransferContext
+        inputs : [TransferInput]
+        -- The delegate is expected to select inputs that cover the amount being transferred, provided they exist.
+        -- Otherwise the transfer will fail.
+        transferPreapprovalCid : ContractId TransferPreapproval2
+      controller dso
+      do -- Verify that receiver and DSO party match. We don't validate that the reeiver's provider matches
+         -- as changing that should be up to the receiver and not require the sender to resign.
+         _ <- fetchChecked (ForOwner with owner = receiver, dso) transferPreapprovalCid
+         now <- getTime -- This is run by the DSO party where getTime is fine
+         require ("Current time " <> show now <> " is before expiry of TransferCommand " <> show expiresAt) (expiresAt > now)
+         result <-
+           try do
+             TransferPreapproval2_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval2_Send context inputs amount sender)
+             pure (TransferCommandResultSuccess result)
+           catch
+             (ex : InvalidTransfer) -> pure (TransferCommandResultFailure ex.reason)
+             (ex : AnyException) -> pure (TransferCommandResultFailure (ITR_Other $ message ex))
+         pure (TransferCommand_SendResult result)
+
+    choice TransferCommand_Withdraw : TransferCommand_WithdrawResult
+      controller sender
+      do pure TransferCommand_WithdrawResult
+
+    choice TransferCommand_Expire : TransferCommand_ExpireResult
+      with
+        p : Party
+      controller p
+      do require "Controller is a stakeholder" (p `elem` stakeholder this)
+         now <- getTime
+         require "TransferCommand is expired" (expiresAt <= now)
+         pure TransferCommand_ExpireResult
+
+instance HasCheckedFetch TransferCommand ForDso where
+  contractGroupId TransferCommand{..} = ForDso dso
+
+data TransferCommand_SendResult = TransferCommand_SendResult
+  with
+    result : TransferCommandResult
+  deriving (Show, Eq)
+
+data TransferCommandResult
+  = TransferCommandResultFailure with
+      reason : InvalidTransferReason
+  | TransferCommandResultSuccess with
+      result : TransferResult
+  deriving (Show, Eq)
+
+data TransferCommand_WithdrawResult = TransferCommand_WithdrawResult {}
+  deriving (Show, Eq)
+
+data TransferCommand_ExpireResult = TransferCommand_ExpireResult {}
+  deriving (Show, Eq)

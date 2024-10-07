@@ -441,6 +441,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
               initialValue.decentralizedSynchronizer,
               initialValue.tickDuration,
               initialValue.packageConfig,
+              java.util.Optional.empty(),
             ),
           )
 

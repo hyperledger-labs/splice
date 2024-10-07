@@ -1,6 +1,6 @@
 import { rest, RestHandler } from 'msw';
 
-import { ValidatorLicense } from '@daml.js/splice-amulet-0.1.5/lib/Splice/ValidatorLicense';
+import { ValidatorLicense } from '@daml.js/splice-amulet-0.1.6/lib/Splice/ValidatorLicense';
 
 export function validatorLicensesHandler(baseUrl: string): RestHandler {
   return rest.get(`${baseUrl}/v0/admin/validator/licenses`, (req, res, ctx) => {

@@ -244,6 +244,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
+      transferPreapprovalFee: Option[BigDecimal] = None,
   ) = new splice.schedule.Schedule[Instant, splice.amuletconfig.AmuletConfig[
     splice.amuletconfig.USD
   ]](
@@ -258,6 +259,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor,
       initialPackageConfig,
       holdingFee,
+      transferPreapprovalFee,
     ),
     List.empty[Tuple2[Instant, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]]].asJava,
   )
@@ -273,6 +275,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
+      transferPreapprovalFee: Option[BigDecimal] = None,
       nextDomainId: Option[DomainId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
@@ -296,6 +299,7 @@ object SpliceUtil {
       // tick duration
       new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
       initialPackageConfig,
+      transferPreapprovalFee.map(_.bigDecimal).toJava,
     )
 
   def defaultAnsConfig(

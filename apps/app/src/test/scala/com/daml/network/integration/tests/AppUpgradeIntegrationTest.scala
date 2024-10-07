@@ -201,6 +201,7 @@ class AppUpgradeIntegrationTest
               DarResources.wallet.bootstrap.metadata.version.toString(),
               DarResources.walletPayments.bootstrap.metadata.version.toString(),
             ),
+            java.util.Optional.empty(),
           )
           val upgradeAction = new ARC_AmuletRules(
             new CRARC_AddFutureAmuletConfigSchedule(

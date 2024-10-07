@@ -147,6 +147,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     ),
     amuletConfig.tickDuration,
     amuletConfig.packageConfig,
+    java.util.Optional.empty(),
   )
 
 }

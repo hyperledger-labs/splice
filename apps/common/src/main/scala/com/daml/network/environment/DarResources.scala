@@ -17,10 +17,19 @@ object DarResources {
   val amulet_0_1_3 = DarResource("splice-amulet-0.1.3.dar")
   val amulet_0_1_4 = DarResource("splice-amulet-0.1.4.dar")
   val amulet_0_1_5 = DarResource("splice-amulet-0.1.5.dar")
+  val amulet_0_1_6 = DarResource("splice-amulet-0.1.6.dar")
   val amulet_current = DarResource("splice-amulet-current.dar")
   val amulet = PackageResource(
     amulet_current,
-    Seq(amulet_0_1_0, amulet_0_1_1, amulet_0_1_2, amulet_0_1_3, amulet_0_1_4, amulet_0_1_5),
+    Seq(
+      amulet_0_1_0,
+      amulet_0_1_1,
+      amulet_0_1_2,
+      amulet_0_1_3,
+      amulet_0_1_4,
+      amulet_0_1_5,
+      amulet_0_1_6,
+    ),
   )
 
   val dsoGovernance_0_1_0 = DarResource("splice-dso-governance-0.1.0.dar")
@@ -32,6 +41,7 @@ object DarResources {
   val dsoGovernance_0_1_6 = DarResource("splice-dso-governance-0.1.6.dar")
   val dsoGovernance_0_1_7 = DarResource("splice-dso-governance-0.1.7.dar")
   val dsoGovernance_0_1_8 = DarResource("splice-dso-governance-0.1.8.dar")
+  val dsoGovernance_0_1_9 = DarResource("splice-dso-governance-0.1.9.dar")
   val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
@@ -45,6 +55,7 @@ object DarResources {
       dsoGovernance_0_1_6,
       dsoGovernance_0_1_7,
       dsoGovernance_0_1_8,
+      dsoGovernance_0_1_9,
     ),
   )
 
@@ -54,6 +65,7 @@ object DarResources {
   val amuletNameService_0_1_3 = DarResource("splice-amulet-name-service-0.1.3.dar")
   val amuletNameService_0_1_4 = DarResource("splice-amulet-name-service-0.1.4.dar")
   val amuletNameService_0_1_5 = DarResource("splice-amulet-name-service-0.1.5.dar")
+  val amuletNameService_0_1_6 = DarResource("splice-amulet-name-service-0.1.6.dar")
   val amuletNameService_current = DarResource("splice-amulet-name-service-current.dar")
   val amuletNameService = PackageResource(
     amuletNameService_current,
@@ -64,6 +76,7 @@ object DarResources {
       amuletNameService_0_1_3,
       amuletNameService_0_1_4,
       amuletNameService_0_1_5,
+      amuletNameService_0_1_6,
     ),
   )
 
@@ -73,6 +86,7 @@ object DarResources {
   val splitwell_0_1_3 = DarResource("splitwell-0.1.3.dar")
   val splitwell_0_1_4 = DarResource("splitwell-0.1.4.dar")
   val splitwell_0_1_5 = DarResource("splitwell-0.1.5.dar")
+  val splitwell_0_1_6 = DarResource("splitwell-0.1.6.dar")
   val splitwell_current = DarResource("splitwell-current.dar")
   val splitwell = PackageResource(
     splitwell_current,
@@ -83,6 +97,7 @@ object DarResources {
       splitwell_0_1_3,
       splitwell_0_1_4,
       splitwell_0_1_5,
+      splitwell_0_1_6,
     ),
   )
 
@@ -92,10 +107,19 @@ object DarResources {
   val wallet_0_1_3 = DarResource("splice-wallet-0.1.3.dar")
   val wallet_0_1_4 = DarResource("splice-wallet-0.1.4.dar")
   val wallet_0_1_5 = DarResource("splice-wallet-0.1.5.dar")
+  val wallet_0_1_6 = DarResource("splice-wallet-0.1.6.dar")
   val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
     wallet_current,
-    Seq(wallet_0_1_0, wallet_0_1_1, wallet_0_1_2, wallet_0_1_3, wallet_0_1_4, wallet_0_1_5),
+    Seq(
+      wallet_0_1_0,
+      wallet_0_1_1,
+      wallet_0_1_2,
+      wallet_0_1_3,
+      wallet_0_1_4,
+      wallet_0_1_5,
+      wallet_0_1_6,
+    ),
   )
 
   val walletPayments_0_1_0 = DarResource("splice-wallet-payments-0.1.0.dar")
@@ -104,6 +128,7 @@ object DarResources {
   val walletPayments_0_1_3 = DarResource("splice-wallet-payments-0.1.3.dar")
   val walletPayments_0_1_4 = DarResource("splice-wallet-payments-0.1.4.dar")
   val walletPayments_0_1_5 = DarResource("splice-wallet-payments-0.1.5.dar")
+  val walletPayments_0_1_6 = DarResource("splice-wallet-payments-0.1.6.dar")
   val walletPayments_current = DarResource("splice-wallet-payments-current.dar")
   val walletPayments = PackageResource(
     walletPayments_current,
@@ -114,6 +139,7 @@ object DarResources {
       walletPayments_0_1_3,
       walletPayments_0_1_4,
       walletPayments_0_1_5,
+      walletPayments_0_1_6,
     ),
   )
 
