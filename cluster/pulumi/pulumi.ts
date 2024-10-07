@@ -92,5 +92,5 @@ export async function upStack(stack: automation.Stack): Promise<void> {
   const name = stack.name;
   const result = await stack.up(pulumiOptsWithPrefix(`[${name}]`));
   console.log(`${name} stack up result:`);
-  console.log(util.inspect(result, { colors: true, depth: null, maxStringLength: null }));
+  console.log(util.inspect(result.summary, { colors: true, depth: null, maxStringLength: null }));
 }
