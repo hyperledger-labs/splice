@@ -80,12 +80,11 @@ workflow:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - deploy_cluster_for_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "prepare_sv_runbook_for_migration"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           action: "prepare"
           scope: "sv"
@@ -132,12 +131,11 @@ workflow:
           migration_id: 1
           requires:
             - trigger_global_domain_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "migrate_sv_runbook"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           action: "migrate"
           scope: "sv"

@@ -38,7 +38,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           requires:
             - deploy_cluster
@@ -60,7 +59,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           validator_party_hint: "DA-Helm-Test-Node"
           validator_new_participant_id: "new-participant"
           restore_identity_from_sv_runbook: true
@@ -73,7 +71,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           requires:
             - deploy_validator_to_recover_sv_amulets
@@ -102,7 +99,6 @@ workflow:
           <<: *main-branch-only
           cluster: "ciperiodic"
           context:
-            - canton-network-vpn
             - slack-context
           requires:
             - preflight_sv_reonboard_check

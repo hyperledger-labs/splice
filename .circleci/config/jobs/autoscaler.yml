@@ -4,13 +4,12 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Prevent autoscaler scaledown
           cluster: << parameters.cluster >>
@@ -23,13 +22,12 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Allow the autoscaler to scaledown
           cluster: << parameters.cluster >>
@@ -37,4 +35,3 @@ jobs:
           cmd: |
             gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MIN_NODES}
           cmd_retry_count: 5
-

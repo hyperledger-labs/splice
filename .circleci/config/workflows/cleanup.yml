@@ -18,6 +18,5 @@ workflow:
           <<: *main-branch-only
           <<: *notify-fail
           context:
-            - canton-network-vpn
             - slack-context
             - artifactory

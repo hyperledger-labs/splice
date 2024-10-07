@@ -1028,7 +1028,8 @@ commands:
     parameters:
       clone_command:
         type: string
-        default: "rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=64 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata copy"
+        # order by name, mixed to try to reduce conflicts when running in multiple jobs at the same time
+        default: "rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=64 --transfers=64 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed copy"
     steps:
       - run:
           name: Restore nix
@@ -1057,7 +1058,9 @@ commands:
           include_binary_cache: true
       # required as the first nix invocation still needs a writeable /nix/store
       - run_bash_command_in_nix:
-          cmd: echo "Validated nix"
+          cmd: |
+            echo "Validated nix"
+            ls -al
       - run:
           name: Save Nix
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
@@ -1640,13 +1643,12 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Prevent autoscaler scaledown
           cluster: << parameters.cluster >>
@@ -1659,13 +1661,12 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Allow the autoscaler to scaledown
           cluster: << parameters.cluster >>
@@ -1673,7 +1674,6 @@ jobs:
           cmd: |
             gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MIN_NODES}
           cmd_retry_count: 5
-
 
   backup_cluster:
     parameters:
@@ -1693,16 +1693,13 @@ jobs:
         default: 3
       migration_id:
         type: integer
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Listing nodes for backup
           cluster: << parameters.cluster >>
@@ -1722,9 +1719,6 @@ jobs:
               nodes="$nodes splitwell"
             fi
             echo $nodes > nodes.txt
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
       - run:
           name: Split backup tasks
           command: |
@@ -1764,18 +1758,12 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Check backup status
           cluster: << parameters.cluster >>
@@ -1801,6 +1789,45 @@ jobs:
           event: fail
           custom: |
             { "text": ":fire: Found backups in << parameters.cluster >> that are older than << parameters.alert_threshold >>:\n${snapshot_array[@]}" }
+
+  restore_node:
+    executor: self_hosted
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      namespace_name:
+        type: string
+      migration_id:
+        type: integer
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Restoring node
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          no_output_timeout: "20m"
+          cmd: |
+            cncluster activate
+            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >>
+
+            case "<< parameters.namespace_name >>" in
+              "sv-1"|"sv-2"|"sv-3"|"sv-4")
+                cncluster wait << parameters.namespace_name >> scan-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> sv-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
+                ;;
+              "validator1")
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
+                ;;
+            esac
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
 
   deploy_sv_runbook:
     executor: self_hosted
@@ -2374,9 +2401,7 @@ jobs:
           cluster: <<parameters.cluster>>
 
   hard_migration:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -2430,7 +2455,7 @@ jobs:
                 command: |
                   echo "Checking out commit << parameters.upgrade_version >>"
                   git checkout << parameters.upgrade_version >>
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts for upgrade version
           cluster: << parameters.cluster >>
@@ -2459,7 +2484,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
-            # if you change this script make sure to also change it in hard_migration_vpn
             set -eou pipefail
 
             base_version=$(build-tools/get-charts-version "<< parameters.base_version >>")
@@ -2468,119 +2492,6 @@ jobs:
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=true
             echo "Running hard domain migration << parameters.action >> << parameters.scope >> from $base_version to $upgrade_version"
-            cncluster activate
-            cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - when:
-          condition: << parameters.send_notifications >>
-          steps:
-            - notify-cluster-fail:
-                channel_notify: << parameters.channel_notify >>
-                cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.cancel_workflow_on_failure >>
-          steps:
-            - cancel_entire_workflow_if_this_job_failed
-
-  hard_migration_vpn:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      # What to do
-      action:
-        type: enum
-        enum:
-          [
-            "prepare",
-            "migrate"
-          ]
-      # What to migrate
-      scope:
-        type: enum
-        enum:
-          [
-            # currently using the _vpn job makes sense only for the sv runbook
-            # where VPN is required to resolve Validator1's PartyId
-            "sv",
-          ]
-      # Commit hash that will become the legacy version.
-      # If left empty then the latest commit on the branch will be used, with locally-built charts.
-      base_version:
-        type: string
-        default: ""
-      # Commit hash that will become the active version.
-      # If left empty then the latest commit on the branch will be used, with locally-built charts.
-      upgrade_version:
-        type: string
-        default: ""
-      cancel_workflow_on_failure:
-        type: boolean
-        default: false
-      deploy_retry_count:
-        type: integer
-        default: 2
-      send_notifications:
-        type: boolean
-        default: true
-    steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.upgrade_version >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.upgrade_version >>
-                command: |
-                  echo "Checking out commit << parameters.upgrade_version >>"
-                  git checkout << parameters.upgrade_version >>
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts for upgrade version
-          cluster: << parameters.cluster >>
-          cmd: |
-            make cluster/build
-          cmd_retry_count: 2
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - run_bash_command_in_nix:
-          cmd_name: Execute hard domain migration action
-          cluster: << parameters.cluster >>
-          additional_nix_args: >
-            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-            --keep ARTIFACTORY_USER
-            --keep ARTIFACTORY_PASSWORD
-            --keep CIRCLECI_TOKEN
-            --keep CIRCLE_WORKFLOW_ID
-            --keep SLACK_ACCESS_TOKEN
-            --keep CIRCLE_BUILD_URL
-          gce_authenticate: true
-          cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-          cmd: |
-            # if you change this script make sure to also change it in hard_migration
-            set -eou pipefail
-
-            base_version=$(build-tools/get-charts-version "<< parameters.base_version >>")
-            upgrade_version=$(build-tools/get-charts-version "<< parameters.upgrade_version >>")
-
-            # All CI-deployed clusters use split postgres instances per app, to support backups.
-            export SPLIT_POSTGRES_INSTANCES=true
-
             cncluster activate
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
       - print_gcloud_logs_commands:
@@ -2778,12 +2689,9 @@ jobs:
           destination: log
 
   pre_migration_dump_identities:
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
@@ -2792,10 +2700,7 @@ jobs:
         default: true
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Dump identities before the migration
           cluster: << parameters.cluster >>
@@ -2816,12 +2721,9 @@ jobs:
                 cluster: << parameters.cluster >>
 
   post_migration_verify_identities:
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
@@ -2830,10 +2732,7 @@ jobs:
         default: true
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - attach_workspace:
           at: workspace
       - run_bash_command_in_nix:
@@ -3109,14 +3008,12 @@ jobs:
       - save_compiled_classes
 
   cluster_lock_reaper:
-    circleci_ip_ranges: true
-    docker:
-    - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - cluster_lock_reaper:
           cluster: "scratchneta"
       - cluster_lock_reaper:
@@ -3509,52 +3406,6 @@ jobs:
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
-
-  restore_node:
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      namespace_name:
-        type: string
-      migration_id:
-        type: integer
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - run_bash_command_in_nix:
-          cmd_name: Restoring node
-          cluster: << parameters.cluster >>
-          gce_authenticate: true
-          no_output_timeout: "20m"
-          cmd: |
-            cncluster activate
-            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >>
-
-            case "<< parameters.namespace_name >>" in
-              "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app << parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> sv-app << parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
-                ;;
-              "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
-                ;;
-            esac
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-          channel_notify: << parameters.channel_notify >>
-
   test_DR:
     parameters:
       <<: *cluster-parameter
@@ -3776,10 +3627,7 @@ jobs:
           destination: log
 
   deploy_operator:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2024.01
-    resource_class: large
+    executor: self_hosted
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -3791,7 +3639,7 @@ jobs:
 
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Install pulumi dependencies
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
@@ -4406,13 +4254,10 @@ jobs:
           cluster: << parameters.cluster >>
 
   deploy_validator_to_recover_sv_amulets:
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
@@ -4439,16 +4284,13 @@ jobs:
         default: 2
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
             make -j cluster/build
           cmd_retry_count: 2
-      - setup_vpn # VPN is required to get sv runbook identities
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
       - when:
           condition:
             and:
@@ -5358,12 +5200,11 @@ workflows:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - deploy_cluster_for_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "prepare_sv_runbook_for_migration"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           action: "prepare"
           scope: "sv"
@@ -5410,12 +5251,11 @@ workflows:
           migration_id: 1
           requires:
             - trigger_global_domain_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "migrate_sv_runbook"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           action: "migrate"
           scope: "sv"
@@ -5689,7 +5529,6 @@ workflows:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           requires:
             - deploy_cluster
@@ -5711,7 +5550,6 @@ workflows:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           validator_party_hint: "DA-Helm-Test-Node"
           validator_new_participant_id: "new-participant"
           restore_identity_from_sv_runbook: true
@@ -5724,7 +5562,6 @@ workflows:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           requires:
             - deploy_validator_to_recover_sv_amulets
@@ -5753,7 +5590,6 @@ workflows:
           <<: *main-branch-only
           cluster: "ciperiodic"
           context:
-            - canton-network-vpn
             - slack-context
           requires:
             - preflight_sv_reonboard_check
@@ -5782,7 +5618,6 @@ workflows:
           <<: *main-branch-only
           <<: *notify-fail
           context:
-            - canton-network-vpn
             - slack-context
             - artifactory
 
@@ -6362,12 +6197,11 @@ workflows:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
             - deploy_validator_runbook_for_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "prepare_sv_runbook_for_migration"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
           action: "prepare"
           scope: "sv"
@@ -6419,12 +6253,11 @@ workflows:
           migration_id: 1
           requires:
             - trigger_global_domain_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "migrate_sv_runbook"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
           action: "migrate"
           scope: "sv"

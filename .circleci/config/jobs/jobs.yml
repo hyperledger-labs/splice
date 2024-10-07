@@ -256,14 +256,12 @@ jobs:
       - save_compiled_classes
 
   cluster_lock_reaper:
-    circleci_ip_ranges: true
-    docker:
-    - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - cluster_lock_reaper:
           cluster: "scratchneta"
       - cluster_lock_reaper:
@@ -656,52 +654,6 @@ jobs:
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
-
-  restore_node:
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      namespace_name:
-        type: string
-      migration_id:
-        type: integer
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - run_bash_command_in_nix:
-          cmd_name: Restoring node
-          cluster: << parameters.cluster >>
-          gce_authenticate: true
-          no_output_timeout: "20m"
-          cmd: |
-            cncluster activate
-            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >>
-
-            case "<< parameters.namespace_name >>" in
-              "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app << parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> sv-app << parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
-                ;;
-              "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
-                ;;
-            esac
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-          channel_notify: << parameters.channel_notify >>
-
   test_DR:
     parameters:
       <<: *cluster-parameter

@@ -81,7 +81,8 @@ commands:
     parameters:
       clone_command:
         type: string
-        default: "rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=64 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata copy"
+        # order by name, mixed to try to reduce conflicts when running in multiple jobs at the same time
+        default: "rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=64 --transfers=64 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed copy"
     steps:
       - run:
           name: Restore nix
@@ -110,7 +111,9 @@ commands:
           include_binary_cache: true
       # required as the first nix invocation still needs a writeable /nix/store
       - run_bash_command_in_nix:
-          cmd: echo "Validated nix"
+          cmd: |
+            echo "Validated nix"
+            ls -al
       - run:
           name: Save Nix
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time

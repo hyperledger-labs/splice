@@ -1,9 +1,6 @@
 jobs:
   deploy_operator:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2024.01
-    resource_class: large
+    executor: self_hosted
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -15,7 +12,7 @@ jobs:
 
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Install pulumi dependencies
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
