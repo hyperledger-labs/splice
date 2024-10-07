@@ -11,12 +11,12 @@ import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMinin
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
-  SpliceLedgerClient,
-  SpliceLedgerConnection,
   HttpAppConnection,
   PackageIdResolver,
   RetryFor,
   RetryProvider,
+  SpliceLedgerClient,
+  SpliceLedgerConnection,
 }
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
@@ -197,7 +197,6 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       ec: ExecutionContext,
       tc: TraceContext,
   ): OptionT[Future, MigrationSchedule]
-
 }
 
 object ScanConnection {
