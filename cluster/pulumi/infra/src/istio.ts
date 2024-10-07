@@ -8,9 +8,8 @@ import {
   infraAffinityAndTolerations,
   installSpliceHelmChart,
   isMainNet,
-  loadIPRanges,
 } from '../../common';
-import { clusterBasename } from './config';
+import { clusterBasename, loadIPRanges } from './config';
 
 export const istioVersion = {
   istio: '1.22.2',
