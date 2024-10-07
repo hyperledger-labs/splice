@@ -4,12 +4,16 @@ jobs:
       <<: *cluster-parameter
       deployment_only:
         type: boolean
-    executor: self_hosted
+    machine:
+      image: ubuntu-2204:2024.01.1
+    resource_class: xlarge
     environment:
       <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix
       - set_pr_target_branch
       - run_bash_command_in_nix:
           cmd_name: Install pulumi dependencies
@@ -17,6 +21,10 @@ jobs:
           cmd: |
             make -j cluster/pulumi/build
           cmd_retry_count: 2
+      # required for the sv-runbook preview to connect to validator1
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
       - when:
           condition:
             not: << parameters.deployment_only >>

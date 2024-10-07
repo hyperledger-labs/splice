@@ -1,5 +1,5 @@
 {
-  description = "splice nix setup for development";
+  description = "my project description";
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixpkgs-unstable";

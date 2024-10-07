@@ -1,9 +1,12 @@
 jobs:
   deploy_sv_runbook:
-    executor: self_hosted
+    machine:
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
@@ -42,13 +45,16 @@ jobs:
                 command: |
                   echo "Checking out commit << parameters.deploy_version >>"
                   git checkout << parameters.deploy_version >>
-      - setup_nix_self_hosted
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
             make -j cluster/build
           cmd_retry_count: 2
+      - setup_vpn # VPN is required to resolve Validator1's PartyId
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
       - when:
           condition:
             and:
@@ -101,7 +107,9 @@ jobs:
           cluster: << parameters.cluster >>
 
   deploy_validator_runbook:
-    executor: self_hosted
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2024.01
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -146,7 +154,7 @@ jobs:
                 command: |
                   echo "Checking out commit << parameters.deploy_version >>"
                   git checkout << parameters.deploy_version >>
-      - setup_nix_self_hosted
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
@@ -205,7 +213,9 @@ jobs:
           cluster: << parameters.cluster >>
 
   deploy_multivalidator:
-    executor: self_hosted
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2024.01
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -220,7 +230,7 @@ jobs:
         default: 2
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
@@ -258,7 +268,10 @@ jobs:
           cluster: << parameters.cluster >>
 
   deploy_cluster:
-    executor: self_hosted
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: xlarge
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -316,7 +329,7 @@ jobs:
                 command: |
                   echo "Checking out commit << parameters.deploy_version >>"
                   git checkout << parameters.deploy_version >>
-      - setup_nix_self_hosted
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
@@ -440,7 +453,10 @@ jobs:
             - cancel_entire_workflow_if_this_job_failed
 
   deploy_partial_upgrade:
-    executor: self_hosted
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: xlarge
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -460,7 +476,7 @@ jobs:
         default: 2
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
@@ -520,7 +536,10 @@ jobs:
             - cancel_entire_workflow_if_this_job_failed
 
   deploy_infra:
-    executor: self_hosted
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: large
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -532,7 +551,7 @@ jobs:
 
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time

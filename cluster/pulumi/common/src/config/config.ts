@@ -9,12 +9,10 @@ import { spliceEnvConfig, SpliceEnvConfig } from './envConfig';
 class CnConfig {
   public readonly configuration: Config;
   public readonly envConfig: SpliceEnvConfig;
-  public readonly clusterConfig: unknown;
 
   constructor() {
     this.envConfig = spliceEnvConfig;
-    this.clusterConfig = this.loadClusterYamlConfig();
-    this.configuration = ConfigSchema.parse(this.clusterConfig);
+    this.configuration = this.loadClusterYamlConfig();
     console.error(
       'Loaded cluster configuration',
       util.inspect(this.configuration, {
@@ -24,14 +22,14 @@ class CnConfig {
     );
   }
 
-  private loadClusterYamlConfig() {
+  private loadClusterYamlConfig(): Config {
     const clusterBaseConfig = this.readAndParseYaml(
       `${this.envConfig.context.deploymentFolderPath}/config.yaml`
     );
     const clusterOverridesConfig = this.readAndParseYaml(
       `${this.envConfig.context.clusterPath()}/config.yaml`
     );
-    return merge({}, clusterBaseConfig, clusterOverridesConfig);
+    return ConfigSchema.parse(merge({}, clusterBaseConfig, clusterOverridesConfig));
   }
 
   private readAndParseYaml(filePath: string): unknown {

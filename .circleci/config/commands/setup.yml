@@ -47,6 +47,60 @@ commands:
           command: |
             git submodule update --init --recursive
             git config submodule.recurse true
+  setup_nix:
+    description: Set up Nix
+    steps:
+      - run:
+          name: Make Nix cache key
+          command: |
+            set -euo pipefail
+            git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
+            uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
+            sudo mkdir /nix
+            sudo chown $USER /nix
+      - restore_cache:
+          name: Restore Nix cache
+          keys:
+            - nix-{{ checksum "/tmp/nix-cache-key" }}
+      - run:
+          name: Setup Nix
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          command: |
+            set -euo pipefail
+            echo 'source ~/.nix-profile/etc/profile.d/nix.sh' >> "$BASH_ENV"
+            if [ -f ~/.config/nix/nix.conf ]; then
+                exit 0
+            fi
+            # Disabling sandbox because:
+            # 1. It doesn't work on CircleCI (sethostname is not allowed)
+            # 2. We don't plan to build anything, so the risk is fairly low
+            mkdir -p ~/.config/nix
+            cat \<<EOF > ~/.config/nix/nix.conf
+            sandbox = false
+            netrc-file = /home/circleci/.config/nix/netrc
+            extra-experimental-features = nix-command flakes
+            EOF
+            sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.13.3/install) --no-daemon
+            cat \<<EOF > ~/.config/nix/netrc
+            machine digitalasset.jfrog.io
+            login $ARTIFACTORY_USER
+            password $ARTIFACTORY_PASSWORD
+            EOF
+            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+            echo "Building nix env"
+            nix develop path:nix -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+            echo "Garbage collecting to reduce cache size"
+            nix-store --gc
+      - save_cache:
+          key: nix-{{ checksum "/tmp/nix-cache-key" }}
+          paths:
+            - /nix
+            - /home/circleci/.nix-profile
+            - /home/circleci/.nix-channels
+            - /home/circleci/.nix-defexpr
+            - /home/circleci/.config/nix
+
 
   # Note: compiled_classes and sbt_cache commands are largely copied from the Canton repo
   # save compiled target directories to cache (so we don't recompile everything again and again)

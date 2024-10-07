@@ -512,6 +512,22 @@ function subcmd_gcp_down() {
     subcmd_pulumi gcp down --yes --skip-preview
 }
 
+###
+
+subcommand_whitelist[delete]='Delete all cluster resources.'
+
+function subcmd_delete() {
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _info "Taking down pulumi infrastructure stack."
+    subcmd_pulumi infra down --yes --skip-preview
+
+    _info "Deleting GKE cluster."
+    gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
+
+    _info "Cluster deleted."
+}
 
 ###
 subcommand_whitelist[pulumi_preview_canton]="Preview the changes for the sv-canton migrations"

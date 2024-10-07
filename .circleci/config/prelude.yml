@@ -158,11 +158,3 @@ main-branch-never: &main-branch-never
     branches:
       ignore:
         - main
-
-executors:
-  self_hosted:
-    resource_class: dach_ny/cn-runner-for-testing
-    docker:
-      - image: cimg/base:current
-    environment:
-      npm_config_cache: "/cache/.npm"

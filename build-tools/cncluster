@@ -638,7 +638,7 @@ function subcmd_create() {
                --enable-ip-alias \
                --enable-private-nodes \
                --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
-               --num-nodes 1 \
+               --num-nodes 0 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_ZONE}" \
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
@@ -658,7 +658,9 @@ function subcmd_create() {
                --maintenance-window-recurrence 'FREQ=WEEKLY;BYDAY=TU,WE,TH'
 
         #### Enable Firewall Access
-        subcmd_cluster_update_access
+        gcloud container clusters update "${GCP_CLUSTER_NAME}" \
+               --enable-master-authorized-networks \
+               --master-authorized-networks "${K8S_CONTROL_PLANE_NETS}"
 
         #### Delete default firewall rules, if they exist.
         if (gcloud compute firewall-rules delete\
@@ -675,10 +677,21 @@ function subcmd_create() {
     _log "Authenticating to newly created cluster."
     subcmd_activate
 
+    subcmd_create_node_pools
+
     #### Open port 15017 in GKE firewall, see https://istio.io/latest/docs/setup/platform-setup/gke/
     _log "Opening port 15017 in GKE firewall"
     FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-master" --format=json | jq -r '.[].name')
     gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
+
+    _infra_up
+
+    _log "Determining cluster ingress IP address"
+    IPADDR=$(_cluster_ip)
+
+    if [ -z "${IPADDR}" ]; then
+        _error "Could not determine cluster IP address."
+    fi
 
     # Create a kms key for pulumi.
     error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
@@ -695,50 +708,15 @@ function subcmd_create() {
       fi
     fi
 
-    _infra_up
-
-
     for stack in infra canton-network sv-runbook validator-runbook; do
       _uses_pulumi_stack $stack
     done
 
     subcmd_pulumi cluster up --yes --skip-preview
 
-    _log "Determining cluster ingress IP address"
-    IPADDR=$(_cluster_ip)
-
-    if [ -z "${IPADDR}" ]; then
-        _error "Could not determine cluster IP address."
-    fi
-
     _log "Cluster at IP ${IPADDR} ready"
 }
 
-###
-
-subcommand_whitelist[delete]='Delete all cluster resources.'
-
-function subcmd_delete() {
-    _prompt_to_confirm
-    _cluster_must_exist
-
-    _info "Taking down pulumi infrastructure stack."
-    subcmd_pulumi infra down --yes --skip-preview
-
-    _info "Deleting GKE cluster."
-    gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
-
-    _info "Cluster deleted."
-}
-
-
-subcommand_whitelist[cluster_update_access]='Update cluster master authorized networks.'
-
-function subcmd_cluster_update_access() {
-    gcloud container clusters update "${GCP_CLUSTER_NAME}" \
-           --enable-master-authorized-networks \
-           --master-authorized-networks "${K8S_CONTROL_PLANE_NETS}"
-}
 ###
 
 subcommand_whitelist[ci_warn_lock_expiry]='Run only by CircleCI'
