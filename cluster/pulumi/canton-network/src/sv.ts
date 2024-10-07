@@ -31,7 +31,6 @@ import {
   PersistenceConfig,
   sanitizedForPostgres,
   spliceInstanceNames,
-  SV_APP_HELM_CHART_TIMEOUT_SEC,
   SvIdKey,
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
@@ -453,8 +452,7 @@ function installSvApp(
         .concat(decentralizedSynchronizer.dependencies),
     },
     undefined,
-    appsAffinityAndTolerations,
-    SV_APP_HELM_CHART_TIMEOUT_SEC
+    appsAffinityAndTolerations
   );
   return svApp;
 }

@@ -332,7 +332,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -613,7 +613,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -722,7 +722,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -921,7 +921,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1014,7 +1014,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1097,7 +1097,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -1160,7 +1160,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -1272,7 +1272,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1355,7 +1355,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1496,7 +1496,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1636,7 +1636,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 1000,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -1831,7 +1831,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],

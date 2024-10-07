@@ -34,7 +34,6 @@ import {
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
   activeVersion,
-  SV_APP_HELM_CHART_TIMEOUT_SEC,
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
@@ -325,8 +324,7 @@ async function installSvAndValidator(
         .concat(canton.decentralizedSynchronizer.dependencies)
         .concat([svAppSecret, svAppUISecret, appsPg])
         .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []),
-    },
-    SV_APP_HELM_CHART_TIMEOUT_SEC
+    }
   );
 
   const defaultScanValues = loadYamlFromFile(
