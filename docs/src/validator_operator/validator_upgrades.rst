@@ -78,7 +78,7 @@ Migration Dumps
 Migration dumps contain identity and transaction data from the validator participant.
 When using the official Helm charts and following the :ref:`Helm-based deployment documentation <k8s_validator>`,
 the migration dump is automatically created once a scheduled synchronizer upgrade begins and the existing synchronizer has been paused.
-As part of the Helm-based deployment of the validator app (``cn-validator``),
+As part of the Helm-based deployment of the validator app (``splice-validator``),
 a persistent Kubernetes volume is attached to the ``validator-app`` pod and configured as the target storage location for migration dumps.
 When redeploying the validator app as part of the migration process (see :ref:`validator-upgrades-deploying`),
 the validator app will automatically consume the migration dump and initialize the participant based on the contents of this dump.

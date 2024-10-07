@@ -1129,15 +1129,15 @@ function subcmd_partial_upgrade() {
     json=$(cat "$original_versions_file")
 
     json_paths=(
-        '["sv-1","cn-participant"]'
-        '["sv-1","cn-global-domain"]'
-        '["sv-1","cn-cometbft"]'
-        '["sv-1","cn-scan"]'
-        '["sv-1","cn-sv-node"]'
-        '["sv-1","cn-validator"]'
-        '["validator1","cn-validator"]'
-        '["validator1","cn-participant"]'
-        '["validator1","cn-splitwell-web-ui"]'
+        '["sv-1","splice-participant"]'
+        '["sv-1","splice-global-domain"]'
+        '["sv-1","splice-cometbft"]'
+        '["sv-1","splice-scan"]'
+        '["sv-1","splice-sv-node"]'
+        '["sv-1","splice-validator"]'
+        '["validator1","splice-validator"]'
+        '["validator1","splice-participant"]'
+        '["validator1","splice-splitwell-web-ui"]'
     )
     for json_path in "${json_paths[@]}"; do
       json=$(jq "setpath($json_path; \"$new_version\")" <<< "$json")
@@ -1385,14 +1385,14 @@ function subcmd_participant_console() {
     validator_app_pod_label=$app
 
     if [ ! "${LEDGER_API_AUTH_TOKEN-}" ] && sv_app_pod=$(_get_single_pod "$namespace" "$sv_app_pod_label"); then
-      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$sv_app_pod" sv-app CN_APP_SV_LEDGER_API_AUTH_TOKEN); then
+      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$sv_app_pod" sv-app SPLICE_APP_SV_LEDGER_API_AUTH_TOKEN); then
         _info "Using Ledger API token from '$sv_app_pod'..."
       else
         _info "Getting Ledger API Auth0 credentials from '$sv_app_pod'..."
         if \
-          client_id=$(_get_env_value "$namespace" "$sv_app_pod" sv-app CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID) && \
-          client_secret=$(_get_env_value "$namespace" "$sv_app_pod" sv-app CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET) && \
-          url=$(_get_env_value "$namespace" "$sv_app_pod" sv-app CN_APP_SV_LEDGER_API_AUTH_URL) && \
+          client_id=$(_get_env_value "$namespace" "$sv_app_pod" sv-app SPLICE_APP_SV_LEDGER_API_AUTH_CLIENT_ID) && \
+          client_secret=$(_get_env_value "$namespace" "$sv_app_pod" sv-app SPLICE_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET) && \
+          url=$(_get_env_value "$namespace" "$sv_app_pod" sv-app SPLICE_APP_SV_LEDGER_API_AUTH_URL) && \
           audience=$(_get_env_value "$namespace" "$participant_pod" participant AUTH_TARGET_AUDIENCE)
         then
           _info "Getting Ledger API auth token from Auth0 using Ledger API Auth0 credentials from '$sv_app_pod'..."
@@ -1402,14 +1402,14 @@ function subcmd_participant_console() {
         fi
       fi
     elif validator_app_pod=$(_get_single_pod "$namespace" "$validator_app_pod_label"); then
-      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$validator_app_pod" validaator-app CN_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN); then
+      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$validator_app_pod" validaator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN); then
         _info "Using Ledger API token from '$validator_app_pod'..."
       else
         _info "Getting Ledger API Auth0 credentials from '$validator_app_pod'..."
         if \
-          client_id=$(_get_env_value "$namespace" "$validator_app_pod" validator-app CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID) && \
-          client_secret=$(_get_env_value "$namespace" "$validator_app_pod" validator-app CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET) && \
-          url=$(_get_env_value "$namespace" "$validator_app_pod" validator-app CN_APP_VALIDATOR_LEDGER_API_AUTH_URL) && \
+          client_id=$(_get_env_value "$namespace" "$validator_app_pod" validator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID) && \
+          client_secret=$(_get_env_value "$namespace" "$validator_app_pod" validator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET) && \
+          url=$(_get_env_value "$namespace" "$validator_app_pod" validator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_URL) && \
           audience=$(_get_env_value "$namespace" "$participant_pod" participant AUTH_TARGET_AUDIENCE)
         then
           _info "Getting Ledger API auth token from Auth0 using Ledger API Auth0 credentials from '$validator_app_pod'..."

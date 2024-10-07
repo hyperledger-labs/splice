@@ -581,50 +581,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "secret": "c3BsaXR3ZWxsc2VjcmV0Mg=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-validator-onboarding-splitwell2",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-validator-onboarding-splitwell2",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "secret": "dmFsaWRhdG9yMXNlY3JldDI="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-validator-onboarding-validator12",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-validator-onboarding-validator12",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "postgresPassword": ""
         }
       },
@@ -1200,6 +1156,50 @@
     "name": "organization/infra/infra.dev",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "c3BsaXR3ZWxsc2VjcmV0Mg=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-splitwell2",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-1-validator-onboarding-splitwell2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldDI="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-validator12",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-1-validator-onboarding-validator12",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,
@@ -1845,7 +1845,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
+          "gateway": "cluster-ingress/splice-apps-gateway",
           "port": 26016
         },
         "logLevel": "debug",
@@ -1920,7 +1920,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cometbft",
+      "chart": "splice-cometbft",
       "compat": "true",
       "name": "cometbft-global-domain-1",
       "namespace": "sv-1",
@@ -1967,7 +1967,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
+          "gateway": "cluster-ingress/splice-apps-gateway",
           "port": 26116
         },
         "logLevel": "debug",
@@ -2225,7 +2225,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-global-domain",
+      "chart": "splice-global-domain",
       "compat": "true",
       "name": "global-domain-1",
       "namespace": "sv-1",
@@ -2308,7 +2308,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-1",
@@ -2371,7 +2371,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "name": "loopback",
       "namespace": "sv-1",
@@ -2566,7 +2566,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "name": "participant-1",
       "namespace": "sv-1",
@@ -2707,7 +2707,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "name": "scan",
       "namespace": "sv-1",
@@ -2847,7 +2847,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "name": "sv-app",
       "namespace": "sv-1",
@@ -3068,7 +3068,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "name": "validator-sv-1",
       "namespace": "sv-1",
@@ -3296,7 +3296,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
+          "gateway": "cluster-ingress/splice-apps-gateway",
           "port": 26026
         },
         "logLevel": "info",
@@ -3367,7 +3367,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cometbft",
+      "chart": "splice-cometbft",
       "compat": "true",
       "name": "cometbft-global-domain-1",
       "namespace": "sv-2",
@@ -3414,7 +3414,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
+          "gateway": "cluster-ingress/splice-apps-gateway",
           "port": 26126
         },
         "logLevel": "info",
@@ -3668,7 +3668,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-global-domain",
+      "chart": "splice-global-domain",
       "compat": "true",
       "name": "global-domain-1",
       "namespace": "sv-2",
@@ -3751,7 +3751,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-2",
@@ -3814,7 +3814,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "name": "loopback",
       "namespace": "sv-2",
@@ -4009,7 +4009,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "name": "participant-1",
       "namespace": "sv-2",
@@ -4150,7 +4150,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "name": "scan",
       "namespace": "sv-2",
@@ -4290,7 +4290,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "name": "sv-app",
       "namespace": "sv-2",
@@ -4484,7 +4484,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "name": "validator-sv-2",
       "namespace": "sv-2",
@@ -4705,7 +4705,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
+          "gateway": "cluster-ingress/splice-apps-gateway",
           "port": 26036
         },
         "logLevel": "info",
@@ -4776,7 +4776,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cometbft",
+      "chart": "splice-cometbft",
       "compat": "true",
       "name": "cometbft-global-domain-1",
       "namespace": "sv-3",
@@ -4823,7 +4823,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
+          "gateway": "cluster-ingress/splice-apps-gateway",
           "port": 26136
         },
         "logLevel": "info",
@@ -5077,7 +5077,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-global-domain",
+      "chart": "splice-global-domain",
       "compat": "true",
       "name": "global-domain-1",
       "namespace": "sv-3",
@@ -5160,7 +5160,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-3",
@@ -5223,7 +5223,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "name": "loopback",
       "namespace": "sv-3",
@@ -5418,7 +5418,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "name": "participant-1",
       "namespace": "sv-3",
@@ -5559,7 +5559,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "name": "scan",
       "namespace": "sv-3",
@@ -5699,7 +5699,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "name": "sv-app",
       "namespace": "sv-3",
@@ -5893,7 +5893,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "name": "validator-sv-3",
       "namespace": "sv-3",
@@ -6114,7 +6114,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
+          "gateway": "cluster-ingress/splice-apps-gateway",
           "port": 26046
         },
         "logLevel": "info",
@@ -6185,7 +6185,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cometbft",
+      "chart": "splice-cometbft",
       "compat": "true",
       "name": "cometbft-global-domain-1",
       "namespace": "sv-4",
@@ -6232,7 +6232,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
+          "gateway": "cluster-ingress/splice-apps-gateway",
           "port": 26146
         },
         "logLevel": "info",
@@ -6486,7 +6486,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-global-domain",
+      "chart": "splice-global-domain",
       "compat": "true",
       "name": "global-domain-1",
       "namespace": "sv-4",
@@ -6569,7 +6569,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-4",
@@ -6632,7 +6632,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "name": "loopback",
       "namespace": "sv-4",
@@ -6827,7 +6827,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "name": "participant-1",
       "namespace": "sv-4",
@@ -6968,7 +6968,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "name": "scan",
       "namespace": "sv-4",
@@ -7108,7 +7108,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "name": "sv-app",
       "namespace": "sv-4",
@@ -7302,7 +7302,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "name": "validator-sv-4",
       "namespace": "sv-4",

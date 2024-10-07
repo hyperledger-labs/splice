@@ -611,12 +611,12 @@ function subcmd_restore_node {
   export SCAN_ADDRESS=
   export SPONSOR_SV_ADDRESS=
   export TARGET_CLUSTER=
-  export CN_APP_UI_NETWORK_NAME=""
-  export CN_APP_UI_NETWORK_FAVICON_URL=""
-  export CN_APP_UI_AMULET_NAME=""
-  export CN_APP_UI_AMULET_NAME_ACRONYM=""
-  export CN_APP_UI_NAME_SERVICE_NAME=""
-  export CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=""
+  export SPLICE_APP_UI_NETWORK_NAME=""
+  export SPLICE_APP_UI_NETWORK_FAVICON_URL=""
+  export SPLICE_APP_UI_AMULET_NAME=""
+  export SPLICE_APP_UI_AMULET_NAME_ACRONYM=""
+  export SPLICE_APP_UI_NAME_SERVICE_NAME=""
+  export SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM=""
   docker volume rm splice-validator_postgres-splice > /dev/null 2>&1 || true
   docker compose -f "${VALIDATOR_DIR}/compose.yaml" up -d postgres-splice
   _info "Waiting for postgres to be ready"

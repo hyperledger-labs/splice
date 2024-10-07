@@ -369,7 +369,7 @@ function configureGateway(
   return installSpliceHelmChart(
     ingressNs,
     'cluster-gateway',
-    'cn-istio-gateway',
+    'splice-istio-gateway',
     {
       cluster: {
         cantonHostname: isMainNet

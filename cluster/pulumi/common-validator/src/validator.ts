@@ -170,7 +170,7 @@ export async function installValidatorApp(
   return installSpliceHelmChart(
     config.xns,
     `validator-${config.xns.logicalName}`,
-    'cn-validator',
+    'splice-validator',
     {
       migration: config.migration,
       additionalUsers: config.additionalUsers || [],

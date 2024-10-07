@@ -245,7 +245,7 @@
       },
       "spec": {
         "gateways": [
-          "cluster-ingress/cn-http-gateway"
+          "cluster-ingress/splice-http-gateway"
         ],
         "hosts": [
           "alertmanager.dev.global.canton.network.digitalasset.com"
@@ -474,7 +474,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-istio-gateway",
+      "chart": "splice-istio-gateway",
       "compat": "true",
       "name": "cluster-gateway",
       "namespace": "cluster-ingress",
@@ -895,7 +895,7 @@
       },
       "spec": {
         "gateways": [
-          "cluster-ingress/cn-public-http-gateway"
+          "cluster-ingress/splice-public-http-gateway"
         ],
         "hosts": [
           "public.dev.global.canton.network.digitalasset.com"
@@ -962,7 +962,7 @@
       },
       "spec": {
         "gateways": [
-          "cluster-ingress/cn-http-gateway"
+          "cluster-ingress/splice-http-gateway"
         ],
         "hosts": [
           "grafana.dev.global.canton.network.digitalasset.com"
@@ -2696,7 +2696,7 @@
       },
       "spec": {
         "gateways": [
-          "cluster-ingress/cn-http-gateway"
+          "cluster-ingress/splice-http-gateway"
         ],
         "hosts": [
           "prometheus.dev.global.canton.network.digitalasset.com"

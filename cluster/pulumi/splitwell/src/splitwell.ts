@@ -41,7 +41,7 @@ export async function installSplitwell(
   const loopback = installSpliceHelmChart(
     xns,
     'loopback',
-    'cn-cluster-loopback-gateway',
+    'splice-cluster-loopback-gateway',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -72,7 +72,7 @@ export async function installSplitwell(
   installSpliceHelmChart(
     xns,
     'splitwell-app',
-    'cn-splitwell-app',
+    'splice-splitwell-app',
     {
       postgres: swPostgres.address,
       metrics: {
@@ -116,7 +116,7 @@ export async function installSplitwell(
     ],
     additionalConfig: [
       'canton.validator-apps.validator_backend.app-instances.splitwell = {',
-      '  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
+      '  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
       '  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}',
       // We vet both versions to easily test upgrades.
       `  dars = ["${splitwellDarPath}"]`,
@@ -156,7 +156,7 @@ export async function installSplitwell(
 }
 
 function installIngress(xns: ExactNamespace, dependsOn: CnInput<pulumi.Resource>[]) {
-  installSpliceHelmChart(xns, 'cluster-ingress-splitwell-uis', 'cn-cluster-ingress-runbook', {
+  installSpliceHelmChart(xns, 'cluster-ingress-splitwell-uis', 'splice-cluster-ingress-runbook', {
     cluster: {
       hostname: CLUSTER_HOSTNAME,
       svNamespace: xns.logicalName,

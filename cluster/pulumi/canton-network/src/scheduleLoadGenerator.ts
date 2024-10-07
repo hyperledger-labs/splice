@@ -25,7 +25,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
     const loopback = installSpliceHelmChart(
       xns,
       'loopback',
-      'cn-cluster-loopback-gateway',
+      'splice-cluster-loopback-gateway',
       {
         cluster: {
           hostname: CLUSTER_HOSTNAME,
@@ -80,7 +80,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
     installSpliceHelmChart(
       xns,
       'load-tester',
-      'cn-load-tester',
+      'splice-load-tester',
       {
         prometheusRw,
         config: JSON.stringify({

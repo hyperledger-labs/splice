@@ -127,7 +127,7 @@ export async function installSvNode(
   const loopback = installSpliceHelmChart(
     xns,
     'loopback',
-    'cn-cluster-loopback-gateway',
+    'splice-cluster-loopback-gateway',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -266,7 +266,7 @@ export async function installSvNode(
   const ingress = installSpliceHelmChart(
     xns,
     'ingress-sv',
-    'cn-cluster-ingress-runbook',
+    'splice-cluster-ingress-runbook',
     {
       withSvIngress: true,
       ingress: {
@@ -442,7 +442,7 @@ function installSvApp(
   const svApp = installSpliceHelmChart(
     xns,
     `sv-app`,
-    'cn-sv-node',
+    'splice-sv-node',
     svValues,
     activeVersion,
     {
@@ -487,7 +487,7 @@ function installScan(
     // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
     clusterUrl: CLUSTER_HOSTNAME,
   };
-  const scan = installSpliceHelmChart(xns, `scan`, 'cn-scan', scanValues, activeVersion, {
+  const scan = installSpliceHelmChart(xns, `scan`, 'splice-scan', scanValues, activeVersion, {
     dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
   });
   return scan;

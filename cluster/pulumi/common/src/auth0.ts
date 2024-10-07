@@ -403,7 +403,7 @@ export function auth0UserNameEnvVar(
     secretName = name;
   }
   return {
-    name: `CN_APP_${name.toUpperCase()}_LEDGER_API_AUTH_USER_NAME`,
+    name: `SPLICE_APP_${name.toUpperCase()}_LEDGER_API_AUTH_USER_NAME`,
     valueFrom: auth0UserNameEnvVarSource(secretName),
   };
 }

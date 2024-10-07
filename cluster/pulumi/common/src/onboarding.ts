@@ -17,7 +17,7 @@ export function installValidatorOnboardingSecret(
 ): k8s.core.v1.Secret {
   const secretName = validatorOnboardingSecretName(name);
   return new k8s.core.v1.Secret(
-    `cn-app-${xns.logicalName}-validator-onboarding-${name}`,
+    `splice-app-${xns.logicalName}-validator-onboarding-${name}`,
     {
       metadata: {
         name: secretName,

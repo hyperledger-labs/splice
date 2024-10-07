@@ -196,7 +196,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     const pg = installSpliceHelmChart(
       xns,
       instanceName,
-      'cn-postgres',
+      'splice-postgres',
       _.merge(values || {}, {
         db: {
           volumeSize: overrideDbSizeFromValues

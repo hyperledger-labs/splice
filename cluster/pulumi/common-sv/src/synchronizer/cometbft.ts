@@ -68,14 +68,14 @@ export function installCometBftNode(
   const release = installSpliceHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
-    'cn-cometbft',
+    'splice-cometbft',
     _.mergeWith(cometBftValues, {
       sv1: nodeConfigs.sv1,
       // TODO (#13845) remove when ciperiodic version >= 0.1.18
       founder: nodeConfigs.sv1,
       istioVirtualService: {
         enabled: true,
-        gateway: 'cluster-ingress/cn-apps-gateway',
+        gateway: 'cluster-ingress/splice-apps-gateway',
         port: nodeConfig.istioPort,
       },
       node: {

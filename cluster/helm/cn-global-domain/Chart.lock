@@ -1,6 +1,0 @@
-dependencies:
-- name: cn-util-lib
-  repository: file://../cn-util-lib
-  version: 0.3.0
-digest: sha256:df9802bfbefd85db97496a87497e3f3d3d42898f3e73f081a654706531eab8e2
-generated: "2024-06-18T02:11:54.305064205Z"

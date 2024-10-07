@@ -32,6 +32,14 @@ Upcoming
 * Canton
 
   * Enabled slow future logging for all components to better debug stuck nodes.
+* Deployment
+
+  * **Breaking** Every Helm chart with a name starting with ``cn-`` has been renamed, now
+    starting with ``splice-`` instead, except for ``cn-docs``.
+  * **Breaking** For the Docker images, these input environment variables have been renamed,
+    replacing ``CN`` with ``SPLICE``:
+
+      * ``CN_APP_LEGACY_PARTY_HINT``
 
 0.2.4
 -----
@@ -99,7 +107,6 @@ Note: 0.2.2 was skipped due to an error in the publishing process.
 
   * Fix a bug that prevented initialization during a hard domain migration if there was a proposal in the topology state
     on the old migration id.
-
 
 0.2.0
 -----

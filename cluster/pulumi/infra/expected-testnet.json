@@ -245,7 +245,7 @@
       },
       "spec": {
         "gateways": [
-          "cluster-ingress/cn-http-gateway"
+          "cluster-ingress/splice-http-gateway"
         ],
         "hosts": [
           "alertmanager.test.global.canton.network.digitalasset.com"
@@ -895,7 +895,7 @@
       },
       "spec": {
         "gateways": [
-          "cluster-ingress/cn-public-http-gateway"
+          "cluster-ingress/splice-public-http-gateway"
         ],
         "hosts": [
           "public.test.global.canton.network.digitalasset.com"
@@ -962,7 +962,7 @@
       },
       "spec": {
         "gateways": [
-          "cluster-ingress/cn-http-gateway"
+          "cluster-ingress/splice-http-gateway"
         ],
         "hosts": [
           "grafana.test.global.canton.network.digitalasset.com"
@@ -2678,7 +2678,7 @@
       },
       "spec": {
         "gateways": [
-          "cluster-ingress/cn-http-gateway"
+          "cluster-ingress/splice-http-gateway"
         ],
         "hosts": [
           "prometheus.test.global.canton.network.digitalasset.com"

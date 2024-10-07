@@ -1,7 +1,7 @@
 import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 
 def main() {
-  val dars = decode[Seq[String]](sys.env.get("CN_APP_DARS").getOrElse("[]")).getOrElse(
+  val dars = decode[Seq[String]](sys.env.get("SPLICE_APP_DARS").getOrElse("[]")).getOrElse(
     sys.error("Failed to parse dars list")
   )
 
