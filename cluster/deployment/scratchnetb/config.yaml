@@ -1,0 +1,4 @@
+infra:
+  ipWhitelisting:
+    extraWhitelistedIngress:
+      - "35.225.102.103/32" # CI GKE cluster for CCI

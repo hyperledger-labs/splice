@@ -1,0 +1,3 @@
+infra:
+  ipWhitelisting:
+    extraWhitelistedIngress: []
