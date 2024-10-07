@@ -27,6 +27,7 @@ class AcsSnapshotStoreTest
     with AcsJdbcTypes
     with AcsTables {
 
+  private val DefaultMigrationId = 0L
   private val timestamp1 = CantonTimestamp.Epoch.plusSeconds(3600)
   private val timestamp2 = CantonTimestamp.Epoch.plusSeconds(3600 * 2)
   private val timestamp3 = CantonTimestamp.Epoch.plusSeconds(3600 * 3)
@@ -41,7 +42,7 @@ class AcsSnapshotStoreTest
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
-          result <- store.lookupSnapshotBefore(0L, CantonTimestamp.MaxValue)
+          result <- store.lookupSnapshotBefore(DefaultMigrationId, CantonTimestamp.MaxValue)
         } yield result should be(None)
       }
 
@@ -54,7 +55,7 @@ class AcsSnapshotStoreTest
             amuletRules(),
             timestamp1.minusSeconds(1L),
           )
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           result <- store.lookupSnapshotBefore(migrationId = 1L, CantonTimestamp.MaxValue)
         } yield result should be(None)
       }
@@ -70,9 +71,9 @@ class AcsSnapshotStoreTest
             amuletRules(),
             timestamp1.minusSeconds(1L),
           )
-          _ <- originalStore.insertNewSnapshot(None, timestamp1)
+          _ <- originalStore.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           result <- activeStore.lookupSnapshotBefore(
-            migrationId = activeStore.migrationId,
+            migrationId = activeStore.currentMigrationId,
             CantonTimestamp.MaxValue,
           )
         } yield result should be(None)
@@ -89,10 +90,10 @@ class AcsSnapshotStoreTest
                 openMiningRound(dsoParty, 0L, 1.0),
                 timestamp.minusSeconds(1L),
               )
-              snapshot <- store.insertNewSnapshot(None, timestamp)
+              snapshot <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp)
             } yield snapshot
           }
-          result <- store.lookupSnapshotBefore(0L, timestamp4)
+          result <- store.lookupSnapshotBefore(DefaultMigrationId, timestamp4)
         } yield result.map(_.snapshotRecordTime) should be(Some(timestamp3))
       }
 
@@ -109,8 +110,8 @@ class AcsSnapshotStoreTest
             amuletRules(),
             timestamp1.minusSeconds(1L),
           )
-          _ <- store.insertNewSnapshot(None, timestamp1)
-          result <- store.insertNewSnapshot(None, timestamp1).transform {
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          result <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1).transform {
             case Success(_) =>
               Failure(new RuntimeException("This insert shouldn't have succeeded!"))
             case Failure(ex)
@@ -135,7 +136,7 @@ class AcsSnapshotStoreTest
                 amuletRules(),
                 timestamp1.minusSeconds(1L),
               )
-              _ <- store.insertNewSnapshot(None, timestamp1)
+              _ <- store.insertNewSnapshot(None, migrationId.toLong, timestamp1)
             } yield succeed
           }
           .map(_ => succeed)
@@ -162,7 +163,7 @@ class AcsSnapshotStoreTest
                 contracts(i),
                 timestamp.minusSeconds(10L).plusSeconds(i.toLong),
               )
-              _ <- store.insertNewSnapshot(None, timestamp)
+              _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp)
               contractsInSnapshot <- queryAll(store, timestamp)
             } yield contractsInSnapshot.createdEventsInPage.map(_.getContractId) should be(
               expectedContractsPerTimestamp(timestamp).map(_.contractId.contractId)
@@ -189,15 +190,15 @@ class AcsSnapshotStoreTest
             omr1,
             timestamp1.minusSeconds(2L),
           )
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           // t2
           _ <- ingestCreate(
             updateHistory,
             omr2,
             timestamp2.minusSeconds(1L),
           )
-          lastSnapshot <- store.lookupSnapshotBefore(0L, timestamp2)
-          _ <- store.insertNewSnapshot(lastSnapshot, timestamp2)
+          lastSnapshot <- store.lookupSnapshotBefore(DefaultMigrationId, timestamp2)
+          _ <- store.insertNewSnapshot(lastSnapshot, DefaultMigrationId, timestamp2)
           result <- queryAll(store, timestamp2)
         } yield result.createdEventsInPage.map(_.getContractId) should be(
           (acs ++ Seq(omr1, omr2)).map(_.contractId.contractId)
@@ -217,13 +218,13 @@ class AcsSnapshotStoreTest
           // t1
           _ <- ingestCreate(updateHistory, alwaysThere, timestamp1.minusSeconds(2L))
           _ <- ingestCreate(updateHistory, toArchive, timestamp1.minusSeconds(1L))
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           // t2
           _ <- ingestArchive(updateHistory, toArchive, timestamp2.minusSeconds(2L))
-          _ <- store.insertNewSnapshot(None, timestamp2)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp2)
           // t3
           _ <- ingestCreate(updateHistory, toCreateT3, timestamp3.minusSeconds(1L))
-          _ <- store.insertNewSnapshot(None, timestamp3)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp3)
           // querying at the end to prove anything happening in between doesn't matters
           afterT1 <- queryAll(store, timestamp1)
           afterT2 <- queryAll(store, timestamp2)
@@ -271,9 +272,9 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(1L),
             signatories = Seq(providerParty(1), providerParty(2)),
           )
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           resultParty1 <- store.queryAcsSnapshot(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
@@ -281,7 +282,7 @@ class AcsSnapshotStoreTest
             Seq.empty,
           )
           resultParty2 <- store.queryAcsSnapshot(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
@@ -289,7 +290,7 @@ class AcsSnapshotStoreTest
             Seq.empty,
           )
           resultBothParties <- store.queryAcsSnapshot(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
@@ -328,9 +329,9 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(1L),
             signatories = Seq(dsoParty),
           )
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           resultTemplate1 <- store.queryAcsSnapshot(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
@@ -338,7 +339,7 @@ class AcsSnapshotStoreTest
             Seq(PackageQualifiedName(t1.identifier)),
           )
           resultTemplate2 <- store.queryAcsSnapshot(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
@@ -381,9 +382,9 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(1L),
             signatories = Seq(providerParty(1)),
           )
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           result <- store.queryAcsSnapshot(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
@@ -408,7 +409,7 @@ class AcsSnapshotStoreTest
         ): Future[Vector[String]] = {
           store
             .queryAcsSnapshot(
-              0L,
+              DefaultMigrationId,
               timestamp1,
               after,
               PageLimit.tryCreate(1),
@@ -434,7 +435,7 @@ class AcsSnapshotStoreTest
               timestamp1.minusSeconds(10L - i.toLong),
             )
           }
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           result <- queryRecursive(store, None, Vector.empty)
         } yield {
           result should be(contracts.map(_.contractId.contractId))
@@ -478,16 +479,16 @@ class AcsSnapshotStoreTest
                 Seq(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner), dsoParty),
               )
           }
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           resultDso <- store.getHoldingsState(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
             Seq(dsoParty),
           )
           resultWanteds <- store.getHoldingsState(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
@@ -514,16 +515,16 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(10L),
             Seq(owner, holder),
           )
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           resultOwner <- store.getHoldingsState(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
             Seq(owner),
           )
           resultHolder <- store.getHoldingsState(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
@@ -571,21 +572,21 @@ class AcsSnapshotStoreTest
                 Seq(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner)),
               )
           }
-          _ <- store.insertNewSnapshot(None, timestamp1)
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           summaryAtRound3 <- store.getHoldingsSummary(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             Seq(wantedParty1, wantedParty2),
             asOfRound = 3L,
           )
           summaryAtRound10 <- store.getHoldingsSummary(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             Seq(wantedParty1, wantedParty2),
             asOfRound = 10L,
           )
           summaryAtRound100 <- store.getHoldingsSummary(
-            0L,
+            DefaultMigrationId,
             timestamp1,
             Seq(wantedParty1, wantedParty2),
             asOfRound = 100L,
@@ -593,7 +594,7 @@ class AcsSnapshotStoreTest
         } yield {
           summaryAtRound3 should be(
             AcsSnapshotStore.HoldingsSummaryResult(
-              0L,
+              DefaultMigrationId,
               timestamp1,
               3L,
               Map(
@@ -620,7 +621,7 @@ class AcsSnapshotStoreTest
           )
           summaryAtRound10 should be(
             AcsSnapshotStore.HoldingsSummaryResult(
-              0L,
+              DefaultMigrationId,
               timestamp1,
               10L,
               Map(
@@ -649,7 +650,7 @@ class AcsSnapshotStoreTest
           )
           summaryAtRound100 should be(
             AcsSnapshotStore.HoldingsSummaryResult(
-              0L,
+              DefaultMigrationId,
               timestamp1,
               100L,
               Map(
@@ -682,7 +683,7 @@ class AcsSnapshotStoreTest
   }
 
   private def mkUpdateHistory(
-      migrationId: Long = 0L,
+      migrationId: Long = DefaultMigrationId,
       participantId: String = "whatever",
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
@@ -697,7 +698,10 @@ class AcsSnapshotStoreTest
     updateHistory.ingestionSink.initialize().map(_ => updateHistory)
   }
 
-  private def mkStore(updateHistory: UpdateHistory, migrationId: Long = 0L): AcsSnapshotStore = {
+  private def mkStore(
+      updateHistory: UpdateHistory,
+      migrationId: Long = DefaultMigrationId,
+  ): AcsSnapshotStore = {
     new AcsSnapshotStore(
       // we're guaranteed to only execute the insert once (in the context of AcsSnapshotTrigger),
       // and the insert query is already complicated enough as-is, so I'm not gonna make it worse just for tests.
@@ -771,9 +775,10 @@ class AcsSnapshotStoreTest
   private def queryAll(
       store: AcsSnapshotStore,
       timestamp: CantonTimestamp,
+      migrationId: Long = DefaultMigrationId,
   ): Future[AcsSnapshotStore.QueryAcsSnapshotResult] = {
     store.queryAcsSnapshot(
-      0L,
+      migrationId,
       timestamp,
       None,
       PageLimit.tryCreate(1000),

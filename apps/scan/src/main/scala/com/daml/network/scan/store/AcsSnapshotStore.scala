@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class AcsSnapshotStore(
     storage: DbStorage,
     val updateHistory: UpdateHistory,
-    val migrationId: Long,
+    val currentMigrationId: Long,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, closeContext: CloseContext)
     extends AcsJdbcTypes
@@ -59,6 +59,7 @@ class AcsSnapshotStore(
 
   def insertNewSnapshot(
       lastSnapshot: Option[AcsSnapshot],
+      migrationId: Long,
       until: CantonTimestamp,
   )(implicit
       tc: TraceContext
