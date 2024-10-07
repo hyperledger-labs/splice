@@ -1,4 +1,3 @@
-import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   Auth0Client,
   auth0UserNameEnvVarSource,
@@ -39,7 +38,7 @@ export function installCantonComponents(
       sv1: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     };
-    sv1SvApp?: Release;
+    enableStateSync?: boolean;
   },
   dbs?: {
     participant: Postgres;

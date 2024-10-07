@@ -122,8 +122,7 @@ export type InstalledSv = {
 
 export async function installSvNode(
   baseConfig: SvConfig,
-  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig,
-  sv1SvApp?: k8s.helm.v3.Release
+  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
   const loopback = installSpliceHelmChart(
@@ -229,7 +228,6 @@ export async function installSvNode(
         ...config.nodeConfigs,
         self: { ...config.cometBft, nodeName: config.nodeName },
       },
-      sv1SvApp: sv1SvApp,
     },
     config
   );

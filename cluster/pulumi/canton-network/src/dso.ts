@@ -1,4 +1,3 @@
-import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import _ from 'lodash';
 import {
@@ -63,8 +62,7 @@ export class Dso extends pulumi.ComponentResource {
     },
     extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
-    isFirstSv = false,
-    sv1SvApp?: k8s.helm.v3.Release
+    isFirstSv = false
   ) {
     const defaultApprovedSvIdentities = approvedSvIdentities();
 
@@ -104,8 +102,7 @@ export class Dso extends pulumi.ComponentResource {
         onboardingPollingInterval: this.args.onboardingPollingInterval,
         sweep: svConf.sweep,
       },
-      this.args.decentralizedSynchronizerUpgradeConfig,
-      sv1SvApp
+      this.args.decentralizedSynchronizerUpgradeConfig
     );
   }
 
@@ -169,15 +166,7 @@ export class Dso extends pulumi.ComponentResource {
           peers: peerCometBftConfs.filter(c => c.id !== conf.cometBft.id), // remove self from peer list
         };
 
-        return this.installSvNode(
-          conf,
-          onboarding,
-          cometBft,
-          additionalSvIdentities,
-          [],
-          false,
-          sv1.svApp
-        );
+        return this.installSvNode(conf, onboarding, cometBft, additionalSvIdentities, [], false);
       })
     );
 
