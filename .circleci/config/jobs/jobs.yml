@@ -426,8 +426,7 @@ jobs:
       - cleanup_sbt_test_job
 
   wait_for_previous_pipeline:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     parameters:
@@ -465,8 +464,7 @@ jobs:
               << parameters.wait_type >>
 
   cancel_if_previous_pipeline:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     parameters:
@@ -509,8 +507,7 @@ jobs:
               $action
 
   cancel_previous_pipelines:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     parameters:
@@ -544,8 +541,7 @@ jobs:
               cancel_pipeline
 
   cancel_if_not_opt_in:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
@@ -562,8 +558,7 @@ jobs:
             fi
 
   cancel_if_current_commit_is_base_version:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
@@ -583,8 +578,7 @@ jobs:
           cluster: "ciupgrade"
 
   launch_ciupgrade_workflow:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
@@ -600,8 +594,7 @@ jobs:
           cluster: "ciupgrade"
 
   launch_ciperiodic_migration_workflow:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
@@ -621,12 +614,9 @@ jobs:
           cluster: "ciperiodic"
 
   wait_for_daml_upgrade:
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parameters:
       run:
         type: boolean
@@ -635,25 +625,16 @@ jobs:
         type: string
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn # VPN is required to get the effective date from SV-1
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Wait for vote to be effective
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
             if [[ << parameters.run >> == true ]]; then
               cncluster activate
               cncluster wait_for_daml_upgrade
             fi
-          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-          cmd_retry_count: 2
-          cmd_before_retry: |-
-            echo "VPN connection seems to have died, restarting VPN and retrying..."
-            /tmp/vpn-scripts/restart-vpn.sh
   test_DR:
     parameters:
       <<: *cluster-parameter
@@ -662,14 +643,9 @@ jobs:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
@@ -687,12 +663,6 @@ jobs:
           cmd: |
             cncluster activate
             cncluster disaster_recovery_test
-          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-          cmd_retry_count: 2
-          cmd_before_retry: |-
-            echo "VPN connection seems to have died, restarting VPN and retrying..."
-            /tmp/vpn-scripts/restart-vpn.sh
-            cncluster prefresh
 
   release_hold_set_scratchnet:
     docker:
@@ -705,8 +675,7 @@ jobs:
             .circleci/release-hold.sh "hold_set_scratchnet"
 
   trigger_pulumi_previews:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     steps:
       - checkout_with_retry
       - set_pr_target_branch
