@@ -38,6 +38,7 @@
         "multi-validator",
         "sv-canton",
         "validator1",
+        "splitwell",
         "circleci"
     ]
 }

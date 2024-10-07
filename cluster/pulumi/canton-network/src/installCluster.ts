@@ -6,8 +6,6 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   ExpectedValidatorOnboarding,
   isDevNet,
-  nonDevNetNonSvValidatorTopupConfig,
-  nonSvValidatorTopupConfig,
   sequencerPruningConfig,
   SplitPostgresInstances,
   svOnboardingPollingInterval,
@@ -27,7 +25,6 @@ import { activeVersion } from '../../common';
 import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';
 import { Dso } from './dso';
-import { installSplitwell } from './splitwell';
 
 /// Toplevel Chart Installs
 
@@ -97,25 +94,6 @@ export async function installCluster(
   const allSvs = await dso.allSvs;
 
   const svDependencies = allSvs.flatMap(sv => [sv.scan, sv.svApp, sv.validatorApp, sv.ingress]);
-
-  const nonSvComponentsDependencies = allSvs.flatMap(sv =>
-    [sv.scan, sv.svApp, sv.ingress].concat(sv.decentralizedSynchronizer.dependencies)
-  );
-
-  if (mustInstallSplitwell) {
-    await installSplitwell(
-      auth0Client,
-      'auth0|63e12e0415ad881ffe914e61',
-      'auth0|65de04b385816c4a38cc044f',
-      splitwellOnboarding.secret,
-      SplitPostgresInstances,
-      DecentralizedSynchronizerUpgradeConfig,
-      nonSvComponentsDependencies,
-      backupConfig.periodicBackupConfig,
-      backupConfig.bootstrappingDumpConfig,
-      isDevNet ? nonSvValidatorTopupConfig : nonDevNetNonSvValidatorTopupConfig
-    );
-  }
 
   installDocs();
 

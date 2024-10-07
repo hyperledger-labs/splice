@@ -1,4 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
+import * as postgres from 'splice-pulumi-common/src/postgres';
 import {
   Auth0Client,
   auth0UserNameEnvVar,
@@ -21,8 +22,6 @@ import { installMigrationSpecificValidatorParticipant } from 'splice-pulumi-comm
 import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
-import * as postgres from '../../common/src/postgres';
-
 export async function installSplitwell(
   auth0Client: Auth0Client,
   providerWalletUser: string,
@@ -30,7 +29,6 @@ export async function installSplitwell(
   onboardingSecret: string,
   splitPostgresInstances: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
-  dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
@@ -64,7 +62,7 @@ export async function installSplitwell(
     'splitwell',
     auth0Client.getCfg(),
     undefined,
-    imagePullDeps.concat(dependsOn).concat([loopback])
+    imagePullDeps.concat([loopback])
   );
 
   const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', 'sw-pg', true);
@@ -96,7 +94,7 @@ export async function installSplitwell(
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
     activeVersion,
-    { dependsOn: imagePullDeps.concat(dependsOn) }
+    { dependsOn: imagePullDeps }
   );
 
   const validatorPostgres =
@@ -104,7 +102,6 @@ export async function installSplitwell(
   const validatorDbName = 'val_splitwell';
 
   const extraDependsOn = imagePullDeps
-    .concat(dependsOn)
     .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'splice'))
     .concat(await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell', 'cn'));
 
