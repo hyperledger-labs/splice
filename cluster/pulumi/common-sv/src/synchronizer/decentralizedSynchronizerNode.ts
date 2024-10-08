@@ -88,7 +88,7 @@ export class InStackDecentralizedSynchronizerNode
         sv1: StaticCometBftConfigWithNodeName;
         peers: StaticCometBftConfigWithNodeName[];
       };
-      stateSyncEnabled?: boolean;
+      enableStateSync?: boolean;
     },
     active: boolean,
     runningMigration: boolean,
@@ -115,7 +115,7 @@ export class InStackDecentralizedSynchronizerNode
       runningMigration,
       logLevel.toLowerCase(),
       version,
-      cometbft.stateSyncEnabled,
+      cometbft.enableStateSync,
       {
         ...opts,
         parent: this,
