@@ -738,6 +738,7 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
     '      "_2": "0.00001"\n' +
     '    }\n' +
     '  ]\n' +
-    '}</pre></div></li></div>'.trim()
+    '}</pre></div></li>' +
+    '<li data-key="transferPreapprovalFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">transferPreapprovalFee</div><div class="jsondiffpatch-value"><pre>null</pre></div></li></div>'.trim()
   );
 }

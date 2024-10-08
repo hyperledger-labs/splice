@@ -211,6 +211,7 @@ export const amuletRules = {
                 },
               ],
             },
+            transferPreapprovalFee: null,
           },
           futureValues: [],
         },

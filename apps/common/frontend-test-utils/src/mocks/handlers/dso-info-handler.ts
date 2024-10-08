@@ -490,6 +490,7 @@ export function getAmuletConfig(createFee: string) {
         },
       ],
     },
+    transferPreapprovalFee: null,
   };
 }
 
