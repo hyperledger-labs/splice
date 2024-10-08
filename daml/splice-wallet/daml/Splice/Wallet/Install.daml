@@ -20,6 +20,7 @@ import Splice.Wallet.Subscriptions
 import Splice.Wallet.TransferOffer
 import Splice.Wallet.BuyTrafficRequest
 import Splice.Wallet.TopUpState
+import Splice.Wallet.TransferPreapproval
 import Prelude hiding (forA)
 import Splice.Util
 
@@ -86,6 +87,10 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
       -- creates TransferPreapproval via the wallet
       resultE <- catchAll $ handleCreateTransferPreapproval expiresAt
       handleResult COO_CreateTransferPreapproval resultE
+    CO_AcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt -> do
+      -- creates TransferPreapproval via the wallet
+      resultE <- catchAll $ handleAcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt
+      handleResult COO_AcceptTransferPreapprovalProposal resultE
     CO_RenewTransferPreapproval previousApprovalCid newExpiresAt -> do
       resultE <- catchAll $ handleRenewTransferPreapproval previousApprovalCid newExpiresAt
       handleResult COO_RenewTransferPreapproval resultE
@@ -239,6 +244,15 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         expiresAt
       pure (transferPreapprovalCid, transferResult.senderChangeAmulet)
 
+    handleAcceptTransferPreapprovalProposal : ContractId TransferPreapprovalProposal -> Time -> Update (ContractId TransferPreapproval2, Optional (ContractId Amulet))
+    handleAcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt = do
+      require "Only a validator can accept a proposal to create a transfer preapproval" (executionContext.endUser == executionContext.validator)
+      TransferPreapprovalProposal_AcceptResult{..} <- exercise preapprovalProposalCid TransferPreapprovalProposal_Accept with
+        context = executionContext.paymentContext
+        inputs
+        expiresAt
+      pure (transferPreapprovalCid, transferResult.senderChangeAmulet)
+
     handleRenewTransferPreapproval : ContractId TransferPreapproval2 -> Time -> Update (ContractId TransferPreapproval2, Optional (ContractId Amulet))
     handleRenewTransferPreapproval previousApprovalCid newExpiresAt = do
       TransferPreapproval2_RenewResult{..} <- exercise previousApprovalCid TransferPreapproval2_Renew with
@@ -290,7 +304,11 @@ data AmuletOperation
   | CO_CreateExternalPartySetupProposal with
       externalParty : Party
       preapprovalExpiresAt : Time
+  -- TODO(#15035) - Remove once the backend switches to using CO_AcceptTransferPreapprovalProposal
   | CO_CreateTransferPreapproval with
+      expiresAt : Time
+  | CO_AcceptTransferPreapprovalProposal with
+      preapprovalProposalCid: ContractId TransferPreapprovalProposal
       expiresAt : Time
   | CO_RenewTransferPreapproval with
       previousApprovalCid : ContractId TransferPreapproval2
@@ -319,7 +337,9 @@ data AmuletOperationOutcome
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   | COO_TransferPreapprovalSend (Optional (ContractId Amulet))
   | COO_CreateExternalPartySetupProposal (ContractId ExternalPartySetupProposal2)
+  -- TODO(#15035) - Remove once the backend switches to using CO_AcceptTransferPreapprovalProposal
   | COO_CreateTransferPreapproval (ContractId TransferPreapproval2)
+  | COO_AcceptTransferPreapprovalProposal (ContractId TransferPreapproval2)
   | COO_RenewTransferPreapproval (ContractId TransferPreapproval2)
   | COO_TransferPreapproval2Send (Optional (ContractId Amulet))
   deriving (Eq, Show)
@@ -400,6 +420,10 @@ data WalletAppInstall_FeaturedAppRights_CancelResult = WalletAppInstall_Featured
 data WalletAppInstall_FeaturedAppRights_SelfGrantResult = WalletAppInstall_FeaturedAppRights_SelfGrantResult
   with
     featuredAppRight : ContractId FeaturedAppRight
+
+data WalletAppInstall_TransferPreapprovalProposal_CreateResult = WalletAppInstall_TransferPreapprovalProposal_CreateResult
+  with
+    preapprovalProposalCid : ContractId TransferPreapprovalProposal
 
 template WalletAppInstall
   with
