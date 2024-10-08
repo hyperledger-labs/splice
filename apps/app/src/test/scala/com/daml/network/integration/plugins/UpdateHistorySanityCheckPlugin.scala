@@ -15,10 +15,13 @@ import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.Inspectors
+import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.time.{Millis, Span}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.concurrent.duration.*
 import scala.sys.process.ProcessLogger
 import scala.util.control.NonFatal
 
@@ -35,6 +38,7 @@ class UpdateHistorySanityCheckPlugin(
     protected val loggerFactory: NamedLoggerFactory,
 ) extends EnvironmentSetupPlugin[EnvironmentImpl, SpliceTestConsoleEnvironment]
     with Matchers
+    with Eventually
     with Inspectors
     with ScalaFuturesWithPatience {
 
@@ -48,6 +52,7 @@ class UpdateHistorySanityCheckPlugin(
       config: SpliceConfig,
       environment: SpliceTestConsoleEnvironment,
   ): Unit = {
+    // TODO(#14270): actually, we should be able to run this against any scan app, not just SV1
     // Only SV1 will work.
     // Also, it might not be initialized if the test uses `manualStart` and it wasn't ever started.
     environment.scans.local.find(scan => scan.name == scanName && scan.is_initialized).foreach {
@@ -119,6 +124,43 @@ class UpdateHistorySanityCheckPlugin(
           case reassignmentMembers.UpdateHistoryUnassignment(event) =>
             paginateHistory(scan, Some((event.migrationId, last.recordTime)))
         }
+    }
+  }
+
+  // TODO(#14270): use this before running the scan_txlog.py script against a joining SV
+  def waitUntilBackfillingComplete(
+      scan: ScanAppBackendReference
+  ): Unit = {
+    // Backfilling is initialized by ScanHistoryBackfillingTrigger, which should take 1-2 trigger invocations
+    // to complete.
+    // Most integration tests use config transforms to reduce the polling interval to 1sec,
+    // but some tests might not use the transforms and end up with the default long polling interval.
+    val estimatedTimeUntilBackfillingComplete =
+      2 * scan.config.automation.pollingInterval.underlying + 5.seconds
+
+    if (estimatedTimeUntilBackfillingComplete > 30.seconds) {
+      logger.warn(
+        s"Scan ${scan.name} has a long polling interval of ${scan.config.automation.pollingInterval.underlying}. " +
+          "Please disable UpdateHistorySanityCheckPlugin for this test or reduce the polling interval to avoid long waits."
+      )(TraceContext.empty)
+    }
+
+    withClue(s"Waiting for backfilling to complete on ${scan.name}") {
+      val patienceConfigForBackfillingInit: PatienceConfig =
+        PatienceConfig(
+          timeout = estimatedTimeUntilBackfillingComplete,
+          interval = Span(100, Millis),
+        )
+      eventually {
+        scan.automation.store.updateHistory
+          .getBackfillingState()(TraceContext.empty)
+          .futureValue
+          .exists(_.complete) should be(true)
+      }(
+        patienceConfigForBackfillingInit,
+        implicitly[org.scalatest.enablers.Retrying[org.scalatest.Assertion]],
+        implicitly[org.scalactic.source.Position],
+      )
     }
   }
 }
