@@ -1845,7 +1845,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26016
         },
         "logLevel": "debug",
@@ -1967,7 +1967,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26116
         },
         "logLevel": "debug",
@@ -3296,7 +3296,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26026
         },
         "logLevel": "info",
@@ -3414,7 +3414,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26126
         },
         "logLevel": "info",
@@ -4705,7 +4705,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26036
         },
         "logLevel": "info",
@@ -4823,7 +4823,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26136
         },
         "logLevel": "info",
@@ -6114,7 +6114,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26046
         },
         "logLevel": "info",
@@ -6232,7 +6232,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26146
         },
         "logLevel": "info",

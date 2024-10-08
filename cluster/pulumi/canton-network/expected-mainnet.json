@@ -607,7 +607,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26016
         },
         "logLevel": "debug",

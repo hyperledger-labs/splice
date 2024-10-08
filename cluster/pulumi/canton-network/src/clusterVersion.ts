@@ -29,7 +29,7 @@ export function installClusterVersion(): k8s.apiextensions.CustomResource {
       },
       spec: {
         hosts: [host],
-        gateways: ['cluster-ingress/splice-http-gateway'],
+        gateways: ['cluster-ingress/cn-http-gateway'],
         http: [
           {
             match: [

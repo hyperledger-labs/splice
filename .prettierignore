@@ -1,2 +1,4 @@
 .circleci/config.yml
 README.md
+
+**/*.yaml
