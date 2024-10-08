@@ -1,5 +1,4 @@
 import * as postgres from 'splice-pulumi-common/src/postgres';
-import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Output } from '@pulumi/pulumi';
 import { DecentralizedSynchronizerMigrationConfig, ExactNamespace } from 'splice-pulumi-common';
 import {
@@ -24,7 +23,6 @@ export function installCanton(
       sv1: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     };
-    sv1SvApp?: Release;
   },
   svConfig: SvConfig
 ): InstalledMigrationSpecificSv {
@@ -83,7 +81,11 @@ export function installCanton(
             isCoreSv: true,
           },
           decentralizedSynchronizerMigrationConfig,
-          cometbft,
+          {
+            ...cometbft,
+            // State sync doesn't make sense in the main stack, as all the cometbft nodes are started at the same time
+            enableStateSync: false,
+          },
           {
             participant: participantPostgres,
             mediator: mediatorPostgres,

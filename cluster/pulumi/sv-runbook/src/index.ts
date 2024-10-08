@@ -1,5 +1,5 @@
-import { Auth0Fetch } from 'splice-pulumi-common';
-import { Auth0ClientType, getAuth0Config, svRunbookConfig } from 'splice-pulumi-common-sv';
+import { Auth0ClientType, getAuth0Config, Auth0Fetch } from 'splice-pulumi-common';
+import { svRunbookConfig } from 'splice-pulumi-common-sv';
 
 import { installNode } from './installNode';
 import {

@@ -47,6 +47,10 @@ case class ScanAppBackendConfig(
     // TODO(#13301) Remove this flag
     supportsSoftDomainMigrationPoc: Boolean = false,
     spliceInstanceNames: SpliceInstanceNamesConfig,
+    // TODO(#14270): Remove these flags and let the scan app periodically fetch all remote scans from DsoRules
+    updateHistoryBackfillEnabled: Boolean = false,
+    updateHistoryBackfillFromScanURL: Option[String] = None,
+    updateHistoryBackfillBatchSize: Int = 100,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {

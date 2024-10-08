@@ -12,7 +12,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -42,7 +42,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "loopback",
     "provider": "",

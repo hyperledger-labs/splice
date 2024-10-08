@@ -65,7 +65,7 @@ export function installParticipant(
     const release = installSpliceHelmChart(
       xns,
       name,
-      'cn-participant',
+      'splice-participant',
       {
         ...participantValuesWithSpecifiedAud,
         logLevel,
@@ -86,7 +86,7 @@ export function installParticipant(
         },
         additionalJvmOptions: jmxOptions(),
         enablePostgresMetrics: true,
-        ...autoInitValues('cn-participant', version, nodeIdentifier),
+        ...autoInitValues('splice-participant', version, nodeIdentifier),
       },
       version,
       {

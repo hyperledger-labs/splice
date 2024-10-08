@@ -18,8 +18,6 @@ function get_stack_for_namespace() {
   local stack=""
   if [[ "${namespace}" =~ sv.* ]]; then
     stack="canton-network"
-  elif [ "$namespace" == "splitwell" ]; then
-      stack="canton-network"
   else
       stack="$namespace"
   fi

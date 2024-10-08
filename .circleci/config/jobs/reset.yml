@@ -1,6 +1,6 @@
 jobs:
-
   reset_cluster:
+    executor: self_hosted
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
@@ -13,18 +13,11 @@ jobs:
       extra_migrations_reset:
         type: string
         default: ""
-    machine:
-      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: "Install pulumi packages" #required for ts-node to reset sv-canton stacks
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
@@ -63,13 +56,10 @@ jobs:
           cluster: << parameters.cluster >>
 
   reset_sv_runbook:
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
@@ -78,10 +68,7 @@ jobs:
         default: false
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
@@ -104,22 +91,16 @@ jobs:
           cluster: << parameters.cluster >>
 
   reset_validator_runbook:
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>

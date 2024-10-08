@@ -1330,7 +1330,7 @@ stack itself.
 
 The participant admin user needs to be allocated during participant initialization.
 Its desired user name is specified through the `CANTON_PARTICIPANT_ADMIN_USER_NAME` environment variable.
-When using the `cn-participant` helm chart,
+When using the `splice-participant` helm chart,
 you can supply an environment variable source for obtaining the admin user name from a k8s secret,
 via the `participantAdminUserNameFrom` value on the helm chart.
 

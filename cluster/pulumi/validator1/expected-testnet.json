@@ -142,28 +142,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "secret": "dmFsaWRhdG9yMXNlY3JldDI="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-validator-onboarding-validator",
-        "namespace": "validator1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-validator1-validator-onboarding-validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "postgresPassword": ""
         }
       },
@@ -205,6 +183,28 @@
     "name": "organization/infra/infra.test",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldDI="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-validator",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-validator1-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
   },
   {
     "custom": true,
@@ -338,7 +338,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -379,7 +379,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -460,7 +460,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -493,7 +493,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -512,7 +512,88 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "dnsName": "test.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "test.global.canton.network.digitalasset.com",
+          "name": "cn-testnet"
+        },
+        "clusterUrl": "test.global.canton.network.digitalasset.com",
+        "disableAutoInit": false,
+        "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
+        "metrics": {
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 1
+          }
+        },
+        "nodeIdentifier": "validator1",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "splice-app-validator-ledger-api-auth",
+            "optional": false
+          }
+        },
+        "persistence": {
+          "databaseName": "participant_1",
+          "postgresName": "participant-pg",
+          "schema": "participant",
+          "secretName": "participant-pg-secrets"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.1.19"
+    },
+    "name": "validator1-participant-1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "splice-participant",
+      "compat": "true",
+      "name": "participant-2",
+      "namespace": "validator1",
+      "repositoryOpts": {
+        "password": "s3cr3t",
+        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+        "username": "art_user"
+      },
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -547,8 +628,8 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
-            "id": 1
+            "active": false,
+            "id": 2
           }
         },
         "participantAdminUserNameFrom": {
@@ -559,7 +640,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_1",
+          "databaseName": "participant_2",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -572,9 +653,9 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
-    "name": "validator1-participant-1",
+    "name": "validator1-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -651,7 +732,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -695,7 +776,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -774,7 +855,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "art_user"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
@@ -874,7 +955,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

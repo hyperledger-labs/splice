@@ -2,5 +2,7 @@
 # without having to wait for the whole nix download.
 
 GitPython
+gql
 marshmallow-dataclass
 requests
+requests_toolbelt

@@ -24,7 +24,7 @@ export interface BaseVotesHooks {
     requester?: string,
     effectiveFrom?: string,
     effectiveTo?: string,
-    executed?: boolean
+    accepted?: boolean
   ) => UseQueryResult<DsoRules_CloseVoteRequestResult[]>;
   useListVotes: (contractIds: ContractId<VoteRequest>[]) => UseQueryResult<SvVote[]>;
   useDsoInfos: () => UseQueryResult<DsoInfo>;

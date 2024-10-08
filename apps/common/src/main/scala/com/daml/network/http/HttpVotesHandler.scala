@@ -10,6 +10,10 @@ import com.daml.network.store.{PageLimit, VotesStore}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
+import com.daml.network.util.Contract
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
+import cats.syntax.either.*
+import com.digitalasset.canton.util.ErrorUtil
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -51,12 +55,17 @@ trait HttpVotesHandler extends Spanning with NamedLogging {
       } yield {
         definitions.ListDsoRulesVoteResultsResponse(
           voteResults
-            .map(_.toJson)
-            .map(json =>
+            .map(voteResult => {
               io.circe.parser
-                .parse(json)
-                .getOrElse(throw new IllegalStateException(s"Failed to parse $json"))
-            )
+                .parse(
+                  ApiCodecCompressed
+                    .apiValueToJsValue(Contract.javaValueToLfValue(voteResult.toValue))
+                    .compactPrint
+                )
+                .valueOr(err =>
+                  ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")
+                )
+            })
             .toVector
         )
       }

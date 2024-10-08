@@ -7,10 +7,16 @@ import com.daml.network.automation.{TriggerContext, TriggerEnabledSynchronizatio
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TreeUpdate}
+import com.daml.network.environment.ledger.api.{LedgerClient, TransactionTreeUpdate, TreeUpdate}
 import com.daml.network.scan.store.AcsSnapshotStore
 import com.daml.network.scan.store.AcsSnapshotStore.AcsSnapshot
-import com.daml.network.store.{PageLimit, TreeUpdateWithMigrationId, UpdateHistory}
+import com.daml.network.store.{
+  HistoryBackfilling,
+  PageLimit,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+}
+import com.daml.network.util.DomainRecordTimeRange
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
@@ -33,17 +39,15 @@ class AcsSnapshotTriggerTest
 
     "when there's a previous snapshot" should {
 
-      "do nothing if the next task is not yet due" in new AcsSnapshotTriggerTestScope {
-        def snapshotPeriodHours = 1
-
+      "do nothing if the next task is not yet due" in new AcsSnapshotTriggerTestScope(false) {
         previousSnapshot(now.minusSeconds(60L))
 
         trigger.retrieveTasks().futureValue should be(Seq.empty)
       }
 
-      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope {
-        def snapshotPeriodHours = 1
-
+      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         // The snapshot was taken more than an hour ago, so the next snapshot is due
         val lastSnapshotTime = now.minusSeconds(3700L)
         previousSnapshot(lastSnapshotTime)
@@ -51,7 +55,7 @@ class AcsSnapshotTriggerTest
         // but there's still updates pending
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, lastSnapshotTime.plusSeconds(3600L)))),
+            eqTo(Some((currentMigrationId, lastSnapshotTime.plusSeconds(3600L)))),
             eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
@@ -60,50 +64,40 @@ class AcsSnapshotTriggerTest
         trigger.retrieveTasks().futureValue should be(Seq.empty)
       }
 
-      "return the new task when due and no updates pending" in new AcsSnapshotTriggerTestScope {
-        def snapshotPeriodHours = 1
-
+      "return the new task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         // The snapshot was taken more than an hour ago, so the next snapshot is due
         val lastSnapshotTime = now.minusSeconds(3700L)
         val lastSnapshot = previousSnapshot(lastSnapshotTime)
 
         // there are no pending updates
-        when(
-          updateHistory.getUpdates(
-            eqTo(Some((migrationId, lastSnapshotTime.plusSeconds(3600L)))),
-            eqTo(true),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(
-          Future.successful(
-            Seq(
-              TreeUpdateWithMigrationId(
-                GetTreeUpdatesResponse(
-                  treeUpdate(lastSnapshotTime.plusSeconds(3700L)),
-                  dummyDomain,
-                ),
-                1L,
-              )
-            )
-          )
+        firstUpdateAt(
+          currentMigrationId,
+          queryRecordTime = lastSnapshotTime.plusSeconds(3600L),
+          updateRecordTime = lastSnapshotTime.plusSeconds(3700L),
         )
 
         trigger.retrieveTasks().futureValue should be(
-          Seq(AcsSnapshotTrigger.Task(lastSnapshotTime.plusSeconds(3600L), Some(lastSnapshot)))
+          Seq(
+            AcsSnapshotTrigger.Task(
+              lastSnapshotTime.plusSeconds(3600L),
+              currentMigrationId,
+              Some(lastSnapshot),
+            )
+          )
         )
       }
 
     }
 
     "when there's no previous snapshot" should {
-      "do nothing if only an ACS import is present" in new AcsSnapshotTriggerTestScope {
-        def snapshotPeriodHours = 1
-
+      "do nothing if only an ACS import is present" in new AcsSnapshotTriggerTestScope(false) {
         noPreviousSnapshot()
 
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
             eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
@@ -112,15 +106,15 @@ class AcsSnapshotTriggerTest
         trigger.retrieveTasks().futureValue should be(Seq.empty)
       }
 
-      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope {
-        def snapshotPeriodHours = 1
-
+      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         noPreviousSnapshot()
 
         // data after ACS
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
             eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
@@ -140,7 +134,7 @@ class AcsSnapshotTriggerTest
         // but there's still updates pending
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, firstSnapshotTime))),
+            eqTo(Some((currentMigrationId, firstSnapshotTime))),
             eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
@@ -149,15 +143,15 @@ class AcsSnapshotTriggerTest
         trigger.retrieveTasks().futureValue should be(Seq.empty)
       }
 
-      "return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope {
-        def snapshotPeriodHours = 1
-
+      "when not backfilling: return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         noPreviousSnapshot()
 
         // data after ACS
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
             eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
@@ -178,7 +172,7 @@ class AcsSnapshotTriggerTest
         // no updates pending
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, firstSnapshotTime))),
+            eqTo(Some((currentMigrationId, firstSnapshotTime))),
             eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
@@ -194,21 +188,254 @@ class AcsSnapshotTriggerTest
         )
 
         trigger.retrieveTasks().futureValue should be(
-          Seq(AcsSnapshotTrigger.Task(firstSnapshotTime, None))
+          Seq(AcsSnapshotTrigger.Task(firstSnapshotTime, currentMigrationId, None))
         )
       }
 
-      "return the first task when due and no updates pending between 23:00 and 00:00" in new AcsSnapshotTriggerTestScope {
+      "when historyBackfilling=true" should {
+
+        "when update history backfilling has not finished: return no task" in new AcsSnapshotTriggerTestScope(
+          true
+        ) {
+          noPreviousSnapshot()
+
+          // data after ACS
+          when(
+            updateHistory.getUpdates(
+              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+              eqTo(true),
+              eqTo(PageLimit.tryCreate(1)),
+            )(any[TraceContext])
+          ).thenReturn(
+            Future.successful(
+              Seq(
+                TreeUpdateWithMigrationId(
+                  GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
+                  1L,
+                )
+              )
+            )
+          )
+
+          historyBackfilled(currentMigrationId, complete = false)
+
+          trigger.retrieveTasks().futureValue should be(empty)
+        }
+
+        // this is the case of when an SV joins late (and the history is backfilled),
+        // or was present at the beginning of a migration (no backfilling required).
+        "when update history backfilling has finished: return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
+          true
+        ) {
+          noPreviousSnapshot()
+
+          // data after ACS
+          when(
+            updateHistory.getUpdates(
+              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+              eqTo(true),
+              eqTo(PageLimit.tryCreate(1)),
+            )(any[TraceContext])
+          ).thenReturn(
+            Future.successful(
+              Seq(
+                TreeUpdateWithMigrationId(
+                  GetTreeUpdatesResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
+                  1L,
+                )
+              )
+            )
+          )
+
+          historyBackfilled(currentMigrationId, complete = true)
+
+          val firstSnapshotTime =
+            CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T10:00:00.00Z"))
+
+          // no updates pending
+          when(
+            updateHistory.getUpdates(
+              eqTo(Some((currentMigrationId, firstSnapshotTime))),
+              eqTo(true),
+              eqTo(PageLimit.tryCreate(1)),
+            )(any[TraceContext])
+          ).thenReturn(
+            Future.successful(
+              Seq(
+                TreeUpdateWithMigrationId(
+                  GetTreeUpdatesResponse(treeUpdate(now.plusSeconds(1800L)), dummyDomain),
+                  1L,
+                )
+              )
+            )
+          )
+
+          trigger.retrieveTasks().futureValue should be(
+            Seq(AcsSnapshotTrigger.Task(firstSnapshotTime, currentMigrationId, None))
+          )
+        }
+
+        "when the current migration id is complete" should {
+
+          "return no task if the previous migration id is not backfilled" in new AcsSnapshotTriggerTestScope(
+            true
+          ) {
+            // no snapshot needed for the current migration id
+            historyBackfilled(currentMigrationId, complete = true)
+            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
+
+            // therefore we attempt to backfill the previous migration id,
+            // but that one is not yet backfilled
+            historyBackfilled(currentMigrationId - 1, complete = false)
+
+            trigger.retrieveTasks().futureValue should be(Seq.empty)
+            trigger.isDoneBackfillingAcsSnapshots should be(false)
+          }
+
+          "return the first task to backfill the previous migration id" in new AcsSnapshotTriggerTestScope(
+            true
+          ) {
+            // no snapshot needed for the current migration id
+            historyBackfilled(currentMigrationId, complete = true)
+            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
+
+            // therefore we attempt to backfill the previous migration id,
+            // which is backfilled
+            val previousMigrationId = currentMigrationId - 1
+            historyBackfilled(previousMigrationId, complete = true)
+            // last update happened on 2007-11-03T10:15:30.00Z
+            recordTimeRange(previousMigrationId, cantonTimestamp("2007-11-03T10:15:30.00Z"))
+            noPreviousSnapshot(previousMigrationId)
+            firstUpdateAt(
+              previousMigrationId,
+              queryRecordTime = CantonTimestamp.MinValue.plusSeconds(1L),
+              // first update happened 10d ~3h before the last update
+              updateRecordTime = cantonTimestamp("2007-01-03T07:55:30.00Z"),
+            )
+
+            trigger.retrieveTasks().futureValue should be(
+              Seq(
+                AcsSnapshotTrigger.Task(
+                  // the next hour after 07:55:30.00Z, on the same day
+                  cantonTimestamp("2007-01-03T08:00:00.00Z"),
+                  currentMigrationId - 1,
+                  None,
+                )
+              )
+            )
+            trigger.isDoneBackfillingAcsSnapshots should be(false)
+          }
+
+          "continue backfilling a previous migration id where it left off" in new AcsSnapshotTriggerTestScope(
+            true
+          ) {
+            // no snapshot needed for the current migration id
+            historyBackfilled(currentMigrationId, complete = true)
+            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
+
+            // therefore we attempt to backfill the previous migration id,
+            // which is backfilled
+            val previousMigrationId = currentMigrationId - 1
+            historyBackfilled(previousMigrationId, complete = true)
+            // last update happened on 2007-11-03T10:15:30.00Z
+            recordTimeRange(previousMigrationId, cantonTimestamp("2007-11-03T10:15:30.00Z"))
+            // there was already a snapshot at 8
+            val lastSnapshot =
+              previousSnapshot(cantonTimestamp("2007-01-03T08:00:00.00Z"), previousMigrationId)
+
+            trigger.retrieveTasks().futureValue should be(
+              Seq(
+                AcsSnapshotTrigger.Task(
+                  // so the next one needs to happen at 9
+                  cantonTimestamp("2007-01-03T09:00:00.00Z"),
+                  currentMigrationId - 1,
+                  Some(lastSnapshot),
+                )
+              )
+            )
+            trigger.isDoneBackfillingAcsSnapshots should be(false)
+          }
+
+          "once done with a migration id, it moves on to the next (previous) one" in new AcsSnapshotTriggerTestScope(
+            true
+          ) {
+            // no snapshot needed for the current migration id
+            historyBackfilled(currentMigrationId, complete = true)
+            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
+
+            // the previous migration id history & snapshots are backfilled
+            val previousMigrationId = currentMigrationId - 1
+            historyBackfilled(previousMigrationId, complete = true)
+            // last update happened on 2007-11-03T10:15:30.00Z
+            recordTimeRange(previousMigrationId, cantonTimestamp("2007-11-03T10:15:30.00Z"))
+            // the last possible snapshot for the migration id already exists,
+            // note that the snapshot at T11 will not be done to avoid issues with recovery of a past migration id.
+            previousSnapshot(cantonTimestamp("2007-11-03T10:00:00.00Z"), previousMigrationId)
+
+            // so we move on to the previous-previous migration id
+            historyBackfilled(previousMigrationId - 1, complete = true)
+            // last update happened on 2007-11-24T19:25:30.00Z
+            recordTimeRange(previousMigrationId - 1, cantonTimestamp("2007-11-24T19:25:30.00Z"))
+            noPreviousSnapshot(previousMigrationId - 1)
+            // first update at 2007-11-20T10:15:30.00Z
+            firstUpdateAt(
+              previousMigrationId - 1,
+              queryRecordTime = CantonTimestamp.MinValue.plusSeconds(1L),
+              updateRecordTime = cantonTimestamp("2007-11-20T10:15:30.00Z"),
+            )
+
+            trigger.retrieveTasks().futureValue should be(
+              Seq(
+                AcsSnapshotTrigger.Task(
+                  cantonTimestamp("2007-11-20T11:00:00.00Z"),
+                  // previous to previous
+                  previousMigrationId - 1,
+                  None,
+                )
+              )
+            )
+            trigger.isDoneBackfillingAcsSnapshots should be(false)
+          }
+
+          "stop backfilling once all previous migration ids have been backfilled" in new AcsSnapshotTriggerTestScope(
+            true
+          ) {
+            // no snapshot needed for the current migration id
+            historyBackfilled(currentMigrationId, complete = true)
+            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
+
+            def migrationIdIsBackfilled(migrationId: Long) = {
+              // the previous migration id history & snapshots are backfilled
+              historyBackfilled(migrationId, complete = true)
+              // last update happened on 2007-11-03T10:15:30.00Z
+              recordTimeRange(migrationId, cantonTimestamp(s"200${migrationId}-11-03T10:15:30.00Z"))
+              // the last possible snapshot for the migration id already exists
+              previousSnapshot(
+                cantonTimestamp(s"200${migrationId}-11-03T11:00:00.00Z"),
+                migrationId,
+              )
+            }
+            ((currentMigrationId - 1) to 0 by -1).foreach(migrationIdIsBackfilled)
+
+            trigger.retrieveTasks().futureValue should be(Seq.empty)
+            trigger.isDoneBackfillingAcsSnapshots should be(true)
+          }
+
+        }
+
+      }
+
+      "return the first task when due and no updates pending between 23:00 and 00:00" in new AcsSnapshotTriggerTestScope(
+        false
+      ) {
         override def now =
           CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T23:15:30.00Z"))
-        def snapshotPeriodHours = 1
-
         noPreviousSnapshot()
 
         // data after ACS
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
+            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
             eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
@@ -229,7 +456,7 @@ class AcsSnapshotTriggerTest
         // no updates pending
         when(
           updateHistory.getUpdates(
-            eqTo(Some((migrationId, firstSnapshotTime))),
+            eqTo(Some((currentMigrationId, firstSnapshotTime))),
             eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
@@ -259,12 +486,17 @@ class AcsSnapshotTriggerTest
 
   }
 
-  trait AcsSnapshotTriggerTestScope {
-    def snapshotPeriodHours: Int
+  abstract class AcsSnapshotTriggerTestScope(
+      updateHistoryBackfillEnabled: Boolean,
+      val currentMigrationId: Long = 5L,
+  ) {
+    final def snapshotPeriodHours: Int = 1
 
     val clock = new SimClock(loggerFactory = loggerFactory)
 
-    def now = CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T10:15:30.00Z"))
+    def cantonTimestamp(isoStr: String) =
+      CantonTimestamp.assertFromInstant(java.time.Instant.parse(isoStr))
+    def now = cantonTimestamp("2007-12-03T10:15:30.00Z")
     clock.advanceTo(now)
 
     val dummyDomain = DomainId.tryFromString("dummy::domain")
@@ -295,14 +527,28 @@ class AcsSnapshotTriggerTest
       NoOpMetricsFactory,
     )
     val store: AcsSnapshotStore = mock[AcsSnapshotStore]
-    val migrationId: Long = 0L
     val historyId: Long = 1L
-    when(store.migrationId).thenReturn(migrationId)
+    when(store.currentMigrationId).thenReturn(currentMigrationId)
     val updateHistory: UpdateHistory = mock[UpdateHistory]
     when(updateHistory.isReady).thenReturn(true)
-    val trigger = new AcsSnapshotTrigger(store, updateHistory, snapshotPeriodHours, triggerContext)
+    when(updateHistory.sourceHistory).thenReturn(
+      mock[HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse]]
+    )
+    when(updateHistory.getPreviousMigrationId(anyLong)(any[TraceContext])).thenAnswer { (n: Long) =>
+      Future.successful(n match {
+        case 0L => None
+        case n => Some(n - 1)
+      })
+    }
+    val trigger = new AcsSnapshotTrigger(
+      store,
+      updateHistory,
+      snapshotPeriodHours,
+      updateHistoryBackfillEnabled = updateHistoryBackfillEnabled,
+      triggerContext,
+    )
 
-    def noPreviousSnapshot(): Unit = {
+    def noPreviousSnapshot(migrationId: Long = currentMigrationId): Unit = {
       when(
         store.lookupSnapshotBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
           any[TraceContext]
@@ -313,7 +559,10 @@ class AcsSnapshotTriggerTest
         )
     }
 
-    def previousSnapshot(time: CantonTimestamp): AcsSnapshot = {
+    def previousSnapshot(
+        time: CantonTimestamp,
+        migrationId: Long = currentMigrationId,
+    ): AcsSnapshot = {
       val lastSnapshot = AcsSnapshot(time, migrationId, historyId, 0, 100)
       when(
         store.lookupSnapshotBefore(eqTo(migrationId), eqTo(CantonTimestamp.MaxValue))(
@@ -324,6 +573,52 @@ class AcsSnapshotTriggerTest
           Future.successful(Some(lastSnapshot))
         )
       lastSnapshot
+    }
+
+    def firstUpdateAt(
+        migrationId: Long,
+        queryRecordTime: CantonTimestamp,
+        updateRecordTime: CantonTimestamp,
+    ) = {
+      when(
+        updateHistory.getUpdates(
+          eqTo(Some((migrationId, queryRecordTime))),
+          eqTo(true),
+          eqTo(PageLimit.tryCreate(1)),
+        )(any[TraceContext])
+      ).thenReturn(
+        Future.successful(
+          Seq(
+            TreeUpdateWithMigrationId(
+              GetTreeUpdatesResponse(
+                treeUpdate(updateRecordTime),
+                dummyDomain,
+              ),
+              migrationId,
+            )
+          )
+        )
+      )
+    }
+
+    def historyBackfilled(migrationId: Long, complete: Boolean): Unit = {
+      when(
+        updateHistory.sourceHistory.migrationInfo(eqTo(migrationId))(any[TraceContext])
+      )
+        .thenReturn(
+          Future.successful(
+            Some(HistoryBackfilling.SourceMigrationInfo(None, Map.empty, complete))
+          )
+        )
+    }
+
+    def recordTimeRange(migrationId: Long, max: CantonTimestamp): Unit = {
+      when(updateHistory.getRecordTimeRange(eqTo(migrationId))(any[TraceContext]))
+        .thenReturn(
+          Future.successful(
+            Map(dummyDomain -> DomainRecordTimeRange(CantonTimestamp.MinValue, max))
+          )
+        )
     }
   }
 

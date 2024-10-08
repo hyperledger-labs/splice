@@ -13,7 +13,7 @@ import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
 export type ListVoteRequestResultParams = {
   actionName?: string;
-  executed?: boolean;
+  accepted?: boolean;
   requester?: string;
   effectiveFrom?: string;
   effectiveTo?: string;
@@ -43,7 +43,7 @@ export const useListVoteRequestResult = (
       DsoRules_CloseVoteRequestResult,
       limit,
       query.actionName,
-      query.executed,
+      query.accepted,
       query.requester,
       query.effectiveFrom,
       query.effectiveTo,
@@ -56,7 +56,7 @@ export const useListVoteRequestResult = (
         query.requester,
         query.effectiveFrom,
         query.effectiveTo,
-        query.executed
+        query.accepted
       );
       return List(DsoRules_CloseVoteRequestResult).decoder.runWithException(dso_rules_vote_results);
     },

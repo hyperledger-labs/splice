@@ -43,7 +43,7 @@ export async function installValidator1(
   const loopback = installSpliceHelmChart(
     xns,
     'loopback',
-    'cn-cluster-loopback-gateway',
+    'splice-cluster-loopback-gateway',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -123,7 +123,7 @@ export async function installValidator1(
     installSpliceHelmChart(
       xns,
       'splitwell-web-ui',
-      'cn-splitwell-web-ui',
+      'splice-splitwell-web-ui',
       {
         ...spliceInstanceNames,
         auth: {
@@ -148,17 +148,22 @@ function installIngress(
   splitwell: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig
 ) {
-  installSpliceHelmChart(xns, `cluster-ingress-${xns.logicalName}`, 'cn-cluster-ingress-runbook', {
-    cluster: {
-      hostname: CLUSTER_HOSTNAME,
-      svNamespace: xns.logicalName,
-    },
-    withSvIngress: false,
-    ingress: {
-      splitwell: splitwell,
-      decentralizedSynchronizer: {
-        activeMigrationId: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+  installSpliceHelmChart(
+    xns,
+    `cluster-ingress-${xns.logicalName}`,
+    'splice-cluster-ingress-runbook',
+    {
+      cluster: {
+        hostname: CLUSTER_HOSTNAME,
+        svNamespace: xns.logicalName,
       },
-    },
-  });
+      withSvIngress: false,
+      ingress: {
+        splitwell: splitwell,
+        decentralizedSynchronizer: {
+          activeMigrationId: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+        },
+      },
+    }
+  );
 }

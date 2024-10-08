@@ -1,8 +1,6 @@
 jobs:
   hard_migration:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -56,7 +54,7 @@ jobs:
                 command: |
                   echo "Checking out commit << parameters.upgrade_version >>"
                   git checkout << parameters.upgrade_version >>
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts for upgrade version
           cluster: << parameters.cluster >>
@@ -85,7 +83,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
-            # if you change this script make sure to also change it in hard_migration_vpn
             set -eou pipefail
 
             base_version=$(build-tools/get-charts-version "<< parameters.base_version >>")
@@ -94,119 +91,6 @@ jobs:
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=true
             echo "Running hard domain migration << parameters.action >> << parameters.scope >> from $base_version to $upgrade_version"
-            cncluster activate
-            cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - when:
-          condition: << parameters.send_notifications >>
-          steps:
-            - notify-cluster-fail:
-                channel_notify: << parameters.channel_notify >>
-                cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.cancel_workflow_on_failure >>
-          steps:
-            - cancel_entire_workflow_if_this_job_failed
-
-  hard_migration_vpn:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      # What to do
-      action:
-        type: enum
-        enum:
-          [
-            "prepare",
-            "migrate"
-          ]
-      # What to migrate
-      scope:
-        type: enum
-        enum:
-          [
-            # currently using the _vpn job makes sense only for the sv runbook
-            # where VPN is required to resolve Validator1's PartyId
-            "sv",
-          ]
-      # Commit hash that will become the legacy version.
-      # If left empty then the latest commit on the branch will be used, with locally-built charts.
-      base_version:
-        type: string
-        default: ""
-      # Commit hash that will become the active version.
-      # If left empty then the latest commit on the branch will be used, with locally-built charts.
-      upgrade_version:
-        type: string
-        default: ""
-      cancel_workflow_on_failure:
-        type: boolean
-        default: false
-      deploy_retry_count:
-        type: integer
-        default: 2
-      send_notifications:
-        type: boolean
-        default: true
-    steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.upgrade_version >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.upgrade_version >>
-                command: |
-                  echo "Checking out commit << parameters.upgrade_version >>"
-                  git checkout << parameters.upgrade_version >>
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts for upgrade version
-          cluster: << parameters.cluster >>
-          cmd: |
-            make cluster/build
-          cmd_retry_count: 2
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - run_bash_command_in_nix:
-          cmd_name: Execute hard domain migration action
-          cluster: << parameters.cluster >>
-          additional_nix_args: >
-            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-            --keep ARTIFACTORY_USER
-            --keep ARTIFACTORY_PASSWORD
-            --keep CIRCLECI_TOKEN
-            --keep CIRCLE_WORKFLOW_ID
-            --keep SLACK_ACCESS_TOKEN
-            --keep CIRCLE_BUILD_URL
-          gce_authenticate: true
-          cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-          cmd: |
-            # if you change this script make sure to also change it in hard_migration
-            set -eou pipefail
-
-            base_version=$(build-tools/get-charts-version "<< parameters.base_version >>")
-            upgrade_version=$(build-tools/get-charts-version "<< parameters.upgrade_version >>")
-
-            # All CI-deployed clusters use split postgres instances per app, to support backups.
-            export SPLIT_POSTGRES_INSTANCES=true
-
             cncluster activate
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
       - print_gcloud_logs_commands:
@@ -402,3 +286,66 @@ jobs:
           name: Store logs
           path: log
           destination: log
+
+  pre_migration_dump_identities:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Dump identities before the migration
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            mkdir -p workspace
+            cncluster dump_identities > workspace/identities-before.json
+      - persist_to_workspace:
+          root: workspace
+          paths:
+            - identities-before.json
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+
+  post_migration_verify_identities:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - attach_workspace:
+          at: workspace
+      - run_bash_command_in_nix:
+          cmd_name: Dump identities after the migration, and compare
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster dump_identities > workspace/identities-after.json
+
+            diff -u workspace/identities-before.json workspace/identities-after.json || exit 1
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>

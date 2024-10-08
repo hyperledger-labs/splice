@@ -2,7 +2,7 @@ services:
   validator:
     environment:
         - |
-          ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_DUMP_IMPORT=
+          ADDITIONAL_CONFIG_SPLICE_APP_VALIDATOR_PARTICIPANT_IDENTITIES_DUMP_IMPORT=
             canton.validator-apps.validator_backend.participant-bootstrapping-dump {
               type = file
               file = /participant-bootstrapping-dump

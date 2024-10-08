@@ -123,7 +123,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "artie"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -155,7 +155,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -246,7 +246,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "artie"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -276,7 +276,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "loopback",
     "provider": "",
@@ -416,7 +416,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "artie"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
@@ -446,6 +446,7 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
+        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
@@ -455,6 +456,7 @@
             "id": 1
           }
         },
+        "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -477,7 +479,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator-participant-1",
     "provider": "",
@@ -516,7 +518,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "artie"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -555,7 +557,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -591,7 +593,7 @@
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
         "username": "artie"
       },
-      "timeout": 480,
+      "timeout": 300,
       "values": {
         "affinity": {
           "nodeAffinity": {
@@ -611,8 +613,7 @@
         },
         "auth": {
           "audience": "https://validator.example.com/api",
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "ledgerApiAudience": "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
@@ -671,7 +672,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator",
     "provider": "",

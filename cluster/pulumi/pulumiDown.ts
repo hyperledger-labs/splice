@@ -1,14 +1,23 @@
-import { mustInstallValidator1 } from 'splice-pulumi-common-validator/src/validators';
+import {
+  mustInstallSplitwell,
+  mustInstallValidator1,
+} from 'splice-pulumi-common-validator/src/validators';
 
 import { downStack, stack } from './pulumi';
 
 async function runCoreStackDown() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
-  await downStack(mainStack);
+  const operations: Promise<void>[] = [];
+  operations.push(downStack(mainStack));
   if (mustInstallValidator1) {
     const validator1 = await stack('validator1', 'validator1', true, {});
-    await downStack(validator1);
+    operations.push(downStack(validator1));
   }
+  if (mustInstallSplitwell) {
+    const splitwell = await stack('splitwell', 'splitwell', true, {});
+    operations.push(downStack(splitwell));
+  }
+  await Promise.all(operations);
 }
 
 runCoreStackDown().catch(e => {

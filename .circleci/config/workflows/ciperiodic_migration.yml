@@ -5,26 +5,22 @@ workflow:
     jobs:
       - artifacts_push:
           <<: *notify-fail
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
           workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - autoscaler_prevent_scaledown:
-          <<: *main-branch-only
           cluster: "ciperiodic"
           requires:
             - wait_for_previous_pipeline
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -37,7 +33,6 @@ workflow:
             - artifacts_push
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -48,7 +43,6 @@ workflow:
             - deploy_cluster_for_migration
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_migration"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -56,6 +50,15 @@ workflow:
           deploy_version: << pipeline.parameters.base-version >>
           requires:
             - deploy_cluster_for_migration
+      - pre_migration_dump_identities:
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - deploy_cluster_for_migration
+            - deploy_validator_runbook_for_migration
       - pre_migration_compose_validator:
           context:
             - artifactory
@@ -67,7 +70,6 @@ workflow:
             - deploy_cluster_for_migration
       - hard_migration:
           name: "prepare_cluster_for_migration"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -78,13 +80,11 @@ workflow:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - deploy_cluster_for_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "prepare_sv_runbook_for_migration"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           action: "prepare"
           scope: "sv"
@@ -94,7 +94,6 @@ workflow:
             - deploy_sv_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
@@ -109,7 +108,6 @@ workflow:
             - deploy_sv_runbook_for_migration
       - hard_migration:
           name: "migrate_cluster"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -124,7 +122,6 @@ workflow:
             - pre_migration_compose_validator
       - preflight_check:
           name: "preflight_check_migrated"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
@@ -134,12 +131,11 @@ workflow:
           migration_id: 1
           requires:
             - trigger_global_domain_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "migrate_sv_runbook"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "ciperiodic"
           action: "migrate"
           scope: "sv"
@@ -173,8 +169,17 @@ workflow:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - migrate_cluster
+      - post_migration_verify_identities:
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - pre_migration_dump_identities
+            - migrate_cluster
+            - migrate_validator_runbook
       - preflight_validator_check:
-          <<: *main-branch-only
           name: "preflight_validator_check_migrated"
           context:
             - artifactory
@@ -196,7 +201,6 @@ workflow:
             - migrate_cluster
       - backup_cluster:
           name: "backup_cluster_after_migration"
-          <<: *main-branch-only
           cluster: "ciperiodic"
           migration_id: 1
           context:
@@ -209,7 +213,6 @@ workflow:
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - restore_node:
-          <<: *main-branch-only
           cluster: "ciperiodic"
           namespace_name: "sv-3"
           migration_id: 1
@@ -221,7 +224,6 @@ workflow:
             - backup_cluster_after_migration
       - deploy_sv_runbook:
           name: "deploy_fresh_sv_runbook_after_migration"
-          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -236,7 +238,6 @@ workflow:
       #            - preflight_sv_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
-          <<: *main-branch-only
           context:
             - artifactory
             - canton-network-vpn
@@ -248,7 +249,6 @@ workflow:
             # We wait for the runbook to redeploy to make sure we're not testing the original deployment
             - deploy_fresh_sv_runbook_after_migration
       - reset_cluster:
-          <<: *main-branch-only
           cluster: "ciperiodic"
           extra_migrations_reset: "0,1"
           context:
@@ -259,7 +259,6 @@ workflow:
             - preflight_sv_check_redeployed
             - post_migration_compose_validator
       - autoscaler_allow_scaledown:
-          <<: *main-branch-only
           cluster: "ciperiodic"
           requires:
             - restore_node

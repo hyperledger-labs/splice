@@ -34,7 +34,6 @@ import {
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
   activeVersion,
-  SV_APP_HELM_CHART_TIMEOUT_SEC,
   approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
@@ -134,7 +133,7 @@ export async function installNode(
     xns.logicalName,
     xns.logicalName,
     'cluster-ingress-sv',
-    'cn-cluster-ingress-runbook',
+    'splice-cluster-ingress-runbook',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -316,7 +315,7 @@ async function installSvAndValidator(
   const sv = installSpliceRunbookHelmChart(
     xns,
     'sv-app',
-    'cn-sv-node',
+    'splice-sv-node',
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
     activeVersion,
     {
@@ -325,8 +324,7 @@ async function installSvAndValidator(
         .concat(canton.decentralizedSynchronizer.dependencies)
         .concat([svAppSecret, svAppUISecret, appsPg])
         .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []),
-    },
-    SV_APP_HELM_CHART_TIMEOUT_SEC
+    }
   );
 
   const defaultScanValues = loadYamlFromFile(
@@ -353,7 +351,7 @@ async function installSvAndValidator(
   installSpliceRunbookHelmChart(
     xns,
     `scan`,
-    'cn-scan',
+    'splice-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     activeVersion,
     {
@@ -413,7 +411,7 @@ async function installSvAndValidator(
   const validator = installSpliceRunbookHelmChart(
     xns,
     'validator',
-    'cn-validator',
+    'splice-validator',
     validatorValuesWithMaybeTopups,
     activeVersion,
     {

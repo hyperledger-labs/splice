@@ -18,6 +18,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
+import { SvAppVotesHooksProvider } from './contexts/SvAppVotesHooksContext';
 import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
 import Delegate from './routes/delegate';
@@ -46,9 +47,11 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
       <QueryClientProvider client={queryClient}>
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-          <SvAdminClientProvider url={config.services.sv.url}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
-          </SvAdminClientProvider>
+          <SvAppVotesHooksProvider>
+            <SvAdminClientProvider url={config.services.sv.url}>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
+            </SvAdminClientProvider>
+          </SvAppVotesHooksProvider>
         </UserProvider>
       </QueryClientProvider>
     </AuthProvider>

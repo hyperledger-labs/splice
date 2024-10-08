@@ -1,13 +1,13 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
+  Auth0ClientType,
+  getAuth0Config,
   DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   exactNamespace,
 } from 'splice-pulumi-common';
 import {
-  Auth0ClientType,
   coreSvsToDeploy,
-  getAuth0Config,
   installCantonComponents,
   sv1Config,
   svConfigs,

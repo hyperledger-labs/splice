@@ -29,7 +29,7 @@ export const SvAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ chi
       requester: string | undefined,
       effectiveFrom: string | undefined,
       effectiveTo: string | undefined,
-      executed: boolean | undefined
+      accepted: boolean | undefined
     ): UseQueryResult<DsoRules_CloseVoteRequestResult[]> {
       return svHooks.useListVoteRequestResult(
         {
@@ -37,7 +37,7 @@ export const SvAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ chi
           requester,
           effectiveFrom,
           effectiveTo,
-          executed,
+          accepted,
         },
         limit
       );

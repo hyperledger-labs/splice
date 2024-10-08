@@ -69,7 +69,7 @@ export function installSvParticipant(
   return installSpliceHelmChart(
     xns,
     name,
-    'cn-participant',
+    'splice-participant',
     {
       ...participantValuesWithOverwrites,
       logLevel,
@@ -83,7 +83,7 @@ export function installSvParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
-      ...autoInitValues('cn-participant', version, onboardingName),
+      ...autoInitValues('splice-participant', version, onboardingName),
     },
     version,
     {

@@ -4,5 +4,4 @@ export * from './synchronizer/cometBftNodeConfigs';
 export * from './synchronizer/decentralizedSynchronizerNode';
 export * from './canton';
 export * from './participant';
-export * from './auth0';
 export * from './svConfigs';

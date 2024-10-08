@@ -28,10 +28,10 @@ import {
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 
-import { ListVoteRequestsFilterTable } from './VoteRequestFilterTable';
+import { VoteRequestsFilterTable } from './VoteRequestFilterTable';
 import VoteRequestModalContent from './VoteRequestModalContent';
 import { VoteResultModalContent } from './VoteResultModalContent';
-import { VoteResultsFilterTable } from './VoteResultsFilterTable';
+import { VoteRequestResultTableType, VoteResultsFilterTable } from './VoteResultsFilterTable';
 
 dayjs.extend(utc);
 
@@ -46,6 +46,18 @@ interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
+}
+
+export function getAction(action: ActionRequiringConfirmation): string {
+  if (action.tag === 'ARC_DsoRules') {
+    const dsoRulesAction = action.value.dsoAction;
+    return `${dsoRulesAction.tag}`;
+  } else if (action.tag === 'ARC_AmuletRules') {
+    const amuletRulesAction = action.value.amuletRulesAction;
+    return `${amuletRulesAction.tag}`;
+  } else {
+    return 'Action tag not defined.';
+  }
 }
 
 const TabPanel = (props: TabPanelProps) => {
@@ -70,6 +82,19 @@ interface ListVoteRequestsProps {
     currentSvVote: SvVote | undefined
   ) => React.ReactNode;
 }
+
+export type VoteResultModalState =
+  | { open: false }
+  | {
+      open: true;
+      tableType: VoteRequestResultTableType;
+      voteResult: DsoRules_CloseVoteRequestResult;
+      effectiveAt: string;
+    };
+
+export type VoteRequestModalState =
+  | { open: false }
+  | { open: true; voteRequestContractId: ContractId<VoteRequest>; effectiveAt: string };
 
 export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
   showActionNeeded,
@@ -99,28 +124,24 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
   const votesQuery = votesHooks.useListVotes(voteRequestIds);
   const dsoInfosQuery = votesHooks.useDsoInfos();
 
-  const [voteRequestContractId, setVoteRequestContractId] = useState<
-    ContractId<VoteRequest> | undefined
-  >(undefined);
-  const [voteResult, setVoteResult] = useState<DsoRules_CloseVoteRequestResult | undefined>(
-    undefined
-  );
-  const [isVoteRequestModalOpen, setVoteRequestModalOpen] = useState<boolean>(false);
-  const [isVoteResultModalOpen, setVoteResultModalOpen] = useState<boolean>(false);
+  const [voteRequestModalState, setVoteRequestModalState] = useState<VoteRequestModalState>({
+    open: false,
+  });
+  const [voteResultModalState, setVoteResultModalState] = useState<VoteResultModalState>({
+    open: false,
+  });
 
-  const openModalWithVoteRequest = (voteRequestContractId: ContractId<VoteRequest>) => {
-    setVoteRequestContractId(voteRequestContractId);
-    setVoteRequestModalOpen(true);
+  const openModalWithVoteRequest = (voteRequestModalState: VoteRequestModalState) => {
+    setVoteRequestModalState(voteRequestModalState);
   };
 
-  const openModalWithVoteResult = (voteResult: DsoRules_CloseVoteRequestResult) => {
-    setVoteResult(voteResult);
-    setVoteResultModalOpen(true);
+  const openModalWithVoteResult = (voteResultModalState: VoteResultModalState) => {
+    setVoteResultModalState(voteResultModalState);
   };
 
   const handleClose = () => {
-    setVoteRequestModalOpen(false);
-    setVoteResultModalOpen(false);
+    setVoteRequestModalState({ open: false });
+    setVoteResultModalState({ open: false });
   };
 
   const svPartyId = dsoInfosQuery.data?.svPartyId;
@@ -139,7 +160,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
     return <p>Error, something went wrong.</p>;
   }
 
-  const voteRequests = listVoteRequestsQuery.data.sort((a, b) => {
+  const voteRequests = [...listVoteRequestsQuery.data].sort((a, b) => {
     const createdAtA = a.createdAt;
     const createdAtB = b.createdAt;
     if (createdAtA === createdAtB) {
@@ -158,37 +179,6 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
     alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId)
   );
 
-  function getAction(action: ActionRequiringConfirmation) {
-    if (action.tag === 'ARC_DsoRules') {
-      const dsoRulesAction = action.value.dsoAction;
-      switch (dsoRulesAction.tag) {
-        case 'SRARC_OffboardSv': {
-          return `${dsoRulesAction.tag}`;
-        }
-        case 'SRARC_GrantFeaturedAppRight': {
-          return `${dsoRulesAction.tag}`;
-        }
-        case 'SRARC_RevokeFeaturedAppRight': {
-          return `${dsoRulesAction.tag}`;
-        }
-        case 'SRARC_SetConfig': {
-          return `${dsoRulesAction.tag}`;
-        }
-        case 'SRARC_UpdateSvRewardWeight': {
-          return `${dsoRulesAction.tag}`;
-        }
-      }
-    } else if (action.tag === 'ARC_AmuletRules') {
-      const amuletRulesAction = action.value.amuletRulesAction;
-      switch (amuletRulesAction.tag) {
-        default: {
-          return `${amuletRulesAction.tag}`;
-        }
-      }
-    }
-    return 'Action tag not defined.';
-  }
-
   const tabsToTabPanel = (
     showActionNeeded
       ? [
@@ -202,7 +192,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
               />
             ),
             () => (
-              <ListVoteRequestsFilterTable
+              <VoteRequestsFilterTable
                 voteRequests={voteRequestsNotVoted}
                 getAction={getAction}
                 openModalWithVoteRequest={openModalWithVoteRequest}
@@ -223,7 +213,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
         />
       ),
       () => (
-        <ListVoteRequestsFilterTable
+        <VoteRequestsFilterTable
           voteRequests={voteRequestsVoted}
           getAction={getAction}
           openModalWithVoteRequest={openModalWithVoteRequest}
@@ -304,7 +294,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
         </TabPanel>
       ))}
       <Modal
-        open={isVoteRequestModalOpen}
+        open={voteRequestModalState.open}
         onClose={handleClose}
         aria-labelledby="vote-request-modal-title"
         aria-describedby="vote-request-modal-description"
@@ -322,11 +312,12 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
                     </IconButton>
                   }
                 />
-                {voteRequestContractId && (
+                {voteRequestModalState.open && (
                   <VoteRequestModalContent
-                    voteRequestContractId={voteRequestContractId}
+                    voteRequestContractId={voteRequestModalState.voteRequestContractId}
                     handleClose={handleClose}
                     voteForm={voteForm}
+                    effectiveAt={voteRequestModalState.effectiveAt}
                   />
                 )}
               </Card>
@@ -335,7 +326,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
         </Box>
       </Modal>
       <Modal
-        open={isVoteResultModalOpen}
+        open={voteResultModalState.open}
         onClose={handleClose}
         aria-labelledby="vote-result-modal-title"
         aria-describedby="vote-result-modal-description"
@@ -353,7 +344,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
                     </IconButton>
                   }
                 />
-                <VoteResultModalContent handleClose={handleClose} voteResult={voteResult} />
+                <VoteResultModalContent voteResultModalState={voteResultModalState} />
               </Card>
             </Container>
           </ClickAwayListener>

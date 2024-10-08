@@ -31,7 +31,6 @@ import {
   PersistenceConfig,
   sanitizedForPostgres,
   spliceInstanceNames,
-  SV_APP_HELM_CHART_TIMEOUT_SEC,
   SvIdKey,
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
@@ -122,14 +121,13 @@ export type InstalledSv = {
 
 export async function installSvNode(
   baseConfig: SvConfig,
-  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig,
-  sv1SvApp?: k8s.helm.v3.Release
+  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
   const loopback = installSpliceHelmChart(
     xns,
     'loopback',
-    'cn-cluster-loopback-gateway',
+    'splice-cluster-loopback-gateway',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -229,7 +227,6 @@ export async function installSvNode(
         ...config.nodeConfigs,
         self: { ...config.cometBft, nodeName: config.nodeName },
       },
-      sv1SvApp: sv1SvApp,
     },
     config
   );
@@ -269,7 +266,7 @@ export async function installSvNode(
   const ingress = installSpliceHelmChart(
     xns,
     'ingress-sv',
-    'cn-cluster-ingress-runbook',
+    'splice-cluster-ingress-runbook',
     {
       withSvIngress: true,
       ingress: {
@@ -445,7 +442,7 @@ function installSvApp(
   const svApp = installSpliceHelmChart(
     xns,
     `sv-app`,
-    'cn-sv-node',
+    'splice-sv-node',
     svValues,
     activeVersion,
     {
@@ -455,8 +452,7 @@ function installSvApp(
         .concat(decentralizedSynchronizer.dependencies),
     },
     undefined,
-    appsAffinityAndTolerations,
-    SV_APP_HELM_CHART_TIMEOUT_SEC
+    appsAffinityAndTolerations
   );
   return svApp;
 }
@@ -491,7 +487,7 @@ function installScan(
     // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
     clusterUrl: CLUSTER_HOSTNAME,
   };
-  const scan = installSpliceHelmChart(xns, `scan`, 'cn-scan', scanValues, activeVersion, {
+  const scan = installSpliceHelmChart(xns, `scan`, 'splice-scan', scanValues, activeVersion, {
     dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
   });
   return scan;
