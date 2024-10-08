@@ -2,23 +2,23 @@
 # SPDX-License-Identifier: Apache-2.0
 
 app_charts := \
-	cn-cluster-ingress-runbook \
-	cn-cluster-loopback-gateway \
-	cn-cometbft \
+	splice-cluster-ingress-runbook \
+	splice-cluster-loopback-gateway \
+	splice-cometbft \
 	cn-docs \
-	cn-domain \
-	cn-global-domain \
-	cn-istio-gateway \
-	cn-load-tester \
-	cn-participant \
-	cn-postgres \
-	cn-scan \
-	cn-splitwell-app \
-	cn-splitwell-web-ui \
-	cn-sv-node \
-	cn-validator
+	splice-domain \
+	splice-global-domain \
+	splice-istio-gateway \
+	splice-load-tester \
+	splice-participant \
+	splice-postgres \
+	splice-scan \
+	splice-splitwell-app \
+	splice-splitwell-web-ui \
+	splice-sv-node \
+	splice-validator
 
-all_charts := $(app_charts) cn-util-lib
+all_charts := $(app_charts) splice-util-lib
 
 HELM_VERSION_TAG := cluster/helm/.version-tag
 IMAGE_DIGESTS := cluster/helm/.image-digests
@@ -79,7 +79,7 @@ endef # end DEFINE_PHONY_CHART_RULES
 
 define ADD_UTIL_DEP =
 prefix := cluster/helm/$(1)
-$$(prefix)/helm-build: cluster/helm/cn-util-lib/Chart.yaml
+$$(prefix)/helm-build: cluster/helm/splice-util-lib/Chart.yaml
 endef
 
 $(foreach chart,$(all_charts),$(eval $(call DEFINE_PHONY_CHART_RULES,$(chart))))

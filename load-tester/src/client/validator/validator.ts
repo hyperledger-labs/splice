@@ -55,10 +55,18 @@ export class ValidatorClient {
 
   public v0 = {
     // -*--- VALIDATOR APIS -------------------------------------------------------*-
-    register: (): void => {
-      this.http.post.success(`${this.validatorBaseUrl}/api/validator/v0/register`, undefined, {
-        headers: this.headers(),
-      });
+    register: async (): Promise<void> => {
+      try {
+        await this.http.post.success(
+          `${this.validatorBaseUrl}/api/validator/v0/register`,
+          undefined,
+          {
+            headers: this.headers(),
+          },
+        );
+      } catch (error) {
+        throw new Error(`Error registering validator: ${error}`);
+      }
     },
 
     // -*--- WALLET APIS ----------------------------------------------------------*-

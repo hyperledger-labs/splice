@@ -210,18 +210,18 @@ else
   # TODO(#14303): remove this once the migration base version supports the splice-instance-names endpoint
   splice_instance_names=${SPLICE_INSTANCE_NAMES}
 fi
-CN_APP_UI_NETWORK_NAME=$(echo "${splice_instance_names}" | jq -r '.network_name')
-export CN_APP_UI_NETWORK_NAME
-CN_APP_UI_NETWORK_FAVICON_URL=$(echo "${splice_instance_names}" | jq -r '.network_favicon_url')
-export CN_APP_UI_NETWORK_FAVICON_URL
-CN_APP_UI_AMULET_NAME=$(echo "${splice_instance_names}" | jq -r '.amulet_name')
-export CN_APP_UI_AMULET_NAME
-CN_APP_UI_AMULET_NAME_ACRONYM=$(echo "${splice_instance_names}" | jq -r '.amulet_name_acronym')
-export CN_APP_UI_AMULET_NAME_ACRONYM
-CN_APP_UI_NAME_SERVICE_NAME=$(echo "${splice_instance_names}" | jq -r '.name_service_name')
-export CN_APP_UI_NAME_SERVICE_NAME
-CN_APP_UI_NAME_SERVICE_NAME_ACRONYM=$(echo "${splice_instance_names}" | jq -r '.name_service_name_acronym')
-export CN_APP_UI_NAME_SERVICE_NAME_ACRONYM
+SPLICE_APP_UI_NETWORK_NAME=$(echo "${splice_instance_names}" | jq -r '.network_name')
+export SPLICE_APP_UI_NETWORK_NAME
+SPLICE_APP_UI_NETWORK_FAVICON_URL=$(echo "${splice_instance_names}" | jq -r '.network_favicon_url')
+export SPLICE_APP_UI_NETWORK_FAVICON_URL
+SPLICE_APP_UI_AMULET_NAME=$(echo "${splice_instance_names}" | jq -r '.amulet_name')
+export SPLICE_APP_UI_AMULET_NAME
+SPLICE_APP_UI_AMULET_NAME_ACRONYM=$(echo "${splice_instance_names}" | jq -r '.amulet_name_acronym')
+export SPLICE_APP_UI_AMULET_NAME_ACRONYM
+SPLICE_APP_UI_NAME_SERVICE_NAME=$(echo "${splice_instance_names}" | jq -r '.name_service_name')
+export SPLICE_APP_UI_NAME_SERVICE_NAME
+SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM=$(echo "${splice_instance_names}" | jq -r '.name_service_name_acronym')
+export SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
 
 extra_compose_files=()
 if [ $auth -ne 1 ]; then

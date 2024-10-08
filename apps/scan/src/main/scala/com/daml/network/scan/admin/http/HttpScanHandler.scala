@@ -1030,7 +1030,7 @@ class HttpScanHandler(
             )
           snapshotTime <- snapshotStore.updateHistory
             .getUpdatesBefore(
-              snapshotStore.migrationId,
+              snapshotStore.currentMigrationId,
               domainId,
               CantonTimestamp.MaxValue,
               PageLimit.tryCreate(1),
@@ -1047,7 +1047,7 @@ class HttpScanHandler(
                 .recordTime
             )
           lastSnapshot <- snapshotStore.lookupSnapshotBefore(
-            snapshotStore.migrationId,
+            snapshotStore.currentMigrationId,
             snapshotTime,
           )
           // note that this will make it so that the next snapshot is taken N hours after THIS snapshot.
@@ -1056,11 +1056,15 @@ class HttpScanHandler(
           // - wall clock tests must take manual snapshots anyway, because they can't wait
           // - simtime tests will advanceTime(N.hours)
           _ = logger.info(s"Forcing ACS snapshot at $snapshotTime. Last snapshot: $lastSnapshot")
-          _ <- snapshotStore.insertNewSnapshot(lastSnapshot, snapshotTime)
+          _ <- snapshotStore.insertNewSnapshot(
+            lastSnapshot,
+            snapshotStore.currentMigrationId,
+            snapshotTime,
+          )
         } yield ScanResource.ForceAcsSnapshotNowResponse.OK(
           definitions.ForceAcsSnapshotResponse(
             snapshotTime.toInstant.atOffset(ZoneOffset.UTC),
-            snapshotStore.migrationId,
+            snapshotStore.currentMigrationId,
           )
         )
       }

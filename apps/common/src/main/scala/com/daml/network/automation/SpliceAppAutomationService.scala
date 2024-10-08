@@ -17,7 +17,6 @@ import com.daml.network.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -92,16 +91,13 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     new DomainIngestionService(
       store.domains.ingestionSink,
       connection,
-      // We want to always poll periodically and quickly even in simtime mode so we overwrite
-      // the polling interval and the clock.
+      // We want to always poll periodically and quickly even in simtime mode so we overwrite the clock.
+      // The polling interval is governed by the domainIngestionPollingInterval config.
       triggerContext.copy(
-        config = triggerContext.config.copy(
-          pollingInterval = NonNegativeFiniteDuration.ofSeconds(1)
-        ),
         clock = new WallClock(
           triggerContext.timeouts,
           triggerContext.loggerFactory,
-        ),
+        )
       ),
     )
   )

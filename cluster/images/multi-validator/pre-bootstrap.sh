@@ -11,11 +11,11 @@ function request_onboarding_secret() {
     MAX_RETRY=100
     n=0
 
-    if [[ -z ${CN_APP_DEVNET:-} ]]; then
+    if [[ -z ${SPLICE_APP_DEVNET:-} ]]; then
         json_log "multi-validator is only supported in devnet mode." >&2
         exit 1
     else
-        ONBOARD_SECRET_URL="${CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS}/api/sv/v0/devnet/onboard/validator/prepare"
+        ONBOARD_SECRET_URL="${SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS}/api/sv/v0/devnet/onboard/validator/prepare"
 
         json_log "Getting onboarding secret from SV (${ONBOARD_SECRET_URL})..." "pre-bootstrap.sh" >&2
 
@@ -51,7 +51,7 @@ function write_validator_config() {
 
     local user="${VALIDATOR_USERNAME_PREFIX}_${index}"
     local partyHint="Digital_Asset-load_test-${index}"
-    if [ -n "${CN_APP_LEGACY_PARTY_HINT:-}" ]; then
+    if [ -n "${SPLICE_APP_LEGACY_PARTY_HINT:-}" ]; then
         partyHint="$user"
     fi
 
@@ -64,7 +64,7 @@ canton.validator-apps.validator_backend_$index = {
     scan-client = {
         type = "bft"
         seed-urls = [
-            \${CN_APP_VALIDATOR_SCAN_URL}
+            \${SPLICE_APP_VALIDATOR_SCAN_URL}
         ]
     }
 
@@ -73,12 +73,12 @@ canton.validator-apps.validator_backend_$index = {
         config {
             dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
             properties = {
-                databaseName = \${CN_APP_POSTGRES_DATABASE_NAME}_$index
-                currentSchema = \${CN_APP_POSTGRES_SCHEMA}_validator_$index
-                serverName = \${CN_APP_POSTGRES_HOST}
-                portNumber = \${CN_APP_POSTGRES_PORT}
-                user = \${CN_APP_POSTGRES_USER}
-                password = \${CN_APP_POSTGRES_PASSWORD}
+                databaseName = \${SPLICE_APP_POSTGRES_DATABASE_NAME}_$index
+                currentSchema = \${SPLICE_APP_POSTGRES_SCHEMA}_validator_$index
+                serverName = \${SPLICE_APP_POSTGRES_HOST}
+                portNumber = \${SPLICE_APP_POSTGRES_PORT}
+                user = \${SPLICE_APP_POSTGRES_USER}
+                password = \${SPLICE_APP_POSTGRES_PASSWORD}
             }
         }
     }
@@ -90,12 +90,12 @@ canton.validator-apps.validator_backend_$index = {
 
     participant-client = {
         admin-api = {
-            address = \${CN_APP_VALIDATOR_PARTICIPANT_ADDRESS}
+            address = \${SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS}
             port = $participant_admin_port
         }
         ledger-api = {
             client-config = {
-                address = \${CN_APP_VALIDATOR_PARTICIPANT_ADDRESS}
+                address = \${SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS}
                 port = $participant_ledger_port
             }
             auth-config = {
@@ -103,7 +103,7 @@ canton.validator-apps.validator_backend_$index = {
                 user = $user
                 secret = "test"
                 # TODO(#2052) use actual audience of the target participant
-                audience = \${CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE}
+                audience = \${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE}
             }
         }
     }
@@ -114,12 +114,12 @@ canton.validator-apps.validator_backend_$index = {
 
     auth {
         algorithm = "hs-256-unsafe"
-        audience = \${CN_APP_VALIDATOR_AUTH_AUDIENCE}
+        audience = \${SPLICE_APP_VALIDATOR_AUTH_AUDIENCE}
         secret = "test"
     }
 
     onboarding = {
-        sv-client.admin-api.url = \${?CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS}
+        sv-client.admin-api.url = \${?SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS}
         secret = "$secret"
     }
 
@@ -133,11 +133,11 @@ canton.validator-apps.validator_backend_$index = {
         }
     }
 
-    domain-migration-id =\${CN_APP_VALIDATOR_MIGRATION_ID}
+    domain-migration-id =\${SPLICE_APP_VALIDATOR_MIGRATION_ID}
 
-    sv-validator = \${?CN_APP_VALIDATOR_SV_VALIDATOR}
+    sv-validator = \${?SPLICE_APP_VALIDATOR_SV_VALIDATOR}
 
-    contact-point = \${CN_APP_CONTACT_POINT}
+    contact-point = \${SPLICE_APP_CONTACT_POINT}
     canton-identifier-config = {
       participant = "participant_$index"
     }
