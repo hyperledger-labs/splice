@@ -570,7 +570,7 @@
             "type": "ClusterIP"
           }
         },
-        "terminationGracePeriodSeconds": 600,
+        "terminationGracePeriodSeconds": 1800,
         "tolerations": [
           {
             "effect": "NoSchedule",
