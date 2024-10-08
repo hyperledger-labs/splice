@@ -1531,6 +1531,7 @@ commands:
     steps:
       - execute_sbt_command:
           cmd: pullRemoteCache
+          cmd_retry_count: 3
 
 
   save_frontend_builds:
