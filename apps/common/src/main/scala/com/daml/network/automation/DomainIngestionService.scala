@@ -17,6 +17,7 @@ class DomainIngestionService(
     context: TriggerContext,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends PeriodicTaskTrigger(
+      // We're effectively overriding the more global `pollingInterval` here
       context.config.domainIngestionPollingInterval,
       context.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop),
       quiet = true,

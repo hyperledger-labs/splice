@@ -1290,7 +1290,7 @@ class UpdateHistory(
     }
   }
 
-  private[this] def getPreviousMigrationId(migrationId: Long)(implicit
+  def getPreviousMigrationId(migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
     def previousId(table: String) = {

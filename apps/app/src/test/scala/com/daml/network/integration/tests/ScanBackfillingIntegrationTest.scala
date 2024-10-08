@@ -79,7 +79,7 @@ class ScanBackfillingIntegrationTest
       sv2ScanBackend.config.updateHistoryBackfillFromScanURL should not be empty
     }
 
-    clue(s"Starting CN nodes: SV1 and Alice validator") {
+    clue(s"Starting Splice nodes: SV1 and Alice validator") {
       startAllSync(
         sv1Backend,
         sv1ScanBackend,
@@ -127,7 +127,7 @@ class ScanBackfillingIntegrationTest
     )
 
     // TODO(#14270): Also start SV3 and SV4
-    clue(s"Starting CN nodes: SV2") {
+    clue(s"Starting Splice nodes: SV2") {
       startAllSync(
         sv2Backend,
         sv2ScanBackend,

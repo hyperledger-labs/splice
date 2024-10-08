@@ -60,6 +60,7 @@ class PruneAmuletConfigScheduleTrigger(
       )
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
+        .withDomainId(amuletRules.work.domain)
         .noDedup
         .yieldResult()
     } yield TaskSuccess(s"Pruned AmuletRules config")

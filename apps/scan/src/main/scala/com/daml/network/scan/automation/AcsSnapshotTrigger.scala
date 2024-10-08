@@ -3,6 +3,7 @@
 
 package com.daml.network.scan.automation
 
+import cats.data.OptionT
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -16,10 +17,14 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.Done
 import org.apache.pekko.stream.Materializer
 
 import java.time.temporal.ChronoField
 import java.time.{Duration, ZoneOffset}
+import cats.implicits.*
+
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
 class AcsSnapshotTrigger(
@@ -36,6 +41,7 @@ class AcsSnapshotTrigger(
 ) extends PollingParallelTaskExecutionTrigger[AcsSnapshotTrigger.Task] {
 
   private val timesToDoSnapshot = (0 to 23).filter(_ % snapshotPeriodHours == 0)
+  private val currentMigrationId = store.currentMigrationId
 
   override def retrieveTasks()(implicit
       tc: TraceContext
@@ -43,17 +49,9 @@ class AcsSnapshotTrigger(
     if (!updateHistory.isReady) {
       Future.successful(Seq.empty)
     } else {
-      val isBackfilled: Future[Boolean] = {
-        if (updateHistoryBackfillEnabled) {
-          updateHistory.sourceHistory.migrationInfo(store.migrationId).map(_.exists(_.complete))
-        } else {
-          Future.successful(true)
-        }
-      }
-
-      isBackfilled.flatMap { backfilled =>
+      isHistoryBackfilled(currentMigrationId).flatMap { backfilled =>
         if (backfilled) {
-          retrieveTask().map(_.toList)
+          retrieveTask().value.map(_.toList)
         } else {
           Future.successful(Seq.empty)
         }
@@ -61,18 +59,51 @@ class AcsSnapshotTrigger(
     }
   }
 
-  private def retrieveTask()(implicit tc: TraceContext) = {
+  /** @return True if the passed migration id was fully backfilled.
+    *         This applies to the current migration id, where it either didn't need to backfill,
+    *         or backfilled because it joined late.
+    *         And also for past migrations, whether the SV was present in them or not.
+    */
+  private def isHistoryBackfilled(migrationId: Long)(implicit tc: TraceContext) = {
+    if (updateHistoryBackfillEnabled) {
+      updateHistory.sourceHistory.migrationInfo(migrationId).map(_.exists(_.complete))
+    } else {
+      Future.successful(true)
+    }
+  }
+
+  private def retrieveTask()(implicit
+      tc: TraceContext
+  ): OptionT[Future, AcsSnapshotTrigger.Task] = {
     val now = context.clock.now
-    for {
-      lastSnapshot <- store.lookupSnapshotBefore(store.migrationId, CantonTimestamp.MaxValue)
+    // prioritize filling the current migration id until there's no more tasks
+    retrieveTaskForCurrentMigrationId(now).orElse {
+      if (updateHistoryBackfillEnabled) {
+        taskToContinueBackfillingACSSnapshots()
+      } else {
+        OptionT.none
+      }
+    }
+  }
+
+  private def nextSnapshotTime(lastSnapshot: AcsSnapshot) = {
+    lastSnapshot.snapshotRecordTime.plus(Duration.ofHours(snapshotPeriodHours.toLong))
+  }
+
+  private def retrieveTaskForCurrentMigrationId(
+      now: CantonTimestamp
+  )(implicit tc: TraceContext): OptionT[Future, AcsSnapshotTrigger.Task] = {
+    OptionT(for {
+      lastSnapshot <- store.lookupSnapshotBefore(currentMigrationId, CantonTimestamp.MaxValue)
       possibleTask <- lastSnapshot match {
         case None =>
-          firstSnapshotForMigrationIdTask()
+          firstSnapshotForMigrationIdTask(currentMigrationId)
         case Some(lastSnapshot) => // new snapshot should be created, if ACS for it is complete
-          val newSnapshotRecordTime =
-            lastSnapshot.snapshotRecordTime.plus(Duration.ofHours(snapshotPeriodHours.toLong))
+          val newSnapshotRecordTime = nextSnapshotTime(lastSnapshot)
           Future.successful(
-            Some(AcsSnapshotTrigger.Task(newSnapshotRecordTime, Some(lastSnapshot)))
+            Some(
+              AcsSnapshotTrigger.Task(newSnapshotRecordTime, currentMigrationId, Some(lastSnapshot))
+            )
           )
       }
       task <- possibleTask match {
@@ -87,7 +118,7 @@ class AcsSnapshotTrigger(
         case Some(task) =>
           updateHistory
             .getUpdates(
-              Some((store.migrationId, task.snapshotRecordTime)),
+              Some((currentMigrationId, task.snapshotRecordTime)),
               includeImportUpdates = true,
               PageLimit.tryCreate(1),
             )
@@ -100,15 +131,86 @@ class AcsSnapshotTrigger(
                 Some(task)
             }
       }
+    } yield task)
+  }
+
+  private val lastCompleteBackfilledMigrationId: AtomicReference[Either[Done, Long]] =
+    new AtomicReference(Right(currentMigrationId))
+  def isDoneBackfillingAcsSnapshots = lastCompleteBackfilledMigrationId.get() == Left(Done)
+  // backfilling is done from latest migration id to oldest
+  private def taskToContinueBackfillingACSSnapshots()(implicit
+      tc: TraceContext
+  ): OptionT[Future, AcsSnapshotTrigger.Task] = {
+    lastCompleteBackfilledMigrationId.get() match {
+      case Left(Done) => // avoid unnecessary queries
+        OptionT.none
+      case Right(backfilledMigrationId) =>
+        OptionT(updateHistory.getPreviousMigrationId(backfilledMigrationId).flatMap {
+          case None =>
+            logger.info("No more migrations to backfill.")
+            lastCompleteBackfilledMigrationId.set(Left(Done))
+            Future.successful(None)
+          case Some(migrationIdToBackfill) =>
+            isHistoryBackfilled(migrationIdToBackfill).flatMap { historyBackfilled =>
+              if (historyBackfilled) {
+                retrieveTaskForPastMigrationId(migrationIdToBackfill)
+              } else {
+                logger.info(
+                  s"Migration id $migrationIdToBackfill does not yet have its history backfilled. Retrying backfill of ACS snapshot later."
+                )
+                Future.successful(None)
+              }
+            }
+        })
+    }
+  }
+
+  private def retrieveTaskForPastMigrationId(migrationIdToBackfill: Long)(implicit
+      tc: TraceContext
+  ): Future[Option[AcsSnapshotTrigger.Task]] = {
+    for {
+      migrationRecordTimeRange <- updateHistory.getRecordTimeRange(migrationIdToBackfill)
+      latestSnapshot <- store
+        .lookupSnapshotBefore(migrationIdToBackfill, CantonTimestamp.MaxValue)
+      task <- latestSnapshot match {
+        // Avoid creating the last snapshot for past migration ids, which will be contain a portion of empty history.
+        // This is important because, if the migration id gets restored after HDM fast enough,
+        // said snapshot might be invalid.
+        case Some(snapshot)
+            if snapshot.snapshotRecordTime.plus(
+              Duration.ofHours(snapshotPeriodHours.toLong)
+            ) > migrationRecordTimeRange
+              .map(_._2.max)
+              .maxOption
+              .getOrElse(
+                throw new IllegalStateException(
+                  s"DomainId with no data in $migrationRecordTimeRange"
+                )
+              ) =>
+          logger.info(
+            s"Backfilling of migration id $migrationIdToBackfill is complete. Trying with next oldest."
+          )
+          lastCompleteBackfilledMigrationId.set(Right(migrationIdToBackfill))
+          taskToContinueBackfillingACSSnapshots().value
+        case Some(snapshot) =>
+          Future.successful(
+            Some(
+              AcsSnapshotTrigger
+                .Task(nextSnapshotTime(snapshot), migrationIdToBackfill, Some(snapshot))
+            )
+          )
+        case None =>
+          firstSnapshotForMigrationIdTask(migrationIdToBackfill)
+      }
     } yield task
   }
 
   override protected def completeTask(task: AcsSnapshotTrigger.Task)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = task match {
-    case AcsSnapshotTrigger.Task(snapshotRecordTime, lastSnapshot) =>
+    case AcsSnapshotTrigger.Task(snapshotRecordTime, migrationId, lastSnapshot) =>
       store
-        .insertNewSnapshot(lastSnapshot, snapshotRecordTime)
+        .insertNewSnapshot(lastSnapshot, migrationId, snapshotRecordTime)
         .map { insertCount =>
           if (insertCount == 0) {
             logger.error(
@@ -125,11 +227,11 @@ class AcsSnapshotTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     store
-      .lookupSnapshotBefore(store.migrationId, task.snapshotRecordTime)
+      .lookupSnapshotBefore(currentMigrationId, task.snapshotRecordTime)
       .map(_.exists(_.snapshotRecordTime == task.snapshotRecordTime))
   }
 
-  private def firstSnapshotForMigrationIdTask()(implicit
+  private def firstSnapshotForMigrationIdTask(migrationId: Long)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[AcsSnapshotTrigger.Task]] = {
@@ -137,7 +239,7 @@ class AcsSnapshotTrigger(
       .getUpdates(
         Some(
           (
-            store.migrationId,
+            migrationId,
             // exclude ACS imports, which have record_time=MinValue
             CantonTimestamp.MinValue.plusSeconds(1L),
           )
@@ -162,15 +264,18 @@ class AcsSnapshotTrigger(
             .plusDays(plusDays.toLong)
             .atTime(hourForSnapshot, 0)
             .toInstant(ZoneOffset.UTC)
-          Some(AcsSnapshotTrigger.Task(CantonTimestamp.assertFromInstant(until), None))
+          Some(AcsSnapshotTrigger.Task(CantonTimestamp.assertFromInstant(until), migrationId, None))
       }
   }
 }
 
 object AcsSnapshotTrigger {
 
-  case class Task(snapshotRecordTime: CantonTimestamp, lastSnapshot: Option[AcsSnapshot])
-      extends PrettyPrinting {
+  case class Task(
+      snapshotRecordTime: CantonTimestamp,
+      migrationId: Long,
+      lastSnapshot: Option[AcsSnapshot],
+  ) extends PrettyPrinting {
     import com.daml.network.util.PrettyInstances.*
 
     override def pretty: Pretty[this.type] = prettyOfClass(
