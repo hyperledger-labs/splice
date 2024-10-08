@@ -34,7 +34,7 @@ workflow:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           reset_cluster: false # done in reset_cluster job
-          skip_infra: true # we need to skip infra because it can lead to issues if it was updated... see #12005
+          skip_infra: false
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
