@@ -104,6 +104,7 @@
   - [Maintenance Windows](#maintenance-windows)
   - [Multi-architecture Docker Images](#multi-architecture-docker-images)
   - [Docker-compose](#docker-compose)
+  - [Testing Performance-Critical Changes](#testing-performance-critical-changes)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -2100,7 +2101,33 @@ The output should look something like the example below:
 
 This output can be used to find the proposer address from the `consensus_state` endpoint and find the associated SV.
 
-###
+## Testing Performance-Critical Changes
+
+Some changes require extra performance testing before making it into a
+release. Notable examples include infrastructure changes (switching
+node types, databases, …) or Canton upgrades that may have a
+performance impact (all major upgrades in particular).
+
+We use `cilr` for performance testing which runs slightly above devnet scale (currently 16 SVs and 200 validators) and with
+a load test of 1 CC p2p transfer/s.
+
+Validating performance consists of two steps:
+
+1. Upgrade CILR to contain the version/configuration you want to test.
+2. Validate that performance matches what you expect.
+   1. First check the [load
+      test](https://grafana.cilr.global.canton.network.digitalasset.com/d/ccbb2351-2ae2-462f-ae0e-f2c893ad1028/k6-load-tester-custom-metrics?orgId=1&refresh=5s)
+      dashboard and ensure that we can keep the target rate of 1 CC
+      tx/s and latency has not increased.
+   2. Run a sequencer catchup test. Sequencers are usually our bottleneck for performance so we specifically isolate how fast they can catch up.
+      To do so
+      1. pick a sequencer (usually any other than SV-1 is a good choice as that is the DSO delegate).
+      2. Scale down the sequencer deployment, e.g., `kubectl scale deployment -n sv-$i global-domain-3-sequencer --replicas=0`.
+      3. Find the database in [GCP](https://console.cloud.google.com/sql/instances?project=da-cn-ci-2) (filter by cluster and namespace)
+      4. Restore the database from a backup that is at least 12h old through the UI.
+      5. Scale up the sequencer `kubectl scale deployment -n sv-$i global-domain-3-sequencer --replicas=1`
+      6. Check catchup performance in the [dashboard](https://grafana.cilr.global.canton.network.digitalasset.com/d/ca9df344-c699-4efe-83c2-5fb2639d96d9/global-domain-catchup?orgId=1&refresh=30s).
+         As a rough guideline anything below 4x is concerning but double check what the current expected numbers are in #team-canton-network-internal.
 
 ## Appendix: Kubernetes and Other Deployment Resources
 
