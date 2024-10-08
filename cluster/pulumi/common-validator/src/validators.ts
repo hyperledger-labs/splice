@@ -4,13 +4,13 @@ import {
   preApproveValidatorRunbook,
 } from 'splice-pulumi-common';
 
-export const mustInstallValidator1 = config.envFlag('CN_INSTALL_VALIDATOR1', true);
+export const mustInstallValidator1 = config.envFlag('SPLICE_INSTALL_VALIDATOR1', true);
 
-export const mustInstallSplitwell = config.envFlag('CN_INSTALL_SPLITWELL', true);
+export const mustInstallSplitwell = config.envFlag('SPLICE_INSTALL_SPLITWELL', true);
 
 export const splitwellOnboarding = {
-  name: 'splitwell',
-  secret: 'splitwellsecret',
+  name: 'splitwell2',
+  secret: 'splitwellsecret2',
   expiresIn: '24h',
 };
 

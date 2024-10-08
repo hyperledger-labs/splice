@@ -1,5 +1,4 @@
-import { Auth0Fetch } from 'splice-pulumi-common';
-import { Auth0ClientType, getAuth0Config } from 'splice-pulumi-common-sv';
+import { Auth0ClientType, getAuth0Config, Auth0Fetch } from 'splice-pulumi-common';
 
 import { installClusterVersion } from './clusterVersion';
 import { installCluster } from './installCluster';

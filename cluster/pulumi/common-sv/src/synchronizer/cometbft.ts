@@ -1,6 +1,5 @@
 import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
-import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   CLUSTER_BASENAME,
@@ -43,7 +42,7 @@ export function installCometBftNode(
   isRunningMigration: boolean,
   logLevel: string,
   version: CnChartVersion = activeVersion,
-  syncSource?: Resource,
+  enableStateSync: boolean = !disableCometBftStateSync,
   opts?: SpliceCustomResourceOptions
 ): Cometbft {
   const cometBftValues = loadYamlFromFile(
@@ -65,19 +64,18 @@ export function installCometBftNode(
   // also for upgrade domains we first deploy the domain and then redeploy the sv app, and as we proxy the calls for state sync through the
   // sv-app we cannot configure state sync until the sv app has migrated
   // if a migration is running we must not configure state sync because that will also add a pulumi dependency and our migrate flow will break (sv2-4 depending on sv1)
-  const stateSyncEnabled =
-    !isSv1 && !disableCometBftStateSync && !isRunningMigration && isActiveDomain;
+  const stateSyncEnabled = !isSv1 && enableStateSync && !isRunningMigration && isActiveDomain;
   const release = installSpliceHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
-    'cn-cometbft',
+    'splice-cometbft',
     _.mergeWith(cometBftValues, {
       sv1: nodeConfigs.sv1,
       // TODO (#13845) remove when ciperiodic version >= 0.1.18
       founder: nodeConfigs.sv1,
       istioVirtualService: {
         enabled: true,
-        gateway: 'cluster-ingress/cn-apps-gateway',
+        gateway: 'cluster-ingress/splice-apps-gateway',
         port: nodeConfig.istioPort,
       },
       node: {
@@ -130,7 +128,6 @@ export function installCometBftNode(
     // support old runbook names, can be removed once the runbooks are all reset and latest release is >= 0.2.x
     {
       ...opts,
-      dependsOn: (opts?.dependsOn || []).concat(syncSource && stateSyncEnabled ? syncSource : []),
       aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
     }

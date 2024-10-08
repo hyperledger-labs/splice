@@ -10,9 +10,7 @@ import { config } from './config';
 import { spliceConfig } from './config/config';
 
 /// Environment variables
-export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 480;
-
-export const SV_APP_HELM_CHART_TIMEOUT_SEC = 1000;
+export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 300;
 
 export const REPO_ROOT = config.requireEnv('REPO_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
@@ -40,8 +38,6 @@ export type LogLevel = 'INFO' | 'DEBUG';
 export const approveDaSupportSvNode = config.envFlag('APPROVE_DA_SUPPORT_SV_NODE', false);
 
 export const ENABLE_NO_DATA_ALERTS = config.envFlag('ENABLE_NO_DATA_ALERTS', false);
-
-const daSupportNodeIpRanges: string[] = approveDaSupportSvNode ? ['35.244.74.143/32'] : [];
 
 export const daSupportApprovedIdentities: ApprovedSvIdentity[] = approveDaSupportSvNode
   ? [
@@ -191,37 +187,6 @@ const _fixedTokens = config.envFlag('CNCLUSTER_FIXED_TOKENS', false);
 
 export function fixedTokens(): boolean {
   return _fixedTokens;
-}
-
-type IpRangesDict = { [key: string]: IpRangesDict } | string[];
-
-function extractIpRanges(x: IpRangesDict): string[] {
-  return Array.isArray(x)
-    ? x
-    : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
-}
-
-export function loadIPRanges(): string[] {
-  const externalIPRangesJson = loadJsonFromFile(
-    REPO_ROOT + '/cluster/cn-svc-configs/configs/allowed-ip-ranges-external.json'
-  );
-  const internalIPRangesJson = loadJsonFromFile(
-    REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
-  );
-
-  if (isDevNet) {
-    return extractIpRanges(externalIPRangesJson.devnet)
-      .concat(extractIpRanges(internalIPRangesJson.devnet))
-      .concat(daSupportNodeIpRanges);
-  } else if (isMainNet) {
-    return extractIpRanges(externalIPRangesJson.mainnet).concat(
-      extractIpRanges(internalIPRangesJson.mainnet)
-    );
-  } else {
-    return extractIpRanges(externalIPRangesJson.testnet)
-      .concat(extractIpRanges(internalIPRangesJson.testnet))
-      .concat(daSupportNodeIpRanges);
-  }
 }
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {

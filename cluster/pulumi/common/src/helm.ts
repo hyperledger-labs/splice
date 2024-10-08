@@ -2,6 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as inputs from '@pulumi/kubernetes/types/input';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
+import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
@@ -192,11 +193,15 @@ export function installSpliceRunbookHelmChart(
 }
 
 export function chartPath(chartName: string, version: CnChartVersion): string {
+  const compatibleName =
+    version.type === 'local' || semver.gt(version.version, '0.2.1')
+      ? chartName
+      : chartName.replace(/^splice/, 'cn');
   return version.type === 'local'
-    ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${chartName}/`
+    ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${compatibleName}/`
     : version.repository === repositories.google
-      ? `${version.repository.helm}/${chartName}`
-      : chartName;
+      ? `${version.repository.helm}/${compatibleName}`
+      : compatibleName;
 }
 
 function versionStringWithPossibleOverride(

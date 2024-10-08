@@ -70,7 +70,7 @@ Migration dumps contain identity and transaction data from all of an SV's Canton
 (participant, sequencer, and mediator) connected to the global synchronizer that is being upgraded.
 When using the official Helm charts and following the :ref:`Helm-based deployment documentation <sv-helm>`,
 the migration dump is automatically created once a scheduled synchronizer upgrade begins and the existing synchronizer has been paused.
-As part of the Helm-based deployment of the SV app (``cn-sv-node``),
+As part of the Helm-based deployment of the SV app (``splice-sv-node``),
 a persistent Kubernetes volume is attached to the ``sv-app`` pod and configured as the target storage location for migration dumps.
 When redeploying the SV app as part of the migration process (see :ref:`sv-upgrades-deploying-apps`),
 the SV app will automatically consume the migration dump and initialize new components (see :ref:`sv-upgrades-deploying-domain`)

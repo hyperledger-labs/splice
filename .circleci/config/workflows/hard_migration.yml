@@ -45,6 +45,17 @@ workflow:
           deploy_version: << pipeline.parameters.base-version >>
           requires:
             - deploy_cluster_for_migration
+      - pre_migration_dump_identities:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          send_notifications: false
+          requires:
+            - deploy_cluster_for_migration
+            - deploy_validator_runbook_for_migration
       - pre_migration_compose_validator:
           context:
             - artifactory
@@ -70,12 +81,11 @@ workflow:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
             - deploy_validator_runbook_for_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "prepare_sv_runbook_for_migration"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
           action: "prepare"
           scope: "sv"
@@ -127,12 +137,11 @@ workflow:
           migration_id: 1
           requires:
             - trigger_global_domain_migration
-      - hard_migration_vpn: # VPN is required to resolve Validator1's PartyId
+      - hard_migration:
           name: "migrate_sv_runbook"
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
           action: "migrate"
           scope: "sv"
@@ -167,6 +176,17 @@ workflow:
           send_notifications: false
           requires:
             - migrate_cluster
+      - post_migration_verify_identities:
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: << pipeline.parameters.cluster >>
+          send_notifications: false
+          requires:
+            - pre_migration_dump_identities
+            - migrate_cluster
+            - migrate_validator_runbook
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           context:

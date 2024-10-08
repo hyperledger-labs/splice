@@ -19,6 +19,7 @@ com.daml.network.integration.tests.GcpBucketPeriodicBackupIntegrationTest
 com.daml.network.integration.tests.ManualStartIntegrationTest
 com.daml.network.integration.tests.MemberTrafficIntegrationTest
 com.daml.network.integration.tests.ParticipantIdentitiesExportIntegrationTest
+com.daml.network.integration.tests.ScanBackfillingIntegrationTest
 com.daml.network.integration.tests.ScanConnectionIntegrationTest
 com.daml.network.integration.tests.ScanIntegrationTest
 com.daml.network.integration.tests.ScanTxLogOwnerExpireLockIntegrationTest

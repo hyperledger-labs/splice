@@ -6,11 +6,11 @@ window.splice_config = {
     },
   },
   spliceInstanceNames: {
-    networkName: "${CN_APP_UI_NETWORK_NAME}",
-    networkFaviconUrl: "${CN_APP_UI_NETWORK_FAVICON_URL}",
-    amuletName: "${CN_APP_UI_AMULET_NAME}",
-    amuletNameAcronym: "${CN_APP_UI_AMULET_NAME_ACRONYM}",
-    nameServiceName: "${CN_APP_UI_NAME_SERVICE_NAME}",
-    nameServiceNameAcronym: "${CN_APP_UI_NAME_SERVICE_NAME_ACRONYM}",
+    networkName: "${SPLICE_APP_UI_NETWORK_NAME}",
+    networkFaviconUrl: "${SPLICE_APP_UI_NETWORK_FAVICON_URL}",
+    amuletName: "${SPLICE_APP_UI_AMULET_NAME}",
+    amuletNameAcronym: "${SPLICE_APP_UI_AMULET_NAME_ACRONYM}",
+    nameServiceName: "${SPLICE_APP_UI_NAME_SERVICE_NAME}",
+    nameServiceNameAcronym: "${SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM}",
   },
 };

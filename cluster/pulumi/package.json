@@ -37,6 +37,8 @@
         "deployment",
         "multi-validator",
         "sv-canton",
-        "validator1"
+        "validator1",
+        "splitwell",
+        "circleci"
     ]
 }

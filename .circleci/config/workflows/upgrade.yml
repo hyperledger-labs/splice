@@ -23,8 +23,8 @@ workflow:
           unlock_shared_cluster: false
           silence_deployment_alerts: true
           context:
-            - canton-network-vpn
             - slack-context
+            - artifactory
           requires:
             - wait_for_previous_pipeline
       - deploy_cluster:

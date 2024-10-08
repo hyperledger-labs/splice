@@ -40,7 +40,8 @@ def build_msg():
   github_url = f"https://github.com/{PROJECT_USERNAME}/{PROJECT_REPONAME}/commit/{commit_sha}"
 
   text=f"""*Job {workflow.name}:{FAILED_JOB_NAME} failed on cluster {args.cluster}* :dumpster-fire:.
-  *{CURRENT_BRANCH}*: <{circleci_url}|{commit_sha_short} {commit_msg}> ({commit_author} <{github_url}|GitHub>)"""
+  *{CURRENT_BRANCH}*: <{circleci_url}|{commit_sha_short} {commit_msg}> ({commit_author} <{github_url}|GitHub>)
+  (<https://github.com/orgs/DACH-NY/projects/48|See GH dashboard>)"""
 
   return text
 

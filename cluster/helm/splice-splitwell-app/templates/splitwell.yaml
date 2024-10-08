@@ -1,0 +1,124 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: splitwell-app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: splitwell-app
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: splitwell-app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: splitwell-app
+    spec:
+      containers:
+      - name: splitwell-app
+        image: "{{ .Values.imageRepo }}/splitwell-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).splitwell_app) }}"
+        imagePullPolicy: Always
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
+        - name: SPLICE_APP_SPLITWELL_SCAN_URL
+          value: {{ .Values.scanAddress }}
+        - name: SPLICE_APP_SPLITWELL_MIGRATION_ID
+          value: {{ .Values.migration.id | quote }}
+        - name: SPLICE_APP_SPLITWELL_PARTICIPANT_HOST
+          value: {{ .Values.participantHost }}
+        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "splitwell" "keyName" "splitwell" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        {{- with .Values.persistence }}
+        - name: ADDITIONAL_CONFIG_PERSISTENCE
+          value: |
+            canton.splitwell-apps.splitwell_backend.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = "{{ .databaseName }}"
+                  currentSchema = "{{ .schema }}"
+                  serverName = "{{ .host }}"
+                  portNumber = {{ .port }}
+                  user = "{{ .user }}"
+                  password = ${SPLICE_APP_POSTGRES_PASSWORD}
+                }
+              }
+            }
+        - name: SPLICE_APP_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.persistence.secretName }}
+              key: postgresPassword
+        {{- end }}
+        - name: FAIL_ON_APP_VERSION_MISMATCH
+          value: {{ .Values.failOnAppVersionMismatch | quote }}
+        {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
+        {{- include "splice-util-lib.log-level" .Values | indent 8}}
+        ports:
+        - containerPort: 5213
+          name: sw-api
+          protocol: TCP
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+      initContainers:
+        - name: {{ .Release.Name }}-init
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.persistence.secretName }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.persistence.host }} -p {{ .Values.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: splitwell-app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: splitwell-app
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  selector:
+    app: splitwell-app
+  ports:
+  - name: sw-api
+    port: 5213
+    protocol: TCP
+  - name: metrics
+    port: 10013
+    protocol: TCP

@@ -6,11 +6,14 @@ package com.daml.network.scan.automation
 import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{AutomationServiceCompanion, SpliceAppAutomationService}
 import com.daml.network.environment.{PackageIdResolver, RetryProvider, SpliceLedgerClient}
+import com.daml.network.http.HttpClient
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
 import com.daml.network.scan.store.{AcsSnapshotStore, ScanStore}
+import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
@@ -26,10 +29,13 @@ class ScanAutomationService(
     snapshotStore: AcsSnapshotStore,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
+    svParty: PartyId,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
+    httpClient: HttpClient,
+    templateJsonDecoder: TemplateJsonDecoder,
 ) extends SpliceAppAutomationService(
       config.automation,
       clock,
@@ -47,11 +53,23 @@ class ScanAutomationService(
 
   registerTrigger(new ScanAggregationTrigger(store, triggerContext))
   registerTrigger(new ScanBackfillAggregatesTrigger(store, triggerContext))
+  if (config.updateHistoryBackfillEnabled) {
+    registerTrigger(
+      new ScanHistoryBackfillingTrigger(
+        store,
+        config.updateHistoryBackfillFromScanURL,
+        config.updateHistoryBackfillBatchSize,
+        svParty,
+        triggerContext,
+      )
+    )
+  }
   registerTrigger(
     new AcsSnapshotTrigger(
       snapshotStore,
       store.updateHistory,
       config.acsSnapshotPeriodHours,
+      config.updateHistoryBackfillEnabled,
       triggerContext,
     )
   )

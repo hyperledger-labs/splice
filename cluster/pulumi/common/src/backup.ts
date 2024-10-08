@@ -129,7 +129,7 @@ export function installParticipantIdentitiesSecret(
   secretName: string,
   content: CnInput<string>
 ): k8s.core.v1.Secret {
-  return new k8s.core.v1.Secret(`cn-app-${xns.logicalName}-${secretName}`, {
+  return new k8s.core.v1.Secret(`splice-app-${xns.logicalName}-${secretName}`, {
     metadata: {
       name: secretName,
       namespace: xns.logicalName,

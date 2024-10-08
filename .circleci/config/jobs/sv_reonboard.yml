@@ -1,12 +1,9 @@
 jobs:
   deploy_validator_to_recover_sv_amulets:
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
@@ -33,16 +30,13 @@ jobs:
         default: 2
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
             make -j cluster/build
           cmd_retry_count: 2
-      - setup_vpn # VPN is required to get sv runbook identities
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
       - when:
           condition:
             and:

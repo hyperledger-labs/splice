@@ -1,0 +1,248 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- $scanAppLabel :=  "scan-app" }}
+{{- $scanWebUiAppLabel := "scan-web-ui" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $scanAppLabel }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ $scanAppLabel }}
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $scanAppLabel }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        {{- toYaml .Values.pod.annotations | nindent 8 }}
+      labels:
+        app: {{ $scanAppLabel }}
+        migration: {{ .Values.migration.id | quote }}
+    spec:
+      containers:
+      - name: scan-app
+        image: "{{ .Values.imageRepo }}/scan-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).scan_app) }}"
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
+        {{- with .Values.persistence }}
+        - name: ADDITIONAL_CONFIG_PERSISTENCE
+          value: |
+            canton.scan-apps.scan-app.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = "{{ .databaseName }}"
+                  currentSchema = "{{ .schema }}"
+                  serverName = "{{ .host }}"
+                  portNumber = {{ .port }}
+                  user = "{{ .user }}"
+                  password = ${SPLICE_APP_POSTGRES_PASSWORD}
+                }
+              }
+            }
+        - name: SPLICE_APP_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.persistence.secretName }}
+              key: postgresPassword
+        {{- end }}
+        {{- if .Values.isFirstSv }}
+        - name: ADDITIONAL_CONFIG_IS_SV1
+          value: |
+            canton.scan-apps.scan-app {
+              is-first-sv = true
+            }
+        {{- end }}
+        - name: ADDITIONAL_CONFIG_MIGRATION_ID
+          value: |
+            canton.scan-apps.scan-app.domain-migration-id = {{ .Values.migration.id }}
+        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        - name: SPLICE_APP_SCAN_PARTICIPANT_ADDRESS
+          value: {{ .Values.participantAddress | default "participant" | quote }}
+        - name: SPLICE_APP_SCAN_SEQUENCER_ADDRESS
+          value: {{ .Values.sequencerAddress | default "global-domain-sequencer" | quote }}
+        - name: FAIL_ON_APP_VERSION_MISMATCH
+          value: {{ .Values.failOnAppVersionMismatch | quote }}
+        - name: SPLICE_APP_UI_NETWORK_NAME
+          value: {{ .Values.spliceInstanceNames.networkName | quote }}
+        - name: SPLICE_APP_UI_NETWORK_FAVICON_URL
+          value: {{ .Values.spliceInstanceNames.networkFaviconUrl | quote }}
+        - name: SPLICE_APP_UI_AMULET_NAME
+          value: {{ .Values.spliceInstanceNames.amuletName | quote }}
+        - name: SPLICE_APP_UI_AMULET_NAME_ACRONYM
+          value: {{ .Values.spliceInstanceNames.amuletNameAcronym | quote }}
+        - name: SPLICE_APP_UI_NAME_SERVICE_NAME
+          value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
+        - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
+          value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
+        {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
+        {{- include "splice-util-lib.log-level" .Values | indent 8}}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5012
+          name: scan-api
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /api/scan/livez
+            port: 5012
+          initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 60 }}
+          periodSeconds: 60
+          failureThreshold: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/scan/readyz
+            port: 5012
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 5
+          timeoutSeconds: 3
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+      initContainers:
+        - name: {{ .Release.Name }}-init
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.persistence.secretName }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.persistence.host }} -p {{ .Values.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $scanAppLabel }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ $scanAppLabel }}
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  selector:
+    app: {{ $scanAppLabel }}
+  ports:
+  - name: scan-api
+    port: 5012
+    protocol: TCP
+  - name: metrics
+    port: 10013
+    protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $scanWebUiAppLabel }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ $scanWebUiAppLabel }}
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $scanWebUiAppLabel }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ $scanWebUiAppLabel }}
+        migration: {{ .Values.migration.id | quote }}
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
+        - name: SPLICE_APP_UI_NETWORK_NAME
+          value: {{ .Values.spliceInstanceNames.networkName | quote }}
+        - name: SPLICE_APP_UI_NETWORK_FAVICON_URL
+          value: {{ .Values.spliceInstanceNames.networkFaviconUrl | quote }}
+        - name: SPLICE_APP_UI_AMULET_NAME
+          value: {{ .Values.spliceInstanceNames.amuletName | quote }}
+        - name: SPLICE_APP_UI_AMULET_NAME_ACRONYM
+          value: {{ .Values.spliceInstanceNames.amuletNameAcronym | quote }}
+        - name: SPLICE_APP_UI_NAME_SERVICE_NAME
+          value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
+        - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
+          value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
+        image: "{{ .Values.imageRepo }}/scan-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).scan_web_ui) }}"
+        imagePullPolicy: Always
+        name: scan-web-ui
+        ports:
+        - containerPort: 80
+          name: scan-ui
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 0.1
+            memory: 240Mi
+          limits:
+            cpu: 1
+            memory: 1536Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $scanWebUiAppLabel }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  selector:
+    app: {{ $scanWebUiAppLabel }}
+  ports:
+  - name: scan-ui
+    port: 80
+    protocol: TCP
+---
+{{- if .Values.enablePostgresMetrics }}
+{{- include "splice-util-lib.postgres-metrics" (dict "persistence" .Values.persistence  "namespace" .Release.Namespace "nodeSelector" .Values.nodeSelector "affinity" .Values.affinity "tolerations" .Values.tolerations ) }}
+{{- end}}

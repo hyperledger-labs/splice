@@ -8,7 +8,13 @@ import com.daml.network.store.HistoryBackfilling.Outcome.{
   MoreWorkAvailableLater,
   MoreWorkAvailableNow,
 }
-import com.daml.network.store.HistoryBackfilling.{DestinationHistory, Outcome, SourceHistory}
+import com.daml.network.store.HistoryBackfilling.{
+  DestinationBackfillingInfo,
+  DestinationHistory,
+  Outcome,
+  SourceHistory,
+  SourceMigrationInfo,
+}
 import com.daml.network.util.DomainRecordTimeRange
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -32,20 +38,21 @@ import scala.concurrent.{ExecutionContext, Future}
   * Therefore, the backfilling process is domain-based, using the following approach:
   *   for each migration id:
   *     for each domain:
-  *       find the oldest record time in the local history
+  *       find the oldest record time in the destination history
   *       fetch N previous records from the source history
-  *       insert these records into the local history
+  *       insert these records into the destination history
   */
 final class HistoryBackfilling[T](
     destination: DestinationHistory[T],
     source: SourceHistory[T],
+    currentMigrationId: Long,
     batchSize: Int,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
 ) extends NamedLogging {
 
-  /** Backfill a small part of the local history, making sure that the local history won't have any gaps.
+  /** Backfill a small part of the destination history, making sure that the destination history won't have any gaps.
     *
     * It is intended that this function is called repeatedly until it returns `BackfillingIsComplete`,
     * e.g., from a PollingTrigger.
@@ -61,83 +68,87 @@ final class HistoryBackfilling[T](
       Future.successful(MoreWorkAvailableLater)
     } else {
       for {
-        destMigrationIdRange <- destination.migrationIdRange
-        outcome <- destMigrationIdRange match {
+        backfillingInfoO <- destination.backfillingInfo
+        outcome <- backfillingInfoO match {
           case None =>
             // Do not backfill while there's absolutely no data, otherwise we don't know where to start backfilling
             logger.info(
-              "Destination migration id range is empty, skipping backfilling until there is some data"
+              "Destination backfilling is not ready, skipping backfilling for now"
             )
             Future.successful(MoreWorkAvailableLater)
-          case Some(range) =>
-            // Otherwise, start backfilling the first (oldest) migration id - since there are no gaps,
-            // only the first migration id needs to be backfilled.
-            backfillMigrationIdRange(range)
+          case Some(backfillingInfo) =>
+            backfillMigrationId(backfillingInfo)
         }
       } yield outcome
     }
   }
 
-  private def backfillMigrationIdRange(
-      destMigrationIdRange: (Long, Long)
+  private def backfillMigrationId(
+      destInfo: DestinationBackfillingInfo
   )(implicit tc: TraceContext): Future[Outcome] = {
-    // Start backfilling the oldest migration id - since there are no gaps,
-    // all other migrations do not need to be backfilled.
-    val migrationId = destMigrationIdRange._1
     for {
-      destComplete <- destination.isBackfillingComplete(migrationId)
-      prevMigrationIdOpt <- source.previousMigrationId(migrationId)
-      outcome <- (destComplete, prevMigrationIdOpt) match {
-        case (true, None) =>
-          logger.info(
-            s"Backfilling migration id $migrationId is complete, and there is no migration id before $migrationId. " +
-              "This history won't need any further backfilling."
+      srcInfo <- source.migrationInfo(destInfo.migrationId)
+      migrationId = destInfo.migrationId
+      outcome <- srcInfo match {
+        case None =>
+          logger.debug(
+            s"Source is not ready for migration id $migrationId, skipping backfill for now"
           )
-          Future.successful(BackfillingIsComplete)
-        case (true, Some(prevMigrationId)) =>
-          logger.info(
-            s"Backfilling migration id $migrationId is complete, continuing with previous migration id $prevMigrationId"
+          Future.successful(MoreWorkAvailableLater)
+        case Some(srcInfo) =>
+          logger.debug(s"Backfilling migration id $migrationId")
+          backfillMigrationId(
+            srcInfo,
+            destInfo,
           )
-          backfillMigrationId(prevMigrationId, destMigrationIdRange)
-        case (false, _) =>
-          logger.debug(s"Backfilling migration id $migrationId not complete yet")
-          backfillMigrationId(migrationId, destMigrationIdRange)
       }
     } yield outcome
   }
 
   private def backfillMigrationId(
-      migrationId: Long,
-      destMigrationIdRange: (Long, Long),
+      srcInfo: SourceMigrationInfo,
+      destInfo: DestinationBackfillingInfo,
   )(implicit tc: TraceContext): Future[Outcome] = {
+    logger.debug(
+      s"backfillMigrationId(srcInfo=${srcInfo}, destInfo=${destInfo})"
+    )
+    val migrationId = destInfo.migrationId
+    // For each remote domain, compute the record time from which we can backfill items
+    val backfillFrom = getBackfillUpdatesBefore(
+      destInfo.backfilledAt,
+      srcInfo.recordTimeRange,
+      migrationId,
+    )
     for {
-      remoteRecordTimes <- source.recordTimeRange(migrationId)
-      localRecordTimes <- destination.recordTimeRange(migrationId)
-      sourceBackfillingComplete <- source.isBackfillingComplete(migrationId)
-
-      // For each remote domain, compute the record time from which we can backfill items
-      backfillFrom = backfillFromByDomain(
-        localRecordTimes,
-        remoteRecordTimes,
-        migrationId,
-        destMigrationIdRange,
-      )
-
       // For UX reasons, we pick the domain that is most behind in history, and backfill from there
-      result <- backfillFrom.headOption match {
+      result <- backfillFrom.recordTimes.headOption match {
         case Some((domainId, backfillFrom)) =>
           logger.info(
             s"Backfilling domain ${domainId} from ${backfillFrom} for migration ${migrationId}"
           )
           backfillDomain(migrationId, domainId, backfillFrom)
         case None =>
-          if (sourceBackfillingComplete) {
-            logger.info(
-              s"No more data to backfill for migration ${migrationId}, marking as complete"
+          if (backfillFrom.missingData) {
+            logger.debug(
+              s"Some domains are not ready for backfilling, skipping backfill for now"
             )
-            destination
-              .markBackfillingComplete(migrationId)
-              .map(_ => MoreWorkAvailableNow)
+            Future.successful(MoreWorkAvailableLater)
+          } else if (srcInfo.complete) {
+            srcInfo.previousMigrationId match {
+              case Some(prevMigrationId) =>
+                logger.info(
+                  s"No more data to backfill for migration ${migrationId}, continuing with previous migration id ${prevMigrationId}"
+                )
+                backfillMigrationId(
+                  DestinationBackfillingInfo(prevMigrationId, Map.empty)
+                )
+              case None =>
+                logger.info(
+                  s"No more data to backfill for migration ${migrationId}, and there is no migration id before ${migrationId}. " +
+                    "This history won't need any further backfilling."
+                )
+                destination.markBackfillingComplete().map(_ => BackfillingIsComplete)
+            }
           } else {
             logger.info(
               s"No more data to backfill for migration ${migrationId} right now, but source is not complete yet"
@@ -148,53 +159,65 @@ final class HistoryBackfilling[T](
     } yield result
   }
 
-  def backfillFromByDomain(
-      destRecordTimes: Map[DomainId, DomainRecordTimeRange],
+  /** @param recordTimes  The record times from which we should backfill for each domain.
+    * @param missingData  True if there are domains for which we do not know where to backfill from yet.
+    */
+  case class BackfillUpdatesBefore(
+      recordTimes: Seq[(DomainId, CantonTimestamp)],
+      missingData: Boolean,
+  )
+  def getBackfillUpdatesBefore(
+      destRecordTimes: Map[DomainId, CantonTimestamp],
       srcRecordTimes: Map[DomainId, DomainRecordTimeRange],
       migrationId: Long,
-      destMigrationIdRange: (Long, Long),
-  )(implicit tc: TraceContext): Seq[(DomainId, CantonTimestamp)] = {
-    srcRecordTimes
+  )(implicit tc: TraceContext): BackfillUpdatesBefore = {
+    logger.debug(
+      s"backfillFromByDomain(destRecordTimes=${destRecordTimes}, srcRecordTimes=${srcRecordTimes}, migrationId=${migrationId}"
+    )
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    var missingData = false
+    val result = srcRecordTimes
       .map {
         case (domainId, srcRecordTime) => {
           val backfillFrom = destRecordTimes.get(domainId) match {
             case Some(destRecordTime) =>
               // Both source and destination history have data for this domain
-              if (destRecordTime.min == srcRecordTime.min) {
+              if (destRecordTime == srcRecordTime.min) {
                 // Source and destination history are both at the same record time, nothing to do
-                logger.trace(
-                  s"Source and destination history are both at the same record time: domain ${domainId}, migration ${migrationId}, time ${destRecordTime.min}"
+                logger.debug(
+                  s"Source and destination history are both at the same record time: domain ${domainId}, migration ${migrationId}, time ${destRecordTime}"
                 )
                 None
-              } else if (destRecordTime.min > srcRecordTime.min) {
+              } else if (destRecordTime > srcRecordTime.min) {
                 // Destination history has less data than source history, start backfilling from the oldest destination item
-                logger.trace(
-                  s"Destination history has less data than source history: domain ${domainId}, migration ${migrationId}, dest min ${destRecordTime.min}, src min ${srcRecordTime.min}"
+                logger.debug(
+                  s"Destination history has less data than source history: domain ${domainId}, migration ${migrationId}, dest min ${destRecordTime}, src min ${srcRecordTime.min}"
                 )
-                Some(destRecordTime.min)
+                Some(destRecordTime)
               } else {
                 // Destination history has more data than source history?!?
                 logger.error(
-                  s"Destination history has more data than source history: domain ${domainId}, migration ${migrationId}, dest min ${destRecordTime.min}, src min ${srcRecordTime.min}"
+                  s"Destination history has more data than source history: domain ${domainId}, migration ${migrationId}, dest min ${destRecordTime}, src min ${srcRecordTime.min}"
                 )
                 None
               }
             case None =>
               // Destination doesn't contain any items for this domain+migration id
-              if (migrationId < destMigrationIdRange._2) {
-                // Destination ingestion is working at `destMigrationIdRange._2` and won't touch this migration id,
+              if (migrationId < currentMigrationId) {
+                // Destination ingestion is working on `currentMigrationId` and won't touch this migration id,
                 // so we can safely backfill from the newest item in the source history.
                 logger.debug(
-                  s"No local data for domain ${domainId}, migration ${migrationId}. Backfilling from the newest item."
+                  s"No destination data for domain ${domainId}, migration ${migrationId}. Backfilling from the newest item."
                 )
                 Some(CantonTimestamp.MaxValue)
               } else {
-                // Ingestion is not complete yet for this migration id, yet we do not have any item for this
-                // domain in this migration id. To avoid race conditions, we skip backfilling this domain id
-                // until we have ingested the first item from which we then can backfill.
+                // We're trying to backfill data for the currently active migration, i.e., the one that is being ingested.
+                // To avoid race conditions, we skip backfilling this domain id until we have ingested the first item
+                // from which we then can backfill.
                 logger.debug(
-                  s"No local data for domain ${domainId}, migration ${migrationId}. Waiting until first item is ingested."
+                  s"No destination data for domain ${domainId}, migration ${migrationId}. Waiting until first item is ingested."
                 )
+                missingData = true
                 None
               }
           }
@@ -207,6 +230,7 @@ final class HistoryBackfilling[T](
         case _ => None
       })
       .sortBy(_._2)
+    BackfillUpdatesBefore(result, missingData)
   }
 
   def backfillDomain(
@@ -248,27 +272,44 @@ object HistoryBackfilling {
     final case object BackfillingIsComplete extends Outcome
   }
 
-  final case class MigrationInfo(
+  /** Metadata for a given migration id.
+    *
+    * @param previousMigrationId The migration id before the given migration id, if any.
+    *                            None if the given migration id is the beginning of known history.
+    * @param recordTimeRange     All domains that produced history items in the given migration id,
+    *                            along with the record time of the newest and oldest history item associated with each domain.
+    * @param complete            True if the backfilling for the given migration id is complete,
+    *                            i.e., the history knows the first item for each domain in the given migration id.
+    *                            We need this to decide when the backfilling is complete, because it might be difficult to
+    *                            identify the first item of a migration otherwise.
+    */
+  final case class SourceMigrationInfo(
       previousMigrationId: Option[Long],
       recordTimeRange: Map[DomainId, DomainRecordTimeRange],
       complete: Boolean,
+  )
+
+  /** Information about the point at which backfilling is currently inserting data.
+    *
+    * @param migrationId   The migration id that is currently being backfilled
+    * @param backfilledAt  A vector clock specifying the earliest updates the destination history
+    *                      has already consumed for backfilling.
+    */
+  final case class DestinationBackfillingInfo(
+      migrationId: Long,
+      backfilledAt: Map[DomainId, CantonTimestamp],
   )
 
   trait SourceHistory[T] {
 
     def isReady: Boolean
 
-    /** Returns the migration id before the given id, if any.
-      * Returns None if the given migration id is the beginning of known history.
+    /** Returns metadata for the given migration id.
+      * Returns None if data for the given migration id is not yet available.
       */
-    def previousMigrationId(migrationId: Long)(implicit tc: TraceContext): Future[Option[Long]]
-
-    /** All domains that produced history items in the given migration id,
-      * along with the record time of the newest and oldest history item associated with each domain
-      */
-    def recordTimeRange(migrationId: Long)(implicit
+    def migrationInfo(migrationId: Long)(implicit
         tc: TraceContext
-    ): Future[Map[DomainId, DomainRecordTimeRange]]
+    ): Future[Option[SourceMigrationInfo]]
 
     /** The newest history items for the given domain and migration id,
       * with a record time before the given record time.
@@ -279,30 +320,17 @@ object HistoryBackfilling {
         before: CantonTimestamp,
         count: Int,
     )(implicit tc: TraceContext): Future[Seq[T]]
-
-    /** True if the backfilling for given migration id is complete,
-      * i.e., this history knows the first item for each domain in the given migration id.
-      *
-      * We need to explicitly track this, as there is no other marker for the first history item of a migration.
-      * Without this, we don't know whether a source history could return more items in the future,
-      * because it is still backfilling itself.
-      */
-    def isBackfillingComplete(migrationId: Long)(implicit tc: TraceContext): Future[Boolean]
   }
 
   trait DestinationHistory[T] {
 
     def isReady: Boolean
 
-    /** The first and last migration id for which there is any data */
-    def migrationIdRange(implicit tc: TraceContext): Future[Option[(Long, Long)]]
-
-    /** All domains that produced history items in the given migration id,
-      * along with the record time of the newest and oldest history item associated with each domain
+    /** Returns information about the point at which backfilling is currently inserting data.
       */
-    def recordTimeRange(migrationId: Long)(implicit
+    def backfillingInfo(implicit
         tc: TraceContext
-    ): Future[Map[DomainId, DomainRecordTimeRange]]
+    ): Future[Option[DestinationBackfillingInfo]]
 
     /** Insert the given sequence of history items. The caller must make sure calls to this
       * function don't leave any gaps in the history.
@@ -311,12 +339,7 @@ object HistoryBackfilling {
         tc: TraceContext
     ): Future[Unit]
 
-    /** True if the backfilling for given migration id is complete,
-      * i.e., this history knows the first item for each domain in the given migration id.
-      */
-    def isBackfillingComplete(migrationId: Long)(implicit tc: TraceContext): Future[Boolean]
-
-    /** Explicitly marks the backfilling of the given migration id as complete */
-    def markBackfillingComplete(migrationId: Long)(implicit tc: TraceContext): Future[Unit]
+    /** Explicitly marks the backfilling as complete */
+    def markBackfillingComplete()(implicit tc: TraceContext): Future[Unit]
   }
 }

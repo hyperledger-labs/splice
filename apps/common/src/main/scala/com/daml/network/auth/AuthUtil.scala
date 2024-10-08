@@ -12,7 +12,7 @@ object AuthUtil {
   val testAudience: String =
     sys.env.getOrElse(
       "OIDC_AUTHORITY_LEDGER_API_AUDIENCE",
-      sys.env("CN_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE"),
+      sys.env("SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE"),
     )
   val testSecret: String = "test"
   val testSignatureAlgorithm: Algorithm = Algorithm.HMAC256(testSecret)

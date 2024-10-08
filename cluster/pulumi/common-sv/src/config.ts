@@ -8,18 +8,12 @@ import {
   ExpectedValidatorOnboarding,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
+import { SweepConfig } from 'splice-pulumi-common-validator';
 
 import {
   StaticCometBftConfig,
   StaticCometBftConfigWithNodeName,
 } from './synchronizer/cometbftConfig';
-
-export type SweepConfig = {
-  fromParty: string;
-  toParty: string;
-  maxBalance: number;
-  minBalance: number;
-};
 
 export interface StaticSvConfig {
   nodeName: string;

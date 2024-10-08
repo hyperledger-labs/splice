@@ -4,7 +4,7 @@
 package com.daml.network.scan.admin.api.client
 
 import com.daml.network.environment.ledger.api.LedgerClient
-import com.daml.network.store.HistoryBackfilling.MigrationInfo
+import com.daml.network.store.HistoryBackfilling.SourceMigrationInfo
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.topology.DomainId
@@ -16,7 +16,7 @@ trait BackfillingScanConnection extends FlagCloseableAsync {
 
   def getMigrationInfo(migrationId: Long)(implicit
       tc: TraceContext
-  ): Future[MigrationInfo]
+  ): Future[Option[SourceMigrationInfo]]
 
   def getUpdatesBefore(
       migrationId: Long,

@@ -110,7 +110,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     xns.ns.metadata.name,
     xns.logicalName,
     'cluster-ingress-validator',
-    'cn-cluster-ingress-runbook',
+    'splice-cluster-ingress-runbook',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -307,7 +307,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
   return installSpliceRunbookHelmChart(
     xns,
     'validator',
-    'cn-validator',
+    'splice-validator',
     validatorValuesWithMaybeTopups,
     activeVersion,
     { dependsOn: dependsOn }

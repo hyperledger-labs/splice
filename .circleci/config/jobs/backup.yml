@@ -17,16 +17,13 @@ jobs:
         default: 3
       migration_id:
         type: integer
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Listing nodes for backup
           cluster: << parameters.cluster >>
@@ -46,9 +43,6 @@ jobs:
               nodes="$nodes splitwell"
             fi
             echo $nodes > nodes.txt
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
       - run:
           name: Split backup tasks
           command: |
@@ -88,18 +82,12 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Check backup status
           cluster: << parameters.cluster >>
@@ -124,4 +112,43 @@ jobs:
           channel: << parameters.channel_notify >>
           event: fail
           custom: |
-            { "text": ":fire: Found backups in << parameters.cluster >> that are older than << parameters.alert_threshold >>:\n${snapshot_array[@]}" }
+            { "text": ":fire: No backup found in << parameters.cluster >> that are newer than << parameters.alert_threshold >>:\n${snapshot_array[@]}" }
+
+  restore_node:
+    executor: self_hosted
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      namespace_name:
+        type: string
+      migration_id:
+        type: integer
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Restoring node
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          no_output_timeout: "20m"
+          cmd: |
+            cncluster activate
+            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >>
+
+            case "<< parameters.namespace_name >>" in
+              "sv-1"|"sv-2"|"sv-3"|"sv-4")
+                cncluster wait << parameters.namespace_name >> scan-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> sv-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
+                ;;
+              "validator1")
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
+                ;;
+            esac
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>

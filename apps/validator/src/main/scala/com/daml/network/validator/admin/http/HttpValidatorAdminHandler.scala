@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   TransferPreapproval2,
   invalidtransferreason,
 }
+import com.daml.network.codegen.java.splice.amuletrules.ExternalPartySetupProposal2
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome
 import com.daml.network.environment.ledger.api.DedupOffset
@@ -484,29 +485,56 @@ class HttpValidatorAdminHandler(
                         )
                       ),
                     )
-                } yield outcome match {
-                  case successResult: amuletoperationoutcome.COO_CreateExternalPartySetupProposal =>
-                    v0.ValidatorAdminResource.CreateExternalPartySetupProposalResponse.OK(
-                      definitions.CreateExternalPartySetupProposalResponse(
-                        successResult.contractIdValue.contractId
-                      )
-                    )
-                  case failedOperation: amuletoperationoutcome.COO_Error =>
-                    failedOperation.invalidTransferReasonValue match {
-                      case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
-                        val missingStr = s"(missing ${fundsError.missingAmount} CC)"
-                        val msg =
-                          s"Insufficient funds for the transfer pre-approval purchase $missingStr"
-                        throw Status.FAILED_PRECONDITION.withDescription(msg).asRuntimeException()
-                      case otherError =>
-                        val msg =
-                          s"Unexpectedly failed to create external party setup proposal due to $otherError"
-                        throw Status.FAILED_PRECONDITION.withDescription(msg).asRuntimeException()
-                    }
-                  case unknownResult =>
-                    val msg = s"Unexpected amulet-operation result $unknownResult"
-                    throw Status.INTERNAL.withDescription(msg).asRuntimeException()
-                }
+                  result <- outcome match {
+                    case successResult: amuletoperationoutcome.COO_CreateExternalPartySetupProposal =>
+                      retryProvider
+                        .retryForClientCalls(
+                          "ingest_external_party_setup_proposal",
+                          s"ExternalPartySetupProposal ${successResult.contractIdValue.contractId} gets ingested in validator store",
+                          store.multiDomainAcsStore
+                            .lookupContractById(ExternalPartySetupProposal2.COMPANION)(
+                              Codec.tryDecodeJavaContractId(ExternalPartySetupProposal2.COMPANION)(
+                                successResult.contractIdValue.contractId
+                              )
+                            )
+                            .map { r =>
+                              if (r.isEmpty)
+                                throw Status.FAILED_PRECONDITION
+                                  .withDescription(
+                                    s"ExternalPartySetupProposal ${successResult.contractIdValue.contractId} not yet ingested in validator store"
+                                  )
+                                  .asRuntimeException
+                            },
+                          logger,
+                        )
+                        .map { _ =>
+                          v0.ValidatorAdminResource.CreateExternalPartySetupProposalResponse.OK(
+                            definitions.CreateExternalPartySetupProposalResponse(
+                              successResult.contractIdValue.contractId
+                            )
+                          )
+                        }
+                    case failedOperation: amuletoperationoutcome.COO_Error =>
+                      failedOperation.invalidTransferReasonValue match {
+                        case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
+                          val missingStr = s"(missing ${fundsError.missingAmount} CC)"
+                          val msg =
+                            s"Insufficient funds for the transfer pre-approval purchase $missingStr"
+                          Future.failed(
+                            Status.FAILED_PRECONDITION.withDescription(msg).asRuntimeException()
+                          )
+                        case otherError =>
+                          val msg =
+                            s"Unexpectedly failed to create external party setup proposal due to $otherError"
+                          Future.failed(
+                            Status.FAILED_PRECONDITION.withDescription(msg).asRuntimeException()
+                          )
+                      }
+                    case unknownResult =>
+                      val msg = s"Unexpected amulet-operation result $unknownResult"
+                      Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+                  }
+                } yield result
             }
         }
       } yield result

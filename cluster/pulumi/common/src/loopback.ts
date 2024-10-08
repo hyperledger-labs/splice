@@ -12,7 +12,7 @@ export function installLoopback(
   return installSpliceRunbookHelmChart(
     namespace,
     'loopback',
-    'cn-cluster-loopback-gateway',
+    'splice-cluster-loopback-gateway',
     {
       cluster: {
         hostname: clusterHostname,

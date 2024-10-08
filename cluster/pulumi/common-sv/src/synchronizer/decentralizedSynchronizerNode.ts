@@ -88,7 +88,7 @@ export class InStackDecentralizedSynchronizerNode
         sv1: StaticCometBftConfigWithNodeName;
         peers: StaticCometBftConfigWithNodeName[];
       };
-      sv1SvApp?: Resource;
+      stateSyncEnabled?: boolean;
     },
     active: boolean,
     runningMigration: boolean,
@@ -115,7 +115,7 @@ export class InStackDecentralizedSynchronizerNode
       runningMigration,
       logLevel.toLowerCase(),
       version,
-      cometbft.sv1SvApp,
+      cometbft.stateSyncEnabled,
       {
         ...opts,
         parent: this,
@@ -134,7 +134,7 @@ export class InStackDecentralizedSynchronizerNode
     installSpliceHelmChart(
       xns,
       this.name,
-      'cn-global-domain',
+      'splice-global-domain',
       {
         ...decentralizedSynchronizerValues,
         ...{
@@ -166,7 +166,7 @@ export class InStackDecentralizedSynchronizerNode
               ...(dbs.setCoreDbNames ? { databaseName: mediatorDbName } : {}),
             },
           },
-          ...autoInitValues('cn-global-domain', version, onboardingName),
+          ...autoInitValues('splice-global-domain', version, onboardingName),
           enablePostgresMetrics: true,
           metrics: {
             enable: true,
