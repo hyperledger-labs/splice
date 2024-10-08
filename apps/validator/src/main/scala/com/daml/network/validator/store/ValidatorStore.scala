@@ -4,26 +4,29 @@
 package com.daml.network.validator.store
 
 import cats.syntax.traverseFilter.*
-import com.daml.network.codegen.java.splice.{
-  amulet as amuletCodegen,
-  amuletrules as amuletrulesCodegen,
-  validatorlicense as validatorLicenseCodegen,
-}
+import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.splice.wallet.{
   install as walletCodegen,
   topupstate as topUpCodegen,
 }
+import com.daml.network.codegen.java.splice.{
+  amulet as amuletCodegen,
+  amuletrules as amuletrulesCodegen,
+  validatorlicense as validatorLicenseCodegen,
+}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.definitions
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
-import com.daml.network.store.{AppStore, Limit, MultiDomainAcsStore}
+import com.daml.network.store.{AppStore, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.util.*
 import com.daml.network.validator.store.db.DbValidatorStore
 import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
 import com.daml.network.wallet.store.WalletStore
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -86,6 +89,79 @@ trait ValidatorStore extends WalletStore with AppStore {
       )
     } yield installs.map(i => i.payload.endUserName)
   }
+
+  def listExternalPartySetupProposals()(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[ContractWithState[
+      amuletrulesCodegen.ExternalPartySetupProposal2.ContractId,
+      amuletrulesCodegen.ExternalPartySetupProposal2,
+    ]]
+  ] = {
+    for {
+      proposals <- multiDomainAcsStore.listContracts(
+        amuletrulesCodegen.ExternalPartySetupProposal2.COMPANION
+      )
+    } yield proposals
+  }
+
+  def listTransferPreapprovals()(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[
+      ContractWithState[
+        amuletrulesCodegen.TransferPreapproval2.ContractId,
+        amuletrulesCodegen.TransferPreapproval2,
+      ]
+    ]
+  ] = {
+    for {
+      preapprovals <- multiDomainAcsStore.listContracts(
+        amuletrulesCodegen.TransferPreapproval2.COMPANION
+      )
+    } yield preapprovals
+  }
+
+  def listExpiringTransferPreapprovals(
+      renewalDuration: NonNegativeFiniteDuration
+  ): ListExpiredContracts[
+    amuletrulesCodegen.TransferPreapproval2.ContractId,
+    amuletrulesCodegen.TransferPreapproval2,
+  ] = { (now: CantonTimestamp, limit: PageLimit) => implicit traceContext =>
+    {
+      def isReadyForRenewal(preapproval: amuletrulesCodegen.TransferPreapproval2): Boolean =
+        now.toInstant.isAfter(preapproval.expiresAt.minus(renewalDuration.asJava))
+
+      // TODO(#14568): Move this filter and limit into the DB query
+      multiDomainAcsStore
+        .listAssignedContracts(
+          amuletrulesCodegen.TransferPreapproval2.COMPANION
+        )
+        .map(_.filter(p => isReadyForRenewal(p.payload)).take(limit.limit))
+    }
+  }
+
+  def lookupExternalPartySetupProposalByUserPartyWithOffset(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[
+      Option[ContractWithState[
+        amuletrulesCodegen.ExternalPartySetupProposal2.ContractId,
+        amuletrulesCodegen.ExternalPartySetupProposal2,
+      ]]
+    ]
+  ]
+
+  def lookupTransferPreapprovalByReceiverPartyWithOffset(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[Option[
+      ContractWithState[
+        amuletrulesCodegen.TransferPreapproval2.ContractId,
+        amuletrulesCodegen.TransferPreapproval2,
+      ]
+    ]]
+  ]
 
   def lookupLatestAppConfiguration(
       provider: PartyId
@@ -276,6 +352,7 @@ object ValidatorStore {
     Seq[ConstrainedTemplate](
       walletCodegen.WalletAppInstall.COMPANION,
       amuletCodegen.ValidatorRight.COMPANION,
+      amuletrulesCodegen.ExternalPartySetupProposal2.COMPANION,
     ) ++ (if (appManagerEnabled)
             Seq[ConstrainedTemplate](
               appManagerCodegen.AppConfiguration.COMPANION,
@@ -341,6 +418,22 @@ object ValidatorStore {
           ValidatorAcsStoreRowData(
             contract = contract,
             trafficDomainId = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
+          )
+        },
+        mkFilter(amuletrulesCodegen.ExternalPartySetupProposal2.COMPANION)(co =>
+          co.payload.validator == validator && co.payload.dso == dso
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+        },
+        mkFilter(amuletrulesCodegen.TransferPreapproval2.COMPANION)(co =>
+          co.payload.provider == validator && co.payload.dso == dso
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         },
         mkFilter(amuletCodegen.Amulet.COMPANION)(co =>

@@ -35,6 +35,7 @@ import com.daml.network.util.Codec
 import com.daml.network.validator.config.*
 import com.daml.network.wallet.config.{
   AutoAcceptTransfersConfig,
+  TransferPreapprovalConfig,
   TreasuryConfig,
   WalletAppClientConfig,
   WalletSweepConfig,
@@ -606,6 +607,16 @@ object SpliceConfig {
       deriveReader[InitialInstalledApp]
     implicit val appManagerConfigReader: ConfigReader[AppManagerConfig] =
       deriveReader[AppManagerConfig]
+    implicit val transferPreapprovalConfigReader: ConfigReader[TransferPreapprovalConfig] =
+      deriveReader[TransferPreapprovalConfig].emap { conf =>
+        Either.cond(
+          conf.renewalDuration.duration.toSeconds < conf.preapprovalLifetime.duration.toSeconds,
+          conf,
+          ConfigValidationFailed(
+            "renewalDuration must be smaller than preapprovalLifetime for TransferPreapprovals"
+          ),
+        )
+      }
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
@@ -861,6 +872,8 @@ object SpliceConfig {
       deriveWriter[InitialInstalledApp]
     implicit val appManagerConfigWriter: ConfigWriter[AppManagerConfig] =
       deriveWriter[AppManagerConfig]
+    implicit val transferPreapprovalConfigWriter: ConfigWriter[TransferPreapprovalConfig] =
+      deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
       deriveWriter[MigrateValidatorPartyConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =

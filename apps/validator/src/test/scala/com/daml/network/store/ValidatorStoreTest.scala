@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.digitalasset.canton.topology.DomainId
 
 import java.time.Instant
+import com.daml.network.codegen.java.splice.amuletrules as amuletrulesCodegen
 import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
 import com.daml.network.codegen.java.splice.wallet.topupstate as topUpCodegen
@@ -25,6 +26,9 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 import scala.concurrent.Future
 import com.daml.network.http.v0.definitions
 import com.daml.network.migration.DomainMigrationInfo
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.tracing.TraceContext
 import io.circe.syntax.*
 
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
@@ -137,6 +141,127 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
             "user1",
             "user2",
           )
+        }
+      }
+    }
+
+    "listExternalPartySetupProposals" should {
+      "return correct result" in {
+        for {
+          store <- mkStore()
+          proposal1 = externalPartySetupProposal(user1)
+          proposal2 = externalPartySetupProposal(user2)
+          _ <- dummyDomain.create(proposal1, createdEventSignatories = Seq(validator))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(proposal2, createdEventSignatories = Seq(validator))(
+            store.multiDomainAcsStore
+          )
+          result <- store.listExternalPartySetupProposals()
+        } yield {
+          result.map(_.contract) should contain theSameElementsAs Seq(proposal1, proposal2)
+        }
+      }
+    }
+
+    "listTransferPreapprovals" should {
+      "return correct results" in {
+        for {
+          store <- mkStore()
+          signatories = Seq(dsoParty, validator, user1)
+          preapproval1 = transferPreapproval(user1, validator, time(0), time(1))
+          preapproval2 = transferPreapproval(user2, validator, time(0), time(1))
+          _ <- dummyDomain.create(
+            preapproval1,
+            createdEventSignatories = Seq(dsoParty, validator, user1),
+          )(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            preapproval2,
+            createdEventSignatories = Seq(dsoParty, validator, user2),
+          )(
+            store.multiDomainAcsStore
+          )
+          result <- store.listTransferPreapprovals()
+        } yield {
+          result.map(_.contract) should contain theSameElementsAs Seq(preapproval1, preapproval2)
+        }
+      }
+    }
+
+    "listExpiringTransferPreapprovals" should {
+      "return correct results" in {
+        for {
+          store <- mkStore()
+          signatories = Seq(dsoParty, validator, user1)
+          preapproval1 = transferPreapproval(user1, validator, time(0), expiresAt = time(2))
+          preapproval2 = transferPreapproval(user2, validator, time(0), expiresAt = time(3))
+          _ <- dummyDomain.create(preapproval1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(preapproval2, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+        } yield {
+          def expiringContractsAt(timestamp: CantonTimestamp) = store
+            .listExpiringTransferPreapprovals(NonNegativeFiniteDuration.ofSeconds(1))(
+              timestamp,
+              PageLimit.tryCreate(10),
+            )(TraceContext.empty)
+            .futureValue
+            .map(_.contract)
+
+          expiringContractsAt(time(1)) should be(empty)
+          expiringContractsAt(time(2)) should contain theSameElementsAs Seq(preapproval1)
+          expiringContractsAt(time(3)) should contain theSameElementsAs Seq(
+            preapproval1,
+            preapproval2,
+          )
+        }
+      }
+    }
+
+    "lookupExternalPartySetupProposalByUserPartyWithOffset" should {
+      "return correct results" in {
+        for {
+          store <- mkStore()
+          proposal1 = externalPartySetupProposal(user1)
+          proposal2 = externalPartySetupProposal(user2)
+          _ <- dummyDomain.create(proposal1, createdEventSignatories = Seq(validator))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(proposal2, createdEventSignatories = Seq(validator))(
+            store.multiDomainAcsStore
+          )
+          result <- store.lookupExternalPartySetupProposalByUserPartyWithOffset(user1)
+        } yield {
+          result.value.value.contract shouldBe proposal1
+        }
+      }
+    }
+
+    "lookupTransferPreapprovalByReceiverPartyWithOffset" should {
+      "return correct results" in {
+        for {
+          store <- mkStore()
+          preapproval1 = transferPreapproval(user1, validator, time(0), time(1))
+          preapproval2 = transferPreapproval(user2, validator, time(0), time(1))
+          _ <- dummyDomain.create(
+            preapproval1,
+            createdEventSignatories = Seq(dsoParty, validator, user1),
+          )(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            preapproval2,
+            createdEventSignatories = Seq(dsoParty, validator, user2),
+          )(
+            store.multiDomainAcsStore
+          )
+          result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(user1)
+        } yield {
+          result.value.value.contract shouldBe preapproval1
         }
       }
     }
@@ -393,6 +518,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
           installedApp1 = installedApp(provider1)
           approvedReleaseConfig1 = approvedReleaseConfig(provider1, 1L)
           validatorFaucetCoupon1 = validatorFaucetCoupon(validator)
+          externalPartySetupProposal1 = externalPartySetupProposal(user1)
           _ <- dummyDomain.create(walletInstall1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
@@ -418,6 +544,12 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
           _ <- dummyDomain.create(validatorFaucetCoupon1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            externalPartySetupProposal1,
+            createdEventSignatories = signatories,
+          )(
             store.multiDomainAcsStore
           )
           _ <- dummy2Domain.create(amuletRules1)(
@@ -495,6 +627,22 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     contract(
       identifier = templateId,
       contractId = new topUpCodegen.ValidatorTopUpState.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
+  private def externalPartySetupProposal(user: PartyId) = {
+    val templateId = amuletrulesCodegen.ExternalPartySetupProposal2.TEMPLATE_ID
+    val template = new amuletrulesCodegen.ExternalPartySetupProposal2(
+      validator.toProtoPrimitive,
+      user.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
+      Instant.EPOCH,
+      Instant.EPOCH,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new amuletrulesCodegen.ExternalPartySetupProposal2.ContractId(nextCid()),
       payload = template,
     )
   }

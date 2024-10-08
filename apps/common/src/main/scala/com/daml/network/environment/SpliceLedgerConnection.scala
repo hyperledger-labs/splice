@@ -50,6 +50,7 @@ import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{LoggerUtil, PekkoUtil}
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -94,7 +95,7 @@ class BaseLedgerConnection(
     client.latestPrunedOffset()
 
   def activeContracts(
-      filter: IngestionFilter,
+      filter: com.daml.ledger.api.v2.transaction_filter.TransactionFilter,
       offset: Long,
   )(implicit tc: TraceContext): Future[
     (
@@ -106,7 +107,7 @@ class BaseLedgerConnection(
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = ApiOffset.fromLong(offset),
-        filter = Some(filter.toTransactionFilter),
+        filter = Some(filter),
       )
     )
     for {
@@ -129,6 +130,17 @@ class BaseLedgerConnection(
       }
     } yield (active, incompleteOut, incompleteIn)
   }
+
+  def activeContracts(
+      filter: IngestionFilter,
+      offset: Long,
+  )(implicit tc: TraceContext): Future[
+    (
+        Seq[ActiveContract],
+        Seq[IncompleteReassignmentEvent.Unassign],
+        Seq[IncompleteReassignmentEvent.Assign],
+    )
+  ] = activeContracts(filter.toTransactionFilter, offset)
 
   def getConnectedDomains(party: PartyId)(implicit
       tc: TraceContext
@@ -677,8 +689,9 @@ class SpliceLedgerConnection(
       (Some(offset), result)
     })
 
-  private def callCallbacksOnCompletionNoWaitForOffset[T](result: Future[T]): Future[T] =
+  private def callCallbacksOnCompletionNoWaitForOffset[T](result: Future[T]): Future[T] = {
     callCallbacksOnCompletion(result)(x => (None, x))
+  }
 
   private def verifyEnoughExtraTrafficRemains(domainId: DomainId, commandPriority: CommandPriority)(
       implicit tc: TraceContext
@@ -924,7 +937,14 @@ class SpliceLedgerConnection(
         client
           .completions(applicationId, Seq(submitter), begin = ledgerEnd)
           .wireTap(csr => logger.trace(s"completions while awaiting reassignment $commandId: $csr"))
-      )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
+      )(
+        awaitCompletion(
+          "reassignment",
+          applicationId = applicationId,
+          commandId = commandId,
+          submissionId = commandId,
+        )
+      )(
         // We call the callbacks for handling stale contract errors here, but wait for the offset
         // ingestion at which the completion is reported.
         callCallbacksOnCompletionNoWaitForOffset(
@@ -961,11 +981,99 @@ class SpliceLedgerConnection(
     }
   }
 
+  def prepareSubmission(
+      domainId: Option[DomainId],
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      commands: Seq[Command],
+      disclosedContracts: DisclosedContracts,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[lapi.interactive_submission_service.PrepareSubmissionResponse] = {
+    client.prepareSubmission(
+      domainId = domainId.map(_.toProtoPrimitive),
+      applicationId = applicationId,
+      // Command dedup with external submissions isn't required for our use atm.
+      commandId = UUID.randomUUID().toString(),
+      actAs = actAs.map(_.toProtoPrimitive),
+      readAs = readAs.map(_.toProtoPrimitive),
+      commands = commands,
+      disclosedContracts = disclosedContracts,
+    )
+  }
+
+  /** Execute a signed submission and wait for it to either get commited or fail.
+    * Returns the update id of the resulting transaction if it succeeds.
+    */
+  def executeSubmissionAndWait(
+      submitter: PartyId,
+      preparedTransaction: ByteString,
+      partySignatures: Map[PartyId, LedgerClient.Signature],
+      waitForOffset: Boolean,
+  )(implicit traceContext: TraceContext): Future[String] = {
+    val commandId = preparedTransaction.toStringUtf8()
+    val submissionId = UUID.randomUUID.toString()
+    ledgerEnd().flatMap { ledgerEnd =>
+      val (ks, completion) = cancelIfFailed(
+        client
+          .completions(applicationId, Seq(submitter), begin = ledgerEnd)
+      )(
+        awaitCompletion(
+          "reassignment",
+          applicationId = applicationId,
+          commandId = commandId,
+          submissionId = submissionId,
+        )
+      )(
+        // We call the callbacks for handling stale contract errors here, but wait for the offset
+        // ingestion at which the completion is reported.
+        callCallbacksOnCompletionNoWaitForOffset[Unit](
+          client
+            .executeSubmission(
+              preparedTransaction,
+              partySignatures,
+              applicationId = applicationId,
+              submissionId = submissionId,
+            )
+            .map { _ =>
+              logger.info(
+                s"Submitted executeSubmission call to ledger, waiting for completion: commandId=$commandId,submissionId=${submissionId}"
+              )
+            }
+        )
+      )
+
+      retryProvider
+        .waitUnlessShutdown(completion)
+        .flatMap { case ((offset, completion), ()) =>
+          (if (waitForOffset) {
+             FutureUnlessShutdown.outcomeF(
+               completionOffsetCallback(offset).map(_ => ())
+             )
+           } else {
+             // TODO(#14568) Once we ingest data for external parties, block on the offset in all cases
+             FutureUnlessShutdown.unit
+           }).map(_ => completion.updateId)
+        }
+        .onShutdown {
+          logger.debug(
+            s"shutting down while awaiting completion of executeSubmission"
+          )
+          ks.shutdown()
+          throw Status.UNAVAILABLE
+            .withDescription("Shutting down while awaiting completion of executeSubmission")
+            .asRuntimeException()
+        }
+    }
+  }
+
   // simulate the completion check of command service; future only yields
   // successfully if the completion was OK
   private[this] def awaitCompletion(
+      description: String,
       applicationId: String,
       commandId: String,
+      submissionId: String,
   )(implicit
       traceContext: TraceContext
   ): Sink[LedgerClient.CompletionStreamResponse, Future[
@@ -978,16 +1086,22 @@ class SpliceLedgerConnection(
       .mapError { case te: concurrent.TimeoutException =>
         DEADLINE_EXCEEDED
           .withCause(te)
-          .augmentDescription(s"timeout while awaiting completion of reassignment $commandId")
+          .augmentDescription(
+            s"timeout while awaiting completion of $description: commandId=$commandId, submissionId=$submissionId"
+          )
           .asRuntimeException()
       }
       .collect {
         case LedgerClient.CompletionStreamResponse(laterOffset, completion)
-            if completion.matchesSubmission(applicationId, commandId, commandId) =>
+            if completion.matchesSubmission(applicationId, commandId, submissionId) =>
           (laterOffset, completion)
       }
       .take(1)
-      .wireTap(cpl => logger.debug(s"selected completion for $commandId: $cpl"))
+      .wireTap(cpl =>
+        logger.debug(
+          s"selected completion for commandId=$commandId, submissionId=$submissionId: $cpl"
+        )
+      )
       .toMat(
         Sink
           .headOption[(Long, LedgerClient.Completion)]
@@ -997,7 +1111,7 @@ class SpliceLedgerConnection(
           } getOrElse {
             throw UNAVAILABLE
               .augmentDescription(
-                s"participant stopped while awaiting completion of reassignment $commandId"
+                s"participant stopped while awaiting completion of $description: commandId=$commandId, submissionId=$submissionId"
               )
               .asRuntimeException()
           }))

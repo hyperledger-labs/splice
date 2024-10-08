@@ -126,9 +126,9 @@ trait SigningPrivateStoreOps extends SigningPrivateOps {
 
 }
 
-final case class Signature private[crypto] (
+final case class Signature(
     format: SignatureFormat,
-    private val signature: ByteString,
+    val signature: ByteString,
     signedBy: Fingerprint,
 ) extends HasVersionedWrapper[Signature]
     with PrettyPrinting
@@ -170,13 +170,6 @@ object Signature
   )
 
   override def name: String = "signature"
-
-  private[this] def apply(
-      format: SignatureFormat,
-      signature: ByteString,
-      signedBy: Fingerprint,
-  ): Signature =
-    throw new UnsupportedOperationException("Use deserialization method instead")
 
   def fromProtoV30(signatureP: v30.Signature): ParsingResult[Signature] =
     for {
@@ -309,7 +302,7 @@ object SigningKeyPair {
 
 final case class SigningPublicKey private[crypto] (
     format: CryptoKeyFormat,
-    protected[crypto] val key: ByteString,
+    val key: ByteString,
     scheme: SigningKeyScheme,
 ) extends PublicKey
     with PrettyPrinting

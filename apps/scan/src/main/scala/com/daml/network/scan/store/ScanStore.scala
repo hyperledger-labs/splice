@@ -119,6 +119,13 @@ trait ScanStore
   ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
     getAmuletRulesWithState().map(_.contract)
 
+  def getExternalPartyAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules.ContractId,
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules,
+  ]]
+
   def getDecentralizedSynchronizerId()(implicit
       tc: TraceContext
   ): Future[DomainId] =
@@ -216,6 +223,15 @@ trait ScanStore
 
   def lookupEntryByName(name: String, now: CantonTimestamp)(implicit tc: TraceContext): Future[
     Option[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
+  ]
+
+  def lookupTransferPreapprovalByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[
+      splice.amuletrules.TransferPreapproval2.ContractId,
+      splice.amuletrules.TransferPreapproval2,
+    ]]
   ]
 
   def listTransactions(
@@ -399,6 +415,21 @@ object ScanStore {
             voteRequestTrackingCid =
               Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
           )
+        },
+        mkFilter(splice.amuletrules.TransferPreapproval2.COMPANION)(co => co.payload.dso == dso) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract,
+              transferPreapprovalReceiver =
+                Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
+              transferPreapprovalValidFrom =
+                Some(Timestamp.assertFromInstant(contract.payload.validFrom)),
+            )
+        },
+        mkFilter(splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION)(co =>
+          co.payload.dso == dso
+        ) {
+          ScanAcsStoreRowData(_)
         },
       ),
     )

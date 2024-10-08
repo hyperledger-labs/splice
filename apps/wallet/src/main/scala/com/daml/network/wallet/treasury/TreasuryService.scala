@@ -19,6 +19,7 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
+  TransferPreapproval2,
 }
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
@@ -172,12 +173,15 @@ class TreasuryService(
       operation: installCodegen.AmuletOperation,
       priority: CommandPriority = CommandPriority.Low,
       dedup: Option[AmuletOperationDedupConfig] = None,
+      extraDisclosedContracts: DisclosedContracts = DisclosedContracts.Empty,
   )(implicit tc: TraceContext): Future[installCodegen.AmuletOperationOutcome] = {
     val p = Promise[installCodegen.AmuletOperationOutcome]()
     logger.debug(
       show"Received operation (queue size before adding this: ${queue.size()}): $operation"
     )
-    queue.offer(EnqueuedAmuletOperation(operation, p, tc, priority, dedup)) match {
+    queue.offer(
+      EnqueuedAmuletOperation(operation, p, tc, priority, dedup, extraDisclosedContracts)
+    ) match {
       case Enqueued =>
         logger.debug(show"Operation $operation enqueued successfully")
         p.future
@@ -254,6 +258,19 @@ class TreasuryService(
             trafficRequestCodegen.BuyTrafficRequest.COMPANION
           )(op.trafficRequestCid)
         } yield ()
+
+      case _: amuletoperation.CO_CreateExternalPartySetupProposal => Future.unit
+
+      case op: amuletoperation.CO_RenewTransferPreapproval =>
+        for {
+          _ <- userStore.multiDomainAcsStore.getContractById(TransferPreapproval2.COMPANION)(
+            op.previousApprovalCid
+          )
+        } yield ()
+
+      case _: amuletoperation.CO_TransferPreapproval2Send => Future.unit
+
+      case _: amuletoperation.CO_TransferPreapprovalSend => Future.unit
 
       case op => throw new NotImplementedError(show"Unexpected amulet operation: $op")
     }
@@ -407,7 +424,7 @@ class TreasuryService(
         priority = batch.priority,
         deadline = treasuryConfig.grpcDeadline,
       )
-      .withDisclosedContracts(disclosedContracts)
+      .withDisclosedContracts(disclosedContracts.merge(batch.extraDisclosedContracts))
     for {
       (offset, result) <- batch.dedup match {
         case None => baseSubmission.noDedup.yieldResultAndOffset()
@@ -904,6 +921,11 @@ object TreasuryService {
           op.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
         )
     }
+
+    lazy val extraDisclosedContracts: DisclosedContracts =
+      operationsToRun.foldLeft[DisclosedContracts](DisclosedContracts.Empty) {
+        case (acc, operation) => acc.merge(operation.extraDisclosedContracts)
+      }
   }
 
   private object AmuletOperationBatch {
@@ -918,6 +940,7 @@ object TreasuryService {
       submittedFrom: TraceContext,
       priority: CommandPriority,
       dedup: Option[AmuletOperationDedupConfig],
+      extraDisclosedContracts: DisclosedContracts,
   ) extends PrettyPrinting {
     override def pretty: Pretty[EnqueuedAmuletOperation.this.type] =
       prettyNode(

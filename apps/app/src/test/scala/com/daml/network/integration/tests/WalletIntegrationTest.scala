@@ -89,7 +89,7 @@ class WalletIntegrationTest
       aliceWalletClient.tap(50.0, Some("dedup-test"))
       assertThrowsAndLogsCommandFailures(
         aliceWalletClient.tap(50.0, Some("dedup-test")),
-        _.errorMessage should include("DUPLICATE_COMMAND"),
+        _.errorMessage should include("409 Conflict"),
       )
     }
 

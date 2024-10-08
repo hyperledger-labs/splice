@@ -55,6 +55,7 @@ in pkgs.mkShell {
     python3
     python3Packages.aiohttp
     python3Packages.colorlog
+    python3Packages.pycryptodome
     (python3Packages.datadog.overrideAttrs (old: {
                                              doCheck = false;
                                              doInstallCheck = false;

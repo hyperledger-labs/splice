@@ -87,6 +87,24 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetAmuletRulesResponse"
+  /v0/external-party-amulet-rules:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getExternalPartyAmuletRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetExternalPartyAmuletRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetExternalPartyAmuletRulesResponse"
   /v0/ans-rules:
     post:
       tags: [scan]
@@ -675,6 +693,26 @@ paths:
                 "$ref": "#/components/schemas/LookupEntryByNameResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/transfer-preapprovals/by-party/{party}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "lookupTransferPreapprovalByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupTransferPreapprovalByPartyResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/acs/{party}:
     get:
       tags: [scan]
@@ -1010,6 +1048,19 @@ components:
         amulet_rules_update:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
       required: ["amulet_rules_update"]
+    GetExternalPartyAmuletRulesRequest:
+      type: object
+      properties:
+        cached_external_party_amulet_rules_contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_external_party_amulet_rules_domain_id:
+          type: string
+    GetExternalPartyAmuletRulesResponse:
+      type: object
+      properties:
+        external_party_amulet_rules_update:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+      required: ["external_party_amulet_rules_update"]
     GetAnsRulesRequest:
       type: object
       properties:
@@ -2153,6 +2204,12 @@ components:
       properties:
         entry:
           "$ref": "#/components/schemas/AnsEntry"
+    LookupTransferPreapprovalByPartyResponse:
+      type: object
+      required: ["transfer_preapproval"]
+      properties:
+        transfer_preapproval:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
     GetAcsSnapshotResponse:
       type: object
       required: ["acs_snapshot"]

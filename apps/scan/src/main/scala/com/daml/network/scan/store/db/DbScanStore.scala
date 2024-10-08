@@ -7,9 +7,10 @@ import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval2}
 import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
+import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
 import com.daml.network.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
@@ -46,6 +47,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.github.benmanes.caffeine.cache as caffeine
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
+import io.grpc.Status
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -179,6 +181,35 @@ class DbScanStore(
       } yield contractWithState
     }
 
+  override def getExternalPartyAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              ScanTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""template_id_qualified_name = ${QualifiedName(
+                  ExternalPartyAmuletRules.TEMPLATE_ID
+                )}""",
+              orderLimit = sql"""order by event_number desc limit 1""",
+            ).headOption,
+            "lookupExternalPartyAmuletRules",
+          )
+          .value
+        contractWithState = row.map(
+          contractWithStateFromRow(ExternalPartyAmuletRules.COMPANION)(_)
+        )
+      } yield contractWithState.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription("No active ExternalPartyAmuletRules contract")
+          .asRuntimeException
+      )
+    }
+
   override def lookupAnsRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[AnsRules.ContractId, AnsRules]]] =
@@ -294,6 +325,33 @@ class DbScanStore(
           "lookupEntryByName",
         )
     } yield contractWithStateFromRow(AnsEntry.COMPANION)(row)).value
+  }
+
+  override def lookupTransferPreapprovalByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]
+  ] = waitUntilAcsIngested {
+    (for {
+      row <- storage
+        .querySingle(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                TransferPreapproval2.COMPANION.TEMPLATE_ID
+              )}
+                and transfer_preapproval_receiver = $partyId
+            """,
+            orderLimit = sql"""
+                order by transfer_preapproval_valid_from desc limit 1
+            """,
+          ).headOption,
+          "lookupTransferPreapprovalReceiver",
+        )
+    } yield contractWithStateFromRow(TransferPreapproval2.COMPANION)(row)).value
   }
 
   override def listTransactions(

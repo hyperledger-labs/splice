@@ -107,6 +107,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
   }
 
+  protected def time(n: Long): CantonTimestamp = CantonTimestamp.ofEpochSecond(n)
+
   private val schedule: scheduleCodegen.Schedule[Instant, AmuletConfig[USD]] =
     SpliceUtil.defaultAmuletConfigSchedule(
       NonNegativeFiniteDuration(Duration.ofMinutes(10)),
@@ -469,6 +471,31 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
       cid,
       template,
+    )
+  }
+
+  protected def transferPreapproval(
+      receiver: PartyId,
+      provider: PartyId,
+      validFrom: CantonTimestamp,
+      expiresAt: CantonTimestamp,
+  ): Contract[
+    amuletrulesCodegen.TransferPreapproval2.ContractId,
+    amuletrulesCodegen.TransferPreapproval2,
+  ] = {
+    val templateId = amuletrulesCodegen.TransferPreapproval2.TEMPLATE_ID
+    val template = new amuletrulesCodegen.TransferPreapproval2(
+      dsoParty.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      provider.toProtoPrimitive,
+      validFrom.toInstant,
+      validFrom.toInstant,
+      expiresAt.toInstant,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new amuletrulesCodegen.TransferPreapproval2.ContractId(nextCid()),
+      payload = template,
     )
   }
 

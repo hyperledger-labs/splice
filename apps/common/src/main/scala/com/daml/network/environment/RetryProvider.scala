@@ -617,6 +617,12 @@ object RetryProvider {
                           .findFirstMatchIn(description)
                           .isDefined
                         ||
+                        // This can happen if the party allocation has not yet been propagated to the new domain.
+                        statusCode == Status.Code.INVALID_ARGUMENT &&
+                        raw"The following parties are not active on the target domain".r
+                          .findFirstMatchIn(description)
+                          .isDefined
+                        ||
                         // TODO (#8011) Remove me once Canton yields a different error for in-flight contracts
                         (statusCode == Status.Code.INVALID_ARGUMENT &&
                           errorDetails.exists {

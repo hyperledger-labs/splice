@@ -899,6 +899,37 @@ abstract class ScanStoreTest
       }
     }
 
+    "lookupTransferPreapprovalByParty" should {
+      "return the TransferPreapproval contract signed by the specified party if available" in {
+        val wanted = transferPreapproval(userParty(1), providerParty(1), time(0), time(1))
+        val unwanted = transferPreapproval(userParty(2), providerParty(1), time(0), time(1))
+        val expectedResult = Some(ContractWithState(wanted, Assigned(dummyDomain)))
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
+        } yield {
+          store.lookupTransferPreapprovalByParty(userParty(1)).futureValue should be(expectedResult)
+          store.lookupTransferPreapprovalByParty(userParty(3)).futureValue should be(None)
+        }
+      }
+
+      "return the latest created TransferPreapproval contract if there are multiple" in {
+        val older =
+          transferPreapproval(userParty(1), providerParty(1), validFrom = time(0), time(1))
+        val newer =
+          transferPreapproval(userParty(1), providerParty(2), validFrom = time(2), time(3))
+        val expectedResult = Some(ContractWithState(newer, Assigned(dummyDomain)))
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(older)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(newer)(store.multiDomainAcsStore)
+        } yield {
+          store.lookupTransferPreapprovalByParty(userParty(1)).futureValue should be(expectedResult)
+        }
+      }
+    }
+
     val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
     val timeInThePast = now.minusSeconds(3600)
 

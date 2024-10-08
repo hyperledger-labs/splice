@@ -10,6 +10,7 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.splice.amulet
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -241,6 +242,38 @@ class HttpScanHandler(
         )
         definitions.GetAmuletRulesResponse(
           amuletRulesUpdate = response
+        )
+      }
+    }
+  }
+
+  def getExternalPartyAmuletRules(
+      response: v0.ScanResource.GetExternalPartyAmuletRulesResponse.type
+  )(
+      body: com.daml.network.http.v0.definitions.GetExternalPartyAmuletRulesRequest
+  )(extracted: TraceContext): Future[v0.ScanResource.GetExternalPartyAmuletRulesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getExternalPartyAmuletRules") { _ => _ =>
+      for {
+        externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
+      } yield {
+        val response = MaybeCachedContractWithState(
+          body.cachedExternalPartyAmuletRulesContractId match {
+            case Some(cachedContractId)
+                if cachedContractId == externalPartyAmuletRules.contractId.contractId =>
+              logger.debug(
+                show"Not sending ${PrettyContractId(ExternalPartyAmuletRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+              )
+              None
+            case Some(_) // else: external party amulet rules are cached but outdated.
+                | None =>
+              Some(externalPartyAmuletRules.contract.toHttp)
+          },
+          domainId =
+            externalPartyAmuletRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
+        )
+        definitions.GetExternalPartyAmuletRulesResponse(
+          externalPartyAmuletRulesUpdate = response
         )
       }
     }
@@ -911,6 +944,33 @@ class HttpScanHandler(
             )
           )
       }
+    }
+  }
+
+  override def lookupTransferPreapprovalByParty(
+      respond: ScanResource.LookupTransferPreapprovalByPartyResponse.type
+  )(
+      party: String
+  )(extracted: TraceContext): Future[ScanResource.LookupTransferPreapprovalByPartyResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupTransferPreapprovalByParty") { _ => _ =>
+      val partyId = PartyId.tryFromProtoPrimitive(party)
+      store
+        .lookupTransferPreapprovalByParty(
+          partyId
+        )
+        .map {
+          case Some(c) =>
+            v0.ScanResource.LookupTransferPreapprovalByPartyResponse.OK(
+              definitions.LookupTransferPreapprovalByPartyResponse(
+                c.toHttp
+              )
+            )
+          case None =>
+            v0.ScanResource.LookupTransferPreapprovalByPartyResponse.NotFound(
+              definitions.ErrorResponse(s"No TransferPreapproval found for party: $party")
+            )
+        }
     }
   }
 

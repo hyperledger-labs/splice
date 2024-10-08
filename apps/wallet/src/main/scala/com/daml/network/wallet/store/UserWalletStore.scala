@@ -310,6 +310,17 @@ trait UserWalletStore extends AppStore with NamedLogging {
     lookupArbitraryPreferAssigned(amuletCodegen.FeaturedAppRight.COMPANION)
       .map(_ map (_.contract))
 
+  def lookupTransferPreapproval()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[QueryResult[Option[Contract[
+    amuletrulesCodegen.TransferPreapproval2.ContractId,
+    amuletrulesCodegen.TransferPreapproval2,
+  ]]]] =
+    multiDomainAcsStore
+      .findAnyContractWithOffset(amuletrulesCodegen.TransferPreapproval2.COMPANION)
+      .map(_.map(_.map(_.contract)))
+
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   final def getValidatorRightsWhereUserIsValidator()(implicit
       tc: TraceContext
@@ -653,6 +664,14 @@ object UserWalletStore {
           UserWalletAcsStoreRowData(
             contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
+        ),
+        // Transfer preapprovals
+        mkFilter(amuletrulesCodegen.TransferPreapproval2.COMPANION)(co =>
+          co.payload.dso == dso && (co.payload.provider == endUser || co.payload.receiver == endUser)
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract
           )
         ),
       ),

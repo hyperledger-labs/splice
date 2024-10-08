@@ -63,6 +63,24 @@ object AmuletRules_BuyMemberTraffic
       template = splice.amuletrules.AmuletRules.COMPANION,
     )
 
+object AmuletRules_CreateExternalPartySetupProposal
+    extends ExerciseNodeCompanion.Mk(
+      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_CreateExternalPartySetupProposal,
+      template = splice.amuletrules.AmuletRules.COMPANION,
+    )
+
+object AmuletRules_CreateTransferPreapproval
+    extends ExerciseNodeCompanion.Mk(
+      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_CreateTransferPreapproval,
+      template = splice.amuletrules.AmuletRules.COMPANION,
+    )
+
+object TransferPreapproval2_Renew
+    extends ExerciseNodeCompanion.Mk(
+      choice = splice.amuletrules.TransferPreapproval2.CHOICE_TransferPreapproval2_Renew,
+      template = splice.amuletrules.TransferPreapproval2.COMPANION,
+    )
+
 object AnsRules_CollectInitialEntryPayment
     extends ExerciseNodeCompanion.Mk(
       choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectInitialEntryPayment,

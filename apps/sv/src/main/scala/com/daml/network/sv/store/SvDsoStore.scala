@@ -940,6 +940,24 @@ trait SvDsoStore
     splice.ans.AnsEntryContext.ContractId,
     splice.ans.AnsEntryContext,
   ]]]
+
+  def lookupTransferPreapprovalByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[
+      splice.amuletrules.TransferPreapproval2.ContractId,
+      splice.amuletrules.TransferPreapproval2,
+    ]]
+  ]
+
+  def listAmuletsByOwner(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Seq[ContractWithState[
+      splice.amulet.Amulet.ContractId,
+      splice.amulet.Amulet,
+    ]]
+  ]
 }
 
 object SvDsoStore {
@@ -996,6 +1014,7 @@ object SvDsoStore {
     splice.ans.AnsEntry.COMPANION,
     splice.ans.AnsEntryContext.COMPANION,
     splice.ans.AnsRules.COMPANION,
+    splice.amuletrules.TransferPreapproval2.COMPANION,
     splice.dso.amuletprice.AmuletPriceVote.COMPANION,
     splice.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
   )
@@ -1283,6 +1302,19 @@ object SvDsoStore {
         DsoAcsStoreRowData(
           contract,
           subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
+      mkFilter(splice.amuletrules.TransferPreapproval2.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract
+          )
+      },
+      mkFilter(splice.externalpartyamuletrules.TransferCommand.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract
         )
       },
     )

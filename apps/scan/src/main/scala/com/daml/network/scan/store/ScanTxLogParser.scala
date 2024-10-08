@@ -8,6 +8,7 @@ import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
 import com.daml.network.codegen.java.splice.amulet.{AmuletCreateSummary, AmuletExpireSummary}
 import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.TransferResult
 import com.daml.network.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequest,
   DsoRules_CloseVoteRequestResult,
@@ -67,6 +68,12 @@ class ScanTxLogParser(
             )
           case AmuletRules_BuyMemberTraffic(node) =>
             State.fromBuyMemberTraffic(exercised, domainId, node)
+          case AmuletRules_CreateExternalPartySetupProposal(node) =>
+            State.fromCreateExternalPartySetupProposal(exercised, domainId, node)
+          case AmuletRules_CreateTransferPreapproval(node) =>
+            State.fromCreateTransferPreapproval(exercised, domainId, node)
+          case TransferPreapproval2_Renew(node) =>
+            State.fromRenewTransferPreapproval(exercised, domainId, node)
           case AmuletExpire(node) =>
             State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
           case LockedAmuletExpireAmulet(node) =>
@@ -494,6 +501,115 @@ object ScanTxLogParser {
         .appended(rewardEntries)
         // append the balance change entry from burning the transferred amulet
         .appended(balanceChangeEntry)
+    }
+
+    def fromCreateExternalPartySetupProposal(
+        event: ExercisedEvent,
+        domainId: DomainId,
+        node: ExerciseNode[
+          AmuletRules_CreateExternalPartySetupProposal.Arg,
+          AmuletRules_CreateExternalPartySetupProposal.Res,
+        ],
+    ): State = {
+      val validatorParty = Codec
+        .decode(Codec.Party)(node.result.value.validator)
+        .getOrElse(
+          throw Status.INTERNAL
+            .withDescription(
+              s"Cannot decode party ID ${node.argument.value.validator}"
+            )
+            .asRuntimeException()
+        )
+      val transferResult = node.result.value.transferResult
+      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
+    }
+
+    def fromCreateTransferPreapproval(
+        event: ExercisedEvent,
+        domainId: DomainId,
+        node: ExerciseNode[
+          AmuletRules_CreateTransferPreapproval.Arg,
+          AmuletRules_CreateTransferPreapproval.Res,
+        ],
+    ): State = {
+      val validatorParty = Codec
+        .decode(Codec.Party)(node.argument.value.provider)
+        .getOrElse(
+          throw Status.INTERNAL
+            .withDescription(
+              s"Cannot decode party ID ${node.argument.value.provider}"
+            )
+            .asRuntimeException()
+        )
+      val transferResult = node.result.value.transferResult
+      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
+    }
+
+    def fromRenewTransferPreapproval(
+        event: ExercisedEvent,
+        domainId: DomainId,
+        node: ExerciseNode[
+          TransferPreapproval2_Renew.Arg,
+          TransferPreapproval2_Renew.Res,
+        ],
+    ): State = {
+      val validatorParty = Codec
+        .decode(Codec.Party)(node.result.value.provider)
+        .getOrElse(
+          throw Status.INTERNAL
+            .withDescription(
+              s"Cannot decode party ID ${node.result.value.provider}"
+            )
+            .asRuntimeException()
+        )
+      val transferResult = node.result.value.transferResult
+      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
+    }
+
+    private def fromTransferPreapprovalPurchase(
+        event: ExercisedEvent,
+        domainId: DomainId,
+        validatorParty: PartyId,
+        transferResult: TransferResult,
+    ) = {
+      val round = transferResult.round
+      val balanceChangeEntry = State(
+        BalanceChangeTxLogEntry(
+          eventId = event.getEventId,
+          domainId = domainId,
+          round = round.number,
+          changeToInitialAmountAsOfRoundZero = transferResult.summary.balanceChanges.values.asScala
+            .map(bc => BigDecimal(bc.changeToInitialAmountAsOfRoundZero))
+            .sum,
+          changeToHoldingFeesRate = transferResult.summary.balanceChanges.values.asScala
+            .map(bc => BigDecimal(bc.changeToHoldingFeesRate))
+            .sum,
+          partyBalanceChanges = transferResult.summary.balanceChanges.asScala.map {
+            case (party, bc) if party == validatorParty.toProtoPrimitive =>
+              validatorParty -> PartyBalanceChange(
+                bc.changeToInitialAmountAsOfRoundZero,
+                bc.changeToHoldingFeesRate,
+              )
+            case (party, bc) =>
+              throw Status.INTERNAL
+                .withDescription(
+                  s"Balance change of $bc for non-validator party $party detected as part of CreateTransferPreapproval"
+                )
+                .asRuntimeException()
+          }.toMap,
+        )
+      )
+
+      val rewardEntries = rewardsEntriesFromTransferSummary(
+        validatorParty,
+        transferResult.summary,
+        event,
+        round.number,
+        domainId,
+        Some(event.getEventId),
+      )
+
+      balanceChangeEntry.appended(rewardEntries)
     }
 
     def fromCollectEntryPayment(

@@ -4,6 +4,7 @@
 package com.daml.network.scan.admin.api.client
 
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.environment.SpliceLedgerClient
@@ -30,6 +31,15 @@ trait CachingScanConnection extends ScanConnection {
   protected val amuletRulesCacheTimeToLive: NonNegativeFiniteDuration
 
   private val amuletRulesCache: AtomicReference[Option[CachedAmuletRules]] =
+    new AtomicReference(None)
+
+  // While ExternalPartyAmuletRules should never change relying on that assumption seems dangerous and cache invalidation doesn't work
+  // since we'll only learn about the contract being inactive when submitting not when preparing.
+  // So we don't set a cache expiration time and instead only use the cache to avoid transmitting the contract payload
+  // if it already exists.
+  private val externalPartyAmuletRulesCache: AtomicReference[
+    Option[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]]
+  ] =
     new AtomicReference(None)
 
   private val ansRulesCache: AtomicReference[Option[CachedAnsRules]] =
@@ -111,6 +121,32 @@ trait CachingScanConnection extends ScanConnection {
   protected def runGetAmuletRulesWithState(
       cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
   )(implicit tc: TraceContext): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]]
+
+  override def getExternalPartyAmuletRules()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] = {
+    for {
+      externalPartyAmuletRules <- runGetExternalPartyAmuletRules(
+        externalPartyAmuletRulesCache.get()
+      )
+    } yield {
+      externalPartyAmuletRulesCache.set(
+        Some(
+          externalPartyAmuletRules
+        )
+      )
+      externalPartyAmuletRules
+    }
+  }
+
+  protected def runGetExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]]
 
   override def getAnsRules()(implicit
       ec: ExecutionContext,

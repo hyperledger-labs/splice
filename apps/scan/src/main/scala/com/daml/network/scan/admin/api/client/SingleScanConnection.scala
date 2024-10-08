@@ -5,11 +5,12 @@ package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval2}
+import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.UpgradesConfig
-import com.daml.network.environment.{SpliceLedgerClient, HttpAppConnection, RetryProvider}
+import com.daml.network.environment.{HttpAppConnection, RetryProvider, SpliceLedgerClient}
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.commands.{
@@ -94,6 +95,27 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
+    )
+  }
+
+  override def getExternalPartyAmuletRules()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] = {
+    getExternalPartyAmuletRules(None)
+  }
+
+  def getExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetExternalPartyAmuletRules(cachedExternalPartyAmuletRules),
     )
   }
 
@@ -387,6 +409,15 @@ class SingleScanConnection private[client] (
         domainIdPrefix
       ),
     )
+
+  override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupTransferPreapprovalByParty(receiver),
+    )
 }
 
 object SingleScanConnection {
@@ -441,6 +472,18 @@ class CachedScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
+    )
+
+  override protected def runGetExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetExternalPartyAmuletRules(cachedExternalPartyAmuletRules),
     )
 
   override protected def runGetAnsRules(

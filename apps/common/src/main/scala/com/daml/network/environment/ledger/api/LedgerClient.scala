@@ -17,6 +17,7 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
   GetPartiesRequest,
   PartyManagementServiceGrpc,
 }
+import com.daml.ledger.api.v2.interactive_submission_service.InteractiveSubmissionServiceGrpc
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
 import com.daml.ledger.javaapi.data.{Command, CreateUserResponse, ListUserRightsResponse, User}
@@ -29,6 +30,7 @@ import com.daml.network.util.DisclosedContracts
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -146,6 +148,9 @@ private[environment] class LedgerClient(
   private val identityProviderConfigServiceStub
       : identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub =
     identity_provider_config_service.IdentityProviderConfigServiceGrpc.stub(channel)
+  private val interactiveSubmissionServiceStub
+      : InteractiveSubmissionServiceGrpc.InteractiveSubmissionServiceStub =
+    InteractiveSubmissionServiceGrpc.stub(channel)
 
   private def toSource[T](f: Future[Source[T, NotUsed]]) =
     Source.futureSource(f).mapMaterializedValue(_ => NotUsed)
@@ -258,6 +263,70 @@ private[environment] class LedgerClient(
         waitFor.stubSubmit(stub, request, ec).map(waitFor.mapResponse)
     } yield res
   }
+
+  def prepareSubmission(
+      domainId: Option[String],
+      applicationId: String,
+      commandId: String,
+      actAs: Seq[String],
+      readAs: Seq[String],
+      commands: Seq[Command],
+      disclosedContracts: DisclosedContracts,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[lapi.interactive_submission_service.PrepareSubmissionResponse] = {
+    for {
+      stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
+      result <- stub.prepareSubmission(
+        lapi.interactive_submission_service.PrepareSubmissionRequest(
+          commands = commands.map(c => lapi.commands.Command.fromJavaProto(c.toProtoCommand)),
+          disclosedContracts = disclosedContracts.toLedgerApiDisclosedContracts.map(
+            lapi.commands.DisclosedContract.fromJavaProto(_)
+          ),
+          domainId = domainId.getOrElse(""),
+          applicationId = applicationId,
+          commandId = commandId,
+          actAs = actAs,
+          readAs = readAs,
+        )
+      )
+    } yield result
+  }
+
+  def executeSubmission(
+      preparedTransaction: ByteString,
+      partySignatures: Map[PartyId, LedgerClient.Signature],
+      applicationId: String,
+      submissionId: String,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[lapi.interactive_submission_service.ExecuteSubmissionResponse] =
+    for {
+      stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
+      result <- stub.executeSubmission(
+        lapi.interactive_submission_service.ExecuteSubmissionRequest(
+          preparedTransaction = preparedTransaction,
+          partiesSignatures =
+            Some(lapi.interactive_submission_service.PartySignatures(partySignatures.toList.map {
+              case (party, signature) =>
+                lapi.interactive_submission_service.SinglePartySignatures(
+                  party.toProtoPrimitive,
+                  Seq(
+                    lapi.interactive_submission_service.Signature(
+                      lapi.interactive_submission_service.SignatureFormat.SIGNATURE_FORMAT_RAW,
+                      signature.signature,
+                      signature.signedBy.toProtoPrimitive,
+                    )
+                  ),
+                )
+            })),
+          applicationId = applicationId,
+          submissionId = submissionId,
+        )
+      )
+    } yield result
 
   def listPackages()(implicit ec: ExecutionContext, tc: TraceContext): Future[Seq[String]] = {
     val request = ListPackagesRequest()
@@ -774,6 +843,11 @@ object LedgerClient {
     }
   }
 
+  final case class Signature(
+      signature: ByteString,
+      signedBy: Fingerprint,
+  )
+
   final case class CompletionStreamResponse(laterOffset: Long, completion: Completion)
 
   object CompletionStreamResponse {
@@ -806,13 +880,14 @@ object LedgerClient {
       applicationId: String,
       commandId: String,
       submissionId: String,
+      updateId: String,
       status: GrpcStatus,
       errorDetails: Seq[ErrorDetail],
   ) {
     def matchesSubmission(applicationId: String, commandId: String, submissionId: String): Boolean =
       this.applicationId == applicationId &&
-        this.commandId == commandId &&
-        this.submissionId == submissionId
+        commandId == this.commandId &&
+        submissionId == this.submissionId
   }
 
   object Completion {
@@ -826,6 +901,7 @@ object LedgerClient {
         applicationId = spb.applicationId,
         commandId = spb.commandId,
         submissionId = spb.submissionId,
+        updateId = spb.updateId,
         status = grpcStatus,
         errorDetails = errors,
       )

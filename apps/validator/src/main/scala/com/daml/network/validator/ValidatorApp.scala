@@ -742,6 +742,7 @@ class ValidatorApp(
         validatorTopupConfig,
         config.domains.global.buyExtraTraffic.grpcDeadline,
         config.appManager,
+        config.transferPreapproval,
         config.domains.global.url.isEmpty,
         config.prevetDuration,
         config.svValidator,
@@ -828,9 +829,12 @@ class ValidatorApp(
           participantIdentitiesStore,
           validatorUserName = config.ledgerApiUser,
           validatorWalletUserName = config.validatorWalletUser,
+          walletManagerOpt,
           getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
+          scanConnection = scanConnection,
           participantAdminConnection,
           config,
+          clock,
           retryProvider = retryProvider,
           loggerFactory,
         )
@@ -842,6 +846,7 @@ class ValidatorApp(
           loggerFactory,
           retryProvider,
           validatorTopupConfig,
+          config.transferPreapproval,
           clock,
         )
       )

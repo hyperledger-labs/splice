@@ -446,7 +446,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
     }
 
-    "na SV's CNS entry can be seen via scan api" in { implicit env =>
+    "an SV's CNS entry can be seen via scan api" in { implicit env =>
       val dsoRules = sv1Backend.getDsoInfo().dsoRules
       dsoRules.payload.svs.asScala.foreach { case (svParty, svInfo) =>
         val expectedSvEntry = svEntry(svInfo.name, svParty, ansAcronym)
@@ -459,6 +459,44 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
         sv1ScanBackend.listEntries("", 100) should contain(expectedSvEntry)
       }
     }
+
+    // TODO(#15035): Move this test out of here and re-enable it once wallet support for TransferPreapproval2s exists
+//    "TransferPreapprovals can be created, looked up and amulet can be sent through them" in {
+//      implicit env =>
+//        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+//        onboardWalletUser(bobWalletClient, bobValidatorBackend)
+//
+//        sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
+//        val (_, cid) = actAndCheck(
+//          "Create TransferPreapproval",
+//          aliceWalletClient.createTransferPreapproval(),
+//        )(
+//          "Scan lookup returns TransferPreapproval",
+//          inside(_) {
+//            case CreateTransferPreapprovalResponse.Created(c) => {
+//              val contract = sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+//              contract.contractId shouldBe c
+//              contract.contractId
+//            }
+//          },
+//        )
+//        aliceWalletClient.createTransferPreapproval() shouldBe CreateTransferPreapprovalResponse
+//          .AlreadyExists(cid)
+//        bobWalletClient.tap(walletAmuletToUsd(50.0))
+//        bobWalletClient.balance().unlockedQty should beAround(50.0)
+//        aliceWalletClient.balance().unlockedQty should beAround(0.0)
+//        actAndCheck(
+//          "Bob sends Alice 40.0 amulet",
+//          bobWalletClient.transferPreapprovalSend(aliceUserParty, 40.0),
+//        )(
+//          "Alice and Bob's balance are updated",
+//          _ => {
+//            // Fees eat up the remainder which is why we allow bob’s balance to drop to close to 0
+//            bobWalletClient.balance().unlockedQty should beWithin(0.0, 10.0)
+//            aliceWalletClient.balance().unlockedQty should beAround(40.0)
+//          },
+//        )
+//    }
   }
 
   private def svEntry(svName: String, svParty: String, ansAcronym: String) =

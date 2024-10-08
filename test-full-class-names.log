@@ -13,6 +13,8 @@ com.daml.network.integration.tests.BootstrapTest
 com.daml.network.integration.tests.CombinedDumpDirectoryExportIntegrationTest
 com.daml.network.integration.tests.DirectoryPeriodicBackupIntegrationTest
 com.daml.network.integration.tests.DistributedDomainIntegrationTest
+com.daml.network.integration.tests.ExternalPartySetupProposalIntegrationTest
+com.daml.network.integration.tests.ExternallySignedPartyOnboardingTest
 com.daml.network.integration.tests.GcpBucketPeriodicBackupIntegrationTest
 com.daml.network.integration.tests.ManualStartIntegrationTest
 com.daml.network.integration.tests.MemberTrafficIntegrationTest

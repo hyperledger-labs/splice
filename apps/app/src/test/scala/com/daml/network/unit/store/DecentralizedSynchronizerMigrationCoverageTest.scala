@@ -1,8 +1,8 @@
 package com.daml.network
 package unit.store
 
-import store.MultiDomainAcsStore.ContractFilter
 import com.daml.ledger.javaapi.data.codegen.ContractTypeCompanion
+import com.daml.network.store.MultiDomainAcsStore.ContractFilter
 import com.daml.network.store.db.AcsRowData
 import com.daml.network.util.PackageQualifiedName
 import com.digitalasset.canton.topology.PartyId
@@ -100,7 +100,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
 
 object DecentralizedSynchronizerMigrationCoverageTest {
   import scan.store.ScanStore
-  import sv.store.{SvStore, SvSvStore, SvDsoStore}
+  import sv.store.{SvDsoStore, SvStore, SvSvStore}
   import validator.store.ValidatorStore
   import wallet.store.UserWalletStore
 
@@ -156,8 +156,12 @@ object DecentralizedSynchronizerMigrationCoverageTest {
 
   private val knownNotHandled = {
     import codegen.java.splice.decentralizedsynchronizer
-    import codegen.java.splice.wallet.topupstate as topUpCodegen
-    import codegen.java.splice.wallet.buytrafficrequest as trafficRequestCodegen
+    import codegen.java.splice.externalpartyamuletrules
+    import codegen.java.splice.wallet.{
+      buytrafficrequest as trafficRequestCodegen,
+      externalparty as externalPartyCodegen,
+      topupstate as topUpCodegen,
+    }
     Seq(
       decentralizedsynchronizer.MemberTraffic.COMPANION ->
         reason("tied to a specific domainId, never migrated", ScanStore, SvDsoStore),
@@ -165,6 +169,12 @@ object DecentralizedSynchronizerMigrationCoverageTest {
         reason("tied to a specific domainId, never migrated", ValidatorStore),
       trafficRequestCodegen.BuyTrafficRequest.COMPANION ->
         reason("tied to a specific domainId, never migrated", UserWalletStore),
+      externalPartyCodegen.ExternalPartySetupProposal.COMPANION ->
+        reason("#15158", ValidatorStore),
+      externalpartyamuletrules.TransferCommand.COMPANION ->
+        reason("#15158", SvDsoStore),
+      externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION ->
+        reason("#15158", ScanStore),
     ).view.map { case (c, reason) =>
       (PackageQualifiedName(c.getTemplateIdWithPackageId), reason)
     }.toMap

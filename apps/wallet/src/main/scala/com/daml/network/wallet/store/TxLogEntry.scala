@@ -6,13 +6,15 @@ package com.daml.network.wallet.store
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.history.{
-  AnsRules_CollectEntryRenewalPayment,
-  AnsRules_CollectInitialEntryPayment,
   AmuletExpire,
   AmuletRules_BuyMemberTraffic,
+  AmuletRules_CreateTransferPreapproval,
+  AnsRules_CollectEntryRenewalPayment,
+  AnsRules_CollectInitialEntryPayment,
   LockedAmuletExpireAmulet,
   LockedAmuletOwnerExpireLock,
   LockedAmuletUnlock,
+  TransferPreapproval2_Renew,
 }
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.http.v0.definitions.{
@@ -442,6 +444,10 @@ object TxLogEntry extends StoreErrors {
         extends TransferTransactionSubtype(AnsRules_CollectInitialEntryPayment)
     case object EntryRenewalPaymentCollection
         extends TransferTransactionSubtype(AnsRules_CollectEntryRenewalPayment)
+    case object TransferPreapprovalCreation
+        extends TransferTransactionSubtype(AmuletRules_CreateTransferPreapproval)
+    case object TransferPreapprovalRenewal
+        extends TransferTransactionSubtype(TransferPreapproval2_Renew)
     case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
 
     val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
@@ -456,6 +462,7 @@ object TxLogEntry extends StoreErrors {
       ExtraTrafficPurchase,
       InitialEntryPaymentCollection,
       EntryRenewalPaymentCollection,
+      TransferPreapprovalCreation,
       Transfer,
     ).map(txSubtype => txSubtype.choice -> txSubtype).toMap
 

@@ -23,6 +23,7 @@ import com.daml.network.validator.migration.DecentralizedSynchronizerMigrationTr
 import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUserPartyTrigger, WalletAppInstallTrigger}
+import com.daml.network.wallet.config.TransferPreapprovalConfig
 import com.daml.network.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -41,6 +42,7 @@ class ValidatorAutomationService(
     validatorTopupConfig: ValidatorTopupConfig,
     grpcDeadline: Option[NonNegativeFiniteDuration],
     appManagerConfig: Option[AppManagerConfig],
+    transferPreapprovalConfig: TransferPreapprovalConfig,
     sequencerConnectionFromScan: Boolean,
     prevetDuration: NonNegativeFiniteDuration,
     isSvValidator: Boolean,
@@ -100,6 +102,15 @@ class ValidatorAutomationService(
     registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
 
     registerTrigger(new OffboardUserPartyTrigger(triggerContext, walletManager, connection))
+
+    registerTrigger(
+      new RenewTransferPreapprovalTrigger(
+        triggerContext,
+        store,
+        walletManager,
+        transferPreapprovalConfig,
+      )
+    )
 
     if (automationConfig.enableAutomaticRewardsCollectionAndAmuletMerging) {
       registerTrigger(

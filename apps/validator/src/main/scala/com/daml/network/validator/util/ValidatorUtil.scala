@@ -3,26 +3,31 @@
 
 package com.daml.network.validator.util
 
+import cats.syntax.either.*
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
-import com.daml.network.environment.{
-  BaseLedgerConnection,
-  CommandPriority,
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-  SpliceLedgerConnection,
-}
+import com.daml.network.environment.*
+import com.daml.network.environment.ledger.api.LedgerClient
+import com.daml.network.http.v0.definitions.ExternalPartySubmission
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
 import com.daml.network.util.SpliceUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions.Proposal
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.crypto.{SigningPublicKey, v30}
 import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.HexString
+import com.google.protobuf.ByteString
 import io.grpc.Status
 
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
 private[validator] object ValidatorUtil {
@@ -158,6 +163,70 @@ private[validator] object ValidatorUtil {
     } yield userPartyId
   }
 
+  def createTopologyMappings(
+      partyHint: String,
+      publicKey: SigningPublicKey,
+      participantAdminConnection: ParticipantAdminConnection,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]]] = {
+    val partyId = PartyId.tryCreate(partyHint, fingerprint = publicKey.fingerprint)
+
+    for {
+      participantId <- participantAdminConnection.getParticipantId()
+      namespaceDelegationMapping = NamespaceDelegation
+        .create(
+          namespace = partyId.uid.namespace,
+          target = publicKey,
+          isRootDelegation = true,
+        )
+        .valueOr(error =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"failed to construct namespace delegation: $error")
+            .asRuntimeException()
+        )
+
+      // TODO(#14568): change to Confirmation
+      partyToParticipantMapping = PartyToParticipant
+        .create(
+          partyId = partyId,
+          threshold = PositiveInt.one,
+          participants = Seq(
+            HostingParticipant(participantId, ParticipantPermission.Submission)
+          ),
+        )
+        .valueOr(error =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"failed to construct party to participant mapping: $error")
+            .asRuntimeException()
+        )
+      partyToKeyMapping = PartyToKeyMapping
+        .create(
+          partyId,
+          None,
+          PositiveInt.one,
+          NonEmpty.mk(Seq, publicKey),
+        )
+        .valueOr(error =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"failed to construct party to key mapping: $error")
+            .asRuntimeException()
+        )
+      transactions <- participantAdminConnection.generateTransactions(
+        Seq(namespaceDelegationMapping, partyToParticipantMapping, partyToKeyMapping)
+          .map(mapping =>
+            Proposal(
+              mapping = mapping,
+              store = TopologyStoreId.AuthorizedStore.filterName,
+              serial = Some(PositiveInt.one),
+            )
+          )
+      )
+    } yield transactions
+
+  }
+
   def offboard(
       endUserName: String,
       storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
@@ -265,4 +334,57 @@ private[validator] object ValidatorUtil {
         )
       case Some(wallet) => Future.successful(wallet)
     }
+
+  def submitAsExternalParty(
+      connection: SpliceLedgerConnection,
+      submission: ExternalPartySubmission,
+      waitForOffset: Boolean = true,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[String] = {
+    val senderParty = PartyId.tryFromProtoPrimitive(submission.partyId)
+    val signedTxHash = HexString.parseToByteString(submission.signedTxHash) match {
+      case Some(hash) => hash
+      case None =>
+        throw Status.INVALID_ARGUMENT
+          .withDescription("Unable to parse signed tx hash")
+          .asRuntimeException()
+    }
+    val publicKey = signingPublicKeyFromHexEd25119(submission.publicKey)
+    for {
+      updateId <- connection.executeSubmissionAndWait(
+        senderParty,
+        ByteString.copyFrom(Base64.getDecoder.decode(submission.transaction)),
+        Map(
+          senderParty ->
+            LedgerClient.Signature(
+              signedTxHash,
+              publicKey.fingerprint,
+            )
+        ),
+        waitForOffset,
+      )
+    } yield updateId
+  }
+
+  def signingPublicKeyFromHexEd25119(publicKey: String): SigningPublicKey = {
+    val publicKeyBytes = HexString
+      .parseToByteString(publicKey)
+      .getOrElse(
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"Could not decode public key $publicKey as a hex string")
+          .asRuntimeException()
+      )
+    SigningPublicKey
+      .fromProtoV30(
+        v30.SigningPublicKey(
+          v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_RAW,
+          publicKeyBytes,
+          v30.SigningKeyScheme.SIGNING_KEY_SCHEME_ED25519,
+        )
+      )
+      .valueOr(err =>
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"Failed to decode public key: $err")
+          .asRuntimeException()
+      )
+  }
 }

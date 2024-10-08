@@ -7,6 +7,7 @@ import org.apache.pekko.stream.Materializer
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval2
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.splice.wallet.install.{
   AmuletOperationOutcome,
@@ -20,21 +21,24 @@ import com.daml.network.codegen.java.splice.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.environment.{CommandPriority, RetryProvider}
+import com.daml.network.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
 import com.daml.network.environment.SpliceLedgerConnection.CommandId
 import com.daml.network.environment.ledger.api.DedupDuration
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, PageLimit}
-import com.daml.network.util.{SpliceUtil, Codec, ContractWithState}
+import com.daml.network.util.{SpliceUtil, Codec, ContractWithState, DisclosedContracts}
 import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.config.TransferPreapprovalConfig
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
 import TreasuryService.AmuletOperationDedupConfig
 import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.Json
@@ -44,6 +48,7 @@ import io.opentelemetry.api.trace.Tracer
 import java.util.UUID
 import java.math.RoundingMode as JRM
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.*
 import scala.reflect.ClassTag
 
 class HttpWalletHandler(
@@ -52,6 +57,7 @@ class HttpWalletHandler(
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     validatorTopupConfig: ValidatorTopupConfig,
+    transferPreapprovalConfig: TransferPreapprovalConfig,
     clock: Clock,
 )(implicit
     mat: Materializer,
@@ -659,6 +665,102 @@ class HttpWalletHandler(
     }
   }
 
+  // TODO(#15035): This is currently broken. Fix this once we properly support TransferPreapproval2 creation in the wallet.
+  override def createTransferPreapproval(
+      respond: r0.CreateTransferPreapprovalResponse.type
+  )()(tuser: TracedUser): Future[r0.CreateTransferPreapprovalResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.createTransferPreapproval") { implicit traceContext => _ =>
+      for {
+        wallet <- getUserWallet(user)
+        store = wallet.store
+        domain <- scanConnection.getAmuletRulesDomain()(traceContext)
+        now = clock.now
+        result <- store.lookupTransferPreapproval() flatMap {
+          case QueryResult(offset, None) =>
+            wallet.connection
+              .submit(
+                Seq(store.key.validatorParty, store.key.endUserParty),
+                Seq.empty,
+                new TransferPreapproval2(
+                  store.key.endUserParty.toProtoPrimitive,
+                  store.key.validatorParty.toProtoPrimitive,
+                  store.key.dsoParty.toProtoPrimitive,
+                  now.toInstant,
+                  now.toInstant,
+                  now.plus(transferPreapprovalConfig.preapprovalLifetime.asJava).toInstant,
+                ).create,
+              )
+              .withDedup(
+                SpliceLedgerConnection.CommandId(
+                  "com.daml.network.wallet.createTransferPreapproval",
+                  Seq(
+                    store.key.endUserParty,
+                    store.key.validatorParty,
+                  ),
+                  "",
+                ),
+                deduplicationOffset = offset,
+              )
+              .withDomainId(domain)
+              .yieldResult()
+              .map(created =>
+                r0.CreateTransferPreapprovalResponse.OK(
+                  d0.CreateTransferPreapprovalResponse(
+                    created.contractId.contractId
+                  )
+                )
+              )
+          case QueryResult(_, Some(c)) =>
+            Future.successful(
+              r0.CreateTransferPreapprovalResponse.Conflict(
+                d0.CreateTransferPreapprovalResponse(
+                  c.contractId.contractId
+                )
+              )
+            )
+        }
+      } yield result
+    }
+  }
+
+  def transferPreapprovalSend(respond: r0.TransferPreapprovalSendResponse.type)(
+      body: d0.TransferPreapprovalSendRequest
+  )(tuser: TracedUser): Future[r0.TransferPreapprovalSendResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.tap") { _ => _ =>
+      val receiver = Codec.tryDecode(Codec.Party)(body.receiverPartyId)
+      val amount = Codec.tryDecode(Codec.JavaBigDecimal)(body.amount)
+      scanConnection.lookupTransferPreapprovalByParty(receiver).flatMap {
+        case None =>
+          Future.failed(
+            Status.INVALID_ARGUMENT
+              .withDescription(s"Receiver $receiver does not have a TransferPreapproval")
+              .asRuntimeException
+          )
+        case Some(preapproval) =>
+          for {
+            wallet <- getUserWallet(user)
+            featuredAppRight <- scanConnection
+              .lookupFeaturedAppRight(PartyId.tryFromProtoPrimitive(preapproval.payload.provider))
+            result <- exerciseWalletAmuletAction(
+              new amuletoperation.CO_TransferPreapproval2Send(
+                preapproval.contractId,
+                featuredAppRight.map(_.contractId).toJava,
+                amount,
+              ),
+              user,
+              (_: amuletoperationoutcome.COO_TransferPreapproval2Send) =>
+                r0.TransferPreapprovalSendResponse.OK,
+              extraDisclosedContracts = wallet.connection.disclosedContracts(
+                preapproval
+              ),
+            )
+          } yield result
+      }
+    }
+  }
+
   private def amuletToAmuletPosition(
       amulet: ContractWithState[Amulet.ContractId, Amulet],
       round: Long,
@@ -704,11 +806,16 @@ class HttpWalletHandler(
       user: String,
       processResponse: ExpectedCOO => R,
       dedupConfig: Option[AmuletOperationDedupConfig] = None,
+      extraDisclosedContracts: DisclosedContracts = DisclosedContracts.Empty,
   )(implicit tc: TraceContext): Future[R] =
     for {
       userTreasury <- getUserTreasury(user)
       res <- userTreasury
-        .enqueueAmuletOperation(operation, dedup = dedupConfig)
+        .enqueueAmuletOperation(
+          operation,
+          dedup = dedupConfig,
+          extraDisclosedContracts = extraDisclosedContracts,
+        )
         .map(processCOO[ExpectedCOO, R](processResponse))
     } yield res
 

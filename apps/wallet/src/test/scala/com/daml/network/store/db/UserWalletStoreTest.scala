@@ -959,8 +959,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     endUserParty = endUserParty,
   )
 
-  private def time(n: Long) = CantonTimestamp.ofEpochSecond(n)
-
   private def walletInstall(endUserParty: PartyId) = {
     val templateId = installCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new installCodegen.WalletAppInstall(

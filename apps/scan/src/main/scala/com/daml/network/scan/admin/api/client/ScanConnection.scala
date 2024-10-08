@@ -4,19 +4,26 @@
 package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext}
+import com.daml.network.codegen.java.splice.amulet.{FeaturedAppRight, ValidatorRight}
+import com.daml.network.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  AppTransferContext,
+  PaymentTransferContext,
+  TransferContext,
+  TransferPreapproval2,
+}
+import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.UpgradesConfig
 import com.daml.network.environment.{
-  SpliceLedgerClient,
-  SpliceLedgerConnection,
   HttpAppConnection,
   PackageIdResolver,
   RetryFor,
   RetryProvider,
+  SpliceLedgerClient,
+  SpliceLedgerConnection,
 }
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.MigrationSchedule
@@ -36,6 +43,7 @@ import io.grpc.Status
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.MapHasAsJava
 import scala.jdk.OptionConverters.*
 
 trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseableAsync {
@@ -65,6 +73,11 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]]
+
+  def getExternalPartyAmuletRules()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]]
 
   def getAnsRules()(implicit
       ec: ExecutionContext,
@@ -160,6 +173,27 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
     }
   }
 
+  def getPaymentTransferContext(ledgerConnection: SpliceLedgerConnection, providerPartyId: PartyId)(
+      implicit tc: TraceContext
+  ): Future[(PaymentTransferContext, DisclosedContracts.NE)] =
+    for {
+      (appTransferContext, disclosedContracts) <- getAppTransferContext(
+        ledgerConnection,
+        providerPartyId,
+      )
+    } yield (
+      new PaymentTransferContext(
+        appTransferContext.amuletRules,
+        new TransferContext(
+          appTransferContext.openMiningRound,
+          Map.empty[Round, IssuingMiningRound.ContractId].asJava,
+          Map.empty[String, ValidatorRight.ContractId].asJava,
+          appTransferContext.featuredAppRight,
+        ),
+      ),
+      disclosedContracts,
+    )
+
   def getAppTransferContextForRound(
       ledgerConnection: SpliceLedgerConnection,
       providerPartyId: PartyId,
@@ -197,6 +231,11 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       ec: ExecutionContext,
       tc: TraceContext,
   ): OptionT[Future, MigrationSchedule]
+
+  def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]]
 
 }
 

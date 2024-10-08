@@ -4,15 +4,19 @@
 package com.daml.network.validator.store.db
 
 import cats.implicits.*
-import com.daml.network.codegen.java.splice.{
-  amulet as amuletCodegen,
-  validatorlicense as validatorLicenseCodegen,
-}
 import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.splice.appmanager.store.AppConfiguration
+import com.daml.network.codegen.java.splice.amuletrules.{
+  ExternalPartySetupProposal2,
+  TransferPreapproval2,
+}
 import com.daml.network.codegen.java.splice.wallet.{
   install as walletCodegen,
   topupstate as topupCodegen,
+}
+import com.daml.network.codegen.java.splice.{
+  amulet as amuletCodegen,
+  validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
@@ -172,6 +176,76 @@ class DbValidatorStore(
       resultWithOffset.offset,
       resultWithOffset.row.map(
         contractWithStateFromRow(walletCodegen.WalletAppInstall.COMPANION)(_)
+      ),
+    )
+  }
+
+  override def lookupExternalPartySetupProposalByUserPartyWithOffset(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[
+      Option[ContractWithState[ExternalPartySetupProposal2.ContractId, ExternalPartySetupProposal2]]
+    ]
+  ] = waitUntilAcsIngested {
+    for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithStateAndOffset(
+            ValidatorTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                ExternalPartySetupProposal2.COMPANION.TEMPLATE_ID
+              )}
+                and user_party = $partyId
+            """, // TODO(#14568): ensure this is indexed
+            orderLimit = sql"""
+                limit 1
+            """,
+          ).headOption,
+          "lookupExternalPartySetupProposalUser",
+        )
+        .getOrElse(throw offsetExpectedError())
+
+    } yield QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(
+        contractWithStateFromRow(ExternalPartySetupProposal2.COMPANION)(_)
+      ),
+    )
+  }
+
+  override def lookupTransferPreapprovalByReceiverPartyWithOffset(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]]
+  ] = waitUntilAcsIngested {
+    for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithStateAndOffset(
+            ValidatorTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                TransferPreapproval2.COMPANION.TEMPLATE_ID
+              )}
+                and user_party = $partyId
+            """,
+            orderLimit = sql"""
+                limit 1
+            """,
+          ).headOption,
+          "lookupTransferPreapprovalReceiver",
+        )
+        .getOrElse(throw offsetExpectedError())
+
+    } yield QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(
+        contractWithStateFromRow(TransferPreapproval2.COMPANION)(_)
       ),
     )
   }

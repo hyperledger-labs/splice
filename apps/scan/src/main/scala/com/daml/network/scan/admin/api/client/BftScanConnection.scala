@@ -7,12 +7,13 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval2}
+import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
 import com.daml.network.environment.PackageIdResolver.HasAmuletRules
-import com.daml.network.environment.{BaseAppConnection, SpliceLedgerClient, RetryFor, RetryProvider}
+import com.daml.network.environment.{BaseAppConnection, RetryFor, RetryProvider, SpliceLedgerClient}
 import com.daml.network.http.HttpClient
 import com.daml.network.http.v0.definitions.{AnsEntry, MigrationSchedule}
 import com.daml.network.scan.admin.api.client.BftScanConnection.{
@@ -104,6 +105,17 @@ class BftScanConnection(
       _.getAmuletRulesWithState(cachedAmuletRules)
     )
 
+  override protected def runGetExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
+    bftCall(
+      _.getExternalPartyAmuletRules(cachedExternalPartyAmuletRules)
+    )
+
   override protected def runGetAnsRules(
       cachedAnsRules: Option[ContractWithState[AnsRules.ContractId, AnsRules]]
   )(implicit tc: TraceContext): Future[ContractWithState[AnsRules.ContractId, AnsRules]] = bftCall(
@@ -160,6 +172,12 @@ class BftScanConnection(
       ec: ExecutionContext,
       tc: TraceContext,
   ): OptionT[Future, MigrationSchedule] = OptionT(bftCall(_.getMigrationSchedule().value))
+
+  override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]] =
+    bftCall(_.lookupTransferPreapprovalByParty(receiver))
 
   private def bftCall[T](
       call: SingleScanConnection => Future[T]

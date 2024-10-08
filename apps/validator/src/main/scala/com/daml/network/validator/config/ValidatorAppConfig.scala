@@ -10,7 +10,12 @@ import com.daml.network.http.v0.definitions
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.SvAppClientConfig
-import com.daml.network.wallet.config.{AutoAcceptTransfersConfig, TreasuryConfig, WalletSweepConfig}
+import com.daml.network.wallet.config.{
+  AutoAcceptTransfersConfig,
+  TransferPreapprovalConfig,
+  TreasuryConfig,
+  WalletSweepConfig,
+}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
@@ -176,6 +181,7 @@ case class ValidatorAppBackendConfig(
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     participantIdentitiesBackup: Option[PeriodicBackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
+    transferPreapproval: TransferPreapprovalConfig = TransferPreapprovalConfig(),
     // Migrate the validator party from an existing participant with the same namespace.
     migrateValidatorParty: Option[MigrateValidatorPartyConfig] = None,
     svValidator: Boolean = false,

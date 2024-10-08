@@ -51,6 +51,8 @@ object ScanTables extends AcsTables {
       voteActionRequiringConfirmation: Option[Json] = None,
       voteRequesterName: Option[String] = None,
       voteRequestTrackingCid: Option[VoteRequest.ContractId] = None,
+      transferPreapprovalReceiver: Option[PartyId] = None,
+      transferPreapprovalValidFrom: Option[Timestamp] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "round" -> round,
@@ -67,6 +69,8 @@ object ScanTables extends AcsTables {
       "vote_action_requiring_confirmation" -> voteActionRequiringConfirmation,
       "vote_requester_name" -> voteRequesterName.map(lengthLimited),
       "vote_request_tracking_cid" -> voteRequestTrackingCid,
+      "transfer_preapproval_receiver" -> transferPreapprovalReceiver,
+      "transfer_preapproval_valid_from" -> transferPreapprovalValidFrom,
     )
   }
 

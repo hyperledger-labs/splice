@@ -7,7 +7,11 @@ import org.apache.pekko.actor.ActorSystem
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, AppTransferContext}
+import com.daml.network.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  AppTransferContext,
+  TransferPreapproval2,
+}
 import com.daml.network.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -136,6 +140,14 @@ abstract class ScanAppReference(
             ConsoleCommandResult.fromEither(optContract.toRight(s"Entry with name $name not found"))
           )
       }
+
+  @Help.Summary("Lookup a TransferPreapproval by the receiver party")
+  def lookupTransferPreapprovalByParty(
+      party: PartyId
+  ): Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupTransferPreapprovalByParty(party))
+    }
 
   @Help.Summary(
     "Get the (cached) amulet config effective now. Note that changes to the config might take some time to propagate due to the client-side caching."
