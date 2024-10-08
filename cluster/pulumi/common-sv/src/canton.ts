@@ -111,7 +111,8 @@ export function installCantonComponents(
       migrationConfig.isRunningMigration(),
       svConfig.onboardingName,
       logLevel,
-      migrationInfo.version
+      migrationInfo.version,
+      opts
     );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,
