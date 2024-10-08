@@ -113,13 +113,19 @@ function _start_validator {
     extra_flags+=("-P" "$participant_id")
   fi
 
-  _info "Curling ${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare for the secret"
+  secret_url="${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare"
+  _info "Curling ${secret_url} for the secret"
   secret=""
   for i in {1..30}; do
-    secret=$(curl -sfL -X POST "${get_secret_url}") && break
+    secret=$(curl -sfL -X POST "${secret_url}") && break
     _warning "Failed to fetch secret, retrying in 10 seconds"
     sleep 10
   done
+
+  if [ -z "$secret" ]; then
+    _error "Failed to fetch secret"
+    exit 1
+  fi
 
   # TODO(#14303): remove this once the migration base version supports the splice-instance-names endpoint
   if ! curl -sLf "${scan}/api/scan/v0/splice-instance-names" > /dev/null; then
