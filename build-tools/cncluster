@@ -1946,12 +1946,14 @@ function subcmd_request_pam() {
     local folder_id
     if [ "$GCP_CLUSTER_BASENAME" == "dev" ] || [ "$GCP_CLUSTER_BASENAME" == "test" ]; then
       folder_id="98574387291"
+      entitlement_name="cn-devnet-admin-entitlement"
     elif (env-bool IS_MAINNET); then
       folder_id="113800715154"
+      entitlement_name="cn-mainnet-admin-entitlement"
     else
       _error >&2 "you don't need PAM for this cluster"
     fi
-    entitlement_id="folders/${folder_id}/locations/global/entitlements/${GCP_CLUSTER_NAME}-admin-entitlement"
+    entitlement_id="folders/${folder_id}/locations/global/entitlements/${entitlement_name}"
 
     echo -en "enter your reason: "
     read -r reason
