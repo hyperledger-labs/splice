@@ -7,7 +7,7 @@ dir := $(call current_dir)
 $(dir)/build: $(dir)/.build
 
 $(dir)/.build: $(dir)/package.json
-	cd $(@D) && if [ -v CI ]; then npm ci; else npm install; fi
+	cd $(@D) && ${REPO_ROOT}/build-tools/npm-install.sh
 	touch $@
 
 .PHONY: $(dir)/clean
