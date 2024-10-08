@@ -17,7 +17,7 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
-import { installMigrationSpecificValidatorParticipant } from 'splice-pulumi-common-validator/src/migrationSpecificParticipant';
+import { installParticipant } from 'splice-pulumi-common-validator';
 import {
   AutoAcceptTransfersConfig,
   installValidatorApp,
@@ -70,14 +70,17 @@ export async function installValidator1(
 
   const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat([loopback]);
 
-  const participant = installMigrationSpecificValidatorParticipant(
-    decentralizedSynchronizerMigrationConfig,
+  const participant = installParticipant(
+    decentralizedSynchronizerMigrationConfig.active.id,
     xns,
-    defaultPostgres,
-    'validator1',
     auth0Client.getCfg(),
+    'validator1',
+    decentralizedSynchronizerMigrationConfig.active.version,
+    defaultPostgres,
     undefined,
-    participantDependsOn
+    {
+      dependsOn: participantDependsOn,
+    }
   );
 
   const extraDependsOn: CnInput<pulumi.Resource>[] = participantDependsOn.concat([
