@@ -50,10 +50,21 @@ lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extens
 
 inThisBuild(
   List(
+    pushRemoteCacheTo := Some(MavenCache("local-cache", file("/cache/sbt/sbt-remote-cache"))),
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
+    semanticdbIncludeInJar := true, // cache it in the remote cache
   )
 )
+
+// relativize semantic DB target root which is part of the scalac options
+// https://github.com/sbt/sbt/issues/6027#issuecomment-717064450
+Seq(Compile, Test).flatMap { c =>
+  (c / semanticdbTargetRoot) := {
+    val old = (c / semanticdbTargetRoot).value.toPath
+    (LocalRootProject / baseDirectory).value.toPath.relativize(old).toFile
+  }
+}
 
 val allDarsFilter = ScopeFilter(inAnyProject, inConfigurations(Compile), inTasks(damlBuild))
 

@@ -33,12 +33,20 @@ workflow:
           <<: *main-branch-only
           context:
             - artifactory
-            - canton-network-vpn
             - slack-context
           cluster: "cimain"
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
           wait_for_sv: false
-          with_docker: true
+          requires:
+            - wait_for_previous_pipeline
+            - artifacts_push
+      - preflight_check_docker:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "cimain"
+          wait_for_sv: false
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -47,7 +55,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "cimain"
           silence_deployment_alerts: true
           requires:
@@ -105,6 +112,7 @@ workflow:
             - preflight_sv_check
             - preflight_validator_check
             - preflight_check
+            - preflight_check_docker
       - reset_cluster:
           <<: *main-branch-only
           cluster: "cimain"

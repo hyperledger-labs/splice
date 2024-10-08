@@ -171,6 +171,7 @@ executors:
       - image: cimg/base:current
     environment:
       npm_config_cache: "/cache/.npm"
+      COURSIER_CACHE: "/cache/coursier"
 
 commands:
   cluster_lock_reaper:
@@ -335,6 +336,7 @@ commands:
 
                # Setup heap size; corresponds to Canton large executors
                SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
+
                # Run command
                timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
                  tee sbt_output
@@ -1172,6 +1174,7 @@ commands:
                 --keep CI \
                 --keep RUN_SPLITTED_TESTS_CMD \
                 --keep npm_config_cache \
+                --keep COURSIER_CACHE \
                 --command echo "Confirmed that we can build and enter the nix environment!" \
                 && break
               NIX_ENV_TRY_COUNT=$((NIX_ENV_TRY_COUNT+1))
@@ -1192,6 +1195,7 @@ commands:
               --keep TERM \
               --keep CI \
               --keep npm_config_cache \
+              --keep COURSIER_CACHE \
               --keep RUN_SPLITTED_TESTS_CMD \
               --keep GCP_DA_CN_DEVNET_KEY \
               --keep GCP_DA_CN_CI_KEY \
@@ -1441,6 +1445,12 @@ commands:
               echo "No precompiled classes found. Skipping..."
             fi
 
+  save_sbt_cache_self_hosted:
+    steps:
+      - execute_sbt_command:
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: pushRemoteCache
+
   save_sbt_cache:
     steps:
       - run:
@@ -1513,6 +1523,12 @@ commands:
             # If this is not possible and Dependencies.scala hasn't changed, populate the cache with slightly outdated data.
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
+
+  restore_sbt_cache_self_hosted:
+    steps:
+      - execute_sbt_command:
+          cmd: pullRemoteCache
+
 
   save_frontend_builds:
     steps:
@@ -2754,14 +2770,13 @@ jobs:
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
   static_tests:
-    docker:
-      - image: cimg/base:2024.01
-    resource_class: "xlarge"
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_sbt_test_job
+      - setup_nix_self_hosted
+      - restore_sbt_cache_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Verify config.yml is up to date with source.
           cmd: .circleci/build-config.sh --check
@@ -2770,32 +2785,27 @@ jobs:
       - run_daml_warts_check
       - run_daml_return_types_check
       - run_todo_script
-      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
-          cmd: "update"
-          cmd_retry_count: 3
-      - execute_sbt_command:
-          cmd: "Test/compile lint"
-      - execute_sbt_command:
-          cmd: "Test/compile printTests"
+          cmd: "Test/compile lint printTests"
       - run_bash_command_in_nix:
           cmd_name: Verify no changes in sbt test files
           cmd: git add . && git diff --staged --exit-code test*.log
-      - cleanup_sbt_test_job
+      - save_sbt_cache_self_hosted
 
   # We put our Daml tests in their own job for more parallelization
   daml_test:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_sbt_test_job
+      - setup_nix_self_hosted
+      - restore_sbt_cache_self_hosted
       - execute_sbt_command:
           cmd: "damlTest"
           timeout: "10m"
           extra_env_vars: DAML_DEBUG=1
+      - save_sbt_cache_self_hosted
 
   # Run UI unit tests
   ui_test:
@@ -3647,6 +3657,138 @@ jobs:
             cncluster activate
             cncluster pulumi deployment up --skip-preview --diff
 
+  preflight_check_docker:
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      test_names_file:
+        type: string
+        default: "test-full-class-names-docker-compose-validator-preflight.log"
+      wait_for_sv:
+        type: boolean
+        default: true
+      wait_for_splitwell:
+        type: boolean
+        default: true
+      cluster_version:
+        type: string
+        default: ""
+      check_cluster_version:
+        type: boolean
+        default: true
+      migration_id:
+        type: integer
+        default: 0
+      extra_env_vars:
+        type: string
+        default: ""
+      force_non_devnet:
+        type: boolean
+        default: false
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parallelism: 1
+    steps:
+      - checkout_with_retry
+      - run:
+          # necessary for npm/webpack dev server launched in start-frontends.sh later
+          # https://webpack.js.org/configuration/watch/#not-enough-watchers
+          name: Set inotify fs watch
+          command: |
+            echo "Checking watch info..."
+            sysctl fs.inotify
+            echo "Setting max_user_watches..."
+            echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+      - when:
+          condition: << parameters.cluster_version >>
+          steps:
+            - run:
+                name: Checkout commit << parameters.cluster_version >>
+                command: git checkout << parameters.cluster_version >>
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Activate cluster (configure kubectl)
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: cncluster activate
+          cmd_retry_count: 5
+      # TODO(#6630): bundle all these restores into a command, consider merging with setup_sbt_test_job
+      - restore_sbt_cache
+      - restore_precompiled_classes
+      - restore_frontend_node_modules
+      - restore_daml_artifacts
+      - split_tests_for_parallel_run:
+          test_names_file: << parameters.test_names_file >>
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: wait for deployment to finish
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          cmd: |
+            if [[ << parameters.check_cluster_version >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+              cncluster wait_version $VERSION
+            fi
+            validator_app="validator-app"
+            # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
+            if [[ << parameters.wait_for_splitwell >> == true ]]; then
+              cncluster wait splitwell $validator_app << parameters.migration_id >>
+            fi
+            cncluster wait sv-1 $validator_app << parameters.migration_id >>
+            cncluster wait validator1 $validator_app << parameters.migration_id >>
+            if (env-bool IS_DEVNET) && [ << parameters.force_non_devnet >> == false ]; then
+              cncluster wait sv-2 $validator_app << parameters.migration_id >>
+              cncluster wait sv-3 $validator_app << parameters.migration_id >>
+              cncluster wait sv-4 $validator_app << parameters.migration_id >>
+            fi
+            if [[ << parameters.wait_for_sv >> == true ]] && ( env-bool APPROVE_SV_RUNBOOK || env-bool IS_DEVNET ); then
+              cncluster wait sv $validator_app << parameters.migration_id >>
+            fi
+            echo "Done waiting. All pods in the cluster are:"
+            kubectl get pods -A
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
+      - get_cluster:
+          cluster: << parameters.cluster >>
+      - docker_login_internal
+      - run_bash_command_in_nix:
+          cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
+      - execute_sbt_command:
+          pre_sbt_cmd: |
+            set -eou pipefail
+            . cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+          cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=<< parameters.migration_id >> << parameters.extra_env_vars >>
+          timeout: "15m"
+          cmd_retry_count: 3
+          # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
+          # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
+          cluster: << parameters.cluster >>
+          cmd_before_retry: |
+            echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
+            ./stop-frontends.sh
+            /tmp/vpn-scripts/restart-vpn.sh
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - cleanup_sbt_test_job
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
+      - store_artifacts:
+          name: Upload vpn log
+          path: /var/log/vpn.log
+
   preflight_check:
     parameters:
       <<: *cluster-parameter
@@ -3678,15 +3820,9 @@ jobs:
       force_non_devnet:
         type: boolean
         default: false
-      with_docker:
-        type: boolean
-        default: false
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     parallelism: 1
     steps:
       - run:
@@ -3714,27 +3850,19 @@ jobs:
                   - run:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
-            - setup_nix
+            - setup_nix_self_hosted
             - run_bash_command_in_nix:
                 cmd_name: Activate cluster (configure kubectl)
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
-            # TODO(#6630): bundle all these restores into a command, consider merging with setup_sbt_test_job
-            - restore_sbt_cache
-            - restore_precompiled_classes
-            - restore_frontend_node_modules
-            - restore_daml_artifacts
+            - restore_sbt_cache_self_hosted
             - split_tests_for_parallel_run:
                 test_names_file: << parameters.test_names_file >>
-            - setup_vpn
-            - setup_vpn_routes:
-                cluster: << parameters.cluster >>
             - run_bash_command_in_nix:
                 cmd_name: wait for deployment to finish
                 cluster: << parameters.cluster >>
-                additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
                 cmd: |
                   if [[ << parameters.check_cluster_version >> == true ]]; then
                     VERSION=$(get-snapshot-version)
@@ -3757,46 +3885,23 @@ jobs:
                   fi
                   echo "Done waiting. All pods in the cluster are:"
                   kubectl get pods -A
-                cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-                cmd_retry_count: 2
-                cmd_before_retry: |-
-                  echo "VPN connection seems to have died, restarting VPN and retrying..."
-                  /tmp/vpn-scripts/restart-vpn.sh
             - get_cluster:
                 cluster: << parameters.cluster >>
-            - when:
-                condition: << parameters.with_docker >>
-                steps:
-                  - docker_login_internal
-                  - run_bash_command_in_nix:
-                      cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
             - execute_sbt_command:
+                cluster: << parameters.cluster >>
                 pre_sbt_cmd: |
                   set -eou pipefail
                   . cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
                 cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
-                additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+                additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
                 extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=<< parameters.migration_id >> << parameters.extra_env_vars >>
                 timeout: "15m"
-                cmd_retry_count: 3
-                # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
-                # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
-                cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-                cluster: << parameters.cluster >>
-                cmd_before_retry: |
-                  echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
-                  ./stop-frontends.sh
-                  /tmp/vpn-scripts/restart-vpn.sh
-
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
-            - cleanup_sbt_test_job
+            - save_sbt_cache_self_hosted
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>
                 channel_notify: << parameters.channel_notify >>
-            - store_artifacts:
-                name: Upload vpn log
-                path: /var/log/vpn.log
 
   preflight_sv_check:
     parameters:
@@ -3820,12 +3925,9 @@ jobs:
       force_non_devnet:
         type: boolean
         default: false
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     steps:
       - run:
           # CircleCI does not allow a job to only contain a when (because when false, there's no steps)
@@ -3843,26 +3945,14 @@ jobs:
                   - run:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
-            - setup_nix
+            - setup_nix_self_hosted
             - run_bash_command_in_nix:
                 cmd_name: Activate cluster (configure kubectl)
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
-            - restore_sbt_cache
-            - restore_precompiled_classes
-            - restore_frontend_node_modules
-            - restore_daml_artifacts
-            # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
-            - execute_sbt_command:
-                cmd: "update"
-                cmd_retry_count: 3
-            - execute_sbt_command:
-                cmd: "Test/compile"
-            - setup_vpn
-            - setup_vpn_routes:
-                cluster: << parameters.cluster >>
+            - restore_sbt_cache_self_hosted
             - wait_for_sv_runbook_deployment:
                 cluster: << parameters.cluster >>
                 check_cluster_version: << parameters.check_cluster_version >>
@@ -3887,8 +3977,7 @@ jobs:
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD \
                   --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID \
-                  --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
-                  --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+                  --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
                 cluster: << parameters.cluster >>
                 cmd: |
                   export MIGRATION_ID=<< parameters.migration_id >>
@@ -3898,23 +3987,12 @@ jobs:
                     export PREAPPROVE_VALIDATOR_RUNBOOK=true
                   fi
                   cncluster preflight_sv
-                cmd_retry_count: 3
-                # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
-                # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
-                cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-                cmd_before_retry: |
-                  echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
-                  ./stop-frontends.sh
-                  /tmp/vpn-scripts/restart-vpn.sh
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
-            - cleanup_sbt_test_job
+            - save_sbt_cache_self_hosted
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>
                 channel_notify: << parameters.channel_notify >>
-            - store_artifacts:
-                name: Upload vpn log
-                path: /var/log/vpn.log
 
   preflight_validator_check:
     parameters:
@@ -3938,12 +4016,9 @@ jobs:
       force_non_devnet:
         type: boolean
         default: false
-    machine:
-      image: ubuntu-2204:2024.01.1
+    executor: self_hosted
     environment:
       <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
     steps:
       - run:
         # CircleCI does not allow a job to only contain a when (because when false, there's no steps)
@@ -3961,30 +4036,19 @@ jobs:
                   - run:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
-            - setup_nix
+            - setup_nix_self_hosted
             - run_bash_command_in_nix:
                 cmd_name: Activate cluster (configure kubectl)
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
-            - restore_sbt_cache
-            - restore_precompiled_classes
-            - restore_frontend_node_modules
-            - restore_daml_artifacts
-            # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
-            - execute_sbt_command:
-                cmd: "update"
-                cmd_retry_count: 3
+            - restore_sbt_cache_self_hosted
             - execute_sbt_command:
                 cmd: "Test/compile"
-            - setup_vpn
-            - setup_vpn_routes:
-                cluster: << parameters.cluster >>
             - run_bash_command_in_nix:
                 cmd_name: wait for validator-runbook deployment to finish
                 cluster: << parameters.cluster >>
-                additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
                 cmd: |
                   if [[ << parameters.check_cluster_version >> == true ]]; then
                     VERSION=$(get-snapshot-version)
@@ -3994,11 +4058,6 @@ jobs:
                   cncluster wait validator validator-app << parameters.migration_id >>
                   echo "Done waiting. All pods in the cluster are:"
                   kubectl get pods -A
-                cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-                cmd_retry_count: 2
-                cmd_before_retry: |-
-                  echo "VPN connection seems to have died, restarting VPN and retrying..."
-                  /tmp/vpn-scripts/restart-vpn.sh
             # TODO(#8300): remove this dependency and check once canton handles sequencer connections more gracefully
             - wait_for_sv_runbook_deployment:
                 cluster: << parameters.cluster >>
@@ -4023,8 +4082,7 @@ jobs:
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD \
                   --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID \
-                  --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET \
-                  --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+                  --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET"
                 cluster: << parameters.cluster >>
                 cmd: |
                   export MIGRATION_ID=<< parameters.migration_id >>
@@ -4034,23 +4092,12 @@ jobs:
                     export PREAPPROVE_VALIDATOR_RUNBOOK=true
                   fi
                   cncluster preflight_validator
-                cmd_retry_count: 3
-                # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
-                # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
-                cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
-                cmd_before_retry: |
-                  echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
-                  ./stop-frontends.sh
-                  /tmp/vpn-scripts/restart-vpn.sh
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
-            - cleanup_sbt_test_job
+            - save_sbt_cache_self_hosted
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>
                 channel_notify: << parameters.channel_notify >>
-            - store_artifacts:
-                name: Upload vpn log
-                path: /var/log/vpn.log
 
   preview_pulumi_changes:
     parameters:
@@ -5007,12 +5054,20 @@ workflows:
           <<: *main-branch-only
           context:
             - artifactory
-            - canton-network-vpn
             - slack-context
           cluster: "cimain"
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
           wait_for_sv: false
-          with_docker: true
+          requires:
+            - wait_for_previous_pipeline
+            - artifacts_push
+      - preflight_check_docker:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "cimain"
+          wait_for_sv: false
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -5021,7 +5076,6 @@ workflows:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "cimain"
           silence_deployment_alerts: true
           requires:
@@ -5079,6 +5133,7 @@ workflows:
             - preflight_sv_check
             - preflight_validator_check
             - preflight_check
+            - preflight_check_docker
       - reset_cluster:
           <<: *main-branch-only
           cluster: "cimain"
@@ -5662,12 +5717,20 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
-            - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
           wait_for_sv: false
-          with_docker: true
+          requires:
+            - artifacts_push
+            - set_scratchnet
+      - preflight_check_docker:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "user-selected-scratchnet"
+          wait_for_sv: false
           requires:
             - artifacts_push
             - set_scratchnet
@@ -5693,6 +5756,7 @@ workflows:
             - slack-context
           requires:
             - preflight_check
+            - preflight_check_docker
             - preflight_sv_check
             - preflight_validator_check
             - deploy_arm_compose_validator
@@ -5709,6 +5773,7 @@ workflows:
             - slack-context
           requires:
             - preflight_check
+            - preflight_check_docker
             - preflight_sv_check
             - preflight_validator_check
             - backup_cluster
@@ -6717,15 +6782,22 @@ workflows:
             - preflight_check_partial_upgrade
             - preflight_sv_check_partial_upgrade
             - preflight_validator_partial_upgrade
-      - preflight_check:
-          name: "preflight_check_final_upgrade"
+      - preflight_check_docker:
+          name: "preflight_check_final_upgrade_docker"
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
-          with_docker: true
+          wait_for_sv: false
+          requires:
+            - deploy_final_upgrade
+      - preflight_check:
+          name: "preflight_check_final_upgrade"
+          context:
+            - artifactory
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
           wait_for_sv: false
           requires:
             - deploy_final_upgrade
@@ -6741,6 +6813,7 @@ workflows:
           wait_for_sv: false
           requires:
             - preflight_check_final_upgrade
+            - preflight_check_final_upgrade_docker
       # the deployment of both SV runbook and validator runbook should be finished
       # before the daml upgrade vote is effective
       - deploy_sv_runbook:

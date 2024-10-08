@@ -2,14 +2,13 @@ jobs:
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
   static_tests:
-    docker:
-      - image: cimg/base:2024.01
-    resource_class: "xlarge"
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_sbt_test_job
+      - setup_nix_self_hosted
+      - restore_sbt_cache_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Verify config.yml is up to date with source.
           cmd: .circleci/build-config.sh --check
@@ -18,32 +17,27 @@ jobs:
       - run_daml_warts_check
       - run_daml_return_types_check
       - run_todo_script
-      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
-          cmd: "update"
-          cmd_retry_count: 3
-      - execute_sbt_command:
-          cmd: "Test/compile lint"
-      - execute_sbt_command:
-          cmd: "Test/compile printTests"
+          cmd: "Test/compile lint printTests"
       - run_bash_command_in_nix:
           cmd_name: Verify no changes in sbt test files
           cmd: git add . && git diff --staged --exit-code test*.log
-      - cleanup_sbt_test_job
+      - save_sbt_cache_self_hosted
 
   # We put our Daml tests in their own job for more parallelization
   daml_test:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_sbt_test_job
+      - setup_nix_self_hosted
+      - restore_sbt_cache_self_hosted
       - execute_sbt_command:
           cmd: "damlTest"
           timeout: "10m"
           extra_env_vars: DAML_DEBUG=1
+      - save_sbt_cache_self_hosted
 
   # Run UI unit tests
   ui_test:

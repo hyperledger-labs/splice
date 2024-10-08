@@ -125,6 +125,12 @@ commands:
               echo "No precompiled classes found. Skipping..."
             fi
 
+  save_sbt_cache_self_hosted:
+    steps:
+      - execute_sbt_command:
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: pushRemoteCache
+
   save_sbt_cache:
     steps:
       - run:
@@ -197,6 +203,12 @@ commands:
             # If this is not possible and Dependencies.scala hasn't changed, populate the cache with slightly outdated data.
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
+
+  restore_sbt_cache_self_hosted:
+    steps:
+      - execute_sbt_command:
+          cmd: pullRemoteCache
+
 
   save_frontend_builds:
     steps:
