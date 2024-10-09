@@ -79,6 +79,8 @@ new k8s.helm.v3.Release('container-agent', {
   },
   values: {
     agent: {
+      replicaCount: 3,
+      maxConcurrentTasks: 100,
       resourceClasses: {
         'dach_ny/cn-runner-for-testing': {
           token: spliceEnvConfig.requireEnv('SPLICE_PULUMI_CCI_RUNNER_TOKEN'),
@@ -89,6 +91,43 @@ new k8s.helm.v3.Release('container-agent', {
                   requests: {
                     cpu: '2',
                     memory: '8Gi',
+                  },
+                },
+                // required to mount the nix store inside the container from the NFS
+                securityContext: {
+                  privileged: true,
+                },
+                volumeMounts: [
+                  {
+                    name: 'cache',
+                    mountPath: '/cache',
+                  },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: 'cache',
+                persistentVolumeClaim: {
+                  claimName: persistentVolumeClaim.metadata.name,
+                },
+              },
+            ],
+            ...appsAffinityAndTolerations,
+          },
+        },
+        'dach_ny/cn-runner-large': {
+          token: spliceEnvConfig.requireEnv('SPLICE_PULUMI_CCI_RUNNER_LARGE_TOKEN'),
+          spec: {
+            containers: [
+              {
+                resources: {
+                  requests: {
+                    cpu: '5',
+                    memory: '24Gi',
+                  },
+                  limits: {
+                    memory: '40Gi', // the high resource tests really use lots all of this
                   },
                 },
                 // required to mount the nix store inside the container from the NFS
