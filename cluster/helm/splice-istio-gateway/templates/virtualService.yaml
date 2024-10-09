@@ -14,7 +14,7 @@ spec:
   - "{{ (.Values.cluster).daHostname }}"
   {{- end }}
   gateways:
-  - splice-http-gateway
+  - cn-http-gateway
   http:
   - match:
       - port: 443

@@ -371,7 +371,7 @@ export const CreateVoteRequest: React.FC = () => {
                   createVoteRequestMutation.mutate();
                 }}
               >
-                Send request to collective
+                Send Request to Super Validators
               </Button>
             </DisableConditionally>
           </Stack>
