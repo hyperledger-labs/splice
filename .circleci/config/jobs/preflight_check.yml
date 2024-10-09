@@ -123,7 +123,8 @@ jobs:
             /tmp/vpn-scripts/restart-vpn.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - cleanup_sbt_test_job
+      - cleanup_sbt_test_job:
+          save_sbt_caches: true
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
@@ -240,6 +241,7 @@ jobs:
                 timeout: "15m"
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
+            - cleanup_sbt_test_job
             - save_sbt_cache_self_hosted
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>
@@ -331,6 +333,7 @@ jobs:
                   cncluster preflight_sv
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
+            - cleanup_sbt_test_job
             - save_sbt_cache_self_hosted
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>
@@ -436,6 +439,7 @@ jobs:
                   cncluster preflight_validator
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
+            - cleanup_sbt_test_job
             - save_sbt_cache_self_hosted
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>

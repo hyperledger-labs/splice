@@ -181,6 +181,9 @@ commands:
 
   cleanup_sbt_test_job:
     parameters:
+      save_sbt_caches:
+        type: boolean
+        default: false
       upload_caches:
         type: boolean
         default: false
@@ -188,7 +191,10 @@ commands:
       - upload_test_reports
       # sbt caches are job-specific, so we're ignoring the upload_caches parameter,
       # and saving those caches in every job
-      - save_sbt_cache
+      - when:
+          condition: << parameters.upload_caches >>
+          steps:
+            - save_sbt_cache
       - when:
           condition: << parameters.upload_caches >>
           steps:

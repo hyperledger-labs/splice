@@ -23,6 +23,7 @@ jobs:
           cmd_name: Verify no changes in sbt test files
           cmd: git add . && git diff --staged --exit-code test*.log
       - save_sbt_cache_self_hosted
+      - cleanup_sbt_test_job
 
   # We put our Daml tests in their own job for more parallelization
   daml_test:
@@ -38,6 +39,7 @@ jobs:
           timeout: "10m"
           extra_env_vars: DAML_DEBUG=1
       - save_sbt_cache_self_hosted
+      - cleanup_sbt_test_job
 
   # Run UI unit tests
   ui_test:
@@ -52,7 +54,8 @@ jobs:
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmTest"
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
-      - cleanup_sbt_test_job
+      - cleanup_sbt_test_job:
+          save_sbt_caches: true
 
   # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
   # work on anything but the Scala tests is duplicated across all parallel runs of this job
@@ -211,6 +214,7 @@ jobs:
            gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - cleanup_sbt_test_job:
+          save_sbt_caches: true
           upload_caches: true
 
   deployment_test:
@@ -334,7 +338,8 @@ jobs:
           cmd: make cluster/helm/push -j
           cmd_retry_count: 5
       - save_frontend_builds
-      - cleanup_sbt_test_job
+      - cleanup_sbt_test_job:
+          save_sbt_caches: true
 
   publish_public_release:
     machine:
@@ -417,7 +422,8 @@ jobs:
       - docker_prep_build
       - docker_build
       - save_frontend_builds
-      - cleanup_sbt_test_job
+      - cleanup_sbt_test_job:
+          save_sbt_caches: true
 
   wait_for_previous_pipeline:
     executor: self_hosted
