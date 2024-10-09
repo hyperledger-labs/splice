@@ -1,20 +1,29 @@
 package com.daml.network.integration.plugins
 
+import cats.data.Chain
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.config.ConfigTransforms.updateAllScanAppConfigs_
 import com.daml.network.config.SpliceConfig
 import com.daml.network.console.ScanAppBackendReference
 import com.daml.network.environment.EnvironmentImpl
+import com.daml.network.http.v0.definitions.TreeEvent.members as treeEventMembers
+import com.daml.network.http.v0.definitions.{
+  AcsResponse,
+  TreeEvent,
+  UpdateHistoryItem,
+  UpdateHistoryReassignment,
+}
 import com.daml.network.http.v0.definitions.UpdateHistoryItem.members
 import com.daml.network.http.v0.definitions.UpdateHistoryReassignment.Event.members as reassignmentMembers
 import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.scan.automation.AcsSnapshotTrigger
-import com.daml.network.util.QualifiedName
+import com.daml.network.util.{QualifiedName, TriggerTestUtil}
 import com.digitalasset.canton.ScalaFuturesWithPatience
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
-import org.scalatest.Inspectors
+import org.scalatest.{Inspectors, LoneElement}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Millis, Span}
@@ -32,7 +41,6 @@ import scala.util.control.NonFatal
   *                            which won't cause an error in the script.
   */
 class UpdateHistorySanityCheckPlugin(
-    scanName: String,
     ignoredRootCreates: Seq[Identifier],
     ignoredRootExercises: Seq[(Identifier, String)],
     protected val loggerFactory: NamedLoggerFactory,
@@ -40,7 +48,8 @@ class UpdateHistorySanityCheckPlugin(
     with Matchers
     with Eventually
     with Inspectors
-    with ScalaFuturesWithPatience {
+    with ScalaFuturesWithPatience
+    with LoneElement {
 
   override def beforeEnvironmentCreated(config: SpliceConfig): SpliceConfig = {
     updateAllScanAppConfigs_(config => config.copy(enableForcedAcsSnapshots = true))(
@@ -52,115 +61,290 @@ class UpdateHistorySanityCheckPlugin(
       config: SpliceConfig,
       environment: SpliceTestConsoleEnvironment,
   ): Unit = {
-    // TODO(#14270): actually, we should be able to run this against any scan app, not just SV1
-    // Only SV1 will work.
-    // Also, it might not be initialized if the test uses `manualStart` and it wasn't ever started.
-    environment.scans.local.find(scan => scan.name == scanName && scan.is_initialized).foreach {
-      scan =>
-        // prevent races with the trigger when taking the forced manual snapshot
-        scan.automation.trigger[AcsSnapshotTrigger].pause().futureValue
+    TraceContext.withNewTraceContext { implicit tc =>
+      // A scan might not be initialized if the test uses `manualStart` and it wasn't ever started.
+      val initializedScans = environment.scans.local.filter(scan => scan.is_initialized)
 
-        val snapshotRecordTime = scan.forceAcsSnapshotNow()
-
-        paginateHistory(scan, None)
-
-        val readLines = mutable.Buffer[String]()
-        val errorProcessor = ProcessLogger(line => readLines.append(line))
-        try {
-          scala.sys.process
-            .Process(
-              Seq(
-                "python",
-                "scripts/scan-txlog/scan_txlog.py",
-                scan.httpClientConfig.url.toString(),
-                "--loglevel",
-                "DEBUG",
-                "--scan-balance-assertions",
-                "--stop-at-record-time",
-                snapshotRecordTime.toInstant.toString,
-                "--compare-acs-with-snapshot",
-                snapshotRecordTime.toInstant.toString,
-              ) ++ ignoredRootCreates.flatMap { templateId =>
-                Seq("--ignore-root-create", QualifiedName(templateId).toString)
-              } ++ ignoredRootExercises.flatMap { case (templateId, choice) =>
-                Seq("--ignore-root-exercise", s"${QualifiedName(templateId).toString}:$choice")
-              }
-            )
-            .!(errorProcessor)
-        } catch {
-          case NonFatal(ex) =>
-            logger.error("Failed to run scan_txlog.py. Dumping output.", ex)(TraceContext.empty)
-            readLines.foreach(logger.error(_)(TraceContext.empty))
-            throw new RuntimeException("scan_txlog.py failed.", ex)
+      TriggerTestUtil
+        .setTriggersWithin(
+          triggersToPauseAtStart = initializedScans.map(scan =>
+            // prevent races with the trigger when taking the forced manual snapshot
+            scan.automation.trigger[AcsSnapshotTrigger]
+          ),
+          triggersToResumeAtStart = Seq(),
+        ) {
+          // This flag should have the same value on all scans
+          if (initializedScans.exists(_.config.updateHistoryBackfillEnabled)) {
+            initializedScans.foreach(waitUntilBackfillingComplete)
+            compareHistories(initializedScans)
+            compareSnapshots(initializedScans)
+            initializedScans.foreach(checkScanTxLogScript)
+          } else {
+            // Just call the /updates endpoint, make sure whatever happened in the test doesn't blow it up,
+            // and that pagination works as intended.
+            // Without backfilling, history only works on the founding SV
+            initializedScans.filter(_.config.isFirstSv).foreach(checkScanTxLogScript)
+          }
         }
-
-        readLines.filter { log =>
-          log.contains("ERROR:") || log.contains("WARNING:")
-        } should be(empty)
-        forExactly(1, readLines) { line =>
-          line should include("Reached end of stream")
-        }
-
-        scan.automation.trigger[AcsSnapshotTrigger].resume()
     }
   }
 
-  // Just call the /updates endpoint, make sure whatever happened in the test doesn't blow it up,
-  // and that pagination works as intended.
   @tailrec
   private def paginateHistory(
       scan: ScanAppBackendReference,
       after: Option[(Long, String)],
-  ): Unit = {
-    val result = scan.getUpdateHistory(10, after, false)
+      acc: Chain[UpdateHistoryItem],
+  ): Chain[UpdateHistoryItem] = {
+    val result = scan.getUpdateHistory(10, after, lossless = false)
+    val newAcc = acc ++ Chain.fromSeq(result)
     result.lastOption match {
-      case None => () // done
+      case None => acc // done
       case Some(members.UpdateHistoryTransaction(last)) =>
-        paginateHistory(scan, Some((last.migrationId, last.recordTime)))
+        paginateHistory(
+          scan,
+          Some((last.migrationId, last.recordTime)),
+          newAcc,
+        )
       case Some(members.UpdateHistoryReassignment(last)) =>
         last.event match {
           case reassignmentMembers.UpdateHistoryAssignment(event) =>
-            paginateHistory(scan, Some((event.migrationId, last.recordTime)))
+            paginateHistory(
+              scan,
+              Some((event.migrationId, last.recordTime)),
+              newAcc,
+            )
           case reassignmentMembers.UpdateHistoryUnassignment(event) =>
-            paginateHistory(scan, Some((event.migrationId, last.recordTime)))
+            paginateHistory(
+              scan,
+              Some((event.migrationId, last.recordTime)),
+              newAcc,
+            )
         }
     }
   }
 
-  // TODO(#14270): use this before running the scan_txlog.py script against a joining SV
-  def waitUntilBackfillingComplete(
-      scan: ScanAppBackendReference
+  private def compareHistories(
+      scans: Seq[ScanAppBackendReference]
   ): Unit = {
-    // Backfilling is initialized by ScanHistoryBackfillingTrigger, which should take 1-2 trigger invocations
-    // to complete.
-    // Most integration tests use config transforms to reduce the polling interval to 1sec,
-    // but some tests might not use the transforms and end up with the default long polling interval.
-    val estimatedTimeUntilBackfillingComplete =
-      2 * scan.config.automation.pollingInterval.underlying + 5.seconds
+    val (founders, others) = scans.partition(_.config.isFirstSv)
+    val founder = founders.loneElement
+    val founderHistory = paginateHistory(founder, None, Chain.empty).toVector
+    forAll(others) { otherScan =>
+      val otherScanHistory = paginateHistory(otherScan, None, Chain.empty).toVector
+      // One of them might be more advanced than the other.
+      // That's fine, we mostly want to check that backfilling works as expected.
+      val minSize = Math.min(founderHistory.size, otherScanHistory.size)
+      val otherComparable = otherScanHistory
+        .take(minSize)
+        .map(toComparableUpdateHistoryItem)
+      val founderComparable = founderHistory
+        .take(minSize)
+        .map(toComparableUpdateHistoryItem)
+      val different = otherComparable.zipWithIndex.collect {
+        case (otherItem, idx) if founderComparable(idx) != otherItem =>
+          otherItem -> founderComparable(idx)
+      }
+      different should be(empty)
+    }
+  }
 
-    if (estimatedTimeUntilBackfillingComplete > 30.seconds) {
-      logger.warn(
-        s"Scan ${scan.name} has a long polling interval of ${scan.config.automation.pollingInterval.underlying}. " +
-          "Please disable UpdateHistorySanityCheckPlugin for this test or reduce the polling interval to avoid long waits."
-      )(TraceContext.empty)
+  // TODO (#14270): this is the same, or at least similar, to what we'll need to do for BFT reads. Adjust and DRY.
+  private def toComparableUpdateHistoryItem(item: UpdateHistoryItem): UpdateHistoryItem =
+    item match {
+      case members.UpdateHistoryTransaction(tx) =>
+        // makes it deterministically by traversing the tree
+        def makeEventIdToNumber(
+            pending: List[TreeEvent],
+            acc: Map[String, Int],
+            currentN: Int,
+        ): Map[String, Int] = {
+          pending match {
+            case Nil =>
+              acc
+            case tree :: tail =>
+              tree match {
+                case treeEventMembers.CreatedEvent(value) =>
+                  makeEventIdToNumber(tail, acc + (value.eventId -> currentN), currentN + 1)
+                case treeEventMembers.ExercisedEvent(value) =>
+                  makeEventIdToNumber(
+                    tail ++ value.childEventIds.map(tx.eventsById),
+                    acc + (value.eventId -> currentN),
+                    currentN + 1,
+                  )
+              }
+          }
+        }
+        val eventIdsMapping = makeEventIdToNumber(
+          tx.rootEventIds.map(tx.eventsById).toList,
+          Map.empty,
+          0,
+        )
+        members.UpdateHistoryTransaction(
+          tx.copy(
+            offset = "different across nodes",
+            rootEventIds = tx.rootEventIds.map(eventIdsMapping(_).toString),
+            eventsById = tx.eventsById.map { case (eventId, tree) =>
+              eventIdsMapping(eventId).toString -> (tree match {
+                case treeEventMembers.CreatedEvent(value) =>
+                  treeEventMembers.CreatedEvent(
+                    value.copy(eventId = eventIdsMapping(value.eventId).toString)
+                  )
+                case treeEventMembers.ExercisedEvent(value) =>
+                  treeEventMembers.ExercisedEvent(
+                    value.copy(
+                      eventId = eventIdsMapping(value.eventId).toString,
+                      childEventIds = value.childEventIds.map(eventIdsMapping(_).toString),
+                    )
+                  )
+              })
+            },
+          )
+        )
+      case members.UpdateHistoryReassignment(assignment) =>
+        val newEvent: UpdateHistoryReassignment.Event = assignment.event match {
+          case reassignmentMembers.UpdateHistoryAssignment(value) =>
+            reassignmentMembers.UpdateHistoryAssignment(
+              value.copy(createdEvent = value.createdEvent.copy(eventId = "different across nodes"))
+            )
+          case unassignment: reassignmentMembers.UpdateHistoryUnassignment =>
+            unassignment
+        }
+        members.UpdateHistoryReassignment(
+          assignment.copy(offset = "different across nodes", event = newEvent)
+        )
     }
 
-    withClue(s"Waiting for backfilling to complete on ${scan.name}") {
-      val patienceConfigForBackfillingInit: PatienceConfig =
-        PatienceConfig(
-          timeout = estimatedTimeUntilBackfillingComplete,
-          interval = Span(100, Millis),
+  private def checkScanTxLogScript(scan: ScanAppBackendReference)(implicit tc: TraceContext) = {
+    val snapshotRecordTime = scan.forceAcsSnapshotNow()
+
+    val readLines = mutable.Buffer[String]()
+    val errorProcessor = ProcessLogger(line => readLines.append(line))
+    try {
+      scala.sys.process
+        .Process(
+          Seq(
+            "python",
+            "scripts/scan-txlog/scan_txlog.py",
+            scan.httpClientConfig.url.toString(),
+            "--loglevel",
+            "DEBUG",
+            "--scan-balance-assertions",
+            "--stop-at-record-time",
+            snapshotRecordTime.toInstant.toString,
+            "--compare-acs-with-snapshot",
+            snapshotRecordTime.toInstant.toString,
+          ) ++ ignoredRootCreates.flatMap { templateId =>
+            Seq("--ignore-root-create", QualifiedName(templateId).toString)
+          } ++ ignoredRootExercises.flatMap { case (templateId, choice) =>
+            Seq("--ignore-root-exercise", s"${QualifiedName(templateId).toString}:$choice")
+          }
         )
-      eventually {
-        scan.automation.store.updateHistory
-          .getBackfillingState()(TraceContext.empty)
-          .futureValue
-          .exists(_.complete) should be(true)
-      }(
-        patienceConfigForBackfillingInit,
-        implicitly[org.scalatest.enablers.Retrying[org.scalatest.Assertion]],
-        implicitly[org.scalactic.source.Position],
-      )
+        .!(errorProcessor)
+    } catch {
+      case NonFatal(ex) =>
+        logger.error("Failed to run scan_txlog.py. Dumping output.", ex)
+        readLines.foreach(logger.error(_))
+        throw new RuntimeException("scan_txlog.py failed.", ex)
+    }
+
+    readLines.filter { log =>
+      log.contains("ERROR:") || log.contains("WARNING:")
+    } should be(empty)
+    forExactly(1, readLines) { line =>
+      line should include("Reached end of stream")
+    }
+  }
+
+  private def waitUntilBackfillingComplete(
+      scan: ScanAppBackendReference
+  )(implicit tc: TraceContext): Unit = {
+    if (scan.config.updateHistoryBackfillEnabled) {
+      // Backfilling is initialized by ScanHistoryBackfillingTrigger, which should take 1-2 trigger invocations
+      // to complete.
+      // Most integration tests use config transforms to reduce the polling interval to 1sec,
+      // but some tests might not use the transforms and end up with the default long polling interval.
+      val estimatedTimeUntilBackfillingComplete =
+        2 * scan.config.automation.pollingInterval.underlying + 5.seconds
+
+      if (estimatedTimeUntilBackfillingComplete > 30.seconds) {
+        logger.warn(
+          s"Scan ${scan.name} has a long polling interval of ${scan.config.automation.pollingInterval.underlying}. " +
+            "Please disable UpdateHistorySanityCheckPlugin for this test or reduce the polling interval to avoid long waits."
+        )
+      }
+
+      withClue(s"Waiting for backfilling to complete on ${scan.name}") {
+        val patienceConfigForBackfillingInit: PatienceConfig =
+          PatienceConfig(
+            timeout = estimatedTimeUntilBackfillingComplete,
+            interval = Span(100, Millis),
+          )
+        eventually {
+          scan.automation.store.updateHistory
+            .getBackfillingState()
+            .futureValue
+            .exists(_.complete) should be(true)
+        }(
+          patienceConfigForBackfillingInit,
+          implicitly[org.scalatest.enablers.Retrying[org.scalatest.Assertion]],
+          implicitly[org.scalactic.source.Position],
+        )
+      }
+    } else {
+      logger.debug("Backfilling is disabled, skipping wait.")
+    }
+  }
+
+  private def compareSnapshots(scans: Seq[ScanAppBackendReference]) = {
+    val (founders, others) = scans.partition(_.config.isFirstSv)
+    val founder = founders.loneElement
+    val founderSnapshots = getAllSnapshots(founder, CantonTimestamp.MaxValue, Nil)
+    forAll(others) { otherScan =>
+      val otherScanSnapshots = getAllSnapshots(otherScan, CantonTimestamp.MaxValue, Nil)
+      // One of them might have more snapshots than the other.
+      val minSize = Math.min(founderSnapshots.size, otherScanSnapshots.size)
+      val otherComparable = otherScanSnapshots.take(minSize).map(toComparableSnapshot)
+      val founderComparable = founderSnapshots.take(minSize).map(toComparableSnapshot)
+      val different = otherComparable.zipWithIndex.collect {
+        case (otherItem, idx) if founderComparable(idx) != otherItem =>
+          otherItem -> founderComparable(idx)
+      }
+      different should be(empty)
+    }
+  }
+
+  private def toComparableSnapshot(acsResponse: AcsResponse) = {
+    acsResponse.copy(createdEvents =
+      acsResponse.createdEvents.map(_.copy(eventId = "different across nodes"))
+    )
+  }
+
+  private def getAllSnapshots(
+      scan: ScanAppBackendReference,
+      before: CantonTimestamp,
+      acc: List[AcsResponse],
+  ): List[AcsResponse] = {
+    val acsSnapshotPeriodHours = scan.config.acsSnapshotPeriodHours
+    val migrationId = scan.config.domainMigrationId
+    scan.getDateOfMostRecentSnapshotBefore(before, migrationId) match {
+      case Some(snapshotDate) =>
+        val snapshot = scan
+          .getAcsSnapshotAt(
+            CantonTimestamp.assertFromInstant(snapshotDate.toInstant),
+            migrationId,
+            pageSize = 1000,
+          )
+          .getOrElse(throw new IllegalStateException("Snapshot must exist by this point"))
+        getAllSnapshots(
+          scan,
+          CantonTimestamp.assertFromInstant(
+            // +1 second because it's < date, instead of <= date
+            snapshotDate.minusHours(acsSnapshotPeriodHours.toLong).plusSeconds(1L).toInstant
+          ),
+          snapshot :: acc,
+        )
+      case None =>
+        acc
     }
   }
 }
