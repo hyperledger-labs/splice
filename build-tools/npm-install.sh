@@ -7,5 +7,5 @@ if [ -z "${CI}" ]; then
     npm install
 else
   # shellcheck disable=SC2015
-  for _ in {1..5}; do npm ci && break || sleep 15; done
+  for _ in {1..5}; do npm ci && break || npm cache verify && sleep 15; done
 fi
