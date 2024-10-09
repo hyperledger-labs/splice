@@ -329,7 +329,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "name": "cluster-ingress-validator1",
       "namespace": "validator1",
@@ -366,7 +366,7 @@
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "1"
+            "activeMigrationId": "2"
           },
           "splitwell": true
         },
@@ -379,7 +379,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -451,7 +451,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "name": "loopback",
       "namespace": "validator1",
@@ -493,7 +493,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -503,9 +503,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
-      "name": "participant-1",
+      "name": "participant-2",
       "namespace": "validator1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -542,17 +542,15 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 1
+            "id": 2
           }
         },
-        "nodeIdentifier": "validator1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -561,7 +559,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_1",
+          "databaseName": "participant_2",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -574,9 +572,9 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
-    "name": "validator1-participant-1",
+    "name": "validator1-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -644,7 +642,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-splitwell-web-ui",
+      "chart": "splice-splitwell-web-ui",
       "compat": "true",
       "name": "splitwell-web-ui",
       "namespace": "validator1",
@@ -697,7 +695,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -767,7 +765,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "name": "validator-validator1",
       "namespace": "validator1",
@@ -817,7 +815,8 @@
           "enable": true
         },
         "migration": {
-          "id": 1,
+          "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -828,7 +827,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -876,7 +875,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

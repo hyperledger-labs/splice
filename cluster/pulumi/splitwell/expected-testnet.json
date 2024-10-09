@@ -329,7 +329,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "name": "cluster-ingress-splitwell-uis",
       "namespace": "splitwell",
@@ -416,7 +416,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -498,7 +498,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "name": "loopback",
       "namespace": "splitwell",
@@ -540,7 +540,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -550,9 +550,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
-      "name": "participant-1",
+      "name": "participant-2",
       "namespace": "splitwell",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -589,17 +589,15 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 1
+            "id": 2
           }
         },
-        "nodeIdentifier": "splitwell",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -608,7 +606,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_1",
+          "databaseName": "participant_2",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -621,9 +619,9 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
-    "name": "splitwell-participant-1",
+    "name": "splitwell-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -691,7 +689,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-splitwell-app",
+      "chart": "splice-splitwell-app",
       "compat": "true",
       "name": "splitwell-app",
       "namespace": "splitwell",
@@ -730,9 +728,9 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
-        "participantHost": "participant-1",
+        "participantHost": "participant-2",
         "persistence": {
           "databaseName": "app_splitwell",
           "port": 5432,
@@ -749,7 +747,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -879,7 +877,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "name": "validator-splitwell",
       "namespace": "splitwell",
@@ -943,7 +941,8 @@
           "enable": true
         },
         "migration": {
-          "id": 1,
+          "id": 2,
+          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "splitwell",
@@ -954,7 +953,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -1002,7 +1001,7 @@
         "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",
