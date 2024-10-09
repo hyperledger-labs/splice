@@ -1039,7 +1039,7 @@ commands:
       clone_command:
         type: string
         # order by name, mixed to try to reduce conflicts when running in multiple jobs at the same time
-        default: "rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=64 --transfers=64 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed copy"
+        default: "rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=64 --transfers=64 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
     steps:
       - run:
           name: Restore nix
