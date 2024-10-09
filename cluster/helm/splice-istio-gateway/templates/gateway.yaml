@@ -4,7 +4,7 @@
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: splice-http-gateway
+  name: cn-http-gateway
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
@@ -38,7 +38,7 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: splice-apps-gateway
+  name: cn-apps-gateway
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
@@ -69,7 +69,7 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: splice-public-http-gateway
+  name: cn-public-http-gateway
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
