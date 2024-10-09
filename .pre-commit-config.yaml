@@ -54,7 +54,7 @@ repos:
       - id: pulumi_config
         name: check pulumi configs
         language: system
-        entry: "make cluster/pulumi/test -j"
+        entry: "make cluster/pulumi/test -j8"
         files: '^cluster/pulumi/.*[.]ts$'
         pass_filenames: false
       - id: circleci_config
