@@ -442,12 +442,14 @@ class ScanTimeBasedIntegrationTest
         .ofHours(sv1ScanBackend.config.acsSnapshotPeriodHours.toLong)
         .plusSeconds(1L)
     )
-    val snapshotAfter = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
-      getLedgerTime,
-      migrationId,
-    )
-    eventually() {
+
+    val snapshotAfter = eventually() {
+      val snapshotAfter = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
+        getLedgerTime,
+        migrationId,
+      )
       snapshotBefore should not(be(snapshotAfter))
+      snapshotAfter
     }
 
     val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
