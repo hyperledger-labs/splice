@@ -27,30 +27,30 @@ function subcmd_disaster_recovery_test() {
   _info "Getting identity dumps"
   for sv in "${!svIngressNames[@]}"; do
     svIngressName=${svIngressNames[$sv]}
-    token=$(subcmd_get_token sv-"$sv")
+    token=$(subcmd_get_token sv-"$sv" sv)
     id=$(curl -sSL --fail-with-body "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
     echo "$id" > "$tmpdir/id-${sv}.json"
   done
 
-  local taps tapsTokens
+  local taps tapsTokenNamespace
   declare -A taps
-  declare -A tapsTokens
+  declare -A tapsTokenNamespace
   taps[sv-${svIngressNames[1]}]=42042042.0
-  tapsTokens[sv-${svIngressNames[1]}]=sv1_validator
+  tapsTokenNamespace[sv-${svIngressNames[1]}]=sv-1
   taps[sv-${svIngressNames[2]}]=21021021.0
-  tapsTokens[sv-${svIngressNames[2]}]=sv2_validator
+  tapsTokenNamespace[sv-${svIngressNames[2]}]=sv-2
   taps[sv-${svIngressNames[3]}]=63063063.0
-  tapsTokens[sv-${svIngressNames[3]}]=sv3_validator
+  tapsTokenNamespace[sv-${svIngressNames[3]}]=sv-3
   taps[sv-${svIngressNames[4]}]=84084084.0
-  tapsTokens[sv-${svIngressNames[4]}]=sv4_validator
+  tapsTokenNamespace[sv-${svIngressNames[4]}]=sv-4
   taps[validator1]=105105105.0
-  tapsTokens[validator1]=validator1
+  tapsTokenNamespace[validator1]=validator1
 
   _info "Tapping amulet before disaster"
   local ingressName
   for ingressName in "${!taps[@]}"; do
-    _info "Tapping ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
-    token=$(subcmd_get_token "${tapsTokens[$ingressName]}")
+    _info "Tapping ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokenNamespace[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokenNamespace[$ingressName]}" validator)
     # TODO(#12764) remove register when validator does it for us
     curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/register" \
          -H "authorization: Bearer ${token}" \
@@ -64,8 +64,8 @@ function subcmd_disaster_recovery_test() {
 
   _info "Checking that taps are complete"
   for ingressName in "${!taps[@]}"; do
-    _info "Checking tap of ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
-    token=$(subcmd_get_token "${tapsTokens[$ingressName]}")
+    _info "Checking tap of ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokenNamespace[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokenNamespace[$ingressName]}" validator)
     local amuletPrice=0.005
     local fuzzFactorForFees=0.95
     totalBalance=$(curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance" \
@@ -85,7 +85,7 @@ function subcmd_disaster_recovery_test() {
   _info "Finding agreed upon timestamp"
   for sv in "${!svIngressNames[@]}"; do
     svIngressName=${svIngressNames[$sv]}
-    token=$(subcmd_get_token sv-"$sv")
+    token=$(subcmd_get_token sv-"$sv" sv)
     done=0
     acs_time=$(date "$sortableDateFormat")
     while [ $done == 0 ]; do
@@ -128,7 +128,7 @@ function subcmd_disaster_recovery_test() {
   _info "Getting data dumps"
   for sv in "${!svIngressNames[@]}"; do
     svIngressName=${svIngressNames[$sv]}
-    token=$(subcmd_get_token sv-"$sv")
+    token=$(subcmd_get_token sv-"$sv" sv)
     data=$(curl -sSL "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&migration_id=1&force=true" \
            -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
     snapshot=$(echo "$data" | jq .data_snapshot)
@@ -157,7 +157,7 @@ function subcmd_disaster_recovery_test() {
     kubectl cp "$tmpdir/dump${sv}.json" "sv-${sv}/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
   done
 
-  token=$(subcmd_get_token validator1)
+  token=$(subcmd_get_token validator1 validator)
   dump=$(curl -sSL --fail-with-body "https://wallet.validator1.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&migration_id=1&force=true" \
          -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
   echo "$dump" | jq .data_snapshot > "$tmpdir/dump-validator1.json"
@@ -193,10 +193,11 @@ EOF
 
   _info "Checking amulet on restored svs/validators"
   for ingressName in "${!taps[@]}"; do
-    _info "Checking restore of tap ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokens[$ingressName]}"
-    token=$(subcmd_get_token "${tapsTokens[$ingressName]}")
+    _info "Checking restore of tap ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokenNamespace[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokenNamespace[$ingressName]}" validator)
     local amuletPrice=0.005
     local fuzzFactorForFees=0.95
+    _info "balance url: https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance"
     totalBalance=$(curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance" \
                    -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq -r '.effective_unlocked_qty')
     if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $amuletPrice * $fuzzFactorForFees")" ]; then
@@ -221,7 +222,7 @@ function take_sv_disaster_recovery_dump() {
     if [ "$namespace" = sv ]; then
         token="$SV_RUNBOOK_TOKEN"
     else
-        token=$(subcmd_get_token "$namespace")
+        token=$(subcmd_get_token "$namespace" sv)
     fi
 
     declare -A svIngressNames
@@ -247,11 +248,7 @@ function take_validator_disaster_recovery_dump() {
     local output_directory="$3"
     local namespace="$4"
     echo "Taking dump of validator $namespace"
-    if [ "$namespace" = splitwell ]; then
-        token=$(subcmd_get_token "splitwell_validator")
-    else
-        token=$(subcmd_get_token "$namespace")
-    fi
+    token=$(subcmd_get_token "$namespace" validator)
     dump="$(curl -sSLf "https://wallet.$namespace.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" \
             -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq .data_snapshot)"
     echo "$dump" > "$output_directory/${namespace}_dump.json"

@@ -902,50 +902,16 @@ function subcmd_preflight_global_domain_upgrade() {
 
 ###
 
-subcommand_whitelist[preflight_refresh_auth0_credentials]='Run the auth0 credentials preflight, updating the auth0 tokens saved in the cluster if necessary'
-
-function subcmd_preflight_refresh_auth0_credentials() {
-    _needs_auth0_management_api_creds
-
-    preflight_tests=$(_get_preflight_test_names "auth0-credentials")
-    _log "Starting auth0 tokens preflight tests: $preflight_tests"
-    cd "${REPO_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
-            sbt "apps-app/testOnly $preflight_tests"
-}
-
-###
-
 subcommand_whitelist[get_token]='Get an auth0 token for a given admin user'
 
 function subcmd_get_token() {
+    if [ "$#" -ne 2 ]; then
+        _error "Usage: $0 get_token <namespace> <app>"
+    fi
 
-  if [ "$#" -ne 1 ]; then
-     _error "Usage: $0 <node>"
-  fi
-
-  node="$1"
-  configType="cantonNetwork"
-  if [ "$node" == "sv" ]; then
-    configType="svRunbook"
-  fi
-  if [ "$node" == "validator" ]; then
-    configType="validatorRunbook"
-  fi
-
-  client_ids=$(subcmd_pulumi infra stack output --json | grep -v "Running Pulumi Command")
-  client_id=$(echo "$client_ids" | jq -r '.auth0."'"$configType"'".appToClientId."'"$node"'"')
-  if [ -z "$client_id" ] || [ "$client_id" == "null" ]; then
-    known=$(echo "$client_ids" | jq -r '.auth0."'"$configType"'".appToClientId')
-    _error "No client ID found for node $node in infra stack. Known client IDs are: $known"
-  fi
-  secrets=$(kubectl get secret auth0-preflight-token-cache -o jsonpath="{.data}")
-  encoded=$(echo "$secrets" | jq -r --arg client_id "$client_id" '.[$client_id]')
-  if [ -z "$encoded" ] || [ "$encoded" == "null" ]; then
-    _error "no secret found for client ID $client_id. Did you run \"preflight_refresh_auth0_credentials\"? Are we fetching a secret for this client (hint: look at Auth0CredentialsPreflightIntegrationTest)?"
-  fi
-  token=$(echo "$encoded" | base64 --decode | jq -r .accessToken)
-  echo "$token"
+    namespace="$1"
+    app="$2"
+    get-auth0-token.py --namespace "$namespace" --app "$app"
 }
 
 ###
@@ -1156,7 +1122,7 @@ subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote
 
 function subcmd_wait_for_daml_upgrade() {
     _info "Fetching DSO rules"
-    token=$(subcmd_get_token sv-1)
+    token=$(subcmd_get_token sv-1 sv)
     dso=$(curl -s "https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/dso" -H "authorization: Bearer ${token}")
     # get the first futureValue's effective date, which corresponds to the vote from DamlCIUpgradeVotePreflightTest
     effective_date=$(jq -r '.amulet_rules.payload.configSchedule.futureValues[0]._1' <<< "$dso")
@@ -1976,13 +1942,13 @@ function subcmd_dump_identities() {
         else
             domain="$i-eng"
         fi
-        token=$(subcmd_get_token $i)
+        token=$(subcmd_get_token $i sv)
         full_identities=$(curl -sSLf -H "authorization: Bearer $token" "https://sv.${domain}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump")
         identities=$(echo "$full_identities" | jq "{\"$i\": {participant: .identities.participant.id, sequencer: .identities.sequencer.id, mediator: .identities.mediator.id}}")
         all=$(echo "$all" "$identities" | jq -s add)
     done
 
-    token=$(subcmd_get_token validator)
+    token=$(subcmd_get_token validator validator)
     full_identities=$(curl -sSLf -H "authorization: Bearer $token" "https://wallet.validator.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities")
     identities=$(echo "$full_identities" | jq '{"validator": {participant: .id}}')
     all=$(echo "$all" "$identities" | jq -s add)

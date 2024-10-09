@@ -6,6 +6,7 @@ import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironme
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{
   AnsFrontendTestUtil,
+  Auth0Util,
   FrontendLoginUtil,
   SvTestUtil,
   WalletFrontendTestUtil,
@@ -281,12 +282,11 @@ abstract class RunbookSvPreflightIntegrationTestBase
   }
 
   "Key API endpoints are reachable and functional" in { implicit env =>
-    val auth0 = auth0UtilFromEnvVars("sv")
     val token = eventuallySucceeds() {
-      getAuth0ClientCredential(
+      Auth0Util.getAuth0ClientCredential(
         sys.env("SPLICE_OAUTH_SV_TEST_CLIENT_ID_VALIDATOR"),
         "https://validator.example.com/api",
-        auth0,
+        sys.env("SPLICE_OAUTH_SV_TEST_AUTHORITY"),
       )(noTracingLogger)
     }
     val svValidatorClient = vc("svTestValidator").copy(token = Some(token))

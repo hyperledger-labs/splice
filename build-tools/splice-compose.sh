@@ -433,7 +433,7 @@ function subcmd_test_before_migration {
 
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
-  TOKEN=$("${VALIDATOR_DIR}/token.py" $USER)
+  TOKEN=$("${VALIDATOR_DIR}/get-token.py" $USER)
 
   onboarded=0
   # Onboard user, with retries because we need to wait for traffic to be available in order for it to succeed
@@ -502,7 +502,7 @@ function subcmd_test_after_migration {
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
   USER=alice
-  TOKEN=$("${VALIDATOR_DIR}/token.py" $USER)
+  TOKEN=$("${VALIDATOR_DIR}/get-token.py" $USER)
 
   onboarded=0
     # Wait until alice gets re-onboarded, which requires traffic to be available in order for it to succeed
@@ -656,7 +656,7 @@ function subcmd_identities_dump {
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
 
-  token=$("${VALIDATOR_DIR}/token.py" administrator)
+  token=$("${VALIDATOR_DIR}/get-token.py" administrator)
   curl -sSLf 'http://wallet.localhost/api/validator/v0/admin/participant/identities' -H "authorization: Bearer $token" > "$output_file"
 }
 

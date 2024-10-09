@@ -1735,16 +1735,12 @@ export TOKEN="What you got from Auth0"
 curl -sSL --fail-with-body "https://sv.sv-2.dev.global.canton.network.digitalasset.com/api/sv/v0/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
 ```
 
-For quickly obtaining a token for the SV API or the validator API on a (non-SV) validator,
-you can currently also use [`cncluster participant_console`](#canton-participant-apis),
-which prints a compatible token as part of its startup.
+For the administrator user, you can get a token for validator apps, SV apps and
+splitwell using the `cncluster get_token <namespace> <app>` command, e.g.
 
-For some UIs, we cache tokens in a secret in k8s, and have a utility `cncluster` command for easily retrieving them.
-At the moment, the four SVs sv-1 to sv-4 are supported. To fetch a token for one of them, run for example:
 ```
-export TOKEN=$(cncluster get_token sv-1)
+export TOKEN=$(cncluster get_token sv-1 sv)
 ```
-If the token saved in the secret is expired, run `cncluster preflight_refresh_auth0_credentials` to update the secret with fresh tokens.
 
 ## Configuring a New GCP Project
 

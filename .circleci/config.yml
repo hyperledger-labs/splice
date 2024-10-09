@@ -2734,6 +2734,13 @@ jobs:
           cmd_name: Dump identities before the migration
           cluster: << parameters.cluster >>
           gce_authenticate: true
+          additional_nix_args: >
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
           cmd: |
             cncluster activate
             mkdir -p workspace
@@ -2768,6 +2775,13 @@ jobs:
           cmd_name: Dump identities after the migration, and compare
           cluster: << parameters.cluster >>
           gce_authenticate: true
+          additional_nix_args: >
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
           cmd: |
             cncluster activate
             cncluster dump_identities > workspace/identities-after.json
@@ -4367,7 +4381,7 @@ jobs:
             fi
             if [[ << parameters.restore_identity_from_sv_runbook >> == true ]]; then
               echo "restoring identity from sv runbook"
-              token=$(cncluster get_token sv)
+              token=$(cncluster get_token sv validator)
               id=$(curl -s "https://wallet.sv.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities" -H "authorization: Bearer ${token}")
               echo "$id" > id.json
               export PARTICIPANT_IDENTITIES_FILE=$(readlink -f id.json)

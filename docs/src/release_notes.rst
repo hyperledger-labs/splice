@@ -32,6 +32,7 @@ Upcoming
 * Canton
 
   * Enabled slow future logging for all components to better debug stuck nodes.
+
 * Deployment
 
   * **Breaking** Every Helm chart with a name starting with ``cn-`` has been renamed, now
@@ -41,6 +42,8 @@ Upcoming
 
       * ``CN_APP_LEGACY_PARTY_HINT``
 
+  * **Breaking** The script token.py was renamed to get-token.py to avoid conflicting with some
+    imported modules.
   * ``imagePullPolicy`` is now unset by default corresponding to ``IfNotPresent``.
     You can overwrite it using the helm value ``imagePullPolicy`` if needed.
 
