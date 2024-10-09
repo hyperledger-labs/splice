@@ -1,7 +1,6 @@
-import { config } from 'splice-pulumi-common';
+import { clusterProdLike, config } from 'splice-pulumi-common';
 
-export const enableAlerts =
-  config.envFlag('GCP_CLUSTER_PROD_LIKE') || config.envFlag('ENABLE_ALERTS_FOR_TESTING');
+export const enableAlerts = clusterProdLike || config.envFlag('ENABLE_ALERTS_FOR_TESTING');
 export const slackAlertNotificationChannel =
   config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL') || 'C064MTNQT88';
 export const enableAlertEmailToSupportTeam =

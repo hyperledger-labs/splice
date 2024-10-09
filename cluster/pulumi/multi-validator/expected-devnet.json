@@ -291,7 +291,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -717,7 +716,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -1143,7 +1141,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -1569,7 +1566,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -1995,7 +1991,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -2457,7 +2452,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -2836,7 +2830,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3215,7 +3208,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3594,7 +3586,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3973,7 +3964,6 @@
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.4",
-                "imagePullPolicy": "Always",
                 "livenessProbe": {
                   "exec": {
                     "command": [

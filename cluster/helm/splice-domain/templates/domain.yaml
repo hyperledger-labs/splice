@@ -43,7 +43,9 @@ spec:
         - name: CANTON_MEDIATOR_POSTGRES_DB
           value: {{ .Values.mediator.persistence.databaseName }}
         {{- end }}
-        imagePullPolicy: Always
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         ports:
         - containerPort: 5008
           name: cd-pub-api

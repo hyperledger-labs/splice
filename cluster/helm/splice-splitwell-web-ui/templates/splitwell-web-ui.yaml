@@ -23,7 +23,9 @@ spec:
       containers:
       - name: splitwell-web-ui
         image: "{{ .Values.imageRepo }}/splitwell-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).splitwell_web_ui) }}"
-        imagePullPolicy: Always
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         env:
         - name: SPLICE_APP_UI_AUTH_CLIENT_ID
           valueFrom:

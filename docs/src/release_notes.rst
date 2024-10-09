@@ -41,6 +41,9 @@ Upcoming
 
       * ``CN_APP_LEGACY_PARTY_HINT``
 
+  * ``imagePullPolicy`` is now unset by default corresponding to ``IfNotPresent``.
+    You can overwrite it using the helm value ``imagePullPolicy`` if needed.
+
 0.2.4
 -----
 

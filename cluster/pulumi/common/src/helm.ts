@@ -17,6 +17,7 @@ import {
   ExactNamespace,
   fixedTokens,
   HELM_CHART_TIMEOUT_SEC,
+  imagePullPolicy,
   loadJsonFromFile,
   loadYamlFromFile,
   REPO_ROOT,
@@ -69,6 +70,7 @@ function installSpliceHelmChartByNamespaceName(
       values: {
         ...cnChartValues(nsLogicalName, version, chartName, values),
         ...affinityAndTolerations,
+        ...imagePullPolicy,
       },
       timeout,
     },
