@@ -766,6 +766,7 @@ lazy val `apps-common-frontend` = {
       // so we just do it once for all workspaces here.
       npmLint := {
         val log = streams.value.log
+        npmInstall.value
         runCommand(
           Seq("npm", "run", "check", "--workspaces", "--if-present"),
           log,
