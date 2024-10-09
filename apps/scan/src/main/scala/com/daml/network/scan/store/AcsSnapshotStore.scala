@@ -9,7 +9,7 @@ import com.daml.network.scan.store.AcsSnapshotStore.{AcsSnapshot, QueryAcsSnapsh
 import com.daml.network.store.UpdateHistory.SelectFromCreateEvents
 import com.daml.network.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
-import com.daml.network.util.{Contract, PackageQualifiedName, SpliceUtil}
+import com.daml.network.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -397,44 +397,6 @@ object AcsSnapshotStore {
         entry =>
           Some(entry.getOrElse(summaryZero).addLockedAmulet(amulet, asOfRound))
       })
-  }
-  case class HoldingsSummary(
-      totalUnlockedCoin: BigDecimal,
-      totalLockedCoin: BigDecimal,
-      totalCoinHoldings: BigDecimal,
-      accumulatedHoldingFeesUnlocked: BigDecimal,
-      accumulatedHoldingFeesLocked: BigDecimal,
-      accumulatedHoldingFeesTotal: BigDecimal,
-      totalAvailableCoin: BigDecimal,
-  ) {
-    def addAmulet(amulet: Amulet, asOfRound: Long): HoldingsSummary = {
-      val holdingFee = SpliceUtil.holdingFee(amulet, asOfRound)
-      HoldingsSummary(
-        totalUnlockedCoin = totalUnlockedCoin + amulet.amount.initialAmount,
-        totalCoinHoldings = totalCoinHoldings + amulet.amount.initialAmount,
-        accumulatedHoldingFeesUnlocked = accumulatedHoldingFeesUnlocked + holdingFee,
-        accumulatedHoldingFeesTotal = accumulatedHoldingFeesTotal + holdingFee,
-        totalAvailableCoin =
-          (totalUnlockedCoin + amulet.amount.initialAmount) - (accumulatedHoldingFeesUnlocked + holdingFee),
-        // unchanged
-        totalLockedCoin = totalLockedCoin,
-        accumulatedHoldingFeesLocked = accumulatedHoldingFeesLocked,
-      )
-    }
-    def addLockedAmulet(amulet: LockedAmulet, asOfRound: Long): HoldingsSummary = {
-      val holdingFee = SpliceUtil.holdingFee(amulet.amulet, asOfRound)
-      HoldingsSummary(
-        totalLockedCoin = totalLockedCoin + amulet.amulet.amount.initialAmount,
-        totalCoinHoldings = totalCoinHoldings + amulet.amulet.amount.initialAmount,
-        accumulatedHoldingFeesLocked = accumulatedHoldingFeesLocked + holdingFee,
-        accumulatedHoldingFeesTotal = accumulatedHoldingFeesTotal + holdingFee,
-        // unchanged
-        totalUnlockedCoin = totalUnlockedCoin,
-        accumulatedHoldingFeesUnlocked = accumulatedHoldingFeesUnlocked,
-        totalAvailableCoin = totalAvailableCoin,
-      )
-    }
-
   }
 
   def apply(

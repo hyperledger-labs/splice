@@ -5,8 +5,6 @@ package com.daml.network.util
 
 import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 
-// TODO(#14568) Remove the duplication with AcsSnapshotStore once we rebase the
-// cc custody branch on main
 case class HoldingsSummary(
     totalUnlockedCoin: BigDecimal,
     totalLockedCoin: BigDecimal,
