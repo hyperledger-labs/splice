@@ -150,9 +150,6 @@ spec:
   - name: metrics
     port: 10013
     protocol: TCP
-  - name: lg-api-gw
-    port: 6001
-    protocol: TCP
   - name: json-api
     port: 7575
     protocol: TCP
