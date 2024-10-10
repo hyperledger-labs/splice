@@ -1,12 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as jtv from '@mojotech/json-type-validation';
-import { dsoInfo, getAmuletConfig, getDsoConfig } from 'common-test-utils';
+import { dsoInfo, getDsoAction, getAmuletRulesAction } from 'common-test-utils';
 import {
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListVoteRequestByTrackingCidResponse,
-  LookupDsoRulesVoteRequestResponse,
 } from 'sv-openapi';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
@@ -123,14 +122,6 @@ export const voteRequests: ListDsoRulesVoteRequestsResponse = {
 
 export const voteRequest: ListVoteRequestByTrackingCidResponse = {
   vote_requests: voteRequests.dso_rules_vote_requests,
-};
-
-export const voteRequestsAddFutureConfig: LookupDsoRulesVoteRequestResponse = {
-  dso_rules_vote_request: voteRequests.dso_rules_vote_requests[0],
-};
-
-export const voteRequestsSetConfig: LookupDsoRulesVoteRequestResponse = {
-  dso_rules_vote_request: voteRequests.dso_rules_vote_requests[1],
 };
 
 export const voteResultsAmuletRules: ListDsoRulesVoteResultsResponse = {
@@ -365,191 +356,6 @@ export const voteResultsDsoRules: ListDsoRulesVoteResultsResponse = {
     },
   ],
 };
-
-function getAmuletRulesAction(action: string, effectiveAt: string, createFee: string) {
-  return {
-    tag: 'ARC_AmuletRules',
-    value: {
-      amuletRulesAction: {
-        tag: action,
-        value: {
-          newScheduleItem: {
-            _1: effectiveAt,
-            _2: getAmuletConfig(createFee),
-          },
-        },
-      },
-    },
-  };
-}
-
-function getDsoAction(acsCommitmentReconciliationInterval: string) {
-  return {
-    tag: 'ARC_DsoRules',
-    value: {
-      dsoAction: {
-        tag: 'SRARC_SetConfig',
-        value: {
-          newConfig: getDsoConfig(acsCommitmentReconciliationInterval),
-        },
-      },
-    },
-  };
-}
-
-export function getExpectedDsoRulesConfigDiffsHTML(
-  originalAcsCommitmentReconciliationInterval: string,
-  replacementAcsCommitmentReconciliationInterval: string
-): string {
-  return (
-    '<div class="jsondiffpatch-delta jsondiffpatch-node jsondiffpatch-child-node-type-object"><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"><li data-key="actionConfirmationTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">actionConfirmationTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "microseconds": "3600000000"\n' +
-    `}</pre></div></li><li data-key="decentralizedSynchronizer" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">decentralizedSynchronizer</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="activeSynchronizerId" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">activeSynchronizerId</div><div class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li data-key="lastSynchronizerId" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">lastSynchronizerId</div><div class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li data-key="synchronizers" class="jsondiffpatch-node jsondiffpatch-child-node-type-array"><div class="jsondiffpatch-property-name">synchronizers</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-array"></ul></li><li data-key="0" class="jsondiffpatch-node jsondiffpatch-child-node-type-array"><div class="jsondiffpatch-property-name">0</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-array"></ul></li><li data-key="0" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">0</div><div class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li data-key="1" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">1</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="acsCommitmentReconciliationInterval" class="jsondiffpatch-modified"><div class="jsondiffpatch-property-name">acsCommitmentReconciliationInterval</div><div class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalAcsCommitmentReconciliationInterval}"</pre></div><div class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementAcsCommitmentReconciliationInterval}"</pre></div></li><li data-key="cometBftGenesisJson" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">cometBftGenesisJson</div><div class="jsondiffpatch-value"><pre>"TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config."</pre></div></li><li data-key="state" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">state</div><div class="jsondiffpatch-value"><pre>"DS_Operational"</pre></div></li></ul><li data-key="dsoDelegateInactiveTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">dsoDelegateInactiveTimeout</div><div class="jsondiffpatch-value"><pre>{\n` +
-    '  "microseconds": "70000000"\n' +
-    '}</pre></div></li><li data-key="maxTextLength" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxTextLength</div><div class="jsondiffpatch-value"><pre>"1024"</pre></div></li><li data-key="nextScheduledSynchronizerUpgrade" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">nextScheduledSynchronizerUpgrade</div><div class="jsondiffpatch-value"><pre>null</pre></div></li><li data-key="numMemberTrafficContractsThreshold" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">numMemberTrafficContractsThreshold</div><div class="jsondiffpatch-value"><pre>"5"</pre></div></li><li data-key="numUnclaimedRewardsThreshold" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">numUnclaimedRewardsThreshold</div><div class="jsondiffpatch-value"><pre>"10"</pre></div></li><li data-key="svOnboardingConfirmedTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">svOnboardingConfirmedTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "microseconds": "3600000000"\n' +
-    '}</pre></div></li><li data-key="svOnboardingRequestTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">svOnboardingRequestTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "microseconds": "3600000000"\n' +
-    '}</pre></div></li><li data-key="synchronizerNodeConfigLimits" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">synchronizerNodeConfigLimits</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "cometBft": {\n' +
-    '    "maxNumCometBftNodes": "2",\n' +
-    '    "maxNumGovernanceKeys": "2",\n' +
-    '    "maxNumSequencingKeys": "2",\n' +
-    '    "maxNodeIdLength": "50",\n' +
-    '    "maxPubKeyLength": "256"\n' +
-    '  }\n' +
-    '}</pre></div></li><li data-key="voteRequestTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">voteRequestTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "microseconds": "604800000000"\n' +
-    '}</pre></div></li></div>'.trim()
-  );
-}
-
-export function getExpectedAmuletRulesConfigDiffsHTML(
-  originalCreateFee: string,
-  replacementCreateFee: string
-): string {
-  return (
-    '<div class="jsondiffpatch-delta jsondiffpatch-node jsondiffpatch-child-node-type-object"><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"><li data-key="decentralizedSynchronizer" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">decentralizedSynchronizer</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "requiredSynchronizers": {\n' +
-    '    "map": [\n' +
-    '      [\n' +
-    '        "global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81",\n' +
-    '        {}\n' +
-    '      ]\n' +
-    '    ]\n' +
-    '  },\n' +
-    '  "activeSynchronizer": "global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81",\n' +
-    '  "fees": {\n' +
-    '    "baseRateTrafficLimits": {\n' +
-    '      "burstAmount": "400000",\n' +
-    '      "burstWindow": {\n' +
-    '        "microseconds": "1200000000"\n' +
-    '      }\n' +
-    '    },\n' +
-    '    "extraTrafficPrice": "16.67",\n' +
-    '    "readVsWriteScalingFactor": "4",\n' +
-    '    "minTopupAmount": "200000"\n' +
-    '  }\n' +
-    '}</pre></div></li><li data-key="issuanceCurve" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">issuanceCurve</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "initialValue": {\n' +
-    '    "amuletToIssuePerYear": "40000000000.0",\n' +
-    '    "validatorRewardPercentage": "0.05",\n' +
-    '    "appRewardPercentage": "0.15",\n' +
-    '    "validatorRewardCap": "0.2",\n' +
-    '    "featuredAppRewardCap": "100.0",\n' +
-    '    "unfeaturedAppRewardCap": "0.6",\n' +
-    '    "optValidatorFaucetCap": "2.85"\n' +
-    '  },\n' +
-    '  "futureValues": [\n' +
-    '    {\n' +
-    '      "_1": {\n' +
-    '        "microseconds": "15768000000000"\n' +
-    '      },\n' +
-    '      "_2": {\n' +
-    '        "amuletToIssuePerYear": "20000000000.0",\n' +
-    '        "validatorRewardPercentage": "0.12",\n' +
-    '        "appRewardPercentage": "0.4",\n' +
-    '        "validatorRewardCap": "0.2",\n' +
-    '        "featuredAppRewardCap": "100.0",\n' +
-    '        "unfeaturedAppRewardCap": "0.6",\n' +
-    '        "optValidatorFaucetCap": "2.85"\n' +
-    '      }\n' +
-    '    },\n' +
-    '    {\n' +
-    '      "_1": {\n' +
-    '        "microseconds": "47304000000000"\n' +
-    '      },\n' +
-    '      "_2": {\n' +
-    '        "amuletToIssuePerYear": "10000000000.0",\n' +
-    '        "validatorRewardPercentage": "0.18",\n' +
-    '        "appRewardPercentage": "0.62",\n' +
-    '        "validatorRewardCap": "0.2",\n' +
-    '        "featuredAppRewardCap": "100.0",\n' +
-    '        "unfeaturedAppRewardCap": "0.6",\n' +
-    '        "optValidatorFaucetCap": "2.85"\n' +
-    '      }\n' +
-    '    },\n' +
-    '    {\n' +
-    '      "_1": {\n' +
-    '        "microseconds": "157680000000000"\n' +
-    '      },\n' +
-    '      "_2": {\n' +
-    '        "amuletToIssuePerYear": "5000000000.0",\n' +
-    '        "validatorRewardPercentage": "0.21",\n' +
-    '        "appRewardPercentage": "0.69",\n' +
-    '        "validatorRewardCap": "0.2",\n' +
-    '        "featuredAppRewardCap": "100.0",\n' +
-    '        "unfeaturedAppRewardCap": "0.6",\n' +
-    '        "optValidatorFaucetCap": "2.85"\n' +
-    '      }\n' +
-    '    },\n' +
-    '    {\n' +
-    '      "_1": {\n' +
-    '        "microseconds": "315360000000000"\n' +
-    '      },\n' +
-    '      "_2": {\n' +
-    '        "amuletToIssuePerYear": "2500000000.0",\n' +
-    '        "validatorRewardPercentage": "0.2",\n' +
-    '        "appRewardPercentage": "0.75",\n' +
-    '        "validatorRewardCap": "0.2",\n' +
-    '        "featuredAppRewardCap": "100.0",\n' +
-    '        "unfeaturedAppRewardCap": "0.6",\n' +
-    '        "optValidatorFaucetCap": "2.85"\n' +
-    '      }\n' +
-    '    }\n' +
-    '  ]\n' +
-    '}</pre></div></li><li data-key="packageConfig" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">packageConfig</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "amulet": "0.1.5",\n' +
-    '  "amuletNameService": "0.1.5",\n' +
-    '  "dsoGovernance": "0.1.8",\n' +
-    '  "validatorLifecycle": "0.1.1",\n' +
-    '  "wallet": "0.1.5",\n' +
-    '  "walletPayments": "0.1.5"\n' +
-    '}</pre></div></li><li data-key="tickDuration" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">tickDuration</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "microseconds": "600000000"\n' +
-    `}</pre></div></li><li data-key="transferConfig" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">transferConfig</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="createFee" class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div class="jsondiffpatch-property-name">createFee</div><ul class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li data-key="fee" class="jsondiffpatch-modified"><div class="jsondiffpatch-property-name">fee</div><div class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalCreateFee}"</pre></div><div class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementCreateFee}"</pre></div></li></ul><li data-key="extraFeaturedAppRewardAmount" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">extraFeaturedAppRewardAmount</div><div class="jsondiffpatch-value"><pre>"1.0"</pre></div></li><li data-key="holdingFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">holdingFee</div><div class="jsondiffpatch-value"><pre>{\n` +
-    '  "rate": "0.0000190259"\n' +
-    '}</pre></div></li><li data-key="lockHolderFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">lockHolderFee</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "fee": "0.005"\n' +
-    '}</pre></div></li><li data-key="maxNumInputs" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxNumInputs</div><div class="jsondiffpatch-value"><pre>"100"</pre></div></li><li data-key="maxNumLockHolders" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxNumLockHolders</div><div class="jsondiffpatch-value"><pre>"50"</pre></div></li><li data-key="maxNumOutputs" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">maxNumOutputs</div><div class="jsondiffpatch-value"><pre>"100"</pre></div></li><li data-key="transferFee" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">transferFee</div><div class="jsondiffpatch-value"><pre>{\n' +
-    '  "initialRate": "0.01",\n' +
-    '  "steps": [\n' +
-    '    {\n' +
-    '      "_1": "100.0",\n' +
-    '      "_2": "0.001"\n' +
-    '    },\n' +
-    '    {\n' +
-    '      "_1": "1000.0",\n' +
-    '      "_2": "0.0001"\n' +
-    '    },\n' +
-    '    {\n' +
-    '      "_1": "1000000.0",\n' +
-    '      "_2": "0.00001"\n' +
-    '    }\n' +
-    '  ]\n' +
-    '}</pre></div></li></div>\n'.trim()
-  );
-}
 
 const result = jtv.Result.andThen(
   () => AmuletRules.decoder.run(dsoInfo.amulet_rules.contract.payload),
