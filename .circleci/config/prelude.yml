@@ -166,6 +166,5 @@ executors:
       - image: cimg/base:current
     environment:
       npm_config_cache: "/cache/.npm"
-      npm_config_prefer_offline: "true"
       npm_config_logs_dir: "/tmp/npm-logs"
       COURSIER_CACHE: "/cache/coursier"
