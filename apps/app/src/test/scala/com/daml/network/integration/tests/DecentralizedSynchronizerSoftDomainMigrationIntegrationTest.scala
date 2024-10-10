@@ -723,6 +723,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
             spw.subscriptions.SubscriptionInitialPayment.COMPANION,
             spw.subscriptions.SubscriptionIdleState.COMPANION,
             spw.subscriptions.SubscriptionPayment.COMPANION,
+            spw.transferpreapproval.TransferPreapprovalProposal.COMPANION,
           )
           map (c(_, sv1WalletUser)): _*
       )

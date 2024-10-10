@@ -7,7 +7,6 @@ import org.apache.pekko.stream.Materializer
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval2
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.splice.wallet.install.{
   AmuletOperationOutcome,
@@ -29,20 +28,19 @@ import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, PageLimit}
-import com.daml.network.util.{SpliceUtil, Codec, ContractWithState, DisclosedContracts}
-import com.daml.network.wallet.UserWalletManager
-import com.daml.network.wallet.config.TransferPreapprovalConfig
+import com.daml.network.util.{Codec, ContractWithState, DisclosedContracts, SpliceUtil}
+import com.daml.network.wallet.{UserWalletManager, UserWalletService}
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
 import TreasuryService.AmuletOperationDedupConfig
+import com.daml.network.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.Json
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.UUID
@@ -57,8 +55,6 @@ class HttpWalletHandler(
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     validatorTopupConfig: ValidatorTopupConfig,
-    transferPreapprovalConfig: TransferPreapprovalConfig,
-    clock: Clock,
 )(implicit
     mat: Materializer,
     ec: ExecutionContext,
@@ -314,7 +310,12 @@ class HttpWalletHandler(
               Future.successful(CommandPriority.Low)
             else
               TopupUtil
-                .hasSufficientFundsForTopup(scanConnection, userStore, validatorTopupConfig, clock)
+                .hasSufficientFundsForTopup(
+                  scanConnection,
+                  userStore,
+                  validatorTopupConfig,
+                  walletManager.clock,
+                )
                 .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
           outcome <-
             exerciseWalletAction((installCid, _) => {
@@ -665,7 +666,6 @@ class HttpWalletHandler(
     }
   }
 
-  // TODO(#15035): This is currently broken. Fix this once we properly support TransferPreapproval2 creation in the wallet.
   override def createTransferPreapproval(
       respond: r0.CreateTransferPreapprovalResponse.type
   )()(tuser: TracedUser): Future[r0.CreateTransferPreapprovalResponse] = {
@@ -675,53 +675,77 @@ class HttpWalletHandler(
         wallet <- getUserWallet(user)
         store = wallet.store
         domain <- scanConnection.getAmuletRulesDomain()(traceContext)
-        now = clock.now
         result <- store.lookupTransferPreapproval() flatMap {
-          case QueryResult(offset, None) =>
-            wallet.connection
-              .submit(
-                Seq(store.key.validatorParty, store.key.endUserParty),
-                Seq.empty,
-                new TransferPreapproval2(
-                  store.key.endUserParty.toProtoPrimitive,
-                  store.key.validatorParty.toProtoPrimitive,
-                  store.key.dsoParty.toProtoPrimitive,
-                  now.toInstant,
-                  now.toInstant,
-                  now.plus(transferPreapprovalConfig.preapprovalLifetime.asJava).toInstant,
-                ).create,
-              )
-              .withDedup(
-                SpliceLedgerConnection.CommandId(
-                  "com.daml.network.wallet.createTransferPreapproval",
-                  Seq(
-                    store.key.endUserParty,
-                    store.key.validatorParty,
-                  ),
-                  "",
-                ),
-                deduplicationOffset = offset,
-              )
-              .withDomainId(domain)
-              .yieldResult()
-              .map(created =>
-                r0.CreateTransferPreapprovalResponse.OK(
-                  d0.CreateTransferPreapprovalResponse(
-                    created.contractId.contractId
-                  )
-                )
-              )
-          case QueryResult(_, Some(c)) =>
+          case QueryResult(_, Some(existingPreapproval)) =>
             Future.successful(
               r0.CreateTransferPreapprovalResponse.Conflict(
                 d0.CreateTransferPreapprovalResponse(
-                  c.contractId.contractId
+                  existingPreapproval.contractId.contractId
                 )
+              )
+            )
+          case QueryResult(preapprovalOffset, None) =>
+            for {
+              proposalCid <- store.lookupTransferPreapprovalProposal() flatMap {
+                case QueryResult(_, Some(proposal)) => Future.successful(proposal.contractId)
+                case QueryResult(proposalOffSet, None) =>
+                  val dedupOffset = Ordering[Option[Long]].min(preapprovalOffset, proposalOffSet)
+                  createTransferPreapprovalProposal(wallet, domain, dedupOffset)
+              }
+              _ = logger.debug(
+                s"Created TransferPreapprovalProposal with contract ID $proposalCid. Now waiting for automation to create the TransferPreapproval."
+              )
+              preapproval <- retryProvider.retryForClientCalls(
+                "getTransferPreapproval",
+                "wait for validator automation to create TransferPreapproval",
+                store.getTransferPreapproval(),
+                logger,
+              ) recover {
+                case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
+                  throw Status.ABORTED
+                    .withDescription(
+                      "Transfer preapproval creation request timed out. Please retry in some time."
+                    )
+                    .asRuntimeException()
+              }
+            } yield r0.CreateTransferPreapprovalResponse.OK(
+              d0.CreateTransferPreapprovalResponse(
+                preapproval.contractId.contractId
               )
             )
         }
       } yield result
     }
+  }
+
+  private def createTransferPreapprovalProposal(
+      wallet: UserWalletService,
+      domain: DomainId,
+      dedupOffset: Option[Long],
+  )(implicit tc: TraceContext) = {
+    val store = wallet.store
+    wallet.connection
+      .submit(
+        Seq(store.key.validatorParty, store.key.endUserParty),
+        Seq.empty,
+        new TransferPreapprovalProposal(
+          store.key.endUserParty.toProtoPrimitive,
+          store.key.validatorParty.toProtoPrimitive,
+        ).create,
+      )
+      .withDedup(
+        SpliceLedgerConnection.CommandId(
+          "com.daml.network.wallet.createTransferPreapprovalProposal",
+          Seq(
+            store.key.endUserParty,
+            store.key.validatorParty,
+          ),
+        ),
+        deduplicationOffset = dedupOffset,
+      )
+      .withDomainId(domain)
+      .yieldResult()
+      .map(_.contractId)
   }
 
   def transferPreapprovalSend(respond: r0.TransferPreapprovalSendResponse.type)(

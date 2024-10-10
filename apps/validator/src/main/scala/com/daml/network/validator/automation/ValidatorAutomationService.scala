@@ -104,6 +104,16 @@ class ValidatorAutomationService(
     registerTrigger(new OffboardUserPartyTrigger(triggerContext, walletManager, connection))
 
     registerTrigger(
+      new AcceptTransferPreapprovalProposalTrigger(
+        triggerContext,
+        store,
+        walletManager,
+        transferPreapprovalConfig,
+        clock,
+      )
+    )
+
+    registerTrigger(
       new RenewTransferPreapprovalTrigger(
         triggerContext,
         store,

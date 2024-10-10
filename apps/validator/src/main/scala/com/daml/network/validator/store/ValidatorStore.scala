@@ -9,6 +9,7 @@ import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodege
 import com.daml.network.codegen.java.splice.wallet.{
   install as walletCodegen,
   topupstate as topUpCodegen,
+  transferpreapproval as preapprovalCodegen,
 }
 import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
@@ -426,6 +427,14 @@ object ValidatorStore {
           ValidatorAcsStoreRowData(
             contract = contract,
             userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+        },
+        mkFilter(preapprovalCodegen.TransferPreapprovalProposal.COMPANION)(co =>
+          co.payload.provider == validator
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         },
         mkFilter(amuletrulesCodegen.TransferPreapproval2.COMPANION)(co =>

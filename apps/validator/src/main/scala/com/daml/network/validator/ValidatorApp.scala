@@ -846,8 +846,6 @@ class ValidatorApp(
           loggerFactory,
           retryProvider,
           validatorTopupConfig,
-          config.transferPreapproval,
-          clock,
         )
       )
 

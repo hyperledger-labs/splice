@@ -20,6 +20,7 @@ import com.daml.network.codegen.java.splice.wallet.{
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
+  transferpreapproval as preapprovalCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.RetryProvider
@@ -310,6 +311,35 @@ trait UserWalletStore extends AppStore with NamedLogging {
     lookupArbitraryPreferAssigned(amuletCodegen.FeaturedAppRight.COMPANION)
       .map(_ map (_.contract))
 
+  def lookupTransferPreapprovalProposal()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[QueryResult[Option[Contract[
+    preapprovalCodegen.TransferPreapprovalProposal.ContractId,
+    preapprovalCodegen.TransferPreapprovalProposal,
+  ]]]] =
+    multiDomainAcsStore
+      .findAnyContractWithOffset(preapprovalCodegen.TransferPreapprovalProposal.COMPANION)
+      .map(_.map(_.map(_.contract)))
+
+  def getTransferPreapproval()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Contract[
+    amuletrulesCodegen.TransferPreapproval2.ContractId,
+    amuletrulesCodegen.TransferPreapproval2,
+  ]] = lookupTransferPreapproval()
+    .map(
+      _.map(
+        _.getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription("No TransferPreapproval found")
+            .asRuntimeException()
+        )
+      )
+    )
+    .map(_.value)
+
   def lookupTransferPreapproval()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -497,6 +527,7 @@ object UserWalletStore {
       transferOffersCodegen.TransferOffer.COMPANION,
       walletCodegen.AcceptedAppPayment.COMPANION,
       walletCodegen.AppPaymentRequest.COMPANION,
+      preapprovalCodegen.TransferPreapprovalProposal.COMPANION,
     )
   }
 
@@ -523,6 +554,7 @@ object UserWalletStore {
       domainMigrationId: Long,
   ): ContractFilter[UserWalletAcsStoreRowData] = {
     val endUser = key.endUserParty.toProtoPrimitive
+    val validator = key.validatorParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive
 
     SimpleContractFilter(
@@ -667,8 +699,15 @@ object UserWalletStore {
           )
         ),
         // Transfer preapprovals
+        mkFilter(preapprovalCodegen.TransferPreapprovalProposal.COMPANION)(co =>
+          co.payload.provider == validator && (co.payload.provider == endUser || co.payload.receiver == endUser)
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract
+          )
+        ),
         mkFilter(amuletrulesCodegen.TransferPreapproval2.COMPANION)(co =>
-          co.payload.dso == dso && (co.payload.provider == endUser || co.payload.receiver == endUser)
+          co.payload.dso == dso && co.payload.provider == validator && (co.payload.provider == endUser || co.payload.receiver == endUser)
         )(contract =>
           UserWalletAcsStoreRowData(
             contract

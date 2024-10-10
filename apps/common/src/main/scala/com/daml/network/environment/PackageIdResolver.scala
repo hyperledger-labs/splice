@@ -215,6 +215,8 @@ object PackageIdResolver {
     "Splice.Wallet.Payment" -> Package.SpliceWalletPayments,
     "Splice.Wallet.Subscriptions" -> Package.SpliceWalletPayments,
     "Splice.Wallet.ExternalParty" -> Package.SpliceWallet,
+    "Splice.Wallet.TransferPreapproval" -> Package.SpliceWallet,
+    // TODO(#14757): Remove this
     "Splice.TransferPreapproval" -> Package.SpliceAmuletNameService,
   )
 

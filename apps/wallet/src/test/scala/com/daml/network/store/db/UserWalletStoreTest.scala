@@ -13,12 +13,14 @@ import com.daml.network.codegen.java.splice.wallet.{
   payment as paymentCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
+  transferpreapproval as preapprovalCodegen,
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.wallet.install
 import com.daml.network.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_MintResult
+import com.daml.network.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,
   BuyTrafficRequestStatusRejected,
@@ -948,6 +950,29 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     }
   }
 
+  "lookupTransferPreapprovalProposal" should {
+    "return correct results" in {
+      for {
+        store <- mkStore(user1)
+        proposal1 = transferPreapprovalProposal(user1, validator)
+        proposal2 = transferPreapprovalProposal(user2, validator)
+        proposal3 = transferPreapprovalProposal(user1, provider1)
+        _ <- dummyDomain.create(proposal1, createdEventSignatories = Seq(user1))(
+          store.multiDomainAcsStore
+        )
+        _ <- dummyDomain.create(proposal2, createdEventSignatories = Seq(user2))(
+          store.multiDomainAcsStore
+        )
+        _ <- dummyDomain.create(proposal3, createdEventSignatories = Seq(user1))(
+          store.multiDomainAcsStore
+        )
+        result <- store.lookupTransferPreapprovalProposal()
+      } yield {
+        result.value.value shouldBe proposal1
+      }
+    }
+  }
+
   private lazy val provider1 = providerParty(1)
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)
@@ -1259,6 +1284,17 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     contract(
       identifier = templateId,
       contractId = new ansCodegen.AnsEntryContext.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
+  protected def transferPreapprovalProposal(receiver: PartyId, provider: PartyId) = {
+    val templateId = preapprovalCodegen.TransferPreapprovalProposal.TEMPLATE_ID
+    val template =
+      new TransferPreapprovalProposal(receiver.toProtoPrimitive, provider.toProtoPrimitive)
+    contract(
+      identifier = templateId,
+      contractId = new preapprovalCodegen.TransferPreapprovalProposal.ContractId(nextCid()),
       payload = template,
     )
   }

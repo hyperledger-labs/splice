@@ -18,6 +18,7 @@ import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason.{
 }
 import com.daml.network.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequestTrackingInfo
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.{
+  CO_AcceptTransferPreapprovalProposal,
   CO_AppPayment,
   CO_BuyMemberTraffic,
   CO_CompleteAcceptedTransfer,
@@ -229,7 +230,8 @@ class UserWalletTxLogParser(
                       case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
                           _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic |
                           _: CO_CompleteBuyTrafficRequest | _: CO_CreateExternalPartySetupProposal |
-                          _: CO_RenewTransferPreapproval | _: CO_Tap | _: ExtAmuletOperation =>
+                          _: CO_AcceptTransferPreapprovalProposal | _: CO_RenewTransferPreapproval |
+                          _: CO_Tap | _: ExtAmuletOperation =>
                         State.empty
                       case _ => {
                         throw new RuntimeException(s"Invalid operation $op")

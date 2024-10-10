@@ -38,6 +38,7 @@ import com.daml.network.codegen.java.splice.wallet.{
 }
 import com.daml.network.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
 import SpliceLedgerConnection.CommandId
+import com.daml.network.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import com.daml.network.environment.ledger.api.DedupConfig
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.PageLimit
@@ -260,6 +261,13 @@ class TreasuryService(
         } yield ()
 
       case _: amuletoperation.CO_CreateExternalPartySetupProposal => Future.unit
+
+      case op: amuletoperation.CO_AcceptTransferPreapprovalProposal =>
+        for {
+          _ <- userStore.multiDomainAcsStore.getContractById(TransferPreapprovalProposal.COMPANION)(
+            op.preapprovalProposalCid
+          )
+        } yield ()
 
       case op: amuletoperation.CO_RenewTransferPreapproval =>
         for {

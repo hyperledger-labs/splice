@@ -542,6 +542,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreateTransferPreapprovalResponse"
+        "429":
+          description:
+            Request to create transfer pre-approval is currently being processed, which
+            may or may not succeed. Retry submitting the request with exponential backoff.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
   /v0/wallet/transfer-preapproval/send:
     post:
       tags: [wallet]
