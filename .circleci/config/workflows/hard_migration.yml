@@ -230,6 +230,16 @@ workflow:
             - slack-context
           requires:
             - backup_cluster_after_migration
+      - reset_sv_runbook:
+          name: "reset_sv_runbook_after_migration"
+          extra_migrations_reset: "0,1"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - migrate_sv_runbook
       - deploy_sv_runbook:
           name: "deploy_fresh_sv_runbook_after_migration"
           context:
@@ -239,9 +249,8 @@ workflow:
           cluster: << pipeline.parameters.cluster >>
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
-#          reset_cluster: true # it's the default, but to make it explicit
           requires:
-            - migrate_sv_runbook
+            - reset_sv_runbook_after_migration
 #          # Re-enable once latest release is > 0.2.3
       #            - preflight_sv_check_migrated
       - preflight_sv_check:

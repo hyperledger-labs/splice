@@ -4154,6 +4154,9 @@ jobs:
       silence_deployment_alerts:
         type: boolean
         default: false
+      extra_migrations_reset:
+        type: string
+        default: ""
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
@@ -4171,6 +4174,10 @@ jobs:
             cncluster activate
             if [[ << parameters.unprotect_dbs >> == true ]]; then
               cncluster unprotect_dbs sv
+            fi
+
+            if [ -n "<< parameters.extra_migrations_reset >>" ]; then
+              export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='<< parameters.extra_migrations_reset >>'
             fi
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
@@ -5350,12 +5357,12 @@ workflows:
             - backup_cluster_after_migration
       - reset_sv_runbook:
           name: "reset_sv_runbook_after_migration"
+          extra_migrations_reset: "0,1"
           context:
             - artifactory
             - slack-context
             - canton-network-vpn
           cluster: "ciperiodic"
-          global_domain_active_migration_id: 1
           requires:
             - migrate_sv_runbook
       - deploy_sv_runbook:
@@ -6401,6 +6408,16 @@ workflows:
             - slack-context
           requires:
             - backup_cluster_after_migration
+      - reset_sv_runbook:
+          name: "reset_sv_runbook_after_migration"
+          extra_migrations_reset: "0,1"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - migrate_sv_runbook
       - deploy_sv_runbook:
           name: "deploy_fresh_sv_runbook_after_migration"
           context:
@@ -6410,9 +6427,8 @@ workflows:
           cluster: << pipeline.parameters.cluster >>
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
-#          reset_cluster: true # it's the default, but to make it explicit
           requires:
-            - migrate_sv_runbook
+            - reset_sv_runbook_after_migration
 #          # Re-enable once latest release is > 0.2.3
       #            - preflight_sv_check_migrated
       - preflight_sv_check:

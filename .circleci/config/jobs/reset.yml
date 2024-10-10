@@ -69,6 +69,9 @@ jobs:
       silence_deployment_alerts:
         type: boolean
         default: false
+      extra_migrations_reset:
+        type: string
+        default: ""
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
@@ -86,6 +89,10 @@ jobs:
             cncluster activate
             if [[ << parameters.unprotect_dbs >> == true ]]; then
               cncluster unprotect_dbs sv
+            fi
+
+            if [ -n "<< parameters.extra_migrations_reset >>" ]; then
+              export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='<< parameters.extra_migrations_reset >>'
             fi
 
             if [[ << parameters.silence_deployment_alerts >> == true ]]; then
