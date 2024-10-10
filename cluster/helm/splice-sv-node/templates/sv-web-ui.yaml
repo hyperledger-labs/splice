@@ -54,7 +54,9 @@ spec:
             - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
               value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
           image: "{{ .Values.imageRepo }}/sv-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).sv_web_ui) }}"
-          imagePullPolicy: Always
+          {{- with .Values.imagePullPolicy }}
+          imagePullPolicy: {{ . }}
+          {{- end }}
           name: sv-web-ui
           ports:
             - containerPort: 80

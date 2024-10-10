@@ -9,6 +9,9 @@
     "imageDigests": {
       "type": "object"
     },
+    "imagePullPolicy": {
+      "type": "string"
+    },
     "defaultJvmOptions": {
       "type": "string"
     },

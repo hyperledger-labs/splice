@@ -1424,8 +1424,6 @@ printTests := {
       name
     ) && name.contains("SvReOnboard")
   def isDamlCiupgradeVote(name: String): Boolean = name contains "DamlCIUpgradeVote"
-  def isAuth0CredentialsPreflightIntegrationTest(name: String): Boolean =
-    isPreflightIntegrationTest(name) && name.contains("Auth0Credentials")
   def isDockerComposeValidatorPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("DockerComposeValidator")
 
@@ -1470,11 +1468,6 @@ printTests := {
       "SV reonboard preflight",
       "test-full-class-names-re-onboard-sv-runbook-preflight.log",
       (t: String) => isSvReOnboardPreflightIntegrationTest(t),
-    ),
-    (
-      "Fetch UI credentials from Auth0 and store them in a k8s secret",
-      "test-full-class-names-auth0-credentials-preflight.log",
-      (t: String) => isAuth0CredentialsPreflightIntegrationTest(t),
     ),
     (
       "Docker Compose validator preflight test",

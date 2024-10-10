@@ -117,9 +117,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
 
-  // We want the scan instance after the migration which contains both old and new data.
-  override def updateHistoryScanName = "sv1ScanLocal"
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
     EnvironmentDefinition
