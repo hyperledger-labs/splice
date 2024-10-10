@@ -13,6 +13,7 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpConfig
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
@@ -45,13 +46,21 @@ def bootstrapOtherDomain(
   // For some stupid reason bootstrap.domain does not allow changing the dynamic domain parameters
   // so we overwrite it here.
   val domainId = sequencer.domain_id
-  // Align the reconciliation interval with what our triggers set. This doesn't really matter for splitwell
-  // but it matters for the soft synchronizer upgrade test.
+  // Align the reconciliation interval and catchup config with what our triggers set.
+  // This doesn't really matter for splitwell but it matters for the soft synchronizer upgrade test.
   Seq(sequencer, mediator).foreach { node =>
     node.topology.domain_parameters.propose_update(
       domainId,
       parameters =>
-        parameters.update(reconciliationInterval = PositiveDurationSeconds.ofMinutes(30)),
+        parameters.update(
+          reconciliationInterval = PositiveDurationSeconds.ofMinutes(30),
+          acsCommitmentsCatchUpConfig = Some(
+            AcsCommitmentsCatchUpConfig(
+              catchUpIntervalSkip = PositiveInt.tryCreate(24),
+              nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
+            )
+          ),
+        ),
       signedBy = Some(node.id.uid.namespace.fingerprint),
     )
   }
