@@ -630,6 +630,8 @@ jobs:
           cmd_name: Wait for vote to be effective
           cluster: << parameters.cluster >>
           gce_authenticate: true
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET"
           cmd: |
             if [[ << parameters.run >> == true ]]; then
               cncluster activate
