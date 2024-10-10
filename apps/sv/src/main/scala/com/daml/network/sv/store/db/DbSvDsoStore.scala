@@ -1467,13 +1467,13 @@ class DbSvDsoStore(
   def lookupTransferPreapprovalByParty(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[Option[ContractWithState[
-    splice.amuletrules.TransferPreapproval2.ContractId,
-    splice.amuletrules.TransferPreapproval2,
+    splice.amuletrules.TransferPreapproval.ContractId,
+    splice.amuletrules.TransferPreapproval,
   ]]] =
     for {
       // TODO(#14568) Hit indices for this instead of doing a linear search
       transferPreapprovals <- multiDomainAcsStore.listContracts(
-        splice.amuletrules.TransferPreapproval2.COMPANION
+        splice.amuletrules.TransferPreapproval.COMPANION
       )
     } yield {
       transferPreapprovals

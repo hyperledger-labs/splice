@@ -7,8 +7,8 @@ import cats.implicits.*
 import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.splice.appmanager.store.AppConfiguration
 import com.daml.network.codegen.java.splice.amuletrules.{
-  ExternalPartySetupProposal2,
-  TransferPreapproval2,
+  ExternalPartySetupProposal,
+  TransferPreapproval,
 }
 import com.daml.network.codegen.java.splice.wallet.{
   install as walletCodegen,
@@ -184,7 +184,7 @@ class DbValidatorStore(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
     QueryResult[
-      Option[ContractWithState[ExternalPartySetupProposal2.ContractId, ExternalPartySetupProposal2]]
+      Option[ContractWithState[ExternalPartySetupProposal.ContractId, ExternalPartySetupProposal]]
     ]
   ] = waitUntilAcsIngested {
     for {
@@ -196,7 +196,7 @@ class DbValidatorStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                ExternalPartySetupProposal2.COMPANION.TEMPLATE_ID
+                ExternalPartySetupProposal.COMPANION.TEMPLATE_ID
               )}
                 and user_party = $partyId
             """, // TODO(#14568): ensure this is indexed
@@ -211,7 +211,7 @@ class DbValidatorStore(
     } yield QueryResult(
       resultWithOffset.offset,
       resultWithOffset.row.map(
-        contractWithStateFromRow(ExternalPartySetupProposal2.COMPANION)(_)
+        contractWithStateFromRow(ExternalPartySetupProposal.COMPANION)(_)
       ),
     )
   }
@@ -219,7 +219,7 @@ class DbValidatorStore(
   override def lookupTransferPreapprovalByReceiverPartyWithOffset(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
-    QueryResult[Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]]
+    QueryResult[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]]
   ] = waitUntilAcsIngested {
     for {
       resultWithOffset <- storage
@@ -230,7 +230,7 @@ class DbValidatorStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                TransferPreapproval2.COMPANION.TEMPLATE_ID
+                TransferPreapproval.COMPANION.TEMPLATE_ID
               )}
                 and user_party = $partyId
             """,
@@ -245,7 +245,7 @@ class DbValidatorStore(
     } yield QueryResult(
       resultWithOffset.offset,
       resultWithOffset.row.map(
-        contractWithStateFromRow(TransferPreapproval2.COMPANION)(_)
+        contractWithStateFromRow(TransferPreapproval.COMPANION)(_)
       ),
     )
   }

@@ -14,7 +14,7 @@ import com.daml.network.history.{
   LockedAmuletExpireAmulet,
   LockedAmuletOwnerExpireLock,
   LockedAmuletUnlock,
-  TransferPreapproval2_Renew,
+  TransferPreapproval_Renew,
 }
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.http.v0.definitions.{
@@ -447,7 +447,7 @@ object TxLogEntry extends StoreErrors {
     case object TransferPreapprovalCreation
         extends TransferTransactionSubtype(AmuletRules_CreateTransferPreapproval)
     case object TransferPreapprovalRenewal
-        extends TransferTransactionSubtype(TransferPreapproval2_Renew)
+        extends TransferTransactionSubtype(TransferPreapproval_Renew)
     case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
 
     val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](

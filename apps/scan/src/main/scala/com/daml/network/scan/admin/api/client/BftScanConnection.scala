@@ -7,7 +7,7 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval2}
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
 import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
@@ -176,7 +176,7 @@ class BftScanConnection(
   override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]] =
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
     bftCall(_.lookupTransferPreapprovalByParty(receiver))
 
   private def bftCall[T](

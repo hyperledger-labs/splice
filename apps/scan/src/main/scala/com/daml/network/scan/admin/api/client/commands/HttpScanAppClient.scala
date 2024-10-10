@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
-  TransferPreapproval2,
+  TransferPreapproval,
 }
 import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.round.{
@@ -428,7 +428,7 @@ object HttpScanAppClient {
   case class LookupTransferPreapprovalByParty(
       party: PartyId
   ) extends InternalBaseCommand[http.LookupTransferPreapprovalByPartyResponse, Option[
-        ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]
+        ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]
       ]] {
 
     override def submitRequest(
@@ -441,7 +441,7 @@ object HttpScanAppClient {
     ) = {
       case http.LookupTransferPreapprovalByPartyResponse.OK(response) =>
         ContractWithState
-          .fromHttp(TransferPreapproval2.COMPANION)(response.transferPreapproval)
+          .fromHttp(TransferPreapproval.COMPANION)(response.transferPreapproval)
           .map(Some(_))
           .leftMap(_.toString)
       case http.LookupTransferPreapprovalByPartyResponse.NotFound(_) =>

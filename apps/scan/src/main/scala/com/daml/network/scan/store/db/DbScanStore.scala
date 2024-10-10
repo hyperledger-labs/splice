@@ -7,7 +7,7 @@ import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval2}
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
 import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
@@ -330,7 +330,7 @@ class DbScanStore(
   override def lookupTransferPreapprovalByParty(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
-    Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]
+    Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]
   ] = waitUntilAcsIngested {
     (for {
       row <- storage
@@ -341,7 +341,7 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                TransferPreapproval2.COMPANION.TEMPLATE_ID
+                TransferPreapproval.COMPANION.TEMPLATE_ID
               )}
                 and transfer_preapproval_receiver = $partyId
             """,
@@ -351,7 +351,7 @@ class DbScanStore(
           ).headOption,
           "lookupTransferPreapprovalReceiver",
         )
-    } yield contractWithStateFromRow(TransferPreapproval2.COMPANION)(row)).value
+    } yield contractWithStateFromRow(TransferPreapproval.COMPANION)(row)).value
   }
 
   override def listTransactions(

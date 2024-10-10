@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   AppTransferContext,
   PaymentTransferContext,
   TransferContext,
-  TransferPreapproval2,
+  TransferPreapproval,
 }
 import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.types.Round
@@ -235,7 +235,7 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
   def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]]
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]]
 
 }
 

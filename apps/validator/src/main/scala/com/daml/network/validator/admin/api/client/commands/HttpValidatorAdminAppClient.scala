@@ -213,7 +213,7 @@ object HttpValidatorAdminAppClient {
   case class CreateExternalPartySetupProposal(partyId: PartyId)
       extends BaseCommand[
         http.CreateExternalPartySetupProposalResponse,
-        amuletrulesCodegen.ExternalPartySetupProposal2.ContractId,
+        amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
       ] {
 
     override def submitRequest(
@@ -232,9 +232,9 @@ object HttpValidatorAdminAppClient {
         decoder: TemplateJsonDecoder
     ): PartialFunction[http.CreateExternalPartySetupProposalResponse, Either[
       String,
-      amuletrulesCodegen.ExternalPartySetupProposal2.ContractId,
+      amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
     ]] = { case http.CreateExternalPartySetupProposalResponse.OK(response) =>
-      Codec.decodeJavaContractId(amuletrulesCodegen.ExternalPartySetupProposal2.COMPANION)(
+      Codec.decodeJavaContractId(amuletrulesCodegen.ExternalPartySetupProposal.COMPANION)(
         response.contractId
       )
     }
@@ -244,8 +244,8 @@ object HttpValidatorAdminAppClient {
       extends BaseCommand[
         http.ListExternalPartySetupProposalsResponse,
         Seq[ContractWithState[
-          amuletrulesCodegen.ExternalPartySetupProposal2.ContractId,
-          amuletrulesCodegen.ExternalPartySetupProposal2,
+          amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
+          amuletrulesCodegen.ExternalPartySetupProposal,
         ]],
       ] {
 
@@ -264,7 +264,7 @@ object HttpValidatorAdminAppClient {
       response.contracts.traverse(contractWithState =>
         for {
           contract <- Contract
-            .fromHttp(amuletrulesCodegen.ExternalPartySetupProposal2.COMPANION)(
+            .fromHttp(amuletrulesCodegen.ExternalPartySetupProposal.COMPANION)(
               contractWithState.contract
             )
             .leftMap(_.toString)
@@ -278,7 +278,7 @@ object HttpValidatorAdminAppClient {
   }
 
   case class PrepareAcceptExternalPartySetupProposal(
-      contractId: amuletrulesCodegen.ExternalPartySetupProposal2.ContractId,
+      contractId: amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
       userPartyId: PartyId,
   ) extends BaseCommand[
         http.PrepareAcceptExternalPartySetupProposalResponse,
@@ -314,7 +314,7 @@ object HttpValidatorAdminAppClient {
       publicKey: String,
   ) extends BaseCommand[
         http.SubmitAcceptExternalPartySetupProposalResponse,
-        (amuletrulesCodegen.TransferPreapproval2.ContractId, String),
+        (amuletrulesCodegen.TransferPreapproval.ContractId, String),
       ] {
 
     override def submitRequest(
@@ -340,7 +340,7 @@ object HttpValidatorAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.SubmitAcceptExternalPartySetupProposalResponse.OK(response) =>
       Codec
-        .decodeJavaContractId(amuletrulesCodegen.TransferPreapproval2.COMPANION)(
+        .decodeJavaContractId(amuletrulesCodegen.TransferPreapproval.COMPANION)(
           response.transferPreapprovalContractId
         )
         .map(cid => (cid, response.updateId))
@@ -352,8 +352,8 @@ object HttpValidatorAdminAppClient {
   ) extends BaseCommand[
         http.LookupTransferPreapprovalByPartyResponse,
         Option[ContractWithState[
-          amuletrulesCodegen.TransferPreapproval2.ContractId,
-          amuletrulesCodegen.TransferPreapproval2,
+          amuletrulesCodegen.TransferPreapproval.ContractId,
+          amuletrulesCodegen.TransferPreapproval,
         ]],
       ] {
 
@@ -371,7 +371,7 @@ object HttpValidatorAdminAppClient {
     ) = {
       case http.LookupTransferPreapprovalByPartyResponse.OK(response) =>
         ContractWithState
-          .fromHttp(amuletrulesCodegen.TransferPreapproval2.COMPANION)(response.transferPreapproval)
+          .fromHttp(amuletrulesCodegen.TransferPreapproval.COMPANION)(response.transferPreapproval)
           .map(Some(_))
           .leftMap(_.toString)
       case http.LookupTransferPreapprovalByPartyResponse.NotFound(_) =>
@@ -383,8 +383,8 @@ object HttpValidatorAdminAppClient {
       extends BaseCommand[
         http.ListTransferPreapprovalsResponse,
         Seq[ContractWithState[
-          amuletrulesCodegen.TransferPreapproval2.ContractId,
-          amuletrulesCodegen.TransferPreapproval2,
+          amuletrulesCodegen.TransferPreapproval.ContractId,
+          amuletrulesCodegen.TransferPreapproval,
         ]],
       ] {
 
@@ -403,7 +403,7 @@ object HttpValidatorAdminAppClient {
       response.contracts.traverse(contractWithState =>
         for {
           contract <- Contract
-            .fromHttp(amuletrulesCodegen.TransferPreapproval2.COMPANION)(
+            .fromHttp(amuletrulesCodegen.TransferPreapproval.COMPANION)(
               contractWithState.contract
             )
             .leftMap(_.toString)

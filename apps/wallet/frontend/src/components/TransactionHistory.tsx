@@ -235,7 +235,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // TransferPreapprovalCreated
       text = 'Transfer Preapproval Created';
       break;
-    case 'TransferPreapproval2_Renew':
+    case 'TransferPreapproval_Renew':
       // TransferPreapprovalRenewed
       text = 'Transfer Preapproval Renewed';
       break;

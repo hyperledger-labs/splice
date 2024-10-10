@@ -13,10 +13,10 @@ import Splice.ExternalPartyAmuletRules
 import Splice.Fees
 import Splice.Types
 
-createTransferPreapproval : Party -> Party -> Party -> Time -> Script (ContractId TransferPreapproval2)
+createTransferPreapproval : Party -> Party -> Party -> Time -> Script (ContractId TransferPreapproval)
 createTransferPreapproval receiver provider dso expiresAt = do
   now <- getTime
-  submitMulti [receiver, provider, dso] [] $ createCmd TransferPreapproval2 with
+  submitMulti [receiver, provider, dso] [] $ createCmd TransferPreapproval with
       receiver
       provider
       dso
@@ -35,7 +35,7 @@ testTransferPreapprovalSend = script do
   -- Externally signed transaction (or not if bob is not also externally hosted, like for a sweep) to send amulets
   context <- getPaymentTransferContext app bob
   amuletCid <- tap app bob 50.0
-  submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval2_Send
+  submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
     with
       sender = bob.primaryParty
       context
@@ -48,7 +48,7 @@ testTransferPreapprovalSend = script do
   -- Send fails if the pre-approval has expired
   context <- getPaymentTransferContext app bob
   amuletCid <- tap app bob 50.0
-  submitMultiMustFail [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval2_Send
+  submitMultiMustFail [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
       with
         sender = bob.primaryParty
         context
@@ -70,7 +70,7 @@ testTransferPreapprovalRenewal = script do
   -- Renewal fails if provided `newExpiresAt` is earlier than previous `expiresAt`
   providerAmuletCid <- tap app aliceValidator 10.0
   submitMultiMustFail [aliceValidator.primaryParty] [app.dso] $
-    exerciseCmd transferPreapprovalCid TransferPreapproval2_Renew with
+    exerciseCmd transferPreapprovalCid TransferPreapproval_Renew with
       context = providerTransferContext
       inputs = [InputAmulet providerAmuletCid]
       newExpiresAt = now
@@ -78,7 +78,7 @@ testTransferPreapprovalRenewal = script do
   -- Provider can renew the pre-approval (before expiry)
   let newExpiresAt = now `addRelTime` (days 2)
   result <- submitMulti [aliceValidator.primaryParty] [app.dso] $
-    exerciseCmd transferPreapprovalCid TransferPreapproval2_Renew with
+    exerciseCmd transferPreapprovalCid TransferPreapproval_Renew with
       context = providerTransferContext
       inputs = [InputAmulet providerAmuletCid]
       newExpiresAt
@@ -93,7 +93,7 @@ testTransferPreapprovalRenewal = script do
   -- Renewal fails if the pre-approval has expired
   providerAmuletCid2 <- tap app aliceValidator 10.0
   submitMultiMustFail [aliceValidator.primaryParty] [app.dso] $
-    exerciseCmd transferPreapprovalCid TransferPreapproval2_Renew with
+    exerciseCmd transferPreapprovalCid TransferPreapproval_Renew with
       context = providerTransferContext
       inputs = [InputAmulet providerAmuletCid2]
       newExpiresAt = now
@@ -108,21 +108,21 @@ testTransferPreapprovalCancelExpire = script do
 
   -- User can cancel pre-approval
   transferPreapprovalCid <- createTransferPreapproval alice.primaryParty aliceValidator.primaryParty app.dso expiresAt
-  submit alice.primaryParty $ exerciseCmd transferPreapprovalCid (TransferPreapproval2_Cancel alice.primaryParty)
+  submit alice.primaryParty $ exerciseCmd transferPreapprovalCid (TransferPreapproval_Cancel alice.primaryParty)
 
   -- Provider can cancel pre-approval
   transferPreapprovalCid2 <- createTransferPreapproval alice.primaryParty aliceValidator.primaryParty app.dso expiresAt
-  submit aliceValidator.primaryParty $ exerciseCmd transferPreapprovalCid2 (TransferPreapproval2_Cancel aliceValidator.primaryParty)
+  submit aliceValidator.primaryParty $ exerciseCmd transferPreapprovalCid2 (TransferPreapproval_Cancel aliceValidator.primaryParty)
 
   transferPreapprovalCid3 <- createTransferPreapproval alice.primaryParty aliceValidator.primaryParty app.dso expiresAt
   -- Move forward in time to expire pre-approval
   passTime (days 1)
 
   -- Expired pre-approvals cannot be canceled...
-  submitMustFail alice.primaryParty $ exerciseCmd transferPreapprovalCid3 (TransferPreapproval2_Cancel alice.primaryParty)
-  submitMustFail aliceValidator.primaryParty $ exerciseCmd transferPreapprovalCid3 (TransferPreapproval2_Cancel aliceValidator.primaryParty)
+  submitMustFail alice.primaryParty $ exerciseCmd transferPreapprovalCid3 (TransferPreapproval_Cancel alice.primaryParty)
+  submitMustFail aliceValidator.primaryParty $ exerciseCmd transferPreapprovalCid3 (TransferPreapproval_Cancel aliceValidator.primaryParty)
   -- ...but the DSO party can archive them
-  submit app.dso $ exerciseCmd transferPreapprovalCid3 TransferPreapproval2_Expire
+  submit app.dso $ exerciseCmd transferPreapprovalCid3 TransferPreapproval_Expire
 
   pure ()
 

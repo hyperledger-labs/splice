@@ -111,7 +111,7 @@ template AmuletRules
 
     nonconsuming choice AmuletRules_CreateExternalPartySetupProposal : AmuletRules_CreateExternalPartySetupProposalResult
       -- ^ Propose to host an external party
-      -- The provider pre-pays the fees for the creation of a TransferPreapproval2 contract
+      -- The provider pre-pays the fees for the creation of a TransferPreapproval contract
       -- on behalf of the external party when exercising this choice
       with
         context : PaymentTransferContext
@@ -126,7 +126,7 @@ template AmuletRules
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (preapprovalExpiresAt `subTime` now) configUsd context.context dso
         transferResult <- chargeTransferPreapprovalFee validator amuletPaid inputs context dso
-        proposalCid <- create ExternalPartySetupProposal2 with
+        proposalCid <- create ExternalPartySetupProposal with
           user
           validator
           dso
@@ -149,7 +149,7 @@ template AmuletRules
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (expiresAt `subTime` now) configUsd context.context dso
         transferResult <- chargeTransferPreapprovalFee provider amuletPaid inputs context dso
-        transferPreapprovalCid <- create TransferPreapproval2 with
+        transferPreapprovalCid <- create TransferPreapproval with
           receiver
           provider
           dso
@@ -1172,7 +1172,7 @@ data AmuletRules_BuyMemberTrafficResult = AmuletRules_BuyMemberTrafficResult wit
 
 data AmuletRules_CreateExternalPartySetupProposalResult = AmuletRules_CreateExternalPartySetupProposalResult
   with
-    proposalCid : ContractId ExternalPartySetupProposal2
+    proposalCid : ContractId ExternalPartySetupProposal
     user: Party
     validator: Party
     transferResult : TransferResult
@@ -1181,7 +1181,7 @@ data AmuletRules_CreateExternalPartySetupProposalResult = AmuletRules_CreateExte
 
 data AmuletRules_CreateTransferPreapprovalResult = AmuletRules_CreateTransferPreapprovalResult
   with
-    transferPreapprovalCid : ContractId TransferPreapproval2
+    transferPreapprovalCid : ContractId TransferPreapproval
     transferResult : TransferResult
     amuletPaid : Decimal
   deriving (Show, Eq)
@@ -1242,8 +1242,7 @@ instance HasCheckedFetch AmuletRules ForDso where
 -- External Party Setup
 -- ----------------------
 
--- TODO(#14757): Rename to `ExternalPartySetupProposal` after old template has been removed
-template ExternalPartySetupProposal2
+template ExternalPartySetupProposal
   with
     validator : Party
     user : Party
@@ -1254,26 +1253,26 @@ template ExternalPartySetupProposal2
     signatory validator, dso
     observer user
 
-    choice ExternalPartySetupProposal2_Accept : ExternalPartySetupProposal2_AcceptResult
+    choice ExternalPartySetupProposal_Accept : ExternalPartySetupProposal_AcceptResult
       controller user
       do
         validatorRightCid <- create ValidatorRight with
            dso
            validator
            user
-        transferPreapprovalCid <- create TransferPreapproval2 with
+        transferPreapprovalCid <- create TransferPreapproval with
           receiver = user
           provider = validator
           dso
           validFrom = createdAt
           lastRenewedAt = createdAt
           expiresAt = preapprovalExpiresAt
-        return ExternalPartySetupProposal2_AcceptResult with ..
+        return ExternalPartySetupProposal_AcceptResult with ..
 
-data ExternalPartySetupProposal2_AcceptResult = ExternalPartySetupProposal2_AcceptResult
+data ExternalPartySetupProposal_AcceptResult = ExternalPartySetupProposal_AcceptResult
   with
     validatorRightCid : ContractId ValidatorRight
-    transferPreapprovalCid : ContractId TransferPreapproval2
+    transferPreapprovalCid : ContractId TransferPreapproval
   deriving (Show, Eq)
 
 -- Transfer Pre-approval
@@ -1288,8 +1287,7 @@ data ExternalPartySetupProposal2_AcceptResult = ExternalPartySetupProposal2_Acce
 -- or have an app provider do so for them in exchange for the app rewards for
 -- the amulet transfers completed via the managed pre-approval.
 
--- TODO(#14757): Rename to `TransferPreapproval` after old template has been removed
-template TransferPreapproval2
+template TransferPreapproval
   with
     dso : Party
     receiver : Party -- ^ The receiver party
@@ -1301,14 +1299,14 @@ template TransferPreapproval2
     signatory receiver, provider, dso
     ensure (expiresAt > validFrom) && (lastRenewedAt >= validFrom)
 
-    nonconsuming choice TransferPreapproval2_Fetch : TransferPreapproval2
+    nonconsuming choice TransferPreapproval_Fetch : TransferPreapproval
       with
         p : Party
       controller p
       do pure this
 
     -- Transfer amulet to the receiver
-    nonconsuming choice TransferPreapproval2_Send : TransferPreapproval2_SendResult
+    nonconsuming choice TransferPreapproval_Send : TransferPreapproval_SendResult
       with
         context : PaymentTransferContext
         inputs : [TransferInput]
@@ -1328,10 +1326,10 @@ template TransferPreapproval2
                  amount = amount
                  lock = None
              ]
-         pure (TransferPreapproval2_SendResult transferResult)
+         pure (TransferPreapproval_SendResult transferResult)
 
     -- Renew the contract as the provider
-    choice TransferPreapproval2_Renew : TransferPreapproval2_RenewResult
+    choice TransferPreapproval_Renew : TransferPreapproval_RenewResult
       with
         context : PaymentTransferContext
         inputs : [TransferInput]
@@ -1349,49 +1347,49 @@ template TransferPreapproval2
          transferPreapprovalCid <- create this with
            lastRenewedAt = now
            expiresAt = newExpiresAt
-         return TransferPreapproval2_RenewResult with ..
+         return TransferPreapproval_RenewResult with ..
 
     -- Used by the DSO party to archive expired contracts
-    choice TransferPreapproval2_Expire : TransferPreapproval2_ExpireResult
+    choice TransferPreapproval_Expire : TransferPreapproval_ExpireResult
       controller dso
       do now <- getTime
          require "Contract has expired" (now >= expiresAt)
-         pure TransferPreapproval2_ExpireResult
+         pure TransferPreapproval_ExpireResult
 
     -- Cancel the contract as the receiver or provider
-    choice TransferPreapproval2_Cancel : TransferPreapproval2_CancelResult
+    choice TransferPreapproval_Cancel : TransferPreapproval_CancelResult
       with
         p : Party
       controller p
       do require ("Controller " <> show p <> " is either receiver or provider") (p `elem` [receiver, provider])
          now <- getTime
          require "Contract has not expired" (now < expiresAt)
-         pure TransferPreapproval2_CancelResult
+         pure TransferPreapproval_CancelResult
 
-instance HasCheckedFetch TransferPreapproval2 ForOwner where
-  contractGroupId TransferPreapproval2{..} =
+instance HasCheckedFetch TransferPreapproval ForOwner where
+  contractGroupId TransferPreapproval{..} =
     ForOwner with
       owner = receiver
       dso
 
-data TransferPreapproval2_SendResult = TransferPreapproval2_SendResult
+data TransferPreapproval_SendResult = TransferPreapproval_SendResult
   with
     result : TransferResult
   deriving (Show, Eq)
 
-data TransferPreapproval2_RenewResult = TransferPreapproval2_RenewResult
+data TransferPreapproval_RenewResult = TransferPreapproval_RenewResult
   with
-    transferPreapprovalCid : ContractId TransferPreapproval2
+    transferPreapprovalCid : ContractId TransferPreapproval
     transferResult : TransferResult
     receiver: Party
     provider: Party
     amuletPaid : Decimal
   deriving (Show, Eq)
 
-data TransferPreapproval2_ExpireResult = TransferPreapproval2_ExpireResult {}
+data TransferPreapproval_ExpireResult = TransferPreapproval_ExpireResult {}
   deriving (Show, Eq)
 
-data TransferPreapproval2_CancelResult = TransferPreapproval2_CancelResult
+data TransferPreapproval_CancelResult = TransferPreapproval_CancelResult
   deriving (Show, Eq)
 
 computeTransferPreapprovalFee : RelTime -> AmuletConfig Unit.USD -> TransferContext -> Party -> Update (Decimal, Decimal)

@@ -326,8 +326,8 @@ trait UserWalletStore extends AppStore with NamedLogging {
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Contract[
-    amuletrulesCodegen.TransferPreapproval2.ContractId,
-    amuletrulesCodegen.TransferPreapproval2,
+    amuletrulesCodegen.TransferPreapproval.ContractId,
+    amuletrulesCodegen.TransferPreapproval,
   ]] = lookupTransferPreapproval()
     .map(
       _.map(
@@ -344,11 +344,11 @@ trait UserWalletStore extends AppStore with NamedLogging {
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[QueryResult[Option[Contract[
-    amuletrulesCodegen.TransferPreapproval2.ContractId,
-    amuletrulesCodegen.TransferPreapproval2,
+    amuletrulesCodegen.TransferPreapproval.ContractId,
+    amuletrulesCodegen.TransferPreapproval,
   ]]]] =
     multiDomainAcsStore
-      .findAnyContractWithOffset(amuletrulesCodegen.TransferPreapproval2.COMPANION)
+      .findAnyContractWithOffset(amuletrulesCodegen.TransferPreapproval.COMPANION)
       .map(_.map(_.map(_.contract)))
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
@@ -706,7 +706,7 @@ object UserWalletStore {
             contract
           )
         ),
-        mkFilter(amuletrulesCodegen.TransferPreapproval2.COMPANION)(co =>
+        mkFilter(amuletrulesCodegen.TransferPreapproval.COMPANION)(co =>
           co.payload.dso == dso && co.payload.provider == validator && (co.payload.provider == endUser || co.payload.receiver == endUser)
         )(contract =>
           UserWalletAcsStoreRowData(

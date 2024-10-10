@@ -23,7 +23,6 @@ import Splice.Wallet.TopUpState
 import Splice.Wallet.BuyTrafficRequest
 import Splice.Wallet.TransferPreapproval
 import Splice.Scripts.Wallet.TestSubscriptions
-import Splice.TransferPreapproval
 import Splice.Fees
 import Splice.Scripts.Util
 import Splice.Scripts.Parameters
@@ -77,7 +76,7 @@ collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
 
 sendPreapprovedTransfer : AmuletApp -> AmuletUser -> AmuletUser -> AmuletUser -> Decimal -> Script AmuletOperationOutcome
 sendPreapprovedTransfer app sender senderWalletProvider receiver amount = do
-  [(preapprovalCid, preapproval)] <- queryFilter @TransferPreapproval2 app.dso (\co -> co.receiver == receiver.primaryParty)
+  [(preapprovalCid, preapproval)] <- queryFilter @TransferPreapproval app.dso (\co -> co.receiver == receiver.primaryParty)
   featuredAppRight <- queryFilter @FeaturedAppRight app.dso (\co -> co.provider == preapproval.provider)
   let receiverProviderFeaturedRight = listToOptional (fmap fst featuredAppRight)
 
@@ -89,7 +88,7 @@ sendPreapprovedTransfer app sender senderWalletProvider receiver amount = do
   context <- getPaymentTransferContextFeaturedApp app sender senderProviderFeaturedRight
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [senderWalletProvider.primaryParty] [sender.primaryParty, app.dso] $ exerciseCmd senderWalletInstall WalletAppInstall_ExecuteBatch with
     inputs = fmap ((\amulet -> InputAmulet amulet) . fst) amulets
-    operations = [CO_TransferPreapproval2Send preapprovalCid receiverProviderFeaturedRight amount]
+    operations = [CO_TransferPreapprovalSend preapprovalCid receiverProviderFeaturedRight amount]
     context
   pure (head outcomes)
 
@@ -549,43 +548,6 @@ testCO_MergeTransferInputs = script do
 
   pure ()
 
-testCO_TransferPreapprovalSend : Script ()
-testCO_TransferPreapprovalSend = script do
-  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  runNextIssuance app
-  runAmuletDepositBots app
-
-  amulet <- tap app bob 42.0
-
-  install <- submitMulti [bob.primaryParty, bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
-    endUserParty = bob.primaryParty
-    endUserName = "bob_user"
-    dsoParty = app.dso
-    validatorParty = bobValidator.primaryParty
-
-  transferPreapprovalCid <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd TransferPreapproval with
-    receiver = alice.primaryParty
-    provider = aliceValidator.primaryParty
-    dso = app.dso
-
-  context <- getPaymentTransferContext app alice
-
-  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [bobValidator.primaryParty] [bob.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [InputAmulet amulet]
-    operations = [CO_TransferPreapprovalSend transferPreapprovalCid 40.0]
-    context
-
-  let [COO_TransferPreapprovalSend (Some resultAmulet)] = outcomes
-  bobAmulets <- query @Amulet bob.primaryParty
-  let [_, (mergedAmuletCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) bobAmulets
-  resultAmulet === mergedAmuletCid
-
-  aliceAmulets <- query @Amulet alice.primaryParty
-  -- Setup creates 1 amulet of value 1. The amulet of value 40 is then the result of the transfer.
-  sort (map (\(_, a) -> a.amount.initialAmount) aliceAmulets) === [1.0, 40.0]
-
-  pure ()
-
 testTransferPreapproval : Script ()
 testTransferPreapproval = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
@@ -620,7 +582,7 @@ testTransferPreapproval = script do
 
   let [COO_CreateExternalPartySetupProposal proposalCid] = outcomes
   Some proposal <- queryContractId aliceValidator.primaryParty proposalCid
-  proposal === ExternalPartySetupProposal2 with
+  proposal === ExternalPartySetupProposal with
     user = alice.primaryParty
     validator = aliceValidator.primaryParty
     dso = app.dso
@@ -638,7 +600,7 @@ testTransferPreapproval = script do
   newCoupon.user === aliceValidator.primaryParty
   newCoupon.amount === preapprovalFee + createFee
 
-  result <- submit alice.primaryParty $ exerciseCmd proposalCid ExternalPartySetupProposal2_Accept {}
+  result <- submit alice.primaryParty $ exerciseCmd proposalCid ExternalPartySetupProposal_Accept {}
   let preapprovalCid = result.transferPreapprovalCid
   Some preapproval <- queryContractId alice.primaryParty preapprovalCid
 
@@ -675,7 +637,7 @@ testTransferPreapproval = script do
 
   -- Send via pre-approval works for unfeatured senders
   outcome <- sendPreapprovedTransfer app bob bobValidator alice 10.0
-  let COO_TransferPreapproval2Send (Some changeAmuletCid) = outcome
+  let COO_TransferPreapprovalSend (Some changeAmuletCid) = outcome
   bobAmulets <- query @Amulet bob.primaryParty
   let [(mergedAmuletCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) bobAmulets
   mergedAmuletCid === changeAmuletCid
@@ -685,7 +647,7 @@ testTransferPreapproval = script do
 
   -- Send via pre-approval works for featured senders
   outcome <- sendPreapprovedTransfer app bob bobValidator alice 20.0
-  let COO_TransferPreapproval2Send (Some changeAmuletCid) = outcome
+  let COO_TransferPreapprovalSend (Some changeAmuletCid) = outcome
   bobAmulets <- query @Amulet bob.primaryParty
   let [(mergedAmuletCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) bobAmulets
   mergedAmuletCid === changeAmuletCid
@@ -716,7 +678,7 @@ testTransferPreapproval = script do
 
   let [COO_AcceptTransferPreapprovalProposal bobPreapprovalCid] = outcomes
   Some bobPreapproval <- queryContractId bob.primaryParty bobPreapprovalCid
-  bobPreapproval === TransferPreapproval2 with
+  bobPreapproval === TransferPreapproval with
     receiver = bob.primaryParty
     provider = bobValidator.primaryParty
     dso = app.dso

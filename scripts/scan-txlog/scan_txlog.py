@@ -139,8 +139,6 @@ class TemplateQualifiedNames:
     dso_bootstrap = "Splice.DsoBootstrap:DsoBootstrap"
     amulet_rules = "Splice.AmuletRules:AmuletRules"
     unclaimed_reward = "Splice.Amulet:UnclaimedReward"
-    # TODO(#14757): Remove this
-    transfer_preapproval = "Splice.TransferPreapproval:TransferPreapproval"
 
     all_tracked = set(
         [
@@ -898,25 +896,25 @@ class LfValue:
     def get_create_transfer_preapproval_result_amulet_paid(self):
         return self.__get_record_field("amuletPaid").__get_numeric()
 
-    # choice TransferPreapproval2_Renew -> inputs
+    # choice TransferPreapproval_Renew -> inputs
     def get_renew_transfer_preapproval_inputs(self):
         return [
             x.__get_variant() for x in self.__get_record_field("inputs").__get_list()
         ]
 
-    # data TransferPreapproval2_RenewResult -> receiver
+    # data TransferPreapproval_RenewResult -> receiver
     def get_renew_transfer_preapproval_receiver(self):
         return self.__get_record_field("receiver").__get_party()
 
-    # data TransferPreapproval2_RenewResult -> provider
+    # data TransferPreapproval_RenewResult -> provider
     def get_renew_transfer_preapproval_provider(self):
         return self.__get_record_field("provider").__get_party()
 
-    # data TransferPreapproval2_RenewResult -> transferResult
+    # data TransferPreapproval_RenewResult -> transferResult
     def get_renew_transfer_preapproval_result_transfer_result(self):
         return self.__get_record_field("transferResult")
 
-    # data TransferPreapproval2_RenewResult -> amuletPaid
+    # data TransferPreapproval_RenewResult -> amuletPaid
     def get_renew_transfer_preapproval_result_amulet_paid(self):
         return self.__get_record_field("amuletPaid").__get_numeric()
 
@@ -2016,8 +2014,6 @@ class State:
         match event.template_id.qualified_name:
             case TemplateQualifiedNames.dso_bootstrap:
                 pass
-            case TemplateQualifiedNames.transfer_preapproval:
-                pass
             case _:
                 self._fail(transaction, f"Unexpected root CreatedEvent: {event}")
         return HandleTransactionResult.empty()
@@ -2878,7 +2874,7 @@ class State:
             if event.choice_name == "TransferCommand_Send":
                 for event_id in event.child_event_ids:
                     event = transaction.events_by_id[event_id]
-                    if event.choice_name == "TransferPreapproval2_Send":
+                    if event.choice_name == "TransferPreapproval_Send":
                         return self.handle_transfer_preapproval_send(
                             transaction,
                             event,
@@ -3464,13 +3460,13 @@ class State:
                 return self.handle_create_external_party_setup_proposal(
                     transaction, event
                 )
-            case "ExternalPartySetupProposal2_Accept":
+            case "ExternalPartySetupProposal_Accept":
                 return HandleTransactionResult.empty()
             case "AmuletRules_CreateTransferPreapproval":
                 return self.handle_create_transfer_preapproval(transaction, event)
-            case "TransferPreapproval2_Renew":
+            case "TransferPreapproval_Renew":
                 return self.handle_renew_transfer_preapproval(transaction, event)
-            case "TransferPreapproval2_Send":
+            case "TransferPreapproval_Send":
                 return self.handle_transfer_preapproval_send(transaction, event)
             case "DsoRules_TransferCommand_Send":
                 return self.handle_dso_rules_transfer_command_send(transaction, event)

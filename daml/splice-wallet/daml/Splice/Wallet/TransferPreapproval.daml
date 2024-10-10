@@ -33,6 +33,6 @@ template TransferPreapprovalProposal
         return TransferPreapprovalProposal_AcceptResult with ..
 
 data TransferPreapprovalProposal_AcceptResult = TransferPreapprovalProposal_AcceptResult with
-  transferPreapprovalCid: ContractId TransferPreapproval2
+  transferPreapprovalCid: ContractId TransferPreapproval
   transferResult: TransferResult
   amuletPaid: Decimal

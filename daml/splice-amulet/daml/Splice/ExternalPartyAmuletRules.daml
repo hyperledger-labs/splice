@@ -71,7 +71,7 @@ template TransferCommand
         inputs : [TransferInput]
         -- The delegate is expected to select inputs that cover the amount being transferred, provided they exist.
         -- Otherwise the transfer will fail.
-        transferPreapprovalCid : ContractId TransferPreapproval2
+        transferPreapprovalCid : ContractId TransferPreapproval
       controller dso
       do -- Verify that receiver and DSO party match. We don't validate that the reeiver's provider matches
          -- as changing that should be up to the receiver and not require the sender to resign.
@@ -80,7 +80,7 @@ template TransferCommand
          require ("Current time " <> show now <> " is before expiry of TransferCommand " <> show expiresAt) (expiresAt > now)
          result <-
            try do
-             TransferPreapproval2_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval2_Send context inputs amount sender)
+             TransferPreapproval_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender)
              pure (TransferCommandResultSuccess result)
            catch
              (ex : InvalidTransfer) -> pure (TransferCommandResultFailure ex.reason)

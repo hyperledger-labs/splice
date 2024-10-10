@@ -75,10 +75,10 @@ object AmuletRules_CreateTransferPreapproval
       template = splice.amuletrules.AmuletRules.COMPANION,
     )
 
-object TransferPreapproval2_Renew
+object TransferPreapproval_Renew
     extends ExerciseNodeCompanion.Mk(
-      choice = splice.amuletrules.TransferPreapproval2.CHOICE_TransferPreapproval2_Renew,
-      template = splice.amuletrules.TransferPreapproval2.COMPANION,
+      choice = splice.amuletrules.TransferPreapproval.CHOICE_TransferPreapproval_Renew,
+      template = splice.amuletrules.TransferPreapproval.COMPANION,
     )
 
 object AnsRules_CollectInitialEntryPayment

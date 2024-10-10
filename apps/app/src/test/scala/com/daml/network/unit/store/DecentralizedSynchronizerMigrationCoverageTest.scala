@@ -159,7 +159,6 @@ object DecentralizedSynchronizerMigrationCoverageTest {
     import codegen.java.splice.externalpartyamuletrules
     import codegen.java.splice.wallet.{
       buytrafficrequest as trafficRequestCodegen,
-      externalparty as externalPartyCodegen,
       topupstate as topUpCodegen,
     }
     Seq(
@@ -169,8 +168,6 @@ object DecentralizedSynchronizerMigrationCoverageTest {
         reason("tied to a specific domainId, never migrated", ValidatorStore),
       trafficRequestCodegen.BuyTrafficRequest.COMPANION ->
         reason("tied to a specific domainId, never migrated", UserWalletStore),
-      externalPartyCodegen.ExternalPartySetupProposal.COMPANION ->
-        reason("#15158", ValidatorStore),
       externalpartyamuletrules.TransferCommand.COMPANION ->
         reason("#15158", SvDsoStore),
       externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION ->

@@ -5,7 +5,7 @@ package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval2}
+import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
 import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.splice.ans.AnsRules
@@ -416,7 +416,7 @@ class SingleScanConnection private[client] (
   override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]]] =
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.LookupTransferPreapprovalByParty(receiver),

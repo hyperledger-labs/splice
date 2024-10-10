@@ -688,7 +688,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
           filterNot Set(
             spw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
             splice.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
-            splice.amuletrules.TransferPreapproval2.COMPANION,
+            splice.amuletrules.TransferPreapproval.COMPANION,
           )
           map (c(_)): _*
       )
@@ -710,7 +710,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       import com.daml.network.validator.store.ValidatorStore.templatesMovedByMyAutomation as templatesMovedByValidatorAutomation
       allContractsMigrated(
         (templatesMovedByValidatorAutomation(true) filterNot Set(
-          splice.amuletrules.ExternalPartySetupProposal2.COMPANION
+          splice.amuletrules.ExternalPartySetupProposal.COMPANION
         )) map (c(_, sv1ValidatorParty)): _*
       )
     }

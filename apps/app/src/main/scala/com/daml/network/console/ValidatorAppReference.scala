@@ -177,7 +177,7 @@ abstract class ValidatorAppReference(
   @Help.Summary("Creates ExternalPartySetupProposal contract for a given party")
   def createExternalPartySetupProposal(
       userPartyId: PartyId
-  ): amuletrulesCodegen.ExternalPartySetupProposal2.ContractId = {
+  ): amuletrulesCodegen.ExternalPartySetupProposal.ContractId = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.CreateExternalPartySetupProposal(userPartyId)
@@ -187,8 +187,8 @@ abstract class ValidatorAppReference(
 
   @Help.Summary("List ExternalPartySetupProposal contracts")
   def listExternalPartySetupProposals(): Seq[ContractWithState[
-    amuletrulesCodegen.ExternalPartySetupProposal2.ContractId,
-    amuletrulesCodegen.ExternalPartySetupProposal2,
+    amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
+    amuletrulesCodegen.ExternalPartySetupProposal,
   ]] = {
     consoleEnvironment.run {
       httpCommand(
@@ -199,7 +199,7 @@ abstract class ValidatorAppReference(
 
   @Help.Summary("Prepare AcceptExternalPartySetupProposal for a given party")
   def prepareAcceptExternalPartySetupProposal(
-      contractId: amuletrulesCodegen.ExternalPartySetupProposal2.ContractId,
+      contractId: amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
       userPartyId: PartyId,
   ): definitions.PrepareAcceptExternalPartySetupProposalResponse = {
     consoleEnvironment.run {
@@ -215,7 +215,7 @@ abstract class ValidatorAppReference(
       transaction: String,
       signature: String,
       publicKey: String,
-  ): (amuletrulesCodegen.TransferPreapproval2.ContractId, String) = {
+  ): (amuletrulesCodegen.TransferPreapproval.ContractId, String) = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.SubmitAcceptExternalPartySetupProposal(
@@ -230,8 +230,8 @@ abstract class ValidatorAppReference(
 
   @Help.Summary("Fetch TransferPreapproval for a given party")
   def lookupTransferPreapprovalByParty(userPartyId: PartyId): Option[ContractWithState[
-    amuletrulesCodegen.TransferPreapproval2.ContractId,
-    amuletrulesCodegen.TransferPreapproval2,
+    amuletrulesCodegen.TransferPreapproval.ContractId,
+    amuletrulesCodegen.TransferPreapproval,
   ]] = {
     consoleEnvironment.run {
       httpCommand(HttpValidatorAdminAppClient.LookupTransferPreapprovalByParty(userPartyId))
@@ -290,8 +290,8 @@ abstract class ValidatorAppReference(
 
   @Help.Summary("List TransferPreapprovals contracts")
   def listTransferPreapprovals(): Seq[ContractWithState[
-    amuletrulesCodegen.TransferPreapproval2.ContractId,
-    amuletrulesCodegen.TransferPreapproval2,
+    amuletrulesCodegen.TransferPreapproval.ContractId,
+    amuletrulesCodegen.TransferPreapproval,
   ]] = {
     consoleEnvironment.run {
       httpCommand(

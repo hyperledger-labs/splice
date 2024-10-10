@@ -632,8 +632,8 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def externalPartySetupProposal(user: PartyId) = {
-    val templateId = amuletrulesCodegen.ExternalPartySetupProposal2.TEMPLATE_ID
-    val template = new amuletrulesCodegen.ExternalPartySetupProposal2(
+    val templateId = amuletrulesCodegen.ExternalPartySetupProposal.TEMPLATE_ID
+    val template = new amuletrulesCodegen.ExternalPartySetupProposal(
       validator.toProtoPrimitive,
       user.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
@@ -642,7 +642,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     )
     contract(
       identifier = templateId,
-      contractId = new amuletrulesCodegen.ExternalPartySetupProposal2.ContractId(nextCid()),
+      contractId = new amuletrulesCodegen.ExternalPartySetupProposal.ContractId(nextCid()),
       payload = template,
     )
   }

@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval2
+import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval
 import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.http.v0.definitions.SignedTopologyTx
 import com.daml.network.integration.tests.SpliceTests.TestCommon
@@ -81,7 +81,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
   protected def createAndAcceptExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
-  ): (TransferPreapproval2.ContractId, String) = {
+  ): (TransferPreapproval.ContractId, String) = {
     val proposal = provider.createExternalPartySetupProposal(externalPartyOnboarding.party)
     provider
       .listExternalPartySetupProposals()

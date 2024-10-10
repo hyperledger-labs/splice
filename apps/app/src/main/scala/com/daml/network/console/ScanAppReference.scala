@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
-  TransferPreapproval2,
+  TransferPreapproval,
 }
 import com.daml.network.codegen.java.splice.round.{
   ClosedMiningRound,
@@ -144,7 +144,7 @@ abstract class ScanAppReference(
   @Help.Summary("Lookup a TransferPreapproval by the receiver party")
   def lookupTransferPreapprovalByParty(
       party: PartyId
-  ): Option[ContractWithState[TransferPreapproval2.ContractId, TransferPreapproval2]] =
+  ): Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupTransferPreapprovalByParty(party))
     }

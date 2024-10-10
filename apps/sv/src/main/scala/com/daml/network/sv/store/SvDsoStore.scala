@@ -945,8 +945,8 @@ trait SvDsoStore
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
     Option[ContractWithState[
-      splice.amuletrules.TransferPreapproval2.ContractId,
-      splice.amuletrules.TransferPreapproval2,
+      splice.amuletrules.TransferPreapproval.ContractId,
+      splice.amuletrules.TransferPreapproval,
     ]]
   ]
 
@@ -1014,7 +1014,7 @@ object SvDsoStore {
     splice.ans.AnsEntry.COMPANION,
     splice.ans.AnsEntryContext.COMPANION,
     splice.ans.AnsRules.COMPANION,
-    splice.amuletrules.TransferPreapproval2.COMPANION,
+    splice.amuletrules.TransferPreapproval.COMPANION,
     splice.dso.amuletprice.AmuletPriceVote.COMPANION,
     splice.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
   )
@@ -1304,7 +1304,7 @@ object SvDsoStore {
           subscriptionReferenceContractId = Some(contract.payload.reference),
         )
       },
-      mkFilter(splice.amuletrules.TransferPreapproval2.COMPANION)(co => co.payload.dso == dso) {
+      mkFilter(splice.amuletrules.TransferPreapproval.COMPANION)(co => co.payload.dso == dso) {
         contract =>
           DsoAcsStoreRowData(
             contract

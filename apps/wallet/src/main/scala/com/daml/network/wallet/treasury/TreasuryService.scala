@@ -19,7 +19,7 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
-  TransferPreapproval2,
+  TransferPreapproval,
 }
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
@@ -271,12 +271,10 @@ class TreasuryService(
 
       case op: amuletoperation.CO_RenewTransferPreapproval =>
         for {
-          _ <- userStore.multiDomainAcsStore.getContractById(TransferPreapproval2.COMPANION)(
+          _ <- userStore.multiDomainAcsStore.getContractById(TransferPreapproval.COMPANION)(
             op.previousApprovalCid
           )
         } yield ()
-
-      case _: amuletoperation.CO_TransferPreapproval2Send => Future.unit
 
       case _: amuletoperation.CO_TransferPreapprovalSend => Future.unit
 

@@ -72,7 +72,7 @@ class ScanTxLogParser(
             State.fromCreateExternalPartySetupProposal(exercised, domainId, node)
           case AmuletRules_CreateTransferPreapproval(node) =>
             State.fromCreateTransferPreapproval(exercised, domainId, node)
-          case TransferPreapproval2_Renew(node) =>
+          case TransferPreapproval_Renew(node) =>
             State.fromRenewTransferPreapproval(exercised, domainId, node)
           case AmuletExpire(node) =>
             State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
@@ -549,8 +549,8 @@ object ScanTxLogParser {
         event: ExercisedEvent,
         domainId: DomainId,
         node: ExerciseNode[
-          TransferPreapproval2_Renew.Arg,
-          TransferPreapproval2_Renew.Res,
+          TransferPreapproval_Renew.Arg,
+          TransferPreapproval_Renew.Res,
         ],
     ): State = {
       val validatorParty = Codec

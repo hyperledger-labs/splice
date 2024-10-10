@@ -8,11 +8,8 @@ import cats.syntax.foldable.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import com.daml.network.codegen.java.splice.amuletrules.{
-  TransferPreapproval2,
-  invalidtransferreason,
-}
-import com.daml.network.codegen.java.splice.amuletrules.ExternalPartySetupProposal2
+import com.daml.network.codegen.java.splice.amuletrules.{TransferPreapproval, invalidtransferreason}
+import com.daml.network.codegen.java.splice.amuletrules.ExternalPartySetupProposal
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome
 import com.daml.network.environment.ledger.api.DedupOffset
@@ -492,8 +489,8 @@ class HttpValidatorAdminHandler(
                           "ingest_external_party_setup_proposal",
                           s"ExternalPartySetupProposal ${successResult.contractIdValue.contractId} gets ingested in validator store",
                           store.multiDomainAcsStore
-                            .lookupContractById(ExternalPartySetupProposal2.COMPANION)(
-                              Codec.tryDecodeJavaContractId(ExternalPartySetupProposal2.COMPANION)(
+                            .lookupContractById(ExternalPartySetupProposal.COMPANION)(
+                              Codec.tryDecodeJavaContractId(ExternalPartySetupProposal.COMPANION)(
                                 successResult.contractIdValue.contractId
                               )
                             )
@@ -582,7 +579,7 @@ class HttpValidatorAdminHandler(
                     .withDescription(s"Invalid contract")
                     .asRuntimeException()
                 )
-                .exercise(_.exerciseExternalPartySetupProposal2_Accept())
+                .exercise(_.exerciseExternalPartySetupProposal_Accept())
                 .update
                 .commands()
                 .asScala
@@ -641,7 +638,7 @@ class HttpValidatorAdminHandler(
           case QueryResult(_, None) =>
             throw Status.FAILED_PRECONDITION
               .withDescription(
-                s"${TransferPreapproval2.COMPANION.TEMPLATE_ID.getEntityName} contract was not created."
+                s"${TransferPreapproval.COMPANION.TEMPLATE_ID.getEntityName} contract was not created."
               )
               .asRuntimeException()
         }

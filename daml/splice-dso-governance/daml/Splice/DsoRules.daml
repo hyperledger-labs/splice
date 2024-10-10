@@ -1233,7 +1233,7 @@ template DsoRules with
         transferCommandCid : ContractId TransferCommand
         context : PaymentTransferContext
         inputs : [TransferInput]
-        transferPreapprovalCid : ContractId TransferPreapproval2
+        transferPreapprovalCid : ContractId TransferPreapproval
       controller dsoDelegate
       do _ <- fetchChecked (ForDso dso) transferCommandCid
          TransferCommand_SendResult result <- exercise transferCommandCid TransferCommand_Send with

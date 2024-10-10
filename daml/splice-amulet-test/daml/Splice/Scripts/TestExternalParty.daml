@@ -31,10 +31,10 @@ testExternalPartySetup = script do
     preapprovalExpiresAt
 
   -- Externally signed transaction to accept proposal.
-  ExternalPartySetupProposal2_AcceptResult{..} <- submit externalUser.primaryParty $ exerciseCmd proposalCid ExternalPartySetupProposal2_Accept {}
+  ExternalPartySetupProposal_AcceptResult{..} <- submit externalUser.primaryParty $ exerciseCmd proposalCid ExternalPartySetupProposal_Accept {}
   -- check transfer pre-approval was created
   Some transferPreapproval1 <- queryContractId app.dso transferPreapprovalCid
-  transferPreapproval1 === TransferPreapproval2 with
+  transferPreapproval1 === TransferPreapproval with
     dso = app.dso
     receiver = externalUser.primaryParty
     provider = aliceValidator.primaryParty

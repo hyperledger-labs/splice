@@ -4,10 +4,7 @@
 package com.daml.network.validator.automation
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.splice.amuletrules.{
-  TransferPreapproval2,
-  invalidtransferreason,
-}
+import com.daml.network.codegen.java.splice.amuletrules.{TransferPreapproval, invalidtransferreason}
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_RenewTransferPreapproval
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome
 import com.daml.network.util.AssignedContract
@@ -32,17 +29,17 @@ class RenewTransferPreapprovalTrigger(
     override val tracer: Tracer,
     mat: Materializer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-      TransferPreapproval2.ContractId,
-      TransferPreapproval2,
+      TransferPreapproval.ContractId,
+      TransferPreapproval,
     ](
       store.multiDomainAcsStore,
       store.listExpiringTransferPreapprovals(transferPreapprovalConfig.renewalDuration),
-      TransferPreapproval2.COMPANION,
+      TransferPreapproval.COMPANION,
     ) {
 
   override def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        AssignedContract[TransferPreapproval2.ContractId, TransferPreapproval2]
+        AssignedContract[TransferPreapproval.ContractId, TransferPreapproval]
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {

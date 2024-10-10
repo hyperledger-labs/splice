@@ -229,8 +229,8 @@ trait ScanStore
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
     Option[ContractWithState[
-      splice.amuletrules.TransferPreapproval2.ContractId,
-      splice.amuletrules.TransferPreapproval2,
+      splice.amuletrules.TransferPreapproval.ContractId,
+      splice.amuletrules.TransferPreapproval,
     ]]
   ]
 
@@ -416,7 +416,7 @@ object ScanStore {
               Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
           )
         },
-        mkFilter(splice.amuletrules.TransferPreapproval2.COMPANION)(co => co.payload.dso == dso) {
+        mkFilter(splice.amuletrules.TransferPreapproval.COMPANION)(co => co.payload.dso == dso) {
           contract =>
             ScanAcsStoreRowData(
               contract,

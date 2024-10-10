@@ -768,13 +768,13 @@ class HttpWalletHandler(
             featuredAppRight <- scanConnection
               .lookupFeaturedAppRight(PartyId.tryFromProtoPrimitive(preapproval.payload.provider))
             result <- exerciseWalletAmuletAction(
-              new amuletoperation.CO_TransferPreapproval2Send(
+              new amuletoperation.CO_TransferPreapprovalSend(
                 preapproval.contractId,
                 featuredAppRight.map(_.contractId).toJava,
                 amount,
               ),
               user,
-              (_: amuletoperationoutcome.COO_TransferPreapproval2Send) =>
+              (_: amuletoperationoutcome.COO_TransferPreapprovalSend) =>
                 r0.TransferPreapprovalSendResponse.OK,
               extraDisclosedContracts = wallet.connection.disclosedContracts(
                 preapproval

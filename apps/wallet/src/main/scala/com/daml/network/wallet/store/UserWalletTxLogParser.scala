@@ -56,7 +56,7 @@ import com.daml.network.history.{
   Mint,
   Tap,
   Transfer,
-  TransferPreapproval2_Renew,
+  TransferPreapproval_Renew,
 }
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion}
@@ -655,7 +655,7 @@ class UserWalletTxLogParser(
           case AmuletRules_CreateTransferPreapproval(node) =>
             now(State.fromCreateTransferPreapproval(node, tree, exercised))
 
-          case TransferPreapproval2_Renew(node) =>
+          case TransferPreapproval_Renew(node) =>
             now(State.fromRenewTransferPreapproval(node, tree, exercised))
 
           // ------------------------------------------------------------------
@@ -1141,8 +1141,8 @@ object UserWalletTxLogParser {
 
     def fromRenewTransferPreapproval(
         node: ExerciseNode[
-          TransferPreapproval2_Renew.Arg,
-          TransferPreapproval2_Renew.Res,
+          TransferPreapproval_Renew.Arg,
+          TransferPreapproval_Renew.Res,
         ],
         tx: TransactionTree,
         event: ExercisedEvent,

@@ -480,11 +480,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       validFrom: CantonTimestamp,
       expiresAt: CantonTimestamp,
   ): Contract[
-    amuletrulesCodegen.TransferPreapproval2.ContractId,
-    amuletrulesCodegen.TransferPreapproval2,
+    amuletrulesCodegen.TransferPreapproval.ContractId,
+    amuletrulesCodegen.TransferPreapproval,
   ] = {
-    val templateId = amuletrulesCodegen.TransferPreapproval2.TEMPLATE_ID
-    val template = new amuletrulesCodegen.TransferPreapproval2(
+    val templateId = amuletrulesCodegen.TransferPreapproval.TEMPLATE_ID
+    val template = new amuletrulesCodegen.TransferPreapproval(
       dsoParty.toProtoPrimitive,
       receiver.toProtoPrimitive,
       provider.toProtoPrimitive,
@@ -494,7 +494,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
     contract(
       identifier = templateId,
-      contractId = new amuletrulesCodegen.TransferPreapproval2.ContractId(nextCid()),
+      contractId = new amuletrulesCodegen.TransferPreapproval.ContractId(nextCid()),
       payload = template,
     )
   }

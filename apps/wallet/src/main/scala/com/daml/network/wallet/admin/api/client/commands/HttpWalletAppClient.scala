@@ -10,7 +10,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval2
+import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval
 import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -975,13 +975,13 @@ object HttpWalletAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.CreateTransferPreapprovalResponse.OK(response) =>
         Codec
-          .decodeJavaContractId(TransferPreapproval2.COMPANION)(
+          .decodeJavaContractId(TransferPreapproval.COMPANION)(
             response.transferPreapprovalContractId
           )
           .map(CreateTransferPreapprovalResponse.Created)
       case http.CreateTransferPreapprovalResponse.Conflict(response) =>
         Codec
-          .decodeJavaContractId(TransferPreapproval2.COMPANION)(
+          .decodeJavaContractId(TransferPreapproval.COMPANION)(
             response.transferPreapprovalContractId
           )
           .map(CreateTransferPreapprovalResponse.AlreadyExists)
@@ -989,13 +989,13 @@ object HttpWalletAppClient {
   }
 
   sealed abstract class CreateTransferPreapprovalResponse {
-    def contractId: TransferPreapproval2.ContractId
+    def contractId: TransferPreapproval.ContractId
   }
 
   object CreateTransferPreapprovalResponse {
-    final case class Created(contractId: TransferPreapproval2.ContractId)
+    final case class Created(contractId: TransferPreapproval.ContractId)
         extends CreateTransferPreapprovalResponse
-    final case class AlreadyExists(contractId: TransferPreapproval2.ContractId)
+    final case class AlreadyExists(contractId: TransferPreapproval.ContractId)
         extends CreateTransferPreapprovalResponse
   }
 
