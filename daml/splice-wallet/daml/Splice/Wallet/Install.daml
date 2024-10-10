@@ -83,10 +83,6 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
       -- creates ExternalPartySetupProposal for externally hosted parties
       resultE <- catchAll $ handleCreateExternalPartySetupProposal externalParty preapprovalExpiresAt
       handleResult COO_CreateExternalPartySetupProposal resultE
-    CO_CreateTransferPreapproval expiresAt -> do
-      -- creates TransferPreapproval via the wallet
-      resultE <- catchAll $ handleCreateTransferPreapproval expiresAt
-      handleResult COO_CreateTransferPreapproval resultE
     CO_AcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt -> do
       -- creates TransferPreapproval via the wallet
       resultE <- catchAll $ handleAcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt
@@ -234,16 +230,6 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         preapprovalExpiresAt
       pure (proposalCid, transferResult.senderChangeAmulet)
 
-    handleCreateTransferPreapproval : Time -> Update (ContractId TransferPreapproval2, Optional (ContractId Amulet))
-    handleCreateTransferPreapproval expiresAt = do
-      AmuletRules_CreateTransferPreapprovalResult{..} <- exercise context.amuletRules AmuletRules_CreateTransferPreapproval with
-        context = executionContext.paymentContext
-        inputs
-        receiver = executionContext.endUser
-        provider = executionContext.validator
-        expiresAt
-      pure (transferPreapprovalCid, transferResult.senderChangeAmulet)
-
     handleAcceptTransferPreapprovalProposal : ContractId TransferPreapprovalProposal -> Time -> Update (ContractId TransferPreapproval2, Optional (ContractId Amulet))
     handleAcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt = do
       require "Only a validator can accept a proposal to create a transfer preapproval" (executionContext.endUser == executionContext.validator)
@@ -304,9 +290,6 @@ data AmuletOperation
   | CO_CreateExternalPartySetupProposal with
       externalParty : Party
       preapprovalExpiresAt : Time
-  -- TODO(#15035) - Remove once the backend switches to using CO_AcceptTransferPreapprovalProposal
-  | CO_CreateTransferPreapproval with
-      expiresAt : Time
   | CO_AcceptTransferPreapprovalProposal with
       preapprovalProposalCid: ContractId TransferPreapprovalProposal
       expiresAt : Time
@@ -337,8 +320,6 @@ data AmuletOperationOutcome
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   | COO_TransferPreapprovalSend (Optional (ContractId Amulet))
   | COO_CreateExternalPartySetupProposal (ContractId ExternalPartySetupProposal2)
-  -- TODO(#15035) - Remove once the backend switches to using CO_AcceptTransferPreapprovalProposal
-  | COO_CreateTransferPreapproval (ContractId TransferPreapproval2)
   | COO_AcceptTransferPreapprovalProposal (ContractId TransferPreapproval2)
   | COO_RenewTransferPreapproval (ContractId TransferPreapproval2)
   | COO_TransferPreapproval2Send (Optional (ContractId Amulet))
