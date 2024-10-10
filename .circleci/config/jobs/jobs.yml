@@ -637,6 +637,8 @@ jobs:
               cncluster activate
               cncluster wait_for_daml_upgrade
             fi
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
   test_DR:
     parameters:
       <<: *cluster-parameter
