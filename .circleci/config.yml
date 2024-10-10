@@ -170,8 +170,6 @@ executors:
     docker:
       - image: cimg/base:current
     environment:
-      npm_config_cache: "/cache/.npm"
-      npm_config_logs_dir: "/tmp/npm-logs"
       COURSIER_CACHE: "/cache/coursier"
 
 commands:
@@ -1180,8 +1178,6 @@ commands:
                 --keep TERM \
                 --keep CI \
                 --keep RUN_SPLITTED_TESTS_CMD \
-                --keep npm_config_cache \
-                --keep npm_config_logs_dir \
                 --keep COURSIER_CACHE \
                 --command echo "Confirmed that we can build and enter the nix environment!" \
                 && break
@@ -1202,8 +1198,6 @@ commands:
               --keep HOME \
               --keep TERM \
               --keep CI \
-              --keep npm_config_cache \
-              --keep npm_config_logs_dir \
               --keep COURSIER_CACHE \
               --keep RUN_SPLITTED_TESTS_CMD \
               --keep GCP_DA_CN_DEVNET_KEY \
@@ -1535,6 +1529,18 @@ commands:
 
   restore_sbt_cache_self_hosted:
     steps:
+      - restore_daml_artifacts
+      - restore_cache:
+          name: Restoring Sbt caches
+          keys:
+            # First try to restore the cache for the exact same build configuration.
+            - *sbt-cache-key
+            # If this is not possible and Dependencies.scala hasn't changed, populate the cache with slightly outdated data.
+            # This will speed-up compilation, because most libraries are already in the cache.
+            - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
+
+      - restore_precompiled_classes
+      - restore_frontend_node_modules
       - execute_sbt_command:
           cmd: pullRemoteCache
           cmd_retry_count: 3

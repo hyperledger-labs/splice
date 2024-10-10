@@ -224,8 +224,6 @@ commands:
                 --keep TERM \
                 --keep CI \
                 --keep RUN_SPLITTED_TESTS_CMD \
-                --keep npm_config_cache \
-                --keep npm_config_logs_dir \
                 --keep COURSIER_CACHE \
                 --command echo "Confirmed that we can build and enter the nix environment!" \
                 && break
@@ -246,8 +244,6 @@ commands:
               --keep HOME \
               --keep TERM \
               --keep CI \
-              --keep npm_config_cache \
-              --keep npm_config_logs_dir \
               --keep COURSIER_CACHE \
               --keep RUN_SPLITTED_TESTS_CMD \
               --keep GCP_DA_CN_DEVNET_KEY \

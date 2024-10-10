@@ -206,6 +206,18 @@ commands:
 
   restore_sbt_cache_self_hosted:
     steps:
+      - restore_daml_artifacts
+      - restore_cache:
+          name: Restoring Sbt caches
+          keys:
+            # First try to restore the cache for the exact same build configuration.
+            - *sbt-cache-key
+            # If this is not possible and Dependencies.scala hasn't changed, populate the cache with slightly outdated data.
+            # This will speed-up compilation, because most libraries are already in the cache.
+            - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
+
+      - restore_precompiled_classes
+      - restore_frontend_node_modules
       - execute_sbt_command:
           cmd: pullRemoteCache
           cmd_retry_count: 3
