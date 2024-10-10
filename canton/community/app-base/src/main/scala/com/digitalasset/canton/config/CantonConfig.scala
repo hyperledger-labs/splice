@@ -597,7 +597,7 @@ object CantonConfig {
       }
 
     implicit val maxRequestSizeReader: ConfigReader[MaxRequestSize] =
-      NonNegativeNumeric.nonNegativeNumericReader[Int].map(MaxRequestSize)
+      NonNegativeNumeric.nonNegativeNumericReader[Int].map(MaxRequestSize.apply)
 
     implicit val sequencerTestingInterceptorReader
         : ConfigReader[DatabaseSequencerConfig.TestingInterceptor] =

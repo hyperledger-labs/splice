@@ -295,7 +295,7 @@ private[environment] class LedgerClient(
   }
 
   def executeSubmission(
-      preparedTransaction: ByteString,
+      preparedTransaction: interactive_submission_data.PreparedTransaction,
       partySignatures: Map[PartyId, LedgerClient.Signature],
       applicationId: String,
       submissionId: String,
@@ -307,7 +307,7 @@ private[environment] class LedgerClient(
       stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
       result <- stub.executeSubmission(
         lapi.interactive_submission_service.ExecuteSubmissionRequest(
-          preparedTransaction = preparedTransaction,
+          preparedTransaction = Some(preparedTransaction),
           partiesSignatures =
             Some(lapi.interactive_submission_service.PartySignatures(partySignatures.toList.map {
               case (party, signature) =>

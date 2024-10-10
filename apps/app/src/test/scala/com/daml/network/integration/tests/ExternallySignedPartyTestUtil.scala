@@ -19,7 +19,11 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
   ): OnboardingResult = {
     val signingPublicKey =
       validatorBackend.participantClient.keys.secret
-        .generate_signing_key(UUID.randomUUID().toString, Some(SigningKeyScheme.Ed25519))
+        .generate_signing_key(
+          UUID.randomUUID().toString,
+          SigningKeyUsage.All,
+          Some(SigningKeyScheme.Ed25519),
+        )
     val signingKeyPairByteString = validatorBackend.participantClient.keys.secret
       .download(signingPublicKey.fingerprint, ProtocolVersion.dev)
     val privateKey =

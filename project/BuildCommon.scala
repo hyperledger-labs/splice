@@ -1122,7 +1122,6 @@ object BuildCommon {
           auth0_java,
           auth0_jwks,
           circe_core,
-          daml_jwt,
           daml_ports,
           daml_struct_spray_json,
           netty_boring_ssl,
@@ -1350,7 +1349,7 @@ object BuildCommon {
           .filterNot(_ == "-Xsource:3"),
         libraryDependencies ++= Seq(
           daml_lf_language,
-          "com.lihaoyi" %% "ujson" % "2.0.0",
+          "com.lihaoyi" %% "ujson" % "4.0.2",
         ),
       )
       .dependsOn(`canton-ledger-api`)

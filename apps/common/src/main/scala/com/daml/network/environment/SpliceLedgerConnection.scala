@@ -50,7 +50,6 @@ import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{LoggerUtil, PekkoUtil}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -1007,11 +1006,11 @@ class SpliceLedgerConnection(
     */
   def executeSubmissionAndWait(
       submitter: PartyId,
-      preparedTransaction: ByteString,
+      preparedTransaction: lapi.interactive_submission_data.PreparedTransaction,
       partySignatures: Map[PartyId, LedgerClient.Signature],
       waitForOffset: Boolean,
   )(implicit traceContext: TraceContext): Future[String] = {
-    val commandId = preparedTransaction.toStringUtf8()
+    val commandId = preparedTransaction.getMetadata.getSubmitterInfo.commandId
     val submissionId = UUID.randomUUID.toString()
     ledgerEnd().flatMap { ledgerEnd =>
       val (ks, completion) = cancelIfFailed(

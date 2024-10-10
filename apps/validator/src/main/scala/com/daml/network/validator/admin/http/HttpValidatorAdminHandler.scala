@@ -599,7 +599,10 @@ class HttpValidatorAdminHandler(
                   Future.successful(
                     v0.ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.OK(
                       definitions.PrepareAcceptExternalPartySetupProposalResponse(
-                        Base64.getEncoder.encodeToString(r.preparedTransaction.toByteArray),
+                        // We convert to a base64 bytestring instead of to JSON
+                        // as JSON support for decoding protobuf may be less well supported
+                        // across languages.
+                        Base64.getEncoder.encodeToString(r.getPreparedTransaction.toByteArray),
                         HexString.toHexString(r.preparedTransactionHash),
                       )
                     )
@@ -736,7 +739,7 @@ class HttpValidatorAdminHandler(
       } yield {
         v0.ValidatorAdminResource.PrepareTransferPreapprovalSendResponse.OK(
           definitions.PrepareTransferPreapprovalSendResponse(
-            Base64.getEncoder.encodeToString(r.preparedTransaction.toByteArray),
+            Base64.getEncoder.encodeToString(r.getPreparedTransaction.toByteArray),
             HexString.toHexString(r.preparedTransactionHash),
           )
         )

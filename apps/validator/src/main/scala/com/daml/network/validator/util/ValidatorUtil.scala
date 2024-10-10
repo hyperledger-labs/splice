@@ -4,6 +4,7 @@
 package com.daml.network.validator.util
 
 import cats.syntax.either.*
+import com.daml.ledger.api.v2.interactive_submission_data
 import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.LedgerClient
@@ -24,7 +25,6 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
-import com.google.protobuf.ByteString
 import io.grpc.Status
 
 import java.util.Base64
@@ -352,7 +352,9 @@ private[validator] object ValidatorUtil {
     for {
       updateId <- connection.executeSubmissionAndWait(
         senderParty,
-        ByteString.copyFrom(Base64.getDecoder.decode(submission.transaction)),
+        interactive_submission_data.PreparedTransaction.parseFrom(
+          Base64.getDecoder.decode(submission.transaction)
+        ),
         Map(
           senderParty ->
             LedgerClient.Signature(
@@ -379,6 +381,7 @@ private[validator] object ValidatorUtil {
           v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_RAW,
           publicKeyBytes,
           v30.SigningKeyScheme.SIGNING_KEY_SCHEME_ED25519,
+          Seq.empty,
         )
       )
       .valueOr(err =>

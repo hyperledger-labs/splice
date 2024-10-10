@@ -30,8 +30,6 @@ import io.grpc.Status
 import slick.jdbc.canton.SQLActionBuilder
 import com.google.protobuf.ByteString
 
-import scala.annotation.nowarn
-
 trait AcsQueries extends AcsJdbcTypes {
 
   /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
@@ -247,8 +245,7 @@ trait AcsQueries extends AcsJdbcTypes {
   protected def sqlCommaSeparated[V](
       seq: Iterable[V]
   )(implicit
-      // used in the Slick macro
-      @nowarn("msg=parameter sp in method sqlCommaSeparated is never used") sp: SetParameter[V]
+      sp: SetParameter[V]
   ): SQLActionBuilder = {
     seq
       .map(v => sql"$v")

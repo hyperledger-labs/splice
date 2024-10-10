@@ -45,7 +45,7 @@ object JvmRulesPlugin extends AutoPlugin {
         "-Wnonunit-statement",
       ), // disable value discard and nonunit statement checks on tests
       addCompilerPlugin(
-        "org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full
+        "org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full
       ),
       Compile / compile / wartremoverErrors ++= {
         if (System.getProperty("canton-disable-warts") == "true") Seq()

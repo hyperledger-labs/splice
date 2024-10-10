@@ -37,6 +37,7 @@ import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
   Fingerprint,
   PublicKey,
+  SigningKeyUsage,
   SigningPublicKey,
 }
 import com.digitalasset.canton.crypto.SigningKeyScheme.Ed25519
@@ -1463,10 +1464,10 @@ abstract class TopologyAdminConnection(
     runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest, password = None))
   }
 
-  def generateKeyPair(name: String)(implicit
+  def generateKeyPair(name: String, usage: NonEmpty[Set[SigningKeyUsage]])(implicit
       traceContext: TraceContext
   ): Future[SigningPublicKey] = {
-    runCmd(VaultAdminCommands.GenerateSigningKey(name, Some(Ed25519)))
+    runCmd(VaultAdminCommands.GenerateSigningKey(name, usage, Some(Ed25519)))
   }
 
   def generateEncryptionKeyPair(name: String)(implicit

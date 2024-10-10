@@ -1363,6 +1363,11 @@ components:
       properties:
         transaction:
           type: string
+          description: |
+            base64-encoded transaction. The transaction corresponds to
+            the protobuf definition of a `PreparedTransaction`
+            https://github.com/digital-asset/canton/blob/main/community/ledger-api/src/main/protobuf/com/daml/ledger/api/v2/interactive_submission_data.proto#L18
+            and can be decoded using standard protobuf libraries.
         tx_hash:
           description: Hex-encoded hash of the transaction
           type: string
@@ -1468,6 +1473,11 @@ components:
       properties:
         transaction:
           type: string
+          description: |
+            base64-encoded transaction. The transaction corresponds to
+            the protobuf definition of a `PreparedTransaction`
+            https://github.com/digital-asset/canton/blob/main/community/ledger-api/src/main/protobuf/com/daml/ledger/api/v2/interactive_submission_data.proto#L18
+            and can be decoded using standard protobuf libraries.
         tx_hash:
           description: Hex-encoded hash of the transaction
           type: string
@@ -1500,6 +1510,11 @@ components:
           type: string
         transaction:
           type: string
+          description: |
+            base64-encoded transaction. The transaction corresponds to
+            the protobuf definition of a `PreparedTransaction`
+            https://github.com/digital-asset/canton/blob/main/community/ledger-api/src/main/protobuf/com/daml/ledger/api/v2/interactive_submission_data.proto#L18
+            and can be decoded using standard protobuf libraries.
         signed_tx_hash:
           description: |
             hex-encoded ed25519 signature of the hash return by the prepare endpoint in the form

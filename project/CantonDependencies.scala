@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.2.0-snapshot.20240930.13323.0.v244737e7"
+  val version: String = "3.2.0-snapshot.20241007.13334.0.v0c487441"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -33,10 +33,10 @@ object CantonDependencies {
   lazy val logback_version = "1.4.5"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
-  lazy val ammonite_version = "2.5.9"
+  lazy val ammonite_version = "3.0.0"
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
-  lazy val slick_version = "3.3.3"
+  lazy val slick_version = "3.5.2"
   lazy val bouncy_castle_version = "1.70"
 
   lazy val pureconfig_version = "0.14.0"
@@ -106,7 +106,6 @@ object CantonDependencies {
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
   lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
-  lazy val daml_jwt = "com.daml" %% "jwt" % daml_libraries_version
   lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
   lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
   lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
@@ -184,7 +183,7 @@ object CantonDependencies {
   lazy val cats_law = "org.typelevel" %% "cats-laws" % "2.6.1"
   lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.2.0"
 
-  lazy val chimney = "io.scalaland" %% "chimney" % "0.6.1"
+  lazy val chimney = "io.scalaland" %% "chimney" % "1.4.0"
 
   lazy val magnolia = "com.softwaremill.magnolia1_2" %% "magnolia" % "1.1.3"
   lazy val magnolify_shared = "com.spotify" % "magnolify-shared_2.13" % "0.6.2"
@@ -221,7 +220,7 @@ object CantonDependencies {
   lazy val opentelemetry_instrumentation_hikari =
     "io.opentelemetry.instrumentation" % "opentelemetry-hikaricp-3.0" % s"$opentelemetry_java_instrumentation_version-alpha"
 
-  lazy val better_files = "com.github.pathikrit" %% "better-files" % "3.8.0"
+  lazy val better_files = "com.github.pathikrit" %% "better-files" % "3.9.2"
 
   lazy val slick = "com.typesafe.slick" %% "slick" % slick_version
   lazy val slick_hikaricp = "com.typesafe.slick" %% "slick-hikaricp" % slick_version
@@ -250,7 +249,7 @@ object CantonDependencies {
   lazy val sttp_apiscpec_asyncapi_circe_yaml =
     "com.softwaremill.sttp.apispec" %% "asyncapi-circe-yaml" % apispec_version
 
-  lazy val upickle_version = "2.0.0"
+  lazy val upickle_version = "4.0.2"
 
   // Transcode dependencies
   lazy val upickle = "com.lihaoyi" %% "upickle" % upickle_version
