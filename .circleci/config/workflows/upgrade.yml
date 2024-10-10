@@ -33,7 +33,6 @@ workflow:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          reset_cluster: false # done in reset_cluster job
           skip_infra: false
           update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
           cancel_workflow_on_failure: true
@@ -54,7 +53,6 @@ workflow:
             - reset_cluster
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
-          reset_cluster: false
           deploy_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
@@ -65,18 +63,17 @@ workflow:
           requires:
             - deploy_cluster_for_upgrade
       - preflight_sv_check:
-           name: "preflight_sv_check_initial"
-           cluster_version: << pipeline.parameters.base-version >>
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: << pipeline.parameters.cluster >>
-           requires:
-             - deploy_cluster_for_upgrade
+          name: "preflight_sv_check_initial"
+          cluster_version: << pipeline.parameters.base-version >>
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - deploy_cluster_for_upgrade
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_upgrade"
-          reset_cluster: false
           deploy_version: << pipeline.parameters.base-version >>
           context:
             - artifactory
@@ -158,7 +155,6 @@ workflow:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          reset_cluster: false
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:
@@ -201,7 +197,6 @@ workflow:
       # before the daml upgrade vote is effective
       - deploy_sv_runbook:
           name: "upgrade_sv_runbook_after_daml_upgrade"
-          reset_cluster: false
           context:
             - artifactory
             - slack-context
@@ -211,7 +206,6 @@ workflow:
             - preflight_daml_upgrade
       - deploy_validator_runbook:
           name: "upgrade_validator_runbook_after_daml_upgrade"
-          reset_cluster: false
           context:
             - artifactory
             - slack-context
@@ -260,11 +254,19 @@ workflow:
             - wait_for_daml_upgrade
             - upgrade_sv_runbook_after_daml_upgrade
             - upgrade_validator_runbook_after_daml_upgrade
-      - deploy_sv_runbook:
-          name: "redeploy_sv_runbook_after_daml_upgrade"
           # by resetting the SV runbook, it's as if a new SV was onboarded,
           # thus testing that SVs joining after an upgrade also work
-          reset_cluster: true
+      - reset_sv_runbook:
+          name: "reset_sv_runbook_after_upgrade"
+          context:
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
+            - wait_for_daml_upgrade
+            - preflight_sv_check_after_sv_upgrade
+            - preflight_validator_runbook_after_upgrade
+      - deploy_sv_runbook:
+          name: "redeploy_sv_runbook_after_daml_upgrade"
           silence_deployment_alerts: true
           context:
             - artifactory
@@ -272,23 +274,26 @@ workflow:
             - canton-network-vpn
           cluster: << pipeline.parameters.cluster >>
           requires:
+            - reset_sv_runbook_after_upgrade
+        # by resetting the Validator runbook, it's as if a new Validator was onboarded,
+        # thus testing that Validators joining after an upgrade also work
+      - reset_validator_runbook:
+          name: "reset_validator_runbook_after_upgrade"
+          silence_deployment_alerts: true
+          context:
+            - slack-context
+          cluster: << pipeline.parameters.cluster >>
+          requires:
             - wait_for_daml_upgrade
-            - preflight_sv_check_after_sv_upgrade
             - preflight_validator_runbook_after_upgrade
       - deploy_validator_runbook:
           name: "redeploy_validator_runbook_after_daml_upgrade"
-          # by resetting the Validator runbook, it's as if a new Validator was onboarded,
-          # thus testing that Validators joining after an upgrade also work
-          reset_cluster: true
-          silence_deployment_alerts: true
           context:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           requires:
-            - wait_for_daml_upgrade
-            - preflight_sv_check_after_sv_upgrade
-            - preflight_validator_runbook_after_upgrade
+            - reset_validator_runbook_after_upgrade
       - preflight_sv_check:
           name: "preflight_sv_check_after_sv_redeploy"
           context:
