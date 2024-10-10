@@ -368,7 +368,7 @@ commands:
       # sbt caches are job-specific, so we're ignoring the upload_caches parameter,
       # and saving those caches in every job
       - when:
-          condition: << parameters.upload_caches >>
+          condition: << parameters.save_sbt_caches >>
           steps:
             - save_sbt_cache
       - when:
