@@ -111,6 +111,15 @@ abstract class TaskbasedTrigger[T: Pretty](
                   metrics.completed.mark()(m)
                 }
                 Success(true)
+              case TaskFailed(description) =>
+                if (quiet)
+                  logger.warn(show"Failed processing $task with outcome: $description")
+                else
+                  logger.warn(show"Failed processing with outcome: $description")
+                MetricsContext.withExtraMetricLabels(("outcome", "fail")) { m =>
+                  metrics.completed.mark()(m)
+                }
+                Success(false)
               case TaskNoop =>
                 if (!quiet) logger.info(show"$TaskNoop")
                 MetricsContext.withExtraMetricLabels(("outcome", "noop")) { m =>

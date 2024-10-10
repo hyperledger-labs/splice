@@ -4,7 +4,7 @@
 package com.daml.network.sv.automation.delegatebased
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.splice.dsorules.VoteRequest
+import com.daml.network.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequest, VoteRequest}
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -44,21 +44,38 @@ class CloseVoteRequestTrigger(
       dsoRules <- svTaskContext.dsoStore.getDsoRules()
       amuletRules <- store.getAmuletRules()
       amuletRulesId = amuletRules.contractId
-      _ <- svTaskContext.connection
-        .submit(
-          Seq(svTaskContext.dsoStore.key.svParty),
-          Seq(svTaskContext.dsoStore.key.dsoParty),
-          dsoRules.exercise(
-            _.exerciseDsoRules_CloseVoteRequest(
-              voteRequestCid,
-              java.util.Optional.of(amuletRulesId),
+      res <- for {
+        outcome <- svTaskContext.connection
+          .submit(
+            Seq(svTaskContext.dsoStore.key.svParty),
+            Seq(svTaskContext.dsoStore.key.dsoParty),
+            dsoRules.exercise(
+              _.exerciseDsoRules_CloseVoteRequest(
+                new DsoRules_CloseVoteRequest(voteRequestCid, java.util.Optional.of(amuletRulesId))
+              )
+            ),
+          )
+          .noDedup
+          .yieldResult()
+      } yield Some(outcome)
+    } yield {
+      res
+        .map(result => {
+          if (result.exerciseResult.outcome.toJson.contains("VRO_AcceptedButActionFailed")) {
+            TaskFailed(
+              s"action ${task.work.contract.payload.action.toValue} was accepted but failed with outcome: ${result.exerciseResult.outcome.toJson}."
             )
-          ),
+          } else {
+            TaskSuccess(
+              s"closing VoteRequest for action: ${task.work.contract.payload.action.toValue} and outcome: ${result.exerciseResult.outcome.toJson} after expiration."
+            )
+          }
+        })
+        .getOrElse(
+          TaskFailed(
+            s"failed to close VoteRequest for action: ${task.work.contract.payload.action.toValue} after expiration."
+          )
         )
-        .noDedup
-        .yieldUnit()
-    } yield TaskSuccess(
-      s"Closing VoteRequest with action ${task.work.contract.payload.action.toValue} as it expired."
-    )
+    }
   }
 }
