@@ -66,6 +66,9 @@ jobs:
       unprotect_dbs:
         type: boolean
         default: false
+      silence_deployment_alerts:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
@@ -84,6 +87,12 @@ jobs:
             if [[ << parameters.unprotect_dbs >> == true ]]; then
               cncluster unprotect_dbs sv
             fi
+
+            if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+              # silence specific alerts that may fire due to reset downtime
+              cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+            fi
+
             cncluster ci_pdown_sv
           cmd_retry_count: 3
       - notify-cluster-fail:
@@ -98,6 +107,9 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
+      silence_deployment_alerts:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
@@ -113,6 +125,10 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
+            if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+              # silence specific alerts that may fire due to reset downtime
+              cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+            fi
             cncluster ci_pdown_validator
           cmd_retry_count: 3
       - notify-cluster-fail:

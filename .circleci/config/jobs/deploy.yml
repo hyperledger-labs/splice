@@ -13,9 +13,6 @@ jobs:
       deploy_version:
         type: string
         default: ""
-      reset_cluster:
-        type: boolean
-        default: true
       silence_deployment_alerts:
         type: boolean
         default: false
@@ -49,26 +46,6 @@ jobs:
           cmd: |
             make -j cluster/build
           cmd_retry_count: 2
-      - when:
-          condition:
-            and:
-              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
-              - equal: [ true, <<parameters.reset_cluster>> ]
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: Reset SV runbook
-                cluster: << parameters.cluster >>
-                gce_authenticate: true
-                cmd_retry_count: 3
-                cmd: |
-                  cncluster activate
-
-                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
-                    # silence specific alerts that may fire due to reset downtime
-                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
-                  fi
-
-                  cncluster ci_pdown_sv
       - run_bash_command_in_nix:
           cmd_name: Apply SV runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
@@ -117,9 +94,6 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
-      reset_cluster:
-        type: boolean
-        default: true
       silence_deployment_alerts:
         type: boolean
         default: false
@@ -153,26 +127,6 @@ jobs:
           cmd: |
             make -j cluster/build
           cmd_retry_count: 2
-      - when:
-          condition:
-            and:
-              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
-              - equal: [ true, <<parameters.reset_cluster>> ]
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: Reset Validator runbook
-                cluster: << parameters.cluster >>
-                gce_authenticate: true
-                cmd_retry_count: 3
-                cmd: |
-                  cncluster activate
-
-                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
-                    # silence specific alerts that may fire due to reset downtime
-                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
-                  fi
-
-                  cncluster ci_pdown_validator
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
@@ -212,9 +166,6 @@ jobs:
     parameters:
       <<: *cluster-parameter
       <<: *channel-notify-parameter
-      reset_cluster:
-        type: boolean
-        default: true
       deploy_retry_count:
         type: integer
         default: 2
@@ -227,20 +178,6 @@ jobs:
           cmd: |
             make -j cluster/build
           cmd_retry_count: 2
-      - when:
-          condition:
-            and:
-              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
-              - equal: [ true, <<parameters.reset_cluster>> ]
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: Reset multi-validator pulumi stack
-                cluster: << parameters.cluster >>
-                gce_authenticate: true
-                cmd_retry_count: 3
-                cmd: |
-                  cncluster activate
-                  cncluster ci_pdown_multi
       - run_bash_command_in_nix:
           cmd_name: Apply multi-validator pulumi stack
           cluster: << parameters.cluster >>
@@ -272,12 +209,6 @@ jobs:
         type: string
         default: ""
       use_published_artifacts:
-        type: boolean
-        default: false
-      reset_cluster:
-        type: boolean
-        default: true
-      silence_deployment_alerts:
         type: boolean
         default: false
       skip_infra:
@@ -325,46 +256,6 @@ jobs:
           cmd: |
             make -j cluster/build
           cmd_retry_count: 2
-      - when:
-          condition:
-            and:
-              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
-              - equal: [ true, <<parameters.reset_cluster>> ]
-              - equal: [ 0, <<parameters.global_domain_active_migration_id>> ]
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: Reset cluster
-                cmd_retry_count: 3
-                cluster: << parameters.cluster >>
-                additional_nix_args: >
-                  --keep GITHUB_TOKEN
-                  --keep AUTH0_MANAGEMENT_API_CLIENT_ID
-                  --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
-                  --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
-                  --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-                  --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
-                  --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
-                  --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-                  --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-                  --keep CIRCLECI_TOKEN
-                  --keep CIRCLE_WORKFLOW_ID
-                  --keep K6_USERS_PASSWORD
-                  --keep K6_VALIDATOR_ADMIN_USERNAME
-                  --keep K6_VALIDATOR_ADMIN_PASSWORD
-                  --keep SLACK_ACCESS_TOKEN
-                gce_authenticate: true
-                cmd: |
-                  cncluster activate
-                  # on occasion, specially after previous failed deployments (e.g., because GCP is acting up),
-                  # the cluster may be in a bad state and need a refresh before it can be correctly/completely reset.
-                  cncluster prefresh
-                  export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET="0,1"
-
-                  if [[ << parameters.silence_deployment_alerts >> == true ]]; then
-                    # silence specific alerts that may fire due to reset downtime
-                    cncluster silence_grafana_alerts "20 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
-                  fi
-                  cncluster reset
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>

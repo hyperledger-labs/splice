@@ -12,7 +12,6 @@ workflow:
           extra_migrations_reset: "0,1"
           unlock_shared_cluster: false
           context:
-            - canton-network-vpn
             - slack-context
       - deploy_cluster:
           name: "deploy_cluster_for_migration"

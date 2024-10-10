@@ -17,6 +17,14 @@ workflow:
             - slack-context
           workflow_names: "deploy_cimain"
           wait_type: "cancel_waiting_and_wait_workflow"
+      - reset_cluster:
+          cluster: "cimain"
+          silence_deployment_alerts: true
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           <<: *main-branch-only
           context:
@@ -24,10 +32,9 @@ workflow:
             - slack-context
           cluster: "cimain"
           update_deployment_branch: false  # No need to create a deployment branch for cimain
-          silence_deployment_alerts: true
           cancel_workflow_on_failure: true
           requires:
-            - wait_for_previous_pipeline
+            - reset_cluster
             - artifacts_push
       - preflight_check:
           <<: *main-branch-only
@@ -60,14 +67,14 @@ workflow:
           requires:
             - deploy_cluster
       - preflight_sv_check:
-           <<: *main-branch-only
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "cimain"
-           requires:
-             - deploy_cluster
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - deploy_cluster
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -114,10 +121,10 @@ workflow:
             - preflight_check
             - preflight_check_docker
       - reset_cluster:
+          name: "reset_end"
           <<: *main-branch-only
           cluster: "cimain"
           context:
-            - canton-network-vpn
             - slack-context
           requires:
             - restore_node

@@ -22,6 +22,16 @@ workflow:
           cluster: "ciperiodic"
           requires:
             - wait_for_previous_pipeline
+      - reset_cluster:
+          name: "reset_initially"
+          cluster: "ciperiodic"
+          extra_migrations_reset: "0,1"
+          silence_deployment_alerts: true
+          context:
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           <<: *main-branch-only
           context:
@@ -29,11 +39,10 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           update_deployment_branch: false
-          silence_deployment_alerts: true
           cancel_workflow_on_failure: true
           force_non_devnet: true
           requires:
-            - wait_for_previous_pipeline
+            - reset_initially
             - artifacts_push
       - preflight_check:
           <<: *main-branch-only
