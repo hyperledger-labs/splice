@@ -25,14 +25,16 @@ import com.daml.network.environment.{MediatorAdminConnection, SequencerAdminConn
 import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SynchronizerNode}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{BeneficiaryConfig, SvScanConfig}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
 import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpConfig
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-
 import io.grpc.Status
+
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.security.{KeyFactory, SecureRandom, Signature}
@@ -54,6 +56,13 @@ object SvUtil {
   // (See #12107).
   val defaultAcsCommitmentReconciliationInterval: PositiveDurationSeconds =
     PositiveDurationSeconds.ofMinutes(30)
+  val defaultAcsCommitmentsCatchUpConfig: AcsCommitmentsCatchUpConfig = AcsCommitmentsCatchUpConfig(
+    // With the default reconciliation interval of 30m this corresponds to a catchup interval of 30m * 24 = 12 hours.
+    // Catchup mode will trigger after a participant has been lagging for 1 day i.e. 2 "catchup" intervals and
+    // the participant will only send an ACS commitment every 12 hours during catchup.
+    catchUpIntervalSkip = PositiveInt.tryCreate(24),
+    nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
+  )
 
   def weightDistributionForSv(
       memberSvRewardWeightBps: Long,

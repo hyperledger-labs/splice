@@ -361,6 +361,7 @@ class SV1Initializer(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
+          acsCommitmentsCatchUpConfigParameter = Some(SvUtil.defaultAcsCommitmentsCatchUpConfig),
         )
         val svKeyFingerprint = participantId.uid.namespace.fingerprint
         for {

@@ -7,7 +7,8 @@ $(dir)/$(docker-build): \
 	$(dir)/target/entrypoint.sh \
 	$(dir)/target/bootstrap-entrypoint.sc \
 	$(dir)/target/tools.sh \
-	$(dir)/target/monitoring.conf
+	$(dir)/target/monitoring.conf \
+	$(dir)/target/parameters.conf
 
 $(dir)/target:
 	mkdir -p $@
@@ -16,6 +17,9 @@ $(dir)/target/entrypoint.sh: $(dir)/../common/entrypoint.sh | $(dir)/target
 	cp $< $@
 
 $(dir)/target/monitoring.conf: $(dir)/../common/monitoring.conf | $(dir)/target
+	cp $< $@
+
+$(dir)/target/parameters.conf: $(dir)/../common/parameters.conf | $(dir)/target
 	cp $< $@
 
 $(dir)/target/bootstrap-entrypoint.sc: $(dir)/../common/bootstrap-entrypoint.sc | $(dir)/target
