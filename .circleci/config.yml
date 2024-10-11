@@ -6415,7 +6415,7 @@ workflows:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - migrate_sv_runbook
       - deploy_sv_runbook:
