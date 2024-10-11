@@ -17,6 +17,7 @@ in pkgs.mkShell {
     istioctl
     ammonite
     auth0-cli
+    bc
     cabal2nix
     canton
     circleci-cli
@@ -54,6 +55,7 @@ in pkgs.mkShell {
     pulumi-bin
     python3
     python3Packages.aiohttp
+    python3Packages.auth0-python
     python3Packages.colorlog
     (python3Packages.datadog.overrideAttrs (old: {
                                              doCheck = false;
@@ -61,6 +63,8 @@ in pkgs.mkShell {
                                      }))
     python3Packages.GitPython
     python3Packages.gql
+    python3Packages.jsonpickle
+    python3Packages.kubernetes
     python3Packages.marshmallow-dataclass
     python3Packages.polib
     python3Packages.pyjwt

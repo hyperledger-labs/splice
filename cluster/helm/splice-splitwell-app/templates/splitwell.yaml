@@ -24,7 +24,9 @@ spec:
       containers:
       - name: splitwell-app
         image: "{{ .Values.imageRepo }}/splitwell-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).splitwell_app) }}"
-        imagePullPolicy: Always
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}

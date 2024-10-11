@@ -23,7 +23,9 @@ spec:
       containers:
         - name: load-tester
           image: "{{ .Values.imageRepo }}/load-tester:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).load_tester) }}"
-          imagePullPolicy: Always
+          {{- with .Values.imagePullPolicy }}
+          imagePullPolicy: {{ . }}
+          {{- end }}
           env:
             - name: EXTERNAL_CONFIG
               value: {{ .Values.config | quote }}

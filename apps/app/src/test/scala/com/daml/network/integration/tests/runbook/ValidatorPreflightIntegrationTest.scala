@@ -84,10 +84,10 @@ abstract class ValidatorPreflightIntegrationTestBase
     val env = provideEnvironment("NotUsed")
     // retry on e.g. network errors and rate limits
     val token = eventuallySucceeds() {
-      getAuth0ClientCredential(
+      Auth0Util.getAuth0ClientCredential(
         validatorAuth0Secret,
         validatorAuth0Audience,
-        auth0,
+        auth0.domain,
       )(noTracingLogger)
     }
 

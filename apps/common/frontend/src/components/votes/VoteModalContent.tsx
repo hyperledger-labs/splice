@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useVotesHooks } from 'common-frontend';
-import { CopyableTypography, DateDisplay, PartyId, SvVote } from 'common-frontend';
+import { CopyableTypography, PartyId, SvVote } from 'common-frontend';
 import React, { ReactElement, useCallback } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';
@@ -26,6 +26,7 @@ import {
 import { ContractId, Party } from '@daml/types';
 
 import { Reason } from '../../models';
+import DateWithDurationDisplay from '../DateWithDurationDisplay';
 import ActionView from './ActionView';
 import { VoteRequestResultTableType } from './VoteResultsFilterTable';
 
@@ -128,7 +129,7 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
                     <Typography variant="h6">Expires At</Typography>
                   </TableCell>
                   <TableCell>
-                    <DateDisplay datetime={voteBefore} />
+                    <DateWithDurationDisplay datetime={voteBefore} enableDuration />
                   </TableCell>
                 </TableRow>
                 <TableRow>

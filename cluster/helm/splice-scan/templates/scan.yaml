@@ -86,7 +86,9 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "splice-util-lib.log-level" .Values | indent 8}}
-        imagePullPolicy: Always
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         ports:
         - containerPort: 5012
           name: scan-api
@@ -202,7 +204,9 @@ spec:
         - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
         image: "{{ .Values.imageRepo }}/scan-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).scan_web_ui) }}"
-        imagePullPolicy: Always
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         name: scan-web-ui
         ports:
         - containerPort: 80

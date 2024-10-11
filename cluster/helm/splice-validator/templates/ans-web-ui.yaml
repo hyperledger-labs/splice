@@ -28,7 +28,9 @@ spec:
       containers:
       - name: ans-web-ui
         image: "{{ .Values.imageRepo }}/ans-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).ans_web_ui) }}"
-        imagePullPolicy: Always
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         env:
         - name: SPLICE_APP_UI_AUTH_CLIENT_ID
           valueFrom:
