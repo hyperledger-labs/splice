@@ -251,6 +251,10 @@ commands:
       no_output_timeout:
         type: string
         default: "10m"
+      succeed_on_error:
+        # Will cause the command to always succeed regardless of the sbt exit code.
+        type: boolean
+        default: false
       extra_parameters:
         type: string
         default: ""
@@ -277,12 +281,6 @@ commands:
       working_dir:
         type: string
         default: ""
-      background:
-        type: boolean
-        default: false
-      enforce_checks_for_background:
-        type: boolean
-        default: true
       <<: *cluster-parameter
     steps:
       - run_bash_command_in_nix:
@@ -292,31 +290,51 @@ commands:
           additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
           cluster: << parameters.cluster >>
           working_dir: << parameters.working_dir >>
-          background: << parameters.background >>
           cmd: |
+            on_exit() {
+              local CODE="$?"
+              # Provide some explanation on exit
+              if [ "$CODE" == 0 ]
+              then
+                echo "sbt terminated successfully."
+              elif [ "$CODE" == 124 ]
+              then
+                echo "sbt has been aborted with the TERM signal after << parameters.timeout >>."
+              elif [ "$CODE" == 137 ]
+              then
+                echo "sbt has been killed because it has allocated too much memory or it has ignored the TERM signal after << parameters.timeout >>."
+              else
+                echo "sbt failed with exit code $CODE."
+              fi
+              <<# parameters.succeed_on_error >>
+              echo "Overriding original exit code $CODE with zero."
+              exit 0
+              <</ parameters.succeed_on_error >>
+            }
+            trap on_exit EXIT
+
+            set -euo pipefail
+            # Necessary for tests of the REPL
+            export TERM=dumb
+
             # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
             export PROTOCBRIDGE_NO_CLEANUP="1"
-
-            if [ << parameters.enforce_checks_for_background >> == true ] && [ << parameters.background >> == false ] && [ -n "<< parameters.additional_nix_args >>" ]; then
-              echo 'You probably want to pass the addition nix envs << parameters.additional_nix_args >> to the background sbt server'
-              exit 1
-            fi
-
-            if [ << parameters.enforce_checks_for_background >> == true ] && [ << parameters.background >> == false ] && [ -n "<< parameters.extra_env_vars >>" ]; then
-              echo 'You probably want to pass the addition envs << parameters.extra_env_vars >> to the background sbt server'
-              exit 1
-            fi
 
             run_sbt() {
                export << parameters.extra_env_vars >>
                # Define sbt command
-               SBT_CMD=("sbtn")
+               SBT_CMD=(sbt)
 
                # Add extra parameters
                SBT_CMD+=(<< parameters.extra_parameters >>)
 
                # Add sbt commands.
-               SBT_CMD+=("<< parameters.cmd >>")
+               # Do not quote this, to allow the caller to pass in several commands.
+               # The caller needs to take care of quoting, if a command contains spaces.
+               SBT_CMD+=(<< parameters.cmd >>)
+
+               # Setup heap size; corresponds to Canton large executors
+               SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
 
                # Run command
                timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
@@ -399,6 +417,14 @@ commands:
             done
       - store_test_results:
           path: test-reports
+
+  setup_sbt_test_job:
+    steps:
+      - setup_nix
+      - restore_sbt_cache
+      - restore_precompiled_classes
+      - restore_frontend_node_modules
+      - restore_daml_artifacts
 
   # Adapted from Canton's CI definition
   split_tests_for_parallel_run:
@@ -494,6 +520,9 @@ commands:
         default: ""
       start_canton_options:
         type: string
+      additional_nix_args:
+        type: string
+        default: ""
     steps:
       - run_bash_command_in_nix:
           cmd_name: "Wait for canton to be ready before running tests"
@@ -507,8 +536,11 @@ commands:
           # run all tests except the live cluster ones
           pre_sbt_cmd: |
             << parameters.pre_sbt_cmd >>
-          cmd: "$RUN_SPLITTED_TESTS_CMD"
+          extra_env_vars: POSTGRES_DB=postgres
+          cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: << parameters.post_sbt_cmd >>
+          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET << parameters.additional_nix_args >>"
+          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
           # it is in our best interest for our tests to be faster than this,
           # but failing CI because of slow tests is also not very nice
           # TODO(#8608): reduce `timeout` to at least 25m again
@@ -516,8 +548,6 @@ commands:
           no_output_timeout: "20m"
       - execute_sbt_command:
           cmd: "checkErrors"
-          # don't meta fail on errors ignored by the check errors
-          fail_on_error_in_output: false
 
   setup_vpn:
     steps:
@@ -884,8 +914,7 @@ commands:
 
   clone_and_update_open_source:
       steps:
-      - setup_nix_self_hosted
-      - setup_sbt_self_hosted_test_server
+      - setup_sbt_test_job
       - clone_and_update_oss_or_splice:
           repo_name: DA oss
           repository: "git@github.com:digital-asset/decentralized-canton-sync.git"
@@ -1150,7 +1179,6 @@ commands:
                 --keep CI \
                 --keep RUN_SPLITTED_TESTS_CMD \
                 --keep COURSIER_CACHE \
-                --keep SBT_OPTS \
                 --command echo "Confirmed that we can build and enter the nix environment!" \
                 && break
               NIX_ENV_TRY_COUNT=$((NIX_ENV_TRY_COUNT+1))
@@ -1171,7 +1199,6 @@ commands:
               --keep TERM \
               --keep CI \
               --keep COURSIER_CACHE \
-              --keep SBT_OPTS \
               --keep RUN_SPLITTED_TESTS_CMD \
               --keep GCP_DA_CN_DEVNET_KEY \
               --keep GCP_DA_CN_CI_KEY \
@@ -1344,30 +1371,6 @@ commands:
             git submodule update --init --recursive
             git config submodule.recurse true
 
-  setup_sbt_test_server:
-    parameters:
-      # required here because of https://github.com/sbt/sbt/issues/7012
-      <<: *cluster-parameter
-      additional_nix_args:
-        type: string
-        default: ""
-      extra_env_vars:
-        type: string
-        default: ""
-    steps:
-      - restore_sbt_cache
-      # execute it first to ensure it has some time to start
-      - execute_sbt_command:
-          cmd: ""
-          background: true
-          additional_nix_args: << parameters.additional_nix_args >>
-          extra_env_vars: << parameters.extra_env_vars >>
-          cluster: << parameters.cluster >>
-      - restore_precompiled_classes
-      - restore_frontend_node_modules
-      - restore_daml_artifacts
-
-
   # Note: compiled_classes and sbt_cache commands are largely copied from the Canton repo
   # save compiled target directories to cache (so we don't recompile everything again and again)
   # uses the target directories in the project (e.g. `canton-network-node/target`) which sbt doesn't cache.
@@ -1524,17 +1527,9 @@ commands:
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
 
-  setup_sbt_self_hosted_test_server:
-    parameters:
-      # required here because of https://github.com/sbt/sbt/issues/7012
-      <<: *cluster-parameter
-      additional_nix_args:
-        type: string
-        default: ""
-      extra_env_vars:
-        type: string
-        default: ""
+  restore_sbt_cache_self_hosted:
     steps:
+      - restore_daml_artifacts
       - restore_cache:
           name: Restoring Sbt caches
           keys:
@@ -1543,16 +1538,9 @@ commands:
             # If this is not possible and Dependencies.scala hasn't changed, populate the cache with slightly outdated data.
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
-      # start sbt server in the background
-      - execute_sbt_command:
-          cmd: ""
-          background: true
-          additional_nix_args: << parameters.additional_nix_args >>
-          extra_env_vars: << parameters.extra_env_vars >>
-          cluster: << parameters.cluster >>
+
       - restore_precompiled_classes
       - restore_frontend_node_modules
-      - restore_daml_artifacts
       - execute_sbt_command:
           cmd: pullRemoteCache
           cmd_retry_count: 3
@@ -2709,7 +2697,7 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
-      - setup_sbt_self_hosted_test_server
+      - restore_sbt_cache_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Verify config.yml is up to date with source.
           cmd: .circleci/build-config.sh --check
@@ -2719,7 +2707,7 @@ jobs:
       - run_daml_return_types_check
       - run_todo_script
       - execute_sbt_command:
-          cmd: "Test/compile; lint; printTests"
+          cmd: "Test/compile lint printTests"
       - run_bash_command_in_nix:
           cmd_name: Verify no changes in sbt test files
           cmd: git add . && git diff --staged --exit-code test*.log
@@ -2734,11 +2722,11 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
-      - setup_sbt_self_hosted_test_server:
-          extra_env_vars: DAML_DEBUG=1
+      - restore_sbt_cache_self_hosted
       - execute_sbt_command:
           cmd: "damlTest"
           timeout: "10m"
+          extra_env_vars: DAML_DEBUG=1
       - save_sbt_cache_self_hosted
       - cleanup_sbt_test_job
 
@@ -2751,8 +2739,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_sbt_test_server
+      - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmTest"
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
@@ -2834,17 +2821,18 @@ jobs:
                     echo "Lock files changed ($changed), breaking"
                     circleci-agent step halt
                   fi
-      - setup_nix
+      - setup_sbt_test_job
       - docker_prep_build
       # Used to pull docker images for cometbft
       - docker_login_artifactory
       - docker_pull_test_images
-      # Start canton before sbt, as it takes a long time to start
+      # Start canton before compiling, as it takes a long time to start
+      # Note that we start canton before connecting VPN, so some initial
+      # metrics from Canton will be lost. Currently, they're Canton metrics
+      # before our actual tests start are not of interest for us,
+      # so we accept that.
       - start_canton_in_background:
           start_canton_options: << parameters.start_canton_options >>
-      - setup_sbt_test_server:
-          extra_env_vars: POSTGRES_DB=postgres
-          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET << parameters.additional_nix_args >>"
       - when:
           condition:
             equal: [ true, "<< parameters.with_shared_gcp >>" ]
@@ -2871,20 +2859,26 @@ jobs:
           pre_sbt_cmd: << parameters.pre_sbt_cmd >>
           post_sbt_cmd: << parameters.post_sbt_cmd >>
           start_canton_options: << parameters.start_canton_options >>
+          additional_nix_args: << parameters.additional_nix_args >>
       - stop_canton
       - cleanup_sbt_test_job
 
   bundle:
-    executor: self_hosted
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: xlarge
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
-      - setup_sbt_self_hosted_test_server
+      - setup_sbt_test_job
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
-          cmd: "Test/compile; bundle"
+          cmd: "Test/compile bundle"
       - run:
           name: Copy bundle
           command: |
@@ -2908,7 +2902,6 @@ jobs:
            # which would lead to an error due to a misisng `delete` permission
            gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
-      - save_sbt_cache_self_hosted
       - cleanup_sbt_test_job:
           save_sbt_caches: true
           upload_caches: true
@@ -2934,16 +2927,20 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix
-      - setup_sbt_test_server:
-          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
-              --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-              --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID
-              --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET
-              --keep ARTIFACTORY_USER
-              --keep ARTIFACTORY_PASSWORD"
+      # TODO(#6630): look into these caches
+      - restore_precompiled_classes
+      - restore_sbt_cache
       - execute_sbt_command:
           cmd: "\"tools/run\""
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD"
           timeout: "10m"
+      - save_sbt_cache
+      - save_compiled_classes
 
   cluster_lock_reaper:
     executor: self_hosted
@@ -2988,8 +2985,7 @@ jobs:
     steps:
       - checkout_with_retry
       - restore_frontend_builds
-      - setup_nix
-      - setup_sbt_test_server
+      - setup_sbt_test_job
       - docker_login_artifactory
       - docker_login_internal
       - run_bash_command_in_nix:
@@ -3041,8 +3037,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
-      - setup_sbt_test_server
+      - setup_sbt_test_job
       - docker_login_artifactory
       - run_bash_command_in_nix:
          cmd_name: Promote images to Artifactory
@@ -3105,8 +3100,7 @@ jobs:
     steps:
       - checkout_with_retry
       - restore_frontend_builds
-      - setup_nix
-      - setup_sbt_test_server
+      - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
          cmd: make build -j
@@ -3449,12 +3443,20 @@ jobs:
             { "text": "*📄Changes to any `.md` files are detected, and they are merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
 
   build_oss:
-    executor: self_hosted
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: "xlarge"
     environment:
       <<: *env
     steps:
       - checkout_with_retry
       - clone_and_update_open_source
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          working_dir: "/home/circleci/oss"
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           working_dir: "/home/circleci/oss"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
@@ -3462,10 +3464,17 @@ jobs:
       - execute_sbt_command:
           working_dir: "/home/circleci/splice"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: "update"
+          cmd_retry_count: 3
+      - execute_sbt_command:
+          working_dir: "/home/circleci/splice"
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "bundle"
 
   create_oss_pr:
-    executor: self_hosted
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: "small"
     environment:
       <<: *env
     steps:
@@ -3638,10 +3647,11 @@ jobs:
           gce_authenticate: true
           cmd: cncluster activate
           cmd_retry_count: 5
-      - setup_sbt_test_server:
-          extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=<< parameters.migration_id >> << parameters.extra_env_vars >>
-          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
-          cluster: << parameters.cluster >>
+      # TODO(#6630): bundle all these restores into a command, consider merging with setup_sbt_test_job
+      - restore_sbt_cache
+      - restore_precompiled_classes
+      - restore_frontend_node_modules
+      - restore_daml_artifacts
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - setup_vpn
@@ -3684,13 +3694,18 @@ jobs:
       - run_bash_command_in_nix:
           cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
       - execute_sbt_command:
-          cmd: "$RUN_SPLITTED_TESTS_CMD"
-          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          pre_sbt_cmd: |
+            set -eou pipefail
+            . cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+          cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=<< parameters.migration_id >> << parameters.extra_env_vars >>
           timeout: "15m"
           cmd_retry_count: 3
           # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
           # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
+          cluster: << parameters.cluster >>
           cmd_before_retry: |
             echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
             ./stop-frontends.sh
@@ -3774,10 +3789,7 @@ jobs:
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
-            - setup_sbt_self_hosted_test_server:
-                cluster: << parameters.cluster >>
-                additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
-                extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=<< parameters.migration_id >> << parameters.extra_env_vars >>
+            - restore_sbt_cache_self_hosted
             - split_tests_for_parallel_run:
                 test_names_file: << parameters.test_names_file >>
             - run_bash_command_in_nix:
@@ -3808,7 +3820,13 @@ jobs:
             - get_cluster:
                 cluster: << parameters.cluster >>
             - execute_sbt_command:
-                cmd: "$RUN_SPLITTED_TESTS_CMD"
+                cluster: << parameters.cluster >>
+                pre_sbt_cmd: |
+                  set -eou pipefail
+                  . cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
+                cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
+                additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
+                extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=<< parameters.migration_id >> << parameters.extra_env_vars >>
                 timeout: "15m"
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
@@ -3861,13 +3879,13 @@ jobs:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
             - setup_nix_self_hosted
-            - setup_sbt_self_hosted_test_server
             - run_bash_command_in_nix:
                 cmd_name: Activate cluster (configure kubectl)
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
+            - restore_sbt_cache_self_hosted
             - wait_for_sv_runbook_deployment:
                 cluster: << parameters.cluster >>
                 check_cluster_version: << parameters.check_cluster_version >>
@@ -3953,13 +3971,13 @@ jobs:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
             - setup_nix_self_hosted
-            - setup_sbt_self_hosted_test_server
             - run_bash_command_in_nix:
                 cmd_name: Activate cluster (configure kubectl)
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
+            - restore_sbt_cache_self_hosted
             - execute_sbt_command:
                 cmd: "Test/compile"
             - run_bash_command_in_nix:

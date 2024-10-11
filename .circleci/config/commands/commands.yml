@@ -77,6 +77,10 @@ commands:
       no_output_timeout:
         type: string
         default: "10m"
+      succeed_on_error:
+        # Will cause the command to always succeed regardless of the sbt exit code.
+        type: boolean
+        default: false
       extra_parameters:
         type: string
         default: ""
@@ -103,12 +107,6 @@ commands:
       working_dir:
         type: string
         default: ""
-      background:
-        type: boolean
-        default: false
-      enforce_checks_for_background:
-        type: boolean
-        default: true
       <<: *cluster-parameter
     steps:
       - run_bash_command_in_nix:
@@ -118,31 +116,51 @@ commands:
           additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
           cluster: << parameters.cluster >>
           working_dir: << parameters.working_dir >>
-          background: << parameters.background >>
           cmd: |
+            on_exit() {
+              local CODE="$?"
+              # Provide some explanation on exit
+              if [ "$CODE" == 0 ]
+              then
+                echo "sbt terminated successfully."
+              elif [ "$CODE" == 124 ]
+              then
+                echo "sbt has been aborted with the TERM signal after << parameters.timeout >>."
+              elif [ "$CODE" == 137 ]
+              then
+                echo "sbt has been killed because it has allocated too much memory or it has ignored the TERM signal after << parameters.timeout >>."
+              else
+                echo "sbt failed with exit code $CODE."
+              fi
+              <<# parameters.succeed_on_error >>
+              echo "Overriding original exit code $CODE with zero."
+              exit 0
+              <</ parameters.succeed_on_error >>
+            }
+            trap on_exit EXIT
+
+            set -euo pipefail
+            # Necessary for tests of the REPL
+            export TERM=dumb
+
             # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
             export PROTOCBRIDGE_NO_CLEANUP="1"
-
-            if [ << parameters.enforce_checks_for_background >> == true ] && [ << parameters.background >> == false ] && [ -n "<< parameters.additional_nix_args >>" ]; then
-              echo 'You probably want to pass the addition nix envs << parameters.additional_nix_args >> to the background sbt server'
-              exit 1
-            fi
-
-            if [ << parameters.enforce_checks_for_background >> == true ] && [ << parameters.background >> == false ] && [ -n "<< parameters.extra_env_vars >>" ]; then
-              echo 'You probably want to pass the addition envs << parameters.extra_env_vars >> to the background sbt server'
-              exit 1
-            fi
 
             run_sbt() {
                export << parameters.extra_env_vars >>
                # Define sbt command
-               SBT_CMD=("sbtn")
+               SBT_CMD=(sbt)
 
                # Add extra parameters
                SBT_CMD+=(<< parameters.extra_parameters >>)
 
                # Add sbt commands.
-               SBT_CMD+=("<< parameters.cmd >>")
+               # Do not quote this, to allow the caller to pass in several commands.
+               # The caller needs to take care of quoting, if a command contains spaces.
+               SBT_CMD+=(<< parameters.cmd >>)
+
+               # Setup heap size; corresponds to Canton large executors
+               SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
 
                # Run command
                timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
@@ -225,6 +243,14 @@ commands:
             done
       - store_test_results:
           path: test-reports
+
+  setup_sbt_test_job:
+    steps:
+      - setup_nix
+      - restore_sbt_cache
+      - restore_precompiled_classes
+      - restore_frontend_node_modules
+      - restore_daml_artifacts
 
   # Adapted from Canton's CI definition
   split_tests_for_parallel_run:
@@ -320,6 +346,9 @@ commands:
         default: ""
       start_canton_options:
         type: string
+      additional_nix_args:
+        type: string
+        default: ""
     steps:
       - run_bash_command_in_nix:
           cmd_name: "Wait for canton to be ready before running tests"
@@ -333,8 +362,11 @@ commands:
           # run all tests except the live cluster ones
           pre_sbt_cmd: |
             << parameters.pre_sbt_cmd >>
-          cmd: "$RUN_SPLITTED_TESTS_CMD"
+          extra_env_vars: POSTGRES_DB=postgres
+          cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: << parameters.post_sbt_cmd >>
+          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET << parameters.additional_nix_args >>"
+          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
           # it is in our best interest for our tests to be faster than this,
           # but failing CI because of slow tests is also not very nice
           # TODO(#8608): reduce `timeout` to at least 25m again
@@ -342,8 +374,6 @@ commands:
           no_output_timeout: "20m"
       - execute_sbt_command:
           cmd: "checkErrors"
-          # don't meta fail on errors ignored by the check errors
-          fail_on_error_in_output: false
 
   setup_vpn:
     steps:
@@ -710,8 +740,7 @@ commands:
 
   clone_and_update_open_source:
       steps:
-      - setup_nix_self_hosted
-      - setup_sbt_self_hosted_test_server
+      - setup_sbt_test_job
       - clone_and_update_oss_or_splice:
           repo_name: DA oss
           repository: "git@github.com:digital-asset/decentralized-canton-sync.git"
