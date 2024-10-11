@@ -5626,6 +5626,15 @@ workflows:
           cluster: "ciperiodic"
           requires:
             - offboard_sv_runbook
+      - reset_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - deploy_validator_to_recover_sv_amulets
       - deploy_sv_runbook:
           name: "redeploy_sv_runbook"
           <<: *main-branch-only
@@ -5634,7 +5643,7 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           requires:
-            - deploy_validator_to_recover_sv_amulets
+            - reset_sv_runbook
       - preflight_check:
           name: "preflight_sv_reonboard_check"
           <<: *main-branch-only
