@@ -147,7 +147,7 @@ onboarded.
 Logging into the CNS UI
 +++++++++++++++++++++++
 
-You can open your browser at https://ans.localhost (note that this is currently by default
+You can open your browser at http://ans.localhost (note that this is currently by default
 `ans` and not `cns`), and login using the same administrator user, or any other user that has been onboarded
 via the wallet, in order to purchase a CNS entry for that user.
 
