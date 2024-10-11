@@ -48,6 +48,30 @@ commands:
             git submodule update --init --recursive
             git config submodule.recurse true
 
+  setup_sbt_test_server:
+    parameters:
+      # required here because of https://github.com/sbt/sbt/issues/7012
+      <<: *cluster-parameter
+      additional_nix_args:
+        type: string
+        default: ""
+      extra_env_vars:
+        type: string
+        default: ""
+    steps:
+      - restore_sbt_cache
+      # execute it first to ensure it has some time to start
+      - execute_sbt_command:
+          cmd: ""
+          background: true
+          additional_nix_args: << parameters.additional_nix_args >>
+          extra_env_vars: << parameters.extra_env_vars >>
+          cluster: << parameters.cluster >>
+      - restore_precompiled_classes
+      - restore_frontend_node_modules
+      - restore_daml_artifacts
+
+
   # Note: compiled_classes and sbt_cache commands are largely copied from the Canton repo
   # save compiled target directories to cache (so we don't recompile everything again and again)
   # uses the target directories in the project (e.g. `canton-network-node/target`) which sbt doesn't cache.
@@ -204,9 +228,17 @@ commands:
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
 
-  restore_sbt_cache_self_hosted:
+  setup_sbt_self_hosted_test_server:
+    parameters:
+      # required here because of https://github.com/sbt/sbt/issues/7012
+      <<: *cluster-parameter
+      additional_nix_args:
+        type: string
+        default: ""
+      extra_env_vars:
+        type: string
+        default: ""
     steps:
-      - restore_daml_artifacts
       - restore_cache:
           name: Restoring Sbt caches
           keys:
@@ -215,9 +247,16 @@ commands:
             # If this is not possible and Dependencies.scala hasn't changed, populate the cache with slightly outdated data.
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
-
+      # start sbt server in the background
+      - execute_sbt_command:
+          cmd: ""
+          background: true
+          additional_nix_args: << parameters.additional_nix_args >>
+          extra_env_vars: << parameters.extra_env_vars >>
+          cluster: << parameters.cluster >>
       - restore_precompiled_classes
       - restore_frontend_node_modules
+      - restore_daml_artifacts
       - execute_sbt_command:
           cmd: pullRemoteCache
           cmd_retry_count: 3
