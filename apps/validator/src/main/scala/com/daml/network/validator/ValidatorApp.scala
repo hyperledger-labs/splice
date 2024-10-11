@@ -255,8 +255,8 @@ class ValidatorApp(
                     nodeIdentitiesDump <- ParticipantInitializer.getDump(
                       participantBootstrappingConfig
                     )
-                    _ <- setupDarsForAcsImport(participantAdminConnection)
-                    _ <-
+                    (_, _) <- (
+                      setupDarsForAcsImport(participantAdminConnection),
                       participantPartyMigrator
                         .migrate(
                           nodeIdentitiesDump,
@@ -278,7 +278,8 @@ class ValidatorApp(
                             DarResources.amuletNameService.bootstrap,
                           ),
                           partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
-                        )
+                        ),
+                    ).tupled
                   } yield ()
                 }
               case (Some(_), None) =>
