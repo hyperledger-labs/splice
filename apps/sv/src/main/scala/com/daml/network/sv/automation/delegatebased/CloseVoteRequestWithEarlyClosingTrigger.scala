@@ -3,13 +3,8 @@
 
 package com.daml.network.sv.automation.delegatebased
 
-import com.daml.network.automation.{
-  OnAssignedContractTrigger,
-  TaskOutcome,
-  TaskSuccess,
-  TriggerContext,
-}
-import com.daml.network.codegen.java.splice.dsorules.VoteRequest
+import com.daml.network.automation.*
+import com.daml.network.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequest, VoteRequest}
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -63,26 +58,44 @@ class CloseVoteRequestWithEarlyClosingTrigger(
                   amuletRulesId = amuletRules.contractId
                   cmd = dsoRules.exercise(
                     _.exerciseDsoRules_CloseVoteRequest(
-                      currentRequestCid,
-                      java.util.Optional.of(amuletRulesId),
+                      new DsoRules_CloseVoteRequest(
+                        currentRequestCid,
+                        java.util.Optional.of(amuletRulesId),
+                      )
                     )
                   )
-                  _ <- svTaskContext.connection
-                    .submit(
-                      Seq(store.key.svParty),
-                      Seq(store.key.dsoParty),
-                      cmd,
-                    )
-                    .noDedup
-                    .yieldResult()
-                } yield TaskSuccess(
-                  s"executed the action $action as there are ${votes.size} vote(s) which is >=" +
-                    s" the $requiredNumVotesForEarlyClosing votes required for early closing."
-                )
+                  res <- for {
+                    outcome <- svTaskContext.connection
+                      .submit(
+                        Seq(store.key.svParty),
+                        Seq(store.key.dsoParty),
+                        cmd,
+                      )
+                      .noDedup
+                      .yieldResult()
+                  } yield Some(outcome)
+                } yield {
+                  res
+                    .map(result => {
+                      if (
+                        result.exerciseResult.outcome.toJson.contains("VRO_AcceptedButActionFailed")
+                      ) {
+                        TaskFailed(
+                          s"action $action was accepted but failed with outcome: ${result.exerciseResult.outcome.toJson}."
+                        )
+                      } else {
+                        TaskSuccess(
+                          s"early closing VoteRequest for action: $action and outcome: ${result.exerciseResult.outcome.toJson} (${votes.size} vote(s) is >=" +
+                            s" the $requiredNumVotesForEarlyClosing votes required)."
+                        )
+                      }
+                    })
+                    .getOrElse(TaskFailed(s"failed to close early VoteRequest for $action."))
+                }
               } else
                 Future.successful(
                   TaskSuccess(
-                    s"not yet executing the action $action," +
+                    s"Not yet executing the action $action," +
                       s" as there are only ${votes.size} out of" +
                       s" the $requiredNumVotesForEarlyClosing votes required for early closing."
                   )

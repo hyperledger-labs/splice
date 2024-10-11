@@ -6,11 +6,13 @@ import com.auth0.client.mgmt.filter.UserFilter
 import com.auth0.json.mgmt.users.User
 
 import scala.jdk.CollectionConverters.*
-import com.daml.network.auth.OAuthApi.TokenResponse
-import com.daml.network.auth.AuthToken
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+
+import com.typesafe.scalalogging.Logger
+import scala.collection.mutable
+import scala.util.control.NonFatal
 
 class Auth0User(val id: String, val email: String, val password: String, val auth0: Auth0Util)
     extends AutoCloseable {
@@ -23,7 +25,7 @@ case class Auth0UserPage(
 )
 
 class Auth0Util(
-    domain: String,
+    val domain: String,
     managementApiClientId: String,
     managementApiClientSecret: String,
     override val loggerFactory: NamedLoggerFactory,
@@ -59,15 +61,6 @@ class Auth0Util(
     )
   }
 
-  def getToken(clientId: String, audience: String): AuthToken = {
-    val client = executeManagementApiRequest(api.clients().get(clientId))
-    val clientSecret = client.getClientSecret()
-    val appApi = new AuthAPI(domain, clientId, clientSecret)
-    val response = appApi.requestToken(audience).execute()
-
-    AuthToken(TokenResponse(response.getAccessToken(), response.getExpiresIn()))
-  }
-
   private def requestManagementAPIToken(): String = {
     auth.requestToken(s"${domain}/api/v2/").execute().getAccessToken()
   }
@@ -80,4 +73,49 @@ class Auth0Util(
     Threading.sleep(500)
     req.execute()
   }
+
+}
+
+object Auth0Util {
+  def getAuth0ClientCredential(
+      clientId: String,
+      audience: String,
+      auth0Domain: String,
+  )(implicit logger: Logger): String = {
+
+    val outLines = mutable.Buffer[String]()
+    val errLines = mutable.Buffer[String]()
+    val outProcessor =
+      scala.sys.process.ProcessLogger(line => outLines.append(line), line => errLines.append(line))
+    try {
+      val ret = scala.sys.process
+        .Process(
+          Seq(
+            "build-tools/get-auth0-token.py",
+            "--client-id",
+            clientId,
+            "--audience",
+            audience,
+            "--auth0-domain",
+            auth0Domain,
+          )
+        )
+        .!(outProcessor)
+      if (ret != 0) {
+        // Stderr contains all actual output, stdout should consist of only the token if successful
+        logger.error("Failed to run get-auth0-token.py. Dumping output.")
+        errLines.foreach(logger.error(_))
+        throw new RuntimeException("get-auth0-token.py failed")
+      }
+    } catch {
+      case NonFatal(ex) =>
+        // Stderr contains all actual output, stdout should consist of only the token if successful
+        logger.error("Failed to run get-auth0-token.py. Dumping output.", ex)
+        errLines.foreach(logger.error(_))
+        throw new RuntimeException("get-auth0-token.py failed.", ex)
+    }
+
+    outLines.head
+  }
+
 }

@@ -5,12 +5,18 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
 import { theme } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
-import { checkAmuletRulesExpectedConfigDiffsHTML } from 'common-test-utils';
+import {
+  checkAmuletRulesExpectedConfigDiffsHTML,
+  dsoInfo,
+  getExpectedAmuletRulesConfigDiffsHTML,
+} from 'common-test-utils';
 import React from 'react';
 import { test, expect, describe } from 'vitest';
 
 import { ThemeProvider } from '@mui/material';
 
+import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
+import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
   VoteRequest,
   DsoRules_CloseVoteRequestResult,
@@ -19,7 +25,6 @@ import { ContractId } from '@daml/types';
 
 import * as constants from '../mocks/constants';
 import { ListVoteRequests } from '../../components';
-import { getExpectedAmuletRulesConfigDiffsHTML } from '../mocks/constants';
 
 const queryClient = new QueryClient();
 // The linter wants me to add the constants.X in the queryKey,
@@ -28,8 +33,18 @@ const provider: VotesHooks = {
   isReadOnly: true,
   useDsoInfos(): UseQueryResult<DsoInfo> {
     return useQuery({
-      queryKey: ['useDsoInfos', constants.dsoInfo],
-      queryFn: async () => constants.dsoInfo,
+      queryKey: ['useDsoInfos', DsoRules, AmuletRules, dsoInfo],
+      queryFn: async () => {
+        return {
+          svUser: dsoInfo.sv_user,
+          svPartyId: dsoInfo.sv_party_id,
+          dsoPartiId: dsoInfo.dso_party_id,
+          votingThreshold: dsoInfo.voting_threshold,
+          amuletRules: Contract.decodeOpenAPI(dsoInfo.amulet_rules.contract, AmuletRules),
+          dsoRules: Contract.decodeOpenAPI(dsoInfo.dso_rules.contract, DsoRules),
+          nodeStates: [],
+        };
+      },
     });
   },
   useListDsoRulesVoteRequests(): UseQueryResult<Contract<VoteRequest>[]> {
@@ -116,7 +131,7 @@ describe('Votes list should', () => {
     fireEvent.click(actionNeeded);
     // TODO(#15151): Test diffs for SRARC_UpdateSvRewardWeight
     const actionNeededRows = await screen.findAllByText('SRARC_UpdateSvRewardWeight');
-    expect(actionNeededRows).toHaveLength(1);
+    expect(actionNeededRows).toHaveLength(2);
   });
 
   test('NOT Show votes requiring action, when that is disabled', async () => {
@@ -137,8 +152,8 @@ describe('Votes list should', () => {
     const action = plannedRows[0]; // Use the first element from the array
     fireEvent.click(action);
 
-    const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('0.005', '0.006');
-    checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
+    const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '0.06');
+    await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
   });
 
   test('Show votes that are executed', async () => {

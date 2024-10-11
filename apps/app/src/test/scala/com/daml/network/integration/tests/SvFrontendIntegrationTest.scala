@@ -1485,23 +1485,32 @@ class SvFrontendIntegrationTest
           )
           vote(sv1Backend, requestIdAdd2, true, "2", true)
           vote(sv3Backend, requestIdAdd2, true, "3", true)
-          vote(sv4Backend, requestIdAdd2, true, "4", true)
+          loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
+            {
+              vote(sv4Backend, requestIdAdd2, true, "4", true)
 
-          clue("The last action was accepted but failed") {
-            eventually() {
-              sv1Backend
-                .listVoteRequestResults(
-                  None,
-                  Some(false),
-                  Some(getSvName(2)),
-                  None,
-                  None,
-                  1,
-                )
-                .loneElement
-                .outcome shouldBe a[VRO_AcceptedButActionFailed]
-            }
-          }
+              clue("The last action was accepted but failed") {
+                eventually() {
+                  sv1Backend
+                    .listVoteRequestResults(
+                      None,
+                      Some(false),
+                      Some(getSvName(2)),
+                      None,
+                      None,
+                      1,
+                    )
+                    .loneElement
+                    .outcome shouldBe a[VRO_AcceptedButActionFailed]
+                }
+              }
+            },
+            lines => {
+              forAtLeast(1, lines) { line =>
+                line.message should include(s"was accepted but failed with outcome")
+              }
+            },
+          )
         }
     }
   }

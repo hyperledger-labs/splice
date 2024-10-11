@@ -3,4 +3,4 @@
 
 dir := $(call current_dir)
 
-$(dir)/$(docker-build): build_arg := --build-arg pulumi_version=${PULUMI_VERSION}
+$(dir)/$(docker-build): platform_opt := --platform=linux/amd64 --build-arg pulumi_version=${PULUMI_VERSION}

@@ -37,6 +37,10 @@ if [ -s "/app/monitoring.conf" ]; then
    ARGS+=( --config /app/monitoring.conf )
 fi
 
+if [ -s "/app/parameters.conf" ]; then
+   ARGS+=( --config /app/parameters.conf )
+fi
+
 if [ -s "/app/additional-config.conf" ]; then
    ARGS+=( --config /app/additional-config.conf )
 fi

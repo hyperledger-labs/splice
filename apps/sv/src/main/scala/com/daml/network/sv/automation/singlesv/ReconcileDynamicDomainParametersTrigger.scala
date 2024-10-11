@@ -93,6 +93,8 @@ class ReconcileDynamicDomainParametersTrigger(
       synchronizerConfig: Option[SynchronizerConfig],
   ): DynamicDomainParameters = {
     val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
+    // Make sure that the bootstrap script for the upgrade domain is aligned with any changes made to the
+    // dynamic domain parameters here to prevent the soft synchronizer upgrade test from failing
     existingDomainParameters.tryUpdate(
       trafficControlParameters =
         existingDomainParameters.trafficControlParameters.map { trafficControl =>
@@ -111,6 +113,7 @@ class ReconcileDynamicDomainParametersTrigger(
         .fold(
           PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval)
         )(PositiveSeconds.tryOfSeconds(_)),
+      acsCommitmentsCatchUpConfigParameter = Some(SvUtil.defaultAcsCommitmentsCatchUpConfig),
     )
   }
 }

@@ -5,16 +5,14 @@ import userEvent from '@testing-library/user-event';
 import {
   checkAmuletRulesExpectedConfigDiffsHTML,
   checkDsoRulesExpectedConfigDiffsHTML,
+  getExpectedAmuletRulesConfigDiffsHTML,
+  getExpectedDsoRulesConfigDiffsHTML,
 } from 'common-test-utils';
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
-import {
-  svPartyId,
-  getExpectedAmuletRulesConfigDiffsHTML,
-  getExpectedDsoRulesConfigDiffsHTML,
-} from './mocks/constants';
+import { svPartyId } from './mocks/constants';
 
 const AppWithConfig = () => {
   return (
@@ -34,7 +32,7 @@ describe('SV user can', () => {
     await user.type(input, 'sv1');
 
     const button = screen.getByRole('button', { name: 'Log In' });
-    user.click(button);
+    await user.click(button);
 
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
@@ -70,7 +68,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     await goToGovernanceTabAndClickOnAction('Action Needed', action, user);
 
     const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '222.2');
-    checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
+    await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
     // current comparison
     checkNumberNumberOfDiffs(1);
@@ -83,7 +81,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     await goToGovernanceTabAndClickOnAction('Planned', action, user);
 
     const mockHtmlContent = getExpectedAmuletRulesConfigDiffsHTML('4815162342', '1.03');
-    checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
+    await checkAmuletRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
     // current comparison
     checkNumberNumberOfDiffs(1);
@@ -147,7 +145,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
     await goToGovernanceTabAndClickOnAction('Action Needed', action, user);
     const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1600', '2100');
-    checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent);
+    await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent);
 
     // current comparison
     checkNumberNumberOfDiffs(2);
@@ -161,7 +159,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
     const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1800', '2200');
 
-    checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
+    await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
     // current comparison against vote result
     checkNumberNumberOfDiffs(1);
@@ -175,7 +173,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
     const mockJsonContent = getMockJsonContentForDsoRules('1800');
 
-    checkDsoRulesExpectedConfigDiffsHTML(mockJsonContent, 0, true);
+    await checkDsoRulesExpectedConfigDiffsHTML(mockJsonContent, 0, true);
 
     checkNumberNumberOfDiffs(1);
   });
@@ -188,7 +186,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
 
     const mockHtmlContent = getMockJsonContentForDsoRules('2000');
 
-    checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0, true);
+    await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0, true);
 
     checkNumberNumberOfDiffs(1);
   });
