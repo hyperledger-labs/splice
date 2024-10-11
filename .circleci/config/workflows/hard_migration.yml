@@ -95,17 +95,12 @@ workflow:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
             - deploy_validator_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
+      - trigger_global_domain_migration:
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          wait_for_sv: false
-          cluster_version: << pipeline.parameters.base-version >>
-          check_cluster_version: false
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration

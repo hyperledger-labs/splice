@@ -2650,6 +2650,40 @@ jobs:
                 channel_notify: << parameters.channel_notify >>
                 cluster: << parameters.cluster >>
 
+  trigger_global_domain_migration:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Trigger the votes for a global domain migration
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args: >
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+          cmd: |
+            cncluster activate
+            cncluster vote_for_migration 1
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+
   post_migration_verify_identities:
     executor: self_hosted
     environment:
@@ -5225,17 +5259,12 @@ workflows:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - deploy_sv_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
+      - trigger_global_domain_migration:
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "ciperiodic"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          wait_for_sv: false
-          cluster_version: << pipeline.parameters.base-version >>
-          check_cluster_version: false
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
@@ -6273,17 +6302,12 @@ workflows:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
             - deploy_validator_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
+      - trigger_global_domain_migration:
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          wait_for_sv: false
-          cluster_version: << pipeline.parameters.base-version >>
-          check_cluster_version: false
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration

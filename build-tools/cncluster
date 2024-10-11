@@ -1956,6 +1956,19 @@ function subcmd_dump_identities() {
     echo "$all" | jq -S .
 }
 
+###
+subcommand_whitelist[vote_for_migration]="Creates a vote request to migrate to a new migration id and has all SVs vote in favour"
+function subcmd_vote_for_migration() {
+  if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 <migration_id>"
+    exit 1
+  fi
+
+  _cluster_must_exist
+
+  "$REPO_ROOT/cluster/scripts/vote-for-migration.sh" "$1"
+}
+
 ################################
 ### Main
 ################################
