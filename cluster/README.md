@@ -1479,11 +1479,12 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
 1. Take down the `multi-validator` stack. From the deployment directory on the current release branch, run `CI=true cncluster pulumi multi-validator down`.
 1. Wait until the scheduled time has arrived, the domain is paused and a migration dump has been exported.
-   If unsure, check the SV app logs for an entry such as "Wrote domain migration dump"
-   (e.g., via [GCE Log Explorer](#gce-log-explorer)).
+   If unsure, check the logs of the SV app (and any validator apps) for an entry such as "Wrote domain migration dump"
+   (e.g., via [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Wrote%20domain%20migration%20dump%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-09T13:01:30.491233228Z;duration=PT30M?project=da-cn-devnet)).
+1. Take a screenshot of the amulet balance of our SVs. You'll use this as a reference to check the balance after the migration is complete.
 1. Wait until all our apps have fully caught up.
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
-   It's probably easiest to check this via the [GCE Log Explorer](#gce-log-explorer).
+   It's probably easiest to check this via the [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Ingested%20transaction%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:41:04.651869226Z;duration=PT30M?project=da-cn-devnet).
    Once you have verified this, move onto the next step quickly (no need to wait for the go-ahead from the person leading the call).
 1. Backup our SVs and validators:
    ```
@@ -1507,6 +1508,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    * in `config.yaml` set `synchronizerMigration.active.migratingFrom` to the migration ID we're migrating away from
    * deploy the operator from the deployment branch where you updated the configuration
    * sync the migration config found in `config.yaml` on all the branches referenced in any migrations `releaseReference` (this just ensure that some metrics are labeled as expected for still running migrations, and that it removes all the deployments for archived migrations)
+   * Update the `CHARTS_VERSION` and `OVERRIDE_VERSION` in the target cluster env vars to the version we're migrating to.
 1. Wait for the operator to apply your changes from the migrate step.
    The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
    (Check the logs of failing pods to be sure that there is no other problem.)
@@ -1519,10 +1521,11 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    Communicate the result of your check to the rest of the DSO to conclude the migration.
    If enough SVs (>2/3) are not able to complete the migration successfully, we may need to roll-back to the previous domain.
    For instructions on how to do so, refer to [Switching back to the old domain](#switching-back-to-the-old-domain).
+1. (non-DevNet clusters) Check to see that fresh node identities dumps have been taken after the migration. Check the logs of the SV app for an entry that says "Wrote node identities dump" [GCloud Logs example](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-testnet%22%0A%22Wrote%20node%20identities%20dump%22%0A;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T05:19:14.578112132Z;duration=PT30M?project=da-cn-devnet)
 1. **Post-migration:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that makes the following changes:
-   * Remove the export of `GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID` from the deployment branch, so that re-onboarded nodes do not attempt another migration.
+   * in `config.yaml` remove `synchronizerMigration.active.migratingFrom`
    * Remove the export of `COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1` from the deployment branch, to disable the throttling after migration is complete.
-   * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_CANTON_AUTO_INIT` and `DISABLE_COMETBFT_STATE_SYNC` to "false".
+   * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_COMETBFT_STATE_SYNC` to "false".
    * [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
      so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
      is set to reflect the expected migration ID after completing the migration.
@@ -1530,9 +1533,8 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
 1. Forward-port all your changes from the deployment branch to `main`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
-1. **Cleanup:** Once you (much later) agree with the other DSO members that it's prudent to tear down all legacy components, you can do this by merging a PR against the target deployment branch that removes part of the changes from the previous steps here so that only the following environment variables remain:
-   * `export CHARTS_VERSION=` the version we're on after the migration
-   * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're on after the migration
+1. **Cleanup:** Once you (much later) agree with the other DSO members that it's prudent to tear down all legacy components, you can do this by merging a PR against the target deployment branch that removes part of the changes from the previous steps:
+   * in `config.yaml`, remove the `synchronizerMigration.legacy` section or move it to `synchronizerMigration.archived` if state from the old synchronizer should be preserved
 
 #### Manual steps
 
@@ -1613,8 +1615,9 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
 #### New domain readiness checks
 
 1. We have our expected amulet balance.
-2. Alls SVs are in sync based on the "SV Status Reports" [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
-3. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
+1. "commitment correct" logs are visible from the other SVs via the new participant [GCloud Logs Example](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0Alabels.%22k8s-pod%2Fmigration_id%22%3D%221%22%0A%22commitment%20correct%22%0A;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:46:01.562157559Z;duration=PT30M?project=da-cn-devnet).
+1. Alls SVs are in sync based on the "SV Status Reports" [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
+1. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
 
 See [Network Health](./network-health/NETWORK_HEALTH.md) for further investigation if any of these checks fail.
 
