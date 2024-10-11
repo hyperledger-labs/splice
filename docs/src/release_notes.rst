@@ -33,6 +33,9 @@ Upcoming
 
   * Enabled slow future logging for all components to better debug stuck nodes.
 
+  * Added a max time of 10 minutes for processing of a sequenced event before the node crashes to get restarted.
+    This mitigates cases where nodes might get stuck due to a bug and a restart recovers them.
+
 * Deployment
 
   * **Breaking** Every Helm chart with a name starting with ``cn-`` has been renamed, now
