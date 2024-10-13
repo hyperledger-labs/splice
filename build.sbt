@@ -1455,11 +1455,6 @@ printTests := {
       (t: String) => isDamlCiupgradeVote(t),
     ),
     (
-      "Global domain upgrade cluster preflight",
-      "test-full-class-names-global-domain-upgrade-preflight.log",
-      (t: String) => isDecentralizedSynchronizerDeploymentPreflightIntegrationTest(t),
-    ),
-    (
       "SV offboard preflight",
       "test-full-class-names-offboard-sv-runbook-preflight.log",
       (t: String) => isSvOffboardPreflightIntegrationTest(t),
