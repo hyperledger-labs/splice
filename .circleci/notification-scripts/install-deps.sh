@@ -9,4 +9,4 @@ if ! (which pip > /dev/null 2>&1); then
   sudo apt-get install python3-pip -y
 fi
 
-python3 -m pip install -r .circleci/requirements.txt
+python3 -m pip install -r .circleci/notification-scripts/requirements.txt
