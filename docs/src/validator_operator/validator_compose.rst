@@ -182,8 +182,8 @@ VALIDATOR_AUTH_CLIENT_ID      The client id of the OAuth app for the validator a
 VALIDATOR_AUTH_CLIENT_SECRET  The client secret of the OAuth app for the validator app backend.
 LEDGER_API_ADMIN_USER         Should match the `sub` field of JWTs issued for the validator app. For some auth providers, this would be formed as ``CLIENT_ID@clients``.
 WALLET_ADMIN_USER             The user ID of the user which should login as the wallet administrator. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
-WALLET_UI_CLIENT_ID           The client id of the Auth0 app for the wallet UI.
-ANS_UI_CLIENT_ID              The client id of the Auth0 app for the CNS UI.
+WALLET_UI_CLIENT_ID           The client id of the OAuth app for the wallet UI.
+ANS_UI_CLIENT_ID              The client id of the OAuth app for the CNS UI.
 ============================= ===========================================================================
 
 If you have already deployed a validator on your machine, you will first need to irrecoverably destroy
