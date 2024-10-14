@@ -51,7 +51,7 @@ jobs:
             - run:
                 name: Checkout commit << parameters.cluster_version >>
                 command: git checkout << parameters.cluster_version >>
-      - setup_nix_self_hosted
+      - setup_nix
       - setup_sbt_test_job:
           runner_type: "circleci"
       - run_bash_command_in_nix:
