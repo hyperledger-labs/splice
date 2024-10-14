@@ -160,12 +160,6 @@ main-branch-never: &main-branch-never
         - main
 
 executors:
-  self_hosted_large:
-    resource_class: dach_ny/cn-runner-large
-    docker:
-      - image: cimg/base:current
-    environment:
-      COURSIER_CACHE: "/cache/coursier"
   self_hosted:
     resource_class: dach_ny/cn-runner-for-testing
     docker:

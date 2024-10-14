@@ -165,12 +165,6 @@ main-branch-never: &main-branch-never
         - main
 
 executors:
-  self_hosted_large:
-    resource_class: dach_ny/cn-runner-large
-    docker:
-      - image: cimg/base:current
-    environment:
-      COURSIER_CACHE: "/cache/coursier"
   self_hosted:
     resource_class: dach_ny/cn-runner-for-testing
     docker:
@@ -1114,6 +1108,9 @@ commands:
                # Do not quote this, to allow the caller to pass in several commands.
                # The caller needs to take care of quoting, if a command contains spaces.
                SBT_CMD+=(<< parameters.cmd >>)
+
+               # Setup heap size; corresponds to Canton large executors
+               SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
 
                # Run command
                timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
@@ -2807,6 +2804,125 @@ jobs:
       - save_sbt_job_result:
           runner_type: "selfhosted"
 
+  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
+  # work on anything but the Scala tests is duplicated across all parallel runs of this job
+  scala_test:
+    machine:
+      image: ubuntu-2204:2024.01.1
+    parameters:
+      test_names_file:
+        type: string
+      start_canton_options:
+        type: string
+      pre_sbt_cmd:
+        type: string
+        default: ""
+      post_sbt_cmd:
+        type: string
+        default: ""
+      parallelism:
+        type: integer
+      resource_class:
+        type: string
+      skip_if_regex:
+        type: string
+        default: ""
+      skip_if_files_changed:
+        type: string
+        default: ""
+      with_shared_gcp:
+        type: boolean
+        default: false
+      with_docker_images:
+        type: boolean
+        default: false
+      additional_nix_args:
+        type: string
+        default: ""
+    resource_class: << parameters.resource_class >>
+    environment:
+      <<: *env
+      POSTGRES_HOST: localhost
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parallelism: << parameters.parallelism >>
+    steps:
+      - checkout_with_retry
+      - when:
+          condition:
+            not:
+              equal: [ "", "<< parameters.skip_if_regex >>" ]
+          steps:
+            - run:
+                name: Checking git commit against regex << parameters.skip_if_regex >>
+                command: |
+                  base=$(build-tools/get-latest-main-commit)
+                  msg=$(git log "$base"..HEAD --pretty=%B)
+                  if [[ $msg =~ << parameters.skip_if_regex >> ]]; then
+                    echo "Commit message ($msg) matches regex (<< parameters.skip_if_regex >>), breaking"
+                    circleci-agent step halt
+                  fi
+      - when:
+          condition:
+            not:
+              equal: [ "", "<< parameters.skip_if_files_changed >>" ]
+          steps:
+            - run:
+                name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
+                command: |
+                  latest_release=$(cat "LATEST_RELEASE")
+                  base=$(git rev-parse heads/origin/release-line-"${latest_release}")
+                  changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
+                  if [ -n "$changed" ]; then
+                    echo "Lock files changed ($changed), breaking"
+                    circleci-agent step halt
+                  fi
+      - setup_sbt_test_job:
+          runner_type: "circleci"
+      - docker_prep_build
+      # Used to pull docker images for cometbft
+      - docker_login_artifactory
+      - docker_pull_test_images
+      # Start canton before compiling, as it takes a long time to start
+      # Note that we start canton before connecting VPN, so some initial
+      # metrics from Canton will be lost. Currently, they're Canton metrics
+      # before our actual tests start are not of interest for us,
+      # so we accept that.
+      - start_canton_in_background:
+          start_canton_options: << parameters.start_canton_options >>
+      - when:
+          condition:
+            equal: [ true, "<< parameters.with_shared_gcp >>" ]
+          steps:
+            run_bash_command_in_nix:
+              cmd_name: "Authenticate to shared GCP project"
+              additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
+              cmd: |
+                echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+      - when:
+          condition:
+            equal: [ true, "<< parameters.with_docker_images >>" ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Build app
+                cmd: make build -j
+                cmd_retry_count: 5 # Retry in case of dependency download errors
+                additional_nix_args: "--keep ARTIFACTORY_USER \
+                  --keep ARTIFACTORY_PASSWORD"
+            - docker_build
+      - split_tests_for_parallel_run:
+          test_names_file: << parameters.test_names_file >>
+      - run_splitted_scala_tests:
+          pre_sbt_cmd: << parameters.pre_sbt_cmd >>
+          post_sbt_cmd: << parameters.post_sbt_cmd >>
+          start_canton_options: << parameters.start_canton_options >>
+          additional_nix_args: << parameters.additional_nix_args >>
+      - stop_canton
+      - save_sbt_job_result:
+          runner_type: "circleci"
+
   bundle:
     executor: self_hosted
     environment:
@@ -4259,219 +4375,6 @@ jobs:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
 
-  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
-  # work on anything but the Scala tests is duplicated across all parallel runs of this job
-  scala_test:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    parameters:
-      test_names_file:
-        type: string
-      start_canton_options:
-        type: string
-      pre_sbt_cmd:
-        type: string
-        default: ""
-      post_sbt_cmd:
-        type: string
-        default: ""
-      parallelism:
-        type: integer
-      resource_class:
-        type: string
-      skip_if_regex:
-        type: string
-        default: ""
-      skip_if_files_changed:
-        type: string
-        default: ""
-      with_shared_gcp:
-        type: boolean
-        default: false
-      with_docker_images:
-        type: boolean
-        default: false
-      additional_nix_args:
-        type: string
-        default: ""
-    resource_class: << parameters.resource_class >>
-    environment:
-      <<: *env
-      POSTGRES_HOST: localhost
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    parallelism: << parameters.parallelism >>
-    steps:
-      - checkout_with_retry
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_regex >>" ]
-          steps:
-            - run:
-                name: Checking git commit against regex << parameters.skip_if_regex >>
-                command: |
-                  base=$(build-tools/get-latest-main-commit)
-                  msg=$(git log "$base"..HEAD --pretty=%B)
-                  if [[ $msg =~ << parameters.skip_if_regex >> ]]; then
-                    echo "Commit message ($msg) matches regex (<< parameters.skip_if_regex >>), breaking"
-                    circleci-agent step halt
-                  fi
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_files_changed >>" ]
-          steps:
-            - run:
-                name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
-                command: |
-                  latest_release=$(cat "LATEST_RELEASE")
-                  base=$(git rev-parse heads/origin/release-line-"${latest_release}")
-                  changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
-                  if [ -n "$changed" ]; then
-                    echo "Lock files changed ($changed), breaking"
-                    circleci-agent step halt
-                  fi
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - docker_prep_build
-      # Used to pull docker images for cometbft
-      - docker_login_artifactory
-      - docker_pull_test_images
-      # Start canton before compiling, as it takes a long time to start
-      # Note that we start canton before connecting VPN, so some initial
-      # metrics from Canton will be lost. Currently, they're Canton metrics
-      # before our actual tests start are not of interest for us,
-      # so we accept that.
-      - start_canton_in_background:
-          start_canton_options: << parameters.start_canton_options >>
-      - when:
-          condition:
-            equal: [ true, "<< parameters.with_shared_gcp >>" ]
-          steps:
-            run_bash_command_in_nix:
-              cmd_name: "Authenticate to shared GCP project"
-              additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-              cmd: |
-                echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-      - when:
-          condition:
-            equal: [ true, "<< parameters.with_docker_images >>" ]
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: Build app
-                cmd: make build -j
-                cmd_retry_count: 5 # Retry in case of dependency download errors
-                additional_nix_args: "--keep ARTIFACTORY_USER \
-                  --keep ARTIFACTORY_PASSWORD"
-            - docker_build
-      - split_tests_for_parallel_run:
-          test_names_file: << parameters.test_names_file >>
-      - run_splitted_scala_tests:
-          pre_sbt_cmd: << parameters.pre_sbt_cmd >>
-          post_sbt_cmd: << parameters.post_sbt_cmd >>
-          start_canton_options: << parameters.start_canton_options >>
-          additional_nix_args: << parameters.additional_nix_args >>
-      - stop_canton
-      - save_sbt_job_result:
-          runner_type: "circleci"
-  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
-  # work on anything but the Scala tests is duplicated across all parallel runs of this job
-  scala_test_self_hosted:
-    executor: self_hosted_large
-    parameters:
-      test_names_file:
-        type: string
-      start_canton_options:
-        type: string
-      pre_sbt_cmd:
-        type: string
-        default: ""
-      post_sbt_cmd:
-        type: string
-        default: ""
-      parallelism:
-        type: integer
-      skip_if_regex:
-        type: string
-        default: ""
-      skip_if_files_changed:
-        type: string
-        default: ""
-      with_shared_gcp:
-        type: boolean
-        default: false
-      additional_nix_args:
-        type: string
-        default: ""
-    environment:
-      <<: *env
-      POSTGRES_HOST: localhost
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-    parallelism: << parameters.parallelism >>
-    steps:
-      - checkout_with_retry
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_regex >>" ]
-          steps:
-            - run:
-                name: Checking git commit against regex << parameters.skip_if_regex >>
-                command: |
-                  base=$(build-tools/get-latest-main-commit)
-                  msg=$(git log "$base"..HEAD --pretty=%B)
-                  if [[ $msg =~ << parameters.skip_if_regex >> ]]; then
-                    echo "Commit message ($msg) matches regex (<< parameters.skip_if_regex >>), breaking"
-                    circleci-agent step halt
-                  fi
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_files_changed >>" ]
-          steps:
-            - run:
-                name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
-                command: |
-                  latest_release=$(cat "LATEST_RELEASE")
-                  base=$(git rev-parse heads/origin/release-line-"${latest_release}")
-                  changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
-                  if [ -n "$changed" ]; then
-                    echo "Lock files changed ($changed), breaking"
-                    circleci-agent step halt
-                  fi
-      - run:
-          name: "Prepare postgres"
-          command: |
-            sudo mkdir -p /run/postgresql
-            sudo chown $USER /run/postgresql
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - start_canton_in_background:
-          start_canton_options: << parameters.start_canton_options >>
-      - when:
-          condition:
-            equal: [ true, "<< parameters.with_shared_gcp >>" ]
-          steps:
-            run_bash_command_in_nix:
-              cmd_name: "Authenticate to shared GCP project"
-              additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-              cmd: |
-                echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-      - split_tests_for_parallel_run:
-          test_names_file: << parameters.test_names_file >>
-      - run_splitted_scala_tests:
-          pre_sbt_cmd: << parameters.pre_sbt_cmd >>
-          post_sbt_cmd: << parameters.post_sbt_cmd >>
-          start_canton_options: << parameters.start_canton_options >>
-          additional_nix_args: << parameters.additional_nix_args >>
-      - stop_canton
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-
 workflows:
   version: 2
 
@@ -4543,23 +4446,27 @@ workflows:
           resource_class: "xlarge"
           # TODO(#10912) Investigate why things got slower
           parallelism: 11
-      - scala_test_self_hosted:
+      - scala_test:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           name: "scala_test resource intensive"
           test_names_file: "test-full-class-names-resource-intensive.log"
-          start_canton_options: "-w"
+          start_canton_options: "-w -f -m"
+          resource_class: "2xlarge"
           parallelism: 2
-      - scala_test_self_hosted:
+      - scala_test:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           name: "scala_test sim time"
           test_names_file: "test-full-class-names-sim-time.log"
           start_canton_options: "-s"
+          resource_class: "xlarge"
           parallelism: 5
       - scala_test:
           <<: *notify-fail
@@ -4600,32 +4507,38 @@ workflows:
           post_sbt_cmd: "./stop-frontends.sh"
           resource_class: "xlarge"
           parallelism: 1
-      - scala_test_self_hosted:
+      - scala_test:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           name: "scala_test global upgrade"
           test_names_file: "test-full-class-names-global-soft-migration.log"
           start_canton_options: "-w -g"
+          resource_class: "xlarge"
           parallelism: 1
-      - scala_test_self_hosted:
+      - scala_test:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           name: "scala_test global upgrade topology"
           test_names_file: "test-full-class-names-global-soft-migration-topology.log"
           start_canton_options: "-w --soft-domain-migration"
+          resource_class: "xlarge"
           parallelism: 1
-      - scala_test_self_hosted:
+      - scala_test:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           name: "scala_test disaster recovery"
           test_names_file: "test-full-class-names-disaster-recovery.log"
           start_canton_options: "-w"
+          resource_class: "2xlarge"
           parallelism: 1
       - scala_test:
           <<: *notify-fail
