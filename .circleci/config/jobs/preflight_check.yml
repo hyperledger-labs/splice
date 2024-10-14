@@ -51,18 +51,14 @@ jobs:
             - run:
                 name: Checkout commit << parameters.cluster_version >>
                 command: git checkout << parameters.cluster_version >>
-      - setup_nix
+      - setup_sbt_test_job:
+          runner_type: "circleci"
       - run_bash_command_in_nix:
           cmd_name: Activate cluster (configure kubectl)
           cluster: << parameters.cluster >>
           gce_authenticate: true
           cmd: cncluster activate
           cmd_retry_count: 5
-      # TODO(#6630): bundle all these restores into a command, consider merging with setup_sbt_test_job
-      - restore_sbt_cache
-      - restore_precompiled_classes
-      - restore_frontend_node_modules
-      - restore_daml_artifacts
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - setup_vpn
@@ -123,8 +119,8 @@ jobs:
             /tmp/vpn-scripts/restart-vpn.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - cleanup_sbt_test_job:
-          save_sbt_caches: true
+      - save_sbt_job_result:
+          runner_type: "circleci"
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
@@ -193,14 +189,14 @@ jobs:
                   - run:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
-            - setup_nix_self_hosted
+            - setup_sbt_test_job:
+                runner_type: "selfhosted"
             - run_bash_command_in_nix:
                 cmd_name: Activate cluster (configure kubectl)
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
-            - restore_sbt_cache_self_hosted
             - split_tests_for_parallel_run:
                 test_names_file: << parameters.test_names_file >>
             - run_bash_command_in_nix:
@@ -241,8 +237,8 @@ jobs:
                 timeout: "15m"
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
-            - cleanup_sbt_test_job
-            - save_sbt_cache_self_hosted
+            - save_sbt_job_result:
+                runner_type: "selfhosted"
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>
                 channel_notify: << parameters.channel_notify >>
@@ -289,14 +285,14 @@ jobs:
                   - run:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
-            - setup_nix_self_hosted
+            - setup_sbt_test_job:
+                runner_type: "selfhosted"
             - run_bash_command_in_nix:
                 cmd_name: Activate cluster (configure kubectl)
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
-            - restore_sbt_cache_self_hosted
             - wait_for_sv_runbook_deployment:
                 cluster: << parameters.cluster >>
                 check_cluster_version: << parameters.check_cluster_version >>
@@ -333,8 +329,8 @@ jobs:
                   cncluster preflight_sv
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
-            - cleanup_sbt_test_job
-            - save_sbt_cache_self_hosted
+            - save_sbt_job_result:
+                runner_type: "selfhosted"
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>
                 channel_notify: << parameters.channel_notify >>
@@ -381,14 +377,14 @@ jobs:
                   - run:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
-            - setup_nix_self_hosted
+            - setup_sbt_test_job:
+                runner_type: "selfhosted"
             - run_bash_command_in_nix:
                 cmd_name: Activate cluster (configure kubectl)
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
                 cmd: cncluster activate
                 cmd_retry_count: 5
-            - restore_sbt_cache_self_hosted
             - execute_sbt_command:
                 cmd: "Test/compile"
             - run_bash_command_in_nix:
@@ -439,8 +435,8 @@ jobs:
                   cncluster preflight_validator
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
-            - cleanup_sbt_test_job
-            - save_sbt_cache_self_hosted
+            - save_sbt_job_result:
+                runner_type: "selfhosted"
             - notify-cluster-fail:
                 cluster: << parameters.cluster >>
                 channel_notify: << parameters.channel_notify >>

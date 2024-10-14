@@ -225,6 +225,7 @@ commands:
                 --keep CI \
                 --keep RUN_SPLITTED_TESTS_CMD \
                 --keep COURSIER_CACHE \
+                --keep SBT_OPTS \
                 --command echo "Confirmed that we can build and enter the nix environment!" \
                 && break
               NIX_ENV_TRY_COUNT=$((NIX_ENV_TRY_COUNT+1))
@@ -245,6 +246,7 @@ commands:
               --keep TERM \
               --keep CI \
               --keep COURSIER_CACHE \
+              --keep SBT_OPTS \
               --keep RUN_SPLITTED_TESTS_CMD \
               --keep GCP_DA_CN_DEVNET_KEY \
               --keep GCP_DA_CN_CI_KEY \

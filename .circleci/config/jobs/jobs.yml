@@ -7,8 +7,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
-      - restore_sbt_cache_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
       - run_bash_command_in_nix:
           cmd_name: Verify config.yml is up to date with source.
           cmd: .circleci/build-config.sh --check
@@ -22,8 +22,9 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Verify no changes in sbt test files
           cmd: git add . && git diff --staged --exit-code test*.log
-      - save_sbt_cache_self_hosted
-      - cleanup_sbt_test_job
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
+          upload_caches: true
 
   # We put our Daml tests in their own job for more parallelization
   daml_test:
@@ -32,30 +33,29 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
-      - restore_sbt_cache_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
       - execute_sbt_command:
           cmd: "damlTest"
           timeout: "10m"
           extra_env_vars: DAML_DEBUG=1
-      - save_sbt_cache_self_hosted
-      - cleanup_sbt_test_job
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
 
   # Run UI unit tests
   ui_test:
-    docker:
-      - image: cimg/base:2024.01
-    resource_class: "xlarge"
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_sbt_test_job
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmTest"
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
-      - cleanup_sbt_test_job:
-          save_sbt_caches: true
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
 
   # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
   # work on anything but the Scala tests is duplicated across all parallel runs of this job
@@ -132,7 +132,8 @@ jobs:
                     echo "Lock files changed ($changed), breaking"
                     circleci-agent step halt
                   fi
-      - setup_sbt_test_job
+      - setup_sbt_test_job:
+          runner_type: "circleci"
       - docker_prep_build
       # Used to pull docker images for cometbft
       - docker_login_artifactory
@@ -172,21 +173,17 @@ jobs:
           start_canton_options: << parameters.start_canton_options >>
           additional_nix_args: << parameters.additional_nix_args >>
       - stop_canton
-      - cleanup_sbt_test_job
+      - save_sbt_job_result:
+          runner_type: "circleci"
 
   bundle:
-    docker:
-      - image: cimg/base:2024.01
-    resource_class: xlarge
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_sbt_test_job
-      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
-      - execute_sbt_command:
-          cmd: "update"
-          cmd_retry_count: 3
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
           cmd: "Test/compile bundle"
@@ -202,45 +199,41 @@ jobs:
             set -eou pipefail
             .circleci/copy-openapi.sh
       - run_bash_command_in_nix:
-         cmd_name: Publish release bundles
-         additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-         cmd: |
-           echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-           export GOOGLE_CLOUD_PROJECT=da-cn-shared
-           VERSION=$(get-snapshot-version)
-           (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
-           # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
-           # which would lead to an error due to a misisng `delete` permission
-           gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
-         # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
-      - cleanup_sbt_test_job:
-          save_sbt_caches: true
+          cmd_name: Publish release bundles
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
+          cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            export GOOGLE_CLOUD_PROJECT=da-cn-shared
+            VERSION=$(get-snapshot-version)
+            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
+            # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
+            # which would lead to an error due to a misisng `delete` permission
+            gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
+          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
           upload_caches: true
 
   deployment_test:
-    docker:
-      - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
-         cmd_name: Deployment Test
-         cmd_retry_count: 5 # Retry in case of dependency download errors
-         cmd: make cluster/pulumi/test
+          cmd_name: Deployment Test
+          cmd_retry_count: 5 # Retry in case of dependency download errors
+          cmd: make cluster/pulumi/test
 
   auth0_user_cleanup:
-    docker:
-    - image: cimg/base:2024.01
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix
-      # TODO(#6630): look into these caches
-      - restore_precompiled_classes
-      - restore_sbt_cache
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
       - execute_sbt_command:
           cmd: "\"tools/run\""
           additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
@@ -250,8 +243,8 @@ jobs:
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD"
           timeout: "10m"
-      - save_sbt_cache
-      - save_compiled_classes
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
 
   cluster_lock_reaper:
     executor: self_hosted
@@ -273,20 +266,20 @@ jobs:
 
   update_pipeline_schedule:
     docker:
-    - image: cimg/base:2024.01
+      - image: cimg/base:2024.01
     environment:
       <<: *env
     steps:
       - checkout_with_retry
       - setup_nix
       - run_bash_command_in_nix:
-         cmd_name: Update CircleCI pipeline configuration (incl. schedule triggers)
-         additional_nix_args: --keep CIRCLECI_TOKEN
-         cmd: |
-           set -euo pipefail
+          cmd_name: Update CircleCI pipeline configuration (incl. schedule triggers)
+          additional_nix_args: --keep CIRCLECI_TOKEN
+          cmd: |
+            set -euo pipefail
 
-           . .envrc.vars
-           .circleci/triggers/setup-pipeline.sh
+            . .envrc.vars
+            .circleci/triggers/setup-pipeline.sh
 
   artifacts_push:
     machine:
@@ -296,7 +289,8 @@ jobs:
     steps:
       - checkout_with_retry
       - restore_frontend_builds
-      - setup_sbt_test_job
+      - setup_sbt_test_job:
+          runner_type: "circleci"
       - docker_login_artifactory
       - docker_login_internal
       - run_bash_command_in_nix:
@@ -316,30 +310,30 @@ jobs:
               circleci-agent step halt
             fi
       - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
-         cmd_retry_count: 5 # Retry in case of dependency download errors
-         additional_nix_args: "--keep ARTIFACTORY_USER \
+          cmd_name: Build app
+          cmd: make build -j
+          cmd_retry_count: 5 # Retry in case of dependency download errors
+          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD"
       - docker_prep_build
       - docker_build
       - run_bash_command_in_nix:
-         cmd_name: Push Docker images
-         additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
+          cmd_name: Push Docker images
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
            --keep DOCKER_CERT_PATH \
            --keep DOCKER_HOST \
            --keep DOCKER_MACHINE_NAME \
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY"
-         cmd: make docker-push -j
-         cmd_retry_count: 5
+          cmd: make docker-push -j
+          cmd_retry_count: 5
       - run_bash_command_in_nix:
           cmd_name: Push Helm Artifacts
           cmd: make cluster/helm/push -j
           cmd_retry_count: 5
       - save_frontend_builds
-      - cleanup_sbt_test_job:
-          save_sbt_caches: true
+      - save_sbt_job_result:
+          runner_type: "circleci"
 
   publish_public_release:
     machine:
@@ -348,59 +342,60 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_sbt_test_job
+      - setup_sbt_test_job:
+          runner_type: "circleci"
       - docker_login_artifactory
       - run_bash_command_in_nix:
-         cmd_name: Promote images to Artifactory
-         additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
+          cmd_name: Promote images to Artifactory
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
            --keep DOCKER_CERT_PATH \
            --keep DOCKER_HOST \
            --keep DOCKER_MACHINE_NAME \
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY"
-         cmd: |
-           echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+          cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
 
-           make docker-promote
-         cmd_retry_count: 5 # Retry in case of connectivity issues
+            make docker-promote
+          cmd_retry_count: 5 # Retry in case of connectivity issues
       - run_bash_command_in_nix:
-         cmd_name: Push Helm charts and tag git accordingly
-         additional_nix_args: "--keep ARTIFACTORY_USER \
+          cmd_name: Push Helm charts and tag git accordingly
+          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD \
            --keep GITHUB_TOKEN \
            --keep CIRCLE_BRANCH"
-         cmd: |
-           publish () {
-             source=$1
-             full_path=$2
-             echo "Publishing ${source} to ${full_path}"
-             curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
-           }
+          cmd: |
+            publish () {
+              source=$1
+              full_path=$2
+              echo "Publishing ${source} to ${full_path}"
+              curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
+            }
 
-           make cluster/helm/write-digests
-           make cluster/helm/build -j
+            make cluster/helm/write-digests
+            make cluster/helm/build -j
 
-           git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-           RELEASE_TAG=$(get-snapshot-version)
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            RELEASE_TAG=$(get-snapshot-version)
 
-           if [[ "${CIRCLE_BRANCH}" != *"$RELEASE_TAG"* && "$RELEASE_TAG" != *"snapshot"* ]]; then
-              echo "Release tag '$RELEASE_TAG' is not contained in the branch name '${CIRCLE_BRANCH}'."
-              echo "You are probably publishing the wrong version."
-              exit 1
-           fi
+            if [[ "${CIRCLE_BRANCH}" != *"$RELEASE_TAG"* && "$RELEASE_TAG" != *"snapshot"* ]]; then
+               echo "Release tag '$RELEASE_TAG' is not contained in the branch name '${CIRCLE_BRANCH}'."
+               echo "You are probably publishing the wrong version."
+               exit 1
+            fi
 
-           for chart in cluster/helm/target/*.tgz; do
-             artifactory_url="https://digitalasset.jfrog.io/artifactory"
-             publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
-           done
+            for chart in cluster/helm/target/*.tgz; do
+              artifactory_url="https://digitalasset.jfrog.io/artifactory"
+              publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
+            done
 
-           if [ $(git tag -l "${RELEASE_TAG}") ]; then
-             echo "tag ${RELEASE_TAG} already exists. not tagging"
-           else
-             git tag "${RELEASE_TAG}"
-             git push origin "${RELEASE_TAG}"
-           fi
+            if [ $(git tag -l "${RELEASE_TAG}") ]; then
+              echo "tag ${RELEASE_TAG} already exists. not tagging"
+            else
+              git tag "${RELEASE_TAG}"
+              git push origin "${RELEASE_TAG}"
+            fi
 
   docker_images_build:
     machine:
@@ -411,19 +406,24 @@ jobs:
     steps:
       - checkout_with_retry
       - restore_frontend_builds
-      - setup_sbt_test_job
+      - setup_sbt_test_job:
+          runner_type: "circleci"
       - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
-         cmd_retry_count: 5 # Retry in case of dependency download errors
-         additional_nix_args: "--keep ARTIFACTORY_USER \
+          cmd_name: Build app
+          cmd: make build -j
+          cmd_retry_count: 5 # Retry in case of dependency download errors
+          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD"
+      # compile everything so that caches for circleci runners are up to date
+      - execute_sbt_command:
+          cmd: "Test/compile"
       - docker_login_artifactory
       - docker_prep_build
       - docker_build
       - save_frontend_builds
-      - cleanup_sbt_test_job:
-          save_sbt_caches: true
+      - save_sbt_job_result:
+          runner_type: "circleci"
+          upload_caches: true
 
   wait_for_previous_pipeline:
     executor: self_hosted
@@ -723,7 +723,7 @@ jobs:
       - persist_to_workspace:
           root: /tmp/workspace
           paths:
-              - cn_env_vars
+            - cn_env_vars
 
   notify_on_readme_changed:
     parameters:
@@ -754,42 +754,31 @@ jobs:
             { "text": "*📄Changes to any `.md` files are detected, and they are merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
 
   build_oss:
-    docker:
-      - image: cimg/base:2024.01
-    resource_class: "xlarge"
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
       - clone_and_update_open_source
-      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
-      - execute_sbt_command:
-          working_dir: "/home/circleci/oss"
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
-          cmd: "update"
-          cmd_retry_count: 3
       - execute_sbt_command:
           working_dir: "/home/circleci/oss"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "bundle"
-      - execute_sbt_command:
-          working_dir: "/home/circleci/splice"
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
-          cmd: "update"
-          cmd_retry_count: 3
       - execute_sbt_command:
           working_dir: "/home/circleci/splice"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "bundle"
 
   create_oss_pr:
-    docker:
-      - image: cimg/base:2024.01
-    resource_class: "small"
+    executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
       - clone_and_update_open_source
       - run_bash_command_in_nix:
           cmd_name: Push changes to DA OSS
