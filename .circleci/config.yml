@@ -230,7 +230,7 @@ commands:
             elif ! cncluster ci_warn_lock_expiry; then
               .circleci/post-slack-message.sh "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*" "C05DT77QF5M"
             fi
-
+          cmd_retry_count: 3
   start_canton_in_background:
     description: Start canton in the background
     parameters:
