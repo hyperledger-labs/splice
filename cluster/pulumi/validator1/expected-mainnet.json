@@ -335,7 +335,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -449,7 +449,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -498,6 +498,7 @@
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
@@ -507,6 +508,7 @@
             "id": 0
           }
         },
+        "nodeIdentifier": "validator1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -528,7 +530,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator1-participant-0",
     "provider": "",
@@ -767,7 +769,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "validator1-validator-validator1",
     "provider": "",
