@@ -39,7 +39,7 @@ import com.daml.network.util.{
   QualifiedName,
 }
 import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -66,7 +66,13 @@ import com.daml.network.scan.store.ScanHistoryBackfilling.{
   FoundingTransactionTreeUpdate,
   InitialTransactionTreeUpdate,
 }
-import com.daml.network.store.{AppStore, PageLimit, SortOrder, VotesStore}
+import com.daml.network.store.{
+  AppStore,
+  PageLimit,
+  SortOrder,
+  TreeUpdateWithMigrationId,
+  VotesStore,
+}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.Clock
 
@@ -669,13 +675,36 @@ class HttpScanHandler(
     }
   }
 
-  override def getUpdateHistory(respond: v0.ScanResource.GetUpdateHistoryResponse.type)(
-      request: definitions.UpdateHistoryRequest
-  )(extracted: TraceContext): Future[v0.ScanResource.GetUpdateHistoryResponse] = {
+  private def encodeUpdate(
+      update: TreeUpdateWithMigrationId,
+      encoding: definitions.DamlValueEncoding,
+      consistentResponses: Boolean,
+  )(implicit
+      elc: ErrorLoggingContext
+  ): definitions.UpdateHistoryItem = {
+    val update2 = if (consistentResponses) {
+      ScanHttpEncodings.makeConsistentAcrossSvs(update)
+    } else {
+      update
+    }
+    val encodings: ScanHttpEncodings = encoding match {
+      case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings
+      case definitions.DamlValueEncoding.members.ProtobufJson => ProtobufJsonScanHttpEncodings
+    }
+    encodings.lapiToHttpUpdate(update2)
+  }
+
+  def getUpdateHistory(
+      after: Option[definitions.UpdateHistoryRequestAfter] = None,
+      pageSize: Int,
+      encoding: definitions.DamlValueEncoding,
+      consistentResponses: Boolean,
+      extracted: TraceContext,
+  ): Future[Vector[definitions.UpdateHistoryItem]] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getUpdateHistory") { _ => _ =>
       val updateHistory = store.updateHistory
-      val afterO = request.after.map { after =>
+      val afterO = after.map { after =>
         val afterRecordTime = {
           for {
             instant <- Try(Instant.parse(after.afterRecordTime)).toEither.left.map(_.getMessage)
@@ -695,7 +724,7 @@ class HttpScanHandler(
         txs <- updateHistory.getUpdates(
           afterO,
           includeImportUpdates = true,
-          PageLimit.tryCreate(request.pageSize),
+          PageLimit.tryCreate(pageSize),
         )
       } yield {
         // TODO(#14270): instead of the below `if`, wait until UpdateHistory.getBackfillingState() says the history is complete
@@ -724,17 +753,52 @@ class HttpScanHandler(
             .asRuntimeException()
         }
 
-        val lossless = request.lossless.getOrElse(false)
-        val encodings: ScanHttpEncodings =
-          if (lossless) LosslessScanHttpEncodings else LossyScanHttpEncodings
-        definitions.UpdateHistoryResponse(
-          txs
-            .map(encodings.lapiToHttpUpdate(_))
-            .toVector
-        )
+        txs
+          .map(
+            encodeUpdate(
+              _,
+              encoding = encoding,
+              consistentResponses = consistentResponses,
+            )
+          )
+          .toVector
       }
     }
   }
+
+  override def getUpdateHistory(respond: v0.ScanResource.GetUpdateHistoryResponse.type)(
+      request: definitions.UpdateHistoryRequest
+  )(extracted: TraceContext): Future[v0.ScanResource.GetUpdateHistoryResponse] = {
+    val encoding =
+      if (request.lossless.contains(true)) {
+        definitions.DamlValueEncoding.ProtobufJson
+      } else {
+        definitions.DamlValueEncoding.CompactJson
+      }
+    getUpdateHistory(
+      after = request.after,
+      pageSize = request.pageSize,
+      encoding = encoding,
+      consistentResponses = false,
+      extracted,
+    ).map(
+      definitions.UpdateHistoryResponse(_)
+    )
+  }
+
+  override def getUpdateHistoryV1(respond: v0.ScanResource.GetUpdateHistoryV1Response.type)(
+      request: definitions.UpdateHistoryRequestV1
+  )(extracted: TraceContext): Future[v0.ScanResource.GetUpdateHistoryV1Response] =
+    getUpdateHistory(
+      after = request.after,
+      pageSize = request.pageSize,
+      encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
+      consistentResponses = true,
+      extracted,
+    )
+      .map(
+        definitions.UpdateHistoryResponse(_)
+      )
 
   override def listActivity(
       respond: v0.ScanResource.ListActivityResponse.type
@@ -1103,7 +1167,8 @@ class HttpScanHandler(
                 definitions.AcsResponse(
                   recordTime,
                   migrationId,
-                  result.createdEventsInPage.map(LossyScanHttpEncodings.javaToHttpCreatedEvent(_)),
+                  result.createdEventsInPage
+                    .map(CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(_)),
                   result.afterToken,
                 )
               )
@@ -1132,7 +1197,8 @@ class HttpScanHandler(
                 definitions.AcsResponse(
                   recordTime,
                   migrationId,
-                  result.createdEventsInPage.map(LossyScanHttpEncodings.javaToHttpCreatedEvent(_)),
+                  result.createdEventsInPage
+                    .map(CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(_)),
                   result.afterToken,
                 )
               )
@@ -1217,25 +1283,70 @@ class HttpScanHandler(
     }
   }
 
-  override def getUpdateById(
-      respond: ScanResource.GetUpdateByIdResponse.type
-  )(updateId: String)(extracted: TraceContext): Future[ScanResource.GetUpdateByIdResponse] = {
+  def getUpdateById(
+      updateId: String,
+      encoding: definitions.DamlValueEncoding,
+      consistentResponses: Boolean,
+      extracted: TraceContext,
+  ): Future[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getUpdateById") { _ => _ =>
       for {
         tx <- store.updateHistory.getUpdate(updateId)
       } yield {
-        tx.fold(
-          v0.ScanResource.GetUpdateByIdResponse.NotFound(
+        tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
+          Left(
             definitions.ErrorResponse(s"Transaction with id $updateId not found")
           )
         )(txWithMigration =>
-          v0.ScanResource.GetUpdateByIdResponse.OK(
-            LossyScanHttpEncodings.lapiToHttpUpdate(txWithMigration)
+          Right(
+            encodeUpdate(
+              txWithMigration,
+              encoding = encoding,
+              consistentResponses = consistentResponses,
+            )
           )
         )
       }
     }
+  }
+
+  override def getUpdateById(
+      respond: ScanResource.GetUpdateByIdResponse.type
+  )(updateId: String, lossless: Option[Boolean])(
+      extracted: TraceContext
+  ): Future[ScanResource.GetUpdateByIdResponse] = {
+    val encoding = if (lossless.getOrElse(false)) {
+      definitions.DamlValueEncoding.ProtobufJson
+    } else {
+      definitions.DamlValueEncoding.CompactJson
+    }
+    getUpdateById(updateId = updateId, encoding = encoding, consistentResponses = false, extracted)
+      .map {
+        case Left(error) =>
+          ScanResource.GetUpdateByIdResponse.NotFound(error)
+        case Right(update) =>
+          ScanResource.GetUpdateByIdResponse.OK(update)
+      }
+  }
+
+  override def getUpdateByIdV1(
+      respond: ScanResource.GetUpdateByIdV1Response.type
+  )(updateId: String, damlValueEncoding: Option[definitions.DamlValueEncoding])(
+      extracted: TraceContext
+  ): Future[ScanResource.GetUpdateByIdV1Response] = {
+    getUpdateById(
+      updateId = updateId,
+      encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
+      consistentResponses = true,
+      extracted,
+    )
+      .map {
+        case Left(error) =>
+          ScanResource.GetUpdateByIdV1Response.NotFound(error)
+        case Right(update) =>
+          ScanResource.GetUpdateByIdV1Response.OK(update)
+      }
   }
 
   private def ensureValidRange[T](start: Long, end: Long, maxRounds: Int)(
@@ -1481,7 +1592,13 @@ class HttpScanHandler(
         .map { txs =>
           definitions.GetUpdatesBeforeResponse(
             txs
-              .map(LosslessScanHttpEncodings.lapiToHttpUpdate)
+              .map(
+                encodeUpdate(
+                  _,
+                  encoding = definitions.DamlValueEncoding.members.ProtobufJson,
+                  consistentResponses = true,
+                )
+              )
               .toVector
           )
         }

@@ -6,13 +6,8 @@ import com.daml.network.config.ConfigTransforms.updateAllScanAppConfigs_
 import com.daml.network.config.SpliceConfig
 import com.daml.network.console.ScanAppBackendReference
 import com.daml.network.environment.EnvironmentImpl
-import com.daml.network.http.v0.definitions.TreeEvent.members as treeEventMembers
-import com.daml.network.http.v0.definitions.{
-  AcsResponse,
-  TreeEvent,
-  UpdateHistoryItem,
-  UpdateHistoryReassignment,
-}
+import com.daml.network.http.v0.definitions.DamlValueEncoding.members.CompactJson
+import com.daml.network.http.v0.definitions.{AcsResponse, UpdateHistoryItem}
 import com.daml.network.http.v0.definitions.UpdateHistoryItem.members
 import com.daml.network.http.v0.definitions.UpdateHistoryReassignment.Event.members as reassignmentMembers
 import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
@@ -95,7 +90,7 @@ class UpdateHistorySanityCheckPlugin(
       after: Option[(Long, String)],
       acc: Chain[UpdateHistoryItem],
   ): Chain[UpdateHistoryItem] = {
-    val result = scan.getUpdateHistory(10, after, lossless = false)
+    val result = scan.getUpdateHistory(10, after, encoding = CompactJson)
     val newAcc = acc ++ Chain.fromSeq(result)
     result.lastOption match {
       case None => acc // done
@@ -136,10 +131,8 @@ class UpdateHistorySanityCheckPlugin(
       val minSize = Math.min(founderHistory.size, otherScanHistory.size)
       val otherComparable = otherScanHistory
         .take(minSize)
-        .map(toComparableUpdateHistoryItem)
       val founderComparable = founderHistory
         .take(minSize)
-        .map(toComparableUpdateHistoryItem)
       val different = otherComparable.zipWithIndex.collect {
         case (otherItem, idx) if founderComparable(idx) != otherItem =>
           otherItem -> founderComparable(idx)
@@ -147,72 +140,6 @@ class UpdateHistorySanityCheckPlugin(
       different should be(empty)
     }
   }
-
-  // TODO (#14270): this is the same, or at least similar, to what we'll need to do for BFT reads. Adjust and DRY.
-  private def toComparableUpdateHistoryItem(item: UpdateHistoryItem): UpdateHistoryItem =
-    item match {
-      case members.UpdateHistoryTransaction(tx) =>
-        // makes it deterministically by traversing the tree
-        def makeEventIdToNumber(
-            pending: List[TreeEvent],
-            acc: Map[String, Int],
-            currentN: Int,
-        ): Map[String, Int] = {
-          pending match {
-            case Nil =>
-              acc
-            case tree :: tail =>
-              tree match {
-                case treeEventMembers.CreatedEvent(value) =>
-                  makeEventIdToNumber(tail, acc + (value.eventId -> currentN), currentN + 1)
-                case treeEventMembers.ExercisedEvent(value) =>
-                  makeEventIdToNumber(
-                    tail ++ value.childEventIds.map(tx.eventsById),
-                    acc + (value.eventId -> currentN),
-                    currentN + 1,
-                  )
-              }
-          }
-        }
-        val eventIdsMapping = makeEventIdToNumber(
-          tx.rootEventIds.map(tx.eventsById).toList,
-          Map.empty,
-          0,
-        )
-        members.UpdateHistoryTransaction(
-          tx.copy(
-            offset = "different across nodes",
-            rootEventIds = tx.rootEventIds.map(eventIdsMapping(_).toString),
-            eventsById = tx.eventsById.map { case (eventId, tree) =>
-              eventIdsMapping(eventId).toString -> (tree match {
-                case treeEventMembers.CreatedEvent(value) =>
-                  treeEventMembers.CreatedEvent(
-                    value.copy(eventId = eventIdsMapping(value.eventId).toString)
-                  )
-                case treeEventMembers.ExercisedEvent(value) =>
-                  treeEventMembers.ExercisedEvent(
-                    value.copy(
-                      eventId = eventIdsMapping(value.eventId).toString,
-                      childEventIds = value.childEventIds.map(eventIdsMapping(_).toString),
-                    )
-                  )
-              })
-            },
-          )
-        )
-      case members.UpdateHistoryReassignment(assignment) =>
-        val newEvent: UpdateHistoryReassignment.Event = assignment.event match {
-          case reassignmentMembers.UpdateHistoryAssignment(value) =>
-            reassignmentMembers.UpdateHistoryAssignment(
-              value.copy(createdEvent = value.createdEvent.copy(eventId = "different across nodes"))
-            )
-          case unassignment: reassignmentMembers.UpdateHistoryUnassignment =>
-            unassignment
-        }
-        members.UpdateHistoryReassignment(
-          assignment.copy(offset = "different across nodes", event = newEvent)
-        )
-    }
 
   private def checkScanTxLogScript(scan: ScanAppBackendReference)(implicit tc: TraceContext) = {
     val snapshotRecordTime = scan.forceAcsSnapshotNow()

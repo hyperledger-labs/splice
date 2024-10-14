@@ -16,8 +16,13 @@ import com.daml.network.environment.ledger.api.{
   TransactionTreeUpdate,
 }
 import com.daml.network.http.v0.definitions
+import com.daml.network.http.v0.definitions.DamlValueEncoding.members.{CompactJson, ProtobufJson}
 import com.daml.network.integration.tests.SpliceTests.TestCommon
-import com.daml.network.scan.admin.http.{LosslessScanHttpEncodings, LossyScanHttpEncodings}
+import com.daml.network.scan.admin.http.{
+  CompactJsonScanHttpEncodings,
+  ProtobufJsonScanHttpEncodings,
+  ScanHttpEncodings,
+}
 import com.daml.network.store.UpdateHistoryTestBase.{LostInScanApi, LostInStoreIngestion}
 import com.daml.network.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
@@ -126,14 +131,26 @@ trait UpdateHistoryTestUtil extends TestCommon {
       .getUpdateHistory(
         1000,
         None,
-        true,
+        encoding = ProtobufJson,
       )
-      .map(LosslessScanHttpEncodings.httpToLapiUpdate)
+      .map(ProtobufJsonScanHttpEncodings.httpToLapiUpdate)
 
     val historyFromStoreWithoutLostData =
-      historyFromStore.map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
+      historyFromStore
+        .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
+        .map(ScanHttpEncodings.makeConsistentAcrossSvs)
 
     historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
+
+    historyThroughApi.headOption.foreach(fromHistory => {
+      val fromPointwiseLookup =
+        ProtobufJsonScanHttpEncodings.httpToLapiUpdate(
+          scanClient.getUpdate(fromHistory.update.update.updateId, encoding = ProtobufJson)
+        )
+      fromPointwiseLookup shouldBe fromHistory
+    })
+
+    succeed
   }
 
   def compareHistoryViaScanApi(
@@ -146,6 +163,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     val updatesFromHistory = updateHistoryFromParticipant(ledgerBegin, dsoParty, participant)
       .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
+      .map(ScanHttpEncodings.makeConsistentAcrossSvs)
 
     val updatesFromScanApi = scanClient
       .getUpdateHistory(
@@ -158,9 +176,9 @@ trait UpdateHistoryTestUtil extends TestCommon {
             updatesFromHistory.head.update.recordTime.addMicros(-1L).toString,
           )
         ),
-        lossless = false,
+        encoding = CompactJson,
       )
-      .map(LossyScanHttpEncodings.httpToLapiUpdate)
+      .map(CompactJsonScanHttpEncodings.httpToLapiUpdate)
       .map(_.update)
 
     updatesFromScanApi should have length updatesFromHistory.size.toLong
@@ -180,6 +198,14 @@ trait UpdateHistoryTestUtil extends TestCommon {
         }
       }
     }
+
+    updatesFromScanApi.headOption.foreach(fromHistory => {
+      val fromPointwiseLookup =
+        CompactJsonScanHttpEncodings.httpToLapiUpdate(
+          scanClient.getUpdate(fromHistory.update.updateId, encoding = CompactJson)
+        )
+      fromPointwiseLookup.update shouldBe fromHistory
+    })
 
     succeed
   }
