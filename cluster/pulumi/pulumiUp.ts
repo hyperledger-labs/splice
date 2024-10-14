@@ -8,16 +8,22 @@ import { stack, upStack } from './pulumi';
 async function runCoreStacksUp() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
   const operations: Promise<void>[] = [];
-  await upStack(mainStack);
-  if (mustInstallValidator1) {
-    const validator1 = await stack('validator1', 'validator1', true, {});
-    operations.push(upStack(validator1));
-  }
-  if (mustInstallSplitwell) {
-    const splitwell = await stack('splitwell', 'splitwell', true, {});
-    operations.push(upStack(splitwell));
-  }
-  await Promise.all(operations);
+  const abortController = new AbortController();
+  await upStack(mainStack, abortController.signal).then(async () => {
+    if (mustInstallValidator1) {
+      const validator1 = await stack('validator1', 'validator1', true, {});
+      operations.push(upStack(validator1, abortController.signal).catch(e => abortController.abort("Aborting because validator1 failed")));
+    }
+    if (mustInstallSplitwell) {
+      const splitwell = await stack('splitwell', 'splitwell', true, {});
+      operations.push(upStack(splitwell, abortController.signal).catch(e => abortController.abort("Aborting because splitwell failed")));
+    }
+    const data = await Promise.allSettled(operations);
+    const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
+    if (!rejected) {
+      throw new Error(rejected);
+    }
+  });
 }
 
 runCoreStacksUp().catch(e => {
