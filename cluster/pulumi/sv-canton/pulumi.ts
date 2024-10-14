@@ -62,7 +62,7 @@ export async function runForAllMigrations(
       })
     );
     const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
-    if (!rejected) {
+    if (rejected) {
       throw new Error(rejected);
     }
   }

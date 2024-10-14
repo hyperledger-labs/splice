@@ -25,7 +25,7 @@ async function downMigrationId(migrationId: DomainMigrationIndex): Promise<void>
     })
   );
   const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
-  if (!rejected) {
+  if (rejected) {
     throw new Error(rejected);
   }
 }
@@ -40,7 +40,7 @@ async function downAllTheStacks() {
     }
     const data = await Promise.allSettled(downOperations);
     const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
-    if (!rejected) {
+    if (rejected) {
       throw new Error(rejected);
     }
 
