@@ -80,6 +80,12 @@ export async function stack(
     : await automation.LocalWorkspace.createOrSelectStack(stackOpts, workspaceOpts);
 }
 
+export async function refreshStack(stack: automation.Stack, abortSignal: AbortSignal): Promise<void> {
+  const name = stack.name;
+  console.log(`${name} - Refreshing stack`);
+  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortSignal));
+}
+
 export async function downStack(stack: automation.Stack, abortSignal: AbortSignal): Promise<void> {
   const name = stack.name;
   console.log(`${name} - Destroying stack`);
