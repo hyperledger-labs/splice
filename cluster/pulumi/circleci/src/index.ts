@@ -84,6 +84,12 @@ new k8s.helm.v3.Release('container-agent', {
       resourceClasses: {
         'dach_ny/cn-runner-for-testing': {
           token: spliceEnvConfig.requireEnv('SPLICE_PULUMI_CCI_RUNNER_TOKEN'),
+          metadata: {
+            // prevent eviction by the gke autoscaler
+            annotations: {
+              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
+          },
           spec: {
             containers: [
               {
@@ -118,6 +124,12 @@ new k8s.helm.v3.Release('container-agent', {
         },
         'dach_ny/cn-runner-large': {
           token: spliceEnvConfig.requireEnv('SPLICE_PULUMI_CCI_RUNNER_LARGE_TOKEN'),
+          metadata: {
+            // prevent eviction by the gke autoscaler
+            annotations: {
+              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
+          },
           spec: {
             containers: [
               {
