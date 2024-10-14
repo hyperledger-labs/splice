@@ -53,7 +53,7 @@ function pgctl_start() {
   initdb -D "$LOCAL_POSTGRES_DATA_DIRECTORY" -U "$POSTGRES_USER" >> "$LOG_FILE"
 
   echo "Starting local Postgres instance"
-  pg_ctl -D "$LOCAL_POSTGRES_DATA_DIRECTORY" -l "$LOCAL_POSTGRES_LOG_FILE" start >> "$LOG_FILE"
+  pg_ctl -D "$LOCAL_POSTGRES_DATA_DIRECTORY" -l "$LOCAL_POSTGRES_LOG_FILE" -o "-c max_connections=16000" start >> "$LOG_FILE"
 }
 
 function docker_stop() {

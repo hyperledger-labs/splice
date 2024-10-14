@@ -9,14 +9,12 @@ commands:
           condition:
             equal: [ "circleci", << parameters.runner_type >> ]
           steps:
-            - setup_nix
             - restore_sbt_cache:
                 runner_type: << parameters.runner_type >>
       - when:
           condition:
             equal: [ "selfhosted", << parameters.runner_type >> ]
           steps:
-            - setup_nix_self_hosted
             - restore_sbt_cache_self_hosted:
                 runner_type: << parameters.runner_type >>
       - restore_precompiled_classes:
