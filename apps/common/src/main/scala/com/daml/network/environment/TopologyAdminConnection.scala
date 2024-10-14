@@ -171,7 +171,7 @@ abstract class TopologyAdminConnection(
   def listPartyToKey(
       operation: Option[TopologyChangeOp] = None,
       filterStore: TopologyStoreId,
-      filterParty: String = "",
+      filterParty: Option[PartyId] = None,
       timeQuery: TimeQuery = TimeQuery.HeadState,
       proposals: TopologyTransactionType = AuthorizedState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToKeyMapping]]] = {
@@ -185,7 +185,7 @@ abstract class TopologyAdminConnection(
           filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
         ),
-        filterParty,
+        filterParty.fold("")(_.toProtoPrimitive),
       )
     ).map(_.map(r => TopologyResult(r.context, r.item)))
   }

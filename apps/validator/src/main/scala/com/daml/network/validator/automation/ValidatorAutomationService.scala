@@ -22,7 +22,11 @@ import com.daml.network.validator.domain.DomainConnector
 import com.daml.network.validator.migration.DecentralizedSynchronizerMigrationTrigger
 import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
-import com.daml.network.wallet.automation.{OffboardUserPartyTrigger, WalletAppInstallTrigger}
+import com.daml.network.wallet.automation.{
+  OffboardUserPartyTrigger,
+  ValidatorRightTrigger,
+  WalletAppInstallTrigger,
+}
 import com.daml.network.wallet.config.TransferPreapprovalConfig
 import com.daml.network.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -100,6 +104,14 @@ class ValidatorAutomationService(
 
   walletManagerOpt.foreach { walletManager =>
     registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
+    registerTrigger(
+      new ValidatorRightTrigger(
+        triggerContext,
+        walletManager.externalPartyWalletManager,
+        connection,
+        participantAdminConnection,
+      )
+    )
 
     registerTrigger(new OffboardUserPartyTrigger(triggerContext, walletManager, connection))
 

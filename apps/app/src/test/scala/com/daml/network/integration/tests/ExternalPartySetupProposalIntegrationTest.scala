@@ -1,11 +1,18 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.config.ConfigTransforms
+import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.http.v0.definitions
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.IntegrationTest
+import com.daml.network.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
 import com.daml.network.util.{TriggerTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.RenewTransferPreapprovalTrigger
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -40,6 +47,15 @@ class ExternalPartySetupProposalIntegrationTest
         (_, config) =>
           ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Validator)(
             _.withPausedTrigger[RenewTransferPreapprovalTrigger]
+          )(config),
+        (_, config) =>
+          updateAutomationConfig(ConfigurableApp.Sv)(
+            _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+              .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
+          )(config),
+        (_, config) =>
+          ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+            _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
           )(config),
       )
 
@@ -167,6 +183,46 @@ class ExternalPartySetupProposalIntegrationTest
     val update = eventuallySucceeds() {
       sv1ScanBackend.getUpdate(updateId)
     }
+    val rewardRound =
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(amuletCodegen.ValidatorRewardCoupon.COMPANION)(
+          aliceParty,
+          c => c.data.user == aliceParty.toProtoPrimitive,
+        )
+        .loneElement
+        .data
+        .round
+        .number
+
+    actAndCheck(
+      s"Advance rounds until $rewardRound is issuing", {
+        advanceRoundsByOneTickViaAutomation()
+        advanceRoundsByOneTickViaAutomation()
+        advanceRoundsByOneTickViaAutomation()
+      },
+    )(
+      s"Round $rewardRound is issuing",
+      _ => {
+        val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+        issuingRounds.map(_.payload.round.number) should contain(rewardRound)
+      },
+    )
+    clue("ValidatorRewardCoupon gets collected") {
+      eventually() {
+        // Just checking for archival. Checking the tx history or something for collection is a bit annoying since there
+        // are multiple things resulting in validator rewards and we only get a total sum.
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(amuletCodegen.ValidatorRewardCoupon.COMPANION)(
+            aliceParty,
+            c => c.data.user == aliceParty.toProtoPrimitive,
+          ) shouldBe empty
+
+        // Sanity check that the reward really got collected and not expired.
+        val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+        issuingRounds.map(_.payload.round.number) should contain(rewardRound)
+      }
+    }
+
     inside(update) {
       case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(transaction) =>
         forExactly(1, transaction.eventsById) {
@@ -208,7 +264,5 @@ class ExternalPartySetupProposalIntegrationTest
         )
       }
     }
-
   }
-
 }

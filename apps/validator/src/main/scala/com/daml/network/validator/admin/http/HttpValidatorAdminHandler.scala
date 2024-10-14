@@ -348,7 +348,7 @@ class HttpValidatorAdminHandler(
           // Check the authorized store first
           _ <- participantAdminConnection
             .listPartyToKey(
-              filterParty = partyId.filterString,
+              filterParty = Some(partyId),
               filterStore = TopologyStoreId.AuthorizedStore,
             )
             .map { txs =>
@@ -404,7 +404,7 @@ class HttpValidatorAdminHandler(
             "PartyToKeyMapping is visible in domain store",
             participantAdminConnection
               .listPartyToKey(
-                filterParty = partyId.filterString,
+                filterParty = Some(partyId),
                 filterStore = TopologyStoreId.DomainStore(domainId),
               )
               .map { txs =>

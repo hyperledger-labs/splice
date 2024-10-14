@@ -44,7 +44,7 @@ import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.PageLimit
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{AssignedContract, DisclosedContracts, HasHealth, SpliceUtil}
-import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService.*
@@ -91,6 +91,7 @@ class TreasuryService(
     clock: Clock,
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
+    externalPartyWalletManager: ExternalPartyWalletManager,
     override protected[this] val retryProvider: RetryProvider,
     scanConnection: BftScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -693,11 +694,21 @@ class TreasuryService(
     (BigDecimal, Set[PartyId], Seq[(Round, BigDecimal, InputValidatorRewardCoupon)])
   ] = {
     for {
-      validatorRewardCouponsRaw <- walletManager
+      validatorRewardCouponsRawLocal <- walletManager
         .listValidatorRewardCouponsCollectableBy(
           userStore,
           limit = PageLimit.tryCreate(validatorRewardCouponsLimit),
           Some(issuingRoundsMap.keySet.map(_.number)),
+        )
+      validatorRewardCouponsRawExternal <- externalPartyWalletManager
+        .listValidatorRewardCouponsCollectableBy(
+          userStore,
+          limit = PageLimit.tryCreate(validatorRewardCouponsLimit),
+          Some(issuingRoundsMap.keySet.map(_.number)),
+        )
+      validatorRewardCouponsRaw =
+        (validatorRewardCouponsRawLocal ++ validatorRewardCouponsRawExternal).take(
+          validatorRewardCouponsLimit
         )
       validatorRewardCouponUsers = validatorRewardCouponsRaw
         .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
