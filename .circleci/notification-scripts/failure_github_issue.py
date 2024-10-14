@@ -7,7 +7,9 @@ import os
 from git import Repo
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
+import sys
 
+sys.path.append('../')
 from circleci import *
 from failure_notification_args import FailureArgs
 
