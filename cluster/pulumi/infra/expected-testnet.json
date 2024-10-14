@@ -39,6 +39,7 @@
         "https://splitwell.splitwell.test-stack.network.canton.global",
         "https://splitwell.splitwell.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and Splitwell UIs for the Splitwell validator",
       "name": "Splitwell UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -82,6 +83,7 @@
         "https://cns.sv.test-stack.network.canton.global",
         "https://cns.sv.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for the SV runbook",
       "name": "ANS UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -121,6 +123,7 @@
         "https://sv.sv.test-stack.network.canton.global",
         "https://sv.sv.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV UI for the SV runbook",
       "name": "SV UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -160,6 +163,7 @@
         "https://wallet.sv.test-stack.network.canton.global",
         "https://wallet.sv.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for the SV runbook",
       "name": "Wallet UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -2862,6 +2866,7 @@
         "https://sv.sv-10-eng.test-stack.network.canton.global",
         "https://sv.sv-10-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV10",
       "name": "SV10 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -2917,6 +2922,7 @@
         "https://sv.sv-11-eng.test-stack.network.canton.global",
         "https://sv.sv-11-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV11",
       "name": "SV11 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -2972,6 +2978,7 @@
         "https://sv.sv-12-eng.test-stack.network.canton.global",
         "https://sv.sv-12-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV12",
       "name": "SV12 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3027,6 +3034,7 @@
         "https://sv.sv-13-eng.test-stack.network.canton.global",
         "https://sv.sv-13-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV13",
       "name": "SV13 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3082,6 +3090,7 @@
         "https://sv.sv-14-eng.test-stack.network.canton.global",
         "https://sv.sv-14-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV14",
       "name": "SV14 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3137,6 +3146,7 @@
         "https://sv.sv-15-eng.test-stack.network.canton.global",
         "https://sv.sv-15-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV15",
       "name": "SV15 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3192,6 +3202,7 @@
         "https://sv.sv-16-eng.test-stack.network.canton.global",
         "https://sv.sv-16-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV16",
       "name": "SV16 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3247,6 +3258,7 @@
         "https://sv.sv-2.test-stack.network.canton.global",
         "https://sv.sv-2.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV1",
       "name": "SV1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3302,6 +3314,7 @@
         "https://sv.sv-2-eng.test-stack.network.canton.global",
         "https://sv.sv-2-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV2",
       "name": "SV2 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3357,6 +3370,7 @@
         "https://sv.sv-3-eng.test-stack.network.canton.global",
         "https://sv.sv-3-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV3",
       "name": "SV3 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3412,6 +3426,7 @@
         "https://sv.sv-4-eng.test-stack.network.canton.global",
         "https://sv.sv-4-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV4",
       "name": "SV4 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3467,6 +3482,7 @@
         "https://sv.sv-5-eng.test-stack.network.canton.global",
         "https://sv.sv-5-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV5",
       "name": "SV5 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3522,6 +3538,7 @@
         "https://sv.sv-6-eng.test-stack.network.canton.global",
         "https://sv.sv-6-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV6",
       "name": "SV6 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3577,6 +3594,7 @@
         "https://sv.sv-7-eng.test-stack.network.canton.global",
         "https://sv.sv-7-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV7",
       "name": "SV7 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3632,6 +3650,7 @@
         "https://sv.sv-8-eng.test-stack.network.canton.global",
         "https://sv.sv-8-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV8",
       "name": "SV8 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3687,6 +3706,7 @@
         "https://sv.sv-9-eng.test-stack.network.canton.global",
         "https://sv.sv-9-eng.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and SV UIs for SV9",
       "name": "SV9 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3939,6 +3959,7 @@
         "https://splitwell.validator1.test-stack.network.canton.global",
         "https://splitwell.validator1.test-stack.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and Splitwell UIs for the standalone Validator1",
       "name": "Validator1 UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -3988,6 +4009,7 @@
         "http://localhost:3001",
         "http://ans.localhost"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for the validator runbook",
       "name": "ANS UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -4035,6 +4057,7 @@
         "http://localhost:3000",
         "http://wallet.localhost"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for the validator runbook",
       "name": "Wallet UI (Pulumi managed, test-stack)",
       "webOrigins": [

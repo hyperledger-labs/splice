@@ -27,6 +27,7 @@
         "https://cns.sv-2.network.canton.global",
         "https://cns.sv-2.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for sv-1 (Digital-Asset 2)",
       "name": "ANS UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -66,6 +67,7 @@
         "https://sv.sv-2.network.canton.global",
         "https://sv.sv-2.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV UI for sv-1 (Digital-Asset 2)",
       "name": "SV UI (Pulumi managed, test-stack)",
       "webOrigins": [
@@ -105,6 +107,7 @@
         "https://wallet.sv-2.network.canton.global",
         "https://wallet.sv-2.global.canton.network.digitalasset.com"
       ],
+      "crossOriginAuth": false,
       "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for sv-1 (Digital-Asset 2)",
       "name": "Wallet UI (Pulumi managed, test-stack)",
       "webOrigins": [
