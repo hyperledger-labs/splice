@@ -451,7 +451,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     }
 
     clue("Alice validator tops up its traffic on new domain") {
-      eventually() {
+      eventually(1.minute) {
         aliceValidatorBackend.participantClient.traffic_control
           .traffic_state(newDomainId)
           .extraTrafficPurchased shouldBe >(NonNegativeLong.zero)
