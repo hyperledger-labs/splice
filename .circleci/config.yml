@@ -416,7 +416,7 @@ commands:
           name: Notify on slack
           when: on_fail
           command: |
-            .circleci/failure_notification.sh \
+            .circleci/notification-scripts/failure_notification.sh \
               --cluster << parameters.cluster >> \
               --slack_channel << parameters.channel_notify >> \
               --branch_pattern "(deployment\\/.*|main|release-line.*)"
