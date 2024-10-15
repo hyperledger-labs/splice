@@ -6,7 +6,7 @@ import json
 import requests
 import sys
 
-sys.path.append('../')
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from circleci import *
 from failure_notification_args import FailureArgs
 
