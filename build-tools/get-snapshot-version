@@ -56,8 +56,8 @@ if ! (env-bool CI_IGNORE_DIRTY_REPO) && [[  $(git diff --stat) != '' || $(git di
         dirty_suffix="-dirty"
     else
         >&2 echo "Repo was dirty on CI"
-        git status
-        git --no-pager diff --cached
+        >&2 git status
+        >&2 git --no-pager diff --cached
         exit 1
     fi
 fi
