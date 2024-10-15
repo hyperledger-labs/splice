@@ -28,7 +28,7 @@ import com.daml.network.http.v0.scan.{
   GetDateOfMostRecentSnapshotBeforeResponse,
   ScanClient,
 }
-import com.daml.network.scan.admin.http.LosslessScanHttpEncodings
+import com.daml.network.scan.admin.http.ProtobufJsonScanHttpEncodings
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.store.HistoryBackfilling.SourceMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore
@@ -967,8 +967,12 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetUpdateHistory(count: Int, after: Option[(Long, String)], lossless: Boolean)
-      extends InternalBaseCommand[http.GetUpdateHistoryResponse, Seq[
+  @deprecated(message = "Use GetUpdateHistory instead", since = "0.2.5")
+  case class GetUpdateHistoryV0(
+      count: Int,
+      after: Option[(Long, String)],
+      lossless: Boolean,
+  ) extends InternalBaseCommand[http.GetUpdateHistoryResponse, Seq[
         definitions.UpdateHistoryItem
       ]] {
     override def submitRequest(
@@ -980,23 +984,55 @@ object HttpScanAppClient {
     ], http.GetUpdateHistoryResponse] = {
       client.getUpdateHistory(
         definitions.UpdateHistoryRequest(
-          after.map { case (migrationId, recordTime) =>
+          after = after.map { case (migrationId, recordTime) =>
             definitions.UpdateHistoryRequestAfter(migrationId, recordTime)
           },
-          count,
-          Some(lossless),
+          pageSize = count,
+          lossless = Some(lossless),
         ),
         headers,
       )
     }
-
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetUpdateHistoryResponse.OK(response) =>
         Right(response.transactions)
     }
   }
 
-  case class GetUpdate(updateId: String)
+  case class GetUpdateHistory(
+      count: Int,
+      after: Option[(Long, String)],
+      damlValueEncoding: definitions.DamlValueEncoding,
+  ) extends InternalBaseCommand[http.GetUpdateHistoryV1Response, Seq[
+        definitions.UpdateHistoryItem
+      ]] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetUpdateHistoryV1Response] = {
+      client.getUpdateHistoryV1(
+        definitions.UpdateHistoryRequestV1(
+          after = after.map { case (migrationId, recordTime) =>
+            definitions.UpdateHistoryRequestAfter(migrationId, recordTime)
+          },
+          pageSize = count,
+          damlValueEncoding = Some(damlValueEncoding),
+        ),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetUpdateHistoryV1Response.OK(response) =>
+        Right(response.transactions)
+    }
+  }
+
+  @deprecated(message = "Use GetUpdateHistory instead", since = "0.2.5")
+  case class GetUpdateV0(updateId: String, lossless: Boolean)
       extends InternalBaseCommand[http.GetUpdateByIdResponse, definitions.UpdateHistoryItem] {
     override def submitRequest(
         client: http.ScanClient,
@@ -1006,13 +1042,38 @@ object HttpScanAppClient {
       HttpResponse,
     ], http.GetUpdateByIdResponse] = {
       client.getUpdateById(
-        updateId,
+        updateId = updateId,
+        lossless = Some(lossless),
         headers,
       )
     }
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetUpdateByIdResponse.OK(response) =>
+        Right(response)
+    }
+  }
+
+  case class GetUpdate(
+      updateId: String,
+      damlValueEncoding: definitions.DamlValueEncoding,
+  ) extends InternalBaseCommand[http.GetUpdateByIdV1Response, definitions.UpdateHistoryItem] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetUpdateByIdV1Response] = {
+      client.getUpdateByIdV1(
+        updateId = updateId,
+        damlValueEncoding = Some(damlValueEncoding),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetUpdateByIdV1Response.OK(response) =>
         Right(response)
     }
   }
@@ -1122,7 +1183,9 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetUpdatesBeforeResponse.OK(response) =>
         Right(
-          response.transactions.map(http => LosslessScanHttpEncodings.httpToLapiUpdate(http).update)
+          response.transactions.map(http =>
+            ProtobufJsonScanHttpEncodings.httpToLapiUpdate(http).update
+          )
         )
     }
   }

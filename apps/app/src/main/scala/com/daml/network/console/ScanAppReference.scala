@@ -396,17 +396,33 @@ abstract class ScanAppReference(
       )
     }
 
-  def getUpdateHistory(count: Int, after: Option[(Long, String)], lossless: Boolean) = {
+  @deprecated(message = "Use getUpdateHistory instead", since = "0.2.5")
+  def getUpdateHistoryV0(
+      count: Int,
+      after: Option[(Long, String)],
+      lossless: Boolean,
+  ) = {
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.GetUpdateHistory(count, after, lossless)
+        HttpScanAppClient.GetUpdateHistoryV0(count, after, lossless)
       )
     }
   }
-  def getUpdate(updateId: String) = {
+  def getUpdateHistory(
+      count: Int,
+      after: Option[(Long, String)],
+      encoding: definitions.DamlValueEncoding,
+  ) = {
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.GetUpdate(updateId)
+        HttpScanAppClient.GetUpdateHistory(count, after, encoding)
+      )
+    }
+  }
+  def getUpdate(updateId: String, encoding: definitions.DamlValueEncoding) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdate(updateId, encoding)
       )
     }
   }

@@ -431,6 +431,7 @@ paths:
       operationId: "getUpdateHistory"
       description: |
         Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
+        Deprecated, use /v1/updates instead.
       requestBody:
         required: true
         content:
@@ -448,17 +449,85 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v1/updates:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getUpdateHistoryV1"
+      description: |
+        Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
+        Unlike /v0/updates, this endpoint returns responses that are consistent across different
+        scan instances. Event ids returned by this endpoint are not comparable to event ids returned by /v0/updates.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateHistoryRequestV1"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/updates/{update_id}:
     get:
       tags: [scan]
       x-jvm-package: scan
       operationId: "getUpdateById"
+      description: |
+          Deprecated, use /v1/updates/{update_id} instead.
       parameters:
         - name: "update_id"
           in: "path"
           required: true
           schema:
             type: string
+        - name: "lossless"
+          in: "query"
+          description: |
+            Whether contract payload should be encoded into json using a lossless, but much harder to process, encoding.
+            This is mostly used for backend calls, and is not recommended for external users.
+            Optional and defaults to false.
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryItem"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v1/updates/{update_id}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getUpdateByIdV1"
+      description: |
+        Returns the update with the given update_id.
+        Unlike /v0/updates/{update_id}, this endpoint returns responses that are consistent across different
+        scan instances. Event ids returned by this endpoint are not comparable to event ids returned by /v0/updates.
+      parameters:
+        - name: "update_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "daml_value_encoding"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/DamlValueEncoding"
       responses:
         "200":
           description: ok
@@ -1444,6 +1513,24 @@ components:
             This is mostly used for backend calls, and is not recommended for external users.
             Optional and defaults to false.
           type: boolean
+    UpdateHistoryRequestV1:
+      type: object
+      required:
+        - page_size
+      properties:
+        after:
+          $ref: "#/components/schemas/UpdateHistoryRequestAfter"
+          description: |
+            The transactions returned will either have a higher migration id or
+            the same migration id and a record_time greater than the migration id and record time
+            specified.
+        page_size:
+          description: |
+            The maximum number of transactions returned for this request.
+          type: integer
+          format: int32
+        daml_value_encoding:
+          $ref: "#/components/schemas/DamlValueEncoding"
     UpdateHistoryResponse:
       type: object
       required:
@@ -2484,3 +2571,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpdateHistoryItem"
+
+    DamlValueEncoding:
+      type: string
+      description: |
+        How daml values should be encoded in the response.
+        "compact_json" is a compact, human-readable JSON encoding. It is the same encoding
+        as the one used in the HTTP JSON API or the JavaScript codegen.
+        "protobuf_json" is a verbose JSON encoding that is more difficult to parse,
+        but contains type information, i.e., the values can be parsed losslessly
+        without having access to the DAML source code.
+        Optional and defaults to "compact_json".
+      enum:
+        - "compact_json"
+        - "protobuf_json"
