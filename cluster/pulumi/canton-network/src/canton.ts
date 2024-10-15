@@ -1,6 +1,10 @@
 import * as postgres from 'splice-pulumi-common/src/postgres';
-import { Output } from '@pulumi/pulumi';
-import { DecentralizedSynchronizerMigrationConfig, ExactNamespace } from 'splice-pulumi-common';
+import { Output, Resource } from '@pulumi/pulumi';
+import {
+  CnInput,
+  DecentralizedSynchronizerMigrationConfig,
+  ExactNamespace,
+} from 'splice-pulumi-common';
 import {
   CometBftNodeConfigs,
   CrossStackDecentralizedSynchronizerNode,
@@ -24,7 +28,8 @@ export function installCanton(
       peers: StaticCometBftConfigWithNodeName[];
     };
   },
-  svConfig: SvConfig
+  svConfig: SvConfig,
+  dependsOn: CnInput<Resource>[]
 ): InstalledMigrationSpecificSv {
   const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
   const activeMigrationId =
@@ -93,7 +98,8 @@ export function installCanton(
             participant: participantPostgres,
             mediator: mediatorPostgres,
             sequencer: sequencerPostgres,
-          }
+          },
+          { dependsOn: dependsOn }
         ),
       };
     });

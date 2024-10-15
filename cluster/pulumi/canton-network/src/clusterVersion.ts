@@ -46,6 +46,6 @@ export function installClusterVersion(): k8s.apiextensions.CustomResource {
         ],
       },
     },
-    { deleteBeforeReplace: true }
+    { deleteBeforeReplace: true, dependsOn: [ns.ns] }
   );
 }
