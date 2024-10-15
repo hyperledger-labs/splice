@@ -33,6 +33,7 @@ function create_pvc_from_snapshot() {
   local -r namespace=$1
   local -r snapshot_name=$2
   local -r pvc_name=$3
+  local -r storage_class_name=$4
 
   vs=$(kubectl get volumesnapshot -n "$namespace" -o json "$snapshot_name")
   status=$(echo "$vs" | jq -r .status.readyToUse)
@@ -53,7 +54,7 @@ spec:
   resources:
     requests:
       storage: "$restore_size"
-  storageClassName: standard-rwo
+  storageClassName: "$storage_class_name"
   volumeMode: Filesystem
   dataSource:
     name: "$snapshot_name"
@@ -66,6 +67,7 @@ function restore_pvc_from_snapshot() {
   local -r namespace=$1
   local -r snapshot_name=$2
   local -r pvc_name=$3
+  local -r storage_class_name=${4:-"standard-rwo"}
 
   _warning "This operation will delete pvc $pvc_name, and restore it from backup."
   _warning "Please consider backing up and/or cloning the DB instance before continuing."
@@ -79,7 +81,7 @@ function restore_pvc_from_snapshot() {
   kubectl delete -n "$namespace" pvc "$pvc_name"
 
   _info "Recreating PVC from snapshot"
-  create_pvc_from_snapshot "$namespace" "$snapshot_name" "$pvc_name"
+  create_pvc_from_snapshot "$namespace" "$snapshot_name" "$pvc_name" "$storage_class_name"
 }
 
 function down() {
@@ -246,7 +248,7 @@ function restore_component() {
   if [ "$component" == "cometbft" ]; then
     _info "Restoring cometbft"
     kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=0
-    restore_pvc_from_snapshot "$namespace" "global-domain-$migration_id-cometbft-cometbft-data-$run_id" "global-domain-$migration_id-cometbft-cometbft-data"
+    restore_pvc_from_snapshot "$namespace" "global-domain-$migration_id-cometbft-cometbft-data-$run_id" "global-domain-$migration_id-cometbft-cometbft-data" "premium-rwo"
     kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=1
   else
     _info "Restoring $component"
