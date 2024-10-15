@@ -124,6 +124,7 @@ workflow:
             - prepare_cluster_for_migration
             - trigger_global_domain_migration
             - pre_migration_compose_validator
+            - pre_migration_dump_identities
       - preflight_check:
           name: "preflight_check_migrated"
           context:
