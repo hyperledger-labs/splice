@@ -7,12 +7,13 @@ import com.daml.network.console.ScanAppBackendReference
 import com.daml.network.environment.EnvironmentImpl
 import com.daml.network.environment.ledger.api.TransactionTreeUpdate
 import com.daml.network.http.v0.definitions
+import com.daml.network.http.v0.definitions.DamlValueEncoding.members.CompactJson
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import com.daml.network.scan.admin.http.LosslessScanHttpEncodings
+import com.daml.network.scan.admin.http.ProtobufJsonScanHttpEncodings
 import com.daml.network.scan.automation.ScanHistoryBackfillingTrigger
 import com.daml.network.store.{PageLimit, TreeUpdateWithMigrationId}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -25,6 +26,7 @@ import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.scalactic.source.Position
 
+import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -214,7 +216,7 @@ class ScanBackfillingIntegrationTest
 
     clue("SV2 scan HTTP API refuses to return history") {
       assertThrowsAndLogsCommandFailures(
-        sv2ScanBackend.getUpdateHistory(1000, None, true),
+        sv2ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson),
         _.errorMessage should include("This scan instance has not yet replicated all data"),
       )
     }
@@ -223,7 +225,7 @@ class ScanBackfillingIntegrationTest
       env.scans.local.filter(_.is_initialized).foreach { scan =>
         logger.debug(
           s"${scan.name} history before backfilling: " + shortDebugDescription(
-            allUpdatesFromScanBackend(scan).map(LosslessScanHttpEncodings.lapiToHttpUpdate)
+            allUpdatesFromScanBackend(scan).map(ProtobufJsonScanHttpEncodings.lapiToHttpUpdate)
           )
         )
       }
@@ -252,7 +254,7 @@ class ScanBackfillingIntegrationTest
       env.scans.local.filter(_.is_initialized).foreach { scan =>
         logger.debug(
           s"${scan.name} history after backfilling: " + shortDebugDescription(
-            allUpdatesFromScanBackend(scan).map(LosslessScanHttpEncodings.lapiToHttpUpdate)
+            allUpdatesFromScanBackend(scan).map(ProtobufJsonScanHttpEncodings.lapiToHttpUpdate)
           )
         )
       }
@@ -267,16 +269,37 @@ class ScanBackfillingIntegrationTest
       sv1Times should contain theSameElementsInOrderAs sv2Times
     }
 
-    clue("Compare scan histories with each other using the HTTP endpoint") {
-      val sv1HttpUpdates = sv1ScanBackend.getUpdateHistory(1000, None, true)
-      val sv2HttpUpdates = sv2ScanBackend.getUpdateHistory(1000, None, true)
+    clue("Compare scan histories with each other using the v0 HTTP endpoint") {
+      // The v0 endpoint is deprecated, but we still have users using it
+      @nowarn("cat=deprecation")
+      val sv1HttpUpdates =
+        sv1ScanBackend.getUpdateHistoryV0(1000, None, lossless = true)
+      @nowarn("cat=deprecation")
+      val sv2HttpUpdates =
+        sv2ScanBackend.getUpdateHistoryV0(1000, None, lossless = true)
 
       // Compare common prefix, as there might be concurrent activity
       val commonLength = sv1HttpUpdates.length min sv2HttpUpdates.length
       commonLength should be > 10
+
+      // Responses are not consistent across SVs, only compare record times
       val sv1ItemTimes = sv1HttpUpdates.take(commonLength).map(httpItemTime)
       val sv2ItemTimes = sv2HttpUpdates.take(commonLength).map(httpItemTime)
       sv1ItemTimes should contain theSameElementsInOrderAs sv2ItemTimes
+    }
+
+    clue("Compare scan histories with each other using the v1 HTTP endpoint") {
+      val sv1HttpUpdates =
+        sv1ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson)
+      val sv2HttpUpdates =
+        sv2ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson)
+
+      // Compare common prefix, as there might be concurrent activity
+      val commonLength = sv1HttpUpdates.length min sv2HttpUpdates.length
+      commonLength should be > 10
+      val sv1Items = sv1HttpUpdates.take(commonLength)
+      val sv2Items = sv2HttpUpdates.take(commonLength)
+      sv1Items should contain theSameElementsInOrderAs sv2Items
     }
 
     clue("Compare scan history with participant update stream") {

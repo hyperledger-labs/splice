@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.http
 
+import com.daml.ledger.javaapi.data as javaApi
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
@@ -12,6 +13,7 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
+import com.daml.network.http.v0.definitions as httpApi
 import com.daml.network.http.v0.definitions.TreeEvent.members.CreatedEvent as HttpCreatedEvent
 import com.daml.network.http.v0.definitions.UpdateHistoryItem
 import com.daml.network.http.v0.definitions.UpdateHistoryItem.members.UpdateHistoryTransaction as HttpUpdateHistoryTx
@@ -64,8 +66,8 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         migrationId = 42L,
       )
 
-      val encoded = LosslessScanHttpEncodings.lapiToHttpUpdate(original)
-      val decoded = LosslessScanHttpEncodings.httpToLapiUpdate(encoded)
+      val encoded = ProtobufJsonScanHttpEncodings.lapiToHttpUpdate(original)
+      val decoded = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(encoded)
 
       decoded shouldBe original
     }
@@ -98,8 +100,8 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       migrationId = 42L,
     )
 
-    val encoded = LosslessScanHttpEncodings.lapiToHttpUpdate(original)
-    val decoded = LosslessScanHttpEncodings.httpToLapiUpdate(encoded)
+    val encoded = ProtobufJsonScanHttpEncodings.lapiToHttpUpdate(original)
+    val decoded = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(encoded)
 
     decoded shouldBe original
   }
@@ -131,8 +133,8 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       migrationId = 42L,
     )
 
-    val encoded = LosslessScanHttpEncodings.lapiToHttpUpdate(original)
-    val decoded = LosslessScanHttpEncodings.httpToLapiUpdate(encoded)
+    val encoded = ProtobufJsonScanHttpEncodings.lapiToHttpUpdate(original)
+    val decoded = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(encoded)
 
     decoded shouldBe original
   }
@@ -169,10 +171,137 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       }
     }
 
-    val encodedLossless = LosslessScanHttpEncodings.lapiToHttpUpdate(tree)
+    val encodedLossless = ProtobufJsonScanHttpEncodings.lapiToHttpUpdate(tree)
     check(encodedLossless)
-    val encodedLossy = LossyScanHttpEncodings.lapiToHttpUpdate(tree)
+    val encodedLossy = CompactJsonScanHttpEncodings.lapiToHttpUpdate(tree)
     check(encodedLossy)
   }
 
+  "make tree update consistent across SVs" in {
+    // Random input event ids, to check whether the resulting event ids are deterministic.
+    val originalEventIds = Random.shuffle(Vector("a", "b", "c", "d", "e", "f"))
+    val leftRootId = originalEventIds(0)
+    val rightRootId = originalEventIds(1)
+    val leftChildId1 = originalEventIds(2)
+    val leftChildId2 = originalEventIds(3)
+    val rightChildId1 = originalEventIds(4)
+    val rightChildId2 = originalEventIds(5)
+
+    val simpleDamlValue = io.circe.Json.obj("record" -> io.circe.Json.obj())
+
+    def mkCreate(eventId: String) = httpApi.TreeEvent.fromCreatedEvent(
+      httpApi.CreatedEvent(
+        "created_event",
+        eventId = eventId,
+        contractId = eventId,
+        templateId = "a:b:c",
+        packageName = "packageName",
+        createArguments = simpleDamlValue,
+        createdAt = java.time.OffsetDateTime.now(),
+        signatories = Vector.empty,
+        observers = Vector.empty,
+      )
+    )
+
+    def mkExercise(eventId: String, childEventIds: Vector[String]) =
+      httpApi.TreeEvent.fromExercisedEvent(
+        httpApi.ExercisedEvent(
+          "exercised_event",
+          eventId = eventId,
+          contractId = eventId,
+          templateId = "a:b:c",
+          packageName = "packageName",
+          choice = "choice",
+          choiceArgument = simpleDamlValue,
+          childEventIds = childEventIds,
+          exerciseResult = simpleDamlValue,
+          consuming = false,
+          actingParties = Vector.empty,
+          interfaceId = None,
+        )
+      )
+
+    // A transaction with two root exercised events, each with two child created events:
+    //          [leftRoot,               rightRoot]
+    //          /       \                /        \
+    // [leftChild1, leftChild2] [rightChild1, rightChild2]
+    val original = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(
+      httpApi.UpdateHistoryTransaction(
+        updateId = "updateId",
+        migrationId = 0L,
+        workflowId = "workflowId",
+        recordTime = "2024-06-03T15:43:38.124Z",
+        synchronizerId = "a::b",
+        effectiveAt = "2024-06-03T15:43:38.124Z",
+        offset = "offset",
+        rootEventIds = Vector(leftRootId, rightRootId),
+        eventsById = Map(
+          leftRootId -> mkExercise(
+            leftRootId,
+            Vector(leftChildId1, leftChildId2),
+          ),
+          rightRootId -> mkExercise(
+            rightRootId,
+            Vector(rightChildId1, rightChildId2),
+          ),
+          leftChildId1 -> mkCreate(leftChildId1),
+          leftChildId2 -> mkCreate(leftChildId2),
+          rightChildId1 -> mkCreate(rightChildId1),
+          rightChildId2 -> mkCreate(rightChildId2),
+        ),
+      )
+    )
+
+    val withoutLocalData = ScanHttpEncodings
+      .makeConsistentAcrossSvs(original)
+      .update
+      .update
+      .asInstanceOf[TransactionTreeUpdate]
+      .tree
+
+    val newLeftRoot = withoutLocalData.getEventsById
+      .get(withoutLocalData.getRootEventIds.get(0))
+      .asInstanceOf[javaApi.ExercisedEvent]
+    val newRightRoot = withoutLocalData.getEventsById
+      .get(withoutLocalData.getRootEventIds.get(1))
+      .asInstanceOf[javaApi.ExercisedEvent]
+    val newLeftChild1 = withoutLocalData.getEventsById
+      .get(newLeftRoot.getChildEventIds.get(0))
+      .asInstanceOf[javaApi.CreatedEvent]
+    val newLeftChild2 = withoutLocalData.getEventsById
+      .get(newLeftRoot.getChildEventIds.get(1))
+      .asInstanceOf[javaApi.CreatedEvent]
+    val newRightChild1 = withoutLocalData.getEventsById
+      .get(newRightRoot.getChildEventIds.get(0))
+      .asInstanceOf[javaApi.CreatedEvent]
+    val newRightChild2 = withoutLocalData.getEventsById
+      .get(newRightRoot.getChildEventIds.get(1))
+      .asInstanceOf[javaApi.CreatedEvent]
+
+    // In the above transaction, contract ids are always equal to event ids
+    // These checks make sure that "newLeftRoot" really refers to the left root event
+    newLeftRoot.getContractId should be(leftRootId)
+    newLeftChild1.getContractId should be(leftChildId1)
+    newLeftChild2.getContractId should be(leftChildId2)
+    newRightRoot.getContractId should be(rightRootId)
+    newRightChild1.getContractId should be(rightChildId1)
+    newRightChild2.getContractId should be(rightChildId2)
+
+    // Event ids must be stable, be careful when changing these values
+    newLeftRoot.getEventId should be("updateId:0")
+    newLeftChild1.getEventId should be("updateId:1")
+    newLeftChild2.getEventId should be("updateId:2")
+    newRightRoot.getEventId should be("updateId:3")
+    newRightChild1.getEventId should be("updateId:4")
+    newRightChild2.getEventId should be("updateId:5")
+
+    // makeConsistentAcrossSvs() should be idempotent
+    val withoutLocalData2 = ScanHttpEncodings
+      .makeConsistentAcrossSvs(original)
+      .update
+      .update
+      .asInstanceOf[TransactionTreeUpdate]
+      .tree
+    withoutLocalData2 should be(withoutLocalData)
+  }
 }

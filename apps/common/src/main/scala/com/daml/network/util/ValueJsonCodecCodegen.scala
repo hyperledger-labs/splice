@@ -8,6 +8,8 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier}
 import com.daml.ledger.javaapi.data.codegen.DefinedDataType
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 
+import scala.util.Try
+
 /** A codec for converting [[com.daml.ledger.javaapi.data.Value]] to/from JSON strings.
   *
   * This codec produces compact and human readable JSON values, but has several drawbacks:
@@ -45,14 +47,16 @@ object ValueJsonCodecCodegen {
       payload: String,
   ): Either[String, JavaApi.DamlRecord] = for {
     companion <- ContractCompanions.lookup(templateId)
-  } yield companion.fromJson(payload).toValue
+    data <- Try(companion.fromJson(payload)).toEither.left.map(_.getMessage)
+  } yield data.toValue
 
   def serializeChoiceArgument(
       event: ExercisedEvent
   ): Either[String, String] = for {
     companion <- ContractCompanions.lookup(event.getTemplateId)
     choiceCompanion <- ContractCompanions.lookupChoice(companion, event.getChoice)
-    arg = choiceCompanion.argTypeDecoder.decode(event.getChoiceArgument)
+    arg <- Try(choiceCompanion.argTypeDecoder.decode(event.getChoiceArgument)).toEither.left
+      .map(_.getMessage)
     json = choiceCompanion.argJsonEncoder(arg).intoString()
   } yield json
 
@@ -63,7 +67,8 @@ object ValueJsonCodecCodegen {
   ): Either[String, JavaApi.DamlRecord] = for {
     companion <- ContractCompanions.lookup(templateId)
     choiceCompanion <- ContractCompanions.lookupChoice(companion, choice)
-    arg = choiceCompanion.argJsonDecoder.decode(new JsonLfReader(argument))
+    arg <- Try(choiceCompanion.argJsonDecoder.decode(new JsonLfReader(argument))).toEither.left
+      .map(_.getMessage)
   } yield arg.toValue
 
   def serializeChoiceResult(
@@ -71,7 +76,8 @@ object ValueJsonCodecCodegen {
   ): Either[String, String] = for {
     companion <- ContractCompanions.lookup(event.getTemplateId)
     choiceCompanion <- ContractCompanions.lookupChoice(companion, event.getChoice)
-    ret = choiceCompanion.returnTypeDecoder.decode(event.getExerciseResult)
+    ret <- Try(choiceCompanion.returnTypeDecoder.decode(event.getExerciseResult)).toEither.left
+      .map(_.getMessage)
     json = choiceCompanion.resultJsonEncoder(ret).intoString()
   } yield json
 
@@ -82,8 +88,9 @@ object ValueJsonCodecCodegen {
   ): Either[String, JavaApi.Value] = for {
     companion <- ContractCompanions.lookup(templateId)
     choiceCompanion <- ContractCompanions.lookupChoice(companion, choice)
-    res = choiceCompanion.resultJsonDecoder.decode(new JsonLfReader(result))
-    value = choiceResultToValue(res)
+    res <- Try(choiceCompanion.resultJsonDecoder.decode(new JsonLfReader(result))).toEither.left
+      .map(_.getMessage)
+    value <- choiceResultToValue(res)
   } yield value
 
   /** In the ledger API, the result of a choice is represented as a JavaApi.Value.
@@ -93,16 +100,16 @@ object ValueJsonCodecCodegen {
     * Unfortunately com.daml.ledger.javaapi.data.codegen.Choice has no method to convert the result type
     * to a JavaApi.Value
     */
-  private def choiceResultToValue(result: Any): JavaApi.Value = result match {
+  private def choiceResultToValue(result: Any): Either[String, JavaApi.Value] = result match {
     // If the result type is a named record
-    case ddt: DefinedDataType[?] => ddt.toValue
+    case ddt: DefinedDataType[?] => Right(ddt.toValue)
 
     // If the result type is Unit
-    case v: JavaApi.Value => v
+    case v: JavaApi.Value => Right(v)
 
     // Our 1st party daml code happens to never use anything but named records and Unit,
     // but the result type can also one of many other types with no common supertype.
-    case _ => throw new RuntimeException(s"Unsupported choice result type: ${result.getClass}")
+    case _ => Left(s"Unsupported choice result type: ${result.getClass}")
   }
 
 }

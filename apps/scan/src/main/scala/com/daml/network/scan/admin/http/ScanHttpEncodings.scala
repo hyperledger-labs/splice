@@ -8,7 +8,7 @@ import com.daml.ledger.javaapi.data as javaApi
 import com.daml.network.environment.ledger.api as ledgerApi
 import com.daml.network.http.v0.definitions as httpApi
 import com.daml.network.store.TreeUpdateWithMigrationId
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, Trees}
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -348,8 +348,137 @@ sealed trait ScanHttpEncodings {
   }
 }
 
+object ScanHttpEncodings {
+  private def formatEventId(updateId: String, eventIndex: Int): String = s"$updateId:$eventIndex"
+
+  /** Returns a copy of the input, modified such that the result is consistent across different SVs:
+    * - Offsets are replaced by empty strings
+    * - Event ids are replaced by deterministically assigned event ids
+    *
+    * Note: both offsets and event ids are assigned locally by the participant.
+    */
+  def makeConsistentAcrossSvs(
+      update: TreeUpdateWithMigrationId
+  ): TreeUpdateWithMigrationId = {
+    update.copy(update = makeConsistentAcrossSvs(update.update))
+  }
+
+  def makeConsistentAcrossSvs(
+      response: ledgerApi.LedgerClient.GetTreeUpdatesResponse
+  ): ledgerApi.LedgerClient.GetTreeUpdatesResponse = {
+    response.copy(update = makeConsistentAcrossSvs(response.update))
+  }
+
+  def makeConsistentAcrossSvs(
+      update: ledgerApi.TreeUpdate
+  ): ledgerApi.TreeUpdate = {
+    update match {
+      case ledgerApi.TransactionTreeUpdate(tree) =>
+        ledgerApi.TransactionTreeUpdate(
+          makeConsistentAcrossSvs(tree)
+        )
+      case ledgerApi.ReassignmentUpdate(transfer) =>
+        transfer.event match {
+          case assign: ledgerApi.ReassignmentEvent.Assign =>
+            ledgerApi.ReassignmentUpdate(
+              ledgerApi.Reassignment(
+                transfer.updateId,
+                new javaApi.ParticipantOffset.Absolute(""),
+                transfer.recordTime,
+                assign.copy(
+                  createdEvent = new javaApi.CreatedEvent(
+                    assign.createdEvent.getWitnessParties,
+                    formatEventId(update.updateId, 0),
+                    assign.createdEvent.getTemplateId,
+                    assign.createdEvent.getPackageName,
+                    assign.createdEvent.getContractId,
+                    assign.createdEvent.getArguments,
+                    assign.createdEvent.getCreatedEventBlob,
+                    assign.createdEvent.getInterfaceViews,
+                    assign.createdEvent.getFailedInterfaceViews,
+                    assign.createdEvent.getContractKey,
+                    assign.createdEvent.getSignatories,
+                    assign.createdEvent.getObservers,
+                    assign.createdEvent.createdAt,
+                  )
+                ),
+              )
+            )
+          case unassign: ledgerApi.ReassignmentEvent.Unassign =>
+            ledgerApi.ReassignmentUpdate(
+              ledgerApi.Reassignment(
+                transfer.updateId,
+                new javaApi.ParticipantOffset.Absolute(""),
+                transfer.recordTime,
+                unassign,
+              )
+            )
+        }
+    }
+  }
+
+  def makeConsistentAcrossSvs(
+      tree: javaApi.TransactionTree
+  ): javaApi.TransactionTree = {
+    val mapping = Trees
+      .getLocalEventIndices(tree)
+      .view
+      .mapValues(i => formatEventId(tree.getUpdateId, i))
+      .toMap
+
+    val eventsById = tree.getEventsById.asScala.map {
+      case (eventId, created: javaApi.CreatedEvent) =>
+        mapping(eventId) -> new javaApi.CreatedEvent(
+          created.getWitnessParties,
+          mapping(created.getEventId),
+          created.getTemplateId,
+          created.getPackageName,
+          created.getContractId,
+          created.getArguments,
+          created.getCreatedEventBlob,
+          created.getInterfaceViews,
+          created.getFailedInterfaceViews,
+          created.getContractKey,
+          created.getSignatories,
+          created.getObservers,
+          created.createdAt,
+        )
+      case (eventId, exercised: javaApi.ExercisedEvent) =>
+        mapping(eventId) -> new javaApi.ExercisedEvent(
+          exercised.getWitnessParties,
+          mapping(exercised.getEventId),
+          exercised.getTemplateId,
+          exercised.getPackageName,
+          exercised.getInterfaceId,
+          exercised.getContractId,
+          exercised.getChoice,
+          exercised.getChoiceArgument,
+          exercised.getActingParties,
+          exercised.isConsuming,
+          exercised.getChildEventIds.asScala.map(mapping).asJava,
+          exercised.getExerciseResult,
+        )
+      case (_, event) => sys.error(s"Unexpected event type: $event")
+    }
+    val rootEventIds = tree.getRootEventIds.asScala.map(mapping)
+
+    new javaApi.TransactionTree(
+      tree.getUpdateId,
+      tree.getCommandId,
+      tree.getWorkflowId,
+      tree.getEffectiveAt,
+      "", // tree.getOffset,
+      eventsById.asJava,
+      rootEventIds.asJava,
+      tree.getDomainId,
+      tree.getTraceContext,
+      tree.getRecordTime,
+    )
+  }
+}
+
 // A lossy, but much easier to process, encoding. Should be used for all endpoints not used for backfilling Scan.
-case object LossyScanHttpEncodings extends ScanHttpEncodings {
+case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
   import com.daml.network.util.ValueJsonCodecCodegen
   override def encodeContractPayload(
       event: javaApi.CreatedEvent
@@ -397,7 +526,10 @@ case object LossyScanHttpEncodings extends ScanHttpEncodings {
     ValueJsonCodecCodegen
       .deserializableContractPayload(templateId, json.noSpaces)
       .fold(
-        error => throw new RuntimeException(s"Failed to decode contract payload: $error"),
+        error =>
+          throw new RuntimeException(
+            s"Failed to decode contract payload '${json.noSpaces}': $error"
+          ),
         withoutFieldLabels,
       )
 
@@ -409,7 +541,10 @@ case object LossyScanHttpEncodings extends ScanHttpEncodings {
     ValueJsonCodecCodegen
       .deserializeChoiceArgument(templateId, choice, json.noSpaces)
       .fold(
-        error => throw new RuntimeException(s"Failed to decode choice argument: $error"),
+        error =>
+          throw new RuntimeException(
+            s"Failed to decode choice argument '${json.noSpaces}': $error"
+          ),
         withoutFieldLabels,
       )
 
@@ -421,7 +556,8 @@ case object LossyScanHttpEncodings extends ScanHttpEncodings {
     ValueJsonCodecCodegen
       .deserializeChoiceResult(templateId, choice, json.noSpaces)
       .fold(
-        error => throw new RuntimeException(s"Failed to decode choice result: $error"),
+        error =>
+          throw new RuntimeException(s"Failed to decode choice result '${json.noSpaces}': $error"),
         withoutFieldLabels,
       )
 
@@ -453,7 +589,7 @@ case object LossyScanHttpEncodings extends ScanHttpEncodings {
 }
 
 // A lossless, but harder to process, encoding. Should be used only for backfilling Scan.
-case object LosslessScanHttpEncodings extends ScanHttpEncodings {
+case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
   import com.daml.network.util.ValueJsonCodecProtobuf
   override def encodeContractPayload(
       event: javaApi.CreatedEvent
