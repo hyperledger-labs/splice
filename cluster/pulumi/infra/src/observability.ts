@@ -16,6 +16,7 @@ import {
   EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
   GCP_PROJECT,
   GrafanaKeys,
+  HELM_MAX_HISTORY_SIZE,
   LOAD_TESTER_MIN_RATE,
   publicPrometheusRemoteWrite,
   REPO_ROOT,
@@ -526,6 +527,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           fullnameOverride: 'node-exporter',
         },
       },
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
       dependsOn: [namespace],

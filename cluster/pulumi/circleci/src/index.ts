@@ -2,7 +2,11 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
-import { appsAffinityAndTolerations, infraAffinityAndTolerations } from 'splice-pulumi-common';
+import {
+  appsAffinityAndTolerations,
+  HELM_MAX_HISTORY_SIZE,
+  infraAffinityAndTolerations,
+} from 'splice-pulumi-common';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 const circleCiNamespace = new Namespace('circleci-runner', {
@@ -177,6 +181,7 @@ new k8s.helm.v3.Release('container-agent', {
         },
       },
       ...infraAffinityAndTolerations,
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
   },
 });

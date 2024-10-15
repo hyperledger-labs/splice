@@ -163,6 +163,7 @@
     "inputs": {
       "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-sv",
       "namespace": "sv",
       "repositoryOpts": {
@@ -397,6 +398,7 @@
     "inputs": {
       "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv",
       "repositoryOpts": {
@@ -446,6 +448,7 @@
     "inputs": {
       "chart": "splice-scan",
       "compat": "true",
+      "maxHistory": 10,
       "name": "scan",
       "namespace": "sv",
       "repositoryOpts": {
@@ -650,6 +653,7 @@
     "inputs": {
       "chart": "splice-postgres",
       "compat": "true",
+      "maxHistory": 10,
       "name": "apps-pg",
       "namespace": "sv",
       "repositoryOpts": {
@@ -708,6 +712,7 @@
     "inputs": {
       "chart": "splice-sv-node",
       "compat": "true",
+      "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv",
       "repositoryOpts": {
@@ -860,6 +865,7 @@
     "inputs": {
       "chart": "cn-cometbft",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cometbft-global-domain-1",
       "namespace": "sv",
       "repositoryOpts": {
@@ -963,6 +969,7 @@
     "inputs": {
       "chart": "splice-cometbft",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cometbft-global-domain-2",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1116,6 +1123,7 @@
     "inputs": {
       "chart": "cn-global-domain",
       "compat": "true",
+      "maxHistory": 10,
       "name": "global-domain-1",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1211,6 +1219,7 @@
     "inputs": {
       "chart": "splice-global-domain",
       "compat": "true",
+      "maxHistory": 10,
       "name": "global-domain-2",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1316,6 +1325,7 @@
     "inputs": {
       "chart": "splice-postgres",
       "compat": "true",
+      "maxHistory": 10,
       "name": "mediator-pg",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1374,6 +1384,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-1",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1458,6 +1469,7 @@
     "inputs": {
       "chart": "splice-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-2",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1560,6 +1572,7 @@
     "inputs": {
       "chart": "splice-postgres",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-pg",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1636,6 +1649,7 @@
     "inputs": {
       "chart": "splice-postgres",
       "compat": "true",
+      "maxHistory": 10,
       "name": "sequencer-pg",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1709,6 +1723,7 @@
     "inputs": {
       "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator",
       "namespace": "sv",
       "repositoryOpts": {

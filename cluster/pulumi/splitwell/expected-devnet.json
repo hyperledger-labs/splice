@@ -309,6 +309,7 @@
     "inputs": {
       "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-splitwell-uis",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -478,6 +479,7 @@
     "inputs": {
       "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -530,6 +532,7 @@
     "inputs": {
       "chart": "splice-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-1",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -669,6 +672,7 @@
     "inputs": {
       "chart": "splice-splitwell-app",
       "compat": "true",
+      "maxHistory": 10,
       "name": "splitwell-app",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -857,6 +861,7 @@
     "inputs": {
       "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator-splitwell",
       "namespace": "splitwell",
       "repositoryOpts": {

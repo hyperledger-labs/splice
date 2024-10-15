@@ -480,6 +480,7 @@
     "inputs": {
       "chart": "splice-istio-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-gateway",
       "namespace": "cluster-ingress",
       "repositoryOpts": {
@@ -1078,6 +1079,7 @@
     "inputs": {
       "chart": "base",
       "compat": "true",
+      "maxHistory": 10,
       "name": "istio-base",
       "namespace": "istio-system",
       "repositoryOpts": {
@@ -1165,6 +1167,7 @@
     "inputs": {
       "chart": "gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "istio-ingress-public",
       "namespace": "cluster-ingress",
       "repositoryOpts": {
@@ -1249,6 +1252,7 @@
     "inputs": {
       "chart": "gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "istio-ingress",
       "namespace": "cluster-ingress",
       "repositoryOpts": {
@@ -1893,6 +1897,7 @@
     "inputs": {
       "chart": "istiod",
       "compat": "true",
+      "maxHistory": 10,
       "name": "istiod",
       "namespace": "cluster-ingress",
       "repositoryOpts": {
@@ -2092,6 +2097,7 @@
     "inputs": {
       "chart": "kube-prometheus-stack",
       "compat": "true",
+      "maxHistory": 10,
       "name": "prometheus-grafana-monitoring",
       "namespace": "observability",
       "repositoryOpts": {

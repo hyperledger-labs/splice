@@ -281,6 +281,7 @@
     "inputs": {
       "chart": "cn-docs",
       "compat": "true",
+      "maxHistory": 10,
       "name": "docs",
       "namespace": "docs",
       "repositoryOpts": {
@@ -562,6 +563,7 @@
     "inputs": {
       "chart": "cn-cometbft",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cometbft-global-domain-0",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -671,6 +673,7 @@
     "inputs": {
       "chart": "splice-cometbft",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cometbft-global-domain-1",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -870,6 +873,7 @@
     "inputs": {
       "chart": "cn-global-domain",
       "compat": "true",
+      "maxHistory": 10,
       "name": "global-domain-0",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -963,6 +967,7 @@
     "inputs": {
       "chart": "splice-global-domain",
       "compat": "true",
+      "maxHistory": 10,
       "name": "global-domain-1",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -1046,6 +1051,7 @@
     "inputs": {
       "chart": "cn-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "ingress-sv",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -1109,6 +1115,7 @@
     "inputs": {
       "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -1221,6 +1228,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-0",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -1304,6 +1312,7 @@
     "inputs": {
       "chart": "splice-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-1",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -1445,6 +1454,7 @@
     "inputs": {
       "chart": "cn-scan",
       "compat": "true",
+      "maxHistory": 10,
       "name": "scan",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -1585,6 +1595,7 @@
     "inputs": {
       "chart": "cn-sv-node",
       "compat": "true",
+      "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv-1",
       "repositoryOpts": {
@@ -1759,6 +1770,7 @@
     "inputs": {
       "chart": "cn-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator-sv-1",
       "namespace": "sv-1",
       "repositoryOpts": {

@@ -183,6 +183,7 @@
     "inputs": {
       "chart": "flux2",
       "compat": "true",
+      "maxHistory": 10,
       "name": "flux",
       "namespace": "operator",
       "repositoryOpts": {
@@ -552,6 +553,7 @@
           "repository": "da-cn-shared/cn-images/pulumi-kubernetes-operator",
           "tag": "0.0.1-deadbeef"
         },
+        "maxHistory": 10,
         "resources": {
           "limits": {
             "cpu": 5,

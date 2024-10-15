@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import { infraAffinityAndTolerations } from 'splice-pulumi-common';
+import { HELM_MAX_HISTORY_SIZE, infraAffinityAndTolerations } from 'splice-pulumi-common';
 
 import { namespace } from '../namespace';
 
@@ -39,4 +39,5 @@ export const flux = new k8s.helm.v3.Release('flux', {
       },
     },
   },
+  maxHistory: HELM_MAX_HISTORY_SIZE,
 });

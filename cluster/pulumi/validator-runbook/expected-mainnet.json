@@ -116,6 +116,7 @@
     "inputs": {
       "chart": "cn-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-validator",
       "namespace": "validator",
       "repositoryOpts": {
@@ -239,6 +240,7 @@
     "inputs": {
       "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "validator",
       "repositoryOpts": {
@@ -409,6 +411,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-0",
       "namespace": "validator",
       "repositoryOpts": {
@@ -511,6 +514,7 @@
     "inputs": {
       "chart": "cn-postgres",
       "compat": "true",
+      "maxHistory": 10,
       "name": "postgres",
       "namespace": "validator",
       "repositoryOpts": {
@@ -586,6 +590,7 @@
     "inputs": {
       "chart": "cn-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator",
       "namespace": "validator",
       "repositoryOpts": {

@@ -309,6 +309,7 @@
     "inputs": {
       "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-validator1",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -431,6 +432,7 @@
     "inputs": {
       "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -483,6 +485,7 @@
     "inputs": {
       "chart": "splice-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-1",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -622,6 +625,7 @@
     "inputs": {
       "chart": "splice-splitwell-web-ui",
       "compat": "true",
+      "maxHistory": 10,
       "name": "splitwell-web-ui",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -745,6 +749,7 @@
     "inputs": {
       "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator-validator1",
       "namespace": "validator1",
       "repositoryOpts": {

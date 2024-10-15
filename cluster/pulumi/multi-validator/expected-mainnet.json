@@ -5,6 +5,7 @@
     "inputs": {
       "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "multi-validator",
       "repositoryOpts": {
