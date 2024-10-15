@@ -89,6 +89,7 @@ export class InStackDecentralizedSynchronizerNode
         peers: StaticCometBftConfigWithNodeName[];
       };
       enableStateSync?: boolean;
+      enableTimeoutCommit?: boolean;
     },
     active: boolean,
     runningMigration: boolean,
@@ -116,6 +117,7 @@ export class InStackDecentralizedSynchronizerNode
       logLevel.toLowerCase(),
       version,
       cometbft.enableStateSync,
+      cometbft.enableTimeoutCommit,
       {
         ...opts,
         parent: this,

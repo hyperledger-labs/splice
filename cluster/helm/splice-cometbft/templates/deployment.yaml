@@ -90,6 +90,12 @@ spec:
               value: "{{ $.Values.stateSync.trustPeriod }}"
             - name: BASH_XTRACEFD
               value: "1"
+            # only included here so that k8s restarts the pod when the config changes
+            - name: CONFIG_HASH
+              value: "{{ include "configToml" $ | sha256sum }}"
+            # only included here so that k8s restarts the pod when the genesis.json changes (which it never should)
+            - name: GENESIS_HASH
+              value: "{{ include "genesisJson" $ | sha256sum }}"
           command:
             - /bin/sh
             - -c

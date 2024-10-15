@@ -85,6 +85,9 @@ export function installCanton(
             ...cometbft,
             // State sync doesn't make sense in the main stack, as all the cometbft nodes are started at the same time
             enableStateSync: false,
+            enableTimeoutCommit:
+              svConfig.isFirstSv &&
+              decentralizedSynchronizerMigrationConfig.runningMigrations().length > 1,
           },
           {
             participant: participantPostgres,

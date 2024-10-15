@@ -167,8 +167,6 @@ function subcmd_disaster_recovery_test() {
   _info "Deploying new domain"
   local migration_config
   export DISABLE_COMETBFT_STATE_SYNC="true"
-  # Throttle SV1's CometBFT block processing during the migration (see #13868)
-  export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
   migration_config=$(cat <<EOF
   upgrade:
     id: 1

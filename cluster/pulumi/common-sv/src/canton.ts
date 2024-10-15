@@ -39,6 +39,7 @@ export function installCantonComponents(
       peers: StaticCometBftConfigWithNodeName[];
     };
     enableStateSync?: boolean;
+    enableTimeoutCommit?: boolean;
   },
   dbs?: {
     participant: Postgres;

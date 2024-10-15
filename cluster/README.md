@@ -1466,7 +1466,6 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    * set in `config.yaml` under the path `synchronizerMigration.upgrade.provider` the type of canton deployment used. `internal` for all the canton components in the `canton-network` or `sv-runbook` stack, `external` to create canton specific stacks for each sv for the migration
    * if using `external` as the provider, set in `config.yaml` under the path `synchronizerMigration.upgrade.releaseReference` the git tag or branch that will be used for the deployment code
    * environment variable `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
-   * environment variable `export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"` to throttle SV1's Cometbft temporarily during the migration
    * if using `external` as the provider, deploy the operator from the deployment branch to create the new stacks CRs
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
@@ -1524,7 +1523,6 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. (non-DevNet clusters) Check to see that fresh node identities dumps have been taken after the migration. Check the logs of the SV app for an entry that says "Wrote node identities dump" [GCloud Logs example](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-testnet%22%0A%22Wrote%20node%20identities%20dump%22%0A;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T05:19:14.578112132Z;duration=PT30M?project=da-cn-devnet)
 1. **Post-migration:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that makes the following changes:
    * in `config.yaml` remove `synchronizerMigration.active.migratingFrom`
-   * Remove the export of `COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1` from the deployment branch, to disable the throttling after migration is complete.
    * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_COMETBFT_STATE_SYNC` to "false".
    * [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
      so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs

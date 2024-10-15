@@ -669,7 +669,7 @@
           }
         },
         "node": {
-          "enableTimeoutCommit": false,
+          "enableTimeoutCommit": true,
           "externalAddress": "test.global.canton.network.digitalasset.com:26116",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-1-cometbft",
@@ -778,7 +778,7 @@
           }
         },
         "node": {
-          "enableTimeoutCommit": false,
+          "enableTimeoutCommit": true,
           "externalAddress": "test.global.canton.network.digitalasset.com:26216",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-2-cometbft",

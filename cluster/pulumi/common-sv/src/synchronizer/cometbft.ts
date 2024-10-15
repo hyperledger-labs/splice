@@ -43,6 +43,7 @@ export function installCometBftNode(
   logLevel: string,
   version: CnChartVersion = activeVersion,
   enableStateSync: boolean = !disableCometBftStateSync,
+  enableTimeoutCommit: boolean = false,
   opts?: SpliceCustomResourceOptions
 ): Cometbft {
   const cometBftValues = loadYamlFromFile(
@@ -57,7 +58,6 @@ export function installCometBftNode(
     }
   );
   const nodeConfig: CometBftNodeConfig = nodeConfigs.self;
-  const enableTimeoutCommitSv1 = config.envFlag('COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1', false);
   const isSv1 = nodeConfigs.self.id === nodeConfigs.sv1NodeConfig.id;
   // legacy domains don't need cometbft state sync because no new nodes will join
   // upgrade domains don't need cometbft state sync because until they are active cometbft will not really progress its height a lot
@@ -82,7 +82,7 @@ export function installCometBftNode(
         ...cometBftValues.node,
         ...nodeConfig,
         ...(nodeConfig.validator ? { keysSecret: '' } : {}),
-        enableTimeoutCommit: isSv1 && enableTimeoutCommitSv1,
+        enableTimeoutCommit,
       },
       logLevel,
       peers: nodeConfigs.peers
