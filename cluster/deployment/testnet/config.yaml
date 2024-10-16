@@ -1,8 +1,4 @@
 synchronizerMigration:
-  legacy:
-    id: 1
-    provider: internal
-    version: 0.1.19
   active:
     id: 2
     provider: internal
