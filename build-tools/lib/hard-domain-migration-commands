@@ -34,9 +34,6 @@ function subcmd_hard_domain_migration_prepare() {
   # so the actual migrate step does not have to redeploy them and is therefore faster.
   export DISABLE_COMETBFT_STATE_SYNC="true"
 
-  # Throttle SV1's CometBFT block processing during the migration (see #13868)
-  export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
-
   local migration_config
   migration_config=$(cat <<EOF
   upgrade:
@@ -112,9 +109,6 @@ function subcmd_hard_domain_migration_migrate() {
 EOF
   )
   _update_cluster_config "$migration_config" "synchronizerMigration"
-
-  # Throttle SV1's CometBFT block processing during the migration (see #13868)
-  export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"
 
   # pulumi will show a preview and ask us to confirm each deployment step
 

@@ -11,6 +11,7 @@ import { spliceConfig } from './config/config';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 300;
+export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY_SIZE')) || 0; // 0 => no limit
 
 export const REPO_ROOT = config.requireEnv('REPO_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
@@ -259,3 +260,10 @@ export const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITO
 // One can force splitting them by setting SPLIT_POSTGRES_INSTANCES to true.
 export const SplitPostgresInstances =
   config.envFlag('SPLIT_POSTGRES_INSTANCES') || config.envFlag('ENABLE_CLOUD_SQL');
+
+export const clusterProdLike = config.envFlag('GCP_CLUSTER_PROD_LIKE');
+
+// During development we often overwrite the same tag so we use imagePullPolicy: Always.
+// Outside of development, we use the default which corresponds to IfNotPresent
+// (unless the tag is LATEST which it never is in our setup).
+export const imagePullPolicy = clusterProdLike ? {} : { imagePullPolicy: 'Always' };

@@ -104,6 +104,7 @@
   - [Maintenance Windows](#maintenance-windows)
   - [Multi-architecture Docker Images](#multi-architecture-docker-images)
   - [Docker-compose](#docker-compose)
+  - [Testing Performance-Critical Changes](#testing-performance-critical-changes)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -1465,7 +1466,6 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    * set in `config.yaml` under the path `synchronizerMigration.upgrade.provider` the type of canton deployment used. `internal` for all the canton components in the `canton-network` or `sv-runbook` stack, `external` to create canton specific stacks for each sv for the migration
    * if using `external` as the provider, set in `config.yaml` under the path `synchronizerMigration.upgrade.releaseReference` the git tag or branch that will be used for the deployment code
    * environment variable `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
-   * environment variable `export COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1="true"` to throttle SV1's Cometbft temporarily during the migration
    * if using `external` as the provider, deploy the operator from the deployment branch to create the new stacks CRs
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
@@ -1478,11 +1478,12 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
 1. Take down the `multi-validator` stack. From the deployment directory on the current release branch, run `CI=true cncluster pulumi multi-validator down`.
 1. Wait until the scheduled time has arrived, the domain is paused and a migration dump has been exported.
-   If unsure, check the SV app logs for an entry such as "Wrote domain migration dump"
-   (e.g., via [GCE Log Explorer](#gce-log-explorer)).
+   If unsure, check the logs of the SV app (and any validator apps) for an entry such as "Wrote domain migration dump"
+   (e.g., via [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Wrote%20domain%20migration%20dump%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-09T13:01:30.491233228Z;duration=PT30M?project=da-cn-devnet)).
+1. Take a screenshot of the amulet balance of our SVs. You'll use this as a reference to check the balance after the migration is complete.
 1. Wait until all our apps have fully caught up.
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
-   It's probably easiest to check this via the [GCE Log Explorer](#gce-log-explorer).
+   It's probably easiest to check this via the [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Ingested%20transaction%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:41:04.651869226Z;duration=PT30M?project=da-cn-devnet).
    Once you have verified this, move onto the next step quickly (no need to wait for the go-ahead from the person leading the call).
 1. Backup our SVs and validators:
    ```
@@ -1506,6 +1507,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    * in `config.yaml` set `synchronizerMigration.active.migratingFrom` to the migration ID we're migrating away from
    * deploy the operator from the deployment branch where you updated the configuration
    * sync the migration config found in `config.yaml` on all the branches referenced in any migrations `releaseReference` (this just ensure that some metrics are labeled as expected for still running migrations, and that it removes all the deployments for archived migrations)
+   * Update the `CHARTS_VERSION` and `OVERRIDE_VERSION` in the target cluster env vars to the version we're migrating to.
 1. Wait for the operator to apply your changes from the migrate step.
    The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
    (Check the logs of failing pods to be sure that there is no other problem.)
@@ -1518,10 +1520,10 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    Communicate the result of your check to the rest of the DSO to conclude the migration.
    If enough SVs (>2/3) are not able to complete the migration successfully, we may need to roll-back to the previous domain.
    For instructions on how to do so, refer to [Switching back to the old domain](#switching-back-to-the-old-domain).
+1. (non-DevNet clusters) Check to see that fresh node identities dumps have been taken after the migration. Check the logs of the SV app for an entry that says "Wrote node identities dump" [GCloud Logs example](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-testnet%22%0A%22Wrote%20node%20identities%20dump%22%0A;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T05:19:14.578112132Z;duration=PT30M?project=da-cn-devnet)
 1. **Post-migration:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that makes the following changes:
-   * Remove the export of `GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID` from the deployment branch, so that re-onboarded nodes do not attempt another migration.
-   * Remove the export of `COMETBFT_ENABLE_TIMEOUT_COMMIT_SV1` from the deployment branch, to disable the throttling after migration is complete.
-   * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_CANTON_AUTO_INIT` and `DISABLE_COMETBFT_STATE_SYNC` to "false".
+   * in `config.yaml` remove `synchronizerMigration.active.migratingFrom`
+   * If periodic SV runbook re-deployments are scheduled for the target cluster, also set `DISABLE_COMETBFT_STATE_SYNC` to "false".
    * [Patch](#patching-healthchecks-against-a-deployed-cluster) our health checks and backups
      so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check`, `preflight_validator_check`, and `backup_cluster` jobs
      is set to reflect the expected migration ID after completing the migration.
@@ -1529,9 +1531,8 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
 1. Forward-port all your changes from the deployment branch to `main`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed that the hard migration has been completed and that they should upgrade (if required) and configure the new migration ID.
-1. **Cleanup:** Once you (much later) agree with the other DSO members that it's prudent to tear down all legacy components, you can do this by merging a PR against the target deployment branch that removes part of the changes from the previous steps here so that only the following environment variables remain:
-   * `export CHARTS_VERSION=` the version we're on after the migration
-   * `export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=` the migration ID we're on after the migration
+1. **Cleanup:** Once you (much later) agree with the other DSO members that it's prudent to tear down all legacy components, you can do this by merging a PR against the target deployment branch that removes part of the changes from the previous steps:
+   * in `config.yaml`, remove the `synchronizerMigration.legacy` section or move it to `synchronizerMigration.archived` if state from the old synchronizer should be preserved
 
 #### Manual steps
 
@@ -1612,8 +1613,9 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
 #### New domain readiness checks
 
 1. We have our expected amulet balance.
-2. Alls SVs are in sync based on the "SV Status Reports" [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
-3. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
+1. "commitment correct" logs are visible from the other SVs via the new participant [GCloud Logs Example](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0Alabels.%22k8s-pod%2Fmigration_id%22%3D%221%22%0A%22commitment%20correct%22%0A;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:46:01.562157559Z;duration=PT30M?project=da-cn-devnet).
+1. Alls SVs are in sync based on the "SV Status Reports" [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
+1. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
 
 See [Network Health](./network-health/NETWORK_HEALTH.md) for further investigation if any of these checks fail.
 
@@ -1734,16 +1736,12 @@ export TOKEN="What you got from Auth0"
 curl -sSL --fail-with-body "https://sv.sv-2.dev.global.canton.network.digitalasset.com/api/sv/v0/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
 ```
 
-For quickly obtaining a token for the SV API or the validator API on a (non-SV) validator,
-you can currently also use [`cncluster participant_console`](#canton-participant-apis),
-which prints a compatible token as part of its startup.
+For the administrator user, you can get a token for validator apps, SV apps and
+splitwell using the `cncluster get_token <namespace> <app>` command, e.g.
 
-For some UIs, we cache tokens in a secret in k8s, and have a utility `cncluster` command for easily retrieving them.
-At the moment, the four SVs sv-1 to sv-4 are supported. To fetch a token for one of them, run for example:
 ```
-export TOKEN=$(cncluster get_token sv-1)
+export TOKEN=$(cncluster get_token sv-1 sv)
 ```
-If the token saved in the secret is expired, run `cncluster preflight_refresh_auth0_credentials` to update the secret with fresh tokens.
 
 ## Configuring a New GCP Project
 
@@ -2100,7 +2098,33 @@ The output should look something like the example below:
 
 This output can be used to find the proposer address from the `consensus_state` endpoint and find the associated SV.
 
-###
+## Testing Performance-Critical Changes
+
+Some changes require extra performance testing before making it into a
+release. Notable examples include infrastructure changes (switching
+node types, databases, …) or Canton upgrades that may have a
+performance impact (all major upgrades in particular).
+
+We use `cilr` for performance testing which runs slightly above devnet scale (currently 16 SVs and 200 validators) and with
+a load test of 1 CC p2p transfer/s.
+
+Validating performance consists of two steps:
+
+1. Upgrade CILR to contain the version/configuration you want to test.
+2. Validate that performance matches what you expect.
+   1. First check the [load
+      test](https://grafana.cilr.global.canton.network.digitalasset.com/d/ccbb2351-2ae2-462f-ae0e-f2c893ad1028/k6-load-tester-custom-metrics?orgId=1&refresh=5s)
+      dashboard and ensure that we can keep the target rate of 1 CC
+      tx/s and latency has not increased.
+   2. Run a sequencer catchup test. Sequencers are usually our bottleneck for performance so we specifically isolate how fast they can catch up.
+      To do so
+      1. pick a sequencer (usually any other than SV-1 is a good choice as that is the DSO delegate).
+      2. Scale down the sequencer deployment, e.g., `kubectl scale deployment -n sv-$i global-domain-3-sequencer --replicas=0`.
+      3. Find the database in [GCP](https://console.cloud.google.com/sql/instances?project=da-cn-ci-2) (filter by cluster and namespace)
+      4. Restore the database from a backup that is at least 12h old through the UI.
+      5. Scale up the sequencer `kubectl scale deployment -n sv-$i global-domain-3-sequencer --replicas=1`
+      6. Check catchup performance in the [dashboard](https://grafana.cilr.global.canton.network.digitalasset.com/d/ca9df344-c699-4efe-83c2-5fb2639d96d9/global-domain-catchup?orgId=1&refresh=30s).
+         As a rough guideline anything below 4x is concerning but double check what the current expected numbers are in #team-canton-network-internal.
 
 ## Appendix: Kubernetes and Other Deployment Resources
 

@@ -9,13 +9,15 @@ assignees: ''
 
 Agenda [here](https://docs.google.com/document/d/1AEh9ZMLPxmc9tKn0L7I5S48xHOR4GN__VpP2_IHnL0A/edit#heading=h.9pjnt72egfzq). *PLEASE UPDATE LINK*
 
+Tracking sheet [here](https://docs.google.com/spreadsheets/d/1AKAVhGqxFkhe7kBnbLf9L-nfnpr1H0QjZ5PHMaVkvc8/edit?gid=128511196). *PLEASE UPDATE LINK*
+
 Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main/cluster/README.md#via-the-pulumi-operator).
 
 ## Checklist
 
 ### Prepare
 
-- [ ] open or create corresponding [agenda](https://drive.google.com/drive/folders/0ACLduXEo3vM1Uk9PVA)
+- [ ] open or create corresponding agenda and tracking sheet in [this folder](https://drive.google.com/drive/folders/0ACLduXEo3vM1Uk9PVA)
 - [ ] prepare our staging nodes and tell partners
 - [ ] a sufficient number of partners have reported that they are ready / prepared (or look as if they are); check once and escalate if check failed
 - [ ] (only if hard migration) vote on scheduled downtime

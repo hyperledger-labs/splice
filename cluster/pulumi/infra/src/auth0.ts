@@ -37,6 +37,7 @@ function newUiApp(
       allowedOrigins: urls,
       allowedLogoutUrls: urls,
       webOrigins: urls,
+      crossOriginAuth: false,
       description: ` ** Managed by Pulumi, do not edit manually **\n${description}`,
     },
     { provider: auth0DomainProvider }

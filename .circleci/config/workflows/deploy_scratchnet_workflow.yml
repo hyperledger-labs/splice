@@ -52,31 +52,50 @@
             - slack-context
           requires:
             - set_scratchnet
+      - reset_cluster:
+          name: "reset_initially"
+          cluster: "user-selected-scratchnet"
+          extra_migrations_reset: "0,1"
+          unlock_shared_cluster: false
+          silence_deployment_alerts: true
+          context:
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - set_scratchnet
       - deploy_cluster:
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "user-selected-scratchnet"
-          silence_deployment_alerts: true
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           deploy_retry_count: 0
           requires:
+            - reset_initially
             - artifacts_push
             - set_scratchnet
       - preflight_check:
           <<: *main-branch-never
           context:
             - artifactory
-            - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
           wait_for_sv: false
-          with_docker: true
+          requires:
+            - artifacts_push
+            - set_scratchnet
+      - preflight_check_docker:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "user-selected-scratchnet"
+          wait_for_sv: false
           requires:
             - artifacts_push
             - set_scratchnet
@@ -102,6 +121,7 @@
             - slack-context
           requires:
             - preflight_check
+            - preflight_check_docker
             - preflight_sv_check
             - preflight_validator_check
             - deploy_arm_compose_validator
@@ -118,6 +138,7 @@
             - slack-context
           requires:
             - preflight_check
+            - preflight_check_docker
             - preflight_sv_check
             - preflight_validator_check
             - backup_cluster

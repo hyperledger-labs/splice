@@ -17,6 +17,14 @@ workflow:
             - slack-context
           workflow_names: "deploy_cimain"
           wait_type: "cancel_waiting_and_wait_workflow"
+      - reset_cluster:
+          cluster: "cimain"
+          silence_deployment_alerts: true
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           <<: *main-branch-only
           context:
@@ -24,21 +32,28 @@ workflow:
             - slack-context
           cluster: "cimain"
           update_deployment_branch: false  # No need to create a deployment branch for cimain
-          silence_deployment_alerts: true
           cancel_workflow_on_failure: true
           requires:
-            - wait_for_previous_pipeline
+            - reset_cluster
             - artifacts_push
       - preflight_check:
           <<: *main-branch-only
           context:
             - artifactory
-            - canton-network-vpn
             - slack-context
           cluster: "cimain"
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log,test-full-class-names-docker-compose-validator-preflight.log"
           wait_for_sv: false
-          with_docker: true
+          requires:
+            - wait_for_previous_pipeline
+            - artifacts_push
+      - preflight_check_docker:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "cimain"
+          wait_for_sv: false
           requires:
             - wait_for_previous_pipeline
             - artifacts_push
@@ -47,20 +62,19 @@ workflow:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "cimain"
           silence_deployment_alerts: true
           requires:
             - deploy_cluster
       - preflight_sv_check:
-           <<: *main-branch-only
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "cimain"
-           requires:
-             - deploy_cluster
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - deploy_cluster
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -105,11 +119,12 @@ workflow:
             - preflight_sv_check
             - preflight_validator_check
             - preflight_check
+            - preflight_check_docker
       - reset_cluster:
+          name: "reset_end"
           <<: *main-branch-only
           cluster: "cimain"
           context:
-            - canton-network-vpn
             - slack-context
           requires:
             - restore_node

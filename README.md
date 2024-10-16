@@ -810,8 +810,9 @@ To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala
 
 ### Opting-in to CI
 
-At the moment, CI is by default being cancelled on commits, unless explicitly opted in. To enable CI for your commit,
-please include the text `[ci]` in your commit message.
+At the moment, CI is by default being cancelled on commits, unless explicitly opted in. (CI jobs will report
+the error `Build was canceled`.) To enable CI for your commit, please include the text `[ci]` in your commit
+message.
 
 ### Managing Canton for Tests
 

@@ -18,7 +18,7 @@ import {
   CnInput,
   activeVersion,
 } from 'splice-pulumi-common';
-import { installMigrationSpecificValidatorParticipant } from 'splice-pulumi-common-validator/src/migrationSpecificParticipant';
+import { installParticipant } from 'splice-pulumi-common-validator';
 import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
@@ -55,14 +55,17 @@ export async function installSplitwell(
 
   installIngress(xns, imagePullDeps);
 
-  const participant = installMigrationSpecificValidatorParticipant(
-    decentralizedSynchronizerMigrationConfig,
+  const participant = installParticipant(
+    decentralizedSynchronizerMigrationConfig.active.id,
     xns,
-    sharedPostgres,
-    'splitwell',
     auth0Client.getCfg(),
+    'splitwell',
+    decentralizedSynchronizerMigrationConfig.active.version,
+    sharedPostgres,
     undefined,
-    imagePullDeps.concat([loopback])
+    {
+      dependsOn: imagePullDeps.concat([loopback]),
+    }
   );
 
   const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', 'sw-pg', true);

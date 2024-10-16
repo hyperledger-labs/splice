@@ -78,5 +78,9 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
         )
       },
     )
+
+    // it seems that without this, the round-party-totals aggregations cannot be computed for SV-2,
+    // and the scan-txlog script fails because it expects those to be there.
+    advanceRoundsByOneTick
   }
 }

@@ -3,20 +3,20 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import argparse
 import os
 from git import Repo
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
+import sys
 
+sys.path.append('../')
 from circleci import *
+from failure_notification_args import FailureArgs
 
-FAILED_PIPELINE_ID = os.environ.get('CIRCLE_PIPELINE_ID')
-FAILED_WORKFLOW_ID = os.environ.get('CIRCLE_WORKFLOW_ID')
-FAILED_JOB_NUM = os.environ.get('CIRCLE_BUILD_NUM')
-FAILED_JOB_NAME = os.environ.get('CIRCLE_JOB')
-FAILED_PARALLEL_RUN_IDX = os.environ.get('CIRCLE_NODE_INDEX')
-CURRENT_BRANCH = os.environ.get('CIRCLE_BRANCH')
+GH_TOKEN = os.environ.get('GITHUB_TOKEN')
+GH_ORGANIZATION="DACH-NY"
+GH_REPO="cn-test-failures"
+GH_FAILURES_PROJECT=48
 
 def get_repo_id(client: Client, organization: str, repo_name: str) -> str:
   query = gql(
@@ -96,6 +96,24 @@ def add_issue_to_project(client: Client, project_id: str, issue_id: str) -> str:
   response = client.execute(query, params)
   return response["addProjectV2ItemById"]["item"]["id"]
 
+def get_issue_number(client: Client, issue_id: str) -> str:
+  query = gql(
+  """
+  query getIssueNumber($issueId: ID!) {
+    node(id: $issueId) {
+      ... on Issue {
+        number
+      }
+    }
+  }
+  """
+  )
+  params = {
+    "issueId": issue_id
+  }
+  response = client.execute(query, params)
+  return response["node"]["number"]
+
 class ProjectFields:
   def __init__(self, data: list[dict[str, str]]):
     self.data = data
@@ -161,17 +179,9 @@ def set_field_value(client: Client, project_id: str, item_id: str, field_id: str
   response = client.execute(query, params)
   return response["updateProjectV2ItemFieldValue"]["projectV2Item"]["id"]
 
-def parse_args() -> argparse.Namespace:
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--cluster', required=True)
-  parser.add_argument('--branch_pattern', default=".*")
-  parser.add_argument('--slack_channel', default="") # Silently ignored, just so that the bash script can call this script and slack_notification.py with the same arguments
-  parser.add_argument('--dry_run', action='store_true')
-  return parser.parse_args()
-
-def get_msg(args: argparse.Namespace, workflow: Workflow) -> tuple[str, str]:
-  circleci_url=f"https://app.circleci.com/pipelines/github/{PROJECT_USERNAME}/{PROJECT_REPONAME}/{workflow.pipeline_number}/workflows/{FAILED_WORKFLOW_ID}/jobs/{FAILED_JOB_NUM}/parallel-runs/{FAILED_PARALLEL_RUN_IDX}"
-  branch_url=f"https://github.com/{PROJECT_USERNAME}/{PROJECT_REPONAME}/tree/{CURRENT_BRANCH}"
+def get_msg(args: FailureArgs, workflow: Workflow) -> tuple[str, str]:
+  circleci_url=f"https://app.circleci.com/pipelines/github/{PROJECT_USERNAME}/{PROJECT_REPONAME}/{workflow.pipeline_number}/workflows/{args.workflow_id}/jobs/{args.job_num}/parallel-runs/{args.parallel_run_idx}"
+  branch_url=f"https://github.com/{PROJECT_USERNAME}/{PROJECT_REPONAME}/tree/{args.branch}"
   github_url=f"https://github.com/{PROJECT_USERNAME}/{PROJECT_REPONAME}/commit/"
   repo = Repo(search_parent_directories=True)
   commit_msg = repo.head.commit.summary
@@ -179,10 +189,10 @@ def get_msg(args: argparse.Namespace, workflow: Workflow) -> tuple[str, str]:
   commit_sha = repo.head.object.hexsha
   commit_sha_short = commit_sha[:7]
 
-  title = f"Job {FAILED_JOB_NUM} Failed :fire:"
+  title = f"Pipelne {workflow.pipeline_number} : job {args.job_num} Failed :fire:"
   body = f"""
 [CircleCI Job]({circleci_url}).
-Branch: [{CURRENT_BRANCH}]({branch_url})
+Branch: [{args.branch}]({branch_url})
 Workflow: {workflow.name}
 Commit: [{commit_sha_short}]({github_url}) {commit_msg}
 Author: {commit_author}
@@ -190,25 +200,25 @@ Author: {commit_author}
 
   return (title, body)
 
-def main(args: argparse.Namespace):
-  if (not re.match(args.branch_pattern, CURRENT_BRANCH)):
-    print(f"Branch {CURRENT_BRANCH} does not match pattern {args.branch_pattern}, skipping notification")
+# Returns a url to the newly created issue
+def failure_github_issue(args: FailureArgs) -> str:
+  if not re.match(args.branch_pattern, args.branch):
+    print(f"Branch {args.branch} does not match pattern {args.branch_pattern}, skipping notification")
     exit(0)
 
-  workflow = fetch_workflow(FAILED_WORKFLOW_ID)
+  workflow = fetch_workflow(args.workflow_id)
   (title, body) = get_msg(args, workflow)
 
   if args.dry_run:
     print(f"Creating an issue with title: {title} and body: {body}")
     return
 
-  GH_TOKEN = os.environ.get('GITHUB_TOKEN')
   transport = RequestsHTTPTransport(url="https://api.github.com/graphql",
                                     headers={'Authorization': 'token ' + GH_TOKEN})
   client = Client(transport=transport, fetch_schema_from_transport=True)
 
-  repo_id = get_repo_id(client, "DACH-NY", "cn-test-failures")
-  project_id = get_project_id(client, "DACH-NY", 48)
+  repo_id = get_repo_id(client, GH_ORGANIZATION, GH_REPO)
+  project_id = get_project_id(client, GH_ORGANIZATION, GH_FAILURES_PROJECT)
   fields = get_project_fields(client, project_id)
   cluster_field_id = fields.get_field_id("Cluster")
   job_field_id = fields.get_field_id("Job")
@@ -216,8 +226,9 @@ def main(args: argparse.Namespace):
   issue_id = create_issue(client, repo_id, title, body)
   issue_project_item_id = add_issue_to_project(client, project_id, issue_id)
   set_field_value(client, project_id, issue_project_item_id, cluster_field_id, args.cluster)
-  set_field_value(client, project_id, issue_project_item_id, job_field_id, f"{workflow.name}:{FAILED_JOB_NAME}")
+  set_field_value(client, project_id, issue_project_item_id, job_field_id, f"{workflow.name}:{args.job_name}")
 
-if __name__ == "__main__":
-  args = parse_args()
-  main(args)
+  issue_number = get_issue_number(client, issue_id)
+  issue_url = f"https://github.com/{GH_ORGANIZATION}/{GH_REPO}/issues/{issue_number}"
+
+  return issue_url

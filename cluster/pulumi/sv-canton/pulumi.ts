@@ -13,12 +13,14 @@ import { pulumiOptsWithPrefix, stack } from '../pulumi';
 
 export function pulumiOptsForMigration(
   migration: DomainMigrationIndex,
-  sv: string
+  sv: string,
+  abortSignal: AbortSignal
 ): {
   parallel: number;
   onOutput: (output: string) => void;
+  signal: AbortSignal;
 } {
-  return pulumiOptsWithPrefix(`[migration=${migration},sv=${sv}]`);
+  return pulumiOptsWithPrefix(`[migration=${migration},sv=${sv}]`, abortSignal);
 }
 
 export async function stackForMigration(
@@ -53,11 +55,15 @@ export async function runForAllMigrations(
   for (const migration of migrations) {
     console.log(`Running for migration ${migration.id}`);
 
-    await Promise.all(
+    const data = await Promise.allSettled(
       svsToDeploy.map(async sv => {
         const stack = await stackForMigration(sv, migration.id, requiresExistingStack);
         await runForStack(stack, migration, sv);
       })
     );
+    const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
+    if (rejected) {
+      throw new Error(rejected);
+    }
   }
 }

@@ -1,9 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.util.{Auth0Util, K8sUtil}
 import com.daml.network.integration.tests.SpliceTests.TestCommon
-import com.typesafe.scalalogging.Logger
-
 import scala.concurrent.duration.*
 
 trait PreflightIntegrationTestUtil extends TestCommon {
@@ -34,19 +31,4 @@ trait PreflightIntegrationTestUtil extends TestCommon {
   )(check: String, checkFun: T => U): (T, U) =
     super.actAndCheck(timeUntilSuccess, maxPollInterval)(action, actionExpr)(check, checkFun)
 
-  protected def getAuth0ClientCredential(
-      clientId: String,
-      audience: String,
-      auth0: Auth0Util,
-  )(implicit logger: Logger): String = {
-    // lookup token from a cached k8s secret, or request a new one from auth0 if not found or expired
-    val cachedToken =
-      K8sUtil.PreflightTokenAccessor.getPreflightToken(clientId)
-
-    cachedToken.getOrElse {
-      val token = auth0.getToken(clientId, audience)
-      K8sUtil.PreflightTokenAccessor.savePreflightToken(clientId, token)
-      token
-    }.accessToken
-  }
 }

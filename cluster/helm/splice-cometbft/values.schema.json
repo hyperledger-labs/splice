@@ -8,6 +8,9 @@
         "chainId"
       ],
       "properties": {
+        "imagePullPolicy": {
+          "type": "string"
+        },
         "chainId": {
           "type": "string"
         },

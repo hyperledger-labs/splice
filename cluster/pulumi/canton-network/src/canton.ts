@@ -1,6 +1,10 @@
 import * as postgres from 'splice-pulumi-common/src/postgres';
-import { Output } from '@pulumi/pulumi';
-import { DecentralizedSynchronizerMigrationConfig, ExactNamespace } from 'splice-pulumi-common';
+import { Output, Resource } from '@pulumi/pulumi';
+import {
+  CnInput,
+  DecentralizedSynchronizerMigrationConfig,
+  ExactNamespace,
+} from 'splice-pulumi-common';
 import {
   CometBftNodeConfigs,
   CrossStackDecentralizedSynchronizerNode,
@@ -24,7 +28,8 @@ export function installCanton(
       peers: StaticCometBftConfigWithNodeName[];
     };
   },
-  svConfig: SvConfig
+  svConfig: SvConfig,
+  dependsOn: CnInput<Resource>[]
 ): InstalledMigrationSpecificSv {
   const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
   const activeMigrationId =
@@ -85,12 +90,16 @@ export function installCanton(
             ...cometbft,
             // State sync doesn't make sense in the main stack, as all the cometbft nodes are started at the same time
             enableStateSync: false,
+            enableTimeoutCommit:
+              svConfig.isFirstSv &&
+              decentralizedSynchronizerMigrationConfig.runningMigrations().length > 1,
           },
           {
             participant: participantPostgres,
             mediator: mediatorPostgres,
             sequencer: sequencerPostgres,
-          }
+          },
+          { dependsOn: dependsOn }
         ),
       };
     });

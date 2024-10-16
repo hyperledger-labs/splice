@@ -57,7 +57,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "cilr"
           channel_notify: C06VDG5RXNE # team-canton-network-cilr-notifications
           requires:

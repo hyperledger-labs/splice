@@ -3,6 +3,7 @@ import { Resource } from '@pulumi/pulumi';
 import {
   DecentralizedSynchronizerUpgradeConfig,
   GCP_PROJECT,
+  HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
 } from 'splice-pulumi-common';
 
@@ -182,6 +183,7 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
           // rather than scale up the default pool from 0, so we just accept that for now.
           ...infraAffinityAndTolerations,
         },
+        maxHistory: HELM_MAX_HISTORY_SIZE,
       },
     },
     {

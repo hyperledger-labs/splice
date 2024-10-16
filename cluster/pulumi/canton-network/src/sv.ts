@@ -228,7 +228,8 @@ export async function installSvNode(
         self: { ...config.cometBft, nodeName: config.nodeName },
       },
     },
-    config
+    config,
+    imagePullDeps
   );
 
   const svApp = installSvApp(

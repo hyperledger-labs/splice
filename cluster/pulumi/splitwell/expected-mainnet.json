@@ -331,6 +331,7 @@
     "inputs": {
       "chart": "cn-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-splitwell-uis",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -416,7 +417,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -500,6 +501,7 @@
     "inputs": {
       "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -540,7 +542,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -552,6 +554,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-0",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -589,6 +592,7 @@
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
@@ -598,6 +602,7 @@
             "id": 0
           }
         },
+        "nodeIdentifier": "splitwell",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -619,7 +624,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "splitwell-participant-0",
     "provider": "",
@@ -691,6 +696,7 @@
     "inputs": {
       "chart": "cn-splitwell-app",
       "compat": "true",
+      "maxHistory": 10,
       "name": "splitwell-app",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -747,7 +753,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -879,6 +885,7 @@
     "inputs": {
       "chart": "cn-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator-splitwell",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -1000,7 +1007,7 @@
         "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.2.0"
+      "version": "0.1.19"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

@@ -4,6 +4,7 @@ import _ from 'lodash';
 import {
   appsAffinityAndTolerations,
   config,
+  imagePullPolicy,
   jmxOptions,
   numNodesPerInstance,
 } from 'splice-pulumi-common';
@@ -79,7 +80,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                   image: `us-central1-docker.pkg.dev/da-cn-shared/cn-images/${
                     args.imageName
                   }:${config.optionalEnv('MULTI_VALIDATOR_IMAGE_VERSION') || config.requireEnv('CHARTS_VERSION')}`,
-                  imagePullPolicy: 'Always',
+                  ...imagePullPolicy,
                   ...args.container,
                   ports: args.container.ports.concat([
                     {

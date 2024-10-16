@@ -53,7 +53,16 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET \
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
+            --keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD
+            --keep CIRCLECI_TOKEN \
+            --keep CIRCLE_WORKFLOW_ID \
+            --keep SLACK_ACCESS_TOKEN \
+            --keep CIRCLE_BUILD_URL"
           gce_authenticate: true
           cmd_retry_count: << parameters.deploy_retry_count >>
 
@@ -74,7 +83,7 @@ jobs:
             fi
             if [[ << parameters.restore_identity_from_sv_runbook >> == true ]]; then
               echo "restoring identity from sv runbook"
-              token=$(cncluster get_token sv)
+              token=$(cncluster get_token sv validator)
               id=$(curl -s "https://wallet.sv.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities" -H "authorization: Bearer ${token}")
               echo "$id" > id.json
               export PARTICIPANT_IDENTITIES_FILE=$(readlink -f id.json)

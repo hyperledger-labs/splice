@@ -329,8 +329,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-splitwell-uis",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -416,7 +417,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -498,8 +499,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -540,7 +542,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -550,89 +552,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
-      "compat": "true",
-      "name": "participant-1",
-      "namespace": "splitwell",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
-      "timeout": 300,
-      "values": {
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "targetAudience": "https://canton.network.global"
-        },
-        "cluster": {
-          "dnsName": "test.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
-        },
-        "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
-        "enableHealthProbes": true,
-        "enablePostgresMetrics": true,
-        "metrics": {
-          "enable": true,
-          "migration": {
-            "active": true,
-            "id": 1
-          }
-        },
-        "nodeIdentifier": "splitwell",
-        "participantAdminUserNameFrom": {
-          "secretKeyRef": {
-            "key": "ledger-api-user",
-            "name": "splice-app-validator-ledger-api-auth",
-            "optional": false
-          }
-        },
-        "persistence": {
-          "databaseName": "participant_1",
-          "postgresName": "participant-pg",
-          "schema": "participant",
-          "secretName": "participant-pg-secrets"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.1.19"
-    },
-    "name": "splitwell-participant-1",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "splice-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-2",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -675,7 +597,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 2
           }
         },
@@ -770,8 +692,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-splitwell-app",
+      "chart": "splice-splitwell-app",
       "compat": "true",
+      "maxHistory": 10,
       "name": "splitwell-app",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -809,9 +732,9 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
-        "participantHost": "participant-1",
+        "participantHost": "participant-2",
         "persistence": {
           "databaseName": "app_splitwell",
           "port": 5432,
@@ -828,7 +751,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -958,8 +881,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator-splitwell",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -1022,7 +946,7 @@
           "enable": true
         },
         "migration": {
-          "id": 1,
+          "id": 2,
           "migrating": false
         },
         "nodeIdentifier": "splitwell",
@@ -1033,7 +957,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -1081,7 +1005,7 @@
         "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

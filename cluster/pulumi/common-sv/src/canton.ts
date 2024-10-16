@@ -39,6 +39,7 @@ export function installCantonComponents(
       peers: StaticCometBftConfigWithNodeName[];
     };
     enableStateSync?: boolean;
+    enableTimeoutCommit?: boolean;
   },
   dbs?: {
     participant: Postgres;
@@ -111,7 +112,8 @@ export function installCantonComponents(
       migrationConfig.isRunningMigration(),
       svConfig.onboardingName,
       logLevel,
-      migrationInfo.version
+      migrationInfo.version,
+      opts
     );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,

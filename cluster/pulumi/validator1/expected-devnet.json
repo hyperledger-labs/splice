@@ -309,6 +309,7 @@
     "inputs": {
       "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-validator1",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -431,6 +432,7 @@
     "inputs": {
       "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -481,89 +483,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
-      "compat": "true",
-      "name": "participant-0",
-      "namespace": "validator1",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
-      "timeout": 300,
-      "values": {
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "targetAudience": "https://canton.network.global"
-        },
-        "cluster": {
-          "dnsName": "dev.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "dev.global.canton.network.digitalasset.com",
-          "name": "cn-devnet"
-        },
-        "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
-        "enableHealthProbes": true,
-        "enablePostgresMetrics": true,
-        "metrics": {
-          "enable": true,
-          "migration": {
-            "active": false,
-            "id": 0
-          }
-        },
-        "nodeIdentifier": "validator1",
-        "participantAdminUserNameFrom": {
-          "secretKeyRef": {
-            "key": "ledger-api-user",
-            "name": "splice-app-validator-ledger-api-auth",
-            "optional": false
-          }
-        },
-        "persistence": {
-          "databaseName": "participant_0",
-          "postgresName": "participant-pg",
-          "schema": "participant",
-          "secretName": "participant-pg-secrets"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.1.19"
-    },
-    "name": "validator1-participant-0",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "splice-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-1",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -703,6 +625,7 @@
     "inputs": {
       "chart": "splice-splitwell-web-ui",
       "compat": "true",
+      "maxHistory": 10,
       "name": "splitwell-web-ui",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -826,6 +749,7 @@
     "inputs": {
       "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator-validator1",
       "namespace": "validator1",
       "repositoryOpts": {

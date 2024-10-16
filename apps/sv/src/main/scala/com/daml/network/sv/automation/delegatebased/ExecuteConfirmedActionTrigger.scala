@@ -8,13 +8,14 @@ import com.daml.network.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
+  TaskFailed,
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
-import com.daml.network.codegen.java.splice.dsorules.Confirmation
+import com.daml.network.codegen.java.splice.dsorules.{Confirmation, DsoRules_ExecuteConfirmedAction}
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
-  ARC_AnsEntryContext,
   ARC_AmuletRules,
+  ARC_AnsEntryContext,
   ARC_DsoRules,
 }
 import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
@@ -77,25 +78,35 @@ class ExecuteConfirmedActionTrigger(
                 amuletRulesId = amuletRules.contractId
                 cmd = dsoRules.exercise(
                   _.exerciseDsoRules_ExecuteConfirmedAction(
-                    action,
-                    java.util.Optional.of(amuletRulesId),
-                    uniqueConfirmations
-                      .map(_.contractId)
-                      .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
+                    new DsoRules_ExecuteConfirmedAction(
+                      action,
+                      java.util.Optional.of(amuletRulesId),
+                      uniqueConfirmations
+                        .map(_.contractId)
+                        .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
+                    )
                   )
                 )
-                _ <- svTaskContext.connection
-                  .submit(
-                    Seq(store.key.svParty),
-                    Seq(store.key.dsoParty),
-                    cmd,
-                  )
-                  .noDedup
-                  .yieldResult()
-              } yield TaskSuccess(
-                show"executed an action $action as there are ${uniqueConfirmations.size} confirmation(s) which is >=" +
-                  show" the required $requiredNumConfirmations confirmations."
-              )
+                res <- for {
+                  outcome <- svTaskContext.connection
+                    .submit(
+                      Seq(store.key.svParty),
+                      Seq(store.key.dsoParty),
+                      cmd,
+                    )
+                    .noDedup
+                    .yieldResult()
+                } yield Some(outcome)
+              } yield {
+                res
+                  .map(_ => {
+                    TaskSuccess(
+                      show"executed action $action as there are ${uniqueConfirmations.size} confirmation(s) which is >=" +
+                        show" the required $requiredNumConfirmations confirmations."
+                    )
+                  })
+                  .getOrElse(TaskFailed(show"failed to execute action $action."))
+              }
             } else {
               Future.successful(
                 TaskSuccess(

@@ -45,7 +45,10 @@ jobs:
             --keep CIRCLE_BUILD_URL
           gce_authenticate: true
           cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
+          cmd_before_retry: |
+            .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
+            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
+            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate

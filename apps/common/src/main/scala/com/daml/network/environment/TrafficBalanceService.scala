@@ -92,6 +92,7 @@ object TrafficBalanceService {
       trafficBalanceCache.get() match {
         case Some(CachedTrafficBalance(cacheValidUntil, trafficBalance))
             if now.isBefore(cacheValidUntil) =>
+          logger.debug(s"Traffic balance cache hit. Fetched traffic balance as $trafficBalance")
           Future.successful(Some(trafficBalance))
         case _ =>
           for {
@@ -100,6 +101,7 @@ object TrafficBalanceService {
             trafficBalanceCache.set(
               Some(CachedTrafficBalance(now.add(trafficBalanceCacheTTL.asJava), trafficBalance))
             )
+            logger.debug(s"Traffic balance cache miss. Fetched traffic balance as $trafficBalance")
             trafficBalance
           })
       }

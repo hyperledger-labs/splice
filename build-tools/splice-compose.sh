@@ -113,8 +113,19 @@ function _start_validator {
     extra_flags+=("-P" "$participant_id")
   fi
 
-  _info "Curling ${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare for the secret"
-  secret=$(curl -sSfL -X POST "${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare")
+  secret_url="${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare"
+  _info "Curling ${secret_url} for the secret"
+  secret=""
+  for i in {1..30}; do
+    secret=$(curl -sfL -X POST "${secret_url}") && break
+    _warning "Failed to fetch secret, retrying in 10 seconds"
+    sleep 10
+  done
+
+  if [ -z "$secret" ]; then
+    _error "Failed to fetch secret"
+    exit 1
+  fi
 
   # TODO(#14303): remove this once the migration base version supports the splice-instance-names endpoint
   if ! curl -sLf "${scan}/api/scan/v0/splice-instance-names" > /dev/null; then
@@ -422,7 +433,7 @@ function subcmd_test_before_migration {
 
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
-  TOKEN=$("${VALIDATOR_DIR}/token.py" $USER)
+  TOKEN=$("${VALIDATOR_DIR}/get-token.py" $USER)
 
   onboarded=0
   # Onboard user, with retries because we need to wait for traffic to be available in order for it to succeed
@@ -491,7 +502,7 @@ function subcmd_test_after_migration {
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
   USER=alice
-  TOKEN=$("${VALIDATOR_DIR}/token.py" $USER)
+  TOKEN=$("${VALIDATOR_DIR}/get-token.py" $USER)
 
   onboarded=0
     # Wait until alice gets re-onboarded, which requires traffic to be available in order for it to succeed
@@ -645,7 +656,7 @@ function subcmd_identities_dump {
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
 
-  token=$("${VALIDATOR_DIR}/token.py" administrator)
+  token=$("${VALIDATOR_DIR}/get-token.py" administrator)
   curl -sSLf 'http://wallet.localhost/api/validator/v0/admin/participant/identities' -H "authorization: Bearer $token" > "$output_file"
 }
 

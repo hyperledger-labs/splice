@@ -5,6 +5,7 @@ package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
@@ -37,5 +38,37 @@ object Trees {
       }
     }
     state
+  }
+
+  /** Returns a map that maps event ids to consecutive numbers, assigned by in-order traversing the transaction tree */
+  def getLocalEventIndices(
+      tree: TransactionTree
+  ): Map[String, Int] = {
+    val eventsById = tree.getEventsById.asScala
+    @tailrec
+    def makeEventIdToNumber(
+        pending: List[TreeEvent],
+        acc: Map[String, Int],
+    ): Map[String, Int] = {
+      pending match {
+        case Nil =>
+          acc
+        case head :: tail =>
+          head match {
+            case created: CreatedEvent =>
+              makeEventIdToNumber(tail, acc + (created.getEventId -> acc.size))
+            case exercised: ExercisedEvent =>
+              makeEventIdToNumber(
+                exercised.getChildEventIds.asScala.map(eventsById).toList ++ tail,
+                acc + (exercised.getEventId -> acc.size),
+              )
+            case _ => sys.error(s"Unexpected event type: $head")
+          }
+      }
+    }
+    makeEventIdToNumber(
+      tree.getRootEventIds.asScala.map(eventsById).toList,
+      Map.empty,
+    )
   }
 }

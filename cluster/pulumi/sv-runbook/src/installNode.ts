@@ -198,6 +198,7 @@ async function installSvAndValidator(
     onboardingName,
     validatorWalletUserName,
     disableOnboardingParticipantPromotionDelay,
+    loopback,
   } = config;
 
   const auth0Config = auth0Client.getCfg();
@@ -221,7 +222,7 @@ async function installSvAndValidator(
     auth0Client,
     onboardingName,
     decentralizedSynchronizerMigrationConfig,
-    imagePullDeps.concat(svKeySecret_)
+    imagePullDeps.concat(svKeySecret_).concat(loopback ? [loopback] : [])
   );
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');

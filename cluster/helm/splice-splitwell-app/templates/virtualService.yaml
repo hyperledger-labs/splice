@@ -10,7 +10,7 @@ spec:
   hosts:
   - "splitwell.{{ (.Values.cluster).hostname }}"
   gateways:
-  - cluster-ingress/splice-http-gateway
+  - cluster-ingress/cn-http-gateway
   http:
   - match:
     - port: 443
@@ -29,7 +29,7 @@ spec:
   hosts:
   - "{{ (.Values.cluster).hostname }}"
   gateways:
-  - cluster-ingress/splice-apps-gateway
+  - cluster-ingress/cn-apps-gateway
   http:
   - match:
     - port: 5108

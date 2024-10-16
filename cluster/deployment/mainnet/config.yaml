@@ -2,4 +2,9 @@ synchronizerMigration:
   active:
     id: 0
     provider: internal
-    releaseReference: "refs/heads/release-line-0.1.19"
+    version: 0.1.19
+    releaseReference: "refs/heads/release-line-0.2.4"
+  upgrade:
+    id: 1
+    provider: internal
+    version: 0.2.4

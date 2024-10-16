@@ -32,9 +32,10 @@ const commandPromise = automation.PulumiCommand.get({
   skipVersionCheck: false,
 });
 
-export function pulumiOptsWithPrefix(prefix: string): {
+export function pulumiOptsWithPrefix(prefix: string, abortSignal: AbortSignal): {
   parallel: 128;
   onOutput: (output: string) => void;
+  signal: AbortSignal;
 } {
   return {
     parallel: 128,
@@ -44,6 +45,7 @@ export function pulumiOptsWithPrefix(prefix: string): {
         console.log(`${prefix}${output.trim()}`);
       }
     },
+    signal: abortSignal,
   };
 }
 
@@ -78,19 +80,21 @@ export async function stack(
     : await automation.LocalWorkspace.createOrSelectStack(stackOpts, workspaceOpts);
 }
 
-export async function downStack(stack: automation.Stack): Promise<void> {
+export async function refreshStack(stack: automation.Stack, abortSignal: AbortSignal): Promise<void> {
   const name = stack.name;
-  console.log(`${name} - Making sure stack is not locked`);
-  await stack.cancel();
   console.log(`${name} - Refreshing stack`);
-  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`));
-  console.log(`${name} - Destroying stack`);
-  await stack.destroy(pulumiOptsWithPrefix(`[${name}]`));
+  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortSignal));
 }
 
-export async function upStack(stack: automation.Stack): Promise<void> {
+export async function downStack(stack: automation.Stack, abortSignal: AbortSignal): Promise<void> {
   const name = stack.name;
-  const result = await stack.up(pulumiOptsWithPrefix(`[${name}]`));
+  console.log(`${name} - Destroying stack`);
+  await stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortSignal));
+}
+
+export async function upStack(stack: automation.Stack, abortSignal: AbortSignal): Promise<void> {
+  const name = stack.name;
+  const result = await stack.up(pulumiOptsWithPrefix(`[${name}]`, abortSignal));
   console.log(`${name} stack up result:`);
   console.log(util.inspect(result.summary, { colors: true, depth: null, maxStringLength: null }));
 }

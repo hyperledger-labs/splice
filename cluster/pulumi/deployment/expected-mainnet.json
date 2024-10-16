@@ -199,6 +199,7 @@
     "inputs": {
       "chart": "flux2",
       "compat": "true",
+      "maxHistory": 10,
       "name": "flux",
       "namespace": "operator",
       "repositoryOpts": {
@@ -582,6 +583,7 @@
           "repository": "da-cn-shared/cn-images/pulumi-kubernetes-operator",
           "tag": "0.0.1-deadbeef"
         },
+        "maxHistory": 10,
         "resources": {
           "limits": {
             "cpu": 5,
@@ -600,7 +602,7 @@
             "type": "ClusterIP"
           }
         },
-        "terminationGracePeriodSeconds": 600,
+        "terminationGracePeriodSeconds": 1800,
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -674,7 +676,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.1.19"
+          "name": "refs/heads/release-line-0.2.4"
         },
         "secretRef": {
           "name": "github"

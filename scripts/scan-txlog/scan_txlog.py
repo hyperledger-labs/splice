@@ -13,11 +13,17 @@ from datetime import datetime
 import json
 import logging
 import textwrap
-from typing import Optional
+from typing import Any, Dict, List, Optional, TextIO
 import sys
 import argparse
 import os
 import time
+
+
+def FAIL(message):
+    LOG.error(message)
+    sys.exit(-1)
+
 
 cli_handler = colorlog.StreamHandler()
 cli_handler.setFormatter(
@@ -64,11 +70,13 @@ def _party_enabled(args, p):
 
 class CSVReport:
     csv_writer: Optional[csv.DictWriter]
+    current_batch: List[Dict[str, Any]]
 
-    def __init__(self, report_stream):
+    def __init__(self, report_stream, write_header):
         fieldnames = [
             "row_type",
             "update_id",
+            "event_id",
             "record_time",
             "provider",
             "sender",
@@ -90,9 +98,13 @@ class CSVReport:
             "scan_balance",
         ]
 
+        self.current_batch = []
+
         if report_stream:
             self.csv_writer = csv.DictWriter(report_stream, fieldnames)
-            self.csv_writer.writeheader()
+
+            if write_header:
+                self.csv_writer.writeheader()
         else:
             self.csv_writer = None
 
@@ -100,7 +112,18 @@ class CSVReport:
         if not self.csv_writer:
             return
 
-        self.csv_writer.writerow({**line_info, "row_type": row_type})
+        # Writes are deferred until the report is flushed. This is done to
+        # ensure that a round can be fully processed and committed to cache
+        # prior to generating report output. Without this safeguard, the
+        # report process is not necessarily restartable after an error, due
+        # to the possibilty partially written round in the output.
+        self.current_batch.append({**line_info, "row_type": row_type})
+
+    def flush(self):
+        for row in self.current_batch:
+            self.csv_writer.writerow(row)
+
+        self.current_batch = []
 
 
 @dataclass
@@ -1120,6 +1143,7 @@ class LfValueParseException(Exception):
 
 @dataclass
 class ExercisedEvent:
+    event_id: str
     template_id: TemplateId
     choice_name: str
     contract_id: str
@@ -1131,6 +1155,7 @@ class ExercisedEvent:
 
 @dataclass
 class CreatedEvent:
+    event_id: str
     template_id: TemplateId
     contract_id: str
     payload: LfValue
@@ -1138,6 +1163,7 @@ class CreatedEvent:
     @classmethod
     def from_json(cls, json):
         return cls(
+            json["event_id"],
             TemplateId(json["template_id"]),
             json["contract_id"],
             LfValue(json["create_arguments"]),
@@ -1145,6 +1171,7 @@ class CreatedEvent:
 
     def to_json(self):
         return {
+            "event_id": self.event_id,
             "template_id": self.template_id.template_id,
             "contract_id": self.contract_id,
             "create_arguments": self.payload.value,
@@ -1153,15 +1180,16 @@ class CreatedEvent:
 
 class Event:
     @staticmethod
-    def parse(json):
+    def parse(json, event_id):
         template_id = TemplateId(json["template_id"])
         contract_id = json["contract_id"]
         if "create_arguments" in json:
             return CreatedEvent(
-                template_id, contract_id, LfValue(json["create_arguments"])
+                event_id, template_id, contract_id, LfValue(json["create_arguments"])
             )
         else:
             return ExercisedEvent(
+                event_id,
                 template_id,
                 json["choice"],
                 contract_id,
@@ -1210,7 +1238,7 @@ class TransactionTree:
         return TransactionTree(
             json["root_event_ids"],
             {
-                event_id: Event.parse(event)
+                event_id: Event.parse(event, event_id)
                 for event_id, event in json["events_by_id"].items()
             },
             json["migration_id"],
@@ -1711,6 +1739,9 @@ class State:
 
         if written:
             self.csv_report.report_line(line_type, line_info)
+
+    def flush_report(self):
+        self.csv_report.flush()
 
     def _fail(self, transaction, message, cause=None, recoverable=True):
         if not self.args.stop_on_error and recoverable:
@@ -2381,6 +2412,7 @@ class State:
             "TX",
             {
                 "update_id": transaction.update_id,
+                "event_id": event.event_id,
                 "record_time": transaction.record_time,
                 "provider": provider,
                 "sender": sender,
@@ -2399,6 +2431,7 @@ class State:
                 "TXI",
                 {
                     "update_id": transaction.update_id,
+                    "event_id": event.event_id,
                     "record_time": transaction.record_time,
                     "provider": provider,
                     "sender": sender,
@@ -2437,6 +2470,7 @@ class State:
                 "TXO",
                 {
                     "update_id": transaction.update_id,
+                    "event_id": event.event_id,
                     "record_time": transaction.record_time,
                     "provider": provider,
                     "sender": sender,
@@ -2580,6 +2614,7 @@ class State:
             "TX",
             {
                 "update_id": transaction.update_id,
+                "event_id": event.event_id,
                 "record_time": transaction.record_time,
                 "provider": provider,
                 "sender": sender,
@@ -2601,6 +2636,7 @@ class State:
                 "TXI",
                 {
                     "update_id": transaction.update_id,
+                    "event_id": event.event_id,
                     "record_time": transaction.record_time,
                     "provider": provider,
                     "sender": sender,
@@ -2624,6 +2660,7 @@ class State:
                 "TXO",
                 {
                     "update_id": transaction.update_id,
+                    "event_id": event.event_id,
                     "record_time": transaction.record_time,
                     "provider": provider,
                     "sender": sender,
@@ -2641,6 +2678,7 @@ class State:
             "TXBW",
             {
                 "update_id": transaction.update_id,
+                "event_id": event.event_id,
                 "record_time": transaction.record_time,
                 "provider": provider,
                 "cc_burnt": amulet_paid,
@@ -3662,7 +3700,7 @@ class AppState:
         return cls(
             State.from_json(args, data["state"], csv_report),
             {
-                int(round_number): State.from_json(args, round_data)
+                int(round_number): State.from_json(args, round_data, csv_report)
                 for round_number, round_data in data["per_round_states"].items()
             },
             PaginationKey.from_json(data["pagination_key"]),
@@ -3703,10 +3741,9 @@ class AppState:
                 return AppState.from_json(args, data, csv_report)
 
         except Exception as e:
-            LOG.error(f"Could not read app state from {args.cache_file_path}: {e}")
-            sys.exit(-1)
+            FAIL(f"Could not read app state from {args.cache_file_path}: {e}")
 
-    def save_to_cache(self, args):
+    def _save_to_cache(self, args):
         if args.cache_file_path:
             try:
                 with open(args.cache_file_path, "w") as file:
@@ -3715,6 +3752,10 @@ class AppState:
                     LOG.debug(f"Saved app state to {args.cache_file_path}")
             except Exception as e:
                 LOG.error(f"Could not save app state to {args.cache_file_path}: {e}")
+
+    def finalize_batch(self, args):
+        self._save_to_cache(args)
+        self.state.flush_report()
 
 
 def _parse_cli_args():
@@ -3800,6 +3841,11 @@ def _parse_cli_args():
     parser.add_argument(
         "--report-output",
         help="The name of a file to which a CSV report stream should be written. (Specific report structure a work in progress)",
+    )
+    parser.add_argument(
+        "--append-to-report",
+        action="store_true",
+        help="Appends to the report file if enabled.",
     )
     parser.add_argument(
         "--stop-at-record-time",
@@ -3924,10 +3970,29 @@ async def main():
     report_stream = None
     try:
         if args.report_output:
-            report_stream = open(args.report_output, "a", buffering=1)
+            report_exists = os.path.isfile(args.report_output)
+
+            mode = "x"
+            if args.append_to_report:
+
+                if report_exists:
+                    mode = "a"
+
+                if args.cache_file_path is None or args.rebuild_cache:
+                    FAIL(
+                        "Cannot sensibly use --append-to-report without cached state to "
+                        "record previous progress through the event stream."
+                    )
+
+            elif report_exists:
+                FAIL(f"Report file already exists: {args.report_output}")
+
+            report_stream = open(args.report_output, mode, buffering=1)
+        else:
+            report_exists = False
 
         app_state = AppState.create_or_restore_from_cache(
-            args, CSVReport(report_stream)
+            args, CSVReport(report_stream, not report_exists)
         )
 
         begin_t = time.time()
@@ -3964,7 +4029,7 @@ async def main():
                     app_state.pagination_key = PaginationKey(
                         last.migration_id, last.record_time.isoformat()
                     )
-                    app_state.save_to_cache(args)
+                    app_state.finalize_batch(args)
                     last_migration_id = last.migration_id
                 if len(batch) < scan_client.page_size:
                     LOG.debug(f"Reached end of stream at {app_state.pagination_key}")

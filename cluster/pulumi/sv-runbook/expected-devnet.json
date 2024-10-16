@@ -163,6 +163,7 @@
     "inputs": {
       "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-sv",
       "namespace": "sv",
       "repositoryOpts": {
@@ -375,6 +376,7 @@
     "inputs": {
       "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv",
       "repositoryOpts": {
@@ -424,6 +426,7 @@
     "inputs": {
       "chart": "splice-scan",
       "compat": "true",
+      "maxHistory": 10,
       "name": "scan",
       "namespace": "sv",
       "repositoryOpts": {
@@ -667,6 +670,7 @@
     "inputs": {
       "chart": "splice-sv-node",
       "compat": "true",
+      "maxHistory": 10,
       "name": "sv-app",
       "namespace": "sv",
       "repositoryOpts": {
@@ -762,6 +766,11 @@
             "name": "Tradeweb-Markets",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEswn0PF61HbmEqWl4XOcKd1OTXto/EKwVVV2mnPJ/jeKkjj+00XYeVQAJV4JNA5X5xNNPDooYd8dW+MTrG6Ya2A==",
             "rewardWeightBps": 0
+          },
+          {
+            "name": "Orb-1-LP-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -843,6 +852,7 @@
     "inputs": {
       "chart": "cn-cometbft",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cometbft-global-domain-0",
       "namespace": "sv",
       "repositoryOpts": {
@@ -888,7 +898,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26006
         },
         "logLevel": "info",
@@ -946,6 +956,7 @@
     "inputs": {
       "chart": "splice-cometbft",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cometbft-global-domain-1",
       "namespace": "sv",
       "repositoryOpts": {
@@ -991,7 +1002,7 @@
         },
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/splice-apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26106
         },
         "logLevel": "info",
@@ -1139,6 +1150,7 @@
     "inputs": {
       "chart": "cn-global-domain",
       "compat": "true",
+      "maxHistory": 10,
       "name": "global-domain-0",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1232,6 +1244,7 @@
     "inputs": {
       "chart": "splice-global-domain",
       "compat": "true",
+      "maxHistory": 10,
       "name": "global-domain-1",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1375,6 +1388,7 @@
     "inputs": {
       "chart": "cn-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-0",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1458,6 +1472,7 @@
     "inputs": {
       "chart": "splice-participant",
       "compat": "true",
+      "maxHistory": 10,
       "name": "participant-1",
       "namespace": "sv",
       "repositoryOpts": {
@@ -1732,6 +1747,7 @@
     "inputs": {
       "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator",
       "namespace": "sv",
       "repositoryOpts": {

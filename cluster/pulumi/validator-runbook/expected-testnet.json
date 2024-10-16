@@ -114,8 +114,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-validator",
       "namespace": "validator",
       "repositoryOpts": {
@@ -155,7 +156,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -237,8 +238,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "validator",
       "repositoryOpts": {
@@ -276,7 +278,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "loopback",
     "provider": "",
@@ -407,9 +409,10 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
-      "name": "participant-1",
+      "maxHistory": 10,
+      "name": "participant-2",
       "namespace": "validator",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -446,17 +449,15 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "disableAutoInit": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "metrics": {
           "enable": true,
           "migration": {
             "active": true,
-            "id": 1
+            "id": 2
           }
         },
-        "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -465,7 +466,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_1",
+          "databaseName": "participant_2",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -479,9 +480,9 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
-    "name": "validator-participant-1",
+    "name": "validator-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -509,8 +510,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
+      "maxHistory": 10,
       "name": "postgres",
       "namespace": "validator",
       "repositoryOpts": {
@@ -557,7 +559,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -584,8 +586,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator",
       "namespace": "validator",
       "repositoryOpts": {
@@ -626,10 +629,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "1"
+          "id": "2"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -672,7 +675,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator",
     "provider": "",

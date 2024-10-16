@@ -184,7 +184,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum by(namespace, node_type, trigger_name, migration, party) (rate(cn_trigger_completed_total{trigger_name=~".+"}[5m]))
+              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(cn_trigger_completed_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger"}[5m]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -200,7 +200,7 @@ groups:
               conditions:
                   - evaluator:
                       params:
-                          - 0.5
+                          - 1
                           - 0
                       type: gt
                     operator:
@@ -231,7 +231,7 @@ groups:
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
           runbook_url: ""
           severity: |-
-              {{- if (gt $values.runs.Value 1) -}}
+              {{- if (gt $values.runs.Value 2) -}}
               critical
               {{- else -}}
               warning
@@ -252,7 +252,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum by(namespace, node_type, trigger_name, migration, party) (rate(cn_trigger_iterations_total{trigger_name=~".+"}[5m]))
+              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(cn_trigger_iterations_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger"}[5m]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -268,7 +268,7 @@ groups:
               conditions:
                   - evaluator:
                       params:
-                          - 0.5
+                          - 1
                           - 0
                       type: gt
                     operator:
@@ -299,7 +299,7 @@ groups:
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
           runbook_url: ""
           severity: |-
-              {{- if (gt $values.runs.Value 1) -}}
+              {{- if (gt $values.runs.Value 2) -}}
               critical
               {{- else -}}
               warning

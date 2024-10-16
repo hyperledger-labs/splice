@@ -181,6 +181,10 @@ function _pulumi_automation_run_down() {
    fi
 }
 
+function _pulumi_automation_run_refresh() {
+  npm --prefix "${REPO_ROOT}/cluster/pulumi" run refresh
+}
+
 # Update the cluster config file
 function _update_cluster_config() {
   local yaml_content="$1"
