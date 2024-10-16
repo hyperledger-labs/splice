@@ -166,23 +166,43 @@ function _cluster_apply() {
 }
 
 function _pulumi_automation_run_up() {
-   if [ $# -eq 1 ]; then
-      npm --prefix "${REPO_ROOT}/cluster/pulumi/$1" run up
+    if [ $# -eq 1 ]; then
+        _killable_pulumi_automation_run --prefix "${REPO_ROOT}/cluster/pulumi/$1" run up
     else
-      npm --prefix "${REPO_ROOT}/cluster/pulumi" run up
-   fi
+        _killable_pulumi_automation_run --prefix "${REPO_ROOT}/cluster/pulumi" run up
+    fi
 }
 
 function _pulumi_automation_run_down() {
-   if [ $# -eq 1 ]; then
-      npm --prefix "${REPO_ROOT}/cluster/pulumi/$1" run down
+    if [ $# -eq 1 ]; then
+        _killable_pulumi_automation_run --prefix "${REPO_ROOT}/cluster/pulumi/$1" run down
     else
-      npm --prefix "${REPO_ROOT}/cluster/pulumi" run down
-   fi
+        _killable_pulumi_automation_run --prefix "${REPO_ROOT}/cluster/pulumi" run down
+    fi
 }
 
 function _pulumi_automation_run_refresh() {
-  npm --prefix "${REPO_ROOT}/cluster/pulumi" run refresh
+  _killable_pulumi_automation_run --prefix "${REPO_ROOT}/cluster/pulumi" run refresh
+}
+
+# If we run npm [...] pulumi in the same process group as us, then when we ctrl-c,
+# it will signal pulumi at least twice, sometimes even three: once through the ctrl-c
+# signalling the whole process group, and once through pulumiXX.ts catching the signal
+# (and if we're not careful, it will catch it twice). Signaling pulumi twice is like hitting
+# ctrl-c twice, thus telling pulumi to exit immediately and not cleanup after itself, thus
+# ending with locked and/or polluted stacks.
+# Similarly, in CCI's run_bash_command_in_nix, we signal the whole process group, which is equivalend
+# to hitting ctrl-c in the terminal.
+# We solve this by running pulumi in a separate process group (using `set -m`), and killing it
+# using /bin/kill, which signals only the process and not its whole process group.
+function _killable_pulumi_automation_run() {
+  set -m
+  npm $@ &
+  PID=$!
+  set +m
+  trap 'echo "caught signal, killing $PID"; kill -2 $PID; wait $PID' SIGINT SIGTERM
+  wait $PID
+  trap - SIGINT SIGTERM
 }
 
 # Update the cluster config file

@@ -3,12 +3,12 @@ import {
   mustInstallSplitwell,
 } from 'splice-pulumi-common-validator/src/validators';
 
-import { stack, upStack } from './pulumi';
+import { PulumiAbortController, stack, upStack } from './pulumi';
 
 async function runCoreStacksUp() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
   const operations: Promise<void>[] = [];
-  const abortController = new AbortController();
+  const abortController = new PulumiAbortController();
   await upStack(mainStack, abortController.signal).then(async () => {
     if (mustInstallValidator1) {
       const validator1 = await stack('validator1', 'validator1', true, {});
