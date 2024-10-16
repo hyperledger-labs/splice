@@ -161,7 +161,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-sv",
@@ -197,8 +197,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "0",
-              "1"
+              "1",
+              "0"
             ]
           }
         },
@@ -210,7 +210,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -396,7 +396,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -436,7 +436,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "loopback",
     "provider": "",
@@ -446,7 +446,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -480,15 +480,15 @@
           "enable": true
         },
         "migration": {
-          "id": "0"
+          "id": "1"
         },
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "sequencerAddress": "global-domain-0-sequencer",
+        "sequencerAddress": "global-domain-1-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -505,7 +505,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "scan",
     "provider": "",
@@ -651,7 +651,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "apps-pg",
@@ -700,7 +700,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -710,7 +710,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -791,22 +791,22 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-0-mediator",
-          "sequencerAddress": "global-domain-0-sequencer",
+          "mediatorAddress": "global-domain-1-mediator",
+          "sequencerAddress": "global-domain-1-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-0.sv.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-1.sv.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
@@ -823,11 +823,11 @@
           "enable": true
         },
         "migration": {
-          "id": "0"
+          "id": "1"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
@@ -853,7 +853,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "sv-app",
     "provider": "",
@@ -920,11 +920,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -940,7 +940,7 @@
         "nodeName": "DA-Helm-Test-Node",
         "peers": [],
         "stateSync": {
-          "enable": true,
+          "enable": false,
           "rpcServers": "https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
@@ -1024,11 +1024,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": false
+              "value": true
             }
           ],
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -1044,7 +1044,7 @@
         "nodeName": "DA-Helm-Test-Node",
         "peers": [],
         "stateSync": {
-          "enable": false,
+          "enable": true,
           "rpcServers": "https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
@@ -1172,7 +1172,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -1267,7 +1267,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -1323,7 +1323,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "mediator-pg",
@@ -1372,7 +1372,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1429,7 +1429,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 0
           }
         },
@@ -1513,7 +1513,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": false,
+            "active": true,
             "id": 1
           }
         },
@@ -1570,7 +1570,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-pg",
@@ -1617,7 +1617,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1647,7 +1647,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "sequencer-pg",
@@ -1694,7 +1694,7 @@
           }
         ]
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1721,7 +1721,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator",
@@ -1755,17 +1755,17 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": "0"
+          "id": "1"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -1808,7 +1808,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.1.19"
+      "version": "0.2.4"
     },
     "name": "validator",
     "provider": "",
