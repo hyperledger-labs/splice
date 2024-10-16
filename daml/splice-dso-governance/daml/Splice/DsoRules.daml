@@ -107,6 +107,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Voted action to update the reward weight of an SV.
   | SRARC_CreateExternalPartyAmuletRules DsoRules_CreateExternalPartyAmuletRules
     -- ^ Create ExternalPartyAmuletRules contract if it has not been created as part of network bootstrapping.
+  | SRARC_CreateTransferCommandCounter DsoRules_CreateTransferCommandCounter
+    -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -266,6 +268,11 @@ data DsoRules_CreateExternalPartyAmuletRulesResult = DsoRules_CreateExternalPart
 data DsoRules_TransferCommand_SendResult = DsoRules_TransferCommand_SendResult
   with
     result : TransferCommandResult
+  deriving (Show, Eq)
+
+data DsoRules_CreateTransferCommandCounterResult = DsoRules_CreateTransferCommandCounterResult
+  with
+    transferCommandCounterCid : ContractId TransferCommandCounter
   deriving (Show, Eq)
 
 
@@ -1234,13 +1241,25 @@ template DsoRules with
         context : PaymentTransferContext
         inputs : [TransferInput]
         transferPreapprovalCid : ContractId TransferPreapproval
+        transferCounterCid : ContractId TransferCommandCounter
       controller dsoDelegate
       do _ <- fetchChecked (ForDso dso) transferCommandCid
          TransferCommand_SendResult result <- exercise transferCommandCid TransferCommand_Send with
            context
            inputs
            transferPreapprovalCid
+           transferCounterCid
          pure (DsoRules_TransferCommand_SendResult result)
+
+    nonconsuming choice DsoRules_CreateTransferCommandCounter : DsoRules_CreateTransferCommandCounterResult
+      with
+        sender : Party
+      controller dso
+      do cid <- create TransferCommandCounter with
+           dso
+           sender
+           nextNonce = 0
+         pure (DsoRules_CreateTransferCommandCounterResult cid)
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
@@ -1294,6 +1313,7 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
       SRARC_SetConfig choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_UpdateSvRewardWeight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. ->
     case ansEntryContextAction of
       ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg

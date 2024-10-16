@@ -378,6 +378,13 @@ class SvDsoAutomationService(
         dsoStore,
       )
     )
+    registerTrigger(
+      new TransferCommandCounterTrigger(
+        triggerContext,
+        dsoStore,
+        connection,
+      )
+    )
 
     config.scan.foreach { scan =>
       registerTrigger(
@@ -518,5 +525,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReportSvStatusMetricsExportTrigger],
       aTrigger[ReportValidatorLicenseMetricsExportTrigger],
       aTrigger[ReconcileDynamicDomainParametersTrigger],
+      aTrigger[TransferCommandCounterTrigger],
     )
 }

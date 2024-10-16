@@ -418,12 +418,13 @@ testCreateExternalPartyAmuletRules = script do
 
 testTransferPreapprovalSend : Script ()
 testTransferPreapprovalSend = do
-  (app, dso, (sv1, _, _, _)) <- initDevNet
+  (app, dso, (sv1, sv2, sv3, _)) <- initDevNet
   validator <- setupValidator app "validator"
   alice <- setupUser app "alice" validator
   externalParty <- allocateParty "externalParty"
   (externalPartyAmuletRulesCid, _) <- getExternalPartyAmuletRules app
   now <- getTime
+  [(dsoRulesCid, _)] <- query @DsoRules dso
 
   transferPreapprovalCid <- createTransferPreapproval externalParty validator dso  (now `addRelTime` hours 24)
 
@@ -434,6 +435,24 @@ testTransferPreapprovalSend = do
       amount = 42.0
       trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 12
+      nonce = 0
+
+  let action = ARC_DsoRules with
+        dsoAction = SRARC_CreateTransferCommandCounter (DsoRules_CreateTransferCommandCounter alice.primaryParty)
+
+  confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
+    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = svParty
+      action
+    return result.confirmation
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+    DsoRules_ExecuteConfirmedAction with
+      action
+      amuletRulesCid = None
+      confirmationCids
+
+  [(transferCounterCid, _)] <- query @TransferCommandCounter app.dso
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
@@ -448,6 +467,7 @@ testTransferPreapprovalSend = do
     context
     transferPreapprovalCid
     inputs = [InputAmulet amulet]
+    transferCounterCid
 
   amulets <- query @Amulet externalParty
   map snd amulets === [Amulet app.dso externalParty (ExpiringAmount 42.0 (Round 1) (RatePerRound 0.00002))]

@@ -958,6 +958,31 @@ trait SvDsoStore
       splice.amulet.Amulet,
     ]]
   ]
+
+  def lookupTransferCommandCounterBySenderWithOffset(partyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[
+    QueryResult[Option[ContractWithState[
+      splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
+      splice.externalpartyamuletrules.TransferCommandCounter,
+    ]]]
+  ]
+
+  def lookupTransferCommandCounterBySender(partyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[
+    Option[ContractWithState[
+      splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
+      splice.externalpartyamuletrules.TransferCommandCounter,
+    ]]
+  ] = lookupTransferCommandCounterBySenderWithOffset(partyId).map(_.value)
+
+  def listTransferCommandCounterConfirmationBySender(
+      confirmer: PartyId,
+      sender: PartyId,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+  ]
 }
 
 object SvDsoStore {
@@ -1315,6 +1340,14 @@ object SvDsoStore {
       ) { contract =>
         DsoAcsStoreRowData(
           contract
+        )
+      },
+      mkFilter(splice.externalpartyamuletrules.TransferCommandCounter.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          walletParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sender)),
         )
       },
     )

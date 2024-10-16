@@ -123,6 +123,7 @@ class ValidatorClient:
         amount,
         expires_at,
         tracking_id,
+        nonce,
     ):
         payload = {
             "sender_party_id": sender_party_id,
@@ -130,6 +131,7 @@ class ValidatorClient:
             "amount": amount,
             "expires_at": expires_at,
             "tracking_id": tracking_id,
+            "nonce": nonce,
         }
         response = await session_post(
             self.session,
@@ -267,6 +269,7 @@ async def handle_transfer_preapproval_send(args, validator_client):
         args.amount,
         expires_at,
         tracking_id,
+        args.nonce,
     )
     signer = eddsa.new(private_key, "rfc8032")
     signed_hash = signer.sign(bytes.fromhex(response["tx_hash"])).hex()
@@ -324,6 +327,7 @@ def parse_cli_args():
     parser_transfer_preapproval_send.add_argument("--sender-party-id", required=True)
     parser_transfer_preapproval_send.add_argument("--receiver-party-id", required=True)
     parser_transfer_preapproval_send.add_argument("--amount", required=True)
+    parser_transfer_preapproval_send.add_argument("--nonce", required=True)
     parser_transfer_preapproval_send.add_argument("--key-directory", required=True)
     parser_transfer_preapproval_send.add_argument("--key-name", required=True)
 

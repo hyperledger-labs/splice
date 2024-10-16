@@ -718,6 +718,7 @@ class HttpValidatorAdminHandler(
               body.amount.bigDecimal,
               body.trackingId,
               body.expiresAt.toInstant,
+              body.nonce,
             )
           )
           .update

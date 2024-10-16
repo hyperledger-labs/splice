@@ -25,7 +25,7 @@ import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiring
   CRARC_MiningRound_Archive,
   CRARC_MiningRound_StartIssuing,
 }
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
 import com.daml.network.config.Thresholds
 import com.daml.network.sv.SvApp.{isDevNet, isSvName, isSvParty}
 import com.daml.network.util.AssignedContract
@@ -164,6 +164,14 @@ class ExecuteConfirmedActionTrigger(
                   )
                 )
             } yield isSvOnboardingConfirmed || isSvPartOfDso
+          case action: SRARC_CreateTransferCommandCounter =>
+            for {
+              transferCommandCounterO <- store.lookupTransferCommandCounterBySender(
+                PartyId.tryFromProtoPrimitive(
+                  action.dsoRules_CreateTransferCommandCounterValue.sender
+                )
+              )
+            } yield transferCommandCounterO.isDefined
           case action =>
             throw new UnsupportedOperationException(
               show"DsoRules $action is not yet supported"

@@ -34,7 +34,7 @@ import com.daml.network.codegen.java.splice.wallet.subscriptions.{
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
+import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
@@ -1537,6 +1537,69 @@ class DbSvDsoStore(
       } yield row.map(assignedContractFromRow(companion)(_))
     }
   }
+
+  def lookupTransferCommandCounterBySenderWithOffset(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[QueryResult[Option[ContractWithState[
+    splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
+    splice.externalpartyamuletrules.TransferCommandCounter,
+  ]]]] =
+    waitUntilAcsIngested {
+      (for {
+        resultWithOffset <- storage
+          .querySingle(
+            selectFromAcsTableWithStateAndOffset(
+              DsoTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""
+                    template_id_qualified_name = ${QualifiedName(
+                  splice.externalpartyamuletrules.TransferCommandCounter.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
+                and wallet_party = $partyId
+                  """,
+              orderLimit = sql" limit 1",
+            ).headOption,
+            "lookupTransferCommandCounterBySender",
+          )
+      } yield MultiDomainAcsStore.QueryResult(
+        resultWithOffset.offset,
+        resultWithOffset.row.map(
+          contractWithStateFromRow(
+            splice.externalpartyamuletrules.TransferCommandCounter.COMPANION
+          )(_)
+        ),
+      )).getOrRaise(offsetExpectedError())
+    }
+
+  def listTransferCommandCounterConfirmationBySender(
+      confirmer: PartyId,
+      partyId: PartyId,
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.dsorules.Confirmation.ContractId,
+    splice.dsorules.Confirmation,
+  ]]] =
+    for {
+      // TODO(#14568) Hit indices for this instead of doing a linear search
+      confirmations <- multiDomainAcsStore.listContracts(
+        splice.dsorules.Confirmation.COMPANION
+      )
+    } yield {
+      confirmations
+        .map(_.contract)
+        .filter { c =>
+          c.payload.confirmer == confirmer.toProtoPrimitive &&
+          (c.payload.action match {
+            case action: splice.dsorules.actionrequiringconfirmation.ARC_DsoRules =>
+              action.dsoAction match {
+                case action: splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateTransferCommandCounter =>
+                  action.dsoRules_CreateTransferCommandCounterValue.sender == partyId.toProtoPrimitive
+                case _ => false
+              }
+            case _ => false
+          })
+        }
+    }
 
   override def close(): Unit = {
     dsoStoreMetrics.close()

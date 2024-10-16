@@ -17,17 +17,19 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   TransferInput,
 }
 import com.daml.network.codegen.java.splice.externalpartyamuletrules.TransferCommand
+import com.daml.network.environment.RetryFor
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class TransferCommandsTrigger(
+class TransferCommandSendTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
@@ -66,6 +68,23 @@ class TransferCommandsTrigger(
             for {
               amulets <- store.listAmuletsByOwner(sender)
               featuredAppRight <- store.lookupFeaturedAppRight(provider)
+              transferCommandNonce <- context.retryProvider.retry(
+                RetryFor.Automation,
+                "wait_for_transfer_command_counter",
+                s"wait for TransferCommandCounter for $sender",
+                store
+                  .lookupTransferCommandCounterBySender(sender)
+                  .map(
+                    _.getOrElse(
+                      throw Status.FAILED_PRECONDITION
+                        .withDescription(
+                          s"No TransferCommandCounter for $sender yet, waiting for SV automation to create it"
+                        )
+                        .asRuntimeException
+                    )
+                  ),
+                logger,
+              )
               dsoRules <- store.getDsoRules()
               amuletRules <- store.getAmuletRules()
               openRound <- store.getLatestUsableOpenMiningRound(now)
@@ -88,6 +107,7 @@ class TransferCommandsTrigger(
                   ),
                   amulets.map[TransferInput](a => new InputAmulet(a.contractId)).asJava,
                   transferPreapproval.contractId,
+                  transferCommandNonce.contractId,
                 )
               )
               result <- svTaskContext.connection

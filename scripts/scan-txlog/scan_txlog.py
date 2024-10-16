@@ -2861,7 +2861,10 @@ class State:
     def handle_transfer_preapproval_send(self, transaction, event):
         for event_id in event.child_event_ids:
             event = transaction.events_by_id[event_id]
-            if event.choice_name == "AmuletRules_Transfer":
+            if (
+                isinstance(event, ExercisedEvent)
+                and event.choice_name == "AmuletRules_Transfer"
+            ):
                 return self.handle_transfer(
                     transaction,
                     event,
@@ -2871,10 +2874,16 @@ class State:
     def handle_dso_rules_transfer_command_send(self, transaction, event):
         for event_id in event.child_event_ids:
             event = transaction.events_by_id[event_id]
-            if event.choice_name == "TransferCommand_Send":
+            if (
+                isinstance(event, ExercisedEvent)
+                and event.choice_name == "TransferCommand_Send"
+            ):
                 for event_id in event.child_event_ids:
                     event = transaction.events_by_id[event_id]
-                    if event.choice_name == "TransferPreapproval_Send":
+                    if (
+                        isinstance(event, ExercisedEvent)
+                        and event.choice_name == "TransferPreapproval_Send"
+                    ):
                         return self.handle_transfer_preapproval_send(
                             transaction,
                             event,

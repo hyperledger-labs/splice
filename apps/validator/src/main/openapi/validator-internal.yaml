@@ -1449,6 +1449,7 @@ components:
         - amount
         - expires_at
         - tracking_id
+        - nonce
       properties:
         sender_party_id:
           type: string
@@ -1464,6 +1465,12 @@ components:
           description: |
             Tracking id to check the status of the transfer. This is always scoped to the sender.
             Uniqueness must be enforced by the sender not signing two transactions with the same sender and same tracking id.
+        nonce:
+          type: integer
+          format: int64
+          description: |
+            The expected value of the counter that is used to order and deduplicate TransferCommands. Starts at 0 and  increases
+            by 1 for each executed TransferCommand (independent of whether is succeeded or not). The most recent value can be read from scan.
 
     PrepareTransferPreapprovalSendResponse:
       type: object

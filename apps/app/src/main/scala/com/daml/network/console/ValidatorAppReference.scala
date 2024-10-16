@@ -245,6 +245,7 @@ abstract class ValidatorAppReference(
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
       trackingId: String,
+      nonce: Long,
   ): definitions.PrepareTransferPreapprovalSendResponse = {
     consoleEnvironment.run {
       httpCommand(
@@ -254,6 +255,7 @@ abstract class ValidatorAppReference(
           amount,
           expiresAt,
           trackingId,
+          nonce,
         )
       )
     }

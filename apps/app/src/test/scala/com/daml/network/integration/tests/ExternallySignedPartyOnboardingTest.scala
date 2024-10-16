@@ -169,6 +169,7 @@ class ExternallySignedPartyOnboardingTest
             s"--sender-party-id=${partyId.toProtoPrimitive}",
             s"--receiver-party-id=${partyId2.toProtoPrimitive}",
             s"--amount=20.0",
+            s"--nonce=0",
           ),
           aliceValidatorBackend.token.value,
         ),

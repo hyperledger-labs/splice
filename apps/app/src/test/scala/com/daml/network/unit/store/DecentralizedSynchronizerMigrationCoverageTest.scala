@@ -170,6 +170,8 @@ object DecentralizedSynchronizerMigrationCoverageTest {
         reason("tied to a specific domainId, never migrated", UserWalletStore),
       externalpartyamuletrules.TransferCommand.COMPANION ->
         reason("#15158", SvDsoStore),
+      externalpartyamuletrules.TransferCommandCounter.COMPANION ->
+        reason("#15158", SvDsoStore),
       externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION ->
         reason("#15158", ScanStore),
     ).view.map { case (c, reason) =>

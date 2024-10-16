@@ -1,6 +1,7 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
+{-# LANGUAGE MultiWayIf #-}
 module Splice.ExternalPartyAmuletRules where
 
 import Splice.AmuletRules
@@ -27,6 +28,7 @@ template ExternalPartyAmuletRules
         amount : Decimal
         trackingId : Text
         expiresAt : Time
+        nonce : Int
       controller sender
       do cmd <- create TransferCommand with
            dso
@@ -36,12 +38,30 @@ template ExternalPartyAmuletRules
            trackingId
            -- We cannot enforce a max expiry as we cannot call getTime.
            expiresAt
+           nonce
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
 
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with
     transferCommandCid : ContractId TransferCommand
   deriving (Show, Eq)
+
+-- | A contract tracking the number of completed TransferCommands per sender,
+-- which is used to determine the nonces used in TransferCommands for deduplication.
+template TransferCommandCounter
+  with
+    dso : Party
+    sender : Party
+    nextNonce : Int
+  where
+    signatory dso
+    observer sender
+
+instance HasCheckedFetch TransferCommandCounter ForOwner where
+  contractGroupId TransferCommandCounter{..} =
+    ForOwner with
+      owner = sender
+      dso
 
 -- | One-time delegation to execute a transfer to the given receiver
 -- for the given amount.
@@ -59,6 +79,9 @@ template TransferCommand
     amount : Decimal
     trackingId : Text -- ^ Tracking id that can be used for deduplication and for querying the status
     expiresAt : Time -- ^ Expiry of the command until when TransferCommand_Send must be called
+    nonce : Int
+      -- ^ Expected nonce value to order and deduplicate concurrent transfers.
+      -- Starts at 0 and the next value to use can then be read from TransferCommandCounter and the in-flight TransferCommand contracts.
   where
     -- The DSO party is a signatory to make sure
     -- that the external signature
@@ -72,20 +95,34 @@ template TransferCommand
         -- The delegate is expected to select inputs that cover the amount being transferred, provided they exist.
         -- Otherwise the transfer will fail.
         transferPreapprovalCid : ContractId TransferPreapproval
+        transferCounterCid : ContractId TransferCommandCounter
       controller dso
       do -- Verify that receiver and DSO party match. We don't validate that the reeiver's provider matches
          -- as changing that should be up to the receiver and not require the sender to resign.
          _ <- fetchChecked (ForOwner with owner = receiver, dso) transferPreapprovalCid
-         now <- getTime -- This is run by the DSO party where getTime is fine
-         require ("Current time " <> show now <> " is before expiry of TransferCommand " <> show expiresAt) (expiresAt > now)
-         result <-
-           try do
-             TransferPreapproval_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender)
-             pure (TransferCommandResultSuccess result)
-           catch
-             (ex : InvalidTransfer) -> pure (TransferCommandResultFailure ex.reason)
-             (ex : AnyException) -> pure (TransferCommandResultFailure (ITR_Other $ message ex))
-         pure (TransferCommand_SendResult result)
+         transferCounter <- fetchChecked (ForOwner with owner = sender, dso) transferCounterCid
+         if | transferCounter.nextNonce > nonce ->
+              -- Fail but archive the TransferCommand
+              pure $ TransferCommand_SendResult $ TransferCommandResultFailure $ ITR_Other $ "Expected nonce " <> show nonce <> " is smaller than current counter " <> show transferCounter.nextNonce
+            | transferCounter.nextNonce < nonce ->
+              -- Fail but don't archive the command so it can be retried
+              abort ("Expected nonce " <> show nonce <> " is bigger than current counter " <> show transferCounter.nextNonce)
+            | otherwise -> do
+              -- Consider the nonce spent independent of whether funds get transferred or not.
+              -- Thereby ensuring that transfer instructions get executed promptly.
+              -- Clients are expected to retry in case their transfer fails unexpectedly.
+              _ <- potentiallyUnsafeArchive transferCounterCid
+              _ <- create transferCounter with nextNonce = transferCounter.nextNonce + 1
+              now <- getTime -- This is run by the DSO party where getTime is fine
+              require ("Current time " <> show now <> " is before expiry of TransferCommand " <> show expiresAt) (expiresAt > now)
+              result <-
+                try do
+                  TransferPreapproval_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender)
+                  pure (TransferCommandResultSuccess result)
+                catch
+                  (ex : InvalidTransfer) -> pure (TransferCommandResultFailure ex.reason)
+                  (ex : AnyException) -> pure (TransferCommandResultFailure (ITR_Other $ message ex))
+              pure (TransferCommand_SendResult result)
 
     choice TransferCommand_Withdraw : TransferCommand_WithdrawResult
       controller sender

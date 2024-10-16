@@ -55,6 +55,7 @@ object DsoTables extends AcsTables with NamedLogging {
       featuredAppRightProvider: Option[PartyId] = None,
       svParty: Option[PartyId] = None,
       svName: Option[String] = None,
+      walletParty: Option[PartyId] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "amulet_round_of_expiry" -> amuletRoundOfExpiry,
@@ -87,6 +88,7 @@ object DsoTables extends AcsTables with NamedLogging {
       "featured_app_right_provider" -> featuredAppRightProvider,
       "sv_party" -> svParty,
       "sv_name" -> svName.map(lengthLimited),
+      "wallet_party" -> walletParty,
     )
   }
 
