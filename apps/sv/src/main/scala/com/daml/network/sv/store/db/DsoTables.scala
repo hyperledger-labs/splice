@@ -12,7 +12,7 @@ import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLog
 import com.daml.network.sv.store.{ErrorTxLogEntry, TxLogEntry, VoteRequestTxLogEntry}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{Member, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import io.circe.Json
 
 object DsoTables extends AcsTables with NamedLogging {
@@ -46,6 +46,7 @@ object DsoTables extends AcsTables with NamedLogging {
       electionRequestEpoch: Option[Long] = None,
       importCrateReceiver: Option[PartyId] = None,
       memberTrafficMember: Option[Member] = None,
+      memberTrafficDomain: Option[DomainId] = None,
       ansEntryName: Option[String] = None,
       actionAnsEntryContextCid: Option[splice.ans.AnsEntryContext.ContractId] = None,
       actionAnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,
@@ -79,6 +80,7 @@ object DsoTables extends AcsTables with NamedLogging {
       "election_request_epoch" -> electionRequestEpoch,
       "import_crate_receiver" -> importCrateReceiver,
       "member_traffic_member" -> memberTrafficMember,
+      "member_traffic_domain" -> memberTrafficDomain,
       "ans_entry_name" -> ansEntryName.map(lengthLimited),
       "action_ans_entry_context_cid" -> actionAnsEntryContextCid,
       "action_ans_entry_context_payment_id" -> actionAnsEntryContextPaymentId,

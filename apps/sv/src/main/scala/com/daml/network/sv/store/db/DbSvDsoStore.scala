@@ -815,7 +815,8 @@ class DbSvDsoStore(
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
-                        and member_traffic_member = $memberId""",
+                        and member_traffic_member = $memberId
+                        and member_traffic_domain = $domainId""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listMemberTrafficContracts",
@@ -947,6 +948,7 @@ class DbSvDsoStore(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
+                and member_traffic_domain = $domainId
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",
         )

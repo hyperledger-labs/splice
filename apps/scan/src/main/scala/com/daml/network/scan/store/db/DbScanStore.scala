@@ -746,6 +746,7 @@ class DbScanStore(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
+                and member_traffic_domain = ${lengthLimited(domainId.toProtoPrimitive)}
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",
         )
