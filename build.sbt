@@ -136,7 +136,7 @@ lazy val root: Project = (project in file("."))
         if !path.startsWith(cantonPath)
       } yield basePath.relativize(path)
       val outputFile = "daml/dars.lock"
-      " " + (Seq(outputFile) ++ darPaths ++ getCommittedDarFiles).mkString(" ")
+      " " + (Seq(outputFile) ++ darPaths).mkString(" ")
     },
     damlDarsLockFileUpdate :=
       Def.taskDyn {
