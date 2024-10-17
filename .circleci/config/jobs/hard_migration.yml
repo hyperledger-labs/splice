@@ -84,7 +84,7 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
             # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             set -eou pipefail
 

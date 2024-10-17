@@ -55,7 +55,7 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of SV runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
             # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
@@ -139,7 +139,7 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of Validator runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
             # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
@@ -193,7 +193,7 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of multi-validator pulumi stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
             # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             cncluster activate
             cncluster ci_apply_multi
@@ -290,7 +290,7 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
             # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             cncluster activate
             # All CI-deployed clusters use split postgres instances per app, to support backups.
@@ -399,7 +399,7 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
             # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run >> == true ]]; then
               cncluster activate
@@ -472,7 +472,7 @@ jobs:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of infra stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
             # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             cncluster activate
             cncluster infra_up
