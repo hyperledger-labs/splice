@@ -1292,6 +1292,17 @@ function subcmd_rename_cn_node() {
 
 }
 
+subcommand_whitelist[base_package]="Rename: com.daml.network to org.lfdecentralizedtrust.splice"
+function subcmd_base_package() {
+  assert_clean_working_dir
+
+  simple_rename '(?<!")com\.daml\.network///org.lfdecentralizedtrust.splice'
+  simple_rename 'com\.daml\.network///org.lfdecentralizedtrust.splice' '--exclude=**/*.scala'
+  simple_rename 'com\.daml\.network///org.lfdecentralizedtrust.splice'
+  simple_rename '/com/daml/network////org/lfdecentralizedtrust/splice'
+  simple_rename 'pr(ivate|otected)\[network\]///pr\1[splice]'
+}
+
 ################################
 ### Main
 ################################

@@ -57,7 +57,7 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
 
   override protected def withFixture(test: OneArgTest): Outcome = {
     val integrationTestPackage = "com.digitalasset.canton.integration.tests"
-    val integrationTestPackageSplice = "com.daml.network.integration.tests"
+    val integrationTestPackageSplice = "org.lfdecentralizedtrust.splice.integration.tests"
     getClass.getName should (startWith(
       integrationTestPackage
     ) or startWith(

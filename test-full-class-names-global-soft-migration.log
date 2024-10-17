@@ -1,1 +1,1 @@
-com.daml.network.integration.tests.DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerSoftDomainMigrationIntegrationTest

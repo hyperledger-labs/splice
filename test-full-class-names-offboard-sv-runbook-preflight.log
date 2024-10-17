@@ -1,1 +1,1 @@
-com.daml.network.integration.tests.reonboard.SvOffboardPreflightIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.reonboard.SvOffboardPreflightIntegrationTest

@@ -1,1 +1,1 @@
-com.daml.network.integration.tests.SoftDomainMigrationTopologySetupIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.SoftDomainMigrationTopologySetupIntegrationTest
