@@ -3,9 +3,9 @@
 
 package com.daml.network.store
 
-import com.daml.metrics.api.{MetricsContext, MetricInfo, MetricName}
 import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Timer}
 import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.network.environment.SpliceMetrics
 
 class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: MetricsContext)

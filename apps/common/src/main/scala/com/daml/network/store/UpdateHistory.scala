@@ -27,7 +27,11 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.HistoryBackfilling.{DestinationBackfillingInfo, SourceMigrationInfo}
+import com.daml.network.store.HistoryBackfilling.{
+  DestinationBackfillingInfo,
+  DestinationHistory,
+  SourceMigrationInfo,
+}
 import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
 import com.daml.network.util.DomainRecordTimeRange
@@ -1462,16 +1466,17 @@ class UpdateHistory(
           items: Seq[LedgerClient.GetTreeUpdatesResponse],
       )(implicit
           tc: TraceContext
-      ): Future[Unit] = {
+      ): Future[DestinationHistory.InsertResult] = {
+        val nonEmpty = NonEmptyList
+          .fromFoldable(items)
+          .getOrElse(
+            throw new RuntimeException("insert() must not be called with an empty sequence")
+          )
         // Because DbStorage requires all actions to be idempotent, and we can't just slap a "ON CONFLICT DO NOTHING"
         // onto all subqueries of ingestUpdate_() because they are using "RETURNING" which doesn't work with the above,
         // we simply check whether one of the items was already inserted.
         val (headItemTable, headItemRecordTime) =
-          items.headOption
-            .getOrElse(
-              throw new RuntimeException("insert() must not be called with an empty sequence")
-            )
-            .update match {
+          nonEmpty.head.update match {
             case TransactionTreeUpdate(tree) =>
               ("update_history_transactions", CantonTimestamp.assertFromInstant(tree.getRecordTime))
             case ReassignmentUpdate(update) =>
@@ -1509,7 +1514,18 @@ class UpdateHistory(
             action.transactionally,
             "destinationHistory.insert",
           )
-          .map(_ => ())
+          .map(_ =>
+            DestinationHistory.InsertResult(
+              backfilledUpdates = nonEmpty.size.toLong,
+              backfilledEvents = nonEmpty
+                .map(_.update)
+                .collect { case TransactionTreeUpdate(tree) =>
+                  tree.getEventsById.size().toLong
+                }
+                .sum,
+              lastBackfilledRecordTime = nonEmpty.last.update.recordTime,
+            )
+          )
       }
 
       override def markBackfillingComplete()(implicit

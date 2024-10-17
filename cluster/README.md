@@ -802,6 +802,7 @@ Prometheus may be configured to collect more metrics by deploying `ServiceMonito
 Grafana is used to visualize Prometheus metrics in various ways, aggregated into Dashboards. We deploy two types of dashboards in all clusters:
 
 - Custom dashboards built by us. To add a new dashboard, add its JSON definition to a file in `cluster/pulumi/infra/grafana-dashboards`. It will then be pushed to the cluster via the `infra` Pulumi stack, under the `canton-network` folder in Grafana.
+  If you have defined a new dashboard, you can add a new `.json` file there by copy pasting from Dashboard Settings > JSON Model.
 - Dashboards from the grafana public marketplace, installed using the dashboard id. Check `observability.ts` for example of such dashboards
 - Default k8s dashboards that are deployed by the prometheus/grafana helm chart
 

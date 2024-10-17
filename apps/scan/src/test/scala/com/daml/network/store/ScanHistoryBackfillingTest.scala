@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.scan.store.ScanHistoryBackfilling
 import com.daml.network.util.DomainRecordTimeRange
@@ -188,6 +189,7 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       batchSize = 1,
       loggerFactory = loggerFactory,
       timeouts = DefaultProcessingTimeouts.testing,
+      metricsFactory = NoOpMetricsFactory,
     )
     def go(i: Int): Future[Boolean] = {
       logger.debug(s"backfill() iteration $i")

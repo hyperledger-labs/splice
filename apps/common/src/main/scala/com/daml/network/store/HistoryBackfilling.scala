@@ -3,6 +3,8 @@
 
 package com.daml.network.store
 
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.MetricsContext
 import com.daml.network.store.HistoryBackfilling.Outcome.{
   BackfillingIsComplete,
   MoreWorkAvailableLater,
@@ -48,9 +50,16 @@ final class HistoryBackfilling[T](
     currentMigrationId: Long,
     batchSize: Int,
     override protected val loggerFactory: NamedLoggerFactory,
+    metricsFactory: LabeledMetricsFactory,
 )(implicit
     ec: ExecutionContext
 ) extends NamedLogging {
+
+  private val historyMetrics = new HistoryMetrics(metricsFactory)(
+    MetricsContext(
+      "current_migration_id" -> currentMigrationId.toString
+    )
+  )
 
   /** Backfill a small part of the destination history, making sure that the destination history won't have any gaps.
     *
@@ -126,7 +135,19 @@ final class HistoryBackfilling[T](
           logger.info(
             s"Backfilling domain ${domainId} from ${backfillFrom} for migration ${migrationId}"
           )
-          backfillDomain(migrationId, domainId, backfillFrom)
+          backfillDomain(migrationId, domainId, backfillFrom).map { insertResult =>
+            historyMetrics.Backfilling.latestRecordTime.updateValue(
+              insertResult.lastBackfilledRecordTime.toMicros
+            )
+            // Using MetricsContext.Empty is okay, because it's merged with the StoreMetrics context
+            historyMetrics.Backfilling.updateCount.inc(
+              insertResult.backfilledUpdates
+            )(MetricsContext.Empty)
+            historyMetrics.Backfilling.eventCount.inc(insertResult.backfilledUpdates)(
+              MetricsContext.Empty
+            )
+            MoreWorkAvailableNow
+          }
         case None =>
           if (backfillFrom.missingData) {
             logger.debug(
@@ -147,7 +168,10 @@ final class HistoryBackfilling[T](
                   s"No more data to backfill for migration ${migrationId}, and there is no migration id before ${migrationId}. " +
                     "This history won't need any further backfilling."
                 )
-                destination.markBackfillingComplete().map(_ => BackfillingIsComplete)
+                destination.markBackfillingComplete().map { _ =>
+                  historyMetrics.Backfilling.completed.updateValue(1)
+                  BackfillingIsComplete
+                }
             }
           } else {
             logger.info(
@@ -237,15 +261,17 @@ final class HistoryBackfilling[T](
       migrationId: Long,
       domainId: DomainId,
       backfillFrom: CantonTimestamp,
-  )(implicit tc: TraceContext): Future[Outcome] = {
+  )(implicit
+      tc: TraceContext
+  ): Future[HistoryBackfilling.DestinationHistory.InsertResult] = {
     for {
       items <- source.items(migrationId, domainId, backfillFrom, batchSize)
-      _ <- destination.insert(migrationId, domainId, items)
+      last <- destination.insert(migrationId, domainId, items)
     } yield {
       logger.debug(
         s"Backfilled ${items.size} items for domain ${domainId} in migration ${migrationId} before record time ${backfillFrom}"
       )
-      MoreWorkAvailableNow
+      last
     }
   }
 
@@ -337,9 +363,16 @@ object HistoryBackfilling {
       */
     def insert(migrationId: Long, domainId: DomainId, items: Seq[T])(implicit
         tc: TraceContext
-    ): Future[Unit]
+    ): Future[DestinationHistory.InsertResult]
 
     /** Explicitly marks the backfilling as complete */
     def markBackfillingComplete()(implicit tc: TraceContext): Future[Unit]
+  }
+  object DestinationHistory {
+    case class InsertResult(
+        backfilledUpdates: Long,
+        backfilledEvents: Long,
+        lastBackfilledRecordTime: CantonTimestamp,
+    )
   }
 }

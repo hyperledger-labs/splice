@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.store.HistoryBackfilling.SourceMigrationInfo
 
@@ -177,6 +178,7 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
       latestMigrationId,
       batchSize = 10,
       loggerFactory = loggerFactory,
+      metricsFactory = NoOpMetricsFactory,
     )
 
   private def backfillAll(
