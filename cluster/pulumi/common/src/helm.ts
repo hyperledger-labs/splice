@@ -17,6 +17,8 @@ import {
   ExactNamespace,
   fixedTokens,
   HELM_CHART_TIMEOUT_SEC,
+  HELM_MAX_HISTORY_SIZE,
+  imagePullPolicy,
   loadJsonFromFile,
   loadYamlFromFile,
   REPO_ROOT,
@@ -69,8 +71,10 @@ function installSpliceHelmChartByNamespaceName(
       values: {
         ...cnChartValues(nsLogicalName, version, chartName, values),
         ...affinityAndTolerations,
+        ...imagePullPolicy,
       },
       timeout,
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     opts
   );
@@ -166,6 +170,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
         clusterUrl: CLUSTER_HOSTNAME,
       },
       timeout,
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     opts
   );

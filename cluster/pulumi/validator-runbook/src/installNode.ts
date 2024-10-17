@@ -3,7 +3,6 @@ import * as pulumi from '@pulumi/pulumi';
 import _ from 'lodash';
 import {
   Auth0Client,
-  auth0UserNameEnvVarSource,
   BackupConfig,
   ChartValues,
   CLUSTER_BASENAME,
@@ -170,12 +169,10 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     supportsValidatorRunbookReset
   );
   const participantAddress = installParticipant(
-    DecentralizedSynchronizerUpgradeConfig,
     DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
     validatorConfig.nodeIdentifier,
-    auth0UserNameEnvVarSource('validator'),
     activeVersion,
     postgres,
     undefined,

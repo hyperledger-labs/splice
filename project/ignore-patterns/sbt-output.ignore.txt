@@ -58,6 +58,8 @@ protoc-jar: caught exception, retrying: java\.io\.IOException: Cannot run progra
 # NPM deprecations in our dependencies
 .*npm WARN deprecated.*
 .*npm warn deprecated.*
+# Npm sometimes reports some errors in writing to the cache, safe to retry
+npm error
 
 # False positive from openapi-generator https://github.com/OpenAPITools/openapi-generator/issues/9008
 .*The value \(generator's option\) must be either boolean or string. Default to `false`\..*

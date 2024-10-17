@@ -23,6 +23,15 @@ workflow:
           cluster: "ciperiodic"
           requires:
             - wait_for_previous_pipeline
+      - reset_cluster:
+          name: "reset_initially"
+          cluster: "ciperiodic"
+          extra_migrations_reset: "0,1"
+          context:
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           <<: *main-branch-only
           context:
@@ -33,6 +42,7 @@ workflow:
           cancel_workflow_on_failure: true
           requires:
             - artifacts_push
+            - reset_initially
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:
@@ -65,6 +75,15 @@ workflow:
           cluster: "ciperiodic"
           requires:
             - offboard_sv_runbook
+      - reset_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - deploy_validator_to_recover_sv_amulets
       - deploy_sv_runbook:
           name: "redeploy_sv_runbook"
           <<: *main-branch-only
@@ -73,7 +92,7 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           requires:
-            - deploy_validator_to_recover_sv_amulets
+            - reset_sv_runbook
       - preflight_check:
           name: "preflight_sv_reonboard_check"
           <<: *main-branch-only

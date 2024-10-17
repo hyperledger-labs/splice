@@ -285,8 +285,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-validator1",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -322,7 +323,7 @@
         "clusterUrl": "global.canton.network.digitalasset.com",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "0"
+            "activeMigrationId": "1"
           },
           "splitwell": false
         },
@@ -335,7 +336,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -407,8 +408,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -449,7 +451,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -459,9 +461,10 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
-      "name": "participant-0",
+      "maxHistory": 10,
+      "name": "participant-1",
       "namespace": "validator1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -504,7 +507,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 0
+            "id": 1
           }
         },
         "participantAdminUserNameFrom": {
@@ -515,7 +518,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_0",
+          "databaseName": "participant_1",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -528,9 +531,9 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
-    "name": "validator1-participant-0",
+    "name": "validator1-participant-1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -658,8 +661,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator-validator1",
       "namespace": "validator1",
       "repositoryOpts": {
@@ -708,7 +712,8 @@
           "enable": true
         },
         "migration": {
-          "id": 0,
+          "id": 1,
+          "legacyId": 0,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -719,7 +724,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -767,7 +772,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

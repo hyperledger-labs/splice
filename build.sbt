@@ -53,10 +53,21 @@ lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extens
 
 inThisBuild(
   List(
+    pushRemoteCacheTo := Some(MavenCache("local-cache", file("/cache/sbt/sbt-remote-cache-4"))),
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
+    semanticdbIncludeInJar := true, // cache it in the remote cache
   )
 )
+
+// relativize semantic DB target root which is part of the scalac options
+// https://github.com/sbt/sbt/issues/6027#issuecomment-717064450
+Seq(Compile, Test).flatMap { c =>
+  (c / semanticdbTargetRoot) := {
+    val old = (c / semanticdbTargetRoot).value.toPath
+    (LocalRootProject / baseDirectory).value.toPath.relativize(old).toFile
+  }
+}
 
 val allDarsFilter = ScopeFilter(inAnyProject, inConfigurations(Compile), inTasks(damlBuild))
 
@@ -128,7 +139,7 @@ lazy val root: Project = (project in file("."))
         if !path.startsWith(cantonPath)
       } yield basePath.relativize(path)
       val outputFile = "daml/dars.lock"
-      " " + (Seq(outputFile) ++ darPaths ++ getCommittedDarFiles).mkString(" ")
+      " " + (Seq(outputFile) ++ darPaths).mkString(" ")
     },
     damlDarsLockFileUpdate :=
       Def.taskDyn {
@@ -758,6 +769,7 @@ lazy val `apps-common-frontend` = {
       // so we just do it once for all workspaces here.
       npmLint := {
         val log = streams.value.log
+        npmInstall.value
         runCommand(
           Seq("npm", "run", "check", "--workspaces", "--if-present"),
           log,
@@ -1415,8 +1427,6 @@ printTests := {
       name
     ) && name.contains("SvReOnboard")
   def isDamlCiupgradeVote(name: String): Boolean = name contains "DamlCIUpgradeVote"
-  def isAuth0CredentialsPreflightIntegrationTest(name: String): Boolean =
-    isPreflightIntegrationTest(name) && name.contains("Auth0Credentials")
   def isDockerComposeValidatorPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("DockerComposeValidator")
 
@@ -1448,11 +1458,6 @@ printTests := {
       (t: String) => isDamlCiupgradeVote(t),
     ),
     (
-      "Global domain upgrade cluster preflight",
-      "test-full-class-names-global-domain-upgrade-preflight.log",
-      (t: String) => isDecentralizedSynchronizerDeploymentPreflightIntegrationTest(t),
-    ),
-    (
       "SV offboard preflight",
       "test-full-class-names-offboard-sv-runbook-preflight.log",
       (t: String) => isSvOffboardPreflightIntegrationTest(t),
@@ -1461,11 +1466,6 @@ printTests := {
       "SV reonboard preflight",
       "test-full-class-names-re-onboard-sv-runbook-preflight.log",
       (t: String) => isSvReOnboardPreflightIntegrationTest(t),
-    ),
-    (
-      "Fetch UI credentials from Auth0 and store them in a k8s secret",
-      "test-full-class-names-auth0-credentials-preflight.log",
-      (t: String) => isAuth0CredentialsPreflightIntegrationTest(t),
     ),
     (
       "Docker Compose validator preflight test",

@@ -3,7 +3,6 @@
 import { QueryObserverSuccessResult } from '@tanstack/react-query';
 import {
   BaseVotesHooks,
-  DateDisplay,
   getAmuletConfigurationAsOfNow,
   Loading,
   PartyId,
@@ -40,6 +39,7 @@ import {
 import { Time } from '@daml/types';
 
 import AccordionList, { AccordionListProps } from '../AccordionList';
+import DateWithDurationDisplay from '../DateWithDurationDisplay';
 import { DsoInfo } from '../Dso';
 import { PrettyJsonDiff } from '../PrettyJsonDiff';
 import { getAction } from './ListVoteRequests';
@@ -436,13 +436,16 @@ const AddFutureConfigValueTable: React.FC<{
       actionName={amuletRulesAction.tag}
       valuesMap={{
         'Effective Time': (
-          <DateOrTextDisplay datetime={amuletRulesAction.value.newScheduleItem._1} />
+          <DateWithDurationDisplay
+            datetime={amuletRulesAction.value.newScheduleItem._1}
+            enableDuration
+          />
         ),
       }}
       accordionList={{
         unfoldedAccordions: [
           {
-            title: <DateOrTextDisplay datetime={amuletConfigToCompareWith[0]} />,
+            title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
                 data={amuletRulesAction.value.newScheduleItem._2}
@@ -452,7 +455,7 @@ const AddFutureConfigValueTable: React.FC<{
           },
         ],
         foldedAccordions: inflightVoteRequests.map(vr => ({
-          title: <DateOrTextDisplay datetime={vr[0]} />,
+          title: <DateWithDurationDisplay datetime={vr[0]} />,
           content: (
             <PrettyJsonDiff
               data={amuletRulesAction.value.newScheduleItem._2}
@@ -501,9 +504,9 @@ const RemoveFutureConfigValueTable: React.FC<{
       actionType={actionType}
       actionName={amuletRulesAction.tag}
       valuesMap={{
-        Time: <DateOrTextDisplay datetime={amuletRulesAction.value.scheduleTime} />,
+        Time: <DateWithDurationDisplay datetime={amuletRulesAction.value.scheduleTime} />,
         'Comparing against config from': (
-          <DateOrTextDisplay datetime={amuletConfigToCompareWith[0]} />
+          <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />
         ),
         ScheduleItem: (
           <PrettyJsonDiff
@@ -569,12 +572,17 @@ const UpdateFutureConfigValueTable: React.FC<{
       actionType={actionType}
       actionName={amuletRulesAction.tag}
       valuesMap={{
-        'Effective Time': <DateOrTextDisplay datetime={amuletRulesAction.value.scheduleItem._1} />,
+        'Effective Time': (
+          <DateWithDurationDisplay
+            datetime={amuletRulesAction.value.scheduleItem._1}
+            enableDuration
+          />
+        ),
       }}
       accordionList={{
         unfoldedAccordions: [
           {
-            title: <DateOrTextDisplay datetime={amuletConfigToCompareWith[0]} />,
+            title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
                 data={amuletRulesAction.value.scheduleItem._2}
@@ -584,7 +592,7 @@ const UpdateFutureConfigValueTable: React.FC<{
           },
         ],
         foldedAccordions: inflightVoteRequests.map(vr => ({
-          title: <DateOrTextDisplay datetime={vr[0]} />,
+          title: <DateWithDurationDisplay datetime={vr[0]} />,
           content: (
             <PrettyJsonDiff
               data={amuletRulesAction.value.scheduleItem._2}
@@ -595,14 +603,6 @@ const UpdateFutureConfigValueTable: React.FC<{
       }}
     />
   );
-};
-
-const DateOrTextDisplay = (props: { datetime: string | Date | undefined }) => {
-  if (props.datetime && (props.datetime instanceof Date || props.datetime !== 'initial')) {
-    return <DateDisplay format={'PPp O'} datetime={props.datetime} />;
-  } else {
-    return <>initial</>;
-  }
 };
 
 const SetConfigValueTable: React.FC<{
@@ -672,13 +672,10 @@ const SetConfigValueTable: React.FC<{
     <ActionValueTable
       actionType={actionType}
       actionName={dsoAction.tag}
-      valuesMap={{
-        'Effective Time': <DateOrTextDisplay datetime={effectiveAt} />,
-      }}
       accordionList={{
         unfoldedAccordions: [
           {
-            title: <DateOrTextDisplay datetime={dsoConfigToCompareWith[0]} />,
+            title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
             content: (
               <PrettyJsonDiff
                 data={dsoAction.value.newConfig}
@@ -688,7 +685,7 @@ const SetConfigValueTable: React.FC<{
           },
         ],
         foldedAccordions: inflightVoteRequests.map(vr => ({
-          title: <DateOrTextDisplay datetime={vr[0]} />,
+          title: <DateWithDurationDisplay datetime={vr[0]} />,
           content: <PrettyJsonDiff data={dsoAction.value.newConfig} compareWithData={vr[1]} />,
         })),
       }}

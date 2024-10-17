@@ -9,7 +9,7 @@ import jwt
 import time
 
 if (len(sys.argv) != 2):
-    print("Usage: token.py <username>")
+    print("Usage: get-token.py <username>")
     sys.exit(1)
 
 username = sys.argv[1]

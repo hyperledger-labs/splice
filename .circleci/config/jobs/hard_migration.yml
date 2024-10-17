@@ -81,7 +81,10 @@ jobs:
             --keep CIRCLE_BUILD_URL
           gce_authenticate: true
           cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
+          cmd_before_retry: |
+            .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
+            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
+            .circleci/reset-repo-if-dirty.sh "<${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             set -eou pipefail
 
@@ -304,6 +307,13 @@ jobs:
           cmd_name: Dump identities before the migration
           cluster: << parameters.cluster >>
           gce_authenticate: true
+          additional_nix_args: >
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
           cmd: |
             cncluster activate
             mkdir -p workspace
@@ -312,6 +322,42 @@ jobs:
           root: workspace
           paths:
             - identities-before.json
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+
+  trigger_global_domain_migration:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      send_notifications:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Trigger the votes for a global domain migration
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args: >
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+          cmd: |
+            cncluster activate
+            cncluster vote_for_migration 1
+      - print_gcloud_logs_commands:
+          cluster: << parameters.cluster >>
       - when:
           condition: << parameters.send_notifications >>
           steps:
@@ -338,6 +384,13 @@ jobs:
           cmd_name: Dump identities after the migration, and compare
           cluster: << parameters.cluster >>
           gce_authenticate: true
+          additional_nix_args: >
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
           cmd: |
             cncluster activate
             cncluster dump_identities > workspace/identities-after.json

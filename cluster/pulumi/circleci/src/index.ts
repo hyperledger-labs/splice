@@ -2,7 +2,11 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
-import { appsAffinityAndTolerations, infraAffinityAndTolerations } from 'splice-pulumi-common';
+import {
+  appsAffinityAndTolerations,
+  HELM_MAX_HISTORY_SIZE,
+  infraAffinityAndTolerations,
+} from 'splice-pulumi-common';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 const circleCiNamespace = new Namespace('circleci-runner', {
@@ -79,9 +83,17 @@ new k8s.helm.v3.Release('container-agent', {
   },
   values: {
     agent: {
+      replicaCount: 3,
+      maxConcurrentTasks: 100,
       resourceClasses: {
         'dach_ny/cn-runner-for-testing': {
           token: spliceEnvConfig.requireEnv('SPLICE_PULUMI_CCI_RUNNER_TOKEN'),
+          metadata: {
+            // prevent eviction by the gke autoscaler
+            annotations: {
+              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
+          },
           spec: {
             containers: [
               {
@@ -89,6 +101,49 @@ new k8s.helm.v3.Release('container-agent', {
                   requests: {
                     cpu: '2',
                     memory: '8Gi',
+                  },
+                },
+                // required to mount the nix store inside the container from the NFS
+                securityContext: {
+                  privileged: true,
+                },
+                volumeMounts: [
+                  {
+                    name: 'cache',
+                    mountPath: '/cache',
+                  },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: 'cache',
+                persistentVolumeClaim: {
+                  claimName: persistentVolumeClaim.metadata.name,
+                },
+              },
+            ],
+            ...appsAffinityAndTolerations,
+          },
+        },
+        'dach_ny/cn-runner-large': {
+          token: spliceEnvConfig.requireEnv('SPLICE_PULUMI_CCI_RUNNER_LARGE_TOKEN'),
+          metadata: {
+            // prevent eviction by the gke autoscaler
+            annotations: {
+              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
+          },
+          spec: {
+            containers: [
+              {
+                resources: {
+                  requests: {
+                    cpu: '5',
+                    memory: '24Gi',
+                  },
+                  limits: {
+                    memory: '40Gi', // the high resource tests really use lots all of this
                   },
                 },
                 // required to mount the nix store inside the container from the NFS
@@ -126,6 +181,7 @@ new k8s.helm.v3.Release('container-agent', {
         },
       },
       ...infraAffinityAndTolerations,
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
   },
 });

@@ -32,8 +32,8 @@ where `<token>` is an OAuth2 Bearer Token with enough claims to access the Valid
 as obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
 
 If you are using a docker-compose deployment, replace `https://wallet.validator.YOUR_HOSTNAME` with `http://wallet.localhost`.
-If you are running the docker-compose deployment with no auth, you can use the utility Python script `token.py`
-to generate a token for the `curl` command by running ``python token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
+If you are running the docker-compose deployment with no auth, you can use the utility Python script `get-token.py`
+to generate a token for the `curl` command by running ``python get-token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
 
 Backups of postgres instances
 +++++++++++++++++++++++++++++
@@ -162,8 +162,8 @@ For docker-compose validator deployments, the process is similar with the follow
 
 #. For the endpoint for fetching the data dump, replace `https://wallet.validator.YOUR_HOSTNAME` with `http://wallet.localhost`.
 
-#. If you are running your validator without auth, you can use the utility Python script `token.py`
-   to generate a token for the `curl` command by running ``python token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
+#. If you are running your validator without auth, you can use the utility Python script `get-token.py`
+   to generate a token for the `curl` command by running ``python get-token.py administrator`` (requires `pyjwt <https://pypi.org/project/PyJWT/>`_).
 
 #. Copy the dump file to the validator's docker volume using:
 

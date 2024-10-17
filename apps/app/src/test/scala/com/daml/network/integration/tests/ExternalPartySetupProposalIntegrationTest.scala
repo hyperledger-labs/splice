@@ -4,6 +4,7 @@ import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.config.ConfigTransforms
 import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.http.v0.definitions
+import definitions.DamlValueEncoding.members.CompactJson
 import com.daml.network.integration.EnvironmentDefinition
 import com.daml.network.integration.tests.SpliceTests.IntegrationTest
 import com.daml.network.sv.automation.delegatebased.{
@@ -182,7 +183,7 @@ class ExternalPartySetupProposalIntegrationTest
       },
     )
     val update = eventuallySucceeds() {
-      sv1ScanBackend.getUpdate(updateId)
+      sv1ScanBackend.getUpdate(updateId, encoding = CompactJson)
     }
     val rewardRound =
       aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs

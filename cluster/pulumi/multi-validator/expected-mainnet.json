@@ -3,8 +3,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "multi-validator",
       "repositoryOpts": {
@@ -42,7 +43,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
     "name": "loopback",
     "provider": "",

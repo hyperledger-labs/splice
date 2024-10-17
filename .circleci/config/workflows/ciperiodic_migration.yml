@@ -19,6 +19,15 @@ workflow:
           cluster: "ciperiodic"
           requires:
             - wait_for_previous_pipeline
+      - reset_cluster:
+          name: "reset_initially"
+          cluster: "ciperiodic"
+          extra_migrations_reset: "0,1"
+          context:
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           context:
@@ -29,8 +38,8 @@ workflow:
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
           requires:
-            - wait_for_previous_pipeline
             - artifacts_push
+            - reset_initially
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
           context:
@@ -92,17 +101,12 @@ workflow:
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - deploy_sv_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
+      - trigger_global_domain_migration:
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "ciperiodic"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          wait_for_sv: false
-          cluster_version: << pipeline.parameters.base-version >>
-          check_cluster_version: false
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
@@ -120,6 +124,7 @@ workflow:
             - prepare_cluster_for_migration
             - trigger_global_domain_migration
             - pre_migration_compose_validator
+            - pre_migration_dump_identities
       - preflight_check:
           name: "preflight_check_migrated"
           context:
@@ -222,6 +227,16 @@ workflow:
             - slack-context
           requires:
             - backup_cluster_after_migration
+      - reset_sv_runbook:
+          name: "reset_sv_runbook_after_migration"
+          extra_migrations_reset: "0,1"
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - migrate_sv_runbook
       - deploy_sv_runbook:
           name: "deploy_fresh_sv_runbook_after_migration"
           context:
@@ -231,9 +246,8 @@ workflow:
           cluster: "ciperiodic"
           deploy_version: << pipeline.parameters.upgrade-version >>
           global_domain_active_migration_id: 1
-          reset_cluster: true # it's the default, but to make it explicit
           requires:
-            - migrate_sv_runbook
+            - reset_sv_runbook_after_migration
       #          # Re-enable once latest release is > 0.2.3
       #            - preflight_sv_check_migrated
       - preflight_sv_check:

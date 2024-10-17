@@ -16,6 +16,14 @@ workflow:
             - artifactory
             - slack-context
           workflow_names: "deploy_cidaily cidaily_health_check redeploy_validator_runbook_cidaily redeploy_sv_runbook_cidaily backup_cidaily restore_sv_cidaily restore_validator_cidaily"
+      - reset_cluster:
+          cluster: "cidaily"
+          silence_deployment_alerts: true
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
       - deploy_cluster:
           name: deploy_cluster_cidaily
           <<: *main-branch-only
@@ -23,10 +31,9 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cidaily"
-          silence_deployment_alerts: true
           requires:
             - artifacts_push
-            - wait_for_previous_pipeline
+            - reset_cluster
       - preflight_check:
           cluster: "cidaily"
           <<: *main-branch-only

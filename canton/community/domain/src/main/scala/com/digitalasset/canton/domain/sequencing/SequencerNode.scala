@@ -649,6 +649,7 @@ class SequencerNodeBootstrap(
             syncCrypto,
             parameters.loggingConfig,
             None,
+            parameters.exitOnFatalFailures,
             loggerFactory,
             futureSupervisor,
             firstSequencerCounterServeableForSequencer, // TODO(#18401): Review this value

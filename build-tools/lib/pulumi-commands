@@ -203,7 +203,7 @@ function subcmd_prefresh() {
     fi
     _cluster_must_exist
 
-    stacks="canton-network multi-validator sv-runbook validator-runbook infra"
+    stacks="multi-validator sv-runbook validator-runbook infra"
 
     refresh_stack() {
         stack="$1"
@@ -238,6 +238,8 @@ function subcmd_prefresh() {
     for stack in $stacks; do
       refresh_stack "$stack"
     done
+
+    _pulumi_automation_run_refresh
 }
 
 ###

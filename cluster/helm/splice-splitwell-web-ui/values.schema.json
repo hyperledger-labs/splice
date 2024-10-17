@@ -15,6 +15,9 @@
     {
       "required": ["spliceInstanceNames", "auth"],
       "properties": {
+        "imagePullPolicy": {
+          "type": "string"
+        },
         "auth": {
           "type": "object",
           "properties": {

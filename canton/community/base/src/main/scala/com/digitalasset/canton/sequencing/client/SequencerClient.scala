@@ -59,6 +59,7 @@ import com.digitalasset.canton.sequencing.handlers.{
   CleanSequencerCounterTracker,
   StoreSequencedEvent,
   ThrottlingApplicationEventHandler,
+  TimeLimitingApplicationEventHandler,
 }
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.{TrafficReceipt, TrafficStateController}
@@ -207,6 +208,7 @@ abstract class SequencerClientImpl(
     replayEnabled: Boolean,
     syncCryptoClient: SyncCryptoClient[SyncCryptoApi],
     loggingConfig: LoggingConfig,
+    exitOnTimeout: Boolean,
     val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
     override protected val initialCounterLowerBound: SequencerCounter,
@@ -681,14 +683,22 @@ abstract class SequencerClientImpl(
       eventHandler: PossiblyIgnoredApplicationHandler[ClosedEnvelope],
       timeTracker: DomainTimeTracker,
       fetchCleanTimestamp: PeriodicAcknowledgements.FetchCleanTimestamp,
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    val timeLimittedEventHandler = new TimeLimitingApplicationEventHandler(
+      timeouts.sequencedEventProcessingBound,
+      clock,
+      exitOnTimeout,
+      loggerFactory,
+    ).timeLimit(eventHandler)
+
     subscribeAfterInternal(
       priorTimestamp,
       cleanPreheadTsO,
-      eventHandler,
+      timeLimittedEventHandler,
       timeTracker,
       fetchCleanTimestamp,
     )
+  }
 
   protected def subscribeAfterInternal(
       priorTimestamp: CantonTimestamp,
@@ -761,6 +771,7 @@ class RichSequencerClientImpl(
     syncCryptoClient: SyncCryptoClient[SyncCryptoApi],
     loggingConfig: LoggingConfig,
     override val trafficStateController: Option[TrafficStateController],
+    exitOnTimeout: Boolean,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
     initialCounterLowerBound: SequencerCounter,
@@ -783,6 +794,7 @@ class RichSequencerClientImpl(
       replayEnabled,
       syncCryptoClient,
       loggingConfig,
+      exitOnTimeout,
       loggerFactory,
       futureSupervisor,
       initialCounterLowerBound,
@@ -1431,6 +1443,7 @@ class SequencerClientImplPekko[E: Pretty](
     syncCryptoClient: SyncCryptoClient[SyncCryptoApi],
     loggingConfig: LoggingConfig,
     override val trafficStateController: Option[TrafficStateController],
+    exitOnTimeout: Boolean,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
     initialCounterLowerBound: SequencerCounter,
@@ -1453,6 +1466,7 @@ class SequencerClientImplPekko[E: Pretty](
       replayEnabled,
       syncCryptoClient,
       loggingConfig,
+      exitOnTimeout,
       loggerFactory,
       futureSupervisor,
       initialCounterLowerBound,

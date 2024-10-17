@@ -307,7 +307,7 @@ The validator app backend requires the following secret.
         "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
-        "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
+        "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}" \
         "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 To setup the wallet and CNS UI, create the following two secrets.

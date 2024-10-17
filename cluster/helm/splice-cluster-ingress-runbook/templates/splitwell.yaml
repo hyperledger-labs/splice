@@ -12,7 +12,7 @@ spec:
   hosts:
     - "splitwell.{{ $ingressName }}.{{ (.Values.cluster).hostname }}"
   gateways:
-    - cluster-ingress/splice-http-gateway
+    - cluster-ingress/cn-http-gateway
   http:
     - match:
         - port: 443

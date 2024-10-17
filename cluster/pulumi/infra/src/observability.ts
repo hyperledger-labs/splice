@@ -16,6 +16,7 @@ import {
   EXPECTED_MAX_BLOCK_RATE_PER_SECOND,
   GCP_PROJECT,
   GrafanaKeys,
+  HELM_MAX_HISTORY_SIZE,
   LOAD_TESTER_MIN_RATE,
   publicPrometheusRemoteWrite,
   REPO_ROOT,
@@ -57,7 +58,7 @@ function istioVirtualService(
       },
       spec: {
         hosts: [`${name}.${CLUSTER_HOSTNAME}`],
-        gateways: ['cluster-ingress/splice-http-gateway'],
+        gateways: ['cluster-ingress/cn-http-gateway'],
         http: [
           {
             match: [{ port: 443 }, { port: 80 }],
@@ -98,7 +99,7 @@ function istioPublicVirtualService(
       },
       spec: {
         hosts: [`public.${CLUSTER_HOSTNAME}`],
-        gateways: ['cluster-ingress/splice-public-http-gateway'],
+        gateways: ['cluster-ingress/cn-public-http-gateway'],
         http: [
           {
             match: [{ uri: { prefix: urlPrefix }, port: 443 }],
@@ -526,6 +527,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           fullnameOverride: 'node-exporter',
         },
       },
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
       dependsOn: [namespace],

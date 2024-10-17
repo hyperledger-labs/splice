@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import { config, infraAffinityAndTolerations } from 'splice-pulumi-common';
+import { config, HELM_MAX_HISTORY_SIZE, infraAffinityAndTolerations } from 'splice-pulumi-common';
 
 import { namespace } from './namespace';
 import { Version } from './version';
@@ -31,7 +31,7 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
         memory: '2G',
       },
     },
-    terminationGracePeriodSeconds: 600,
+    terminationGracePeriodSeconds: 1800,
     image: {
       registry: 'us-central1-docker.pkg.dev',
       repository: 'da-cn-shared/cn-images/pulumi-kubernetes-operator',
@@ -97,5 +97,6 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
       },
     ],
     ...infraAffinityAndTolerations,
+    maxHistory: HELM_MAX_HISTORY_SIZE,
   },
 });

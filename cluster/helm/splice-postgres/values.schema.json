@@ -6,6 +6,9 @@
     "imageRepo": {
       "type": "string"
     },
+    "imagePullPolicy": {
+      "type": "string"
+    },
     "resources": {
       "type": "object",
       "properties": {

@@ -19,7 +19,7 @@ parameters:
   # old files don't pollute your build.
   cache-version:
     type: string
-    default: "40"
+    default: "43"
   run-job:
     type: enum
     enum:
@@ -160,9 +160,20 @@ main-branch-never: &main-branch-never
         - main
 
 executors:
+  self_hosted_large:
+    resource_class: dach_ny/cn-runner-large
+    docker:
+      - image: cimg/base:current
+    environment:
+      COURSIER_CACHE: "/cache/coursier"
   self_hosted:
     resource_class: dach_ny/cn-runner-for-testing
     docker:
       - image: cimg/base:current
     environment:
-      npm_config_cache: "/cache/.npm"
+      COURSIER_CACHE: "/cache/coursier"
+
+runner_type: &runner_type
+  runner_type:
+    type: enum
+    enum: ["selfhosted", "circleci"]

@@ -22,7 +22,8 @@
         "lint:fix": "npm run lint:fix --workspaces --if-present",
         "lint:check": "npm run lint:check --workspaces --if-present",
         "up": "ts-node ./pulumiUp.ts",
-        "down": "ts-node ./pulumiDown.ts"
+        "down": "ts-node ./pulumiDown.ts",
+        "refresh": "ts-node ./pulumiRefresh.ts"
     },
     "workspaces": [
         "common",

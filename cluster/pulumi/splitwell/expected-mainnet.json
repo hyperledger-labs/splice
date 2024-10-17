@@ -329,8 +329,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
+      "maxHistory": 10,
       "name": "cluster-ingress-splitwell-uis",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -416,7 +417,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -498,8 +499,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
+      "maxHistory": 10,
       "name": "loopback",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -540,7 +542,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -550,9 +552,10 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
-      "name": "participant-0",
+      "maxHistory": 10,
+      "name": "participant-1",
       "namespace": "splitwell",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -595,7 +598,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 0
+            "id": 1
           }
         },
         "participantAdminUserNameFrom": {
@@ -606,7 +609,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_0",
+          "databaseName": "participant_1",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -619,9 +622,9 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
-    "name": "splitwell-participant-0",
+    "name": "splitwell-participant-1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -689,8 +692,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-splitwell-app",
+      "chart": "splice-splitwell-app",
       "compat": "true",
+      "maxHistory": 10,
       "name": "splitwell-app",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -728,9 +732,9 @@
           "enable": true
         },
         "migration": {
-          "id": 0
+          "id": 1
         },
-        "participantHost": "participant-0",
+        "participantHost": "participant-1",
         "persistence": {
           "databaseName": "app_splitwell",
           "port": 5432,
@@ -747,7 +751,7 @@
           }
         ]
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -877,8 +881,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
+      "maxHistory": 10,
       "name": "validator-splitwell",
       "namespace": "splitwell",
       "repositoryOpts": {
@@ -941,7 +946,8 @@
           "enable": true
         },
         "migration": {
-          "id": 0,
+          "id": 1,
+          "legacyId": 0,
           "migrating": false
         },
         "nodeIdentifier": "splitwell",
@@ -952,7 +958,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-0",
+        "participantAddress": "participant-1",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -1000,7 +1006,7 @@
         "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.2.0"
+      "version": "0.2.4"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

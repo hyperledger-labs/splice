@@ -2,8 +2,9 @@ package com.daml.network.integration.tests.auth
 
 import com.daml.network.console.SvAppClientReference
 import com.daml.network.environment.EnvironmentImpl
-import com.daml.network.integration.tests.SpliceTests.{TestCommon, SpliceTestConsoleEnvironment}
+import com.daml.network.integration.tests.SpliceTests.{SpliceTestConsoleEnvironment, TestCommon}
 import com.daml.network.integration.tests.runbook.PreflightIntegrationTestUtil
+import com.daml.network.util.Auth0Util
 import com.digitalasset.canton.integration.BaseIntegrationTest
 
 trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
@@ -24,16 +25,15 @@ trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
     "splitwell_validator" -> sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_SPLITWELL_VALIDATOR"),
   )
 
-  lazy val auth0 = auth0UtilFromEnvVars("dev")
   protected def svClientWithToken(
       name: String
   )(implicit env: SpliceTestConsoleEnvironment): SvAppClientReference = {
     val clientId = clientIds.get(name).value
     val token = eventuallySucceeds() {
-      getAuth0ClientCredential(
+      Auth0Util.getAuth0ClientCredential(
         clientId,
         sys.env("OIDC_AUTHORITY_SV_AUDIENCE"),
-        auth0,
+        sys.env("SPLICE_OAUTH_DEV_AUTHORITY"),
       )(noTracingLogger)
     }
 

@@ -28,13 +28,13 @@ import com.daml.network.codegen.java.splice.dsorules.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import com.daml.network.sv.automation.delegatebased.CloseVoteRequestTrigger
-import com.daml.network.util.Codec
+import com.daml.network.util.{Codec, TriggerTestUtil}
 
 import java.time.Instant
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
-class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
+class SvStateManagementIntegrationTest extends SvIntegrationTestBase with TriggerTestUtil {
 
   private def actionRequiring3VotesForEarlyClosing(sv: String) = new ARC_DsoRules(
     new SRARC_OffboardSv(
@@ -285,19 +285,29 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
             )
           },
         )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-        // We need SV3's vote here for immediate offboarding
-        Seq(sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
-          clue(s"${sv.name} accepts vote") {
-            getTrackingId(voteRequest) shouldBe voteRequest.contractId
-            eventuallySucceeds() {
-              sv.castVote(
-                voteRequest.contractId,
-                true,
-                "url",
-                "description",
-              )
+
+        setTriggersWithin(
+          // Pause so SV3 can be stopped before it gets offboarded
+          triggersToPauseAtStart =
+            Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger])
+        ) {
+          // We need SV3's vote here for immediate offboarding
+          Seq(sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
+            clue(s"${sv.name} accepts vote") {
+              getTrackingId(voteRequest) shouldBe voteRequest.contractId
+              eventuallySucceeds() {
+                sv.castVote(
+                  voteRequest.contractId,
+                  true,
+                  "url",
+                  "description",
+                )
+              }
             }
           }
+          // Stop SV3 to make sure it does not produce
+          // UNAUTHORIZED_TOPOLOGY_TRANSACTION warnings, see #11639.
+          sv3Backend.stop()
         }
       },
     )(

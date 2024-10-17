@@ -5,6 +5,7 @@ import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 import {
   activeVersion,
   ExactNamespace,
+  HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
   installSpliceHelmChart,
   isMainNet,
@@ -42,6 +43,7 @@ function configureIstioBase(
           },
         },
       },
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
       dependsOn: [ns],
@@ -107,6 +109,7 @@ function configureIstiod(
           },
         },
       },
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
       dependsOn: [ingressNs, base],
@@ -306,6 +309,7 @@ function configureGatewayService(
         },
         ...infraAffinityAndTolerations,
       },
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
       dependsOn: [ingressNs, istiod],

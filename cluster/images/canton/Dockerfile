@@ -25,7 +25,7 @@ WORKDIR /app
 # move tarball to a static name
 ADD target/canton.tar .
 
-COPY target/monitoring.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
+COPY target/monitoring.conf target/parameters.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
 
 RUN ln -s bin/canton splice-image-bin
 
