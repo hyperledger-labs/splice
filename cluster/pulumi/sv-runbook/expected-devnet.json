@@ -161,7 +161,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-ingress-runbook",
+      "chart": "cn-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-sv",
@@ -373,7 +373,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -423,7 +423,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-scan",
+      "chart": "cn-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -667,7 +667,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-sv-node",
+      "chart": "cn-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -849,7 +849,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cometbft",
+      "chart": "cn-cometbft",
       "compat": "true",
       "maxHistory": 10,
       "name": "cometbft-global-domain-1",
@@ -1043,7 +1043,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-global-domain",
+      "chart": "cn-global-domain",
       "compat": "true",
       "maxHistory": 10,
       "name": "global-domain-1",
@@ -1187,7 +1187,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-participant",
+      "chart": "cn-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-1",
@@ -1462,7 +1462,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-validator",
+      "chart": "cn-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator",

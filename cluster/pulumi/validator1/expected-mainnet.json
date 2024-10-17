@@ -285,7 +285,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-ingress-runbook",
+      "chart": "cn-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-validator1",
@@ -408,7 +408,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -461,7 +461,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-participant",
+      "chart": "cn-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-1",
@@ -661,7 +661,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-validator",
+      "chart": "cn-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-validator1",

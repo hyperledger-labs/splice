@@ -288,3 +288,11 @@ export const infraAffinityAndTolerations = {
     },
   ],
 };
+
+export function helmChartNamesPrefix(version: CnChartVersion): string {
+  if (version.type === 'local' || semver.gte(version.version, '0.2.5')) {
+    return 'splice';
+  } else {
+    return 'cn';
+  }
+}

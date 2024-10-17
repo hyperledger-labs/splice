@@ -6,7 +6,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 
 import { config } from './config';
 import { activeVersion } from './domainMigration';
-import { installSpliceHelmChart } from './helm';
+import { helmChartNamesPrefix, installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME } from './utils';
 
@@ -196,7 +196,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     const pg = installSpliceHelmChart(
       xns,
       instanceName,
-      'splice-postgres',
+      `${helmChartNamesPrefix(activeVersion)}-postgres`,
       _.merge(values || {}, {
         db: {
           volumeSize: overrideDbSizeFromValues

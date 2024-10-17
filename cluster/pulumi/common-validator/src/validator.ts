@@ -15,6 +15,7 @@ import {
   DomainMigrationIndex,
   ExactNamespace,
   fetchAndInstallParticipantBootstrapDump,
+  helmChartNamesPrefix,
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
@@ -170,7 +171,7 @@ export async function installValidatorApp(
   return installSpliceHelmChart(
     config.xns,
     `validator-${config.xns.logicalName}`,
-    'splice-validator',
+    `${helmChartNamesPrefix(chartVersion)}-validator`,
     {
       migration: config.migration,
       additionalUsers: config.additionalUsers || [],
