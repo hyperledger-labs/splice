@@ -97,8 +97,19 @@ commands:
             if [ -f "/cache/nix/$cache_key/cached" ]; then
               echo "Restoring nix cache"
               # we use rsync here because it's simply faster to install
-              sudo apt update
-              sudo apt install rsync
+              # Retry because we've seen Ubuntu be down sometimes.
+              n=0
+              until [ $n -gt 50 ]; do
+                sudo apt update -o APT::Update::Error-Mode=any && break
+                n=$((n+1))
+                sleep 10
+              done
+              n=0
+              until [ $n -gt 50 ]; do
+                sudo apt install rsync && break
+                n=$((n+1))
+                sleep 10
+              done
               rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
               rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
               rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
