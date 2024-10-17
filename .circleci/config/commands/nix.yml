@@ -391,5 +391,6 @@ commands:
               --keep TARGET_CLUSTER \
               $ADDITIONAL_NIX_ARGS \
               --command bash $CMD_FILE &
+            PID=$!
 
-            wait
+            wait $PID
