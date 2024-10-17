@@ -50,7 +50,7 @@ lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extens
 
 inThisBuild(
   List(
-    pushRemoteCacheTo := Some(MavenCache("local-cache", file("/cache/sbt/sbt-remote-cache"))),
+    pushRemoteCacheTo := Some(MavenCache("local-cache", file("/cache/sbt/sbt-remote-cache-2"))),
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
     semanticdbIncludeInJar := true, // cache it in the remote cache
@@ -136,7 +136,7 @@ lazy val root: Project = (project in file("."))
         if !path.startsWith(cantonPath)
       } yield basePath.relativize(path)
       val outputFile = "daml/dars.lock"
-      " " + (Seq(outputFile) ++ darPaths ++ getCommittedDarFiles).mkString(" ")
+      " " + (Seq(outputFile) ++ darPaths).mkString(" ")
     },
     damlDarsLockFileUpdate :=
       Def.taskDyn {
