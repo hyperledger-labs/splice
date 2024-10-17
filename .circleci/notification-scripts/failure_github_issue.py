@@ -189,7 +189,7 @@ def get_msg(args: FailureArgs, workflow: Workflow) -> tuple[str, str]:
   commit_sha = repo.head.object.hexsha
   commit_sha_short = commit_sha[:7]
 
-  title = f"Pipelne {workflow.pipeline_number} : job {args.job_num} Failed :fire:"
+  title = f"Pipeline {workflow.pipeline_number} : job {args.job_num} Failed :fire:"
   body = f"""
 [CircleCI Job]({circleci_url}).
 Branch: [{args.branch}]({branch_url})
