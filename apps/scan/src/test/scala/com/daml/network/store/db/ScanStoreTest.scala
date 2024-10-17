@@ -816,8 +816,9 @@ abstract class ScanStoreTest
         val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
         val goodMember = ParticipantId(UniqueIdentifier.tryCreate("good", namespace))
         val badMember = MediatorId(UniqueIdentifier.tryCreate("bad", namespace))
-        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, n.toLong))
-        val badContracts = (4 to 6).map(n => memberTraffic(badMember, n.toLong))
+        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, dummyDomain, n.toLong))
+        val badContracts = (4 to 6).map(n => memberTraffic(badMember, dummyDomain, n.toLong)) ++
+          (7 to 9).map(n => memberTraffic(goodMember, dummy2Domain, n.toLong))
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(
@@ -1646,11 +1647,11 @@ trait AmuletTransferUtil { self: StoreTest =>
     )
   }
 
-  def memberTraffic(member: Member, totalPurchased: Long) = {
+  def memberTraffic(member: Member, domainId: DomainId, totalPurchased: Long) = {
     val template = new MemberTraffic(
       dsoParty.toProtoPrimitive,
       member.toProtoPrimitive,
-      dummyDomain.toProtoPrimitive,
+      domainId.toProtoPrimitive,
       domainMigrationId,
       totalPurchased,
       1,

@@ -28,7 +28,7 @@ import com.daml.network.scan.store.{
 import com.daml.network.store.{Accepted, StoreErrors, VoteRequestOutcome}
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.topology.{Member, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.data.CantonTimestamp
 import io.circe.Json
 
@@ -45,6 +45,7 @@ object ScanTables extends AcsTables {
       ansEntryName: Option[String] = None,
       ansEntryOwner: Option[PartyId] = None,
       memberTrafficMember: Option[Member] = None,
+      memberTrafficDomain: Option[DomainId] = None,
       totalTrafficPurchased: Option[Long] = None,
       validatorLicenseRoundsCollected: Option[Long] = None,
       svParty: Option[PartyId] = None,
@@ -63,6 +64,7 @@ object ScanTables extends AcsTables {
       "ans_entry_name" -> ansEntryName.map(lengthLimited),
       "ans_entry_owner" -> ansEntryOwner,
       "member_traffic_member" -> memberTrafficMember,
+      "member_traffic_domain" -> memberTrafficDomain,
       "total_traffic_purchased" -> totalTrafficPurchased,
       "validator_license_rounds_collected" -> validatorLicenseRoundsCollected,
       "sv_party" -> svParty,

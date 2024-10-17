@@ -1276,6 +1276,7 @@ object SvDsoStore {
               _ => None,
               Some(_),
             ),
+          memberTrafficDomain = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
           totalTrafficPurchased = Some(contract.payload.totalPurchased),
         )
       },
