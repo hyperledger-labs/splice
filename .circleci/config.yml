@@ -5434,6 +5434,8 @@ workflows:
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
+            - prepare_cluster_for_migration
+            - prepare_sv_runbook_for_migration
       - hard_migration:
           name: "migrate_cluster"
           context:
