@@ -50,10 +50,11 @@ lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extens
 
 inThisBuild(
   List(
-    pushRemoteCacheTo := Some(MavenCache("local-cache", file("/cache/sbt/sbt-remote-cache-4"))),
+    // re-enable when it's not broken
+//     pushRemoteCacheTo := Some(MavenCache("local-cache", file("/cache/sbt/sbt-remote-cache-4"))),
+//    semanticdbIncludeInJar := true, // cache it in the remote cache
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
-    semanticdbIncludeInJar := true, // cache it in the remote cache
   )
 )
 

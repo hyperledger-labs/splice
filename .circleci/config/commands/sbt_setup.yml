@@ -42,13 +42,14 @@ commands:
                 runner_type: << parameters.runner_type >>
             - save_frontend_node_modules
             - save_daml_artifacts
-      - when:
-          condition:
-            and:
-              - equal: [ << parameters.upload_caches >>, true ]
-              - equal: [ << parameters.runner_type >>, "selfhosted" ]
-          steps:
-            - save_sbt_cache_self_hosted
+      # re-enable when it's not broken
+      # - when:
+      #     condition:
+      #       and:
+      #         - equal: [ << parameters.upload_caches >>, true ]
+      #         - equal: [ << parameters.runner_type >>, "selfhosted" ]
+      #     steps:
+      #       - save_sbt_cache_self_hosted
       - run:
           name: Convert time stamps in browser logs
           when: on_fail
@@ -250,12 +251,13 @@ commands:
 
 
   #### Self hosted runners
-  save_sbt_cache_self_hosted:
-    steps:
-      - execute_sbt_command:
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
-          cmd: pushRemoteCache
-          cmd_retry_count: 3
+  # re-enable when it's not broken
+  # save_sbt_cache_self_hosted:
+  #   steps:
+  #     - execute_sbt_command:
+  #         pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+  #         cmd: pushRemoteCache
+  #         cmd_retry_count: 3
 
   restore_sbt_cache_self_hosted:
     parameters:
@@ -270,6 +272,7 @@ commands:
       - restore_precompiled_classes:
           runner_type: << parameters.runner_type >>
       - restore_frontend_node_modules
-      - execute_sbt_command:
-          cmd: pullRemoteCache
-          cmd_retry_count: 3
+      # re-enable when it's not broken
+#      - execute_sbt_command:
+#          cmd: pullRemoteCache
+#          cmd_retry_count: 3
