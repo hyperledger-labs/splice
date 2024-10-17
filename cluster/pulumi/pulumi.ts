@@ -80,22 +80,30 @@ export async function stack(
     : await automation.LocalWorkspace.createOrSelectStack(stackOpts, workspaceOpts);
 }
 
-export async function refreshStack(stack: automation.Stack, abortSignal: AbortSignal): Promise<void> {
+export async function refreshStack(stack: automation.Stack, abortController: PulumiAbortController): Promise<void> {
   const name = stack.name;
   console.log(`${name} - Refreshing stack`);
-  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortSignal));
+  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
+    abortController.abort(`Aborting because of caught exception`);
+    throw e;
+  });
 }
 
-export async function downStack(stack: automation.Stack, abortSignal: AbortSignal): Promise<void> {
+export async function downStack(stack: automation.Stack, abortController: PulumiAbortController): Promise<void> {
   const name = stack.name;
-  console.log(`${name} - Destroying stack`);
-  await stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortSignal));
+  console.error(`${name} - Destroying stack`);
+  await stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
+    abortController.abort(`Aborting because of caught exception`);
+    throw e;
+  });
 }
 
-export async function upStack(stack: automation.Stack, abortSignal: AbortSignal): Promise<void> {
+export async function upStack(stack: automation.Stack, abortController: PulumiAbortController): Promise<void> {
   const name = stack.name;
-  const result = await stack.up(pulumiOptsWithPrefix(`[${name}]`, abortSignal));
-  console.log(`${name} stack up result:`);
+  const result = await stack.up(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
+    abortController.abort(`Aborting because of caught exception`);
+    throw e;
+  });
   console.log(util.inspect(result.summary, { colors: true, depth: null, maxStringLength: null }));
 }
 
@@ -103,11 +111,17 @@ export async function upStack(stack: automation.Stack, abortSignal: AbortSignal)
 // 1. Also listens for SIGINT and SIGTERM signals
 // 2. Guarantees it will signal only once because aborting pulumi is not idempotent, if we signal twice
 //    pulumi will abort without cleanup.
+// 3. Waits a few seconds before actually signalling, see https://github.com/DACH-NY/canton-network-node/issues/15519
+//    for the reason (the gist is: aborting pulumi actions too early causes pulumi to terminate without releasing the lock)
 export class PulumiAbortController {
 
   constructor() {
     ['SIGINT', 'SIGTERM']
       .forEach(signal =>
+        // We assume here that an external abort signal will not come immediately, and do not
+        // wait before sending the actual signal to Pulumi. This is because we do not want to
+        // add delays to cleaning up when CCI terminates us, to try to avoid CCI timing out and
+        // hard-killing us.
         process.on(signal, () => { this.abort("Aborting due to caught signal"); })
       );
   }
@@ -115,9 +129,13 @@ export class PulumiAbortController {
   private controller = new AbortController();
   private aborted = false;
 
+  private WAIT_BEFORE_ABORT = 10000;
+
   public abort(reason?: any): void {
     if (!this.aborted) {
-      this.controller.abort(reason);
+      new Promise((f) => setTimeout(f, this.WAIT_BEFORE_ABORT)).then(() =>
+        this.controller.abort(reason)
+      );
     }
     this.aborted = true;
   }
@@ -126,3 +144,11 @@ export class PulumiAbortController {
     return this.controller.signal;
   }
 }
+
+export async function awaitAllOrThrowAllExceptions(operations: Promise<void>[]): Promise<void> {
+  const data = await Promise.allSettled(operations);
+  const rejectionReasons = (data.filter((res) => res.status === "rejected") as PromiseRejectedResult[]).map(res => res.reason);
+  if (rejectionReasons.length > 0) {
+    throw new Error(rejectionReasons.join("\n"));
+  }
+};
