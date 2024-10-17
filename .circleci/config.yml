@@ -1820,6 +1820,8 @@ jobs:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "20m"
+          # Note that this'll also mean duplicate backups for the nodes that did succeed, but not worth the extra complexity to avoid that.
+          cmd_retry_count: 3
           cmd: |
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
