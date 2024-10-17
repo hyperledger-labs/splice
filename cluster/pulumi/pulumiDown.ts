@@ -3,12 +3,12 @@ import {
   mustInstallValidator1,
 } from 'splice-pulumi-common-validator/src/validators';
 
-import { downStack, stack } from './pulumi';
+import { downStack, PulumiAbortController, stack } from './pulumi';
 
 async function runCoreStackDown() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
   const operations: Promise<void>[] = [];
-  const abortController = new AbortController();
+  const abortController = new PulumiAbortController();
   operations.push(downStack(mainStack, abortController.signal).catch(e => abortController.abort("Aborting because mainStack failed")));
   if (mustInstallValidator1) {
     const validator1 = await stack('validator1', 'validator1', true, {});

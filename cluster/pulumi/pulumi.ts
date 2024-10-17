@@ -98,3 +98,31 @@ export async function upStack(stack: automation.Stack, abortSignal: AbortSignal)
   console.log(`${name} stack up result:`);
   console.log(util.inspect(result.summary, { colors: true, depth: null, maxStringLength: null }));
 }
+
+// An AbortController that:
+// 1. Also listens for SIGINT and SIGTERM signals
+// 2. Guarantees it will signal only once because aborting pulumi is not idempotent, if we signal twice
+//    pulumi will abort without cleanup.
+export class PulumiAbortController {
+
+  constructor() {
+    ['SIGINT', 'SIGTERM']
+      .forEach(signal =>
+        process.on(signal, () => { this.abort("Aborting due to caught signal"); })
+      );
+  }
+
+  private controller = new AbortController();
+  private aborted = false;
+
+  public abort(reason?: any): void {
+    if (!this.aborted) {
+      this.controller.abort(reason);
+    }
+    this.aborted = true;
+  }
+
+  public get signal(): AbortSignal {
+    return this.controller.signal;
+  }
+}

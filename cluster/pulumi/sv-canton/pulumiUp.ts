@@ -1,6 +1,7 @@
+import { PulumiAbortController } from '../pulumi';
 import { pulumiOptsForMigration, runForAllMigrations } from './pulumi';
 
-const abortController = new AbortController();
+const abortController = new PulumiAbortController();
 
 runForAllMigrations(async (stack, migration, sv) => {
   console.log(`[migration=${migration.id}]Updating stack for ${sv}`);
