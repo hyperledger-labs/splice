@@ -799,7 +799,6 @@
         },
         "migration": {
           "id": 1,
-          "legacyId": 0,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
