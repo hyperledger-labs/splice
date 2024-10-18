@@ -22,7 +22,7 @@ object Wartremover {
   }
 
   lazy val extraWartRemoverErrors =
-    if (sys.env.contains("CI")) Seq(Wart.custom("com.daml.network.wart.Println"))
+    if (sys.env.contains("CI")) Seq(Wart.custom("org.lfdecentralizedtrust.splice.wart.Println"))
     else Seq()
 
   lazy val spliceWarts = Seq(

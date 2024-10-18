@@ -3,7 +3,7 @@
 
 syntax = "proto3";
 
-package com.daml.network.sv.store;
+package org.lfdecentralizedtrust.splice.sv.store;
 
 import "google/protobuf/struct.proto";
 import "scalapb/scalapb.proto";
@@ -13,13 +13,13 @@ message ARC_DsoRules {
 }
 
 message VoteRequestTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.sv.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.sv.store.TxLogEntry.TypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.sv.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.sv.store.TxLogEntry.TypeMappers";
 
-  google.protobuf.Struct result = 1 [(scalapb.field).type = "com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult"];
+  google.protobuf.Struct result = 1 [(scalapb.field).type = "org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult"];
 }
 
 message ErrorTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.sv.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.sv.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 }

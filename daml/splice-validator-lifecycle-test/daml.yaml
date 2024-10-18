@@ -15,6 +15,6 @@ build-options:
   - --target=2.1
 codegen:
   java:
-    package-prefix: com.daml.network.codegen.java
-    decoderClass: com.daml.network.codegen.java.DecoderSpliceValidatorLifecycleTest
+    package-prefix: org.lfdecentralizedtrust.splice.codegen.java
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceValidatorLifecycleTest
     output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
