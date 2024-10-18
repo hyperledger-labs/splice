@@ -205,6 +205,7 @@ class ScanHistoryBackfillingTrigger(
                   batchSize = batchSize,
                   loggerFactory = loggerFactory,
                   timeouts = context.timeouts,
+                  metricsFactory = context.metricsFactory,
                 )
               backfillingVar = Some(backfilling)
               backfillingVar

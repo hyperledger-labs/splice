@@ -309,3 +309,59 @@ groups:
           "": ""
           gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A%22{{ index  "trigger_name" }}%22
         isPaused: false
+      - uid: fe12i7xur3eo0d
+        title: Backfilling not progressing
+        condition: C
+        data:
+          - refId: Max (rate vs completed)
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by(namespace)(cn_history_backfilling_completed OR rate(cn_history_backfilling_transaction_count[5m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: Max (rate vs completed)
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1e-11
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: Max (rate vs completed)
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: ""
+          runbook_url: ""
+          summary: History backfill is not making any progress in {{ index $labels "namespace" }}
+        labels:
+          "": ""
+        isPaused: false

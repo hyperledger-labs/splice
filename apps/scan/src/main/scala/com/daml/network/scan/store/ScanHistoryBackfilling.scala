@@ -4,6 +4,7 @@
 package com.daml.network.scan.store
 
 import com.daml.ledger.javaapi.data as javaApi
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.network.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
 import com.daml.network.scan.admin.api.client.BackfillingScanConnection
 import com.daml.network.store.{HistoryBackfilling, TreeUpdateWithMigrationId}
@@ -40,6 +41,7 @@ class ScanHistoryBackfilling(
     batchSize: Int = 100,
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
+    metricsFactory: LabeledMetricsFactory,
 )(implicit
     ec: ExecutionContextExecutor
 ) extends FlagCloseableAsync
@@ -79,6 +81,7 @@ class ScanHistoryBackfilling(
       currentMigrationId = currentMigrationId,
       batchSize = batchSize,
       loggerFactory,
+      metricsFactory,
     )
 
   def backfill()(implicit tc: TraceContext): Future[Outcome] = {

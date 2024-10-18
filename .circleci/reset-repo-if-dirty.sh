@@ -13,6 +13,7 @@ if [[  $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
   echo "Repo is dirty on CI"
   git status
   git --no-pager diff --cached
+  # post-slack-message skips the notification if the message contains "cluster scratchnet" ...
   .circleci/post-slack-message.sh "Repo is dirty on CI; resetting. ( $slack_message_suffix )"
   echo "Resetting repo..."
   git reset HEAD --hard
