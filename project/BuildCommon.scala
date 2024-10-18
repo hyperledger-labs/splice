@@ -106,7 +106,7 @@ object BuildCommon {
             (
               (Compile / baseDirectory).value,
               darFile,
-              "com.daml.network.codegen",
+              "org.lfdecentralizedtrust.splice.codegen",
             )
           )
         }
@@ -209,7 +209,7 @@ object BuildCommon {
         addCommandAlias("cn-clean", "; clean-cn")
     val buildSettings = inThisBuild(
       Seq(
-        organization := "com.daml.network",
+        organization := "org.lfdecentralizedtrust.splice",
         scalaVersion := scala_version,
         // , scalacOptions += "-Ystatistics" // re-enable if you need to debug compile times
       )
