@@ -1,27 +1,41 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.round.IssuingMiningRound
+import com.daml.network.codegen.java.splice.types.Round
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_CreateExternalPartySetupProposal
+import com.daml.network.codegen.java.splice.wallet.install.{AmuletOperation, WalletAppInstall}
 import com.daml.network.config.ConfigTransforms
-import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import com.daml.network.integration.EnvironmentDefinition
-import com.daml.network.integration.tests.SpliceTests.IntegrationTest
+import com.daml.network.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
 import com.daml.network.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
+  ExpireTransferPreapprovalsTrigger,
 }
-import com.daml.network.util.{TriggerTestUtil, WalletTestUtil}
+import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.RenewTransferPreapprovalTrigger
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressingLogger
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.HexString
 import monocle.macros.syntax.lens.*
-import java.time.Duration
+
+import java.time.{Duration, Instant}
 import java.util.UUID
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 // TODO(#14568) Merge this into ExternallySignedPartyOnboardingTest
 class ExternalPartySetupProposalIntegrationTest
@@ -265,6 +279,105 @@ class ExternalPartySetupProposalIntegrationTest
           )
         )
       }
+    }
+  }
+
+  // TODO(#15468): Simplify this test to not require a ledger submission
+  "TransferPreapprovals get expired by SV automation" in { implicit env =>
+    val onboarding = onboardExternalParty(aliceValidatorBackend)
+    val externalParty = onboarding.party
+    aliceValidatorWalletClient.tap(10.0)
+    aliceValidatorBackend.lookupTransferPreapprovalByParty(externalParty) shouldBe None
+    // Pause the expiry trigger
+    setTriggersWithin(
+      triggersToPauseAtStart =
+        env.svs.local.map(_.dsoDelegateBasedAutomation.trigger[ExpireTransferPreapprovalsTrigger])
+    ) {
+      val (proposalCid, _) = actAndCheck(
+        s"Create a proposal to setup an external party with a soon-to-expire transfer preapproval",
+        createExternalPartyProposalViaLedgerApi(externalParty, Instant.now().plusSeconds(2)),
+      )(
+        s"External party setup proposal for $externalParty was created",
+        { proposalCid =>
+          aliceValidatorBackend
+            .listExternalPartySetupProposals()
+            .map(c => c.contract.contractId) contains proposalCid
+        },
+      )
+      actAndCheck(
+        "External party accepts the proposal",
+        acceptExternalPartySetupProposal(aliceValidatorBackend, onboarding, proposalCid),
+      )(
+        "An expiring TransferPreapproval for the external party is created",
+        _ =>
+          aliceValidatorBackend.lookupTransferPreapprovalByParty(externalParty) should not be None,
+      )
+    }
+
+    // Expiry trigger resumed
+    clue("SV automation expires the TransferPreapproval contract") {
+      eventually() {
+        aliceValidatorBackend.lookupTransferPreapprovalByParty(externalParty) shouldBe None
+      }
+    }
+  }
+
+  private def createExternalPartyProposalViaLedgerApi(receiverParty: PartyId, expiresAt: Instant)(
+      implicit env: SpliceTestConsoleEnvironment
+  ) = {
+    val validatorParty = aliceValidatorBackend.getValidatorPartyId()
+    val transferContext = sv1ScanBackend.getTransferContextWithInstances(env.environment.clock.now)
+    val inputAmulets = aliceValidatorWalletClient.list().amulets
+    val walletInstall = inside(
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(WalletAppInstall.COMPANION)(
+          validatorParty,
+          c => c.data.validatorParty == c.data.endUserParty,
+        )
+    ) { case Seq(install) => install }
+    val executeBatchCmd = walletInstall.id.exerciseWalletAppInstall_ExecuteBatch(
+      new splice.amuletrules.PaymentTransferContext(
+        transferContext.amuletRules.contract.contractId,
+        new splice.amuletrules.TransferContext(
+          transferContext.latestOpenMiningRound.contract.contractId,
+          Map.empty[Round, IssuingMiningRound.ContractId].asJava,
+          Map.empty[String, splice.amulet.ValidatorRight.ContractId].asJava,
+          None.toJava,
+        ),
+      ),
+      inputAmulets
+        .map(_.contract.contractId.contractId)
+        .map[splice.amuletrules.TransferInput](cid =>
+          new splice.amuletrules.transferinput.InputAmulet(new splice.amulet.Amulet.ContractId(cid))
+        )
+        .asJava,
+      List[AmuletOperation](
+        new CO_CreateExternalPartySetupProposal(
+          receiverParty.toProtoPrimitive,
+          expiresAt,
+        )
+      ).asJava,
+    )
+    inside(
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+        .submitWithResult(
+          aliceValidatorBackend.config.ledgerApiUser,
+          Seq(validatorParty),
+          Seq(validatorParty),
+          executeBatchCmd,
+          disclosedContracts = DisclosedContracts
+            .forTesting(
+              transferContext.amuletRules,
+              transferContext.latestOpenMiningRound,
+            )
+            .toLedgerApiDisclosedContracts,
+        )
+        .exerciseResult
+        .outcomes
+        .asScala
+        .toSeq
+    ) { case Seq(outcome) =>
+      outcome.asInstanceOf[COO_CreateExternalPartySetupProposal].contractIdValue
     }
   }
 }

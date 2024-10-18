@@ -983,6 +983,14 @@ trait SvDsoStore
   )(implicit tc: TraceContext): Future[
     Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
   ]
+
+  def listExpiredTransferPreapprovals: ListExpiredContracts[
+    splice.amuletrules.TransferPreapproval.ContractId,
+    splice.amuletrules.TransferPreapproval,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(
+      splice.amuletrules.TransferPreapproval.COMPANION
+    )
 }
 
 object SvDsoStore {
@@ -1333,7 +1341,8 @@ object SvDsoStore {
       mkFilter(splice.amuletrules.TransferPreapproval.COMPANION)(co => co.payload.dso == dso) {
         contract =>
           DsoAcsStoreRowData(
-            contract
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
       },
       mkFilter(splice.externalpartyamuletrules.TransferCommand.COMPANION)(co =>

@@ -473,3 +473,24 @@ testTransferPreapprovalSend = do
   map snd amulets === [Amulet app.dso externalParty (ExpiringAmount 42.0 (Round 1) (RatePerRound 0.00002))]
 
   pure ()
+
+testTransferPreapprovalExpiry: Script ()
+testTransferPreapprovalExpiry = do
+  (app, dso, (sv1, _, _, _)) <- initDevNet
+  validator <- setupValidator app "validator"
+  externalParty <- allocateParty "externalParty"
+  now <- getTime
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  transferPreapprovalCid <- createTransferPreapproval externalParty validator dso  (now `addRelTime` days 1)
+
+  -- Fails before expiry
+  submitMultiMustFail [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
+    transferPreapprovalCid
+  -- Expire the TransferPreapproval
+  passTime (days 1)
+  -- Succeeds after expiry
+  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
+    transferPreapprovalCid
+
+  pure ()

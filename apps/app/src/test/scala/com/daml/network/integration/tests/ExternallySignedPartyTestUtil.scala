@@ -1,6 +1,9 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval
+import com.daml.network.codegen.java.splice.amuletrules.{
+  ExternalPartySetupProposal,
+  TransferPreapproval,
+}
 import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.http.v0.definitions.SignedTopologyTx
 import com.daml.network.integration.tests.SpliceTests.TestCommon
@@ -86,7 +89,14 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
     provider
       .listExternalPartySetupProposals()
       .map(c => c.contract.contractId.contractId) contains proposal.contractId
+    acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal)
+  }
 
+  protected def acceptExternalPartySetupProposal(
+      provider: ValidatorAppBackendReference,
+      externalPartyOnboarding: OnboardingResult,
+      proposal: ExternalPartySetupProposal.ContractId,
+  ): (TransferPreapproval.ContractId, String) = {
     val prepare =
       provider.prepareAcceptExternalPartySetupProposal(proposal, externalPartyOnboarding.party)
     prepare.txHash should not be empty
@@ -107,5 +117,4 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       HexString.toHexString(externalPartyOnboarding.publicKey.key),
     )
   }
-
 }

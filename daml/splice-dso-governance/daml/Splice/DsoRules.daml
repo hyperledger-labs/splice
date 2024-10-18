@@ -275,6 +275,8 @@ data DsoRules_CreateTransferCommandCounterResult = DsoRules_CreateTransferComman
     transferCommandCounterCid : ContractId TransferCommandCounter
   deriving (Show, Eq)
 
+data DsoRules_ExpireTransferPreapprovalResult = DsoRules_ExpireTransferPreapprovalResult
+  deriving (Show, Eq)
 
 -- Workflow templates
 ---------------------
@@ -1260,6 +1262,14 @@ template DsoRules with
            sender
            nextNonce = 0
          pure (DsoRules_CreateTransferCommandCounterResult cid)
+
+    nonconsuming choice DsoRules_ExpireTransferPreapproval : DsoRules_ExpireTransferPreapprovalResult
+      with
+        transferPreapprovalCid : ContractId TransferPreapproval
+      controller dsoDelegate
+      do
+        exercise transferPreapprovalCid TransferPreapproval_Expire
+        pure DsoRules_ExpireTransferPreapprovalResult
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =

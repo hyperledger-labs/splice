@@ -1217,6 +1217,44 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       }
     }
 
+    "listExpiredTransferPreapprovals" should {
+
+      "return all expired transfer pre-approvals" in {
+        val expired = (1 to 3).map(n =>
+          transferPreapproval(
+            userParty(n),
+            providerParty(n),
+            time(0),
+            expiresAt = time(n.toLong),
+          )
+        )
+        val notExpired =
+          (4 to 6).map(n =>
+            transferPreapproval(
+              userParty(n),
+              providerParty(n),
+              time(0),
+              expiresAt = time(n.toLong),
+            )
+          )
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.listExpiredTransferPreapprovals(
+            time(4),
+            PageLimit.tryCreate(100),
+          )(
+            traceContext
+          )
+        } yield {
+          val contracts = result.map(_.contract)
+          contracts should contain theSameElementsAs expired
+        }
+      }
+
+    }
   }
 
   lazy val addUser667Action = new ARC_DsoRules(
