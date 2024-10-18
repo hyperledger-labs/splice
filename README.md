@@ -589,7 +589,7 @@ and the package ids change. That way there is no dedicated vote required.
 
 #### Bumping Our Canton fork
 
-Current Canton commit: `ca8fecb4f389ef7ca565626c6469fe0b84045d2c`
+Current Canton commit: `5938cedddffdd2715cd57e120feab3945f2bfb2e`
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
    In that repo, execute the following steps:
