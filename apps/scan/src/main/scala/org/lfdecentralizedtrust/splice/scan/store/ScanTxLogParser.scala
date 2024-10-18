@@ -6,7 +6,10 @@ package org.lfdecentralizedtrust.splice.scan.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{AmuletCreateSummary, AmuletExpireSummary}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  AmuletCreateSummary,
+  AmuletExpireSummary,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferResult
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{

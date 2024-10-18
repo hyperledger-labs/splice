@@ -12,7 +12,10 @@ import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
+  ClosedMiningRound,
+  SummarizingMiningRound,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.{
   ValidatorFaucetCoupon,
   ValidatorLicense,
@@ -37,7 +40,12 @@ import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsQueries,
+  AcsTables,
+  DbTxLogAppStore,
+  TxLogQueries,
+}
 import org.lfdecentralizedtrust.splice.store.{
   DbVotesStoreQueryBuilder,
   IngestionSummary,

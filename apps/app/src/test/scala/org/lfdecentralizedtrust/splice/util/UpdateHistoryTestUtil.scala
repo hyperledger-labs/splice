@@ -17,14 +17,20 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdate,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions
-import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.{CompactJson, ProtobufJson}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.{
+  CompactJson,
+  ProtobufJson,
+}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
   ProtobufJsonScanHttpEncodings,
   ScanHttpEncodings,
 }
-import org.lfdecentralizedtrust.splice.store.UpdateHistoryTestBase.{LostInScanApi, LostInStoreIngestion}
+import org.lfdecentralizedtrust.splice.store.UpdateHistoryTestBase.{
+  LostInScanApi,
+  LostInStoreIngestion,
+}
 import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
 import com.daml.ledger.javaapi.data.*
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{

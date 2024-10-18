@@ -30,7 +30,12 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   NoDedup,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionFilter
-import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState, DisclosedContracts}
+import org.lfdecentralizedtrust.splice.util.{
+  AssignedContract,
+  Contract,
+  ContractWithState,
+  DisclosedContracts,
+}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,

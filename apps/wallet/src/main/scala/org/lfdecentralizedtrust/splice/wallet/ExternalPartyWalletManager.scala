@@ -16,7 +16,11 @@ import org.lfdecentralizedtrust.splice.store.{
   LimitHelpers,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, HasHealth, TemplateJsonDecoder}
-import org.lfdecentralizedtrust.splice.wallet.store.{ExternalPartyWalletStore, UserWalletStore, WalletStore}
+import org.lfdecentralizedtrust.splice.wallet.store.{
+  ExternalPartyWalletStore,
+  UserWalletStore,
+  WalletStore,
+}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage

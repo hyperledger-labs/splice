@@ -61,7 +61,11 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRes
   Mint,
   Transfer,
 }
-import org.lfdecentralizedtrust.splice.http.{HttpValidatorLicensesHandler, HttpVotesHandler, UrlValidator}
+import org.lfdecentralizedtrust.splice.http.{
+  HttpValidatorLicensesHandler,
+  HttpVotesHandler,
+  UrlValidator,
+}
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.scan.store.ScanHistoryBackfilling.{
   FoundingTransactionTreeUpdate,

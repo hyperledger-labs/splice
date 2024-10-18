@@ -24,7 +24,12 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
 import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers}
-import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  ContractWithState,
+  QualifiedName,
+  TemplateJsonDecoder,
+}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash

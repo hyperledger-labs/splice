@@ -4,7 +4,10 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{ActionRequiringConfirmation, VoteRequest}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  ActionRequiringConfirmation,
+  VoteRequest,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_AnsEntryContext,
@@ -26,7 +29,12 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.{Accepted, StoreErrors, VoteRequestOutcome}
-import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsRowData,
+  AcsTables,
+  IndexColumnValue,
+  TxLogRowData,
+}
 import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.data.CantonTimestamp

@@ -4,7 +4,10 @@
 package org.lfdecentralizedtrust.splice.validator.automation
 
 import org.lfdecentralizedtrust.splice.automation.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{TransferPreapproval, invalidtransferreason}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  TransferPreapproval,
+  invalidtransferreason,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_RenewTransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome
 import org.lfdecentralizedtrust.splice.util.AssignedContract

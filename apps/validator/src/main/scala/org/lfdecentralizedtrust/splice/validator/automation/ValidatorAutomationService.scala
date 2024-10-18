@@ -15,7 +15,10 @@ import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.store.{
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.validator.config.AppManagerConfig
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector

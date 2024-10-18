@@ -9,7 +9,10 @@ import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AmuletCreateSummary
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{InvalidTransferReason, TransferSummary}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  InvalidTransferReason,
+  TransferSummary,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtransferreason.{
   ITR_InsufficientFunds,
   ITR_InsufficientTopupAmount,
@@ -31,7 +34,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amulet
   CO_Tap,
   ExtAmuletOperation,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{AmuletOperation, AmuletOperationOutcome}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
+  AmuletOperation,
+  AmuletOperationOutcome,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,

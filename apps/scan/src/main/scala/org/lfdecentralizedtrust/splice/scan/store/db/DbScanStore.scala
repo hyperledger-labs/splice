@@ -7,13 +7,19 @@ import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  TransferPreapproval,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+}
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
@@ -27,9 +33,25 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
-import org.lfdecentralizedtrust.splice.store.{DbVotesStoreQueryBuilder, Limit, PageLimit, SortOrder, TxLogStore}
-import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsQueries,
+  AcsTables,
+  DbTxLogAppStore,
+  TxLogQueries,
+}
+import org.lfdecentralizedtrust.splice.store.{
+  DbVotesStoreQueryBuilder,
+  Limit,
+  PageLimit,
+  SortOrder,
+  TxLogStore,
+}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  ContractWithState,
+  QualifiedName,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.caching.CaffeineCache
 import com.digitalasset.canton.caching.CaffeineCache.FutureAsyncCacheLoader
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -743,7 +765,9 @@ class DbScanStore(
                from #${ScanTables.acsTableName}
                where store_id = $storeId
                 and migration_id = $domainMigrationId
-                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID)}
+                and template_id_qualified_name = ${QualifiedName(
+              MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
+            )}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
                 and member_traffic_domain = ${lengthLimited(domainId.toProtoPrimitive)}
              """.as[Long].headOption,

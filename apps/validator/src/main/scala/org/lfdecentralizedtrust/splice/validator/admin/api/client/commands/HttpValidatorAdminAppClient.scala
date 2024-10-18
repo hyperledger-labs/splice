@@ -12,7 +12,12 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, validator_admin as http}
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
-import org.lfdecentralizedtrust.splice.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}

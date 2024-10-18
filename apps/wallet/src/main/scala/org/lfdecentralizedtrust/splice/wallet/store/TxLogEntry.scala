@@ -448,7 +448,8 @@ object TxLogEntry extends StoreErrors {
         extends TransferTransactionSubtype(AmuletRules_CreateTransferPreapproval)
     case object TransferPreapprovalRenewal
         extends TransferTransactionSubtype(TransferPreapproval_Renew)
-    case object Transfer extends TransferTransactionSubtype(org.lfdecentralizedtrust.splice.history.Transfer)
+    case object Transfer
+        extends TransferTransactionSubtype(org.lfdecentralizedtrust.splice.history.Transfer)
 
     val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
       P2PPaymentCompleted,
@@ -476,8 +477,10 @@ object TxLogEntry extends StoreErrors {
 
   object BalanceChangeTransactionSubtype {
 
-    case object Tap extends BalanceChangeTransactionSubtype(org.lfdecentralizedtrust.splice.history.Tap)
-    case object Mint extends BalanceChangeTransactionSubtype(org.lfdecentralizedtrust.splice.history.Mint)
+    case object Tap
+        extends BalanceChangeTransactionSubtype(org.lfdecentralizedtrust.splice.history.Tap)
+    case object Mint
+        extends BalanceChangeTransactionSubtype(org.lfdecentralizedtrust.splice.history.Mint)
     case object AppPaymentRejected
         extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Reject)
     case object AppPaymentExpired extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Expire)

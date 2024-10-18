@@ -36,14 +36,23 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import org.lfdecentralizedtrust.splice.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.{
+  CommandPriority,
+  RetryProvider,
+  SpliceLedgerConnection,
+}
 import SpliceLedgerConnection.CommandId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupConfig
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
-import org.lfdecentralizedtrust.splice.util.{AssignedContract, DisclosedContracts, HasHealth, SpliceUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  AssignedContract,
+  DisclosedContracts,
+  HasHealth,
+  SpliceUtil,
+}
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.splice.wallet.config.TreasuryConfig
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore

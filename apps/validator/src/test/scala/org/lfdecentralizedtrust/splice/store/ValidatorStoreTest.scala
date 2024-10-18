@@ -11,7 +11,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install as wal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.topupstate as topUpCodegen
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
-import org.lfdecentralizedtrust.splice.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  AssignedContract,
+  ResourceTemplateDecoder,
+  TemplateJsonDecoder,
+}
 import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
   ValidatorSynchronizerConfig,

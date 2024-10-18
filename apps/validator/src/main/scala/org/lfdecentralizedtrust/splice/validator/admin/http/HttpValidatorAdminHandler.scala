@@ -8,7 +8,10 @@ import cats.syntax.foldable.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{TransferPreapproval, invalidtransferreason}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  TransferPreapproval,
+  invalidtransferreason,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.ExternalPartySetupProposal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome

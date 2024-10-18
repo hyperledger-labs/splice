@@ -19,12 +19,26 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.migration.{DomainDataRestorer, DomainMigrationInfo}
-import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.store.{
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
 import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftClient, CometBftNode, CometBftRequestSigner}
-import org.lfdecentralizedtrust.splice.sv.config.{CometBftConfig, SvAppBackendConfig, SvOnboardingConfig}
-import org.lfdecentralizedtrust.splice.sv.migration.{DomainMigrationDump, SynchronizerNodeIdentities}
+import org.lfdecentralizedtrust.splice.sv.cometbft.{
+  CometBftClient,
+  CometBftNode,
+  CometBftRequestSigner,
+}
+import org.lfdecentralizedtrust.splice.sv.config.{
+  CometBftConfig,
+  SvAppBackendConfig,
+  SvOnboardingConfig,
+}
+import org.lfdecentralizedtrust.splice.sv.migration.{
+  DomainMigrationDump,
+  SynchronizerNodeIdentities,
+}
 import org.lfdecentralizedtrust.splice.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,

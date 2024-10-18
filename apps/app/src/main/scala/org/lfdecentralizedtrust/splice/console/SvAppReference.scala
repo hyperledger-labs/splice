@@ -14,7 +14,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
-import org.lfdecentralizedtrust.splice.environment.{BuildInfo, SpliceConsoleEnvironment, SpliceStatus}
+import org.lfdecentralizedtrust.splice.environment.{
+  BuildInfo,
+  SpliceConsoleEnvironment,
+  SpliceStatus,
+}
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.{
@@ -22,7 +26,10 @@ import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.{
   HttpSvSoftDomainMigrationPocAppClient,
   HttpSvAppClient,
 }
-import org.lfdecentralizedtrust.splice.sv.automation.{DsoDelegateBasedAutomationService, SvDsoAutomationService}
+import org.lfdecentralizedtrust.splice.sv.automation.{
+  DsoDelegateBasedAutomationService,
+  SvDsoAutomationService,
+}
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
 import org.lfdecentralizedtrust.splice.util.Contract

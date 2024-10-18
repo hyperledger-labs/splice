@@ -14,7 +14,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
+  IssuingMiningRound,
+  OpenMiningRound,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.{

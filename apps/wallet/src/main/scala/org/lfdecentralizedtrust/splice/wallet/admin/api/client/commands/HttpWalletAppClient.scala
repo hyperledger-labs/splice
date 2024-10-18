@@ -26,7 +26,12 @@ import org.lfdecentralizedtrust.splice.http.v0.wallet.{
   GetSubscriptionRequestResponse,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
-import org.lfdecentralizedtrust.splice.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp

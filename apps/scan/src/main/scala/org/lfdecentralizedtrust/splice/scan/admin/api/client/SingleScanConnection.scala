@@ -5,13 +5,23 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  TransferPreapproval,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
+  IssuingMiningRound,
+  OpenMiningRound,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
-import org.lfdecentralizedtrust.splice.environment.{HttpAppConnection, RetryProvider, SpliceLedgerClient}
+import org.lfdecentralizedtrust.splice.environment.{
+  HttpAppConnection,
+  RetryProvider,
+  SpliceLedgerClient,
+}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.MigrationSchedule
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{
@@ -21,7 +31,12 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
-import org.lfdecentralizedtrust.splice.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -143,7 +158,9 @@ class SingleScanConnection private[client] (
 
   def lookupAnsEntryByParty(
       id: PartyId
-  )(implicit tc: TraceContext): Future[Option[org.lfdecentralizedtrust.splice.http.v0.definitions.AnsEntry]] = {
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[org.lfdecentralizedtrust.splice.http.v0.definitions.AnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.LookupAnsEntryByParty(id),
@@ -152,7 +169,9 @@ class SingleScanConnection private[client] (
 
   def lookupAnsEntryByName(
       name: String
-  )(implicit tc: TraceContext): Future[Option[org.lfdecentralizedtrust.splice.http.v0.definitions.AnsEntry]] = {
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[org.lfdecentralizedtrust.splice.http.v0.definitions.AnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.LookupAnsEntryByName(name),

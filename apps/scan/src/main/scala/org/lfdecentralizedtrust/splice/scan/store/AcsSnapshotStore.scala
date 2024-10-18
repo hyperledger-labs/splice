@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import com.daml.ledger.javaapi.data.CreatedEvent
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{AcsSnapshot, QueryAcsSnapshotResult}
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
+  AcsSnapshot,
+  QueryAcsSnapshotResult,
+}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}

@@ -7,7 +7,10 @@ import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.store.{
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
 import org.lfdecentralizedtrust.splice.util.{HasHealth, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore

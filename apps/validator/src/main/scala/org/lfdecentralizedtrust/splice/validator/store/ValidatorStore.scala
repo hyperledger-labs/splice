@@ -19,7 +19,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
+  ConstrainedTemplate,
+  QueryResult,
+  TemplateFilter,
+}
 import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore, PageLimit}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore

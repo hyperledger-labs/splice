@@ -3,12 +3,18 @@
 
 package org.lfdecentralizedtrust.splice.wallet.automation
 
-import org.lfdecentralizedtrust.splice.automation.{AutomationServiceCompanion, SpliceAppAutomationService}
+import org.lfdecentralizedtrust.splice.automation.{
+  AutomationServiceCompanion,
+  SpliceAppAutomationService,
+}
 import AutomationServiceCompanion.TriggerClass
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.store.{
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
 import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock

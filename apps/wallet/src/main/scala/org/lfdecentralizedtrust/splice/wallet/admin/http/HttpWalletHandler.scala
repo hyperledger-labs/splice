@@ -20,7 +20,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
-import org.lfdecentralizedtrust.splice.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.{
+  CommandPriority,
+  RetryProvider,
+  SpliceLedgerConnection,
+}
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection.CommandId
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletResource as r0
@@ -28,7 +32,12 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions as d0, wallet as v0}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
-import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, DisclosedContracts, SpliceUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  ContractWithState,
+  DisclosedContracts,
+  SpliceUtil,
+}
 import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletService}
 import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService

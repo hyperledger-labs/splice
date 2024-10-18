@@ -9,7 +9,12 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.store.Limit
 import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  SpliceUtil,
+  SplitwellTestUtil,
+  TriggerTestUtil,
+  WalletTestUtil,
+}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.splice.wallet.automation.AcceptedTransferOfferTrigger
 import org.lfdecentralizedtrust.splice.validator.automation.RenewTransferPreapprovalTrigger

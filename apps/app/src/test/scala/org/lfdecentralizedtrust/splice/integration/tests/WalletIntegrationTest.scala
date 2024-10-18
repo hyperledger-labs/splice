@@ -10,7 +10,11 @@ import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletClient
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, WalletTestUtil, JavaDecodeUtil as DecodeUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  SpliceUtil,
+  WalletTestUtil,
+  JavaDecodeUtil as DecodeUtil,
+}
 import org.lfdecentralizedtrust.splice.validator.automation.AcceptTransferPreapprovalProposalTrigger
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import com.digitalasset.canton.console.CommandFailure

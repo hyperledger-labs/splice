@@ -10,7 +10,11 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRight
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  RetryFor,
+  SpliceLedgerConnection,
+}
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.wallet.ExternalPartyWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown

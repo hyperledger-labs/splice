@@ -10,7 +10,11 @@ import org.lfdecentralizedtrust.splice.config.{
   ParticipantClientConfig,
   SpliceDbConfig,
 }
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, bumpUrl, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  bumpUrl,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,

@@ -11,8 +11,14 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskFailed,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{Confirmation, DsoRules_ExecuteConfirmedAction}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
+  ClosedMiningRound,
+  SummarizingMiningRound,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  Confirmation,
+  DsoRules_ExecuteConfirmedAction,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_AnsEntryContext,

@@ -11,9 +11,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRo
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_CreateExternalPartySetupProposal
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{AmuletOperation, WalletAppInstall}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
+  AmuletOperation,
+  WalletAppInstall,
+}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition

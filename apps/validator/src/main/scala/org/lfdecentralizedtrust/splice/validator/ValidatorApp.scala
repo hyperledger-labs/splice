@@ -8,7 +8,10 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
-import org.lfdecentralizedtrust.splice.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
+import org.lfdecentralizedtrust.splice.automation.{
+  DomainParamsAutomationService,
+  DomainTimeAutomationService,
+}
 import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
@@ -33,7 +36,11 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
-import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer, ParticipantPartyMigrator}
+import org.lfdecentralizedtrust.splice.setup.{
+  NodeInitializer,
+  ParticipantInitializer,
+  ParticipantPartyMigrator,
+}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.util.{
@@ -62,7 +69,10 @@ import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.validator.util.{OAuth2Manager, ValidatorUtil}
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
-import org.lfdecentralizedtrust.splice.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
+import org.lfdecentralizedtrust.splice.wallet.admin.http.{
+  HttpExternalWalletHandler,
+  HttpWalletHandler,
+}
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.concurrent.FutureSupervisor
