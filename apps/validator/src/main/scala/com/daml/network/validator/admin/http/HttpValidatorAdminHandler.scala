@@ -715,7 +715,6 @@ class HttpValidatorAdminHandler(
               senderParty.toProtoPrimitive,
               receiverParty.toProtoPrimitive,
               body.amount.bigDecimal,
-              body.trackingId,
               body.expiresAt.toInstant,
               body.nonce,
             )

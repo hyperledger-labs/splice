@@ -122,7 +122,6 @@ class ValidatorClient:
         receiver_party_id,
         amount,
         expires_at,
-        tracking_id,
         nonce,
     ):
         payload = {
@@ -130,7 +129,6 @@ class ValidatorClient:
             "receiver_party_id": receiver_party_id,
             "amount": amount,
             "expires_at": expires_at,
-            "tracking_id": tracking_id,
             "nonce": nonce,
         }
         response = await session_post(
@@ -262,13 +260,11 @@ async def handle_transfer_preapproval_send(args, validator_client):
     expires_at = (
         f"{(datetime.datetime.now() + datetime.timedelta(hours=24)).isoformat()}Z"
     )
-    tracking_id = str(uuid.uuid4())
     response = await validator_client.prepare_transfer_preapproval_send(
         args.sender_party_id,
         args.receiver_party_id,
         args.amount,
         expires_at,
-        tracking_id,
         args.nonce,
     )
     signer = eddsa.new(private_key, "rfc8032")

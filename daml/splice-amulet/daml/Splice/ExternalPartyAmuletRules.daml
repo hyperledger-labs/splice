@@ -26,7 +26,6 @@ template ExternalPartyAmuletRules
         sender : Party
         receiver : Party
         amount : Decimal
-        trackingId : Text
         expiresAt : Time
         nonce : Int
       controller sender
@@ -35,7 +34,6 @@ template ExternalPartyAmuletRules
            sender
            receiver
            amount
-           trackingId
            -- We cannot enforce a max expiry as we cannot call getTime.
            expiresAt
            nonce
@@ -77,7 +75,6 @@ template TransferCommand
     sender : Party
     receiver : Party
     amount : Decimal
-    trackingId : Text -- ^ Tracking id that can be used for deduplication and for querying the status
     expiresAt : Time -- ^ Expiry of the command until when TransferCommand_Send must be called
     nonce : Int
       -- ^ Expected nonce value to order and deduplicate concurrent transfers.

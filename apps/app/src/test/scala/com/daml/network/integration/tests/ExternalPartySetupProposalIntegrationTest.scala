@@ -39,7 +39,6 @@ import com.digitalasset.canton.util.HexString
 import monocle.macros.syntax.lens.*
 
 import java.time.{Duration, Instant}
-import java.util.UUID
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -173,14 +172,12 @@ class ExternalPartySetupProposalIntegrationTest
       .map(tp => tp.contract.contractId) contains cidBob
 
     // Transfer 10.0 from Alice to Bob (with OutputFees: 6.1, SenderChangeFee: 6.0)
-    val trackingId = UUID.randomUUID().toString
     val prepareSend =
       aliceValidatorBackend.prepareTransferPreapprovalSend(
         aliceParty,
         bobParty,
         BigDecimal(10.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
-        trackingId,
         0L,
       )
     val (updateId, _) = actAndCheck(
@@ -293,10 +290,9 @@ class ExternalPartySetupProposalIntegrationTest
     val prepareSendNoPreapproval =
       aliceValidatorBackend.prepareTransferPreapprovalSend(
         aliceParty,
-        sv1Party, // no preapproval for sv1
+        sv1Party,
         BigDecimal(10.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
-        UUID.randomUUID.toString(),
         1L,
       )
     // Archive the preapproval

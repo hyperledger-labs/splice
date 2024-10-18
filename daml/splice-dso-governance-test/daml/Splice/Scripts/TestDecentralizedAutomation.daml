@@ -433,7 +433,6 @@ testTransferPreapprovalSend = do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 12
       nonce = 0
 

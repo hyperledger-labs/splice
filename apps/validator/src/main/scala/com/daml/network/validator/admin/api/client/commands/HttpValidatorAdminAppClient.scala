@@ -442,7 +442,6 @@ object HttpValidatorAdminAppClient {
       receiverPartyId: PartyId,
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
-      trackingId: String,
       nonce: Long,
   ) extends BaseCommand[
         http.PrepareTransferPreapprovalSendResponse,
@@ -462,7 +461,6 @@ object HttpValidatorAdminAppClient {
           receiverPartyId.toProtoPrimitive,
           amount,
           expiresAt.toInstant.atOffset(ZoneOffset.UTC),
-          trackingId,
           nonce,
         ),
         headers = headers,

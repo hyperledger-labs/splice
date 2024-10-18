@@ -244,7 +244,6 @@ abstract class ValidatorAppReference(
       receiverPartyId: PartyId,
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
-      trackingId: String,
       nonce: Long,
   ): definitions.PrepareTransferPreapprovalSendResponse = {
     consoleEnvironment.run {
@@ -254,7 +253,6 @@ abstract class ValidatorAppReference(
           receiverPartyId,
           amount,
           expiresAt,
-          trackingId,
           nonce,
         )
       )

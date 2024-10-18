@@ -1448,7 +1448,6 @@ components:
         - receiver_party_id
         - amount
         - expires_at
-        - tracking_id
         - nonce
       properties:
         sender_party_id:
@@ -1460,11 +1459,6 @@ components:
         expires_at:
           type: string
           format: date-time
-        tracking_id:
-          type: string
-          description: |
-            Tracking id to check the status of the transfer. This is always scoped to the sender.
-            Uniqueness must be enforced by the sender not signing two transactions with the same sender and same tracking id.
         nonce:
           type: integer
           format: int64

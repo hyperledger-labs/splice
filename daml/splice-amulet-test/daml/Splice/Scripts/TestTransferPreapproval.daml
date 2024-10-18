@@ -147,7 +147,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 12
       nonce = 0
 
@@ -203,7 +202,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 12
       nonce = 1
 
@@ -228,7 +226,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 1
       nonce = 1
 
@@ -254,7 +251,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 1
       nonce = 2
 
@@ -268,7 +264,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 1
       nonce = 2
 
@@ -287,7 +282,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 1
       nonce = 1
 
@@ -305,7 +299,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 1
       nonce = 3
 
@@ -325,7 +318,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = externalParty
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 1
       nonce = 2
 
@@ -359,7 +351,6 @@ testTransferCommand = script do
       sender = alice.primaryParty
       receiver = receiverNoPreapproval
       amount = 42.0
-      trackingId = "tracking-id"
       expiresAt = now `addRelTime` hours 1
       nonce = 4
 
