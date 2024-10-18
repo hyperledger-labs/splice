@@ -35,7 +35,7 @@ class ExternalPartyWalletManager(
     val store: WalletStore,
     val validatorUser: String,
     automationConfig: AutomationConfig,
-    private[network] val clock: Clock,
+    private[splice] val clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     storage: Storage,

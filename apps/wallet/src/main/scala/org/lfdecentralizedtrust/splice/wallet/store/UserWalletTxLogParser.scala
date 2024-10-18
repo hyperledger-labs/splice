@@ -1376,7 +1376,7 @@ object UserWalletTxLogParser {
       }
   }
 
-  private[network] def splitFirst[A, CC[_], C, Z](
+  private[splice] def splitFirst[A, CC[_], C, Z](
       fa: collection.SeqOps[A, CC, C] & C
   )(p: A PartialFunction Z): (C, Option[(Z, C)]) = {
     val pivot = fa indexWhere p.isDefinedAt

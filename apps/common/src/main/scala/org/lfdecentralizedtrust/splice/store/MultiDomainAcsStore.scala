@@ -191,7 +191,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       limit: notOnDomainsTotalLimit.type = notOnDomainsTotalLimit,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]
 
-  private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
+  private[splice] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
       companion: C
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
@@ -545,7 +545,7 @@ object MultiDomainAcsStore {
     * We'll have to take an implicit conversion approach instead to support
     * interfaces, but this is good enough for the current callers.
     */
-  private[network] type ConstrainedTemplate =
+  private[splice] type ConstrainedTemplate =
     TemplateCompanion[_ <: ContractId[T], T] forSome {
       type T <: Template
     }

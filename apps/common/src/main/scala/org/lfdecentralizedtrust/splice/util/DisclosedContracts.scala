@@ -34,17 +34,17 @@ sealed abstract class DisclosedContracts {
     * `ifExpected` is [[None]]; otherwise equivalent to [[#assertOnDomain]].
     */
   @throws[Ex]
-  private[network] def inferDomain(ifExpected: Option[DomainId]): Option[DomainId]
+  private[splice] def inferDomain(ifExpected: Option[DomainId]): Option[DomainId]
 
   /** Overwrite the domain id with the domain id of the disclosed contracts as those cannot be reassigned.
     */
   // TODO(#13713) Remove this once our domain selection logic works properly with soft domain migrations
-  private[network] def overwriteDomain(target: DomainId): DomainId
+  private[splice] def overwriteDomain(target: DomainId): DomainId
 
   /** Throw if any contracts with known state are not assigned to `domainId`.
     */
   @throws[Ex]
-  private[network] def assertOnDomain(domainId: DomainId): this.type =
+  private[splice] def assertOnDomain(domainId: DomainId): this.type =
     this match {
       case Empty | NE(_, `domainId`) => this
       case NE(contracts, otherDomainId) =>
@@ -96,10 +96,10 @@ object DisclosedContracts {
     throw (FAILED_PRECONDITION.augmentDescription(description).asRuntimeException(): Ex)
 
   case object Empty extends DisclosedContracts {
-    private[network] override def inferDomain(ifExpected: Option[DomainId]): ifExpected.type =
+    private[splice] override def inferDomain(ifExpected: Option[DomainId]): ifExpected.type =
       ifExpected
 
-    private[network] override def overwriteDomain(target: DomainId) = target
+    private[splice] override def overwriteDomain(target: DomainId) = target
 
     override def merge(other: DisclosedContracts) = other
   }
@@ -108,7 +108,7 @@ object DisclosedContracts {
       private val contracts: NonEmpty[Seq[Contract[?, ?]]],
       assignedDomain: DomainId,
   ) extends DisclosedContracts {
-    private[network] override def inferDomain(ifExpected: Option[DomainId]): Some[DomainId] =
+    private[splice] override def inferDomain(ifExpected: Option[DomainId]): Some[DomainId] =
       ifExpected match {
         case it @ Some(exDomain) =>
           assertOnDomain(exDomain)
@@ -116,7 +116,7 @@ object DisclosedContracts {
         case None => Some(assignedDomain)
       }
 
-    private[network] override def overwriteDomain(target: DomainId) = assignedDomain
+    private[splice] override def overwriteDomain(target: DomainId) = assignedDomain
 
     @throws[Ex]
     def addAll(other: Seq[ContractWithState[?, ?]]): NE = {

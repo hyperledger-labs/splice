@@ -24,7 +24,7 @@ final case class Reassignment[+E](
 }
 
 object Reassignment {
-  private[network] def fromProto(
+  private[splice] def fromProto(
       proto: multidomain.Reassignment
   ): Reassignment[ReassignmentEvent] = {
     val event = proto.event match {

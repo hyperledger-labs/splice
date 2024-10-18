@@ -347,7 +347,7 @@ object ValidatorStore {
     )
   }
 
-  private[network] def templatesMovedByMyAutomation(
+  private[splice] def templatesMovedByMyAutomation(
       appManagerEnabled: Boolean
   ): Seq[ConstrainedTemplate] =
     Seq[ConstrainedTemplate](
