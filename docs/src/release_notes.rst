@@ -26,6 +26,8 @@ Upcoming
     * The `/v0/updates` endpoint now excludes updates resulting from ACS imports (those with workflow id starting with ``canton-network-acs-import``).
     * Fix an issue where the ordering of stakeholders (signatories and observers) would be inconsistent across SVs
       when calling the `/v0/updates` and `/v0/updates/{update_id}` endpoints on the Scan API.
+    * Fix a bug in `/v0/domains/{domain_id}/members/{member_id}/traffic-status`
+      that resulted in the returned total purchased traffic value being incorrect after a hard migration.
 
 * Add a new index to Splice application databases. Scan and validator apps might take a while to start after the upgrade.
 

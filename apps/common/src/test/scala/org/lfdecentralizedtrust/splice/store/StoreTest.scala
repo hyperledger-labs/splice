@@ -610,6 +610,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val domainMigrationId = 0L
 
+  protected val nextDomainMigrationId = 1L
+
   protected val defaultEffectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
   protected def toIncompleteUnassign(
