@@ -91,11 +91,12 @@ export async function refreshStack(stack: automation.Stack, abortController: Pul
 
 export async function downStack(stack: automation.Stack, abortController: PulumiAbortController): Promise<void> {
   const name = stack.name;
-  console.error(`${name} - Destroying stack`);
-  await stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
-    abortController.abort(`Aborting because of caught exception`);
-    throw e;
-  });
+  console.error(`${name} - Refreshing & Destroying stack`);
+  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).then(() =>
+    stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortController.signal))).catch(e => {
+      abortController.abort(`Aborting because of caught exception`);
+      throw e;
+    });
 }
 
 export async function upStack(stack: automation.Stack, abortController: PulumiAbortController): Promise<void> {
