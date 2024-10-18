@@ -1,14 +1,14 @@
-package com.daml.network.util
+package org.lfdecentralizedtrust.splice.util
 
-import com.daml.network.console.{
+import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
   ScanAppClientReference,
   SvAppBackendReference,
 }
-import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
-import com.daml.network.environment.ledger.api.{
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   LedgerClient,
   Reassignment,
   ReassignmentEvent,
@@ -16,16 +16,16 @@ import com.daml.network.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdate,
 }
-import com.daml.network.http.v0.definitions
-import com.daml.network.http.v0.definitions.DamlValueEncoding.members.{CompactJson, ProtobufJson}
-import com.daml.network.integration.tests.SpliceTests.TestCommon
-import com.daml.network.scan.admin.http.{
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.{CompactJson, ProtobufJson}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
+import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
   ProtobufJsonScanHttpEncodings,
   ScanHttpEncodings,
 }
-import com.daml.network.store.UpdateHistoryTestBase.{LostInScanApi, LostInStoreIngestion}
-import com.daml.network.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
+import org.lfdecentralizedtrust.splice.store.UpdateHistoryTestBase.{LostInScanApi, LostInStoreIngestion}
+import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
 import com.daml.ledger.javaapi.data.*
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
   AssignedWrapper,

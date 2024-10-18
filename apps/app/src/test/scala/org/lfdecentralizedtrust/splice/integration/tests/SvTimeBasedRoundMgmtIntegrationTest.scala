@@ -1,9 +1,9 @@
-package com.daml.network.integration.tests
+package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.{ConfigScheduleUtil, JavaDecodeUtil as DecodeUtil}
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.util.{ConfigScheduleUtil, JavaDecodeUtil as DecodeUtil}
 import com.digitalasset.canton.time.EnrichedDurations.*
 
 import java.time.Duration as JavaDuration

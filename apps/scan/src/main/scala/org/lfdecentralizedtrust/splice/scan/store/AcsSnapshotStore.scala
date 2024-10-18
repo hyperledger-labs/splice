@@ -1,15 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.store
+package org.lfdecentralizedtrust.splice.scan.store
 
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import com.daml.network.scan.store.AcsSnapshotStore.{AcsSnapshot, QueryAcsSnapshotResult}
-import com.daml.network.store.UpdateHistory.SelectFromCreateEvents
-import com.daml.network.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
-import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
-import com.daml.network.util.{Contract, HoldingsSummary, PackageQualifiedName}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{AcsSnapshot, QueryAcsSnapshotResult}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
+import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -316,7 +316,7 @@ object AcsSnapshotStore {
       firstRowId: Long,
       lastRowId: Long,
   ) extends PrettyPrinting {
-    import com.daml.network.util.PrettyInstances.*
+    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
     override def pretty: Pretty[this.type] = prettyOfClass(
       param("snapshotRecordTime", _.snapshotRecordTime),
       param("migrationId", _.migrationId),

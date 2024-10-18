@@ -1,27 +1,27 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.admin.api.client
+package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
-import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.config.UpgradesConfig
-import com.daml.network.environment.ledger.api.LedgerClient
-import com.daml.network.environment.{HttpAppConnection, RetryProvider, SpliceLedgerClient}
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.definitions.MigrationSchedule
-import com.daml.network.scan.admin.api.client.commands.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.config.UpgradesConfig
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
+import org.lfdecentralizedtrust.splice.environment.{HttpAppConnection, RetryProvider, SpliceLedgerClient}
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.definitions.MigrationSchedule
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{
   HttpScanAppClient,
   HttpScanSoftDomainMigrationPocAppClient,
 }
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.scan.store.db.ScanAggregator
-import com.daml.network.store.HistoryBackfilling.SourceMigrationInfo
-import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
+import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -143,7 +143,7 @@ class SingleScanConnection private[client] (
 
   def lookupAnsEntryByParty(
       id: PartyId
-  )(implicit tc: TraceContext): Future[Option[com.daml.network.http.v0.definitions.AnsEntry]] = {
+  )(implicit tc: TraceContext): Future[Option[org.lfdecentralizedtrust.splice.http.v0.definitions.AnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.LookupAnsEntryByParty(id),
@@ -152,7 +152,7 @@ class SingleScanConnection private[client] (
 
   def lookupAnsEntryByName(
       name: String
-  )(implicit tc: TraceContext): Future[Option[com.daml.network.http.v0.definitions.AnsEntry]] = {
+  )(implicit tc: TraceContext): Future[Option[org.lfdecentralizedtrust.splice.http.v0.definitions.AnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.LookupAnsEntryByName(name),
@@ -161,7 +161,7 @@ class SingleScanConnection private[client] (
 
   def listAnsEntries(namePrefix: Option[String], pageSize: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[com.daml.network.http.v0.definitions.AnsEntry]] = {
+  ): Future[Seq[org.lfdecentralizedtrust.splice.http.v0.definitions.AnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListAnsEntries(namePrefix, pageSize),
@@ -250,7 +250,7 @@ class SingleScanConnection private[client] (
       end: Long,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[com.daml.network.http.v0.definitions.RoundTotals]] = {
+  ): Future[Seq[org.lfdecentralizedtrust.splice.http.v0.definitions.RoundTotals]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListRoundTotals(start, end),
@@ -261,7 +261,7 @@ class SingleScanConnection private[client] (
       end: Long,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[com.daml.network.http.v0.definitions.RoundPartyTotals]] = {
+  ): Future[Seq[org.lfdecentralizedtrust.splice.http.v0.definitions.RoundPartyTotals]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListRoundPartyTotals(start, end),
@@ -313,7 +313,7 @@ class SingleScanConnection private[client] (
   }
 
   private def decodeRoundTotal(
-      rt: com.daml.network.http.v0.definitions.RoundTotals
+      rt: org.lfdecentralizedtrust.splice.http.v0.definitions.RoundTotals
   ): Either[String, ScanAggregator.RoundTotals] = {
     (for {
       closedRoundEffectiveAt <- CantonTimestamp.fromInstant(rt.closedRoundEffectiveAt.toInstant)
@@ -348,7 +348,7 @@ class SingleScanConnection private[client] (
   }
 
   private def decodeRoundPartyTotals(
-      rt: com.daml.network.http.v0.definitions.RoundPartyTotals
+      rt: org.lfdecentralizedtrust.splice.http.v0.definitions.RoundPartyTotals
   ): Either[String, ScanAggregator.RoundPartyTotals] = {
     (for {
       appRewards <- Codec.decode(Codec.BigDecimal)(rt.appRewards)

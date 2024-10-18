@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.admin.http
+package org.lfdecentralizedtrust.splice.admin.http
 
-import com.daml.network.environment.{BuildInfo, SpliceStatus}
-import com.daml.network.http.v0.definitions
-import com.daml.network.http.v0.external.common_admin as v0
+import org.lfdecentralizedtrust.splice.environment.{BuildInfo, SpliceStatus}
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.external.common_admin as v0
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}

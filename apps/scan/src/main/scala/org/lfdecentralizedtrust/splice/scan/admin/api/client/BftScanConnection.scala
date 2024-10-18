@@ -1,31 +1,31 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.admin.api.client
+package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
-import com.daml.network.admin.http.HttpErrorWithHttpCode
-import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
-import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
-import com.daml.network.environment.PackageIdResolver.HasAmuletRules
-import com.daml.network.environment.{BaseAppConnection, RetryFor, RetryProvider, SpliceLedgerClient}
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.definitions.{AnsEntry, MigrationSchedule}
-import com.daml.network.scan.admin.api.client.BftScanConnection.{
+import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
+import org.lfdecentralizedtrust.splice.environment.{BaseAppConnection, RetryFor, RetryProvider, SpliceLedgerClient}
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{AnsEntry, MigrationSchedule}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.{
   ConsensusNotReached,
   ConsensusNotReachedRetryable,
   ScanConnections,
   ScanList,
 }
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DsoScan
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoScan
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}

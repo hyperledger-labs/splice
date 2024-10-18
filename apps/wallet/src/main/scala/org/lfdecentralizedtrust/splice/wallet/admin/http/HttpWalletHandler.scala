@@ -1,40 +1,40 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet.admin.http
+package org.lfdecentralizedtrust.splice.wallet.admin.http
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
-import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
-import com.daml.network.codegen.java.splice.wallet.install.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
   AmuletOperationOutcome,
   amuletoperation,
   amuletoperationoutcome,
 }
-import com.daml.network.codegen.java.splice.wallet.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
-import com.daml.network.environment.SpliceLedgerConnection.CommandId
-import com.daml.network.environment.ledger.api.DedupDuration
-import com.daml.network.http.v0.wallet.WalletResource as r0
-import com.daml.network.http.v0.{definitions as d0, wallet as v0}
-import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.{Limit, PageLimit}
-import com.daml.network.util.{Codec, ContractWithState, DisclosedContracts, SpliceUtil}
-import com.daml.network.wallet.{UserWalletManager, UserWalletService}
-import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
-import com.daml.network.wallet.treasury.TreasuryService
+import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
+import org.lfdecentralizedtrust.splice.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection.CommandId
+import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
+import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletResource as r0
+import org.lfdecentralizedtrust.splice.http.v0.{definitions as d0, wallet as v0}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
+import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, DisclosedContracts, SpliceUtil}
+import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletService}
+import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
+import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import TreasuryService.AmuletOperationDedupConfig
-import com.daml.network.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
-import com.daml.network.wallet.util.{TopupUtil, ValidatorTopupConfig}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
+import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext

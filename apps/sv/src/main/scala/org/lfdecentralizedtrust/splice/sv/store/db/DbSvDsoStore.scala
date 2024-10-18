@@ -1,52 +1,52 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.store.db
+package org.lfdecentralizedtrust.splice.sv.store.db
 
 import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.amulet.*
-import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
-import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
-import com.daml.network.codegen.java.splice.validatorlicense.{
+import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.{
   ValidatorFaucetCoupon,
   ValidatorLicense,
   ValidatorLivenessActivityRecord,
 }
-import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsEntryContext}
-import com.daml.network.codegen.java.splice.dso.amuletprice.AmuletPriceVote
-import com.daml.network.codegen.java.splice.dso.svstate.{SvNodeState, SvRewardState}
-import com.daml.network.codegen.java.splice.dso.svstate.SvStatusReport
-import com.daml.network.codegen.java.splice.dsorules.*
-import com.daml.network.codegen.java.splice.svonboarding.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.{AnsEntry, AnsEntryContext}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice.AmuletPriceVote
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.{SvNodeState, SvRewardState}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvStatusReport
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
 }
-import com.daml.network.codegen.java.splice.wallet.subscriptions.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.{
   SubscriptionIdleState,
   SubscriptionInitialPayment,
   SubscriptionRequest,
 }
-import com.daml.network.environment.RetryProvider
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
-import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
-import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
-import com.daml.network.store.{
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
+import org.lfdecentralizedtrust.splice.store.{
   DbVotesStoreQueryBuilder,
   IngestionSummary,
   Limit,
   MultiDomainAcsStore,
   TxLogStore,
 }
-import com.daml.network.sv.store.TxLogEntry.EntryType
-import com.daml.network.sv.store.{
+import org.lfdecentralizedtrust.splice.sv.store.TxLogEntry.EntryType
+import org.lfdecentralizedtrust.splice.sv.store.{
   AppRewardCouponsSum,
   DsoTxLogParser,
   SvDsoStore,
@@ -57,8 +57,8 @@ import com.daml.network.sv.store.{
 import SvDsoStore.RoundCounterpartyBatch
 
 import scala.jdk.CollectionConverters.*
-import com.daml.network.util.*
-import com.daml.network.util.Contract.Companion.Template
+import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory

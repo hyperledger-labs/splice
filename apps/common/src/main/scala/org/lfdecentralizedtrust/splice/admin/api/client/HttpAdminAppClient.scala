@@ -1,18 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.admin.api.client
+package org.lfdecentralizedtrust.splice.admin.api.client
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
-import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.environment.SpliceStatus
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.definitions
-import com.daml.network.http.v0.external.common_admin as externalHttp
-import com.daml.network.http.v0.external.common_admin.CommonAdminClient
-import com.daml.network.util.TemplateJsonDecoder
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.environment.SpliceStatus
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.external.common_admin as externalHttp
+import org.lfdecentralizedtrust.splice.http.v0.external.common_admin.CommonAdminClient
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.tracing.TraceContext

@@ -1,27 +1,27 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.store
+package org.lfdecentralizedtrust.splice.scan.store
 
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
-import com.daml.network.codegen.java.splice.amulet.{AmuletCreateSummary, AmuletExpireSummary}
-import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.amuletrules.TransferResult
-import com.daml.network.codegen.java.splice.dsorules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{AmuletCreateSummary, AmuletExpireSummary}
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferResult
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequest,
   DsoRules_CloseVoteRequestResult,
 }
 import splice.wallet.subscriptions as sws
-import com.daml.network.codegen.java.splice.fees.ExpiringAmount
-import com.daml.network.history.*
-import com.daml.network.store.TxLogStore
-import com.daml.network.scan.store.TxLogEntry.*
-import com.daml.network.store.events.DsoRulesCloseVoteRequest
-import com.daml.network.util.{Codec, ExerciseNode}
-import com.daml.network.util.SpliceUtil.dollarsToCC
-import com.daml.network.util.TransactionTreeExtensions.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.fees.ExpiringAmount
+import org.lfdecentralizedtrust.splice.history.*
+import org.lfdecentralizedtrust.splice.store.TxLogStore
+import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.*
+import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
+import org.lfdecentralizedtrust.splice.util.{Codec, ExerciseNode}
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.dollarsToCC
+import org.lfdecentralizedtrust.splice.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext

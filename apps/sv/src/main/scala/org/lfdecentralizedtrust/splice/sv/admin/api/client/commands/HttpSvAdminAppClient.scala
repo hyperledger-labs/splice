@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.admin.api.client.commands
+package org.lfdecentralizedtrust.splice.sv.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
@@ -9,33 +9,33 @@ import cats.data.EitherT
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
-import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.splice.round.OpenMiningRound
-import com.daml.network.codegen.java.splice.dso.amuletprice.AmuletPriceVote
-import com.daml.network.codegen.java.splice.dsorules.{
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice.AmuletPriceVote
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
-import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
-import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.SpliceStatus
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.definitions.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.ValidatorOnboarding
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.environment.SpliceStatus
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   CometBftNodeDumpResponse,
   TriggerDomainMigrationDumpRequest,
 }
-import com.daml.network.http.v0.sv_admin.{
+import org.lfdecentralizedtrust.splice.http.v0.sv_admin.{
   GetCometBftNodeDebugDumpResponse,
   TriggerDomainMigrationDumpResponse,
 }
-import com.daml.network.http.v0.{definitions, sv_admin as http}
-import com.daml.network.sv.migration.{
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_admin as http}
+import org.lfdecentralizedtrust.splice.sv.migration.{
   DomainDataSnapshot,
   DomainMigrationDump,
   SynchronizerNodeIdentities,
 }
-import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.PartyId

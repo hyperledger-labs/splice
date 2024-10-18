@@ -1,34 +1,34 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.automation
+package org.lfdecentralizedtrust.splice.validator.automation
 
-import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
-import com.daml.network.automation.{
+import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger.Task as FollowTask
+import org.lfdecentralizedtrust.splice.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
   TransferFollowTrigger,
 }
-import com.daml.network.config.{AutomationConfig, PeriodicBackupDumpConfig}
-import com.daml.network.environment.*
-import com.daml.network.http.HttpClient
-import com.daml.network.identities.NodeIdentitiesStore
-import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
-import com.daml.network.util.QualifiedName
-import com.daml.network.validator.config.AppManagerConfig
-import com.daml.network.validator.domain.DomainConnector
-import com.daml.network.validator.migration.DecentralizedSynchronizerMigrationTrigger
-import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
-import com.daml.network.wallet.UserWalletManager
-import com.daml.network.wallet.automation.{
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, PeriodicBackupDumpConfig}
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.util.QualifiedName
+import org.lfdecentralizedtrust.splice.validator.config.AppManagerConfig
+import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
+import org.lfdecentralizedtrust.splice.validator.migration.DecentralizedSynchronizerMigrationTrigger
+import org.lfdecentralizedtrust.splice.validator.store.{AppManagerStore, ValidatorStore}
+import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
+import org.lfdecentralizedtrust.splice.wallet.automation.{
   OffboardUserPartyTrigger,
   ValidatorRightTrigger,
   WalletAppInstallTrigger,
 }
-import com.daml.network.wallet.config.TransferPreapprovalConfig
-import com.daml.network.wallet.util.ValidatorTopupConfig
+import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
+import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock

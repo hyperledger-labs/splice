@@ -1,23 +1,23 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.admin.api.client
+package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.splice.amulet.{FeaturedAppRight, ValidatorRight}
-import com.daml.network.codegen.java.splice.amuletrules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{FeaturedAppRight, ValidatorRight}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
   PaymentTransferContext,
   TransferContext,
   TransferPreapproval,
 }
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
-import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.config.UpgradesConfig
-import com.daml.network.environment.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.config.UpgradesConfig
+import org.lfdecentralizedtrust.splice.environment.{
   HttpAppConnection,
   PackageIdResolver,
   RetryFor,
@@ -25,14 +25,14 @@ import com.daml.network.environment.{
   SpliceLedgerClient,
   SpliceLedgerConnection,
 }
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.definitions.MigrationSchedule
-import com.daml.network.scan.admin.api.client.ScanConnection.*
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.*
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.definitions.MigrationSchedule
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.*
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}

@@ -1,24 +1,24 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.admin.api.client
+package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
-import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
-import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.environment.SpliceLedgerClient
-import com.daml.network.scan.admin.api.client.ScanConnection.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerClient
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.{
   CachedAnsRules,
   CachedAmuletRules,
   CachedMiningRounds,
 }
-import com.daml.network.util.ContractWithState
-import com.daml.network.util.PrettyInstances.PrettyContractId
+import org.lfdecentralizedtrust.splice.util.ContractWithState
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.PrettyContractId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.daml.network.util.PrettyInstances.*
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import org.apache.pekko.stream.Materializer
 
 import java.time.Duration

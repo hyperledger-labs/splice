@@ -1,34 +1,34 @@
-package com.daml.network.integration.tests
+package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.codegen.java.splice.amuletrules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   ExternalPartySetupProposal,
   TransferPreapproval,
 }
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.TransferCommand
-import com.daml.network.codegen.java.splice.round.IssuingMiningRound
-import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_CreateExternalPartySetupProposal
-import com.daml.network.codegen.java.splice.wallet.install.{AmuletOperation, WalletAppInstall}
-import com.daml.network.config.ConfigTransforms
-import com.daml.network.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.http.v0.definitions
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_CreateExternalPartySetupProposal
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{AmuletOperation, WalletAppInstall}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.http.v0.definitions
 import definitions.DamlValueEncoding.members.CompactJson
-import com.daml.network.integration.EnvironmentDefinition
-import com.daml.network.integration.tests.SpliceTests.{
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import com.daml.network.sv.automation.delegatebased.{
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
   ExpireTransferPreapprovalsTrigger,
   TransferCommandSendTrigger,
 }
-import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
-import com.daml.network.validator.automation.RenewTransferPreapprovalTrigger
+import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.validator.automation.RenewTransferPreapprovalTrigger
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.*

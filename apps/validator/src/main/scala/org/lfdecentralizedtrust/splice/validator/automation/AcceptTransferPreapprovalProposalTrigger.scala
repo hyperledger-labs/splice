@@ -1,29 +1,29 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.automation
+package org.lfdecentralizedtrust.splice.validator.automation
 
-import com.daml.network.automation.{
+import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_AcceptTransferPreapprovalProposal
-import com.daml.network.codegen.java.splice.wallet.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtransferreason
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_AcceptTransferPreapprovalProposal
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as installCodegen,
   transferpreapproval as preapprovalCodegen,
 }
-import com.daml.network.environment.SpliceLedgerConnection
-import com.daml.network.environment.ledger.api.DedupOffset
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.AssignedContract
-import com.daml.network.validator.store.ValidatorStore
-import com.daml.network.validator.util.ValidatorUtil
-import com.daml.network.wallet.UserWalletManager
-import com.daml.network.wallet.config.TransferPreapprovalConfig
-import com.daml.network.wallet.treasury.TreasuryService.AmuletOperationDedupConfig
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupOffset
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.util.AssignedContract
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
+import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
+import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
+import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService.AmuletOperationDedupConfig
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext

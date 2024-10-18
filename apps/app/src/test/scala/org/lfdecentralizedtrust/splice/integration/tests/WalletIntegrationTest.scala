@@ -1,18 +1,18 @@
-package com.daml.network.integration.tests
+package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
-import com.daml.network.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
-import com.daml.network.http.v0.definitions.TapRequest
-import com.daml.network.http.v0.wallet.WalletClient
-import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
-import com.daml.network.integration.EnvironmentDefinition
-import com.daml.network.integration.tests.SpliceTests.BracketSynchronous.bracket
-import com.daml.network.util.{SpliceUtil, WalletTestUtil, JavaDecodeUtil as DecodeUtil}
-import com.daml.network.validator.automation.AcceptTransferPreapprovalProposalTrigger
-import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
+import org.lfdecentralizedtrust.splice.auth.AuthUtil
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TapRequest
+import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletClient
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
+import org.lfdecentralizedtrust.splice.util.{SpliceUtil, WalletTestUtil, JavaDecodeUtil as DecodeUtil}
+import org.lfdecentralizedtrust.splice.validator.automation.AcceptTransferPreapprovalProposalTrigger
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule

@@ -1,35 +1,35 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.store.db
+package org.lfdecentralizedtrust.splice.scan.store.db
 
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
-import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
-import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
-import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
-import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
-import com.daml.network.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
-import com.daml.network.environment.RetryProvider
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.store.TxLogEntry.EntryType
-import com.daml.network.scan.store.db.ScanTables.txLogTableName
-import com.daml.network.scan.store.{
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.{AnsEntry, AnsRules}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
+import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.EntryType
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.txLogTableName
+import org.lfdecentralizedtrust.splice.scan.store.{
   OpenMiningRoundTxLogEntry,
   ScanStore,
   ScanTxLogParser,
   TxLogEntry,
   VoteRequestTxLogEntry,
 }
-import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
-import com.daml.network.store.{DbVotesStoreQueryBuilder, Limit, PageLimit, SortOrder, TxLogStore}
-import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
+import org.lfdecentralizedtrust.splice.store.{DbVotesStoreQueryBuilder, Limit, PageLimit, SortOrder, TxLogStore}
+import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.caching.CaffeineCache
 import com.digitalasset.canton.caching.CaffeineCache.FutureAsyncCacheLoader
 import com.digitalasset.canton.config.NonNegativeDuration

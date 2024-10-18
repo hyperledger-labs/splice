@@ -1,28 +1,28 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.admin.http
+package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.digitalasset.canton.data.CantonTimestamp
 import cats.data.OptionT
 import cats.syntax.either.*
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.splice.amulet
-import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
-import com.daml.network.codegen.java.splice.round.{
+import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
   OpenMiningRound,
   SummarizingMiningRound,
 }
-import com.daml.network.codegen.java.splice.ans as ansCodegen
-import com.daml.network.config.Thresholds
-import com.daml.network.config.SpliceInstanceNamesConfig
-import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.http.v0.{definitions, scan as v0}
-import com.daml.network.http.v0.definitions.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
+import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
   HoldingsStateRequest,
@@ -30,16 +30,16 @@ import com.daml.network.http.v0.definitions.{
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
 }
-import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
-import com.daml.network.util.{
+import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
+import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
   ContractWithState,
   PackageQualifiedName,
   QualifiedName,
 }
-import com.daml.network.util.PrettyInstances.*
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -56,18 +56,18 @@ import scala.util.{Try, Using}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
-import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   DevnetTap,
   Mint,
   Transfer,
 }
-import com.daml.network.http.{HttpValidatorLicensesHandler, HttpVotesHandler, UrlValidator}
-import com.daml.network.scan.dso.DsoAnsResolver
-import com.daml.network.scan.store.ScanHistoryBackfilling.{
+import org.lfdecentralizedtrust.splice.http.{HttpValidatorLicensesHandler, HttpVotesHandler, UrlValidator}
+import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
+import org.lfdecentralizedtrust.splice.scan.store.ScanHistoryBackfilling.{
   FoundingTransactionTreeUpdate,
   InitialTransactionTreeUpdate,
 }
-import com.daml.network.store.{
+import org.lfdecentralizedtrust.splice.store.{
   AppStore,
   PageLimit,
   SortOrder,
@@ -135,7 +135,7 @@ class HttpScanHandler(
   def getOpenAndIssuingMiningRounds(
       response: v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse.type
   )(
-      body: com.daml.network.http.v0.definitions.GetOpenAndIssuingMiningRoundsRequest
+      body: org.lfdecentralizedtrust.splice.http.v0.definitions.GetOpenAndIssuingMiningRoundsRequest
   )(extracted: TraceContext): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getOpenAndIssuingMiningRounds") { _ => _ =>
@@ -227,7 +227,7 @@ class HttpScanHandler(
   def getAmuletRules(
       response: v0.ScanResource.GetAmuletRulesResponse.type
   )(
-      body: com.daml.network.http.v0.definitions.GetAmuletRulesRequest
+      body: org.lfdecentralizedtrust.splice.http.v0.definitions.GetAmuletRulesRequest
   )(extracted: TraceContext): Future[v0.ScanResource.GetAmuletRulesResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getAmuletRulesWithState") { _ => _ =>
@@ -260,7 +260,7 @@ class HttpScanHandler(
   def getExternalPartyAmuletRules(
       response: v0.ScanResource.GetExternalPartyAmuletRulesResponse.type
   )(
-      body: com.daml.network.http.v0.definitions.GetExternalPartyAmuletRulesRequest
+      body: org.lfdecentralizedtrust.splice.http.v0.definitions.GetExternalPartyAmuletRulesRequest
   )(extracted: TraceContext): Future[v0.ScanResource.GetExternalPartyAmuletRulesResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getExternalPartyAmuletRules") { _ => _ =>
@@ -292,7 +292,7 @@ class HttpScanHandler(
   def getAnsRules(
       response: v0.ScanResource.GetAnsRulesResponse.type
   )(
-      body: com.daml.network.http.v0.definitions.GetAnsRulesRequest
+      body: org.lfdecentralizedtrust.splice.http.v0.definitions.GetAnsRulesRequest
   )(extracted: TraceContext): Future[v0.ScanResource.GetAnsRulesResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getAnsRules") { _ => _ =>
@@ -353,9 +353,9 @@ class HttpScanHandler(
   }
 
   def lookupFeaturedAppRight(
-      response: com.daml.network.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse.type
+      response: org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse.type
   )(providerPartyId: String)(extracted: TraceContext): Future[
-    com.daml.network.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse
+    org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse
   ] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupFeaturedAppRight") { _ => _ =>

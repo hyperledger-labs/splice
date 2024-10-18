@@ -1,29 +1,29 @@
-package com.daml.network.integration.tests
+package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.network.codegen.java.splice.dsorules.*
-import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.*
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
-import com.daml.network.config.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
+import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
   ParticipantClientConfig,
   SpliceDbConfig,
 }
-import com.daml.network.config.ConfigTransforms.{ConfigurableApp, bumpUrl, updateAutomationConfig}
-import com.daml.network.environment.EnvironmentImpl
-import com.daml.network.integration.tests.SpliceTests.{
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, bumpUrl, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import com.daml.network.integration.EnvironmentDefinition
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.automation.singlesv.offboarding.{
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingSequencerTrigger,
 }
-import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
-import com.daml.network.validator.config.MigrateValidatorPartyConfig
+import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.validator.config.MigrateValidatorPartyConfig
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ClientConfig

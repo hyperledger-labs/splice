@@ -1,9 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.environment.ledger.api
+package org.lfdecentralizedtrust.splice.environment.ledger.api
 
-import com.daml.network.util.PrettyInstances.*
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.daml.ledger.api.v2.reassignment as multidomain
 import com.digitalasset.canton.data.CantonTimestamp

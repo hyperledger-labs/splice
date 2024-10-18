@@ -1,36 +1,36 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.delegatebased
+package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.automation.{
+import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TaskFailed,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
-import com.daml.network.codegen.java.splice.dsorules.{Confirmation, DsoRules_ExecuteConfirmedAction}
-import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{Confirmation, DsoRules_ExecuteConfirmedAction}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_AnsEntryContext,
   ARC_DsoRules,
 }
-import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
   ANSRARC_CollectInitialEntryPayment,
   ANSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.{
   CRARC_MiningRound_Archive,
   CRARC_MiningRound_StartIssuing,
 }
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
-import com.daml.network.config.Thresholds
-import com.daml.network.sv.SvApp.{isDevNet, isSvName, isSvParty}
-import com.daml.network.util.AssignedContract
-import com.daml.network.util.PrettyInstances.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
+import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.sv.SvApp.{isDevNet, isSvName, isSvParty}
+import org.lfdecentralizedtrust.splice.util.AssignedContract
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*

@@ -1,13 +1,13 @@
-package com.daml.network.store.db
+package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.network.codegen.java.splice.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
   round as roundCodegen,
 }
-import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.splice.wallet.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
   payment as paymentCodegen,
@@ -15,13 +15,13 @@ import com.daml.network.codegen.java.splice.wallet.{
   transferoffer as transferOffersCodegen,
   transferpreapproval as preapprovalCodegen,
 }
-import com.daml.network.codegen.java.splice.ans as ansCodegen
-import com.daml.network.codegen.java.splice.wallet.install
-import com.daml.network.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
-import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_MintResult
-import com.daml.network.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
-import com.daml.network.wallet.store.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_MintResult
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
+import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
   BuyTrafficRequestStatusRejected,
   BuyTrafficRequestTxLogEntry,
@@ -30,11 +30,11 @@ import com.daml.network.wallet.store.{
   TxLogEntry,
   UserWalletStore,
 }
-import com.daml.network.wallet.store.db.DbUserWalletStore
-import com.daml.network.environment.{DarResources, RetryProvider}
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.{Limit, PageLimit, StoreTest}
-import com.daml.network.util.{
+import org.lfdecentralizedtrust.splice.wallet.store.db.DbUserWalletStore
+import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit, StoreTest}
+import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   ResourceTemplateDecoder,
@@ -328,7 +328,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
       "retrieve requests from batch operations without losing elements" in scForAll {
         (n: Int, xs: List[Int]) =>
-          import com.daml.network.wallet.store.UserWalletTxLogParser.splitFirst
+          import org.lfdecentralizedtrust.splice.wallet.store.UserWalletTxLogParser.splitFirst
           val withoutN = xs.filterNot(Set(n))
           val withN = util.Random.shuffle(n +: xs)
           val isN: Int PartialFunction Int = { case nn if n == nn => nn }

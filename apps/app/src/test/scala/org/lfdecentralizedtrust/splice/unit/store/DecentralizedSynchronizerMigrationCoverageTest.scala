@@ -1,10 +1,10 @@
-package com.daml.network
+package org.lfdecentralizedtrust.splice
 package unit.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractTypeCompanion
-import com.daml.network.store.MultiDomainAcsStore.ContractFilter
-import com.daml.network.store.db.AcsRowData
-import com.daml.network.util.PackageQualifiedName
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData
+import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.AppendedClues
 import org.scalatest.matchers.should.Matchers

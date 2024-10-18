@@ -1,16 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.config
+package org.lfdecentralizedtrust.splice.validator.config
 
 import org.apache.pekko.http.scaladsl.model.Uri
-import com.daml.network.auth.AuthConfig
-import com.daml.network.config.*
-import com.daml.network.http.v0.definitions
-import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.SvAppClientConfig
-import com.daml.network.wallet.config.{
+import org.lfdecentralizedtrust.splice.auth.AuthConfig
+import org.lfdecentralizedtrust.splice.config.*
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
+import org.lfdecentralizedtrust.splice.wallet.config.{
   AutoAcceptTransfersConfig,
   TransferPreapprovalConfig,
   TreasuryConfig,

@@ -1,19 +1,19 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.admin.api.client.commands
+package org.lfdecentralizedtrust.splice.validator.admin.api.client.commands
 
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.splice.amuletrules as amuletrulesCodegen
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.{definitions, validator_admin as http}
-import com.daml.network.identities.NodeIdentitiesDump
-import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
-import com.daml.network.validator.migration.DomainMigrationDump
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, validator_admin as http}
+import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext

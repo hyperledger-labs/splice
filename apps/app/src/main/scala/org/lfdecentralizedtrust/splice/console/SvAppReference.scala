@@ -1,31 +1,31 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.console
+package org.lfdecentralizedtrust.splice.console
 
-import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.splice.round.OpenMiningRound
-import com.daml.network.codegen.java.splice.validatoronboarding as vo
-import com.daml.network.codegen.java.splice.dso.amuletprice as cp
-import com.daml.network.codegen.java.splice.dsorules.{
+import org.lfdecentralizedtrust.splice.auth.AuthUtil
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding as vo
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice as cp
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   VoteRequest,
   DsoRules_CloseVoteRequestResult,
 }
-import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.{BuildInfo, SpliceConsoleEnvironment, SpliceStatus}
-import com.daml.network.http.v0.definitions
-import com.daml.network.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
-import com.daml.network.sv.admin.api.client.commands.{
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
+import org.lfdecentralizedtrust.splice.environment.{BuildInfo, SpliceConsoleEnvironment, SpliceStatus}
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.{
   HttpSvAdminAppClient,
   HttpSvSoftDomainMigrationPocAppClient,
   HttpSvAppClient,
 }
-import com.daml.network.sv.automation.{DsoDelegateBasedAutomationService, SvDsoAutomationService}
-import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
-import com.daml.network.util.Contract
+import org.lfdecentralizedtrust.splice.sv.automation.{DsoDelegateBasedAutomationService, SvDsoAutomationService}
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
+import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}

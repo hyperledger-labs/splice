@@ -1,16 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.store.db
+package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.splice.dsorules.{ActionRequiringConfirmation, VoteRequest}
-import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{ActionRequiringConfirmation, VoteRequest}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_AnsEntryContext,
   ARC_DsoRules,
 }
-import com.daml.network.scan.store.{
+import org.lfdecentralizedtrust.splice.scan.store.{
   AppRewardTxLogEntry,
   BalanceChangeTxLogEntry,
   ClosedMiningRoundTxLogEntry,
@@ -25,9 +25,9 @@ import com.daml.network.scan.store.{
   ValidatorRewardTxLogEntry,
   VoteRequestTxLogEntry,
 }
-import com.daml.network.store.{Accepted, StoreErrors, VoteRequestOutcome}
-import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
-import com.daml.network.util.Contract
+import org.lfdecentralizedtrust.splice.store.{Accepted, StoreErrors, VoteRequestOutcome}
+import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
+import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.data.CantonTimestamp
 import io.circe.Json

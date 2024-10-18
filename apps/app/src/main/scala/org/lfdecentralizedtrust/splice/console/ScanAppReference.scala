@@ -1,34 +1,34 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.console
+package org.lfdecentralizedtrust.splice.console
 
 import org.apache.pekko.actor.ActorSystem
-import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
   TransferPreapproval,
 }
-import com.daml.network.codegen.java.splice.round.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
   OpenMiningRound,
 }
-import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.SpliceConsoleEnvironment
-import com.daml.network.http.v0.definitions
-import com.daml.network.http.v0.definitions.GetDsoInfoResponse
-import com.daml.network.scan.{ScanApp, ScanAppBootstrap}
-import com.daml.network.scan.automation.ScanAutomationService
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
-import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
-import com.daml.network.scan.store.db.ScanAggregator
-import com.daml.network.util.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
+import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.definitions.GetDsoInfoResponse
+import org.lfdecentralizedtrust.splice.scan.{ScanApp, ScanAppBootstrap}
+import org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
+import org.lfdecentralizedtrust.splice.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
+import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
   Contract,
   ContractWithState,
@@ -299,8 +299,8 @@ abstract class ScanAppReference(
       )
     }
 
-  import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem
-  import com.daml.network.http.v0.definitions.TransactionHistoryRequest.SortOrder
+  import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
+  import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
 
   def listTransactions(
       pageEndEventId: Option[String],

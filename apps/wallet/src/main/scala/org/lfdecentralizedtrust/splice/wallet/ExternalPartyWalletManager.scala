@@ -1,22 +1,22 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet
+package org.lfdecentralizedtrust.splice.wallet
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{SpliceLedgerClient, RetryProvider}
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
   Limit,
   LimitHelpers,
 }
-import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
-import com.daml.network.wallet.store.{ExternalPartyWalletStore, UserWalletStore, WalletStore}
+import org.lfdecentralizedtrust.splice.util.{Contract, HasHealth, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.wallet.store.{ExternalPartyWalletStore, UserWalletStore, WalletStore}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage

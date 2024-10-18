@@ -1,21 +1,21 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv
+package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
-import com.daml.network.automation.{
+import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
-import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerConfig
-import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.sv.automation.singlesv.ReconcileSynchronizerFeesConfigTrigger.Task
-import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.AmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerConfig
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReconcileSynchronizerFeesConfigTrigger.Task
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.protocol.DynamicDomainParameters
@@ -121,7 +121,7 @@ class ReconcileDynamicDomainParametersTrigger(
 object ReconcileSynchronizerFeesConfigTrigger {
   case class Task(amuletConfig: AmuletConfig[USD], synchronizerConfig: Option[SynchronizerConfig])
       extends PrettyPrinting {
-    import com.daml.network.util.PrettyInstances.*
+    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
         param("globalFeesConfig", _.amuletConfig.decentralizedSynchronizer.fees),

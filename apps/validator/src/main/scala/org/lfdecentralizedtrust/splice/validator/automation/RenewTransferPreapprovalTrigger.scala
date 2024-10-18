@@ -1,17 +1,17 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.automation
+package org.lfdecentralizedtrust.splice.validator.automation
 
-import com.daml.network.automation.*
-import com.daml.network.codegen.java.splice.amuletrules.{TransferPreapproval, invalidtransferreason}
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_RenewTransferPreapproval
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome
-import com.daml.network.util.AssignedContract
-import com.daml.network.validator.store.ValidatorStore
-import com.daml.network.validator.util.ValidatorUtil
-import com.daml.network.wallet.UserWalletManager
-import com.daml.network.wallet.config.TransferPreapprovalConfig
+import org.lfdecentralizedtrust.splice.automation.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{TransferPreapproval, invalidtransferreason}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_RenewTransferPreapproval
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome
+import org.lfdecentralizedtrust.splice.util.AssignedContract
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
+import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
+import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer

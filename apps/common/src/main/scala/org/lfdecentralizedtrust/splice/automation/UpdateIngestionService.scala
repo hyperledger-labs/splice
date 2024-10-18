@@ -1,17 +1,17 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.automation
+package org.lfdecentralizedtrust.splice.automation
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
   SpliceLedgerSubscription,
   RetryProvider,
 }
-import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.store.MultiDomainAcsStore
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext

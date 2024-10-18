@@ -1,23 +1,23 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.confirmation
+package org.lfdecentralizedtrust.splice.sv.automation.confirmation
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.automation.{
+import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.TransferCommand
-import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateTransferCommandCounter
-import com.daml.network.codegen.java.splice.dsorules.DsoRules_CreateTransferCommandCounter
-import com.daml.network.environment.SpliceLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.util.AssignedContract
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateTransferCommandCounter
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_CreateTransferCommandCounter
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer

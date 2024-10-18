@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet.store
+package org.lfdecentralizedtrust.splice.wallet.store
 
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.network.history.{
+import org.lfdecentralizedtrust.splice.history.{
   AmuletExpire,
   AmuletRules_BuyMemberTraffic,
   AmuletRules_CreateTransferPreapproval,
@@ -16,13 +16,13 @@ import com.daml.network.history.{
   LockedAmuletUnlock,
   TransferPreapproval_Renew,
 }
-import com.daml.network.http.v0.definitions as httpDef
-import com.daml.network.http.v0.definitions.{
+import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
 }
-import com.daml.network.store.StoreErrors
-import com.daml.network.util.{Codec, ExerciseNodeCompanion}
+import org.lfdecentralizedtrust.splice.store.StoreErrors
+import org.lfdecentralizedtrust.splice.util.{Codec, ExerciseNodeCompanion}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 
 import java.time.{Instant, ZoneOffset}
@@ -448,7 +448,7 @@ object TxLogEntry extends StoreErrors {
         extends TransferTransactionSubtype(AmuletRules_CreateTransferPreapproval)
     case object TransferPreapprovalRenewal
         extends TransferTransactionSubtype(TransferPreapproval_Renew)
-    case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
+    case object Transfer extends TransferTransactionSubtype(org.lfdecentralizedtrust.splice.history.Transfer)
 
     val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
       P2PPaymentCompleted,
@@ -476,8 +476,8 @@ object TxLogEntry extends StoreErrors {
 
   object BalanceChangeTransactionSubtype {
 
-    case object Tap extends BalanceChangeTransactionSubtype(com.daml.network.history.Tap)
-    case object Mint extends BalanceChangeTransactionSubtype(com.daml.network.history.Mint)
+    case object Tap extends BalanceChangeTransactionSubtype(org.lfdecentralizedtrust.splice.history.Tap)
+    case object Mint extends BalanceChangeTransactionSubtype(org.lfdecentralizedtrust.splice.history.Mint)
     case object AppPaymentRejected
         extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Reject)
     case object AppPaymentExpired extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Expire)

@@ -1,30 +1,30 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.store
+package org.lfdecentralizedtrust.splice.validator.store
 
 import cats.syntax.traverseFilter.*
-import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
-import com.daml.network.codegen.java.splice.wallet.{
+import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as walletCodegen,
   topupstate as topUpCodegen,
   transferpreapproval as preapprovalCodegen,
 }
-import com.daml.network.codegen.java.splice.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.environment.RetryProvider
-import com.daml.network.http.v0.definitions
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
-import com.daml.network.store.{AppStore, Limit, MultiDomainAcsStore, PageLimit}
-import com.daml.network.util.*
-import com.daml.network.validator.store.db.DbValidatorStore
-import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
-import com.daml.network.wallet.store.WalletStore
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
+import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore, PageLimit}
+import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
+import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
+import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp

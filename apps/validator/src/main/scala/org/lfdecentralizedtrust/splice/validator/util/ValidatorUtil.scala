@@ -1,20 +1,20 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.util
+package org.lfdecentralizedtrust.splice.validator.util
 
 import cats.syntax.either.*
 import com.daml.ledger.api.v2.interactive_submission_data
-import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
-import com.daml.network.environment.*
-import com.daml.network.environment.ledger.api.LedgerClient
-import com.daml.network.http.v0.definitions.ExternalPartySubmission
-import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.AppStoreWithIngestion
-import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
-import com.daml.network.util.SpliceUtil
-import com.daml.network.validator.store.ValidatorStore
-import com.daml.network.wallet.{UserWalletManager, UserWalletService}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install as walletCodegen
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
+import org.lfdecentralizedtrust.splice.http.v0.definitions.ExternalPartySubmission
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractState, QueryResult}
+import org.lfdecentralizedtrust.splice.util.SpliceUtil
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletService}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions.Proposal
 import com.digitalasset.canton.config.RequireTypes.PositiveInt

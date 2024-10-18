@@ -1,13 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet.treasury
+package org.lfdecentralizedtrust.splice.wallet.treasury
 
 import com.daml.ledger.javaapi.data.codegen.Exercised
-import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.codegen.java.splice.amulet.ValidatorRight
-import com.daml.network.codegen.java.splice.amuletrules.transferinput.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferinput.{
   ExtTransferInput,
   InputAmulet,
   InputAppRewardCoupon,
@@ -15,39 +15,39 @@ import com.daml.network.codegen.java.splice.amuletrules.transferinput.{
   InputValidatorLivenessActivityRecord,
   InputValidatorRewardCoupon,
 }
-import com.daml.network.codegen.java.splice.amuletrules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
   TransferPreapproval,
 }
-import com.daml.network.codegen.java.splice.round.IssuingMiningRound
-import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
-import com.daml.network.codegen.java.splice.wallet.install.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
   WalletAppInstall,
   WalletAppInstall_ExecuteBatchResult,
   amuletoperation,
 }
-import com.daml.network.codegen.java.splice.wallet.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.{CommandPriority, RetryProvider, SpliceLedgerConnection}
 import SpliceLedgerConnection.CommandId
-import com.daml.network.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
-import com.daml.network.environment.ledger.api.DedupConfig
-import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.PageLimit
-import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{AssignedContract, DisclosedContracts, HasHealth, SpliceUtil}
-import com.daml.network.wallet.{ExternalPartyWalletManager, UserWalletManager}
-import com.daml.network.wallet.config.TreasuryConfig
-import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.TreasuryService.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
+import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupConfig
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.store.PageLimit
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+import org.lfdecentralizedtrust.splice.util.{AssignedContract, DisclosedContracts, HasHealth, SpliceUtil}
+import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
+import org.lfdecentralizedtrust.splice.wallet.config.TreasuryConfig
+import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
+import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,

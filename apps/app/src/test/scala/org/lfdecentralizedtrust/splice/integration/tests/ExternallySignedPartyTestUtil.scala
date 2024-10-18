@@ -1,12 +1,12 @@
-package com.daml.network.integration.tests
+package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.network.codegen.java.splice.amuletrules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   ExternalPartySetupProposal,
   TransferPreapproval,
 }
-import com.daml.network.console.ValidatorAppBackendReference
-import com.daml.network.http.v0.definitions.SignedTopologyTx
-import com.daml.network.integration.tests.SpliceTests.TestCommon
+import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
+import org.lfdecentralizedtrust.splice.http.v0.definitions.SignedTopologyTx
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import com.digitalasset.canton.config.CommunityCryptoProvider
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto

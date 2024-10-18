@@ -1,16 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet
+package org.lfdecentralizedtrust.splice.wallet
 
-import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.*
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
-import com.daml.network.util.{HasHealth, TemplateJsonDecoder}
-import com.daml.network.wallet.automation.ExternalPartyWalletAutomationService
-import com.daml.network.wallet.store.ExternalPartyWalletStore
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.util.{HasHealth, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService
+import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage

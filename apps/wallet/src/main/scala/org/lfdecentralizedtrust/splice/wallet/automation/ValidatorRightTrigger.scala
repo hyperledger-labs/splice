@@ -1,18 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet.automation
+package org.lfdecentralizedtrust.splice.wallet.automation
 
-import com.daml.network.automation.{
+import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.amulet.ValidatorRight
-import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, SpliceLedgerConnection}
-import com.daml.network.util.AssignedContract
-import com.daml.network.wallet.ExternalPartyWalletManager
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRight
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.util.AssignedContract
+import org.lfdecentralizedtrust.splice.wallet.ExternalPartyWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.store.TopologyStoreId

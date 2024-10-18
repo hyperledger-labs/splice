@@ -1,28 +1,28 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.delegatebased
+package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
 import cats.syntax.traverse.*
 import org.apache.pekko.stream.Materializer
-import com.daml.network.automation.{
+import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.amuletrules.transferinput.InputAmulet
-import com.daml.network.codegen.java.splice.amuletrules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferinput.InputAmulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
 }
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   TransferCommand,
   TransferCommand_Send,
 }
-import com.daml.network.environment.RetryFor
-import com.daml.network.util.AssignedContract
+import org.lfdecentralizedtrust.splice.environment.RetryFor
+import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext

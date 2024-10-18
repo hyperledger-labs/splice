@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.store
+package org.lfdecentralizedtrust.splice.store
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
@@ -9,22 +9,22 @@ import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
   TransactionFilter as LapiTransactionFilter,
 }
-import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
+import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
 import com.daml.metrics.api.MetricsContext
-import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.environment.ledger.api.{
+import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
   ReassignmentEvent,
   TreeUpdate,
 }
-import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink
-import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
-import com.daml.network.store.db.AcsRowData
-import com.daml.network.util.Contract.Companion
-import com.daml.network.util.{
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData
+import org.lfdecentralizedtrust.splice.util.Contract.Companion
+import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
   Contract,
   ContractWithState,
@@ -32,7 +32,7 @@ import com.daml.network.util.{
   QualifiedName,
   TemplateJsonDecoder,
 }
-import com.daml.network.util.PrettyInstances.*
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.NamedLogging

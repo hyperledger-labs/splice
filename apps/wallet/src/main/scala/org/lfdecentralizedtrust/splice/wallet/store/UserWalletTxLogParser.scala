@@ -1,23 +1,23 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet.store
+package org.lfdecentralizedtrust.splice.wallet.store
 
 import cats.{Eval, Monoid}
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.amulet.AmuletCreateSummary
-import com.daml.network.codegen.java.splice.amuletrules.{InvalidTransferReason, TransferSummary}
-import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AmuletCreateSummary
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{InvalidTransferReason, TransferSummary}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtransferreason.{
   ITR_InsufficientFunds,
   ITR_InsufficientTopupAmount,
   ITR_Other,
   ITR_UnknownSynchronizer,
 }
-import com.daml.network.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequestTrackingInfo
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequestTrackingInfo
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.{
   CO_AcceptTransferPreapprovalProposal,
   CO_AppPayment,
   CO_BuyMemberTraffic,
@@ -31,17 +31,17 @@ import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.{
   CO_Tap,
   ExtAmuletOperation,
 }
-import com.daml.network.codegen.java.splice.wallet.install.{AmuletOperation, AmuletOperationOutcome}
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{AmuletOperation, AmuletOperationOutcome}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
 }
-import com.daml.network.codegen.java.splice.wallet.transferoffer.TransferOfferTrackingInfo
-import com.daml.network.codegen.java.splice.wallet.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferoffer.TransferOfferTrackingInfo
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   transferoffer as transferCodegen,
 }
-import com.daml.network.history.{
+import org.lfdecentralizedtrust.splice.history.{
   AmuletArchive,
   AmuletCreate,
   AmuletExpire,
@@ -58,9 +58,9 @@ import com.daml.network.history.{
   Transfer,
   TransferPreapproval_Renew,
 }
-import com.daml.network.store.TxLogStore
-import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion}
-import com.daml.network.util.TransactionTreeExtensions.*
+import org.lfdecentralizedtrust.splice.store.TxLogStore
+import org.lfdecentralizedtrust.splice.util.{ExerciseNode, ExerciseNodeCompanion}
+import org.lfdecentralizedtrust.splice.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -70,8 +70,8 @@ import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
-import com.daml.network.environment.ledger.api.ActiveContract
-import com.daml.network.wallet.store.TxLogEntry.{
+import org.lfdecentralizedtrust.splice.environment.ledger.api.ActiveContract
+import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.{
   BalanceChangeTransactionSubtype,
   NotificationTransactionSubtype,
   TransferTransactionSubtype,

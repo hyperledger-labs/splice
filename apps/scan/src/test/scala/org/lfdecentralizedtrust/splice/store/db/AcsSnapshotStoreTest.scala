@@ -1,12 +1,12 @@
-package com.daml.network.store.db
+package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.environment.DarResources
-import com.daml.network.environment.ledger.api.TransactionTreeUpdate
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.scan.store.AcsSnapshotStore
-import com.daml.network.store.{PageLimit, StoreErrors, StoreTest, UpdateHistory}
-import com.daml.network.util.{Contract, HoldingsSummary, PackageQualifiedName}
+import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
+import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreErrors, StoreTest, UpdateHistory}
+import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId

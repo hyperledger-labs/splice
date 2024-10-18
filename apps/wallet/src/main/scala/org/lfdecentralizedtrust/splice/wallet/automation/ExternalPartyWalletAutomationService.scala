@@ -1,15 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet.automation
+package org.lfdecentralizedtrust.splice.wallet.automation
 
-import com.daml.network.automation.{AutomationServiceCompanion, SpliceAppAutomationService}
+import org.lfdecentralizedtrust.splice.automation.{AutomationServiceCompanion, SpliceAppAutomationService}
 import AutomationServiceCompanion.TriggerClass
-import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.*
-import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
-import com.daml.network.wallet.store.ExternalPartyWalletStore
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
+import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer

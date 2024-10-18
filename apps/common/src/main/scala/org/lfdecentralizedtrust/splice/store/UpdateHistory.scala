@@ -1,16 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.store
+package org.lfdecentralizedtrust.splice.store
 
 import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
-import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
-import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
-import com.daml.network.environment.ledger.api.{
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
+import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
   LedgerClient,
@@ -20,16 +20,16 @@ import com.daml.network.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdate,
 }
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.HistoryBackfilling.{
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
   DestinationBackfillingInfo,
   DestinationHistory,
   SourceMigrationInfo,
 }
-import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
-import com.daml.network.store.db.{AcsJdbcTypes, AcsQueries}
-import com.daml.network.util.DomainRecordTimeRange
-import com.daml.network.util.ValueJsonCodecProtobuf as ProtobufCodec
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
+import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
+import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
+import org.lfdecentralizedtrust.splice.util.ValueJsonCodecProtobuf as ProtobufCodec
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext

@@ -1,16 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet.store.db
+package org.lfdecentralizedtrust.splice.wallet.store.db
 
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.environment.RetryProvider
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbAppStore}
-import com.daml.network.store.{Limit, LimitHelpers}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
-import com.daml.network.wallet.store.{ExternalPartyWalletStore}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
+import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers}
+import org.lfdecentralizedtrust.splice.util.{Contract, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.wallet.store.{ExternalPartyWalletStore}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage

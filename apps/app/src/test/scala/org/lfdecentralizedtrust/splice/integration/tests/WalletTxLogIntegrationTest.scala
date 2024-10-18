@@ -1,19 +1,19 @@
-package com.daml.network.integration.tests
+package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.daml.lf.data.Numeric
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
-import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen
-import com.daml.network.config.ConfigTransforms
-import com.daml.network.integration.EnvironmentDefinition
-import com.daml.network.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
-import com.daml.network.store.Limit
-import com.daml.network.sv.config.InitialAnsConfig
-import com.daml.network.util.{SpliceUtil, SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
-import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
-import com.daml.network.wallet.automation.AcceptedTransferOfferTrigger
-import com.daml.network.validator.automation.RenewTransferPreapprovalTrigger
-import com.daml.network.wallet.store.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as subsCodegen
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.store.Limit
+import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
+import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
+import org.lfdecentralizedtrust.splice.wallet.automation.AcceptedTransferOfferTrigger
+import org.lfdecentralizedtrust.splice.validator.automation.RenewTransferPreapprovalTrigger
+import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
   NotificationTxLogEntry,
   TransferTxLogEntry,

@@ -1,33 +1,33 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.wallet.admin.api.client.commands
+package org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval
-import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
-import com.daml.network.codegen.java.splice.wallet.{
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.{definitions, wallet as http}
-import com.daml.network.http.v0.external.wallet as externalHttp
-import com.daml.network.http.v0.wallet.{
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, wallet as http}
+import org.lfdecentralizedtrust.splice.http.v0.external.wallet as externalHttp
+import org.lfdecentralizedtrust.splice.http.v0.wallet.{
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,
 }
-import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
-import com.daml.network.wallet.store.TxLogEntry
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}

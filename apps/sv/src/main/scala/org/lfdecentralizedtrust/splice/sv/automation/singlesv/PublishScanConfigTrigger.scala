@@ -1,28 +1,28 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.singlesv
+package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.data.OptionT
-import com.daml.network.automation.{
+import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice as daml
-import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
-import com.daml.network.config.{NetworkAppClientConfig, UpgradesConfig}
-import com.daml.network.environment.SpliceLedgerConnection
-import com.daml.network.http.HttpClient
-import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.config.SvScanConfig
-import com.daml.network.sv.onboarding.SynchronizerNodeConfigClient
-import com.daml.network.sv.store.SvDsoStore
-import com.daml.network.store.DsoRulesStore
-import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.TemplateJsonDecoder
+import org.lfdecentralizedtrust.splice.codegen.java.splice as daml
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
+import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvScanConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeConfigClient
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.store.DsoRulesStore
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
@@ -139,7 +139,7 @@ object PublishScanConfigTrigger {
       domainId: DomainId,
   ) extends PrettyPrinting {
 
-    import com.daml.network.util.PrettyInstances.*
+    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
     override def pretty: Pretty[this.type] = prettyOfClass(
       param("dsoRulesAndState", _.dsoRulesAndState),

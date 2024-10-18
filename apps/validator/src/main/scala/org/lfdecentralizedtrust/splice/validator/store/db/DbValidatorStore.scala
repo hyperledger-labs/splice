@@ -1,32 +1,32 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.store.db
+package org.lfdecentralizedtrust.splice.validator.store.db
 
 import cats.implicits.*
-import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
-import com.daml.network.codegen.java.splice.appmanager.store.AppConfiguration
-import com.daml.network.codegen.java.splice.amuletrules.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store.AppConfiguration
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   ExternalPartySetupProposal,
   TransferPreapproval,
 }
-import com.daml.network.codegen.java.splice.wallet.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as walletCodegen,
   topupstate as topupCodegen,
 }
-import com.daml.network.codegen.java.splice.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.environment.RetryProvider
-import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbAppStore}
-import com.daml.network.store.{Limit, LimitHelpers}
-import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
-import com.daml.network.validator.store.ValidatorStore
-import com.daml.network.wallet.store.WalletStore
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
+import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers}
+import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory

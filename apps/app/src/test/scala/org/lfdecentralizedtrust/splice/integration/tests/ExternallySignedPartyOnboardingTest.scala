@@ -1,8 +1,8 @@
-package com.daml.network.integration.tests
+package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.network.environment.EnvironmentImpl
-import com.daml.network.integration.EnvironmentDefinition
-import com.daml.network.integration.tests.SpliceTests.{
+import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }

@@ -1,10 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.util
+package org.lfdecentralizedtrust.splice.util
 
 import com.daml.ledger.api.v2.CommandsOuterClass.DisclosedContract as Lav1DisclosedContract
-import com.daml.network.store.MultiDomainAcsStore.ContractState
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import com.daml.nonempty.{NonEmpty, Singleton}
 import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.canton.topology.DomainId

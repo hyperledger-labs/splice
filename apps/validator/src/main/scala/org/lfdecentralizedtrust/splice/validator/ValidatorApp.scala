@@ -1,70 +1,70 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator
+package org.lfdecentralizedtrust.splice.validator
 
 import cats.implicits.{catsSyntaxApplicativeByValue as _, *}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
-import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
-import com.daml.network.admin.http.{AdminRoutes, HttpErrorHandler}
-import com.daml.network.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
-import com.daml.network.auth.*
-import com.daml.network.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
-import com.daml.network.environment.*
-import com.daml.network.http.v0.app_manager.AppManagerResource
-import com.daml.network.http.v0.app_manager_admin.AppManagerAdminResource
-import com.daml.network.http.v0.app_manager_public.AppManagerPublicResource
-import com.daml.network.http.v0.external.ans.AnsResource
-import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
-import com.daml.network.http.v0.json_api_public.JsonApiPublicResource
-import com.daml.network.http.v0.scanproxy.ScanproxyResource
-import com.daml.network.http.v0.validator.ValidatorResource
-import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
-import com.daml.network.http.v0.validator_public.ValidatorPublicResource
-import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
-import com.daml.network.identities.NodeIdentitiesStore
-import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
-import com.daml.network.scan.admin.api.client
-import com.daml.network.scan.admin.api.client.{
+import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
+import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
+import org.lfdecentralizedtrust.splice.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
+import org.lfdecentralizedtrust.splice.auth.*
+import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.http.v0.app_manager.AppManagerResource
+import org.lfdecentralizedtrust.splice.http.v0.app_manager_admin.AppManagerAdminResource
+import org.lfdecentralizedtrust.splice.http.v0.app_manager_public.AppManagerPublicResource
+import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
+import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
+import org.lfdecentralizedtrust.splice.http.v0.json_api_public.JsonApiPublicResource
+import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
+import org.lfdecentralizedtrust.splice.http.v0.validator.ValidatorResource
+import org.lfdecentralizedtrust.splice.http.v0.validator_admin.ValidatorAdminResource
+import org.lfdecentralizedtrust.splice.http.v0.validator_public.ValidatorPublicResource
+import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletResource as InternalWalletResource
+import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
+import org.lfdecentralizedtrust.splice.migration.{DomainDataRestorer, DomainMigrationInfo}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   BftScanConnection,
   MinimalScanConnection,
   SingleScanConnection,
 }
-import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.setup.{NodeInitializer, ParticipantInitializer, ParticipantPartyMigrator}
-import com.daml.network.store.AppStoreWithIngestion
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.{
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer, ParticipantPartyMigrator}
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
   BackupDump,
   HasHealth,
   PackageVetting,
   UploadablePackage,
 }
-import com.daml.network.validator.admin.AppManagerService
-import com.daml.network.validator.admin.http.*
-import com.daml.network.validator.automation.{
+import org.lfdecentralizedtrust.splice.validator.admin.AppManagerService
+import org.lfdecentralizedtrust.splice.validator.admin.http.*
+import org.lfdecentralizedtrust.splice.validator.automation.{
   ValidatorAutomationService,
   ValidatorPackageVettingTrigger,
 }
-import com.daml.network.validator.config.{
+import org.lfdecentralizedtrust.splice.validator.config.{
   AppInstance,
   MigrateValidatorPartyConfig,
   ValidatorAppBackendConfig,
   ValidatorCantonIdentifierConfig,
   ValidatorOnboardingConfig,
 }
-import com.daml.network.validator.domain.DomainConnector
-import com.daml.network.validator.metrics.ValidatorAppMetrics
-import com.daml.network.validator.migration.DomainMigrationDump
-import com.daml.network.validator.store.ValidatorStore
-import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
-import com.daml.network.wallet.{ExternalPartyWalletManager, UserWalletManager}
-import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
-import com.daml.network.wallet.automation.UserWalletAutomationService
-import com.daml.network.wallet.util.ValidatorTopupConfig
+import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
+import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
+import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.validator.util.{OAuth2Manager, ValidatorUtil}
+import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
+import org.lfdecentralizedtrust.splice.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
+import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
+import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout

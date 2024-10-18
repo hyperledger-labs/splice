@@ -1,12 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.onboarding.domainmigration
+package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
-import com.daml.network.config.{SpliceInstanceNamesConfig, UpgradesConfig}
-import com.daml.network.environment.{
+import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   MediatorAdminConnection,
   ParticipantAdminConnection,
@@ -15,26 +15,26 @@ import com.daml.network.environment.{
   SpliceLedgerClient,
   StatusAdminConnection,
 }
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.definitions as http
-import com.daml.network.identities.NodeIdentitiesDump
-import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
-import com.daml.network.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
-import com.daml.network.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
-import com.daml.network.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import com.daml.network.sv.cometbft.{CometBftClient, CometBftNode, CometBftRequestSigner}
-import com.daml.network.sv.config.{CometBftConfig, SvAppBackendConfig, SvOnboardingConfig}
-import com.daml.network.sv.migration.{DomainMigrationDump, SynchronizerNodeIdentities}
-import com.daml.network.sv.onboarding.{
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.definitions as http
+import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
+import org.lfdecentralizedtrust.splice.migration.{DomainDataRestorer, DomainMigrationInfo}
+import org.lfdecentralizedtrust.splice.store.{DomainTimeSynchronization, DomainUnpausedSynchronization}
+import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
+import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftClient, CometBftNode, CometBftRequestSigner}
+import org.lfdecentralizedtrust.splice.sv.config.{CometBftConfig, SvAppBackendConfig, SvOnboardingConfig}
+import org.lfdecentralizedtrust.splice.sv.migration.{DomainMigrationDump, SynchronizerNodeIdentities}
+import org.lfdecentralizedtrust.splice.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,
   SetupUtil,
   SynchronizerNodeInitializer,
 }
-import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
-import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
-import com.daml.network.sv.store.{SvDsoStore, SvStore, SvSvStore}
-import com.daml.network.util.TemplateJsonDecoder
+import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
+import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext

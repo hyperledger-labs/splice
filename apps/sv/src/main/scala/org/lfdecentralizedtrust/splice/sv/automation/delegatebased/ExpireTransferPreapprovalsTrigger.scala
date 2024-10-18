@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.sv.automation.delegatebased
+package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
-import com.daml.network.automation.*
-import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval
-import com.daml.network.util.AssignedContract
+import org.lfdecentralizedtrust.splice.automation.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
+import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer

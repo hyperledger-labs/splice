@@ -1,38 +1,38 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.validator.admin.http
+package org.lfdecentralizedtrust.splice.validator.admin.http
 
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import com.daml.network.codegen.java.splice.amuletrules.{TransferPreapproval, invalidtransferreason}
-import com.daml.network.codegen.java.splice.amuletrules.ExternalPartySetupProposal
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
-import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome
-import com.daml.network.environment.ledger.api.DedupOffset
-import com.daml.network.environment.{
+import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
+import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{TransferPreapproval, invalidtransferreason}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.ExternalPartySetupProposal
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome
+import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupOffset
+import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
   SpliceLedgerConnection,
 }
-import com.daml.network.http.v0.{definitions, validator_admin as v0}
-import com.daml.network.identities.NodeIdentitiesStore
-import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
-import com.daml.network.store.AppStoreWithIngestion
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.*
-import com.daml.network.validator.config.ValidatorAppBackendConfig
-import com.daml.network.validator.migration.DomainMigrationDumpGenerator
-import com.daml.network.validator.store.ValidatorStore
-import com.daml.network.validator.util.ValidatorUtil
-import com.daml.network.wallet.UserWalletManager
-import com.daml.network.wallet.treasury.TreasuryService.AmuletOperationDedupConfig
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, validator_admin as v0}
+import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
+import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDumpGenerator
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
+import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
+import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService.AmuletOperationDedupConfig
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.*

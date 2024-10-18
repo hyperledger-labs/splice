@@ -1,43 +1,43 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.scan.admin.api.client.commands
+package org.lfdecentralizedtrust.splice.scan.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes, Uri}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.splice.amuletrules.{
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
   TransferPreapproval,
 }
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
-import com.daml.network.codegen.java.splice.round.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
   OpenMiningRound,
 }
-import com.daml.network.codegen.java.splice.ans as ansCodegen
-import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.config.SpliceInstanceNamesConfig
-import com.daml.network.environment.ledger.api.LedgerClient
-import com.daml.network.http.HttpClient
-import com.daml.network.http.v0.{definitions, scan as http}
-import com.daml.network.http.v0.external.scan as externalHttp
-import com.daml.network.http.v0.scan.{
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
+import org.lfdecentralizedtrust.splice.http.v0.external.scan as externalHttp
+import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
   ScanClient,
 }
-import com.daml.network.scan.admin.http.ProtobufJsonScanHttpEncodings
-import com.daml.network.scan.store.db.ScanAggregator
-import com.daml.network.store.HistoryBackfilling.SourceMigrationInfo
-import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.util.{
+import org.lfdecentralizedtrust.splice.scan.admin.http.ProtobufJsonScanHttpEncodings
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
+import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
+import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
   ContractWithState,

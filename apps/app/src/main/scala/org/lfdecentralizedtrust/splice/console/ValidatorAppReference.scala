@@ -1,30 +1,30 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.console
+package org.lfdecentralizedtrust.splice.console
 
-import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.splice.ans.AnsRules
-import com.daml.network.codegen.java.splice.amuletrules as amuletrulesCodegen
-import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.SpliceConsoleEnvironment
-import com.daml.network.http.v0.definitions
-import com.daml.network.http.v0.definitions.{
+import org.lfdecentralizedtrust.splice.auth.AuthUtil
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
+import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
+import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   GenerateExternalPartyTopologyResponse,
   SignedTopologyTx,
 }
-import com.daml.network.identities.NodeIdentitiesDump
-import com.daml.network.util.ContractWithState
-import com.daml.network.validator.admin.api.client.commands.*
-import com.daml.network.validator.automation.ValidatorAutomationService
-import com.daml.network.validator.config.{
+import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
+import org.lfdecentralizedtrust.splice.util.ContractWithState
+import org.lfdecentralizedtrust.splice.validator.admin.api.client.commands.*
+import org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService
+import org.lfdecentralizedtrust.splice.validator.config.{
   AppManagerAppClientConfig,
   ValidatorAppBackendConfig,
   ValidatorAppClientConfig,
 }
-import com.daml.network.validator.migration.DomainMigrationDump
-import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
-import com.daml.network.wallet.automation.UserWalletAutomationService
+import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
+import org.lfdecentralizedtrust.splice.validator.{ValidatorApp, ValidatorAppBootstrap}
+import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId

@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.daml.network.environment
+package org.lfdecentralizedtrust.splice.environment
 
 import org.apache.pekko.{Done, NotUsed}
 import org.apache.pekko.actor.ActorSystem
@@ -21,7 +21,7 @@ import com.daml.ledger.javaapi.data.{
   User,
 }
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
-import com.daml.network.environment.ledger.api.{
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   DedupConfig,
   DedupOffset,
@@ -29,8 +29,8 @@ import com.daml.network.environment.ledger.api.{
   LedgerClient,
   NoDedup,
 }
-import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState, DisclosedContracts}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionFilter
+import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState, DisclosedContracts}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -466,7 +466,7 @@ class BaseLedgerConnection(
   def waitForPackages(
       requiredPackageIds: Set[String]
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    import com.daml.network.util.PrettyInstances.*
+    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
     if (requiredPackageIds.isEmpty) {
       logger.debug("Skipping waiting for required packages to be uploaded, as there are none.")
