@@ -646,6 +646,12 @@ object RetryProvider {
                           .findFirstMatchIn(description)
                           .isDefined
                         ||
+                        // This can occur if the party has not yet been propagated to the ledger API server
+                        statusCode == Status.Code.INVALID_ARGUMENT &&
+                        raw"Provided parties have not been found in identity_provider_id".r
+                          .findFirstMatchIn(description)
+                          .isDefined
+                        ||
                         // CANCELLED can also be a deliberate cancellation from the client
                         // so we only retry if we observe RST_STREAM which we sometimes see
                         // around Canton restarts.
