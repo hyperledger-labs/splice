@@ -68,7 +68,9 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
       .map(
         _.getOrElse(
           throw Status.NOT_FOUND
-            .withDescription(show"User ${user.singleQuoted}")
+            .withDescription(
+              show"No wallet found for user ${user.singleQuoted}?"
+            )
             .asRuntimeException()
         )
       )
