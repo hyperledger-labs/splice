@@ -464,10 +464,11 @@ testTransferPreapprovalSend = do
 
   DsoRules_TransferCommand_SendResult (TransferCommandResultSuccess _) <- submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_TransferCommand_Send with
     transferCommandCid = transferCmd
-    context
-    transferPreapprovalCid
-    inputs = [InputAmulet amulet]
-    transferCounterCid
+    choiceArgument = TransferCommand_Send with
+      context
+      transferPreapprovalCidO = Some transferPreapprovalCid
+      inputs = [InputAmulet amulet]
+      transferCounterCid
 
   amulets <- query @Amulet externalParty
   map snd amulets === [Amulet app.dso externalParty (ExpiringAmount 42.0 (Round 1) (RatePerRound 0.00002))]

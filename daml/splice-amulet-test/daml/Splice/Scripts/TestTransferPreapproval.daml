@@ -172,7 +172,7 @@ testTransferCommand = script do
     with
       context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid = transferPreapprovalFakeDsoCid
+      transferPreapprovalCidO = Some transferPreapprovalFakeDsoCid
       transferCounterCid
 
   -- receiver is checked
@@ -180,14 +180,14 @@ testTransferCommand = script do
     with
       context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid = transferPreapprovalWrongReceiverCid
+      transferPreapprovalCidO = Some transferPreapprovalWrongReceiverCid
       transferCounterCid
 
   TransferCommand_SendResult (TransferCommandResultSuccess _) <- submit app.dso $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid
+      transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
   [(transferCounterCid, _)] <- query @TransferCommandCounter alice.primaryParty
@@ -218,7 +218,7 @@ testTransferCommand = script do
     with
       context = context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid
+      transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
   now <- getTime
@@ -239,7 +239,7 @@ testTransferCommand = script do
     with
       context = context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid
+      transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
   reason === ITR_InsufficientFunds 32.45
@@ -295,7 +295,7 @@ testTransferCommand = script do
     with
       context = context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid
+      transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
   reason === ITR_Other "Expected nonce 1 is smaller than current counter 2"
@@ -315,7 +315,7 @@ testTransferCommand = script do
     with
       context = context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid
+      transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
   -- Sequence another transfer with nonce 2
@@ -335,7 +335,7 @@ testTransferCommand = script do
     with
       context = context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid
+      transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
   [(transferCounterCid, _)] <- query @TransferCommandCounter alice.primaryParty
@@ -347,7 +347,34 @@ testTransferCommand = script do
     with
       context = context
       inputs = [InputAmulet amulet]
-      transferPreapprovalCid
+      transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
+
+  [(transferCounterCid, transferCounter)] <- query @TransferCommandCounter alice.primaryParty
+  transferCounter.nextNonce === 4
+
+  receiverNoPreapproval <- allocateParty "receiver-no-preapproval"
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+    with
+      sender = alice.primaryParty
+      receiver = receiverNoPreapproval
+      amount = 42.0
+      trackingId = "tracking-id"
+      expiresAt = now `addRelTime` hours 1
+      nonce = 4
+
+  -- transferCmdFuture can now be submitted after the counter advanced
+  TransferCommand_SendResult (TransferCommandResultFailure msg) <- submit app.dso $ exerciseCmd transferCmd TransferCommand_Send
+    with
+      context = context
+      inputs = []
+      transferPreapprovalCidO = None -- no preapproval
+      transferCounterCid
+
+  msg === ITR_Other ("No TransferPreapproval for receiver " <> show receiverNoPreapproval)
+
+  [(_, transferCounter)] <- query @TransferCommandCounter alice.primaryParty
+  transferCounter.nextNonce === 5
+  None <- queryContractId app.dso transferCmd
 
   pure ()

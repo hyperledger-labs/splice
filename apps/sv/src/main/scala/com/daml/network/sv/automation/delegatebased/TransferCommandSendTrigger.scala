@@ -3,6 +3,7 @@
 
 package com.daml.network.sv.automation.delegatebased
 
+import cats.syntax.traverse.*
 import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{
   OnAssignedContractTrigger,
@@ -16,7 +17,10 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   TransferContext,
   TransferInput,
 }
-import com.daml.network.codegen.java.splice.externalpartyamuletrules.TransferCommand
+import com.daml.network.codegen.java.splice.externalpartyamuletrules.{
+  TransferCommand,
+  TransferCommand_Send,
+}
 import com.daml.network.environment.RetryFor
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
@@ -55,72 +59,66 @@ class TransferCommandSendTrigger(
     } else {
       for {
         transferPreapprovalO <- store.lookupTransferPreapprovalByParty(receiver)
-        r <- transferPreapprovalO match {
-          case None =>
-            // TODO(#15159) Archive the contract here.
-            Future.successful(
-              TaskSuccess(
-                s"No TransferPreapproval contract for receiver ${transferCommand.payload.receiver}"
+        amulets <- store.listAmuletsByOwner(sender)
+        featuredAppRight <- transferPreapprovalO
+          .traverse { preapproval =>
+            val provider = PartyId.tryFromProtoPrimitive(preapproval.payload.provider)
+            store.lookupFeaturedAppRight(provider)
+          }
+          .map(_.flatten)
+        transferCommandNonce <- context.retryProvider.retry(
+          RetryFor.Automation,
+          "wait_for_transfer_command_counter",
+          s"wait for TransferCommandCounter for $sender",
+          store
+            .lookupTransferCommandCounterBySender(sender)
+            .map(
+              _.getOrElse(
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(
+                    s"No TransferCommandCounter for $sender yet, waiting for SV automation to create it"
+                  )
+                  .asRuntimeException
               )
-            )
-          case Some(transferPreapproval) =>
-            val provider = PartyId.tryFromProtoPrimitive(transferPreapproval.payload.provider)
-            for {
-              amulets <- store.listAmuletsByOwner(sender)
-              featuredAppRight <- store.lookupFeaturedAppRight(provider)
-              transferCommandNonce <- context.retryProvider.retry(
-                RetryFor.Automation,
-                "wait_for_transfer_command_counter",
-                s"wait for TransferCommandCounter for $sender",
-                store
-                  .lookupTransferCommandCounterBySender(sender)
-                  .map(
-                    _.getOrElse(
-                      throw Status.FAILED_PRECONDITION
-                        .withDescription(
-                          s"No TransferCommandCounter for $sender yet, waiting for SV automation to create it"
-                        )
-                        .asRuntimeException
-                    )
-                  ),
-                logger,
-              )
-              dsoRules <- store.getDsoRules()
-              amuletRules <- store.getAmuletRules()
-              openRound <- store.getLatestUsableOpenMiningRound(now)
-              transferContext = new TransferContext(
-                openRound.contractId,
-                // TODO(#15160) Include app rewards
-                Map.empty.asJava,
-                // validator right contracts are not visible to DSO
-                // so cannot use validator rewards. That's fine
-                // as we also don't expect the external party to have any
-                Map.empty.asJava,
-                featuredAppRight.map(_.contractId).toJava,
-              )
-              cmd = dsoRules.exercise(
-                _.exerciseDsoRules_TransferCommand_Send(
-                  transferCommand.contractId,
-                  new PaymentTransferContext(
-                    amuletRules.contractId,
-                    transferContext,
-                  ),
-                  amulets.map[TransferInput](a => new InputAmulet(a.contractId)).asJava,
-                  transferPreapproval.contractId,
-                  transferCommandNonce.contractId,
-                )
-              )
-              result <- svTaskContext.connection
-                .submit(
-                  Seq(store.key.svParty),
-                  Seq(store.key.dsoParty),
-                  cmd,
-                )
-                .noDedup
-                .yieldResult()
-            } yield TaskSuccess(s"Completed TransferCommand with: $result")
-        }
-      } yield r
+            ),
+          logger,
+        )
+        dsoRules <- store.getDsoRules()
+        amuletRules <- store.getAmuletRules()
+        openRound <- store.getLatestUsableOpenMiningRound(now)
+        transferContext = new TransferContext(
+          openRound.contractId,
+          // TODO(#15160) Include app rewards
+          Map.empty.asJava,
+          // validator right contracts are not visible to DSO
+          // so cannot use validator rewards. That's fine
+          // as we also don't expect the external party to have any
+          Map.empty.asJava,
+          featuredAppRight.map(_.contractId).toJava,
+        )
+        cmd = dsoRules.exercise(
+          _.exerciseDsoRules_TransferCommand_Send(
+            transferCommand.contractId,
+            new TransferCommand_Send(
+              new PaymentTransferContext(
+                amuletRules.contractId,
+                transferContext,
+              ),
+              amulets.map[TransferInput](a => new InputAmulet(a.contractId)).asJava,
+              transferPreapprovalO.map(_.contractId).toJava,
+              transferCommandNonce.contractId,
+            ),
+          )
+        )
+        result <- svTaskContext.connection
+          .submit(
+            Seq(store.key.svParty),
+            Seq(store.key.dsoParty),
+            cmd,
+          )
+          .noDedup
+          .yieldResult()
+      } yield TaskSuccess(s"Completed TransferCommand with: $result")
     }
   }
 }

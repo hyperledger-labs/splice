@@ -78,6 +78,7 @@ class HttpValidatorAdminHandler(
 ) extends v0.ValidatorAdminHandler[TracedUser]
     with Spanning
     with NamedLogging {
+
   private val workflowId = this.getClass.getSimpleName
   private val store = storeWithIngestion.store
   private val dumpGenerator = new DomainMigrationDumpGenerator(
@@ -693,13 +694,11 @@ class HttpValidatorAdminHandler(
         domainId <- getAmuletRulesDomain()(tracedContext)
         // This check is just to make it fail early. The actual preapproval is fixed when the automation
         // executes the transfer but we want the user to get feedback during the prepare step already.
-        _ <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(receiverParty).map {
-          case QueryResult(_, c) => {
-            if (c.isEmpty) {
-              throw Status.INVALID_ARGUMENT
-                .withDescription(s"Receiver $receiverParty does not have a TransferPreapproval")
-                .asRuntimeException
-            }
+        _ <- scanConnection.lookupTransferPreapprovalByParty(receiverParty).map { preapprovalO =>
+          if (preapprovalO.isEmpty) {
+            throw Status.INVALID_ARGUMENT
+              .withDescription(s"Receiver $receiverParty does not have a TransferPreapproval")
+              .asRuntimeException
           }
         }
         externalPartyAmuletRules <- scanConnection.getExternalPartyAmuletRules()

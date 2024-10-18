@@ -2,6 +2,8 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval
+import com.daml.network.codegen.java.splice.externalpartyamuletrules.TransferCommand
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CreateExternalPartySetupProposal
@@ -20,6 +22,7 @@ import com.daml.network.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
   ExpireTransferPreapprovalsTrigger,
+  TransferCommandSendTrigger,
 }
 import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.RenewTransferPreapprovalTrigger
@@ -44,6 +47,14 @@ class ExternalPartySetupProposalIntegrationTest
     with WalletTestUtil
     with TriggerTestUtil
     with ExternallySignedPartyTestUtil {
+
+  override lazy val updateHistoryIgnoredRootExercises = Seq(
+    (TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID, "Archive")
+  )
+
+  override lazy val updateHistoryIgnoredRootCreates = Seq(
+    TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
+  )
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 
@@ -246,6 +257,98 @@ class ExternalPartySetupProposalIntegrationTest
             ev.choice shouldBe "ExternalPartyAmuletRules_CreateTransferCommand"
           case _ => fail()
         }
+    }
+
+    // Check that transfer command gets archived if preapproval does not exist.
+    val sv1Party = sv1Backend.getDsoInfo().svParty
+    val now = env.environment.clock.now.toInstant
+    // Create a preapproval temporarily, otherwise the prepare step already rejects
+    val (preapproval, _) = actAndCheck(
+      "Create preapproval",
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+        .submitWithResult(
+          userId = sv1Backend.config.ledgerApiUser,
+          actAs = Seq(dsoParty, sv1Party),
+          readAs = Seq.empty,
+          update = new TransferPreapproval(
+            dsoParty.toProtoPrimitive,
+            sv1Party.toProtoPrimitive,
+            sv1Party.toProtoPrimitive,
+            now,
+            now,
+            now.plusMillis(500),
+          ).create,
+        ),
+    )(
+      "Preapproval is ingested by scan",
+      _ =>
+        inside(sv1ScanBackend.lookupTransferPreapprovalByParty(sv1Party)) { case Some(_) =>
+          succeed
+        },
+    )
+
+    val prepareSendNoPreapproval =
+      aliceValidatorBackend.prepareTransferPreapprovalSend(
+        aliceParty,
+        sv1Party, // no preapproval for sv1
+        BigDecimal(10.0),
+        CantonTimestamp.now().plus(Duration.ofHours(24)),
+        UUID.randomUUID.toString(),
+        1L,
+      )
+    // Archive the preapproval
+    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = sv1Backend.config.ledgerApiUser,
+        actAs = Seq(dsoParty, sv1Party),
+        readAs = Seq.empty,
+        update = preapproval.contractId.exerciseArchive(),
+      )
+    setTriggersWithin(triggersToPauseAtStart =
+      Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[TransferCommandSendTrigger])
+    ) {
+      actAndCheck(
+        "Submit signed TransferCommand creation",
+        aliceValidatorBackend.submitTransferPreapprovalSend(
+          aliceParty,
+          prepareSendNoPreapproval.transaction,
+          HexString.toHexString(
+            crypto
+              .sign(
+                Hash
+                  .fromByteString(
+                    HexString.parseToByteString(prepareSendNoPreapproval.txHash).value
+                  )
+                  .value,
+                alicePrivateKey.asInstanceOf[SigningPrivateKey],
+              )
+              .value
+              .signature
+          ),
+          HexString.toHexString(alicePublicKey.key),
+        ),
+      )(
+        "TransferCommand is created",
+        _ => {
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(TransferCommand.COMPANION)(
+              aliceParty,
+              c => c.data.sender == aliceParty.toProtoPrimitive,
+            ) should have size (1)
+        },
+      )
+      actAndCheck(
+        "Resume DSO automation for TransferCommands",
+        sv1Backend.dsoDelegateBasedAutomation.trigger[TransferCommandSendTrigger].resume(),
+      )(
+        "TransferCommand gets archived",
+        _ =>
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(TransferCommand.COMPANION)(
+              aliceParty,
+              c => c.data.sender == aliceParty.toProtoPrimitive,
+            ) shouldBe empty,
+      )
     }
   }
 

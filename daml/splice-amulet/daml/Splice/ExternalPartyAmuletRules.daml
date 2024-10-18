@@ -94,13 +94,11 @@ template TransferCommand
         inputs : [TransferInput]
         -- The delegate is expected to select inputs that cover the amount being transferred, provided they exist.
         -- Otherwise the transfer will fail.
-        transferPreapprovalCid : ContractId TransferPreapproval
+        transferPreapprovalCidO : Optional (ContractId TransferPreapproval)
+        -- Unspecified if the transfer preapproval does not exist. The transfer command will get rejected in that case
         transferCounterCid : ContractId TransferCommandCounter
       controller dso
-      do -- Verify that receiver and DSO party match. We don't validate that the reeiver's provider matches
-         -- as changing that should be up to the receiver and not require the sender to resign.
-         _ <- fetchChecked (ForOwner with owner = receiver, dso) transferPreapprovalCid
-         transferCounter <- fetchChecked (ForOwner with owner = sender, dso) transferCounterCid
+      do transferCounter <- fetchChecked (ForOwner with owner = sender, dso) transferCounterCid
          if | transferCounter.nextNonce > nonce ->
               -- Fail but archive the TransferCommand
               pure $ TransferCommand_SendResult $ TransferCommandResultFailure $ ITR_Other $ "Expected nonce " <> show nonce <> " is smaller than current counter " <> show transferCounter.nextNonce
@@ -113,16 +111,27 @@ template TransferCommand
               -- Clients are expected to retry in case their transfer fails unexpectedly.
               _ <- potentiallyUnsafeArchive transferCounterCid
               _ <- create transferCounter with nextNonce = transferCounter.nextNonce + 1
-              now <- getTime -- This is run by the DSO party where getTime is fine
-              require ("Current time " <> show now <> " is before expiry of TransferCommand " <> show expiresAt) (expiresAt > now)
-              result <-
-                try do
-                  TransferPreapproval_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender)
-                  pure (TransferCommandResultSuccess result)
-                catch
-                  (ex : InvalidTransfer) -> pure (TransferCommandResultFailure ex.reason)
-                  (ex : AnyException) -> pure (TransferCommandResultFailure (ITR_Other $ message ex))
-              pure (TransferCommand_SendResult result)
+              case transferPreapprovalCidO of
+                None ->
+                  -- We cannot verify in Daml that the TransferPreapproval actually does not exist.
+                  -- For now we trust the DSO delegate to chose correctly. The other SVs can monitor
+                  -- this and change the delegate or even remove the SV if it does not operate
+                  -- correctly.
+                  pure $ TransferCommand_SendResult $ TransferCommandResultFailure $ ITR_Other $ "No TransferPreapproval for receiver " <> show receiver
+                Some transferPreapprovalCid -> do
+                  -- Verify that receiver and DSO party match. We don't validate that the reeiver's provider matches
+                 -- as changing that should be up to the receiver and not require the sender to resign.
+                  _ <- fetchChecked (ForOwner with owner = receiver, dso) transferPreapprovalCid
+                  now <- getTime -- This is run by the DSO party where getTime is fine
+                  require ("Current time " <> show now <> " is before expiry of TransferCommand " <> show expiresAt) (expiresAt > now)
+                  result <-
+                    try do
+                      TransferPreapproval_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender)
+                      pure (TransferCommandResultSuccess result)
+                    catch
+                      (ex : InvalidTransfer) -> pure (TransferCommandResultFailure ex.reason)
+                      (ex : AnyException) -> pure (TransferCommandResultFailure (ITR_Other $ message ex))
+                  pure (TransferCommand_SendResult result)
 
     choice TransferCommand_Withdraw : TransferCommand_WithdrawResult
       controller sender
