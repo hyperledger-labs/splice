@@ -64,7 +64,7 @@ class AcceptTransferPreapprovalProposalTrigger(
       clock.now.plus(transferPreapprovalConfig.preapprovalLifetime.asJava).toInstant,
     )
     val commandId = SpliceLedgerConnection.CommandId(
-      "com.daml.network.validator.acceptTransferPreapprovalProposal",
+      "org.lfdecentralizedtrust.splice.validator.acceptTransferPreapprovalProposal",
       Seq(
         receiverParty,
         store.key.validatorParty,

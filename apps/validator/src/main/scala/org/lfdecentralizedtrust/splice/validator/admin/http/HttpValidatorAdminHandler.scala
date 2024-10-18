@@ -475,7 +475,7 @@ class HttpValidatorAdminHandler(
                       dedup = Some(
                         AmuletOperationDedupConfig(
                           SpliceLedgerConnection.CommandId(
-                            "com.daml.network.validator.createExternalPartySetupProposal",
+                            "org.lfdecentralizedtrust.splice.validator.createExternalPartySetupProposal",
                             Seq(validatorServiceParty),
                             BaseLedgerConnection.sanitizeUserIdToPartyString(body.userPartyId),
                           ),

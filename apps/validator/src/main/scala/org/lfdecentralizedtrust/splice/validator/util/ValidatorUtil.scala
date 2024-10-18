@@ -73,7 +73,7 @@ private[validator] object ValidatorUtil {
               .withDedup(
                 commandId = SpliceLedgerConnection
                   .CommandId(
-                    "com.daml.network.validator.installWalletForUser",
+                    "org.lfdecentralizedtrust.splice.validator.installWalletForUser",
                     Seq(validatorServiceParty),
                     BaseLedgerConnection.sanitizeUserIdToPartyString(endUserName),
                   ),

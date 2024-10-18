@@ -87,7 +87,7 @@ class TransferCommandCounterTrigger(
                 )
                 .withDedup(
                   commandId = SpliceLedgerConnection.CommandId(
-                    "com.daml.network.sv.createTransferCommandCounter",
+                    "org.lfdecentralizedtrust.splice.sv.createTransferCommandCounter",
                     Seq(svParty, dsoParty, sender),
                   ),
                   deduplicationOffset = offset,

@@ -1182,7 +1182,7 @@ object SpliceLedgerConnection {
   /** Abstract representation of a command-id for deduplication.
     *
     * @param methodName    : fully-classified name of the method whose calls should be deduplicated,
-    *                      e.g., "com.daml.network.directory.createDirectoryEntry". DON'T USE [[io.functionmeta.functionFullName]] here,
+    *                      e.g., "org.lfdecentralizedtrust.splice.directory.createDirectoryEntry". DON'T USE [[io.functionmeta.functionFullName]] here,
     *                      as it is not consistent across updates and restarts.
     * @param parties       : list of parties whose method calls should be considered distinct,
     *                      e.g., "Seq(directoryProvider)"

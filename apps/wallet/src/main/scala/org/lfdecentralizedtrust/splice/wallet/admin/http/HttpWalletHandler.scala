@@ -573,7 +573,7 @@ class HttpWalletHandler(
       for {
         userStore <- getUserStore(user)
         commandId = CommandId(
-          "com.daml.network.wallet.tap",
+          "org.lfdecentralizedtrust.splice.wallet.tap",
           Seq(userStore.key.endUserParty),
           request.commandId.getOrElse(UUID.randomUUID().toString),
         )
@@ -735,7 +735,7 @@ class HttpWalletHandler(
       )
       .withDedup(
         SpliceLedgerConnection.CommandId(
-          "com.daml.network.wallet.createTransferPreapprovalProposal",
+          "org.lfdecentralizedtrust.splice.wallet.createTransferPreapprovalProposal",
           Seq(
             store.key.endUserParty,
             store.key.validatorParty,
