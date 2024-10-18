@@ -2,7 +2,10 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
-import com.daml.network.codegen.java.splice.amuletrules.TransferPreapproval
+import com.daml.network.codegen.java.splice.amuletrules.{
+  ExternalPartySetupProposal,
+  TransferPreapproval,
+}
 import com.daml.network.codegen.java.splice.externalpartyamuletrules.TransferCommand
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
@@ -404,7 +407,7 @@ class ExternalPartySetupProposalIntegrationTest
         { proposalCid =>
           aliceValidatorBackend
             .listExternalPartySetupProposals()
-            .map(c => c.contract.contractId) contains proposalCid
+            .map(c => c.contract.contractId) should contain(proposalCid)
         },
       )
       actAndCheck(
@@ -427,7 +430,7 @@ class ExternalPartySetupProposalIntegrationTest
 
   private def createExternalPartyProposalViaLedgerApi(receiverParty: PartyId, expiresAt: Instant)(
       implicit env: SpliceTestConsoleEnvironment
-  ) = {
+  ): ExternalPartySetupProposal.ContractId = {
     val validatorParty = aliceValidatorBackend.getValidatorPartyId()
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(env.environment.clock.now)
     val inputAmulets = aliceValidatorWalletClient.list().amulets
