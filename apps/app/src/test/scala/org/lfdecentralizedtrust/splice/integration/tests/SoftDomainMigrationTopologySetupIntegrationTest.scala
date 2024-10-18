@@ -95,6 +95,8 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
+      // TODO(#15569): Get rid of this once we retry transfer offer creation for this test
+      .withTrafficBalanceCacheDisabled
       .addConfigTransformsToFront(
         (_, conf) =>
           ConfigTransforms.updateAllSvAppConfigs_ { conf =>
