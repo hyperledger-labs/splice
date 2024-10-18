@@ -291,7 +291,11 @@ export const infraAffinityAndTolerations = {
 
 // TODO(#15530): remove this once base version is >= 0.2.5
 export function helmChartNamesPrefix(version: CnChartVersion): string {
-  if (version.type === 'local' || semver.gte(version.version, '0.2.5')) {
+  if (
+    version.type === 'local' ||
+    version.version.startsWith('0.2.5') ||
+    semver.gt(version.version, '0.2.5')
+  ) {
     return 'splice';
   } else {
     return 'cn';
