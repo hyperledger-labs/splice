@@ -471,20 +471,20 @@ lazy val `apps-common` =
           better.files.File("LATEST_RELEASE").contentAsString.strip,
         ),
       ),
-      buildInfoPackage := "com.daml.network.environment",
+      buildInfoPackage := "org.lfdecentralizedtrust.splice.environment",
       buildInfoObject := "BuildInfo",
       Compile / guardrailTasks :=
         List("external", "internal").flatMap { scope =>
           List(
             ScalaServer(
               new File(s"apps/common/src/main/openapi/common-$scope.yaml"),
-              pkg = "com.daml.network.http.v0",
+              pkg = "org.lfdecentralizedtrust.splice.http.v0",
               modules = List("pekko-http-v1.0.0", "circe"),
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/common/src/main/openapi/common-$scope.yaml"),
-              pkg = "com.daml.network.http.v0",
+              pkg = "org.lfdecentralizedtrust.splice.http.v0",
               modules = List("pekko-http-v1.0.0", "circe"),
             ),
           )
@@ -502,7 +502,7 @@ lazy val `apps-common-sv` =
       Compile / guardrailTasks := List(
         ScalaClient(
           new File(s"apps/sv/src/main/openapi/sv-internal.yaml"),
-          pkg = "com.daml.network.http.v0",
+          pkg = "org.lfdecentralizedtrust.splice.http.v0",
           modules = List("pekko-http-v1.0.0", "circe"),
         )
       ),
@@ -543,13 +543,13 @@ lazy val `apps-validator` =
             List(
               ScalaServer(
                 new File(s"apps/validator/src/main/openapi/${api}.yaml"),
-                pkg = "com.daml.network.http.v0",
+                pkg = "org.lfdecentralizedtrust.splice.http.v0",
                 modules = List("pekko-http-v1.0.0", "circe"),
                 customExtraction = true,
               ),
               ScalaClient(
                 new File(s"apps/validator/src/main/openapi/${api}.yaml"),
-                pkg = "com.daml.network.http.v0",
+                pkg = "org.lfdecentralizedtrust.splice.http.v0",
                 modules = List("pekko-http-v1.0.0", "circe"),
               ),
             )
@@ -582,7 +582,7 @@ lazy val `apps-sv` =
         List(
           ScalaServer(
             new File("apps/sv/src/main/openapi/sv-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
+            pkg = "org.lfdecentralizedtrust.splice.http.v0",
             modules = List("pekko-http-v1.0.0", "circe"),
             customExtraction = true,
           )
@@ -614,14 +614,14 @@ lazy val `apps-scan` =
           List(
             ScalaServer(
               new File(s"apps/scan/src/main/openapi/scan-$scope.yaml"),
-              pkg = "com.daml.network.http.v0",
+              pkg = "org.lfdecentralizedtrust.splice.http.v0",
               modules = List("pekko-http-v1.0.0", "circe"),
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/scan/src/main/openapi/scan-$scope.yaml"),
               modules = List("pekko-http-v1.0.0", "circe"),
-              pkg = "com.daml.network.http.v0",
+              pkg = "org.lfdecentralizedtrust.splice.http.v0",
             ),
           ),
         },
@@ -920,13 +920,13 @@ lazy val `apps-wallet` =
           List(
             ScalaServer(
               new File(s"apps/wallet/src/main/openapi/wallet-$scope.yaml"),
-              pkg = "com.daml.network.http.v0",
+              pkg = "org.lfdecentralizedtrust.splice.http.v0",
               modules = List("pekko-http-v1.0.0", "circe"),
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/wallet/src/main/openapi/wallet-$scope.yaml"),
-              pkg = "com.daml.network.http.v0",
+              pkg = "org.lfdecentralizedtrust.splice.http.v0",
               modules = List("pekko-http-v1.0.0", "circe"),
             ),
           )
@@ -953,13 +953,13 @@ lazy val `apps-splitwell` =
         List(
           ScalaServer(
             new File("apps/splitwell/src/main/openapi/splitwell-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
+            pkg = "org.lfdecentralizedtrust.splice.http.v0",
             modules = List("pekko-http-v1.0.0", "circe"),
             customExtraction = true,
           ),
           ScalaClient(
             new File("apps/splitwell/src/main/openapi/splitwell-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
+            pkg = "org.lfdecentralizedtrust.splice.http.v0",
             modules = List("pekko-http-v1.0.0", "circe"),
           ),
         ),
@@ -1154,7 +1154,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     // and the copy of that inlined into bindings-java.
     case PathList("com", "daml", "ledger", "api", "v1" | "v2", _*) => MergeStrategy.first
     // Hack for not getting trouble with different versions of generated classes of common openapi
-    case x @ PathList("com", "daml", "network", "http", "v0" | "commonAdmin", _*) =>
+    case x @ PathList("org", "lfdecentralizedtrust", "splice", "http", "v0" | "commonAdmin", _*) =>
       MergeStrategy.first
     case PathList("com", "google", _*) => MergeStrategy.first
     case PathList("io", "grpc", _*) => MergeStrategy.first
@@ -1380,7 +1380,7 @@ lazy val `apps-app` =
       assembly / test := {}, // don't run tests during assembly
       // when building the fat jar, we need to properly merge our artefacts
       assembly / assemblyMergeStrategy := mergeStrategy((assembly / assemblyMergeStrategy).value),
-      assembly / mainClass := Some("com.daml.network.SpliceApp"),
+      assembly / mainClass := Some("org.lfdecentralizedtrust.splice.SpliceApp"),
       assembly / assemblyJarName := "splice-node.jar",
       // include historic dars in the jar
       Compile / unmanagedResourceDirectories += { file(file(".").absolutePath) / "daml/dars" },

@@ -1,1 +1,1 @@
-com.daml.network.integration.tests.runbook.DockerComposeValidatorPreflightIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.runbook.DockerComposeValidatorPreflightIntegrationTest

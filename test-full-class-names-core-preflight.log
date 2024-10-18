@@ -1,2 +1,2 @@
-com.daml.network.integration.tests.runbook.CometBftPreflightIntegrationTest
-com.daml.network.integration.tests.runbook.DsoPreflightIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.runbook.CometBftPreflightIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.runbook.DsoPreflightIntegrationTest

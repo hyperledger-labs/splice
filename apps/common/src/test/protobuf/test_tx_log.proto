@@ -3,12 +3,12 @@
 
 syntax = "proto3";
 
-package com.daml.network.store;
+package org.lfdecentralizedtrust.splice.store;
 
 import "scalapb/scalapb.proto";
 
 message TestTxLogEntry {
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string contract_id = 2;

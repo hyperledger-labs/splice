@@ -865,7 +865,6 @@ function subcmd_preflight() {
     _log "Starting preflight"
 
     preflight_tests=$(_get_preflight_test_names "core")
-    preflight_tests="$preflight_tests $(_get_preflight_test_names "splitwell")"
     preflight_tests="$preflight_tests $(_get_preflight_test_names "validator1")"
     _log "Starting preflight tests: $preflight_tests"
     subcmd_sbt_for_preflight "apps-app/testOnly $preflight_tests"

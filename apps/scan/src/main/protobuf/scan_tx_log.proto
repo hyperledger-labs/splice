@@ -3,24 +3,24 @@
 
 syntax = "proto3";
 
-package com.daml.network.scan.store;
+package org.lfdecentralizedtrust.splice.scan.store;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "scalapb/scalapb.proto";
 
 message PartyBalanceChange {
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string change_to_initial_amount_as_of_round_zero = 1 [(scalapb.field).type = "scala.math.BigDecimal"];
   string change_to_holding_fees_rate = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
 }
 
 message SteppedRate {
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   message Step {
-    option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+    option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
     string from = 1 [(scalapb.field).type = "scala.math.BigDecimal"];
     string rate = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -31,7 +31,7 @@ message SteppedRate {
 }
 
 message SenderAmount {
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string party = 1 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string input_amulet_amount = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -47,7 +47,7 @@ message SenderAmount {
 }
 
 message ReceiverAmount {
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string party = 1 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string amount = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -55,7 +55,7 @@ message ReceiverAmount {
 }
 
 message BalanceChange {
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string party = 1 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
   string change_to_initial_amount_as_of_round_zero = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -63,15 +63,15 @@ message BalanceChange {
 }
 
 message ErrorTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
 }
 
 message BalanceChangeTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
@@ -82,8 +82,8 @@ message BalanceChangeTxLogEntry {
 }
 
 message ExtraTrafficPurchaseTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
@@ -94,8 +94,8 @@ message ExtraTrafficPurchaseTxLogEntry {
 }
 
 message OpenMiningRoundTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
@@ -107,8 +107,8 @@ message OpenMiningRoundTxLogEntry {
 }
 
 message ClosedMiningRoundTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
@@ -117,8 +117,8 @@ message ClosedMiningRoundTxLogEntry {
 }
 
 message TransferTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.TransactionTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.TransactionTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string offset = 2;
@@ -133,8 +133,8 @@ message TransferTxLogEntry {
 }
 
 message TapTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.TransactionTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.TransactionTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string offset = 2;
@@ -147,8 +147,8 @@ message TapTxLogEntry {
 }
 
 message MintTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.TransactionTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.TransactionTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string offset = 2;
@@ -161,8 +161,8 @@ message MintTxLogEntry {
 }
 
 message SvRewardTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.RewardTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
@@ -172,8 +172,8 @@ message SvRewardTxLogEntry {
 }
 
 message AppRewardTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.RewardTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
@@ -183,8 +183,8 @@ message AppRewardTxLogEntry {
 }
 
 message ValidatorRewardTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.RewardTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   string domain_id = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.DomainId"];
@@ -194,9 +194,9 @@ message ValidatorRewardTxLogEntry {
 }
 
 message VoteRequestTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.scan.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
-  google.protobuf.Struct result = 2 [(scalapb.field).type = "com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult"];
+  google.protobuf.Struct result = 2 [(scalapb.field).type = "org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult"];
 }

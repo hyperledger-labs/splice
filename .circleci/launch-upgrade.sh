@@ -102,7 +102,7 @@ if [ -z "${run_daml_upgrade-}" ]; then
 fi
 
 if [ -z "${run_partial_upgrade-}" ]; then
-  if "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/cluster" && "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/apps/app/src/test/scala/com/daml/network/integration/tests/runbook"; then
+  if "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/cluster" && "$REPO_ROOT"/build-tools/changes-vs-base "$REPO_ROOT/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/runbook"; then
     echo "Proceeding with partial upgrade."
     run_partial_upgrade="true"
   else

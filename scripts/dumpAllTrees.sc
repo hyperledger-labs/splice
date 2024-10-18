@@ -5,7 +5,7 @@
 // Even on small ledgers, it takes a while to execute.
 //
 // Example usage:
-// sbt "apps-app/runMain com.daml.network.SpliceApp --config ${CONFIG} --bootstrap ./scripts/dumpAllTrees.sc"
+// sbt "apps-app/runMain org.lfdecentralizedtrust.splice.SpliceApp --config ${CONFIG} --bootstrap ./scripts/dumpAllTrees.sc"
 
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
 import com.digitalasset.canton.topology.PartyId

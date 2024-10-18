@@ -1,2 +1,2 @@
-com.daml.network.integration.tests.DockerComposeFullNetworkFrontendIntegrationTest
-com.daml.network.integration.tests.DockerComposeValidatorFrontendIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.DockerComposeFullNetworkFrontendIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.DockerComposeValidatorFrontendIntegrationTest

@@ -1,7 +1,7 @@
 import com.digitalasset.daml.lf.value.Value.ContractId
-import com.daml.network.codegen.java.splice.{splitwell => splitwellCodegen}
-import com.daml.network.console.{AnsExternalAppClientReference, WalletAppClientReference}
-import com.daml.network.console.LedgerApiExtensions._
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{splitwell => splitwellCodegen}
+import org.lfdecentralizedtrust.splice.console.{AnsExternalAppClientReference, WalletAppClientReference}
+import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions._
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
