@@ -3,21 +3,21 @@
 
 syntax = "proto3";
 
-package com.daml.network.wallet.store;
+package org.lfdecentralizedtrust.splice.wallet.store;
 
 import "google/protobuf/timestamp.proto";
 import "scalapb/scalapb.proto";
 
 /* Unknown event, caused the parser failing to parse a transaction tree */
 message UnknownTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
 }
 
 message PartyAndAmount {
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string party = 1;
   string amount = 2 [(scalapb.field).type = "scala.math.BigDecimal"];
@@ -34,8 +34,8 @@ message TransactionSubtype {
 
 /** Balance change due to a transfer */
 message TransferTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   TransactionSubtype subtype = 2;
@@ -52,8 +52,8 @@ message TransferTxLogEntry {
 
 /** Balance change not due to a transfer, for example a tap or returning a locked amulet to the owner. */
 message BalanceChangeTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   TransactionSubtype subtype = 2;
@@ -65,8 +65,8 @@ message BalanceChangeTxLogEntry {
 
 /** An event that does not change anyone's amulet balance. */
 message NotificationTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string event_id = 1;
   TransactionSubtype subtype = 2;
@@ -75,17 +75,17 @@ message NotificationTxLogEntry {
 }
 
 message TransferOfferStatusCreated {
-  string contract_id = 1; // com.daml.network.codegen.java.splice.wallet.transferoffer.TransferOffer.ContractId
+  string contract_id = 1; // org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferoffer.TransferOffer.ContractId
   string transaction_id = 2;
 }
 
 message TransferOfferStatusAccepted {
-  string contract_id = 1; // com.daml.network.codegen.java.splice.wallet.transferoffer.AcceptedTransferOffer.ContractId
+  string contract_id = 1; // org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferoffer.AcceptedTransferOffer.ContractId
   string transaction_id = 2;
 }
 
 message TransferOfferStatusCompleted {
-  string contract_id = 1; // com.daml.network.codegen.java.splice.amulet.Amulet.ContractId
+  string contract_id = 1; // org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet.ContractId
   string transaction_id = 2;
 }
 
@@ -100,8 +100,8 @@ message TransferOfferStatusExpired {
 }
 
 message TransferOfferTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string tracking_id = 1;
   oneof status {
@@ -131,8 +131,8 @@ message BuyTrafficRequestStatusExpired {
 }
 
 message BuyTrafficRequestTxLogEntry {
-  option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry";
-  option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
 
   string tracking_id = 1;
   oneof status {
