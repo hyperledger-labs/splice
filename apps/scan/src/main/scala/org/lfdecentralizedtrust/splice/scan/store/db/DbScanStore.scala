@@ -742,9 +742,8 @@ class DbScanStore(
                select sum(total_traffic_purchased)
                from #${ScanTables.acsTableName}
                where store_id = $storeId
-                and template_id_qualified_name = ${QualifiedName(
-              MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
-            )}
+                and migration_id = $domainMigrationId
+                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID)}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
                 and member_traffic_domain = ${lengthLimited(domainId.toProtoPrimitive)}
              """.as[Long].headOption,

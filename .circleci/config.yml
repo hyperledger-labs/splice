@@ -24,7 +24,7 @@ parameters:
   # old files don't pollute your build.
   cache-version:
     type: string
-    default: "44"
+    default: "45"
   run-job:
     type: enum
     enum:
@@ -4896,7 +4896,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for sv runbook deployments and for backup-recovery, concurrent preflight checks are fine.
-          workflow_names: "redeploy_sv_runbook_cidaily redeploy_validator_runbook_cidaily"
+          workflow_names: "redeploy_sv_runbook_cidaily redeploy_validator_runbook_cidaily deploy-cidaily"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
@@ -5435,6 +5435,8 @@ workflows:
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
+            - prepare_cluster_for_migration
+            - prepare_sv_runbook_for_migration
       - hard_migration:
           name: "migrate_cluster"
           context:

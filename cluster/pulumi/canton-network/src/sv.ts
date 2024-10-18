@@ -19,6 +19,7 @@ import {
   ExactNamespace,
   exactNamespace,
   fetchAndInstallParticipantBootstrapDump,
+  helmChartNamesPrefix,
   imagePullSecret,
   initialPackageConfigJson,
   initialSynchronizerFeesConfig,
@@ -127,7 +128,7 @@ export async function installSvNode(
   const loopback = installSpliceHelmChart(
     xns,
     'loopback',
-    'splice-cluster-loopback-gateway',
+    `${helmChartNamesPrefix(activeVersion)}-cluster-loopback-gateway`,
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -267,7 +268,7 @@ export async function installSvNode(
   const ingress = installSpliceHelmChart(
     xns,
     'ingress-sv',
-    'splice-cluster-ingress-runbook',
+    `${helmChartNamesPrefix(activeVersion)}-cluster-ingress-runbook`,
     {
       withSvIngress: true,
       ingress: {
@@ -443,7 +444,7 @@ function installSvApp(
   const svApp = installSpliceHelmChart(
     xns,
     `sv-app`,
-    'splice-sv-node',
+    `${helmChartNamesPrefix(activeVersion)}-sv-node`,
     svValues,
     activeVersion,
     {
@@ -488,9 +489,16 @@ function installScan(
     // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
     clusterUrl: CLUSTER_HOSTNAME,
   };
-  const scan = installSpliceHelmChart(xns, `scan`, 'splice-scan', scanValues, activeVersion, {
-    dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
-  });
+  const scan = installSpliceHelmChart(
+    xns,
+    `scan`,
+    `${helmChartNamesPrefix(activeVersion)}-scan`,
+    scanValues,
+    activeVersion,
+    {
+      dependsOn: decentralizedSynchronizerNode.dependencies.concat([svApp]),
+    }
+  );
   return scan;
 }
 

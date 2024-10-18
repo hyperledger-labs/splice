@@ -8,6 +8,7 @@ import {
   DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
+  helmChartNamesPrefix,
   installSpliceHelmChart,
   jmxOptions,
   loadYamlFromFile,
@@ -69,7 +70,7 @@ export function installSvParticipant(
   return installSpliceHelmChart(
     xns,
     name,
-    'splice-participant',
+    `${helmChartNamesPrefix(version)}-participant`,
     {
       ...participantValuesWithOverwrites,
       logLevel,
@@ -83,7 +84,7 @@ export function installSvParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
-      ...autoInitValues('splice-participant', version, onboardingName),
+      ...autoInitValues(`${helmChartNamesPrefix(version)}-participant`, version, onboardingName),
     },
     version,
     {

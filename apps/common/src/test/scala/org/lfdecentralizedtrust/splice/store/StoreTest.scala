@@ -942,9 +942,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         reassignmentId: String,
         counter: Long,
         recordTime: CantonTimestamp = CantonTimestamp.Epoch,
+        offset: Long = nextOffset(),
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Unassign]] = {
       val reassignment = mkReassignment(
-        nextOffset(),
+        offset,
         toUnassignEvent(
           contractAndDomain._1.contractId,
           reassignmentId,
@@ -968,9 +969,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         reassignmentId: String,
         counter: Long,
         recordTime: CantonTimestamp = CantonTimestamp.Epoch,
+        offset: Long = nextOffset(),
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Assign]] = {
       val reassignment = mkReassignment(
-        nextOffset(),
+        offset,
         toAssignEvent(
           contractAndDomain._1,
           reassignmentId,
@@ -1081,7 +1083,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       recordTime: CantonTimestamp = CantonTimestamp.Epoch,
   ): Reassignment[T] =
     Reassignment(
-      updateId = "",
+      updateId = nextUpdateId(),
       offset = offset,
       recordTime = recordTime,
       event = event,

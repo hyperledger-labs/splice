@@ -1,25 +1,368 @@
 {
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
-  "properties": {
-    "auth": {
-      "type": "object",
-      "description": "The authentication configuration for the application"
-    },
-    "spliceInstanceNames": {
-      "type": "object",
-      "description": "The names unique for the splice instance, must be specified as provided in the docs"
-    }
-  },
   "allOf": [
     {
-      "required": ["auth", "spliceInstanceNames"],
+      "if": {
+        "properties": {
+          "cometbft": {
+            "properties": {
+              "enabled": {
+                "const": "true"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cometbft": {
+            "type": "object",
+            "required": ["connectionUri"],
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "connectionUri": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "required": [
+        "auth",
+        "decentralizedSynchronizerUrl",
+        "defaultJvmOptions",
+        "domain",
+        "imageRepo",
+        "nodeIdentifier",
+        "onboardingName",
+        "persistence",
+        "spliceInstanceNames"
+      ],
       "properties": {
+        "defaultJvmOptions": {
+          "type": "string"
+        },
+        "additionalJvmOptions": {
+          "type": "string"
+        },
+        "imageRepo": {
+          "type": "string"
+        },
+        "imageDigests": {
+          "type": "object"
+        },
+        "onboardingName": {
+          "type": "string"
+        },
+        "onboardingType": {
+          "type": "string"
+        },
+        "onboardingFoundingSvRewardWeightBps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "onboardingRoundZeroDuration": {
+          "type": "string"
+        },
+        "onboardingPollingInterval": {
+          "type": "string"
+        },
+        "expectedValidatorOnboardings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "expiresIn": {
+                "type": "string"
+              },
+              "secretFrom": {
+                "type": "object",
+                "properties": {
+                  "secretKeyRef": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "optional": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "approvedSvIdentities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "publicKey": {
+                "type": "string"
+              },
+              "rewardWeightBps": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "initialTickDuration": {
+          "type": "string"
+        },
+        "initialHoldingFee": {
+          "type": "number",
+          "minimum": 0
+        },
+        "initialSynchronizerFeesConfig": {
+          "type": "object",
+          "required": [
+            "baseRateBurstAmount",
+            "baseRateBurstWindowMins",
+            "extraTrafficPrice",
+            "minTopupAmount",
+            "readVsWriteScalingFactor"
+          ],
+          "properties": {
+            "baseRateBurstAmount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "baseRateBurstWindowMins": {
+              "type": "number",
+              "minimum": 0
+            },
+            "extraTrafficPrice": {
+              "type": "number",
+              "minimum": 0
+            },
+            "minTopupAmount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "readVsWriteScalingFactor": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "isDevNet": {
+          "type": "boolean"
+        },
+        "decentralizedSynchronizerUrl": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "object",
+          "required": ["sequencerPublicUrl"],
+          "properties": {
+            "mediatorAddress": {
+              "type": "string"
+            },
+            "sequencerAddress": {
+              "type": "string"
+            },
+            "sequencerPublicUrl": {
+              "type": "string"
+            },
+            "sequencerPruningConfig": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "retentionPeriod": {
+                  "type": "string"
+                },
+                "pruningInterval": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "joinWithKeyOnboarding": {
+          "type": "object",
+          "properties": {
+            "sponsorApiUrl": {
+              "type": "string"
+            }
+          }
+        },
+        "disableIngestUpdateHistoryFromParticipantBegin": {
+          "type": "boolean"
+        },
+        "disableOnboardingParticipantPromotionDelay": {
+          "type": "boolean"
+        },
+        "extraBeneficiaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "beneficiary": {
+                "type": "string"
+              },
+              "weight": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "identitiesExport": {
+          "type": "object",
+          "properties": {
+            "bucket": {
+              "type": "object",
+              "properties": {
+                "bucketName": {
+                  "type": "string"
+                },
+                "jsonCredentials": {
+                  "type": "string"
+                },
+                "projectId": {
+                  "type": "string"
+                },
+                "secretName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "bucketName",
+                "jsonCredentials",
+                "projectId",
+                "secretName"
+              ]
+            },
+            "prefix": {
+              "type": "string"
+            }
+          },
+          "required": ["bucket", "prefix"]
+        },
+        "participantIdentitiesDumpImport": {
+          "type": "object",
+          "properties": {
+            "newParticipantIdentifier": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            }
+          }
+        },
+        "scan": {
+          "type": "object",
+          "properties": {
+            "publicUrl": {
+              "type": "string"
+            },
+            "internalUrl": {
+              "type": "string"
+            }
+          }
+        },
+        "nodeIdentifier": {
+          "type": "string"
+        },
+        "migration": {
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "id": {
+              "description": "The migration id of the synchronizer"
+            },
+            "migrating": {
+              "type": "boolean"
+            },
+            "attachPvc": {
+              "type": "boolean"
+            }
+          }
+        },
+        "pvc": {
+          "type": "object",
+          "properties": {
+            "volumeStorageClass": {
+              "type": "string"
+            }
+          }
+        },
+        "failOnAppVersionMismatch": {
+          "type": "boolean"
+        },
+        "enablePostgresMetrics": {
+          "type": "boolean"
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "enable": {
+              "type": "boolean"
+            },
+            "release": {
+              "type": "string"
+            },
+            "interval": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": ["number", "string"]
+                },
+                "memory": {
+                  "type": ["number", "string"]
+                }
+              }
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": ["number", "string"]
+                },
+                "memory": {
+                  "type": ["number", "string"]
+                }
+              }
+            }
+          }
+        },
+        "cluster": {
+          "type": "object",
+          "properties": {
+            "fixedTokens": {
+              "type": "boolean"
+            }
+          }
+        },
         "imagePullPolicy": {
           "type": "string"
         },
         "auth": {
           "type": "object",
+          "description": "The authentication configuration for the application",
           "properties": {
             "audience": {
               "type": "string",
@@ -29,11 +372,61 @@
               "type": "string",
               "pattern": "^http[s]?://.+$",
               "description": "The URL for the JWKS endpoint for the SV app API"
+            },
+            "targetAudience": {
+              "type": "string"
             }
           }
         },
+        "persistence": {
+          "type": "object",
+          "required": [
+            "databaseName",
+            "schema",
+            "host",
+            "port",
+            "user",
+            "secretName"
+          ],
+          "properties": {
+            "databaseName": {
+              "type": "string"
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            }
+          }
+        },
+        "contactPoint": {
+          "type": "string"
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "livenessProbeInitialDelaySeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
         "spliceInstanceNames": {
           "type": "object",
+          "description": "The names unique for the splice instance, must be specified as provided in the docs",
           "properties": {
             "networkName": {
               "type": "string",

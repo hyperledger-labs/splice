@@ -124,8 +124,28 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       // domain 2: . 2 .
       _ <- initStore(storeA0)
       tx1 <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
-      _ <- create(domain2, validContractId(2), validOffset(2), party1, storeA0, time(2))
-      _ <- create(domain1, validContractId(3), validOffset(3), party1, storeA0, time(3))
+      _ <- assign(
+        domain2,
+        domain1,
+        validContractId(1),
+        validOffset(2),
+        party1,
+        0,
+        "rid1",
+        storeA0,
+        time(2),
+      )
+      _ <- unassign(
+        domain1,
+        domain2,
+        validContractId(1),
+        validOffset(3),
+        party1,
+        0,
+        "rid1",
+        storeA0,
+        time(3),
+      )
       // Migration 1:
       // domain 1: 4 5
       // domain 2: . .

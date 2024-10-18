@@ -1,4 +1,8 @@
-import { DecentralizedSynchronizerUpgradeConfig, DomainMigrationIndex } from 'splice-pulumi-common';
+import {
+  config,
+  DecentralizedSynchronizerUpgradeConfig,
+  DomainMigrationIndex,
+} from 'splice-pulumi-common';
 import { allSvsToDeploy, svRunbookConfig } from 'splice-pulumi-common-sv';
 
 import { GitFluxRef, gitRepoForRef } from '../flux';
@@ -24,7 +28,7 @@ function createStackForMigration(
   createStackCR(
     `sv-canton.${sv}-migration-${migrationId}`,
     'sv-canton',
-    sv === svRunbookConfig.nodeName,
+    sv === svRunbookConfig.nodeName && config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
     reference,
     {
       SPLICE_MIGRATION_ID: migrationId.toString(),

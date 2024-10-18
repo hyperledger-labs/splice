@@ -3,26 +3,22 @@ import {
   mustInstallValidator1,
 } from 'splice-pulumi-common-validator/src/validators';
 
-import { downStack, PulumiAbortController, stack } from './pulumi';
+import { awaitAllOrThrowAllExceptions, downStack, PulumiAbortController, stack } from './pulumi';
 
 async function runCoreStackDown() {
   const mainStack = await stack('canton-network', 'canton-network', true, {});
   const operations: Promise<void>[] = [];
   const abortController = new PulumiAbortController();
-  operations.push(downStack(mainStack, abortController.signal).catch(e => abortController.abort("Aborting because mainStack failed")));
+  operations.push(downStack(mainStack, abortController));
   if (mustInstallValidator1) {
     const validator1 = await stack('validator1', 'validator1', true, {});
-    operations.push(downStack(validator1, abortController.signal).catch(e => abortController.abort("Aborting because validator1 failed")));
+    operations.push(downStack(validator1, abortController));
   }
   if (mustInstallSplitwell) {
     const splitwell = await stack('splitwell', 'splitwell', true, {});
-    operations.push(downStack(splitwell, abortController.signal).catch(e => abortController.abort("Aborting because splitwell failed")));
+    operations.push(downStack(splitwell, abortController));
   }
-  const data = await Promise.allSettled(operations);
-  const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
-  if (rejected) {
-    throw new Error(rejected);
-  }
+  awaitAllOrThrowAllExceptions(operations);
 }
 
 runCoreStackDown().catch(e => {

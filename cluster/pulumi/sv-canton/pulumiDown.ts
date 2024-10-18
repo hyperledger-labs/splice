@@ -1,10 +1,10 @@
 import { DomainMigrationIndex } from 'splice-pulumi-common';
 import { config } from 'splice-pulumi-common/src/config';
 
-import { downStack } from '../pulumi';
+import { awaitAllOrThrowAllExceptions, downStack, PulumiAbortController } from '../pulumi';
 import { runForAllMigrations, stackForMigration, svsToDeploy } from './pulumi';
 
-const abortController = new AbortController();
+const abortController = new PulumiAbortController();
 
 // used in CI clusters that run HDM to ensure everything is cleaned up
 const extraMigrationsToReset =
@@ -17,11 +17,7 @@ async function downMigrationId(migrationId: DomainMigrationIndex): Promise<void>
   const data = await Promise.allSettled(
     svsToDeploy.map(async sv => {
       const stack = await stackForMigration(sv, migrationId, false);
-      await downStack(stack, abortController.signal).catch(e => {
-        console.error(`Failed to down stack ${stack.name}`);
-        console.error(e);
-        abortController.abort();
-      });
+      await downStack(stack, abortController);
     })
   );
   const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
@@ -32,18 +28,13 @@ async function downMigrationId(migrationId: DomainMigrationIndex): Promise<void>
 
 async function downAllTheStacks() {
   await runForAllMigrations(async stack => {
-    await downStack(stack, abortController.signal);
+    await downStack(stack, abortController);
   }, false).then(async () => {
     const downOperations: Promise<void>[] = [];
     for (const migrationId of extraMigrationsToReset) {
       downOperations.push(downMigrationId(migrationId));
     }
-    const data = await Promise.allSettled(downOperations);
-    const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
-    if (rejected) {
-      throw new Error(rejected);
-    }
-
+    awaitAllOrThrowAllExceptions(downOperations);
     return null;
   });
 }
