@@ -42,8 +42,8 @@ temp/
 # Exclude generated ts protobuf sources
 **/com/daml/ledger/api/**/*.ts
 **/com/daml/ledger/api/**/*.js
-**/com/daml/network/**/*.ts
-**/com/daml/network/**/*.js
+**/org/lfdecentralizedtrust/splice/**/*.ts
+**/org/lfdecentralizedtrust/splice/**/*.js
 **/com/digitalasset/canton/**/*.ts
 **/com/digitalasset/canton/**/*.js
 **/google/**/*.js

@@ -307,7 +307,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-ingress-runbook",
+      "chart": "cn-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-validator1",
@@ -430,7 +430,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -483,7 +483,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-participant",
+      "chart": "cn-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-1",
@@ -623,7 +623,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-splitwell-web-ui",
+      "chart": "cn-splitwell-web-ui",
       "compat": "true",
       "maxHistory": 10,
       "name": "splitwell-web-ui",
@@ -747,7 +747,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-validator",
+      "chart": "cn-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-validator1",
@@ -799,7 +799,6 @@
         },
         "migration": {
           "id": 1,
-          "legacyId": 0,
           "migrating": false
         },
         "nodeIdentifier": "validator1",

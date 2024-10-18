@@ -1,7 +1,7 @@
 import java.io.File
 import scala.collection.mutable
 
-import com.daml.network.config.SpliceConfig
+import org.lfdecentralizedtrust.splice.config.SpliceConfig
 
 // TODO(tech-debt): make it easier/automatic to select the input config files
 // TODO(tech-debt): print daml user names used in the config

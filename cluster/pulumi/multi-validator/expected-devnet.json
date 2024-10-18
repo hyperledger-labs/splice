@@ -113,7 +113,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -4265,7 +4265,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-postgres",
+      "chart": "cn-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "postgres-0",
@@ -4327,7 +4327,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-postgres",
+      "chart": "cn-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "postgres-1",
@@ -4389,7 +4389,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-postgres",
+      "chart": "cn-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "postgres-2",
@@ -4451,7 +4451,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-postgres",
+      "chart": "cn-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "postgres-3",
@@ -4513,7 +4513,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-postgres",
+      "chart": "cn-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "postgres-4",

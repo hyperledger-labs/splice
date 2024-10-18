@@ -509,7 +509,7 @@ to Scala BigDecimals by the Scala compiler unlike Java BigDecimals
 (`wallet.tap(10)` vs `wallet.tap(new java.math.BigDecimal(10))`).
 
 To represent Daml Numerics in Protobuf we use `string`s (there is no Protobuf BigDecimal type). Conversions to
-and from `string`s should occur via `com.daml.network.util.Proto.encode/tryDecode`.
+and from `string`s should occur via `org.lfdecentralizedtrust.splice.util.Proto.encode/tryDecode`.
 
 When interacting with the Ledger API, we convert the Scala BigDecimals to Java BigDecimals.
 
@@ -858,9 +858,9 @@ It can be stopped via `./stop-frontends.sh`.
 
 ### Running and Debugging Integration Tests
 
-The integration tests are located at [`/apps/app/src/test/scala/com/daml/network/integration/tests/`](/apps/app/src/test/scala/com/daml/network/integration/tests).
+The integration tests are located at [`/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/`](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests).
 They work by defining and starting a Canton network topology and running Canton console commands against that topology,
-see for example the [`DirectoryIntegrationTest.scala`](/apps/app/src/test/scala/com/daml/network/integration/tests/DirectoryIntegrationTest.scala).
+see for example the [`DirectoryIntegrationTest.scala`](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/DirectoryIntegrationTest.scala).
 Also see the Scaladocs on Canton's [`BaseIntegrationTest.scala`](/canton/community/app/src/test/scala/com/digitalasset/canton/integration/BaseIntegrationTest.scala) for more information about the intended usage of the test framework.
 
 Many tests use the topology and base configuration defined in [`/apps/app/src/test/resources/simple-topology.conf`](apps/app/src/test/resources/simple-topology.conf), or a variant thereof.
@@ -868,8 +868,8 @@ Adjusting these configurations can sometimes help with debugging.
 See for example https://docs.daml.com/canton/usermanual/monitoring.html on how to adjust logging and monitoring for Canton nodes.
 
 Frontend tests use selenium for launching a (usually headless) browser (currently we use Firefox), and interacting with it as a user would.
-To make it run with a UI, for debugging - turn the headless flag in [`FrontendIntegrationTest.scala`](/apps/app/src/test/scala/com/daml/network/integration/tests/FrontendIntegrationTest.scala) to false.
-To take screenshots (also in headless mode) of the browser at certain points of the tests - call `screenshot()` from [`FrontendIntegrationTest.scala`](/apps/app/src/test/scala/com/daml/network/integration/tests/FrontendIntegrationTest.scala) in your test.
+To make it run with a UI, for debugging - turn the headless flag in [`FrontendIntegrationTest.scala`](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/FrontendIntegrationTest.scala) to false.
+To take screenshots (also in headless mode) of the browser at certain points of the tests - call `screenshot()` from [`FrontendIntegrationTest.scala`](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/FrontendIntegrationTest.scala) in your test.
 
 You can run integration tests from IntelliJ by navigating to the file and clicking the little green "run-triangle"
 in the gutter at the start of the test definition.
@@ -878,13 +878,13 @@ The logs from test executions are output to `/log/canton_network_test.clog`.
 Use `lnav` to view these logs for debugging failing test cases.
 No installation of `lnav` is required, as it is provided by default by our `direnv`.
 
-Documentation about common pitfalls when writing new integration tests and debugging existing ones can be found [here](/apps/app/src/test/scala/com/daml/network/integration/tests/README.md).
+Documentation about common pitfalls when writing new integration tests and debugging existing ones can be found [here](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/README.md).
 If you wish to extend our testing topology please also consult [this README](/apps/app/src/test/resources/README.md) about name and port allocation.
 
 ### Testing App Behaviour Outside of Tests Without Running Bundle
 
 Sometimes, you may need to debug startup behaviour of the Canton coin apps that is causing issues for the
-initialization of the [`CNNodeEnvironment`](apps/app/src/main/scala/com/daml/network/environment/CNNodeEnvironment.scala).
+initialization of the [`CNNodeEnvironment`](apps/app/src/main/scala/org/lfdecentralizedtrust/splice/environment/CNNodeEnvironment.scala).
 You usually can't debug this behaviour
 via our integration tests because the integration tests require an initialized `CNNodeEnvironment`.
 At other times, you may want to start an interactive console without having to run `sbt bundle`.
@@ -896,7 +896,7 @@ see the results of adding log statements without needing to run `sbt bundle`.
 
 All screenshots are from IntelliJ IDEA 2020.1.4 on Ubuntu.
 
-If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain com.daml.network.SpliceApp -c <conf-files>`, however,
+If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain org.lfdecentralizedtrust.splice.SpliceApp -c <conf-files>`, however,
 this doesn't give you a debugger.
 
 ### Testing Auth0 Auth Flows Locally

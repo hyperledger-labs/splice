@@ -32,7 +32,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Temporarily added a new release version in `CantonVersion.scala`
 * Added `class UnitCommand` for admin commands that do not take arguments
 * Adds some more utility methods to `PartyId`
-* Added `com.daml.network.integration.CNNodeEnvironmentDefinition` to `LogEntry.scala`
+* Added `org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition` to `LogEntry.scala`
 * Support `readAs` in `commands.submit`, should be upstreamed
 * Added `internalErrorGrpc` to `ErrorUtil`
 * Generalized `ApiRequestLogger` to allow its definition to be reused to build an Api Client request logger.
@@ -68,3 +68,4 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Changed cache detection logic for `damlBuild` in SBT DamlPlugin to file-hash instead of the default modification time.
 * Changed `DbStorageSetup` to use `DbConfig with PostgresDbConfig` instead of `CommunityDbConfig.Postgres`.
 * Stubbed the `SequencerConfig` due to a missing project dependency in on `communite-reference-sequecer`
+* Added `org.lfdecentralizedtrust.splice` to `logback-test.xml`

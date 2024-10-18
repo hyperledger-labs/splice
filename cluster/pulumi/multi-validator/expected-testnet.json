@@ -3,7 +3,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "splice-cluster-loopback-gateway",
+      "chart": "cn-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",

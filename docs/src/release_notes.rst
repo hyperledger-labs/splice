@@ -49,6 +49,9 @@ Upcoming
     imported modules.
   * ``imagePullPolicy`` is now unset by default corresponding to ``IfNotPresent``.
     You can overwrite it using the helm value ``imagePullPolicy`` if needed.
+  * In ``paused-triggers`` settings, the trigger name prefix ``com.daml.network`` has been
+    replaced by ``org.lfdecentralizedtrust.splice``. This also applies to stacktraces you may
+    see in logs.
 
 0.2.4
 -----

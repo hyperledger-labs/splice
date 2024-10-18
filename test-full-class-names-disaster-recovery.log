@@ -1,1 +1,1 @@
-com.daml.network.integration.tests.DisasterRecoveryIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.DisasterRecoveryIntegrationTest
