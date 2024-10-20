@@ -57,6 +57,64 @@ abstract class UpdateHistoryTestBase
     )
   }
 
+  protected def assign(
+      domainTo: DomainId,
+      domainFrom: DomainId,
+      contractId: String,
+      offset: String,
+      party: PartyId,
+      counter: Long,
+      reassignmentId: String,
+      store: UpdateHistory,
+      txEffectiveAt: CantonTimestamp,
+  ) = {
+    DomainSyntax(domainTo).assign(
+      contractAndDomain = (
+        appRewardCoupon(
+          round = 0,
+          provider = party,
+          contractId = contractId,
+        ),
+        domainFrom,
+      ),
+      offset = offset,
+      counter = counter,
+      reassignmentId = reassignmentId,
+      recordTime = txEffectiveAt,
+    )(
+      store
+    )
+  }
+
+  protected def unassign(
+      domainFrom: DomainId,
+      domainTo: DomainId,
+      contractId: String,
+      offset: String,
+      party: PartyId,
+      counter: Long,
+      reassignmentId: String,
+      store: UpdateHistory,
+      txEffectiveAt: CantonTimestamp,
+  ) = {
+    DomainSyntax(domainFrom).unassign(
+      contractAndDomain = (
+        appRewardCoupon(
+          round = 0,
+          provider = party,
+          contractId = contractId,
+        ),
+        domainTo,
+      ),
+      offset = offset,
+      counter = counter,
+      reassignmentId = reassignmentId,
+      recordTime = txEffectiveAt,
+    )(
+      store
+    )
+  }
+
   protected def createMulti(
       domain: DomainId,
       contractId: String,

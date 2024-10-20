@@ -14,7 +14,6 @@ import com.daml.ledger.javaapi.data.{
   ParticipantOffset,
   TransactionTree,
 }
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -686,33 +685,72 @@ class UpdateHistory(
     )
   }
 
-  private def updatesQuery(
+  private def afterFilters(
       afterO: Option[(Long, CantonTimestamp)],
-      limit: PageLimit,
-      makeSubQuery: SQLActionBuilder => SQLActionBuilderChain,
-  ) = {
-    val afterFilters = afterO match {
+      includeImportUpdates: Boolean,
+  ): NonEmptyList[SQLActionBuilder] = {
+    val gt = if (includeImportUpdates) ">=" else ">"
+    afterO match {
       case None =>
-        NonEmptyList.of(sql"migration_id >= 0 and record_time >= ${CantonTimestamp.MinValue}")
+        NonEmptyList.of(sql"migration_id >= 0 and record_time #$gt ${CantonTimestamp.MinValue}")
       case Some((afterMigrationId, afterRecordTime)) =>
-        // using an OR in a query might cause the query planner to do a Seq scan,
-        // whereas this makes it so that the two queries use updt_hist_tran_hi_mi_rt_di,
-        // and merged via Merge Append.
+        // This makes it so that the two queries use updt_hist_tran_hi_mi_rt_di,
         NonEmptyList.of(
           sql"migration_id = ${afterMigrationId} and record_time > ${afterRecordTime} ",
-          sql"migration_id > ${afterMigrationId} and record_time >= ${CantonTimestamp.MinValue}",
+          sql"migration_id > ${afterMigrationId} and record_time #$gt ${CantonTimestamp.MinValue}",
+        )
+    }
+  }
+
+  private def beforeFilters(
+      migrationId: Long,
+      domainId: DomainId,
+      beforeRecordTime: CantonTimestamp,
+      atOrAfterRecordTimeO: Option[CantonTimestamp],
+  ): NonEmptyList[SQLActionBuilder] = {
+    atOrAfterRecordTimeO match {
+      case None =>
+        NonEmptyList.of(
+          // Uses `> CantonTimestamp.MinValue` to exclude import updates
+          sql"""migration_id = $migrationId and
+                domain_id = $domainId and
+                record_time < $beforeRecordTime and
+                record_time > ${CantonTimestamp.MinValue}"""
+        )
+      case Some(atOrAfterRecordTime) =>
+        NonEmptyList.of(
+          sql"""migration_id = $migrationId and
+                domain_id = $domainId and
+                record_time < $beforeRecordTime and
+                record_time >= ${atOrAfterRecordTime}
+                """
         )
     }
 
-    val unionAll = afterFilters.map(makeSubQuery).reduceLeft(_ ++ sql" union all " ++ _)
+  }
 
-    sql"select * from (" ++ unionAll ++ sql") all_queries " ++
-      sql"""order by migration_id, record_time, domain_id limit ${limit.limit}"""
+  private def updatesQuery(
+      filters: NonEmptyList[SQLActionBuilder],
+      orderBy: SQLActionBuilder,
+      limit: PageLimit,
+      makeSubQuery: SQLActionBuilder => SQLActionBuilderChain,
+  ) = {
+    if (filters.size == 1) {
+      makeSubQuery(filters.head)
+    } else {
+      // Using an OR in a query might cause the query planner to do a Seq scan,
+      // whereas using a union all makes it so that the individual queries use the right index,
+      // and are merged via Merge Append.
+      val unionAll = filters.map(makeSubQuery).reduceLeft(_ ++ sql" union all " ++ _)
+
+      sql"select * from (" ++ unionAll ++ sql") all_queries " ++
+        sql"order by " ++ orderBy ++ sql" limit ${limit.limit}"
+    }
   }
 
   private def getTxUpdates(
-      afterO: Option[(Long, CantonTimestamp)],
-      includeImportUpdates: Boolean,
+      filters: NonEmptyList[SQLActionBuilder],
+      orderBy: SQLActionBuilder,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
@@ -731,17 +769,10 @@ class UpdateHistory(
       from update_history_transactions
       where
         history_id = $historyId and """ ++ afterFilter ++
-        (if (!includeImportUpdates) {
-           sql""" and not starts_with(workflow_id, ${lengthLimited(
-               IMPORT_ACS_WORKFLOW_ID_PREFIX
-             )})"""
-         } else {
-           sql""
-         }) ++
-        sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
+        sql" order by " ++ orderBy ++ sql" limit ${limit.limit})"
     }
 
-    val finalQuery = updatesQuery(afterO, limit, makeSubQuery)
+    val finalQuery = updatesQuery(filters, orderBy, limit, makeSubQuery)
     for {
       rows <- storage
         .query(
@@ -764,8 +795,9 @@ class UpdateHistory(
     }
   }
 
-  def getAssignmentUpdates(
-      afterO: Option[(Long, CantonTimestamp)],
+  private def getAssignmentUpdates(
+      filters: NonEmptyList[SQLActionBuilder],
+      orderBy: SQLActionBuilder,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
 
@@ -795,10 +827,10 @@ class UpdateHistory(
     from update_history_assignments
     where
       history_id = $historyId and """ ++ afterFilter ++
-        sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
+        sql" order by " ++ orderBy ++ sql" limit ${limit.limit})"
     }
 
-    val finalQuery = updatesQuery(afterO, limit, makeSubQuery)
+    val finalQuery = updatesQuery(filters, orderBy, limit, makeSubQuery)
     for {
       rows <- storage
         .query(
@@ -810,8 +842,9 @@ class UpdateHistory(
     }
   }
 
-  def getUnassignmentUpdates(
-      afterO: Option[(Long, CantonTimestamp)],
+  private def getUnassignmentUpdates(
+      filters: NonEmptyList[SQLActionBuilder],
+      orderBy: SQLActionBuilder,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
 
@@ -831,10 +864,10 @@ class UpdateHistory(
     from update_history_unassignments
     where
       history_id = $historyId and """ ++ afterFilter ++
-        sql""" order by migration_id, record_time, domain_id limit ${limit.limit})"""
+        sql" order by " ++ orderBy ++ sql" limit ${limit.limit})"
     }
 
-    val finalQuery = updatesQuery(afterO, limit, makeSubQuery)
+    val finalQuery = updatesQuery(filters, orderBy, limit, makeSubQuery)
     for {
       rows <- storage
         .query(
@@ -851,10 +884,12 @@ class UpdateHistory(
       includeImportUpdates: Boolean,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
+    val filters = afterFilters(afterO, includeImportUpdates)
+    val orderBy = sql"migration_id, record_time, domain_id"
     for {
-      txs <- getTxUpdates(afterO, includeImportUpdates, limit)
-      assignments <- getAssignmentUpdates(afterO, limit)
-      unassignments <- getUnassignmentUpdates(afterO, limit)
+      txs <- getTxUpdates(filters, orderBy, limit)
+      assignments <- getAssignmentUpdates(filters, orderBy, limit)
+      unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
     } yield {
       (txs ++ assignments ++ unassignments).sorted.take(limit.limit)
     }
@@ -866,47 +901,14 @@ class UpdateHistory(
       beforeRecordTime: CantonTimestamp,
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
-    val query =
-      sql"""
-      (select
-        row_id,
-        update_id,
-        record_time,
-        participant_offset,
-        domain_id,
-        migration_id,
-        effective_at,
-        root_event_ids,
-        workflow_id,
-        command_id
-      from update_history_transactions
-      where
-        history_id = $historyId and
-        migration_id = $migrationId and
-        domain_id = $domainId and
-        record_time < $beforeRecordTime
-        order by record_time desc limit ${limit.limit})
-        """
-
+    val filters = beforeFilters(migrationId, domainId, beforeRecordTime, None)
+    val orderBy = sql"record_time desc"
     for {
-      rows <- storage
-        .query(
-          query.toActionBuilder.as[SelectFromTransactions],
-          "getUpdates",
-        )
-      creates <- queryCreateEvents(rows.map(_.rowId))
-      exercises <- queryExerciseEvents(rows.map(_.rowId))
+      txs <- getTxUpdates(filters, orderBy, limit)
+      assignments <- getAssignmentUpdates(filters, orderBy, limit)
+      unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
     } yield {
-      rows.map { row =>
-        TreeUpdateWithMigrationId(
-          update = decodeTransaction(
-            row,
-            creates.getOrElse(row.rowId, Seq.empty),
-            exercises.getOrElse(row.rowId, Seq.empty),
-          ),
-          migrationId = row.migrationId,
-        )
-      }
+      (txs ++ assignments ++ unassignments).sorted.reverse.take(limit.limit)
     }
   }
 
@@ -1317,7 +1319,7 @@ class UpdateHistory(
         transactions,
         assignments,
         unassignments,
-      ).flatten.minOption
+      ).flatten.maxOption
     }
   }
 
