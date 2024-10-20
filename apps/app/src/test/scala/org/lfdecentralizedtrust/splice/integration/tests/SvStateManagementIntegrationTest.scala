@@ -315,14 +315,24 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         }
       },
     )(
-      "vote of sv3 is remove",
-      _ =>
+      "vote of sv3 is removed and sv3 is removed from decentralized namespace",
+      _ => {
         getAmuletPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv2") -> Seq(Some(BigDecimal(0.005))),
-          svParties("sv3") -> Seq(None),
           svParties("sv4") -> Seq(None),
-        ),
+        )
+        // Wait for the decentralized namespace change to avoid triggering in UNAUTHORIZED_TOPOLOGY_TRANSACTION
+        sv1Backend.participantClient.topology.decentralized_namespaces
+          .list(
+            filterStore = decentralizedSynchronizerId.filterString,
+            filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
+          )
+          .loneElement
+          .item
+          .owners
+          .forgetNE should have size (3)
+      },
     )
   }
 

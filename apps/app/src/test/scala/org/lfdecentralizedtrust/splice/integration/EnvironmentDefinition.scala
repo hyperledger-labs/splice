@@ -189,6 +189,15 @@ case class EnvironmentDefinition(
       )(config)
     )
 
+  def withTrafficBalanceCacheDisabled: EnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      ConfigTransforms.updateAllValidatorConfigs_(config =>
+        config
+          .focus(_.domains.global.trafficBalanceCacheTimeToLive)
+          .replace(NonNegativeFiniteDuration.ofMillis(0))
+      )(config)
+    )
+
   def withSequencerConnectionsFromScanDisabled(
       sequencerPortBump: Int = 0
   ): EnvironmentDefinition =

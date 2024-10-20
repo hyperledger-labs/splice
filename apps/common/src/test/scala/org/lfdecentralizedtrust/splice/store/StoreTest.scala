@@ -610,6 +610,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val domainMigrationId = 0L
 
+  protected val nextDomainMigrationId = 1L
+
   protected val defaultEffectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
   protected def toIncompleteUnassign(
@@ -915,9 +917,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         reassignmentId: String,
         counter: Long,
         recordTime: CantonTimestamp = CantonTimestamp.Epoch,
+        offset: String = nextOffset(),
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Unassign]] = {
       val reassignment = mkReassignment(
-        nextOffset(),
+        offset,
         toUnassignEvent(
           contractAndDomain._1.contractId,
           reassignmentId,
@@ -941,9 +944,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         reassignmentId: String,
         counter: Long,
         recordTime: CantonTimestamp = CantonTimestamp.Epoch,
+        offset: String = nextOffset(),
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Assign]] = {
       val reassignment = mkReassignment(
-        nextOffset(),
+        offset,
         toAssignEvent(
           contractAndDomain._1,
           reassignmentId,
@@ -1054,7 +1058,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       recordTime: CantonTimestamp = CantonTimestamp.Epoch,
   ): Reassignment[T] =
     Reassignment(
-      updateId = "",
+      updateId = nextUpdateId(),
       offset = new ParticipantOffset.Absolute(offset),
       recordTime = recordTime,
       event = event,
