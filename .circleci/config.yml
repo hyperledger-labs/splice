@@ -2936,7 +2936,15 @@ jobs:
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
             cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF || true
             
-            git add **/config.yaml || true
+            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"  
+            
+            echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
+            echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
+            echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
+            echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+
+            git add **/.envrc.vars            
+            git add **/config.yaml
             git commit -m "Add migration config to deploy version $BASE_VERSION to << parameters.cluster >>"
             git push origin $BASE_VERSION_BRANCH
       - deploy_operator:
