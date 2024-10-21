@@ -47,7 +47,8 @@ class Workflow:
   id: str
   name: str
   pipeline_number: int
-  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "failed", "error", "failing", "on_hold", "canceled", "unauthorized"])})
+  # unfun fact: circleci docs says "not_run", but we've seen "not_running" in the wild, so we defensively allow both
+  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "not_running", "failed", "error", "failing", "on_hold", "canceled", "unauthorized"])})
   stopped_at: datetime | None
   class Meta:
     unknown = EXCLUDE
@@ -66,7 +67,8 @@ class WorkflowsResponse:
 class Job:
   id: str
   name: str
-  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "failed", "error", "failing", "on_hold", "canceled", "unauthorized", "blocked"])})
+  # unfun fact: circleci docs says "not_run", but we've seen "not_running" in the wild, so we defensively allow both
+  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "not_running", "failed", "error", "failing", "on_hold", "canceled", "unauthorized", "blocked"])})
   stopped_at: datetime | None
   class Meta:
     unknown = EXCLUDE
