@@ -254,6 +254,10 @@ export const DeploySvRunbook = config.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false)
 
 export const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
 
+export const dockerImageArtifactsRepository = config.optionalEnv(
+  'SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY'
+);
+
 // This flag determines whether to split postgres instances per app, or have one per namespace.
 // By default, we split instances on CloudSQL (where we expect longer-living environments, thus want to support backup&recovery),
 // but not on k8s-deployed postgres (where we optimize for faster deployment).

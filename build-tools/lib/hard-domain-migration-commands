@@ -132,17 +132,82 @@ EOF
   fi
 }
 
-subcommand_whitelist[hard_domain_migration_update_active_config]='Upgrade the hard domain migration config'
+subcommand_whitelist[hard_domain_migration_update_config]='Upgrade the hard domain migration config'
 
-function subcmd_hard_domain_migration_update_active_config() {
-  local active_migration_id="$1"
-  local active_migration_canton_stack="$2"
+function subcmd_hard_domain_migration_update_config() {
+  local migration_type
+  local migration_id
+  local migration_canton_stack
+  if [ "$#" -ge 3 ]; then
+    migration_type="$1"
+    migration_id="$2"
+    migration_canton_stack="$3"
+    shift 3
+  else
+    _error "Usage: $0 $SCRIPTNAME migration_type migration_id migration_canton_stack [version] [release_reference]"
+  fi
   local migration_config
   migration_config=$(cat <<EOF
-  active:
-    id: $active_migration_id
-    provider: $active_migration_canton_stack
+      id: $migration_id
+      provider: $migration_canton_stack
 EOF
   )
-  _update_cluster_config "$migration_config" "synchronizerMigration"
+  if [ "$#" -gt 0 ]; then
+    migration_config+=$(cat <<EOF
+
+      version: $1
+EOF
+  )
+    shift
+  fi
+  if [ "$#" -gt 0 ]; then
+    migration_config+=$(cat <<EOF
+
+      releaseReference: $1
+EOF
+  )
+    shift
+  fi
+  _update_cluster_config "$migration_config" "synchronizerMigration.$migration_type"
+}
+
+subcommand_whitelist[hard_domain_migration_update_config_to_migrate]='Upgrade the hard domain migration config to migrate cluster'
+
+function subcmd_hard_domain_migration_update_config_to_migrate() {
+  local configFile
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    configFile="config.yaml"
+  else
+    configFile="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/config.yaml"
+  fi
+
+  yq e 'with(.synchronizerMigration; .legacy = .active | .active = .upgrade | del(.upgrade))' -i $configFile
+  yq e '.synchronizerMigration.active.migratingFrom = 0' -i $configFile
+  yq e 'del(.synchronizerMigration.legacy.releaseReference)' -i $configFile
+}
+
+subcommand_whitelist[hard_domain_migration_update_config_to_archive_legacy_migration]='Upgrade the hard domain migration config to archive legacy migration'
+
+function subcmd_hard_domain_migration_update_config_to_archive_legacy_migration() {
+  local configFile
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    configFile="config.yaml"
+  else
+    configFile="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/config.yaml"
+  fi
+
+  yq e '.synchronizerMigration.archived = [ .synchronizerMigration.legacy ] | del(.synchronizerMigration.legacy)' -i $configFile
+}
+
+subcommand_whitelist[hard_domain_migration_update_config_to_remove_migrating_from]='Upgrade the hard domain migration config to remove migratingFrom field from active migration'
+
+function subcmd_hard_domain_migration_update_config_to_remove_migrating_from() {
+  local configFile
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    configFile="config.yaml"
+  else
+    configFile="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/config.yaml"
+  fi
+
+  yq e 'del(.synchronizerMigration.active.migratingFrom)' -i $configFile
 }

@@ -402,3 +402,262 @@ jobs:
             - notify-cluster-fail:
                 channel_notify: << parameters.channel_notify >>
                 cluster: << parameters.cluster >>
+  deploy_cluster_for_migration_base_version:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      base_version:
+        type: string
+        default: ""
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - when:
+          condition: << parameters.base_version >>
+          steps:
+            - run:
+                name: Checkout commit << parameters.base_version >>
+                command: |
+                  echo "Checking out commit << parameters.base_version >>"
+                  git checkout << parameters.base_version >>
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch for base version with migration config changes
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
+            git branch -f $BASE_VERSION_BRANCH HEAD
+            git checkout $BASE_VERSION_BRANCH
+            git push -f origin $BASE_VERSION_BRANCH
+            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
+            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF || true
+            
+            git add **/config.yaml || true
+            git commit -m "Add migration config to deploy version $BASE_VERSION to << parameters.cluster >>"
+            git push origin $BASE_VERSION_BRANCH
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,sv-runbook,validator-runbook"
+  prepare_cluster_for_migration:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      base_version:
+        type: string
+        default: ""
+      upgrade_version:
+        type: string
+        default: ""
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - when:
+          condition: << parameters.upgrade_version >>
+          steps:
+            - run:
+                name: Checkout commit << parameters.upgrade_version >>
+                command: |
+                  echo "Checking out commit << parameters.upgrade_version >>"
+                  git checkout << parameters.upgrade_version >>
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch with migration config changes
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git branch -f $UPGRADE_VERSION_BRANCH HEAD
+            git checkout $UPGRADE_VERSION_BRANCH
+            git push -f origin $UPGRADE_VERSION_BRANCH
+            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+            
+            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
+            
+            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
+            cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+          
+            git add **/.envrc.vars          
+            git add **/config.yaml || true
+            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git push origin $UPGRADE_VERSION_BRANCH
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+  migrate_cluster:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch with migration config changes
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git checkout $UPGRADE_VERSION_BRANCH
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
+            
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+            cncluster hard_domain_migration_update_config_to_migrate
+
+            git add **/config.yaml || true
+            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git push origin $UPGRADE_VERSION_BRANCH
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+  archive_legacy_migration:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch with migration config changes
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git checkout $UPGRADE_VERSION_BRANCH
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
+            
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+            
+            cncluster hard_domain_migration_update_config_to_archive_legacy_migration
+            
+            git add **/config.yaml || true
+            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git push origin $UPGRADE_VERSION_BRANCH
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+  reset_and_wait_for_operator_to_redeploy_sv_runbook:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Reset SV runbook
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            cncluster activate
+
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git checkout $UPGRADE_VERSION_BRANCH
+            
+            export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='0,1'
+            
+            cncluster ci_pdown_sv
+          cmd_retry_count: 4
+          cmd_retry_wait: 150
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch with migration config changes
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            cncluster activate
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git checkout $UPGRADE_VERSION_BRANCH
+            
+            cncluster hard_domain_migration_update_config_to_remove_migrating_from
+
+            git add **/config.yaml || true
+            git commit -m "Add migration config to remove migratingFrom" || true
+            git push origin $UPGRADE_VERSION_BRANCH
+          cmd_retry_count: 3
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"

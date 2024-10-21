@@ -302,7 +302,7 @@ delete default-pools], so please refrain from using it.
 
 ### Operator deployments
 
-The `pulumi/deployment` project controls the deployment of production clusters (currently only cilr) using the [pulumi operator](https://github.com/pulumi/pulumi-kubernetes-operator).
+The `pulumi/deployment` project controls the deployment of production clusters using the [pulumi operator](https://github.com/pulumi/pulumi-kubernetes-operator).
 
 #### Deployment stack configuration
 

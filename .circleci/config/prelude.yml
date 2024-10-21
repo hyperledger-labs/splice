@@ -28,6 +28,7 @@ parameters:
         deploy-cidaily,
         deploy-upgrade,
         deploy-ciperiodic-migration,
+        deploy-ciperiodic-migration-operator,
         determine-ciperiodic-migration-work,
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,

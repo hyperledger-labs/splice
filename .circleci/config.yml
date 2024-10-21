@@ -33,6 +33,7 @@ parameters:
         deploy-cidaily,
         deploy-upgrade,
         deploy-ciperiodic-migration,
+        deploy-ciperiodic-migration-operator,
         determine-ciperiodic-migration-work,
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
@@ -656,6 +657,53 @@ commands:
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
+  deploy_operator:
+    parameters:
+      <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Install pulumi dependencies
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Apply the deployment stack
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep GITHUB_TOKEN
+            --keep SLACK_ACCESS_TOKEN
+            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD
+            --keep K6_USERS_PASSWORD
+            --keep K6_VALIDATOR_ADMIN_USERNAME
+            --keep K6_VALIDATOR_ADMIN_PASSWORD
+            --keep CIRCLE_BUILD_URL
+          gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: |
+            .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
+            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
+          cmd: |
+            export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
+            cncluster activate
+            cncluster pulumi deployment up --skip-preview --diff
 
   run_setup_nix:
     description: Set up Nix without cache
@@ -1052,6 +1100,52 @@ commands:
             PID=$!
 
             wait $PID
+
+  wait_for_pulumi_stacks_updated:
+    parameters:
+      <<: *cluster-parameter
+      pulumi_stack_names:
+        type: string
+        default: "canton-network"
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: wait for all pulumi stacks to be updated.
+          cluster: << parameters.cluster >>
+          no_output_timeout: "30m"
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            EXPECTED_GIT_COMMIT=$(echo "refs/heads/$(git rev-parse --abbrev-ref HEAD)@sha1:$(git rev-parse HEAD)")
+            wait_for_stack_updated() {
+              local STACK_NAME=$1
+              echo "waiting for stack $STACK_NAME being updated with commit $EXPECTED_GIT_COMMIT"
+    
+              START_TIME=$(date +%s)
+              TIMEOUT=1800
+              while true; do
+                LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}")
+              
+                if echo "$LAST_SUCCESSFUL_COMMIT" | grep -q "$EXPECTED_GIT_COMMIT"; then
+                  echo "stack $STACK_NAME is successfully updated with commit $EXPECTED_GIT_COMMIT"
+                  break
+                else
+                  echo "stack is currently on commit: $LAST_SUCCESSFUL_COMMIT. Waiting for the expecting commit $EXPECTED_GIT_COMMIT."
+                fi
+                # Check for timeout
+                CURRENT_TIME=$(date +%s)
+                ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+              
+                if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+                  echo "Timeout reached without finding stack $STACK_NAME has the updated with expected commit $EXPECTED_GIT_COMMIT."
+                  exit 1
+                fi
+                sleep 5
+              done            
+            }
+            
+            echo "<< parameters.pulumi_stack_names >>" | tr ',' '\n' | while read STACK; do
+              wait_for_stack_updated "$STACK"
+            done
 
   # Largely copied from Canton's CI definition
   execute_sbt_command:
@@ -1983,7 +2077,7 @@ jobs:
               VERSION=$(get-snapshot-version)
             fi
             # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -2072,7 +2166,7 @@ jobs:
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
             # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - print_gcloud_logs_commands:
@@ -2221,7 +2315,7 @@ jobs:
               VERSION=$(get-snapshot-version)
             fi
             # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -2799,6 +2893,265 @@ jobs:
             - notify-cluster-fail:
                 channel_notify: << parameters.channel_notify >>
                 cluster: << parameters.cluster >>
+  deploy_cluster_for_migration_base_version:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      base_version:
+        type: string
+        default: ""
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - when:
+          condition: << parameters.base_version >>
+          steps:
+            - run:
+                name: Checkout commit << parameters.base_version >>
+                command: |
+                  echo "Checking out commit << parameters.base_version >>"
+                  git checkout << parameters.base_version >>
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch for base version with migration config changes
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
+            git branch -f $BASE_VERSION_BRANCH HEAD
+            git checkout $BASE_VERSION_BRANCH
+            git push -f origin $BASE_VERSION_BRANCH
+            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
+            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF || true
+            
+            git add **/config.yaml || true
+            git commit -m "Add migration config to deploy version $BASE_VERSION to << parameters.cluster >>"
+            git push origin $BASE_VERSION_BRANCH
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,sv-runbook,validator-runbook"
+  prepare_cluster_for_migration:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      base_version:
+        type: string
+        default: ""
+      upgrade_version:
+        type: string
+        default: ""
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - when:
+          condition: << parameters.upgrade_version >>
+          steps:
+            - run:
+                name: Checkout commit << parameters.upgrade_version >>
+                command: |
+                  echo "Checking out commit << parameters.upgrade_version >>"
+                  git checkout << parameters.upgrade_version >>
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch with migration config changes
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git branch -f $UPGRADE_VERSION_BRANCH HEAD
+            git checkout $UPGRADE_VERSION_BRANCH
+            git push -f origin $UPGRADE_VERSION_BRANCH
+            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+            
+            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+            echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
+            
+            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
+            cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
+          
+            git add **/.envrc.vars          
+            git add **/config.yaml || true
+            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git push origin $UPGRADE_VERSION_BRANCH
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+  migrate_cluster:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch with migration config changes
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git checkout $UPGRADE_VERSION_BRANCH
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
+            
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+            cncluster hard_domain_migration_update_config_to_migrate
+
+            git add **/config.yaml || true
+            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git push origin $UPGRADE_VERSION_BRANCH
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+  archive_legacy_migration:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch with migration config changes
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git checkout $UPGRADE_VERSION_BRANCH
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
+            
+            UPGRADE_VERSION=$(build-tools/get-snapshot-version)
+            
+            cncluster hard_domain_migration_update_config_to_archive_legacy_migration
+            
+            git add **/config.yaml || true
+            git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
+            git push origin $UPGRADE_VERSION_BRANCH
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+  reset_and_wait_for_operator_to_redeploy_sv_runbook:
+    executor: self_hosted
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      <<: *channel-notify-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Reset SV runbook
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            cncluster activate
+
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git checkout $UPGRADE_VERSION_BRANCH
+            
+            export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='0,1'
+            
+            cncluster ci_pdown_sv
+          cmd_retry_count: 4
+          cmd_retry_wait: 150
+      - run_bash_command_in_nix:
+          cmd_name: Push new branch with migration config changes
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          cmd: |
+            cncluster activate
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            
+            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            git checkout $UPGRADE_VERSION_BRANCH
+            
+            cncluster hard_domain_migration_update_config_to_remove_migrating_from
+
+            git add **/config.yaml || true
+            git commit -m "Add migration config to remove migratingFrom" || true
+            git push origin $UPGRADE_VERSION_BRANCH
+          cmd_retry_count: 3
+      - deploy_operator:
+          cluster: << parameters.cluster >>
+          deploy_retry_count: << parameters.deploy_retry_count >>
+      - wait_for_pulumi_stacks_updated:
+          cluster: << parameters.cluster >>
+          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
 
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
@@ -2973,6 +3326,10 @@ jobs:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
+    parameters:
+      push_helm_to_artifactory:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - restore_frontend_builds
@@ -3016,9 +3373,30 @@ jobs:
           cmd: make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
-          cmd_name: Push Helm Artifacts
+          cmd_name: Push Helm Artifacts to gcp
           cmd: make cluster/helm/push -j
           cmd_retry_count: 5
+      - when:
+          condition:
+            equal: [ true, "<< parameters.push_helm_to_artifactory >>" ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Push Helm Artifacts to artifactory
+                additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
+                cmd: |
+                  publish () {
+                    source=$1
+                    full_path=$2
+                    echo "Publishing ${source} to ${full_path}"
+                    curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
+                  }
+                  
+                  make cluster/helm/build -j
+                  
+                  for chart in cluster/helm/target/*.tgz; do
+                    artifactory_url="https://digitalasset.jfrog.io/artifactory"
+                    publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
+                  done
       - save_frontend_builds
       - save_sbt_job_result:
           runner_type: "circleci"
@@ -3538,50 +3916,12 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
-
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
-      - run_bash_command_in_nix:
-          cmd_name: Install pulumi dependencies
-          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
-          no_output_timeout: "20m"
+      - deploy_operator:
           cluster: << parameters.cluster >>
-          cmd: |
-            make -j cluster/pulumi/build
-          cmd_retry_count: 2
-      - run_bash_command_in_nix:
-          cmd_name: Apply the deployment stack
-          cluster: << parameters.cluster >>
-          additional_nix_args: >
-            --keep GITHUB_TOKEN
-            --keep SLACK_ACCESS_TOKEN
-            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
-            --keep ARTIFACTORY_USER
-            --keep ARTIFACTORY_PASSWORD
-            --keep K6_USERS_PASSWORD
-            --keep K6_VALIDATOR_ADMIN_USERNAME
-            --keep K6_VALIDATOR_ADMIN_PASSWORD
-            --keep CIRCLE_BUILD_URL
-          gce_authenticate: true
-          cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: |
-            .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
-          cmd: |
-            export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
-            cncluster activate
-            cncluster pulumi deployment up --skip-preview --diff
+          deploy_retry_count: << parameters.deploy_retry_count >>
 
   preflight_check_docker:
     parameters:
@@ -5345,7 +5685,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - autoscaler_prevent_scaledown:
           cluster: "ciperiodic"
@@ -5614,6 +5954,213 @@ workflows:
             - preflight_sv_check_redeployed
             - post_migration_compose_validator
 
+  deploy_ciperiodic_migration_operator:
+    when:
+      equal: [ deploy-ciperiodic-migration-operator, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          wait_type: "wait_workflow"
+      - artifacts_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          push_helm_to_artifactory: true
+      - autoscaler_prevent_scaledown:
+          cluster: "ciperiodic"
+          requires:
+            - wait_for_previous_pipeline
+      - reset_cluster:
+          name: "reset_before_deploy"
+          cluster: "ciperiodic"
+          extra_migrations_reset: "0,1"
+          unlock_shared_cluster: false
+          context:
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+      - deploy_cluster_for_migration_base_version:
+          name: "deploy_cluster_for_migration"
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          base_version: << pipeline.parameters.base-version >>
+          requires:
+            - artifacts_push
+            - reset_before_deploy
+      - pre_migration_dump_identities:
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - prepare_cluster_for_migration
+      - pre_migration_compose_validator:
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          base_version: << pipeline.parameters.base-version >>
+          requires:
+            - deploy_cluster_for_migration
+      - prepare_cluster_for_migration:
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          base_version: << pipeline.parameters.base-version >>
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          wait_for_sv: false
+          cluster_version: << pipeline.parameters.base-version >>
+          check_cluster_version: false
+          requires:
+            - prepare_cluster_for_migration
+      - migrate_cluster:
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          requires:
+            - trigger_global_domain_migration
+            - pre_migration_compose_validator
+      - preflight_check:
+          name: "preflight_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
+      # Re-enable once latest release is > 0.2.3
+      #      - preflight_sv_check:
+      #          name: "preflight_sv_check_migrated"
+      #          <<: *main-branch-only
+      #          context:
+      #            - artifactory
+      #            - canton-network-vpn
+      #            - slack-context
+      #          cluster: "ciperiodic"
+      #          cluster_version: << pipeline.parameters.upgrade-version >>
+      #          migration_id: 1
+      #          requires:
+      #            - migrate_cluster
+      - post_migration_verify_identities:
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          requires:
+            - pre_migration_dump_identities
+            - migrate_cluster
+      - preflight_validator_check:
+          name: "preflight_validator_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
+      - post_migration_compose_validator:
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciperiodic"
+          upgrade_version: << pipeline.parameters.upgrade-version >>
+          requires:
+            - migrate_cluster
+      - backup_cluster:
+          name: "backup_cluster_after_migration"
+          cluster: "ciperiodic"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            # Re-enable once latest release is > 0.2.3
+            #            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      - restore_node:
+          cluster: "ciperiodic"
+          namespace_name: "sv-3"
+          migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster_after_migration
+      - reset_and_wait_for_operator_to_redeploy_sv_runbook:
+          name: "deploy_fresh_sv_runbook_after_migration"
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          requires:
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      #   Re-enable once latest release is > 0.2.3
+      #            - preflight_sv_check_migrated
+      - preflight_sv_check:
+          name: "preflight_sv_check_redeployed"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            # We wait for the runbook to redeploy to make sure we're not testing the original deployment
+            - deploy_fresh_sv_runbook_after_migration
+      - archive_legacy_migration:
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciperiodic"
+          requires:
+            - restore_node
+            - preflight_sv_check_redeployed
+            - post_migration_compose_validator
+      - reset_cluster:
+          cluster: "ciperiodic"
+          extra_migrations_reset: "0,1"
+          context:
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - archive_legacy_migration
+      - autoscaler_allow_scaledown:
+          cluster: "ciperiodic"
+          requires:
+            - archive_legacy_migration
+
   deploy_ciperiodic_non_devnet:
     when:
       equal: [ deploy-ciperiodic-non-devnet, << pipeline.parameters.run-job >> ]
@@ -5630,7 +6177,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - autoscaler_prevent_scaledown:
           <<: *main-branch-only
@@ -5738,7 +6285,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - artifacts_push:
           <<: *main-branch-only
@@ -6721,6 +7268,8 @@ workflows:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
+          enable_alerts: true
+
   preview_operator:
     when:
       equal: [ preview-operator, << pipeline.parameters.run-job >> ]
