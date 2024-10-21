@@ -61,6 +61,10 @@ Upcoming
     replaced by ``org.lfdecentralizedtrust.splice``. This also applies to stacktraces you may
     see in logs.
 
+* Bugfixes
+
+  * Fix an issue in the wallet app where the transactions from previous migration ids would not be listed when paginating.
+
 0.2.4
 -----
 

@@ -32,11 +32,9 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
   protected def selectFromTxLogTableWithOffset(
       tableName: String,
       storeId: Int,
-      migrationId: Long,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
   ) = {
-    // TODO(#9957): filter in across all migrationIds.
     (sql"""select
             tx.store_id,
             o.last_ingested_offset,
@@ -51,7 +49,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
            left join #$tableName tx
                on o.store_id = tx.store_id
                and """ ++ where ++ sql"""
-       where sd.id = $storeId and o.migration_id = $migrationId
+       where sd.id = $storeId
        """ ++ orderLimit).toActionBuilder.as[TxLogQueries.SelectFromTxLogTableResultWithOffset]
   }
 
