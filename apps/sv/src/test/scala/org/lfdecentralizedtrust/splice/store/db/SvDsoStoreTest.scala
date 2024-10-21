@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
   AmuletRules_MiningRound_Archive,
   AppTransferContext,
 }
@@ -1770,6 +1771,91 @@ class DbSvDsoStoreTest
         result <- store.lookupVoteByThisSvAndVoteRequestWithOffset(goodRequest.contractId)
       } yield {
         result.value should be(Some(goodVote))
+      }
+    }
+  }
+
+  "lookupContractByDateTime" should {
+
+    "find the DsoRules contract at a given time" in {
+      val now = CantonTimestamp.now()
+      val firstDsoRules = dsoRules(epoch = 1)
+      val secondDsoRules = dsoRules(epoch = 2)
+      val thirdDsoRules = dsoRules(epoch = 3)
+      val recordTimeFirst = now.plusSeconds(1).toInstant
+      val recordTimeSecond = now.plusSeconds(5).toInstant
+      val recordTimeThird = now.plusSeconds(9).toInstant
+      for {
+        store <- mkStore()
+        _ <- store.updateHistory.ingestionSink.initialize()
+        first <- dummyDomain.create(
+          firstDsoRules,
+          recordTime = recordTimeFirst,
+          packageName = "splice-dso-governance",
+        )(
+          store.updateHistory
+        )
+        firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
+        _ <- dummyDomain.create(
+          secondDsoRules,
+          recordTime = recordTimeSecond,
+          packageName = "splice-dso-governance",
+        )(store.updateHistory)
+        _ <- dummyDomain.create(
+          thirdDsoRules,
+          recordTime = recordTimeThird,
+          packageName = "splice-dso-governance",
+        )(store.updateHistory)
+        result <- store.lookupContractByRecordTime(
+          DsoRules.COMPANION,
+          firstRecordTime.plusSeconds(1),
+        )
+      } yield {
+        result.value should not be firstDsoRules
+        result.value shouldBe secondDsoRules
+        result.value should not be thirdDsoRules
+      }
+    }
+
+    "find the AmuletRules contract at a given time" in {
+      val now = CantonTimestamp.now()
+      val firstAmuletRules = amuletRules(10)
+      val secondAmuletRules = amuletRules(20)
+      val thirdAmuletRules = amuletRules(30)
+      val recordTimeFirst = now.plusSeconds(1).toInstant
+      val recordTimeSecond = now.plusSeconds(5).toInstant
+      val recordTimeThird = now.plusSeconds(9).toInstant
+      for {
+        store <- mkStore()
+        _ <- store.updateHistory.ingestionSink.initialize()
+        first <- dummyDomain.create(
+          firstAmuletRules,
+          recordTime = recordTimeFirst,
+          packageName = "splice-amulet",
+        )(
+          store.updateHistory
+        )
+        firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
+        _ <- dummyDomain.create(
+          secondAmuletRules,
+          recordTime = recordTimeSecond,
+          packageName = "splice-amulet",
+        )(
+          store.updateHistory
+        )
+        _ <- dummyDomain.create(
+          thirdAmuletRules,
+          recordTime = recordTimeThird,
+          packageName = "splice-amulet",
+        )(store.updateHistory)
+        result <- store.lookupContractByRecordTime(
+          AmuletRules.COMPANION,
+          firstRecordTime.plusSeconds(1),
+        )
+      } yield {
+        result.value should not be firstAmuletRules
+        result.value shouldBe secondAmuletRules
+        result.value should not be thirdAmuletRules
       }
     }
   }
