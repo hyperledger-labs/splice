@@ -85,7 +85,12 @@ def fetch_paginated(url: str, schema: Schema, params = {}, halt = lambda x: Fals
     request_params = params | ({"page-token": next_page_token} if next_page_token else {})
     raw_response = requests.get(url, params = request_params, headers = HEADERS)
     raw_response.raise_for_status()
-    response = schema.load(raw_response.json())
+    json_data=raw_response.json()
+    try:
+      response = schema.load(json_data)
+    except Exception as e:
+      print(f"Failed to parse response from {url}: {json_data}")
+      raise e
     next_page_token = response.next_page_token
     items += response.items
     if not next_page_token:
