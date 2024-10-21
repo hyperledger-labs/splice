@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+* Docs
+
+    * Updated docs to include a section on how to create a stand alone Canton Network for Development only. See :ref:`scratchnet`.
+
 * SV UI
 
     * Configuration changes for AmuletRules and DsoRules are diffed against the configuration it will replace and the in-flights proposals.
