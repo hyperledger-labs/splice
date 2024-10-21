@@ -252,6 +252,8 @@ workflow:
             - reset_sv_runbook_after_migration
 #          # Re-enable once latest release is > 0.2.3
       #            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           context:
