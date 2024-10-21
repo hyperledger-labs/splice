@@ -15,6 +15,7 @@ import com.daml.ledger.javaapi.data.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
+  externalpartyamuletrules as externalpartyamuletrulesCodegen,
   expiry as expiryCodegen,
   fees as feesCodegen,
   round as roundCodegen,
@@ -495,6 +496,26 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     contract(
       identifier = templateId,
       contractId = new amuletrulesCodegen.TransferPreapproval.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
+  protected def transferCommandCounter(
+      sender: PartyId,
+      nextNonce: Long,
+  ): Contract[
+    externalpartyamuletrulesCodegen.TransferCommandCounter.ContractId,
+    externalpartyamuletrulesCodegen.TransferCommandCounter,
+  ] = {
+    val templateId = externalpartyamuletrulesCodegen.TransferCommandCounter.TEMPLATE_ID
+    val template = new externalpartyamuletrulesCodegen.TransferCommandCounter(
+      dsoParty.toProtoPrimitive,
+      sender.toProtoPrimitive,
+      nextNonce,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new externalpartyamuletrulesCodegen.TransferCommandCounter.ContractId(nextCid()),
       payload = template,
     )
   }

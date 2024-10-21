@@ -13,7 +13,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
@@ -374,6 +377,31 @@ class DbScanStore(
           "lookupTransferPreapprovalReceiver",
         )
     } yield contractWithStateFromRow(TransferPreapproval.COMPANION)(row)).value
+  }
+
+  override def lookupTransferCommandCounterByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]
+  ] = waitUntilAcsIngested {
+    (for {
+      row <- storage
+        .querySingle(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                TransferCommandCounter.COMPANION.TEMPLATE_ID
+              )}
+                and wallet_party = $partyId
+            """,
+            orderLimit = sql"limit 1",
+          ).headOption,
+          "lookupTransferCommandCounterReceiver",
+        )
+    } yield contractWithStateFromRow(TransferCommandCounter.COMPANION)(row)).value
   }
 
   override def listTransactions(

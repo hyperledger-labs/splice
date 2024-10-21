@@ -938,6 +938,22 @@ abstract class ScanStoreTest
       }
     }
 
+    "lookupTransferCommandCounterByParty" should {
+      "return the TransferCommandCounter for the specified party if available" in {
+        val counter = transferCommandCounter(userParty(1), 0L)
+        for {
+          store <- mkStore()
+          r <- store.lookupTransferCommandCounterByParty(userParty(1))
+          _ = r shouldBe None
+          _ <- dummyDomain.create(counter)(store.multiDomainAcsStore)
+          r <- store.lookupTransferCommandCounterByParty(userParty(1))
+          _ = r.map(_.contract) shouldBe Some(counter)
+          r <- store.lookupTransferCommandCounterByParty(userParty(2))
+          _ = r shouldBe None
+        } yield succeed
+      }
+    }
+
     val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
     val timeInThePast = now.minusSeconds(3600)
 

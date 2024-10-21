@@ -782,6 +782,27 @@ paths:
                 "$ref": "#/components/schemas/LookupTransferPreapprovalByPartyResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/transfer-command-counter/{party}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "lookupTransferCommandCounterByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupTransferCommandCounterByPartyResponse"
+        "404":
+          description: No TransferCommandCounter exists for this party. This means the nonce that should be used is 0.
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/acs/{party}:
     get:
       tags: [scan]
@@ -2338,6 +2359,12 @@ components:
       required: ["transfer_preapproval"]
       properties:
         transfer_preapproval:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+    LookupTransferCommandCounterByPartyResponse:
+      type: object
+      required: ["transfer_command_counter"]
+      properties:
+        transfer_command_counter:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
     GetAcsSnapshotResponse:
       type: object

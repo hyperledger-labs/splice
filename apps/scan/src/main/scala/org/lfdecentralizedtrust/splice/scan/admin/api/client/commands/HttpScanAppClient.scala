@@ -15,7 +15,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AppTransferContext,
   TransferPreapproval,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -445,6 +448,30 @@ object HttpScanAppClient {
           .map(Some(_))
           .leftMap(_.toString)
       case http.LookupTransferPreapprovalByPartyResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class LookupTransferCommandCounterByParty(
+      party: PartyId
+  ) extends InternalBaseCommand[http.LookupTransferCommandCounterByPartyResponse, Option[
+        ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.lookupTransferCommandCounterByParty(party.toProtoPrimitive, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.LookupTransferCommandCounterByPartyResponse.OK(response) =>
+        ContractWithState
+          .fromHttp(TransferCommandCounter.COMPANION)(response.transferCommandCounter)
+          .map(Some(_))
+          .leftMap(_.toString)
+      case http.LookupTransferCommandCounterByPartyResponse.NotFound(_) =>
         Right(None)
     }
   }

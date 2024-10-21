@@ -238,6 +238,15 @@ trait ScanStore
     ]]
   ]
 
+  def lookupTransferCommandCounterByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[
+      splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
+      splice.externalpartyamuletrules.TransferCommandCounter,
+    ]]
+  ]
+
   def listTransactions(
       pageEndEventId: Option[String],
       sortOrder: SortOrder,
@@ -435,6 +444,14 @@ object ScanStore {
           co.payload.dso == dso
         ) {
           ScanAcsStoreRowData(_)
+        },
+        mkFilter(splice.externalpartyamuletrules.TransferCommandCounter.COMPANION)(co =>
+          co.payload.dso == dso
+        ) { contract =>
+          ScanAcsStoreRowData(
+            contract,
+            walletParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sender)),
+          )
         },
       ),
     )

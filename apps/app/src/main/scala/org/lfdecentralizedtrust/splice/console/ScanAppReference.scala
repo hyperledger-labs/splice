@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AppTransferContext,
   TransferPreapproval,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -147,6 +148,14 @@ abstract class ScanAppReference(
   ): Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupTransferPreapprovalByParty(party))
+    }
+
+  @Help.Summary("Lookup a TransferCommandCounter by the receiver party")
+  def lookupTransferCommandCounterByParty(
+      party: PartyId
+  ): Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupTransferCommandCounterByParty(party))
     }
 
   @Help.Summary(

@@ -62,6 +62,7 @@ object ScanTables extends AcsTables {
       voteRequestTrackingCid: Option[VoteRequest.ContractId] = None,
       transferPreapprovalReceiver: Option[PartyId] = None,
       transferPreapprovalValidFrom: Option[Timestamp] = None,
+      walletParty: Option[PartyId] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "round" -> round,
@@ -81,6 +82,7 @@ object ScanTables extends AcsTables {
       "vote_request_tracking_cid" -> voteRequestTrackingCid,
       "transfer_preapproval_receiver" -> transferPreapprovalReceiver,
       "transfer_preapproval_valid_from" -> transferPreapprovalValidFrom,
+      "wallet_party" -> walletParty,
     )
   }
 

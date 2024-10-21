@@ -177,6 +177,9 @@ class ExternalPartySetupProposalIntegrationTest
       .listTransferPreapprovals()
       .map(tp => tp.contract.contractId) contains cidBob
 
+    // Lookup transfer command counter before any transfer command
+    sv1ScanBackend.lookupTransferCommandCounterByParty(aliceParty) shouldBe None
+
     // Transfer 10.0 from Alice to Bob (with OutputFees: 6.1, SenderChangeFee: 6.0)
     val prepareSend =
       aliceValidatorBackend.prepareTransferPreapprovalSend(
@@ -211,6 +214,12 @@ class ExternalPartySetupProposalIntegrationTest
         aliceValidatorBackend
           .getExternalPartyBalance(bobParty)
           .totalUnlockedCoin shouldBe "10.0000000000"
+        // Transfer command counter gets created/incremented
+        sv1ScanBackend
+          .lookupTransferCommandCounterByParty(aliceParty)
+          .value
+          .payload
+          .nextNonce shouldBe 1
       },
     )
     val update = eventuallySucceeds() {

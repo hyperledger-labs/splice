@@ -1464,7 +1464,8 @@ components:
           format: int64
           description: |
             The expected value of the counter that is used to order and deduplicate TransferCommands. Starts at 0 and  increases
-            by 1 for each executed TransferCommand (independent of whether is succeeded or not). The most recent value can be read from scan.
+            by 1 for each executed TransferCommand (independent of whether is succeeded or not). The most recent value can be read from scan
+            through /v0/transfer-command-counter/{party}
 
     PrepareTransferPreapprovalSendResponse:
       type: object
