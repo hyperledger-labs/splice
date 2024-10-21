@@ -38,7 +38,6 @@ workflow:
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
           requires:
-            - artifacts_push
             - reset_initially
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
@@ -88,6 +87,7 @@ workflow:
           base_version: << pipeline.parameters.base-version >>
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
+            - artifacts_push
             - deploy_cluster_for_migration
       - hard_migration:
           name: "prepare_sv_runbook_for_migration"
@@ -100,6 +100,7 @@ workflow:
           base_version: << pipeline.parameters.base-version >>
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
+            - artifacts_push
             - deploy_sv_runbook_for_migration
       - trigger_global_domain_migration:
           context:
