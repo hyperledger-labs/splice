@@ -20,6 +20,8 @@ Upcoming
 
 * Scan
 
+  * Added endpoint `/v0/validators/validator-faucets` to query the validator faucet by validator party Ids.
+
   * Modified the `/v0/updates` and `/v0/updates/{update_id}` Scan API endpoints to make sure they consistently returns the same history across SVs:
 
     * The `/v0/updates` endpoint now fails on scans that have not yet replicated history from before their SV node joined the network.

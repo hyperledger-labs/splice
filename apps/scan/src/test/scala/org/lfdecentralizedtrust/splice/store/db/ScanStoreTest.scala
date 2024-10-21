@@ -1741,4 +1741,41 @@ class DbScanStoreTest
       } yield result shouldBe Seq(first, almostFirst, third)
     }
   }
+
+  "getValidatorFaucetsByValidator" should {
+
+    "return the validator license of a specified validator" in {
+      val alice = userParty(443)
+      val aliceValidatorLicense = validatorLicense(
+        alice,
+        dsoParty,
+        Some(new FaucetState(new Round(0), new Round(1000), 0L)),
+      )
+      val bob = userParty(444)
+      val bobValidatorLicense = validatorLicense(
+        bob,
+        dsoParty,
+        Some(new FaucetState(new Round(1), new Round(1001), 1L)),
+      )
+      val charles = userParty(445)
+      val charlesValidatorLicense = validatorLicense(
+        charles,
+        dsoParty,
+        Some(new FaucetState(new Round(3), new Round(1002), 2L)),
+      )
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(bobValidatorLicense)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(aliceValidatorLicense)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(charlesValidatorLicense)(store.multiDomainAcsStore)
+        result <- store.getValidatorLicenseByValidator(
+          Vector(alice, bob)
+        )
+      } yield {
+        result should contain(aliceValidatorLicense)
+        result should contain(bobValidatorLicense)
+        result should not contain charlesValidatorLicense
+      }
+    }
+  }
 }

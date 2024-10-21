@@ -1253,32 +1253,7 @@ components:
         validatorsByReceivedFaucets:
           type: array
           items:
-            $ref: "#/components/schemas/ValidatorReceivedFaucets"
-    ValidatorReceivedFaucets:
-      type: object
-      required:
-        [
-          "validator",
-          "numRoundsCollected",
-          "numRoundsMissed",
-          "firstCollectedInRound",
-          "lastCollectedInRound",
-        ]
-      properties:
-        validator:
-          type: string
-        numRoundsCollected:
-          type: integer
-          format: int64
-        numRoundsMissed:
-          type: integer
-          format: int64
-        firstCollectedInRound:
-          type: integer
-          format: int64
-        lastCollectedInRound:
-          type: integer
-          format: int64
+            $ref: "./scan-external.yaml#/components/schemas/ValidatorReceivedFaucets"
     GetTopValidatorsByPurchasedTrafficResponse:
       type: object
       required: ["validatorsByPurchasedTraffic"]

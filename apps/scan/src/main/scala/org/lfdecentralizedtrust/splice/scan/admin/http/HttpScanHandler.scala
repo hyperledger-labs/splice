@@ -511,25 +511,7 @@ class HttpScanHandler(
           v0.ScanResource.GetTopValidatorsByValidatorFaucetsResponse.OK(
             definitions
               .GetTopValidatorsByValidatorFaucetsResponse(
-                licenses.map { license =>
-                  val numRoundsCollected = license.payload.faucetState
-                    .map { faucetState =>
-                      faucetState.lastReceivedFor.number - faucetState.firstReceivedFor.number - faucetState.numCouponsMissed + 1
-                    }
-                    .orElse(0L)
-                  definitions.ValidatorReceivedFaucets(
-                    validator = license.payload.validator,
-                    numRoundsCollected = numRoundsCollected,
-                    numRoundsMissed =
-                      license.payload.faucetState.map(_.numCouponsMissed.longValue()).orElse(0L),
-                    firstCollectedInRound = license.payload.faucetState
-                      .map(_.firstReceivedFor.number.longValue())
-                      .orElse(0L),
-                    lastCollectedInRound = license.payload.faucetState
-                      .map(_.lastReceivedFor.number.longValue())
-                      .orElse(0L),
-                  )
-                }.toVector
+                FaucetProcessor.process(licenses)
               )
           )
         )
