@@ -16,6 +16,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequest,
   DsoRules_CloseVoteRequestResult,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.transfercommandresult.{
+  TransferCommandResultFailure,
+  TransferCommandResultSuccess,
+}
 import splice.wallet.subscriptions as sws
 import org.lfdecentralizedtrust.splice.codegen.java.splice.fees.ExpiringAmount
 import org.lfdecentralizedtrust.splice.history.*
@@ -110,6 +114,14 @@ class ScanTxLogParser(
             )
           case DsoRulesCloseVoteRequest(node) =>
             State.fromCloseVoteRequest(exercised.getEventId, node)
+          case ExternalPartyAmuletRules_CreateTransferCommand(node) =>
+            State.fromCreateTransferCommand(exercised.getEventId, node)
+          case TransferCommand_Send(node) =>
+            State.fromTransferCommand_Send(exercised, node)
+          case TransferCommand_Withdraw(_) =>
+            State.fromTransferCommand_Withdraw(exercised)
+          case TransferCommand_Expire(_) =>
+            State.fromTransferCommand_Expire(exercised)
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -731,6 +743,76 @@ object ScanTxLogParser {
           VoteRequestTxLogEntry(
             eventId,
             result = Some(node.result.value),
+          )
+        )
+      )
+    }
+
+    def fromCreateTransferCommand(
+        eventId: String,
+        node: ExerciseNode[
+          ExternalPartyAmuletRules_CreateTransferCommand.Arg,
+          ExternalPartyAmuletRules_CreateTransferCommand.Res,
+        ],
+    ): State = {
+      State(
+        immutable.Queue(
+          TransferCommandTxLogEntry(
+            eventId,
+            contractId = Codec.encodeContractId(node.result.value.transferCommandCid),
+            status = TransferCommandTxLogEntry.Status.Created(TransferCommandCreated()),
+          )
+        )
+      )
+    }
+
+    def fromTransferCommand_Send(
+        exercised: ExercisedEvent,
+        node: ExerciseNode[TransferCommand_Send.Arg, TransferCommand_Send.Res],
+    ): State = {
+      State(
+        immutable.Queue(
+          TransferCommandTxLogEntry(
+            eventId = exercised.getEventId,
+            contractId = exercised.getContractId,
+            status = node.result.value.result match {
+              case failure: TransferCommandResultFailure =>
+                TransferCommandTxLogEntry.Status.Failed(
+                  TransferCommandFailed(failure.reason.toString)
+                )
+              case _: TransferCommandResultSuccess =>
+                TransferCommandTxLogEntry.Status.Sent(TransferCommandSent())
+              case e =>
+                sys.error(s"TransferCommandResult must be either failure or success but got: $e")
+            },
+          )
+        )
+      )
+    }
+
+    def fromTransferCommand_Withdraw(
+        exercised: ExercisedEvent
+    ): State = {
+      State(
+        immutable.Queue(
+          TransferCommandTxLogEntry(
+            eventId = exercised.getEventId,
+            contractId = exercised.getContractId,
+            status = TransferCommandTxLogEntry.Status.Withdrawn(TransferCommandWithdrawn()),
+          )
+        )
+      )
+    }
+
+    def fromTransferCommand_Expire(
+        exercised: ExercisedEvent
+    ): State = {
+      State(
+        immutable.Queue(
+          TransferCommandTxLogEntry(
+            eventId = exercised.getEventId,
+            contractId = exercised.getContractId,
+            status = TransferCommandTxLogEntry.Status.Expired(TransferCommandExpired()),
           )
         )
       )

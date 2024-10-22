@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_AnsEntryContext,
   ARC_DsoRules,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
 import org.lfdecentralizedtrust.splice.scan.store.{
   AppRewardTxLogEntry,
   BalanceChangeTxLogEntry,
@@ -27,6 +28,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   TxLogEntry,
   ValidatorRewardTxLogEntry,
   VoteRequestTxLogEntry,
+  TransferCommandTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.{Accepted, StoreErrors, VoteRequestOutcome}
 import org.lfdecentralizedtrust.splice.store.db.{
@@ -101,6 +103,7 @@ object ScanTables extends AcsTables {
       voteAccepted: Option[Boolean] = None,
       voteRequesterName: Option[String] = None,
       voteEffectiveAt: Option[String] = None,
+      transferCommandContractId: Option[TransferCommand.ContractId] = None,
   ) extends TxLogRowData {
 
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
@@ -118,6 +121,7 @@ object ScanTables extends AcsTables {
       "vote_accepted" -> voteAccepted,
       "vote_requester_name" -> voteRequesterName.map(lengthLimited),
       "vote_effective_at" -> voteEffectiveAt.map(lengthLimited),
+      "transfer_command_contract_id" -> transferCommandContractId,
     )
   }
 
@@ -207,6 +211,16 @@ object ScanTables extends AcsTables {
               case Some(effectiveAt) => Some(effectiveAt.toString)
               case None => None
             },
+          )
+        case entry: TransferCommandTxLogEntry =>
+          ScanTxLogRowData(
+            entry = entry,
+            transferCommandContractId = Some(
+              new TransferCommand.ContractId(
+                // TODO(#15594) Remove this once Canton exposes the suffixed CIDs
+                entry.contractId.take(66)
+              )
+            ),
           )
         case _ =>
           throw txEncodingFailed()

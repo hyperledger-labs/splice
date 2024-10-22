@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.{AnsEntry, AnsRul
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
+  TransferCommand,
   TransferCommandCounter,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
@@ -33,6 +34,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   ScanTxLogParser,
   TxLogEntry,
+  TransferCommandTxLogEntry,
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
@@ -980,4 +982,23 @@ class DbScanStore(
         .value
     } yield result.map(contractFromRow(VoteRequest.COMPANION)(_))
   }
+
+  override def lookupLatestTransferCommandEvent(contractId: TransferCommand.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Option[TransferCommandTxLogEntry]] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .querySingle(
+            selectFromTxLogTable(
+              ScanTables.txLogTableName,
+              storeId,
+              sql"entry_type = ${TxLogEntry.EntryType.TransferCommandTxLogEntry} and transfer_command_contract_id = ${contractId}",
+              sql"order by entry_number desc limit 1",
+            ).headOption,
+            "getLatestTransferCommandEventByContractId",
+          )
+          .value
+      } yield result.map(txLogEntryFromRow[TransferCommandTxLogEntry](txLogConfig))
+    }
 }

@@ -35,6 +35,8 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
 }
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.RenewTransferPreapprovalTrigger
+import com.daml.ledger.api.v2.interactive_submission_data
+import interactive_submission_data.PreparedTransaction
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.*
@@ -45,6 +47,7 @@ import com.digitalasset.canton.util.HexString
 import monocle.macros.syntax.lens.*
 
 import java.time.{Duration, Instant}
+import java.util.Base64
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -180,6 +183,11 @@ class ExternalPartySetupProposalIntegrationTest
     // Lookup transfer command counter before any transfer command
     sv1ScanBackend.lookupTransferCommandCounterByParty(aliceParty) shouldBe None
 
+    // Lookup transfer command that does not exist
+    sv1ScanBackend.lookupTransferCommandStatus(
+      new TransferCommand.ContractId("does-not-exist")
+    ) shouldBe None
+
     // Transfer 10.0 from Alice to Bob (with OutputFees: 6.1, SenderChangeFee: 6.0)
     val prepareSend =
       aliceValidatorBackend.prepareTransferPreapprovalSend(
@@ -189,6 +197,20 @@ class ExternalPartySetupProposalIntegrationTest
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         0L,
       )
+    val tx = PreparedTransaction.parseFrom(
+      Base64.getDecoder.decode(prepareSend.transaction)
+    )
+    // TODO(#15593) Read the cid from the response without decoding the tx
+    val createNode = tx.getTransaction.nodes
+      .flatMap(n =>
+        n.nodeType match {
+          case interactive_submission_data.Node.NodeType.Create(create) =>
+            Seq(create)
+          case _ => Seq.empty
+        }
+      )
+      .loneElement
+    createNode.getTemplateId.entityName shouldBe "TransferCommand"
     val (updateId, _) = actAndCheck(
       "Submit signed TransferCommand creation",
       aliceValidatorBackend.submitTransferPreapprovalSend(
@@ -220,6 +242,13 @@ class ExternalPartySetupProposalIntegrationTest
           .value
           .payload
           .nextNonce shouldBe 1
+        sv1ScanBackend.lookupTransferCommandStatus(
+          new TransferCommand.ContractId(createNode.contractId)
+        ) shouldBe Some(
+          definitions.LookupTransferCommandStatusResponse.members.TransferCommandSentResponse(
+            definitions.TransferCommandSentResponse(status = "sent")
+          )
+        )
       },
     )
     val update = eventuallySucceeds() {
@@ -310,6 +339,22 @@ class ExternalPartySetupProposalIntegrationTest
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         1L,
       )
+
+    val txNoPreapproval = PreparedTransaction.parseFrom(
+      Base64.getDecoder.decode(prepareSendNoPreapproval.transaction)
+    )
+    // TODO(#15593) Read the cid from the respones without decoding the tx
+    val createNodeNoPreapproval = txNoPreapproval.getTransaction.nodes
+      .flatMap(n =>
+        n.nodeType match {
+          case interactive_submission_data.Node.NodeType.Create(create) =>
+            Seq(create)
+          case _ => Seq.empty
+        }
+      )
+      .loneElement
+    createNode.getTemplateId.entityName shouldBe "TransferCommand"
+
     // Archive the preapproval
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
       .submitWithResult(
@@ -356,12 +401,25 @@ class ExternalPartySetupProposalIntegrationTest
         sv1Backend.dsoDelegateBasedAutomation.trigger[TransferCommandSendTrigger].resume(),
       )(
         "TransferCommand gets archived",
-        _ =>
+        _ => {
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(TransferCommand.COMPANION)(
               aliceParty,
               c => c.data.sender == aliceParty.toProtoPrimitive,
-            ) shouldBe empty,
+            ) shouldBe empty
+          sv1ScanBackend.lookupTransferCommandStatus(
+            new TransferCommand.ContractId(createNodeNoPreapproval.contractId)
+          ) shouldBe Some(
+            definitions.LookupTransferCommandStatusResponse.members.TransferCommandFailedResponse(
+              definitions.TransferCommandFailedResponse(
+                status = "failed",
+                failureKind = definitions.TransferCommandFailedResponse.FailureKind.members.Failed,
+                reason =
+                  s"ITR_Other(No TransferPreapproval for receiver '${sv1Party.toProtoPrimitive}')",
+              )
+            )
+          )
+        },
       )
     }
   }

@@ -803,6 +803,27 @@ paths:
         "404":
           description: No TransferCommandCounter exists for this party. This means the nonce that should be used is 0.
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/transfer-command/{contract_id}/status:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "lookupTransferCommandStatus"
+      parameters:
+        - name: contract_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupTransferCommandStatusResponse"
+        "404":
+          description: No TransferCommand exists with this contract id within the last 24h
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/acs/{party}:
     get:
       tags: [scan]
@@ -2366,6 +2387,69 @@ components:
       properties:
         transfer_command_counter:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+    LookupTransferCommandStatusResponse:
+      type: object
+      oneOf:
+        - "$ref": "#/components/schemas/TransferCommandCreatedResponse"
+        - "$ref": "#/components/schemas/TransferCommandSentResponse"
+        - "$ref": "#/components/schemas/TransferCommandFailedResponse"
+      discriminator:
+        propertyName: status
+        mapping:
+          created: "#/components/schemas/TransferCommandCreatedResponse"
+          sent: "#/components/schemas/TransferCommandSentResponse"
+          failed: "#/components/schemas/TransferCommandFailedResponse"
+    BaseLookupTransferCommandStatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: |
+            The status of the transfer command.
+            created:
+              The transfer command has been created and is waiting for automation to complete it.
+            sent:
+              The transfer command has been completed and the transfer to the receiver has finished.
+            failed:
+              The transfer command has failed permanently and nothing has been transferred. Refer to
+              failure_reason for details. A new transfer command can be created.
+    TransferCommandCreatedResponse:
+      type: object
+      allOf:
+        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
+    TransferCommandSentResponse:
+      type: object
+      allOf:
+        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
+    TransferCommandFailedResponse:
+      type: object
+      allOf:
+        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
+        - type: object
+          required:
+            - failure_kind
+            - reason
+          properties:
+            failure_kind:
+              type: string
+              description: |
+                The reason for the failure of the TransferCommand.
+                failed:
+                  Completing the transfer failed, check the reason for details.
+                withdrawn:
+                  The sender has withdrawn the TransferCommand before it could be completed.
+                expired:
+                  The expiry time on the TransferCommand was reached before it could be completed.
+              enum:
+                - failed
+                - expired
+                - withdrawn
+            reason:
+              type: string
+              description: |
+                Human readable description of the failure
     GetAcsSnapshotResponse:
       type: object
       required: ["acs_snapshot"]

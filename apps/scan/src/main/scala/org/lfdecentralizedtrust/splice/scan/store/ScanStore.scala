@@ -262,6 +262,12 @@ trait ScanStore
   def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]]
+
+  def lookupLatestTransferCommandEvent(
+      contractId: splice.externalpartyamuletrules.TransferCommand.ContractId
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[TransferCommandTxLogEntry]]
 }
 
 object ScanStore {

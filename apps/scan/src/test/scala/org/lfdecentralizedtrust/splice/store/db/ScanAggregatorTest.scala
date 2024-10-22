@@ -712,7 +712,7 @@ class ScanAggregatorTest
         interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(party, 0),
-        mkTransferResult(
+        mkTransferResultRecord(
           round = round,
           inputAppRewardAmount = 0,
           inputAmuletAmount = 0,
@@ -762,7 +762,7 @@ class ScanAggregatorTest
         interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(rewardedParty, 0),
-        mkTransferResult(
+        mkTransferResultRecord(
           round = round,
           inputAppRewardAmount = rewardAmount,
           inputAmuletAmount = 0,
@@ -791,7 +791,7 @@ class ScanAggregatorTest
         interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(rewardedParty, 0),
-        mkTransferResult(
+        mkTransferResultRecord(
           round = round,
           inputAppRewardAmount = 0,
           inputAmuletAmount = 0,

@@ -28,7 +28,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, Reason, Vote}
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
-import org.lfdecentralizedtrust.splice.history.{AmuletExpire, LockedAmuletExpireAmulet, Transfer}
+import org.lfdecentralizedtrust.splice.history.{
+  AmuletExpire,
+  ExternalPartyAmuletRules_CreateTransferCommand,
+  LockedAmuletExpireAmulet,
+  Transfer,
+  TransferCommand_Expire,
+  TransferCommand_Send,
+  TransferCommand_Withdraw,
+}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -36,6 +44,12 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ReceiverAmount,
   SenderAmount,
   TransferTxLogEntry,
+  TransferCommandTxLogEntry,
+  TransferCommandCreated,
+  TransferCommandSent,
+  TransferCommandFailed,
+  TransferCommandExpired,
+  TransferCommandWithdrawn,
 }
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.store.db.{
@@ -66,6 +80,7 @@ import java.time.Instant
 import java.util.{Collections, Optional}
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
 import com.digitalasset.canton.util.MonadUtil
@@ -97,7 +112,7 @@ abstract class ScanStoreTest
             interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
             Transfer.choice.name,
             mkAmuletRulesTransfer(user1, amuletAmount),
-            mkTransferResult(
+            mkTransferResultRecord(
               round = 2,
               inputAppRewardAmount = 0,
               inputAmuletAmount = amuletAmount,
@@ -316,7 +331,7 @@ abstract class ScanStoreTest
                 interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
                 Transfer.choice.name,
                 dummyTransferArg,
-                mkTransferResult(
+                mkTransferResultRecord(
                   round = round,
                   inputAppRewardAmount = 0,
                   inputAmuletAmount = amuletAmount,
@@ -472,7 +487,7 @@ abstract class ScanStoreTest
                 Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
                 Transfer.choice.name,
                 mkAmuletRulesTransfer(user1, 1.0),
-                mkTransferResult(
+                mkTransferResultRecord(
                   round = round.toLong,
                   inputAppRewardAmount = appAmount,
                   inputValidatorRewardAmount = validatorAmount,
@@ -521,7 +536,7 @@ abstract class ScanStoreTest
               Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
               Transfer.choice.name,
               mkAmuletRulesTransfer(user1, amount),
-              mkTransferResult(
+              mkTransferResultRecord(
                 round = round.toLong,
                 inputAppRewardAmount = amount,
                 inputAmuletAmount = 0,
@@ -538,7 +553,7 @@ abstract class ScanStoreTest
               Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
               Transfer.choice.name,
               mkAmuletRulesTransfer(user1, amount),
-              mkTransferResult(
+              mkTransferResultRecord(
                 round = round.toLong,
                 inputAppRewardAmount = 0,
                 inputValidatorRewardAmount = amount,
@@ -688,7 +703,7 @@ abstract class ScanStoreTest
         topProvidersTest(
           (store, round, limit) => store.getTopProvidersByAppRewards(round, limit),
           (amount, round) =>
-            mkTransferResult(
+            mkTransferResultRecord(
               round = round,
               inputAppRewardAmount = amount,
               inputAmuletAmount = 0,
@@ -707,7 +722,7 @@ abstract class ScanStoreTest
         topProvidersTest(
           (store, round, limit) => store.getTopValidatorsByValidatorRewards(round, limit),
           (amount, round) =>
-            mkTransferResult(
+            mkTransferResultRecord(
               round = round,
               inputAppRewardAmount = 0,
               inputValidatorRewardAmount = amount,
@@ -1113,7 +1128,7 @@ abstract class ScanStoreTest
                   List(mkTransferOutput(receiverParty, receiverAmount)),
                 )
               ),
-              exerciseResult = mkTransferResult(
+              exerciseResult = mkTransferResultRecord(
                 round = round,
                 inputAppRewardAmount = sender.inputAppRewardAmount.toDouble,
                 inputAmuletAmount = senderAmount.toDouble,
@@ -1309,7 +1324,257 @@ abstract class ScanStoreTest
           }
         }
       }
+    }
 
+    "lookupLatestTransferCommandEvent" should {
+      def createTransferCommand(
+          store: ScanStore,
+          externalPartyRules: Contract[
+            splice.externalpartyamuletrules.ExternalPartyAmuletRules.ContractId,
+            splice.externalpartyamuletrules.ExternalPartyAmuletRules,
+          ],
+          transferCmd: Contract[
+            splice.externalpartyamuletrules.TransferCommand.ContractId,
+            splice.externalpartyamuletrules.TransferCommand,
+          ],
+      ) = {
+        dummyDomain.exercise(
+          externalPartyRules,
+          interfaceId = Some(
+            splice.externalpartyamuletrules.ExternalPartyAmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
+          ),
+          ExternalPartyAmuletRules_CreateTransferCommand.choice.name,
+          new splice.externalpartyamuletrules.ExternalPartyAmuletRules_CreateTransferCommand(
+            transferCmd.payload.sender,
+            transferCmd.payload.receiver,
+            transferCmd.payload.amount,
+            transferCmd.payload.expiresAt,
+            transferCmd.payload.nonce,
+          ).toValue,
+          new splice.externalpartyamuletrules.ExternalPartyAmuletRules_CreateTransferCommandResult(
+            transferCmd.contractId
+          ).toValue,
+          nextOffset(),
+        )(
+          store.multiDomainAcsStore
+        )
+      }
+
+      "transitions from Created to Sent" in {
+        for {
+          store <- mkStore()
+          transferCmd = transferCommand(
+            userParty(1),
+            userParty(2),
+            42.0,
+            Instant.EPOCH,
+            0L,
+          )
+          counter = transferCommandCounter(
+            userParty(1),
+            0L,
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result shouldBe None
+          rules = amuletRules()
+          externalPartyRules = externalPartyAmuletRules()
+
+          _ <- createTransferCommand(
+            store,
+            externalPartyRules,
+            transferCmd,
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result.map(_.status) shouldBe Some(
+            TransferCommandTxLogEntry.Status.Created(TransferCommandCreated())
+          )
+          _ <- dummyDomain.exercise(
+            transferCmd,
+            interfaceId =
+              Some(splice.externalpartyamuletrules.TransferCommand.TEMPLATE_ID_WITH_PACKAGE_ID),
+            TransferCommand_Send.choice.name,
+            new splice.externalpartyamuletrules.TransferCommand_Send(
+              mkPaymentTransferContext(rules.contractId),
+              Seq.empty.asJava,
+              None.toJava,
+              counter.contractId,
+            ).toValue,
+            new splice.externalpartyamuletrules.TransferCommand_SendResult(
+              new splice.externalpartyamuletrules.transfercommandresult.TransferCommandResultSuccess(
+                mkTransferResult(
+                  round = 0,
+                  inputAppRewardAmount = 0,
+                  inputAmuletAmount = 42.0,
+                  inputValidatorRewardAmount = 0,
+                  inputSvRewardAmount = 0,
+                  balanceChanges = Map(
+                    user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
+                      BigDecimal(42.0).bigDecimal,
+                      holdingFee.bigDecimal,
+                    )
+                  ),
+                  amuletPrice = 0.0005,
+                )
+              )
+            ).toValue,
+            nextOffset(),
+          )(
+            store.multiDomainAcsStore
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result.map(_.status) shouldBe Some(
+            TransferCommandTxLogEntry.Status.Sent(TransferCommandSent())
+          )
+        } yield succeed
+      }
+
+      "transitions from Created to Failed" in {
+        for {
+          store <- mkStore()
+          transferCmd = transferCommand(
+            userParty(1),
+            userParty(2),
+            42.0,
+            Instant.EPOCH,
+            0L,
+          )
+          counter = transferCommandCounter(
+            userParty(1),
+            0L,
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result shouldBe None
+          rules = amuletRules()
+          externalPartyRules = externalPartyAmuletRules()
+          _ <- createTransferCommand(
+            store,
+            externalPartyRules,
+            transferCmd,
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result.map(_.status) shouldBe Some(
+            TransferCommandTxLogEntry.Status.Created(TransferCommandCreated())
+          )
+          _ <- dummyDomain.exercise(
+            transferCmd,
+            interfaceId =
+              Some(splice.externalpartyamuletrules.TransferCommand.TEMPLATE_ID_WITH_PACKAGE_ID),
+            TransferCommand_Send.choice.name,
+            new splice.externalpartyamuletrules.TransferCommand_Send(
+              mkPaymentTransferContext(rules.contractId),
+              Seq.empty.asJava,
+              None.toJava,
+              counter.contractId,
+            ).toValue,
+            new splice.externalpartyamuletrules.TransferCommand_SendResult(
+              new splice.externalpartyamuletrules.transfercommandresult.TransferCommandResultFailure(
+                new splice.amuletrules.invalidtransferreason.ITR_Other("cool reason")
+              )
+            ).toValue,
+            nextOffset(),
+          )(
+            store.multiDomainAcsStore
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result.map(_.status) shouldBe Some(
+            TransferCommandTxLogEntry.Status.Failed(TransferCommandFailed("ITR_Other(cool reason)"))
+          )
+        } yield succeed
+      }
+      "transitions from Created to Withdrawn" in {
+        for {
+          store <- mkStore()
+          transferCmd = transferCommand(
+            userParty(1),
+            userParty(2),
+            42.0,
+            Instant.EPOCH,
+            0L,
+          )
+          counter = transferCommandCounter(
+            userParty(1),
+            0L,
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result shouldBe None
+          rules = amuletRules()
+          externalPartyRules = externalPartyAmuletRules()
+          _ <- createTransferCommand(
+            store,
+            externalPartyRules,
+            transferCmd,
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result.map(_.status) shouldBe Some(
+            TransferCommandTxLogEntry.Status.Created(TransferCommandCreated())
+          )
+          _ <- dummyDomain.exercise(
+            transferCmd,
+            interfaceId =
+              Some(splice.externalpartyamuletrules.TransferCommand.TEMPLATE_ID_WITH_PACKAGE_ID),
+            TransferCommand_Withdraw.choice.name,
+            new splice.externalpartyamuletrules.TransferCommand_Withdraw(
+            ).toValue,
+            new splice.externalpartyamuletrules.TransferCommand_WithdrawResult(
+            ).toValue,
+            nextOffset(),
+          )(
+            store.multiDomainAcsStore
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result.map(_.status) shouldBe Some(
+            TransferCommandTxLogEntry.Status.Withdrawn(TransferCommandWithdrawn())
+          )
+        } yield succeed
+      }
+
+      "transitions from Created to Expired" in {
+        for {
+          store <- mkStore()
+          transferCmd = transferCommand(
+            userParty(1),
+            userParty(2),
+            42.0,
+            Instant.EPOCH,
+            0L,
+          )
+          counter = transferCommandCounter(
+            userParty(1),
+            0L,
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result shouldBe None
+          rules = amuletRules()
+          externalPartyRules = externalPartyAmuletRules()
+          _ <- createTransferCommand(
+            store,
+            externalPartyRules,
+            transferCmd,
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result.map(_.status) shouldBe Some(
+            TransferCommandTxLogEntry.Status.Created(TransferCommandCreated())
+          )
+          _ <- dummyDomain.exercise(
+            transferCmd,
+            interfaceId =
+              Some(splice.externalpartyamuletrules.TransferCommand.TEMPLATE_ID_WITH_PACKAGE_ID),
+            TransferCommand_Expire.choice.name,
+            new splice.externalpartyamuletrules.TransferCommand_Expire(
+              dsoParty.toProtoPrimitive
+            ).toValue,
+            new splice.externalpartyamuletrules.TransferCommand_ExpireResult(
+            ).toValue,
+            nextOffset(),
+          )(
+            store.multiDomainAcsStore
+          )
+          result <- store.lookupLatestTransferCommandEvent(transferCmd.contractId)
+          _ = result.map(_.status) shouldBe Some(
+            TransferCommandTxLogEntry.Status.Expired(TransferCommandExpired())
+          )
+        } yield succeed
+      }
     }
   }
 
@@ -1366,6 +1631,12 @@ trait AmuletTransferUtil { self: StoreTest =>
     java.util.Map.of(),
     Optional.empty(),
   )
+
+  def mkPaymentTransferContext(amuletRules: splice.amuletrules.AmuletRules.ContractId) =
+    new splice.amuletrules.PaymentTransferContext(
+      amuletRules,
+      mkTransferContext(),
+    )
 
   def mkTransferInputOutput(
       sender: PartyId,
@@ -1438,7 +1709,25 @@ trait AmuletTransferUtil { self: StoreTest =>
       ),
       java.util.List.of(),
       Optional.empty(),
-    ).toValue
+    )
+
+  def mkTransferResultRecord(
+      round: Long,
+      inputAppRewardAmount: Double,
+      inputValidatorRewardAmount: Double,
+      inputSvRewardAmount: Double,
+      inputAmuletAmount: Double,
+      balanceChanges: Map[String, splice.amuletrules.BalanceChange],
+      amuletPrice: Double,
+  ) = mkTransferResult(
+    round,
+    inputAppRewardAmount,
+    inputValidatorRewardAmount,
+    inputSvRewardAmount,
+    inputAmuletAmount,
+    balanceChanges,
+    amuletPrice,
+  ).toValue
 
   def mkAmuletRules_BuyMemberTrafficResult(
       round: Long,

@@ -10,7 +10,10 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommand,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -1076,6 +1079,34 @@ class HttpScanHandler(
               )
             )
         }
+    }
+  }
+
+  def lookupTransferCommandStatus(
+      respond: ScanResource.LookupTransferCommandStatusResponse.type
+  )(
+      contractId: String
+  )(extracted: TraceContext): Future[ScanResource.LookupTransferCommandStatusResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupTransferCommandStatus") { _ => _ =>
+      for {
+        txLogEntry <- store.lookupLatestTransferCommandEvent(
+          Codec.tryDecodeJavaContractId(TransferCommand.COMPANION)(contractId)
+        )
+      } yield {
+        txLogEntry
+          .map(_.status)
+          .fold[v0.ScanResource.LookupTransferCommandStatusResponse](
+            v0.ScanResource.LookupTransferCommandStatusResponseNotFound(
+              definitions.ErrorResponse(
+                s"Couldn't find transfer command with contract id $contractId created in the last 24h"
+              )
+            )
+          )(status =>
+            v0.ScanResource
+              .LookupTransferCommandStatusResponseOK(TxLogEntry.Http.toResponse(status))
+          )
+      }
     }
   }
 

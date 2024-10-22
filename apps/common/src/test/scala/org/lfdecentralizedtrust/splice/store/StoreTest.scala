@@ -130,6 +130,45 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  protected def externalPartyAmuletRules() = {
+    val templateId =
+      externalpartyamuletrulesCodegen.ExternalPartyAmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
+
+    val template = new externalpartyamuletrulesCodegen.ExternalPartyAmuletRules(
+      dsoParty.toProtoPrimitive
+    )
+    contract(
+      identifier = templateId,
+      contractId =
+        new externalpartyamuletrulesCodegen.ExternalPartyAmuletRules.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
+  protected def transferCommand(
+      sender: PartyId,
+      receiver: PartyId,
+      amount: BigDecimal,
+      expiresAt: Instant,
+      nonce: Long,
+  ) = {
+    val templateId = externalpartyamuletrulesCodegen.TransferCommand.TEMPLATE_ID_WITH_PACKAGE_ID
+
+    val template = new externalpartyamuletrulesCodegen.TransferCommand(
+      dsoParty.toProtoPrimitive,
+      sender.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      amount.bigDecimal,
+      expiresAt,
+      nonce,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new externalpartyamuletrulesCodegen.TransferCommand.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
   protected def ansRules() = {
     val templateId = ansCodegen.AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID
 

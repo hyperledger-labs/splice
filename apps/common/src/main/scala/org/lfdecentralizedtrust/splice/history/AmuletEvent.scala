@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.history
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules as externalPartyAmuletRulesCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   OpenMiningRound,
@@ -99,6 +100,31 @@ object AnsRules_CollectEntryRenewalPayment
     extends ExerciseNodeCompanion.Mk(
       choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectEntryRenewalPayment,
       template = ansCodegen.AnsRules.COMPANION,
+    )
+
+object ExternalPartyAmuletRules_CreateTransferCommand
+    extends ExerciseNodeCompanion.Mk(
+      choice =
+        externalPartyAmuletRulesCodegen.ExternalPartyAmuletRules.CHOICE_ExternalPartyAmuletRules_CreateTransferCommand,
+      template = externalPartyAmuletRulesCodegen.ExternalPartyAmuletRules.COMPANION,
+    )
+
+object TransferCommand_Send
+    extends ExerciseNodeCompanion.Mk(
+      choice = externalPartyAmuletRulesCodegen.TransferCommand.CHOICE_TransferCommand_Send,
+      template = externalPartyAmuletRulesCodegen.TransferCommand.COMPANION,
+    )
+
+object TransferCommand_Withdraw
+    extends ExerciseNodeCompanion.Mk(
+      choice = externalPartyAmuletRulesCodegen.TransferCommand.CHOICE_TransferCommand_Withdraw,
+      template = externalPartyAmuletRulesCodegen.TransferCommand.COMPANION,
+    )
+
+object TransferCommand_Expire
+    extends ExerciseNodeCompanion.Mk(
+      choice = externalPartyAmuletRulesCodegen.TransferCommand.CHOICE_TransferCommand_Expire,
+      template = externalPartyAmuletRulesCodegen.TransferCommand.COMPANION,
     )
 
 object AmuletArchive {
