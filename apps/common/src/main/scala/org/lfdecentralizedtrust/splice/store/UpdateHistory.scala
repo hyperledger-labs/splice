@@ -31,10 +31,18 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
   DestinationHistory,
   SourceMigrationInfo,
 }
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
+  ContractCompanion,
+  HasIngestionSink,
+  IngestionFilter,
+}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
-import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
-import org.lfdecentralizedtrust.splice.util.ValueJsonCodecProtobuf as ProtobufCodec
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  DomainRecordTimeRange,
+  TemplateJsonDecoder,
+  ValueJsonCodecProtobuf as ProtobufCodec,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -1576,6 +1584,33 @@ object UpdateHistory {
       observers: Option[Seq[String]],
       contractKey: Option[String],
   ) {
+
+    def toContract[C, TCId <: ContractId[_], T](companion: C)(implicit
+        companionClass: ContractCompanion[C, TCId, T],
+        decoder: TemplateJsonDecoder,
+    ): Contract[TCId, T] = {
+      companionClass
+        .fromJson(companion)(
+          new Identifier(
+            templatePackageId,
+            templateModuleName,
+            templateEntityName,
+          ),
+          contractId,
+          io.circe.parser
+            .parse(createArguments)
+            .getOrElse(
+              throw new IllegalStateException(s"Failed to parse create arguments: $createArguments")
+            ),
+          ByteString.EMPTY,
+          createdAt.toInstant,
+        )
+        .fold(
+          err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
+          identity,
+        )
+    }
+
     def toCreatedEvent: CreatedEvent = {
       new CreatedEvent(
         /*witnessParties = */ java.util.Collections.emptyList(),

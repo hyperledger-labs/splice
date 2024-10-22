@@ -199,8 +199,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         }
 
         for {
-          store1 <- mkStore(user1)
-          store2 <- mkStore(user2)
+          store1 <- mkStore(user1, migrationId = 1L)
+          store2 <- mkStore(user2, migrationId = 2L)
           allStores = List(store1.multiDomainAcsStore, store2.multiDomainAcsStore)
           _ <- dummyDomain.ingestMulti(mkSharedTx())(allStores)
           result1 <- store1.getLatestTransferOfferEventByTrackingId("trackingId")
@@ -280,21 +280,20 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
+      def mkBuyTrafficRequest(
+          trackingId: String,
+          cid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
+      )(offset: String) = {
+        mkBuyTrafficRequestTx(offset, trackingId, user1, participantId, dummyDomain, cid)
+      }
+      def mkCancelTrafficRequest(trackingId: String, reason: String, cid: String)(
+          offset: String
+      ) = {
+        mkCancelTrafficRequestTx(offset, trackingId, user1, reason, cid)
+      }
+
       "return the latest entry" in {
         val trafficRequestCid = nextCid()
-
-        def mkBuyTrafficRequest(
-            trackingId: String,
-            cid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
-        )(offset: String) = {
-          mkBuyTrafficRequestTx(offset, trackingId, user1, participantId, dummyDomain, cid)
-        }
-        def mkCancelTrafficRequest(trackingId: String, reason: String, cid: String)(
-            offset: String
-        ) = {
-          mkCancelTrafficRequestTx(offset, trackingId, user1, reason, cid)
-        }
-
         for {
           store <- mkStore(user1)
           _ <- dummyDomain.ingest(
@@ -311,6 +310,37 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
           result <- store.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
+        } yield {
+          result.offset should be(cancelledTree.getOffset)
+          result.value.map(_.status) should be(
+            Some(
+              BuyTrafficRequestTxLogEntry.Status.Rejected(
+                BuyTrafficRequestStatusRejected("just because")
+              )
+            )
+          )
+        }
+      }
+
+      "return the entry even if it's on a different migration id" in {
+        val trafficRequestCid = nextCid()
+        for {
+          store1 <- mkStore(user1, migrationId = 1L)
+          store2 <- mkStore(user1, migrationId = 2L)
+          _ <- dummyDomain.ingest(
+            mkBuyTrafficRequest(
+              "trackingId",
+              new trafficRequestCodegen.BuyTrafficRequest.ContractId(trafficRequestCid),
+            )
+          )(
+            store1.multiDomainAcsStore
+          )
+          cancelledTree <- dummyDomain.ingest(
+            mkCancelTrafficRequest("trackingId", "just because", trafficRequestCid)
+          )(
+            store1.multiDomainAcsStore
+          )
+          result <- store2.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
         } yield {
           result.offset should be(cancelledTree.getOffset)
           result.value.map(_.status) should be(
@@ -810,11 +840,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
-      "return entries in correct order" in {
-        def mkMint(amount: Double)(offset: String) = {
-          mintTransaction(user1, amount, 1, 1)(offset)
-        }
+      def mkMint(amount: Double)(offset: String) = {
+        mintTransaction(user1, amount, 1, 1)(offset)
+      }
 
+      "return entries in correct order" in {
         for {
           store <- mkStore(user1)
           _ <- dummyDomain.ingest(mkMint(1.0))(store.multiDomainAcsStore)
@@ -851,6 +881,34 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           Succeeded
         }
+      }
+
+      "work across several migration ids when paginating" in {
+        def paginate(
+            store: UserWalletStore,
+            after: Option[String],
+            acc: Seq[TxLogEntry.TransactionHistoryTxLogEntry],
+        ): Future[Seq[TxLogEntry.TransactionHistoryTxLogEntry]] = {
+          store.listTransactions(after, limit = PageLimit.tryCreate(1)).flatMap { seq =>
+            seq.lastOption match {
+              case None =>
+                Future.successful(acc)
+              case Some(last) =>
+                paginate(store, Some(last.eventId), acc ++ seq)
+            }
+          }
+        }
+        for {
+          store1 <- mkStore(user1, migrationId = 1L)
+          _ <- dummyDomain.ingest(mkMint(1.0))(store1.multiDomainAcsStore)
+          store2 <- mkStore(user1, migrationId = 2L)
+          _ <- dummyDomain.ingest(mkMint(2.0))(store2.multiDomainAcsStore)
+          store3 <- mkStore(user1, migrationId = 3L)
+          _ <- dummyDomain.ingest(mkMint(3.0))(store3.multiDomainAcsStore)
+          result <- paginate(store3, None, Seq.empty)
+        } yield result.collect { case logEntry: BalanceChangeTxLogEntry =>
+          logEntry.amount
+        } should be(Seq(3.0, 2.0, 1.0).map(BigDecimal(_)))
       }
     }
 
@@ -1474,7 +1532,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   protected def mkStore(
-      endUserParty: PartyId
+      endUserParty: PartyId,
+      migrationId: Long = domainMigrationId,
   ): Future[UserWalletStore]
 
   lazy val acsOffset = nextOffset()
@@ -1490,7 +1549,8 @@ class DbUserWalletStoreTest
     with AcsTables {
 
   override protected def mkStore(
-      endUserParty: PartyId
+      endUserParty: PartyId,
+      migrationId: Long = domainMigrationId,
   ): Future[DbUserWalletStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -1508,7 +1568,7 @@ class DbUserWalletStoreTest
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       DomainMigrationInfo(
-        domainMigrationId,
+        migrationId,
         None,
       ),
       participantId = mkParticipantId("UserWalletStoreTest"),

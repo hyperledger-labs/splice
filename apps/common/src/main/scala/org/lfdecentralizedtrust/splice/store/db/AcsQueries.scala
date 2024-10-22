@@ -168,7 +168,6 @@ trait AcsQueries extends AcsJdbcTypes {
   protected def selectFromAcsTableWithStateAndOffset(
       tableName: String,
       storeId: Int,
-      // TODO(#9957): re visit if migrationId is needed.
       migrationId: Long,
       where: SQLActionBuilder = sql"true",
       orderLimit: SQLActionBuilder = sql"",
