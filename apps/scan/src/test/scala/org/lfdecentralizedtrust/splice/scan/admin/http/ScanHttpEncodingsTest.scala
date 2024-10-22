@@ -233,7 +233,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         recordTime = "2024-06-03T15:43:38.124Z",
         synchronizerId = "a::b",
         effectiveAt = "2024-06-03T15:43:38.124Z",
-        offset = "offset",
+        offset = "000000000000000001",
         rootEventIds = Vector(leftRootId, rightRootId),
         eventsById = Map(
           leftRootId -> mkExercise(
