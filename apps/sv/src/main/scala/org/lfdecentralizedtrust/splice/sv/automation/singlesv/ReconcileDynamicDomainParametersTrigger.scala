@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReconcileSynchroni
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
-import com.digitalasset.canton.time.PositiveSeconds
+import com.digitalasset.canton.time.{PositiveFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.tracing.TraceContext
@@ -103,7 +103,7 @@ class ReconcileDynamicDomainParametersTrigger(
               NonNegativeLong.tryCreate(domainFeesConfig.baseRateTrafficLimits.burstAmount),
             readVsWriteScalingFactor =
               PositiveInt.tryCreate(domainFeesConfig.readVsWriteScalingFactor.toInt),
-            maxBaseTrafficAccumulationDuration = PositiveSeconds.tryOfSeconds(
+            maxBaseTrafficAccumulationDuration = PositiveFiniteDuration.tryOfSeconds(
               domainFeesConfig.baseRateTrafficLimits.burstWindow.microseconds / 1000_000
             ),
           )

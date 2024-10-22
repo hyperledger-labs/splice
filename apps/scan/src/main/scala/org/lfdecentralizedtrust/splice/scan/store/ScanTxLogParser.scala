@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.util.{Codec, ExerciseNode}
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.dollarsToCC
 import org.lfdecentralizedtrust.splice.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -236,7 +237,7 @@ object ScanTxLogParser {
       val activityEntry: TransactionTxLogEntry = activityType match {
         case TransactionType.Tap =>
           TapTxLogEntry(
-            offset = tx.getOffset,
+            offset = ApiOffset.fromLong(tx.getOffset),
             eventId = event.getEventId,
             domainId = domainId,
             date = Some(tx.getEffectiveAt),
@@ -247,7 +248,7 @@ object ScanTxLogParser {
           )
         case TransactionType.Mint =>
           MintTxLogEntry(
-            offset = tx.getOffset,
+            offset = ApiOffset.fromLong(tx.getOffset),
             eventId = event.getEventId,
             domainId = domainId,
             date = Some(tx.getEffectiveAt),
@@ -398,7 +399,7 @@ object ScanTxLogParser {
       val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
 
       new TransferTxLogEntry(
-        offset = tx.getOffset,
+        offset = ApiOffset.fromLong(tx.getOffset),
         eventId = event.getEventId,
         domainId = domainId,
         date = Some(tx.getEffectiveAt),

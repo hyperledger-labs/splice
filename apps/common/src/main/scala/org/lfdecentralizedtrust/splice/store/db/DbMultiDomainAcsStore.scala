@@ -806,7 +806,7 @@ final class DbMultiDomainAcsStore[TXE](
             handleIngestionSummary(summary)
           }
         case TransactionTreeUpdate(tree) =>
-          val offset = ApiOffset.assertFromStringToLong(tree.getOffset)
+          val offset = tree.getOffset
           ingestTransactionTree(domain, offset, tree).map { summaryState =>
             state
               .getAndUpdate(s =>

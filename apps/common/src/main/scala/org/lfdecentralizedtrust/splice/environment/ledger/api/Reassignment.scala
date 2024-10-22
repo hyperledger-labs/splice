@@ -7,7 +7,6 @@ import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.daml.ledger.api.v2.reassignment as multidomain
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.platform.ApiOffset
 
 final case class Reassignment[+E](
     updateId: String,
@@ -51,7 +50,7 @@ object Reassignment {
       )
     Reassignment(
       proto.updateId,
-      ApiOffset.assertFromStringToLong(proto.offset),
+      proto.offset,
       recordTime,
       event,
     )

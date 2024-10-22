@@ -39,7 +39,6 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
@@ -1060,7 +1059,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       commandId,
       workflowId,
       effectiveAt,
-      ApiOffset.fromLong(offset),
+      offset,
       eventsById.asJava,
       rootEventIds.asJava,
       domainId.toProtoPrimitive,
@@ -1089,7 +1088,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       "",
       "",
       effectiveAt,
-      ApiOffset.fromLong(offset),
+      offset,
       eventsById.asJava,
       rootEventIds.asJava,
       domainId.toProtoPrimitive,

@@ -35,7 +35,6 @@ import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ErrorUtil
@@ -240,7 +239,7 @@ private[environment] class LedgerClient(
         // Canton does not allow an empty offset (ledger begin) so just go for
         // not specfying anything which means max deduplication duration.
         offsetO.foreach { offset =>
-          commandsBuilder.setDeduplicationOffset(ApiOffset.fromLong(offset))
+          commandsBuilder.setDeduplicationOffset(offset)
         }
       case DedupDuration(duration) =>
         commandsBuilder.setDeduplicationDuration(duration)
@@ -684,9 +683,7 @@ object LedgerClient {
     import com.daml.ledger.javaapi.data as jdata
 
     val CompletionOffset: SubmitAndWaitFor[Long] =
-      impl((r: CSOC.SubmitAndWaitForUpdateIdResponse) =>
-        ApiOffset.assertFromStringToLong(r.getCompletionOffset)
-      )(
+      impl((r: CSOC.SubmitAndWaitForUpdateIdResponse) => r.getCompletionOffset)(
         { case (stub, r, ec) =>
           stub
             .submitAndWaitForUpdateId(command_service.SubmitAndWaitRequest.fromJavaProto(r))
@@ -857,7 +854,7 @@ object LedgerClient {
       val offset: Long = spb.completionResponse match {
         case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse
               .Completion(completion) =>
-          ApiOffset.assertFromStringToLong(completion.offset)
+          completion.offset
         case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse
               .OffsetCheckpoint(checkpoint) =>
           checkpoint.offset

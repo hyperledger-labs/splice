@@ -44,7 +44,7 @@ sealed trait ScanHttpEncodings {
               tree.getRecordTime.toString,
               updateWithMigrationId.update.domainId.toProtoPrimitive,
               tree.getEffectiveAt.toString,
-              tree.getOffset,
+              ApiOffset.fromLong(tree.getOffset),
               tree.getRootEventIds.asScala.toVector,
               tree.getEventsById.asScala.map { case (eventId, treeEvent) =>
                 eventId -> javaToHttpEvent(treeEvent)
@@ -174,7 +174,7 @@ sealed trait ScanHttpEncodings {
             "",
             http.workflowId,
             Instant.parse(http.effectiveAt),
-            http.offset,
+            ApiOffset.assertFromStringToLong(http.offset),
             http.eventsById.map { case (eventId, treeEventHttp) =>
               eventId -> httpToJavaEvent(treeEventHttp)
             }.asJava,
@@ -468,7 +468,7 @@ object ScanHttpEncodings {
       tree.getCommandId,
       tree.getWorkflowId,
       tree.getEffectiveAt,
-      "", // tree.getOffset,
+      1L, // tree.getOffset,
       eventsById.asJava,
       rootEventIds.asJava,
       tree.getDomainId,

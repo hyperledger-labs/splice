@@ -62,7 +62,12 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
   TrafficControlParameters,
 }
-import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, PositiveSeconds}
+import com.digitalasset.canton.time.{
+  Clock,
+  NonNegativeFiniteDuration,
+  PositiveFiniteDuration,
+  PositiveSeconds,
+}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
@@ -337,7 +342,7 @@ class SV1Initializer(
       sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount,
       sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor,
       // have to convert canton.config.NonNegativeDuration to canton.time.NonNegativeDuration
-      PositiveSeconds.tryOfSeconds(
+      PositiveFiniteDuration.tryOfSeconds(
         sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toSeconds
       ),
     )

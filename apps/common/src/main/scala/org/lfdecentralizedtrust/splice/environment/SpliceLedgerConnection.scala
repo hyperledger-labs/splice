@@ -908,16 +908,12 @@ class SpliceLedgerConnection(
               case _: Ignored =>
                 clientSubmit(WF.CompletionOffset)(offset => (offset, (): Z0))
               case _: JustTransaction =>
-                clientSubmit(WF.Transaction)(tx =>
-                  (ApiOffset.assertFromStringToLong(tx.getOffset), tx)
-                )
+                clientSubmit(WF.Transaction)(tx => (tx.getOffset, tx))
               case k: ResultAndOffset[t, Z0] =>
                 for {
-                  tree <- clientSubmit(WF.TransactionTree)(tx =>
-                    (ApiOffset.assertFromStringToLong(tx.getOffset), tx)
-                  )
+                  tree <- clientSubmit(WF.TransactionTree)(tx => (tx.getOffset, tx))
                 } yield k.continue(
-                  ApiOffset.assertFromStringToLong(tree.getOffset),
+                  tree.getOffset,
                   decodeExerciseResult(update, tree),
                 )
               case wrapper: Contramap[C0, u, Z0] =>

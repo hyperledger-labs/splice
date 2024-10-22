@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.jdk.CollectionConverters.*
@@ -74,7 +73,7 @@ object TxLogStore {
           logger.error(s"Failed to parse transaction: ${e.getMessage}", e)
           val firstRootEventId = tx.getRootEventIds.asScala.headOption.getOrElse("")
           Try(
-            error(ApiOffset.assertFromStringToLong(tx.getOffset), firstRootEventId, domain).toList
+            error(tx.getOffset, firstRootEventId, domain).toList
           )
         }
         .fold(

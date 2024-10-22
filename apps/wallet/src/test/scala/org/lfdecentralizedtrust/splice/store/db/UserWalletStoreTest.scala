@@ -42,7 +42,6 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -241,7 +240,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store.getLatestTransferOfferEventByTrackingId("good")
         } yield {
-          result.offset.value should be(ApiOffset.assertFromStringToLong(acceptedTree.getOffset))
+          result.offset.value should be(acceptedTree.getOffset)
           result.value.map(_.status) should be(
             Some(
               TransferOfferTxLogEntry.Status.Accepted(
@@ -315,7 +314,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
         } yield {
-          result.offset.value should be(ApiOffset.assertFromStringToLong(cancelledTree.getOffset))
+          result.offset.value should be(cancelledTree.getOffset)
           result.value.map(_.status) should be(
             Some(
               BuyTrafficRequestTxLogEntry.Status.Rejected(

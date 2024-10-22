@@ -105,7 +105,7 @@ Now retrying operation 'insert block'
 Failed to send commitment message batch for period CommitmentPeriod.*RequestRefused\(UnknownRecipients
 
 # TODO(#15539) Figure out where this is coming from
-Instrument rpc\.server\.duration has exceeded the maximum cardinality
+Instrument rpc\.server\.duration has exceeded the maximum allowed cardinality
 Too many log messages detected
 
 # Make sure to have a trailing newline

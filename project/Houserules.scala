@@ -27,6 +27,7 @@ object JvmRulesPlugin extends AutoPlugin {
             "-Xlint:_,-unused",
             "-Xmacro-settings:materialize-derivations",
             "-Xfatal-warnings",
+            "-Wconf:cat=lint-byname-implicit:silent", // https://github.com/scala/bug/issues/12072
             "-Wnonunit-statement", // Warns about any interesting expression whose value is ignored because it is followed by another expression
             "-Ywarn-dead-code",
             "-Ywarn-numeric-widen",

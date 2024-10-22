@@ -268,7 +268,7 @@ class UpdateHistory(
       ): Future[Unit] = {
         val offset: Long = update match {
           case ReassignmentUpdate(reassignment) => reassignment.offset
-          case TransactionTreeUpdate(tree) => ApiOffset.assertFromStringToLong(tree.getOffset)
+          case TransactionTreeUpdate(tree) => tree.getOffset
         }
         val recordTime = update match {
           case ReassignmentUpdate(reassignment) => reassignment.recordTime
@@ -457,7 +457,7 @@ class UpdateHistory(
   ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
     val safeUpdateId = lengthLimited(tree.getUpdateId)
     val safeRecordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
-    val safeParticipantOffset = lengthLimited(tree.getOffset)
+    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(tree.getOffset))
     val safeDomainId = lengthLimited(tree.getDomainId)
     val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
     val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
@@ -1074,7 +1074,7 @@ class UpdateHistory(
           /*commandId = */ updateRow.commandId.getOrElse(missingString),
           /*workflowId = */ updateRow.workflowId.getOrElse(missingString),
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
-          /*offset = */ updateRow.participantOffset,
+          /*offset = */ ApiOffset.assertFromStringToLong(updateRow.participantOffset),
           /*eventsById = */ eventsById.asJava,
 
           /*rootEventIds = */ rootEventsIds.asJava,
