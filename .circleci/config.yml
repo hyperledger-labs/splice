@@ -1364,6 +1364,8 @@ commands:
           timeout: "35m"
           no_output_timeout: "20m"
       - execute_sbt_command:
+          # we don't care if some integration test happened to make the repo dirty
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "checkErrors"
 
   ##### Overall setup
