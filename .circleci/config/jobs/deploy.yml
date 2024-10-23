@@ -66,7 +66,7 @@ jobs:
               VERSION=$(get-snapshot-version)
             fi
             # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -155,7 +155,7 @@ jobs:
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
             # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
             cncluster activate
             cncluster ci_apply_validator $VERSION
       - print_gcloud_logs_commands:
@@ -304,7 +304,7 @@ jobs:
               VERSION=$(get-snapshot-version)
             fi
             # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_active_config << parameters.global_domain_active_migration_id >> internal || true
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0

@@ -557,7 +557,7 @@
         "resources": {
           "limits": {
             "cpu": 5,
-            "memory": "10G"
+            "memory": "20G"
           },
           "requests": {
             "cpu": 1,
@@ -757,7 +757,7 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
+        "refresh": true,
         "retryOnUpdateConflict": true,
         "stack": "organization/splitwell/splitwell.dev",
         "useLocalStackOnly": true
@@ -1086,7 +1086,7 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
+        "refresh": true,
         "retryOnUpdateConflict": true,
         "stack": "organization/validator1/validator1.dev",
         "useLocalStackOnly": true

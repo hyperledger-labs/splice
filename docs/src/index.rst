@@ -50,6 +50,7 @@ Canton Network Documentation
    sv_operator/sv_upgrades.rst
    sv_operator/sv_restore.rst
    sv_operator/sv_operations.rst
+   sv_operator/sv_scratchnet.rst
 
 
 .. toctree::

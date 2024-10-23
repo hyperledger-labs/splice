@@ -20,7 +20,7 @@ CURRENT_BRANCH=os.environ.get('CIRCLE_BRANCH')
 class Job:
   id: str
   name: str
-  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "failed", "error", "failing", "on_hold", "canceled", "unauthorized", "blocked"])})
+  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "not_running", "failed", "error", "failing", "on_hold", "canceled", "unauthorized", "blocked"])})
   class Meta:
     unknown = EXCLUDE
 
@@ -88,7 +88,7 @@ def wait_for_pipeline_to_complete(pipeline: Pipeline):
 def cancel_if_waiting_or_wait_workflow(pipeline: Pipeline, workflow: Workflow, waiting_job_name: str):
   jobs = fetch_jobs(workflow)
   status = [x for x in jobs if x.name == waiting_job_name][0].status
-  if status == "running" or status == "not_run":
+  if status == "running" or status == "not_run" or status == "not_running":
     print(f"Workflow {workflow.name} ({workflow.id}) is waiting (the waiting job is in status {status}), cancelling it")
     cancel_workflow(workflow.id)
   else:

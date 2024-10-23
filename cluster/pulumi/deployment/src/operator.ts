@@ -24,7 +24,7 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
     resources: {
       limits: {
         cpu: 5,
-        memory: '10G',
+        memory: config.optionalEnv('OPERATOR_MEMORY_LIMIT') || '20G',
       },
       requests: {
         cpu: 1,

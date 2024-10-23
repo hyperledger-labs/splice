@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+* Docs
+
+    * Updated docs to include a section on how to create a stand alone Canton Network for Development only. See :ref:`scratchnet`.
+
 * SV UI
 
     * Configuration changes for AmuletRules and DsoRules are diffed against the configuration it will replace and the in-flights proposals.
@@ -20,12 +24,16 @@ Upcoming
 
 * Scan
 
+  * Added endpoint `/v0/validators/validator-faucets` to query the validator faucet by validator party Ids.
+
   * Modified the `/v0/updates` and `/v0/updates/{update_id}` Scan API endpoints to make sure they consistently returns the same history across SVs:
 
     * The `/v0/updates` endpoint now fails on scans that have not yet replicated history from before their SV node joined the network.
     * The `/v0/updates` endpoint now excludes updates resulting from ACS imports (those with workflow id starting with ``canton-network-acs-import``).
     * Fix an issue where the ordering of stakeholders (signatories and observers) would be inconsistent across SVs
       when calling the `/v0/updates` and `/v0/updates/{update_id}` endpoints on the Scan API.
+    * Fix a bug in `/v0/domains/{domain_id}/members/{member_id}/traffic-status`
+      that resulted in the returned total purchased traffic value being incorrect after a hard migration.
 
 * Add a new index to Splice application databases. Scan and validator apps might take a while to start after the upgrade.
 
@@ -52,6 +60,10 @@ Upcoming
   * In ``paused-triggers`` settings, the trigger name prefix ``com.daml.network`` has been
     replaced by ``org.lfdecentralizedtrust.splice``. This also applies to stacktraces you may
     see in logs.
+
+* Bugfixes
+
+  * Fix an issue in the wallet app where the transactions from previous migration ids would not be listed when paginating.
 
 0.2.4
 -----

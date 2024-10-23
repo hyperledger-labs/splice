@@ -838,9 +838,11 @@ abstract class ScanStoreTest
         val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
         val goodMember = ParticipantId(UniqueIdentifier.tryCreate("good", namespace))
         val badMember = MediatorId(UniqueIdentifier.tryCreate("bad", namespace))
-        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, dummyDomain, n.toLong))
-        val badContracts = (4 to 6).map(n => memberTraffic(badMember, dummyDomain, n.toLong)) ++
-          (7 to 9).map(n => memberTraffic(goodMember, dummy2Domain, n.toLong))
+        val goodContracts =
+          (1 to 3).map(n => memberTraffic(goodMember, domainMigrationId, n.toLong))
+        val badContracts =
+          (4 to 6).map(n => memberTraffic(badMember, domainMigrationId, n.toLong)) ++
+            (7 to 9).map(n => memberTraffic(goodMember, nextDomainMigrationId, n.toLong))
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(
@@ -1959,11 +1961,11 @@ trait AmuletTransferUtil { self: StoreTest =>
     )
   }
 
-  def memberTraffic(member: Member, domainId: DomainId, totalPurchased: Long) = {
+  def memberTraffic(member: Member, domainMigrationId: Long, totalPurchased: Long) = {
     val template = new MemberTraffic(
       dsoParty.toProtoPrimitive,
       member.toProtoPrimitive,
-      domainId.toProtoPrimitive,
+      dummyDomain.toProtoPrimitive,
       domainMigrationId,
       totalPurchased,
       1,
@@ -2073,6 +2075,43 @@ class DbScanStoreTest
         _ <- dummyDomain.create(third)(store.multiDomainAcsStore)
         result <- store.getTopValidatorLicenses(PageLimit.tryCreate(3))
       } yield result shouldBe Seq(first, almostFirst, third)
+    }
+  }
+
+  "getValidatorFaucetsByValidator" should {
+
+    "return the validator license of a specified validator" in {
+      val alice = userParty(443)
+      val aliceValidatorLicense = validatorLicense(
+        alice,
+        dsoParty,
+        Some(new FaucetState(new Round(0), new Round(1000), 0L)),
+      )
+      val bob = userParty(444)
+      val bobValidatorLicense = validatorLicense(
+        bob,
+        dsoParty,
+        Some(new FaucetState(new Round(1), new Round(1001), 1L)),
+      )
+      val charles = userParty(445)
+      val charlesValidatorLicense = validatorLicense(
+        charles,
+        dsoParty,
+        Some(new FaucetState(new Round(3), new Round(1002), 2L)),
+      )
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(bobValidatorLicense)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(aliceValidatorLicense)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(charlesValidatorLicense)(store.multiDomainAcsStore)
+        result <- store.getValidatorLicenseByValidator(
+          Vector(alice, bob)
+        )
+      } yield {
+        result should contain(aliceValidatorLicense)
+        result should contain(bobValidatorLicense)
+        result should not contain charlesValidatorLicense
+      }
     }
   }
 }

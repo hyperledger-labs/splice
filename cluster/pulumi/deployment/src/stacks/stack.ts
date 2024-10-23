@@ -62,7 +62,8 @@ export function createStackCR(
   projectName: string,
   supportsResetOnSameCommit: boolean,
   ref: k8s.apiextensions.CustomResource,
-  extraEnvs: { [key: string]: string } = {}
+  extraEnvs: { [key: string]: string } = {},
+  refresh: boolean = false
 ): pulumi.CustomResource {
   return new k8s.apiextensions.CustomResource(
     name,
@@ -113,7 +114,7 @@ export function createStackCR(
           // Do not destroy the stack when the CR is deleted
           destroyOnFinalize: false,
           // Refresh before every sync
-          refresh: false,
+          refresh: refresh,
           // Enforce that the stack already exists
           useLocalStackOnly: true,
           // retry if the stack is locked by another operation

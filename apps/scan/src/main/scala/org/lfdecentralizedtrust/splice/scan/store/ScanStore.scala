@@ -193,6 +193,15 @@ trait ScanStore
     ]
   ]]
 
+  def getValidatorLicenseByValidator(
+      validator: Vector[PartyId]
+  )(implicit tc: TraceContext): Future[Seq[
+    Contract[
+      splice.validatorlicense.ValidatorLicense.ContractId,
+      splice.validatorlicense.ValidatorLicense,
+    ]
+  ]]
+
   def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[splice.decentralizedsynchronizer.BaseRateTrafficLimits] =
@@ -416,6 +425,7 @@ object ScanStore {
             ScanAcsStoreRowData(
               contract = contract,
               validatorLicenseRoundsCollected = Some(roundsCollected.orElse(0L)),
+              validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
             )
         },
         mkFilter(splice.dso.svstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) {

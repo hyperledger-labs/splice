@@ -471,3 +471,50 @@ commands:
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
+  deploy_operator:
+    parameters:
+      <<: *cluster-parameter
+      deploy_retry_count:
+        type: integer
+        default: 2
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Install pulumi dependencies
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/pulumi/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Apply the deployment stack
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep GITHUB_TOKEN
+            --keep SLACK_ACCESS_TOKEN
+            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD
+            --keep K6_USERS_PASSWORD
+            --keep K6_VALIDATOR_ADMIN_USERNAME
+            --keep K6_VALIDATOR_ADMIN_PASSWORD
+            --keep CIRCLE_BUILD_URL
+          gce_authenticate: true
+          cmd_retry_count: << parameters.deploy_retry_count >>
+          cmd_before_retry: |
+            .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
+            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
+            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
+          cmd: |
+            export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
+            cncluster activate
+            cncluster pulumi deployment up --skip-preview --diff

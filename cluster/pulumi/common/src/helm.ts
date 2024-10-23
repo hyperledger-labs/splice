@@ -14,6 +14,7 @@ import {
   ChartValues,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
+  dockerImageArtifactsRepository,
   ExactNamespace,
   fixedTokens,
   HELM_CHART_TIMEOUT_SEC,
@@ -121,7 +122,9 @@ function cnChartValues(
     {
       // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
       imageRepo:
-        version.type === 'local' || artifactsRepository === 'google'
+        version.type === 'local' ||
+        artifactsRepository === 'google' ||
+        dockerImageArtifactsRepository === 'google'
           ? repositories.google.dockerImages
           : undefined,
       cluster: {
@@ -162,7 +165,9 @@ export function installSpliceRunbookHelmChartByNamespaceName(
         ...values,
         // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
         imageRepo:
-          version.type === 'local' || artifactsRepository === 'google'
+          version.type === 'local' ||
+          artifactsRepository === 'google' ||
+          dockerImageArtifactsRepository === 'google'
             ? repositories.google.dockerImages
             : undefined,
         ...appsAffinityAndTolerations,

@@ -196,6 +196,7 @@ object ConfigTransforms {
       withPausedSvDomainComponentsOffboardingTriggers(),
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
+      setDefaultGrpcDeadlineForTreasuryService(),
       enableScanHistoryBackfilling,
     )
   }
@@ -278,13 +279,11 @@ object ConfigTransforms {
       )
     )
 
-  def setGrpcDeadlineForTreasuryService(
-      grpcDeadline: Option[NonNegativeFiniteDuration]
-  ): ConfigTransform =
+  private def setDefaultGrpcDeadlineForTreasuryService(): ConfigTransform =
     ConfigTransforms.updateAllValidatorAppConfigs_(c =>
       c.copy(treasury =
         c.treasury.copy(
-          grpcDeadline = grpcDeadline
+          grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(10))
         )
       )
     )
