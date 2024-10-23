@@ -528,7 +528,8 @@
             "--zap-level=debug",
             "--zap-time-encoding=iso8601",
             "--zap-encoder=json"
-          ]
+          ],
+          "gracefulShutdownTimeoutDuration": "30m"
         },
         "createClusterRole": true,
         "extraEnv": [
