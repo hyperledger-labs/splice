@@ -1129,7 +1129,7 @@ commands:
                   echo "stack $STACK_NAME is successfully updated with commit $EXPECTED_GIT_COMMIT"
                   break
                 else
-                  echo "stack is currently on commit: $LAST_SUCCESSFUL_COMMIT. Waiting for the expecting commit $EXPECTED_GIT_COMMIT."
+                  echo "stack $STACK_NAME is currently on commit: $LAST_SUCCESSFUL_COMMIT. Waiting for the expecting commit $EXPECTED_GIT_COMMIT."
                 fi
                 # Check for timeout
                 CURRENT_TIME=$(date +%s)
@@ -3334,10 +3334,6 @@ jobs:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
-    parameters:
-      push_helm_to_artifactory:
-        type: boolean
-        default: false
     steps:
       - checkout_with_retry
       - restore_frontend_builds
@@ -3386,7 +3382,7 @@ jobs:
           cmd_retry_count: 5
       - when:
           condition:
-            equal: [ true, "<< parameters.push_helm_to_artifactory >>" ]
+            equal: [ main, << pipeline.git.branch >> ]
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Push Helm Artifacts to artifactory
@@ -5980,7 +5976,6 @@ workflows:
           context:
             - artifactory
             - slack-context
-          push_helm_to_artifactory: true
       - autoscaler_prevent_scaledown:
           cluster: "ciperiodic"
           requires:
@@ -6061,19 +6056,17 @@ workflows:
           migration_id: 1
           requires:
             - migrate_cluster
-      # Re-enable once latest release is > 0.2.3
-      #      - preflight_sv_check:
-      #          name: "preflight_sv_check_migrated"
-      #          <<: *main-branch-only
-      #          context:
-      #            - artifactory
-      #            - canton-network-vpn
-      #            - slack-context
-      #          cluster: "ciperiodic"
-      #          cluster_version: << pipeline.parameters.upgrade-version >>
-      #          migration_id: 1
-      #          requires:
-      #            - migrate_cluster
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
       - post_migration_verify_identities:
           context:
             - artifactory
@@ -6112,8 +6105,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           requires:
-            # Re-enable once latest release is > 0.2.3
-            #            - preflight_sv_check_migrated
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - restore_node:
@@ -6133,10 +6125,9 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           requires:
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
-      #   Re-enable once latest release is > 0.2.3
-      #            - preflight_sv_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           context:

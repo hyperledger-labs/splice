@@ -27,7 +27,7 @@ commands:
                   echo "stack $STACK_NAME is successfully updated with commit $EXPECTED_GIT_COMMIT"
                   break
                 else
-                  echo "stack is currently on commit: $LAST_SUCCESSFUL_COMMIT. Waiting for the expecting commit $EXPECTED_GIT_COMMIT."
+                  echo "stack $STACK_NAME is currently on commit: $LAST_SUCCESSFUL_COMMIT. Waiting for the expecting commit $EXPECTED_GIT_COMMIT."
                 fi
                 # Check for timeout
                 CURRENT_TIME=$(date +%s)
