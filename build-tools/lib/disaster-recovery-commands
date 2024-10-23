@@ -14,9 +14,6 @@ function subcmd_disaster_recovery_test() {
   svIngressNames[4]=4-eng
   local svIngressName
 
-  # TODO(#12765) remove when all clusters are refreshed for sv{1,2,3,4}_validator tokens
-  subcmd_preflight_refresh_auth0_credentials
-
   _cluster_reset
 
   _info "Deploying original domain"
