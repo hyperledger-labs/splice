@@ -4421,6 +4421,14 @@ jobs:
                 cluster: << parameters.cluster >>
                 project: "validator-runbook"
                 when_env: "SPLICE_DEPLOY_VALIDATOR_RUNBOOK"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "validator1"
+                when_env: "SPLICE_DEPLOY_VALIDATOR1"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "splitwell"
+                when_env: "SPLICE_DEPLOY_SPLITWELL"
       - when:
           condition: << parameters.deployment_only >>
           steps:

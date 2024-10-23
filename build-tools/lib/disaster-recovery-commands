@@ -18,7 +18,7 @@ function subcmd_disaster_recovery_test() {
 
   _info "Deploying original domain"
   # We test that splitwell can onboard after the DR, so don't deploy it just yet
-  export SPLICE_INSTALL_SPLITWELL="false"
+  export SPLICE_DEPLOY_SPLITWELL="false"
   _cluster_apply
 
   _info "Getting identity dumps"
@@ -204,7 +204,7 @@ EOF
 
   # TODO(#12123) Reenable this.
   # _info "Installing Splitwell"
-  # export SPLICE_INSTALL_SPLITWELL="true"
+  # export SPLICE_DEPLOY_SPLITWELL="true"
   # _cluster_apply
 }
 
