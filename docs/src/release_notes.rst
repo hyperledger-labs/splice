@@ -8,12 +8,12 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.2.5
+-----
 
 * Docs
 
-    * Updated docs to include a section on how to create a stand alone Canton Network for Development only. See :ref:`scratchnet`.
+    * Updated docs to include a section on how to create a standalone k8s-based Canton Network. This can be useful to test deployment changes, in particular for SVs. See :ref:`scratchnet`.
 
 * SV UI
 
@@ -40,7 +40,6 @@ Upcoming
 * Canton
 
   * Enabled slow future logging for all components to better debug stuck nodes.
-
   * Added a max time of 10 minutes for processing of a sequenced event before the node crashes to get restarted.
     This mitigates cases where nodes might get stuck due to a bug and a restart recovers them.
 
