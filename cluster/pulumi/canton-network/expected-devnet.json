@@ -625,29 +625,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "private": "c3YyLWlkLXByaXZhdGUta2V5",
-          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-sv-key",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-2-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "postgresPassword": ""
         }
       },
@@ -758,29 +735,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "private": "c3YzLWlkLXByaXZhdGUta2V5",
-          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-sv-key",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-3-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "postgresPassword": ""
         }
       },
@@ -880,29 +834,6 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-4-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
-          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-sv-key",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-4-key",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1199,75 +1130,6 @@
       "type": "Opaque"
     },
     "name": "splice-app-sv-1-validator-onboarding-validator12",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3YyLWlkLXByaXZhdGUta2V5",
-          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-key",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-2-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3YzLWlkLXByaXZhdGUta2V5",
-          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-key",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-3-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
-          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-key",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "splice-app-sv-4-key",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1856,16 +1718,16 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
         "node": {
-          "enableTimeoutCommit": false,
+          "enableTimeoutCommit": true,
           "externalAddress": "dev.global.canton.network.digitalasset.com:26116",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-1-cometbft",
@@ -2061,7 +1923,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -2136,6 +1998,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
+              "2",
               "1"
             ]
           }
@@ -2261,7 +2124,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -2319,7 +2182,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -2404,7 +2267,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -2459,9 +2322,9 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "scan_sv_1",
           "port": 5432,
@@ -2470,7 +2333,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-1-sequencer",
+        "sequencerAddress": "global-domain-2-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -2546,7 +2409,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -2676,21 +2539,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-1-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-1-mediator",
-          "sequencerAddress": "global-domain-1-sequencer",
+          "mediatorAddress": "global-domain-2-mediator",
+          "sequencerAddress": "global-domain-2-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -2725,27 +2588,19 @@
           },
           "prefix": "dev/sv-1"
         },
-        "initialSynchronizerFeesConfig": {
-          "baseRateBurstAmount": 400000,
-          "baseRateBurstWindowMins": 20,
-          "extraTrafficPrice": 16.67,
-          "minTopupAmount": 200000,
-          "readVsWriteScalingFactor": 4
-        },
         "isDevNet": true,
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": 1,
-          "migrating": false
+          "id": 2,
+          "legacyId": 1,
+          "migrating": true
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingRoundZeroDuration": "27 h",
-        "onboardingType": "found-dso",
-        "participantAddress": "participant-1",
+        "onboardingType": "domain-migration",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -2827,7 +2682,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -2835,10 +2690,10 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "validator_sv_1",
           "port": 5432,
@@ -3023,11 +2878,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -3224,7 +3079,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -3299,6 +3154,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
+              "2",
               "1"
             ]
           }
@@ -3424,7 +3280,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -3482,7 +3338,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -3567,7 +3423,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -3622,9 +3478,9 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "scan_sv_2",
           "port": 5432,
@@ -3633,7 +3489,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-1-sequencer",
+        "sequencerAddress": "global-domain-2-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -3709,7 +3565,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -3839,21 +3695,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-1-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-1-mediator",
-          "sequencerAddress": "global-domain-1-sequencer",
+          "mediatorAddress": "global-domain-2-mediator",
+          "sequencerAddress": "global-domain-2-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-1.sv-2-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-2.sv-2-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -3868,20 +3724,18 @@
           "prefix": "dev/sv-2"
         },
         "isDevNet": true,
-        "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014"
-        },
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": 1,
-          "migrating": false
+          "id": 2,
+          "legacyId": 1,
+          "migrating": true
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
         "onboardingName": "Digital-Asset-Eng-2",
-        "onboardingType": "join-with-key",
-        "participantAddress": "participant-1",
+        "onboardingType": "domain-migration",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "sv_sv_2",
           "port": 5432,
@@ -3963,7 +3817,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -3971,10 +3825,10 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "validator_sv_2",
           "port": 5432,
@@ -4152,11 +4006,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -4353,7 +4207,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -4428,6 +4282,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
+              "2",
               "1"
             ]
           }
@@ -4553,7 +4408,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -4611,7 +4466,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -4696,7 +4551,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -4751,9 +4606,9 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "scan_sv_3",
           "port": 5432,
@@ -4762,7 +4617,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-1-sequencer",
+        "sequencerAddress": "global-domain-2-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -4838,7 +4693,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -4968,21 +4823,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-1-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-1-mediator",
-          "sequencerAddress": "global-domain-1-sequencer",
+          "mediatorAddress": "global-domain-2-mediator",
+          "sequencerAddress": "global-domain-2-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-1.sv-3-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-2.sv-3-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -4997,20 +4852,18 @@
           "prefix": "dev/sv-3"
         },
         "isDevNet": true,
-        "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014"
-        },
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": 1,
-          "migrating": false
+          "id": 2,
+          "legacyId": 1,
+          "migrating": true
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
         "onboardingName": "Digital-Asset-Eng-3",
-        "onboardingType": "join-with-key",
-        "participantAddress": "participant-1",
+        "onboardingType": "domain-migration",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "sv_sv_3",
           "port": 5432,
@@ -5092,7 +4945,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -5100,10 +4953,10 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "validator_sv_3",
           "port": 5432,
@@ -5281,11 +5134,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -5482,7 +5335,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -5557,6 +5410,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
+              "2",
               "1"
             ]
           }
@@ -5682,7 +5536,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -5740,7 +5594,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -5825,7 +5679,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -5880,9 +5734,9 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "scan_sv_4",
           "port": 5432,
@@ -5891,7 +5745,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-1-sequencer",
+        "sequencerAddress": "global-domain-2-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -5967,7 +5821,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "dev",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -6097,21 +5951,21 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-1-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-2-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-1-mediator",
-          "sequencerAddress": "global-domain-1-sequencer",
+          "mediatorAddress": "global-domain-2-mediator",
+          "sequencerAddress": "global-domain-2-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-1.sv-4-eng.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-2.sv-4-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [],
@@ -6126,20 +5980,18 @@
           "prefix": "dev/sv-4"
         },
         "isDevNet": true,
-        "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014"
-        },
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": 1,
-          "migrating": false
+          "id": 2,
+          "legacyId": 1,
+          "migrating": true
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
         "onboardingName": "Digital-Asset-Eng-4",
-        "onboardingType": "join-with-key",
-        "participantAddress": "participant-1",
+        "onboardingType": "domain-migration",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "sv_sv_4",
           "port": 5432,
@@ -6221,7 +6073,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -6229,10 +6081,10 @@
           "enable": true
         },
         "migration": {
-          "id": 1
+          "id": 2
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "validator_sv_4",
           "port": 5432,

@@ -6797,7 +6797,7 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 1
+          migration_id: 2
           context:
             - artifactory
             - canton-network-vpn
@@ -6885,7 +6885,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 1
+          migration_id: 2
           requires:
             - wait_for_previous_pipeline
 
@@ -6914,7 +6914,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 1
+          migration_id: 2
           requires:
             - wait_for_previous_pipeline
 
@@ -6929,7 +6929,7 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 1
+          migration_id: 2
           context:
             - artifactory
             - canton-network-vpn
@@ -6941,7 +6941,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "devnet"
-          migration_id: 1
+          migration_id: 2
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context

@@ -197,6 +197,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
+              "2",
               "1"
             ]
           }
@@ -457,14 +458,14 @@
           "enable": true
         },
         "migration": {
-          "id": "1"
+          "id": "2"
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "sequencerAddress": "global-domain-1-sequencer",
+        "sequencerAddress": "global-domain-2-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -778,22 +779,22 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-1-mediator",
-          "sequencerAddress": "global-domain-1-sequencer",
+          "mediatorAddress": "global-domain-2-mediator",
+          "sequencerAddress": "global-domain-2-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-1.sv.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-2.sv.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
@@ -810,11 +811,12 @@
           "enable": true
         },
         "migration": {
-          "id": "1"
+          "id": "2",
+          "migrating": true
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
@@ -906,11 +908,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -1092,7 +1094,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -1233,7 +1235,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -1496,17 +1498,17 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "metrics": {
           "enable": true
         },
         "migration": {
-          "id": "1"
+          "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
