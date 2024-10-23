@@ -63,6 +63,7 @@ in pkgs.mkShell {
                                      }))
     python3Packages.GitPython
     python3Packages.gql
+    python3Packages.humanize
     python3Packages.jsonpickle
     python3Packages.kubernetes
     python3Packages.marshmallow-dataclass

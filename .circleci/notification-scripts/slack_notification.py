@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+from datetime import datetime, timezone
 import json
 import requests
 import sys
+from humanize import naturaldelta
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from circleci import *
@@ -14,27 +16,23 @@ def build_msg(args: FailureArgs, gh_url: str):
   workflow = fetch_workflow(args.workflow_id)
   stats = failures_and_last_success(
     workflow.pipeline_number, args.branch, workflow, args.job_name)
+  now = datetime.now(timezone.utc)
 
   text=f"""*Job {workflow.name}:{args.job_name} {workflow.pipeline_number}:{args.job_num} failed on cluster {args.cluster}* :dumpster-fire:.
   (<{gh_url}|Issue in GitHub>)
-  {failure_stat(f"workflow {workflow.name}", stats.failed_workflows, stats.last_workflow_success, stats)}
-  {failure_stat(f"Job {args.job_name}", stats.failed_jobs, stats.last_job_success, stats)}"""
+  {failure_stat(f"workflow {workflow.name}", stats.failed_workflows, stats.last_workflow_success, stats, now)}
+  {failure_stat(f"Job {args.job_name}", stats.failed_jobs, stats.last_job_success, stats, now)}"""
 
   return text
 
-def failure_stat(what: str, failures: int, last_success: datetime | None, windows: SuccessStats):
+def failure_stat(what: str, failures: int, last_success: datetime | None, windows: SuccessStats, now: datetime):
   if failures:
-    pretty_success = (f"Last success: {last_success}" if last_success
-                      else f"No successes in {pretty_timedelta(windows.success_window)}")
-    return f"{what} failed {failures} times in last {pretty_timedelta(windows.failure_window)} ({pretty_success})"
+    pretty_success = (f"Last success: {naturaldelta(now - last_success)} ago" if last_success
+                      else f"No successes in {naturaldelta(windows.success_window)}")
+    return f"{what} failed {failures} times in last {naturaldelta(windows.failure_window)} ({pretty_success})"
   else:
-    return (f"Last {what} success: {last_success}" if last_success
-            else f"No {what} success in last {pretty_timedelta(windows.success_window)}")
-
-# incomplete but good enough for our cases
-def pretty_timedelta(td: timedelta):
-  s = int(td.total_seconds())
-  return f"{s // 86400} days" if s >= 86400 else f"{s // 3600} hours"
+    return (f"Last {what} success: {naturaldelta(now - last_success)} ago" if last_success
+            else f"No {what} success in last {naturaldelta(windows.success_window)}")
 
 def slack_notification(args: FailureArgs, gh_url: str):
 
