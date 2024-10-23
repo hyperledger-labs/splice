@@ -682,9 +682,36 @@ class DbScanStore(
           ),
           "getTopValidatorLicenses",
         )
-    } yield applyLimit("getTopValidatorLicenses", limit, rows).map(
-      contractFromRow(ValidatorLicense.COMPANION)(_)
-    )
+    } yield {
+      applyLimit("getTopValidatorLicenses", limit, rows).map(
+        contractFromRow(ValidatorLicense.COMPANION)(_)
+      )
+    }
+  }
+
+  override def getValidatorLicenseByValidator(validators: Vector[PartyId])(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] = waitUntilAcsIngested {
+    val validatorPartyIds = inClause(validators)
+    for {
+      rows <- storage
+        .query(
+          selectFromAcsTable(
+            ScanTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = (sql"""template_id_qualified_name = ${QualifiedName(
+                ValidatorLicense.TEMPLATE_ID
+              )} and validator in """ ++ validatorPartyIds).toActionBuilder,
+          ),
+          "getValidatorLicenseByValidator",
+        )
+    } yield {
+      rows
+        .map(
+          contractFromRow(ValidatorLicense.COMPANION)(_)
+        )
+    }
   }
 
   override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
