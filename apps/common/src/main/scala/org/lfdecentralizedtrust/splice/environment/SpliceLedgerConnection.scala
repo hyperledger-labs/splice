@@ -232,8 +232,8 @@ class BaseLedgerConnection(
       RetryFor.WaitingOnInitDependency,
       "ledger_api_wait_party",
       show"Party $party is observed on ledger API",
-      getParty(party).map { party =>
-        if (party.isEmpty)
+      getParty(party).map { details =>
+        if (details.isEmpty)
           throw Status.NOT_FOUND
             .withDescription(s"Party allocation of $party not observed on ledger API")
             .asRuntimeException()
