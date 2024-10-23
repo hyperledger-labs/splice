@@ -300,7 +300,6 @@ class DbUserWalletStore(
                       select entry_number
                       from #${WalletTables.txLogTableName}
                       where store_id = $storeId
-                      and migration_id = $domainMigrationId
                       and tx_log_id = ${TxLogEntry.LogId.TransactionHistoryTxLog}
                       and event_id = ${lengthLimited(beginAfterEventId)}
                   )""",
@@ -369,7 +368,6 @@ class DbUserWalletStore(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
-              domainMigrationId,
               sql"entry_type = ${TxLogEntry.EntryType.TransferOfferTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             ).headOption,
@@ -396,7 +394,6 @@ class DbUserWalletStore(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
-              domainMigrationId,
               sql"entry_type = ${TxLogEntry.EntryType.BuyTrafficRequestTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             ).headOption,

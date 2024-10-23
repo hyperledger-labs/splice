@@ -1,6 +1,9 @@
 import com.digitalasset.daml.lf.value.Value.ContractId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{splitwell => splitwellCodegen}
-import org.lfdecentralizedtrust.splice.console.{AnsExternalAppClientReference, WalletAppClientReference}
+import org.lfdecentralizedtrust.splice.console.{
+  AnsExternalAppClientReference,
+  WalletAppClientReference,
+}
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions._
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.CommandFailure
