@@ -13,7 +13,7 @@ from failure_notification_args import FailureArgs
 def build_msg(args: FailureArgs, gh_url: str):
   workflow = fetch_workflow(args.workflow_id)
   stats = failures_and_last_success(
-    workflow.pipeline_number, args.branch, workflow, args.job_num)
+    workflow.pipeline_number, args.branch, workflow, args.job_name)
 
   text=f"""*Job {workflow.name}:{args.job_name} {workflow.pipeline_number}:{args.job_num} failed on cluster {args.cluster}* :dumpster-fire:.
   (<{gh_url}|Issue in GitHub>)
