@@ -63,8 +63,6 @@ import org.lfdecentralizedtrust.splice.sv.store.{
   VoteRequestTxLogEntry,
 }
 import SvDsoStore.RoundCounterpartyBatch
-
-import scala.jdk.CollectionConverters.*
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template
 import com.digitalasset.canton.data.CantonTimestamp
@@ -75,10 +73,12 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
 
+import scala.jdk.CollectionConverters.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
@@ -116,6 +116,7 @@ class DbSvDsoStore(
     with SvDsoStore
     with AcsTables
     with AcsQueries
+    with UpdateHistoryQueries
     with TxLogQueries[TxLogEntry]
     with DbVotesStoreQueryBuilder {
 
@@ -1477,6 +1478,36 @@ class DbSvDsoStore(
           )
           .value
       } yield row.map(assignedContractFromRow(companion)(_))
+    }
+  }
+
+  def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+      companion: C,
+      recordTime: CantonTimestamp = CantonTimestamp.MinValue,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Option[Contract[TCId, T]]] = {
+    val templateId = companionClass.typeId(companion)
+    val packageName = PackageQualifiedName(templateId).packageName
+    for {
+      row <- storage
+        .querySingle(
+          selectFromUpdateTableResult(
+            updateHistory.historyId,
+            where = sql"""t.template_id_module_name = ${lengthLimited(
+                templateId.getModuleName
+              )} and t.template_id_entity_name = ${lengthLimited(
+                templateId.getEntityName
+              )} and t.package_name = ${lengthLimited(packageName)}
+              and uht.record_time > $recordTime""",
+            orderLimit = sql"""order by t.row_id asc limit 1""",
+          ).headOption,
+          s"lookup[$templateId]",
+        )
+        .value
+    } yield {
+      row.map(contractFromEvent(companion)(_))
     }
   }
 
