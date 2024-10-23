@@ -381,7 +381,7 @@ object HttpScanAppClient {
   }
 
   case class GetTotalAmuletBalance(asOfEndOfRound: Long)
-      extends InternalBaseCommand[http.GetTotalAmuletBalanceResponse, BigDecimal] {
+      extends InternalBaseCommand[http.GetTotalAmuletBalanceResponse, Option[BigDecimal]] {
 
     override def submitRequest(
         client: Client,
@@ -391,9 +391,9 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetTotalAmuletBalanceResponse.OK(response) =>
-        Codec.decode(Codec.BigDecimal)(response.totalBalance)
-      case http.GetTotalAmuletBalanceResponse.NotFound(err) =>
-        Left(err.error)
+        Codec.decode(Codec.BigDecimal)(response.totalBalance).map(Some(_))
+      case http.GetTotalAmuletBalanceResponse.NotFound(_) =>
+        Right(None)
     }
   }
 

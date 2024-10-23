@@ -194,7 +194,7 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary("Get the total balance of Amulet in the network")
-  def getTotalAmuletBalance(asOfEndOfRound: Long): BigDecimal =
+  def getTotalAmuletBalance(asOfEndOfRound: Long): Option[BigDecimal] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetTotalAmuletBalance(asOfEndOfRound))
     }

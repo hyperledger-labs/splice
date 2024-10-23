@@ -335,9 +335,12 @@ class ScanTimeBasedIntegrationTest
     )
 
     clue("Get total balances for round 0, 1 and 2") {
-      val total0 = sv1ScanBackend.getTotalAmuletBalance(0)
-      val total1 = sv1ScanBackend.getTotalAmuletBalance(1)
-      val total2 = sv1ScanBackend.getTotalAmuletBalance(2)
+      val total0 =
+        sv1ScanBackend.getTotalAmuletBalance(0).valueOrFail("Amulet balance not yet computed")
+      val total1 =
+        sv1ScanBackend.getTotalAmuletBalance(1).valueOrFail("Amulet balance not yet computed")
+      val total2 =
+        sv1ScanBackend.getTotalAmuletBalance(2).valueOrFail("Amulet balance not yet computed")
 
       val holdingFeeAfterOneRound = 1 * defaultHoldingFeeAmulet
       val holdingFeeAfterTwoRounds = 2 * defaultHoldingFeeAmulet

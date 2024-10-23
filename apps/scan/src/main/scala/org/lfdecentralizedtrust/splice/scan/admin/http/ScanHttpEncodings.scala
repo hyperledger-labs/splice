@@ -15,6 +15,8 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.ByteString
 import io.circe.Json
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
+import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 
 import java.time.{Instant, ZoneOffset}
 import scala.jdk.CollectionConverters.*
@@ -634,4 +636,29 @@ case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
       json: Json,
   ): javaApi.Value =
     ValueJsonCodecProtobuf.deserializeValue(json.toString())
+}
+
+object FaucetProcessor {
+  def process(
+      licenses: Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]
+  ): Vector[ValidatorReceivedFaucets] = {
+    licenses.map { license =>
+      val numRoundsCollected = license.payload.faucetState
+        .map { faucetState =>
+          faucetState.lastReceivedFor.number - faucetState.firstReceivedFor.number - faucetState.numCouponsMissed + 1
+        }
+        .orElse(0L)
+
+      ValidatorReceivedFaucets(
+        validator = license.payload.validator,
+        numRoundsCollected = numRoundsCollected,
+        numRoundsMissed =
+          license.payload.faucetState.map(_.numCouponsMissed.longValue()).orElse(0L),
+        firstCollectedInRound =
+          license.payload.faucetState.map(_.firstReceivedFor.number.longValue()).orElse(0L),
+        lastCollectedInRound =
+          license.payload.faucetState.map(_.lastReceivedFor.number.longValue()).orElse(0L),
+      )
+    }.toVector
+  }
 }
