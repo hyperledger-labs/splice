@@ -1941,6 +1941,8 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
+      migration_id:
+        type: integer
     executor: self_hosted
     environment:
       <<: *env
@@ -1952,7 +1954,7 @@ jobs:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "10m"
-          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "<< parameters.cluster >>"
+          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "<< parameters.cluster >>" "<< parameters.migration_id >>"
       - run:
           name: Add snapshot_array to env
           command: |
@@ -6794,7 +6796,7 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 3
+          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -6882,7 +6884,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 3
+          migration_id: 1
           requires:
             - wait_for_previous_pipeline
 
@@ -6911,7 +6913,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 3
+          migration_id: 1
           requires:
             - wait_for_previous_pipeline
 
@@ -6926,7 +6928,7 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 3
+          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -6938,6 +6940,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "devnet"
+          migration_id: 1
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context
@@ -7246,7 +7249,7 @@ workflows:
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           cluster: "mainnet"
           parallelism: 1
-          migration_id: 0
+          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -7258,6 +7261,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "mainnet"
+          migration_id: 1
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           alert_threshold: "4 hours ago"
           context:
@@ -7416,6 +7420,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "testnet"
+          migration_id: 2
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context

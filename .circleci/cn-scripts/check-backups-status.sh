@@ -7,6 +7,7 @@ set -eou pipefail
 
 alert_threshold="${1}"
 cluster="${2}"
+migration_id="${3}"
 
 
 snapshot_array=()
@@ -49,7 +50,7 @@ exclude_patterns=("splitwell-sw" "sv-apps" "sv-sequencer" "sv-participant" "sv-m
 exclude_pattern=$(printf "|%s" "${exclude_patterns[@]}")
 exclude_pattern="${exclude_pattern:1}"
 
-instances=$(gcloud sql instances list --format="value(name)" --filter="labels.cluster=${cluster//net/}" | grep -vE "^($exclude_pattern)")
+instances=$(gcloud sql instances list --format="value(name)" --filter="labels.cluster=${cluster//net/} AND (labels.migration_id=${migration_id} OR NOT labels.migration_id:*)" | grep -vE "^($exclude_pattern)")
 
 for instance in $instances;
   do

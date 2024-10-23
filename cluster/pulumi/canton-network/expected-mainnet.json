@@ -1214,7 +1214,8 @@
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "main"
+          "cluster": "main",
+          "migration_id": "1"
         }
       }
     },
@@ -1440,7 +1441,8 @@
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "main"
+          "cluster": "main",
+          "migration_id": "1"
         }
       }
     },
@@ -1581,7 +1583,8 @@
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "main"
+          "cluster": "main",
+          "migration_id": "1"
         }
       }
     },
