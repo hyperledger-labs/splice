@@ -378,6 +378,9 @@ infrastructure script.
    - Note: helm charts built locally reference the docker images using just your username.
      Make sure to `make docker-push`, whenever you want to propagate local changes.
    - If this fails with an error `Unauthenticated requests do not have permission "artifactregistry.repositories.uploadArtifacts"`, you may need to run `gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev` to set the proper credentials.
+1. If you plan on using manual `pulumi` commands for deployment (i.e., calling `cncluster pulumi ...` instead of `cncluster apply`),
+   ensure that pulumi is set up: `make -C $REPO_ROOT cluster/build -j`
+   - This step is handled automatically by `cncluster apply`.
 1. Start with a working cluster and change to its deployment directory.
 1. Acquire the cluster lock `cncluster lock`.
 1. Delete the existing cluster resources managed by pulumi: `cncluster reset`.
