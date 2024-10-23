@@ -63,6 +63,31 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/validators/validator-faucets:
+    get:
+      tags: [ scan ]
+      x-jvm-package: external.scan
+      operationId: "getValidatorFaucetsByValidator"
+      parameters:
+        - name: validator_ids
+          in: query
+          required: true
+          description: A comma-separated list of validator party IDs
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetValidatorFaucetsByValidatorResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 components:
   schemas:
     GetMemberTrafficStatusResponse:
@@ -111,3 +136,36 @@ components:
           description: |
             ID of the participant hosting the provided party
           type: string
+    GetValidatorFaucetsByValidatorResponse:
+      type: object
+      required: [ "validatorsReceivedFaucets" ]
+      properties:
+        validatorsReceivedFaucets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidatorReceivedFaucets"
+    ValidatorReceivedFaucets:
+      type: object
+      required:
+        [
+          "validator",
+          "numRoundsCollected",
+          "numRoundsMissed",
+          "firstCollectedInRound",
+          "lastCollectedInRound",
+        ]
+      properties:
+        validator:
+          type: string
+        numRoundsCollected:
+          type: integer
+          format: int64
+        numRoundsMissed:
+          type: integer
+          format: int64
+        firstCollectedInRound:
+          type: integer
+          format: int64
+        lastCollectedInRound:
+          type: integer
+          format: int64

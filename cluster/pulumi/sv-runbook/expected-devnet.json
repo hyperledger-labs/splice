@@ -719,7 +719,7 @@
           {
             "name": "Orb-1-LP",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1LDIm4cEZ/fVP9Y3ReyP93osmeZ+9saRSHRDRb+gmLxtAEOL3GTYCRZClItc4gS8Y8FCNBBYkcSpfjvtBSTfGw==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 0
           },
           {
             "name": "Digital-Asset-Eng-2",
@@ -769,7 +769,7 @@
           {
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {

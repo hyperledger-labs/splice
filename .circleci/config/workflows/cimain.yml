@@ -17,6 +17,10 @@ workflow:
             - slack-context
           workflow_names: "deploy_cimain"
           wait_type: "cancel_waiting_and_wait_workflow"
+      - autoscaler_prevent_scaledown:
+          cluster: "cimain"
+          requires:
+            - wait_for_previous_pipeline
       - reset_cluster:
           cluster: "cimain"
           silence_deployment_alerts: true
@@ -126,5 +130,9 @@ workflow:
           cluster: "cimain"
           context:
             - slack-context
+          requires:
+            - restore_node
+      - autoscaler_allow_scaledown:
+          cluster: "cimain"
           requires:
             - restore_node

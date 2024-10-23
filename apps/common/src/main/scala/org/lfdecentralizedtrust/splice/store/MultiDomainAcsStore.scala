@@ -462,8 +462,7 @@ object MultiDomainAcsStore {
     def fromCreatedEvent(
         companion: C
     )(
-        filter: MultiDomainAcsStore.ContractFilter[?],
-        event: CreatedEvent,
+        event: CreatedEvent
     ): Option[Contract[TCid, T]]
 
     def fromJson(companion: C)(
@@ -506,8 +505,7 @@ object MultiDomainAcsStore {
       : ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T] =
     new ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T] {
       override def fromCreatedEvent(companion: Contract.Companion.Template[TCid, T])(
-          filter: MultiDomainAcsStore.ContractFilter[?],
-          event: CreatedEvent,
+          event: CreatedEvent
       ): Option[Contract[TCid, T]] = Contract.fromCreatedEvent(companion)(event)
 
       override def mightContain(filter: MultiDomainAcsStore.ContractFilter[?])(

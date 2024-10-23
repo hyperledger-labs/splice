@@ -109,18 +109,22 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def time(n: Long): CantonTimestamp = CantonTimestamp.ofEpochSecond(n)
 
-  private val schedule: scheduleCodegen.Schedule[Instant, AmuletConfig[USD]] =
+  private def schedule(
+      initialTickDuration: Long
+  ): scheduleCodegen.Schedule[Instant, AmuletConfig[USD]] = {
     SpliceUtil.defaultAmuletConfigSchedule(
-      NonNegativeFiniteDuration(Duration.ofMinutes(10)),
+      NonNegativeFiniteDuration(Duration.ofMinutes(initialTickDuration)),
       10,
       dummyDomain,
     )
-  protected def amuletRules() = {
+  }
+
+  protected def amuletRules(initialTickDuration: Long = 10) = {
     val templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
 
     val template = new amuletrulesCodegen.AmuletRules(
       dsoParty.toProtoPrimitive,
-      schedule,
+      schedule(initialTickDuration),
       false,
     )
     contract(
@@ -696,6 +700,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val domainMigrationId = 0L
 
+  protected val nextDomainMigrationId = 1L
+
   protected val defaultEffectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
   protected def toIncompleteUnassign(
@@ -903,6 +909,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
         recordTime: Instant = defaultEffectiveAt,
+        packageName: String = dummyPackageName,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
@@ -912,6 +919,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         domain,
         workflowId,
         recordTime,
+        packageName,
       )
 
       store.testIngestionSink
