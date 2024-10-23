@@ -344,7 +344,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store2.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
         } yield {
-          result.offset should be(cancelledTree.getOffset)
+          result.offset shouldBe Some(cancelledTree.getOffset)
           result.value.map(_.status) should be(
             Some(
               BuyTrafficRequestTxLogEntry.Status.Rejected(
