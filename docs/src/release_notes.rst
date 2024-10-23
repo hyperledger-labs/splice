@@ -8,6 +8,16 @@
 Release Notes
 =============
 
+Upcoming
+
+* Deployment
+
+  * ``domain.sequencerAddress``, ``domain.mediatorAddress`` and
+    ``participantAddress`` in the SV and Scan helm values are now
+    mandatory. The defaults did not include the migration id so are
+    almost always incorrect which means this likely has no impact as
+    SVs should already have this set explicitly.
+
 0.2.5
 -----
 
