@@ -35,8 +35,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
 }
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.RenewTransferPreapprovalTrigger
-import com.daml.ledger.api.v2.interactive_submission_data
-import interactive_submission_data.PreparedTransaction
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.*
@@ -47,7 +45,6 @@ import com.digitalasset.canton.util.HexString
 import monocle.macros.syntax.lens.*
 
 import java.time.{Duration, Instant}
-import java.util.Base64
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -197,20 +194,6 @@ class ExternalPartySetupProposalIntegrationTest
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         0L,
       )
-    val tx = PreparedTransaction.parseFrom(
-      Base64.getDecoder.decode(prepareSend.transaction)
-    )
-    // TODO(#15593) Read the cid from the response without decoding the tx
-    val createNode = tx.getTransaction.nodes
-      .flatMap(n =>
-        n.nodeType match {
-          case interactive_submission_data.Node.NodeType.Create(create) =>
-            Seq(create)
-          case _ => Seq.empty
-        }
-      )
-      .loneElement
-    createNode.getTemplateId.entityName shouldBe "TransferCommand"
     val (updateId, _) = actAndCheck(
       "Submit signed TransferCommand creation",
       aliceValidatorBackend.submitTransferPreapprovalSend(
@@ -243,7 +226,7 @@ class ExternalPartySetupProposalIntegrationTest
           .payload
           .nextNonce shouldBe 1
         sv1ScanBackend.lookupTransferCommandStatus(
-          new TransferCommand.ContractId(createNode.contractId)
+          new TransferCommand.ContractId(prepareSend.transferCommandContractId)
         ) shouldBe Some(
           definitions.LookupTransferCommandStatusResponse.members.TransferCommandSentResponse(
             definitions.TransferCommandSentResponse(status = "sent")
@@ -340,21 +323,6 @@ class ExternalPartySetupProposalIntegrationTest
         1L,
       )
 
-    val txNoPreapproval = PreparedTransaction.parseFrom(
-      Base64.getDecoder.decode(prepareSendNoPreapproval.transaction)
-    )
-    // TODO(#15593) Read the cid from the respones without decoding the tx
-    val createNodeNoPreapproval = txNoPreapproval.getTransaction.nodes
-      .flatMap(n =>
-        n.nodeType match {
-          case interactive_submission_data.Node.NodeType.Create(create) =>
-            Seq(create)
-          case _ => Seq.empty
-        }
-      )
-      .loneElement
-    createNode.getTemplateId.entityName shouldBe "TransferCommand"
-
     // Archive the preapproval
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
       .submitWithResult(
@@ -408,7 +376,7 @@ class ExternalPartySetupProposalIntegrationTest
               c => c.data.sender == aliceParty.toProtoPrimitive,
             ) shouldBe empty
           sv1ScanBackend.lookupTransferCommandStatus(
-            new TransferCommand.ContractId(createNodeNoPreapproval.contractId)
+            new TransferCommand.ContractId(prepareSendNoPreapproval.transferCommandContractId)
           ) shouldBe Some(
             definitions.LookupTransferCommandStatusResponse.members.TransferCommandFailedResponse(
               definitions.TransferCommandFailedResponse(

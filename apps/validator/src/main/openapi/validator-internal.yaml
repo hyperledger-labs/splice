@@ -1472,6 +1472,7 @@ components:
       required:
         - transaction
         - tx_hash
+        - transfer_command_contract_id
       properties:
         transaction:
           type: string
@@ -1482,6 +1483,9 @@ components:
             and can be decoded using standard protobuf libraries.
         tx_hash:
           description: Hex-encoded hash of the transaction
+          type: string
+        transfer_command_contract_id:
+          description: ContractId of the created TransferCommand. Matches the contract id of the corresponding `Create` node in the prepared transaction.
           type: string
 
     SubmitTransferPreapprovalSendRequest:
