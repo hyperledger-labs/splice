@@ -833,7 +833,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv-1"
       }
     },
@@ -1354,7 +1356,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv-2"
       }
     },
@@ -1875,7 +1879,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv-3"
       }
     },
@@ -2396,7 +2402,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv-4"
       }
     },
@@ -2902,7 +2910,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv"
       }
     },
