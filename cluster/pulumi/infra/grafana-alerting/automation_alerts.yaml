@@ -355,7 +355,7 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        noDataState: NoData
+        noDataState: $NODATA
         execErrState: Error
         for: 5m
         annotations:
