@@ -625,6 +625,29 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "private": "c3YyLWlkLXByaXZhdGUta2V5",
+          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -735,6 +758,29 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "private": "c3YzLWlkLXByaXZhdGUta2V5",
+          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -834,6 +880,29 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-4-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
+          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-key",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1000,7 +1069,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "docs-docs",
     "provider": "",
@@ -1130,6 +1199,75 @@
       "type": "Opaque"
     },
     "name": "splice-app-sv-1-validator-onboarding-validator12",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YyLWlkLXByaXZhdGUta2V5",
+          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-2-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YzLWlkLXByaXZhdGUta2V5",
+          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-3-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
+          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-key",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-sv-4-key",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1958,7 +2096,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -2012,7 +2150,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -2022,7 +2160,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -2065,7 +2203,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -2279,7 +2417,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -2350,7 +2488,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -2421,7 +2559,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -2588,6 +2726,13 @@
           },
           "prefix": "dev/sv-1"
         },
+        "initialSynchronizerFeesConfig": {
+          "baseRateBurstAmount": 400000,
+          "baseRateBurstWindowMins": 20,
+          "extraTrafficPrice": 16.67,
+          "minTopupAmount": 200000,
+          "readVsWriteScalingFactor": 4
+        },
         "isDevNet": true,
         "metrics": {
           "enable": true
@@ -2595,11 +2740,13 @@
         "migration": {
           "id": 2,
           "legacyId": 1,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
+        "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingType": "domain-migration",
+        "onboardingRoundZeroDuration": "27 h",
+        "onboardingType": "found-dso",
         "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "sv_sv_1",
@@ -2629,7 +2776,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -2639,7 +2786,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-1",
@@ -2734,7 +2881,7 @@
           }
         }
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
@@ -3114,7 +3261,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -3168,7 +3315,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-2-ingress-sv",
     "provider": "",
@@ -3178,7 +3325,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -3221,7 +3368,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-2-loopback",
     "provider": "",
@@ -3435,7 +3582,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -3506,7 +3653,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-2-scan",
     "provider": "",
@@ -3577,7 +3724,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -3724,17 +3871,20 @@
           "prefix": "dev/sv-2"
         },
         "isDevNet": true,
+        "joinWithKeyOnboarding": {
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+        },
         "metrics": {
           "enable": true
         },
         "migration": {
           "id": 2,
           "legacyId": 1,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
         "onboardingName": "Digital-Asset-Eng-2",
-        "onboardingType": "domain-migration",
+        "onboardingType": "join-with-key",
         "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "sv_sv_2",
@@ -3764,7 +3914,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-2-sv-app",
     "provider": "",
@@ -3774,7 +3924,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-2",
@@ -3862,7 +4012,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-2-validator-sv-2",
     "provider": "",
@@ -4242,7 +4392,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -4296,7 +4446,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-3-ingress-sv",
     "provider": "",
@@ -4306,7 +4456,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -4349,7 +4499,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-3-loopback",
     "provider": "",
@@ -4563,7 +4713,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -4634,7 +4784,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-3-scan",
     "provider": "",
@@ -4705,7 +4855,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -4852,17 +5002,20 @@
           "prefix": "dev/sv-3"
         },
         "isDevNet": true,
+        "joinWithKeyOnboarding": {
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+        },
         "metrics": {
           "enable": true
         },
         "migration": {
           "id": 2,
           "legacyId": 1,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
         "onboardingName": "Digital-Asset-Eng-3",
-        "onboardingType": "domain-migration",
+        "onboardingType": "join-with-key",
         "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "sv_sv_3",
@@ -4892,7 +5045,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-3-sv-app",
     "provider": "",
@@ -4902,7 +5055,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-3",
@@ -4990,7 +5143,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-3-validator-sv-3",
     "provider": "",
@@ -5370,7 +5523,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "ingress-sv",
@@ -5424,7 +5577,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-4-ingress-sv",
     "provider": "",
@@ -5434,7 +5587,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -5477,7 +5630,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-4-loopback",
     "provider": "",
@@ -5691,7 +5844,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -5762,7 +5915,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-4-scan",
     "provider": "",
@@ -5833,7 +5986,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -5980,17 +6133,20 @@
           "prefix": "dev/sv-4"
         },
         "isDevNet": true,
+        "joinWithKeyOnboarding": {
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+        },
         "metrics": {
           "enable": true
         },
         "migration": {
           "id": 2,
           "legacyId": 1,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
         "onboardingName": "Digital-Asset-Eng-4",
-        "onboardingType": "domain-migration",
+        "onboardingType": "join-with-key",
         "participantAddress": "participant-2",
         "persistence": {
           "databaseName": "sv_sv_4",
@@ -6020,7 +6176,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-4-sv-app",
     "provider": "",
@@ -6030,7 +6186,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-sv-4",
@@ -6118,7 +6274,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-4-validator-sv-4",
     "provider": "",

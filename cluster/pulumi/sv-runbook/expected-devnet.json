@@ -161,7 +161,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-sv",
@@ -210,7 +210,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -374,7 +374,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -414,7 +414,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "loopback",
     "provider": "",
@@ -424,7 +424,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -482,7 +482,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "scan",
     "provider": "",
@@ -668,7 +668,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -811,8 +811,7 @@
           "enable": true
         },
         "migration": {
-          "id": "2",
-          "migrating": true
+          "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
@@ -841,7 +840,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-app",
     "provider": "",
@@ -1464,7 +1463,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator",
@@ -1538,7 +1537,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "validator",
     "provider": "",

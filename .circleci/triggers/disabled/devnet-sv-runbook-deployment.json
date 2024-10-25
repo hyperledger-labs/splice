@@ -3,7 +3,7 @@
     "description": "Daily DevNet SV Runbook Redeployment",
     "attribution-actor": "system",
     "parameters" : {
-      "branch": "release-line-0.2.4",
+      "branch": "release-line-0.2.5",
       "run-job": "redeploy-sv-runbook-devnet"
     },
     "timetable" : {
