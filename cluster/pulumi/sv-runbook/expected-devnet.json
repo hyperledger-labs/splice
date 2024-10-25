@@ -210,7 +210,7 @@
           }
         ]
       },
-      "version": "0.2.5"
+      "version": "0.2.6"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -414,7 +414,7 @@
           }
         ]
       },
-      "version": "0.2.5"
+      "version": "0.2.6"
     },
     "name": "loopback",
     "provider": "",
@@ -482,7 +482,7 @@
           }
         ]
       },
-      "version": "0.2.5"
+      "version": "0.2.6"
     },
     "name": "scan",
     "provider": "",
@@ -840,7 +840,7 @@
           }
         ]
       },
-      "version": "0.2.5"
+      "version": "0.2.6"
     },
     "name": "sv-app",
     "provider": "",
@@ -850,7 +850,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cometbft",
+      "chart": "splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
       "name": "cometbft-global-domain-1",
@@ -944,7 +944,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-cometbft-global-domain-1",
     "provider": "",
@@ -1044,7 +1044,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-global-domain",
+      "chart": "splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
       "name": "global-domain-1",
@@ -1118,7 +1118,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-global-domain-1",
     "provider": "",
@@ -1188,7 +1188,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-1",
@@ -1260,7 +1260,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "name": "sv-participant-1",
     "provider": "",
@@ -1537,7 +1537,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.2.5"
+      "version": "0.2.6"
     },
     "name": "validator",
     "provider": "",
