@@ -7286,7 +7286,6 @@ workflows:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          enable_alerts: true
 
   preview_operator:
     when:
