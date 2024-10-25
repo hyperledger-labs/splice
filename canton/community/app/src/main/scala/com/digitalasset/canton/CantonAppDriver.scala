@@ -34,7 +34,7 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
 
   protected def additionalVersions: Map[String, String] = Map.empty
 
-  protected def printVersion(): Unit = {
+  protected def printVersion(): Unit =
     (Map(
       "Canton" -> BuildInfo.version,
       "Daml Libraries" -> BuildInfo.damlLibrariesVersion,
@@ -43,7 +43,6 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
     ) ++ additionalVersions) foreach { case (name, version) =>
       Console.out.println(s"$name: $version")
     }
-  }
 
   protected def logAppVersion(): Unit = logger.info(s"Starting Canton version ${BuildInfo.version}")
 
@@ -196,8 +195,7 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
   }
 
   private lazy val bootstrapScript: Option[CantonScript] =
-    cliOptions.bootstrapScriptPath
-      .map(CantonScriptFromFile)
+    cliOptions.bootstrapScriptPath.map(CantonScriptFromFile.apply)
 
   val runner: Runner[E] = cliOptions.command match {
     case Some(Command.Daemon) => new ServerRunner(bootstrapScript, loggerFactory)

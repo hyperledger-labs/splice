@@ -67,7 +67,7 @@ final case class TrafficState(
     )
   }
 
-  override def pretty: Pretty[TrafficState] = prettyOfClass(
+  override protected def pretty: Pretty[TrafficState] = prettyOfClass(
     param("extraTrafficLimit", _.extraTrafficPurchased),
     param("extraTrafficConsumed", _.extraTrafficConsumed),
     param("baseTrafficRemainder", _.baseTrafficRemainder),
@@ -89,7 +89,7 @@ object TrafficState {
     pp >> v.serial.map(_.value)
   }
 
-  implicit val getResultTrafficState: GetResult[Option[TrafficState]] = {
+  implicit val getResultTrafficState: GetResult[Option[TrafficState]] =
     GetResult
       .createGetTuple6(
         nonNegativeLongOptionGetResult,
@@ -100,7 +100,6 @@ object TrafficState {
         GetResult(_ => Some(Option.empty[PositiveInt])),
       )
       .andThen(_.mapN(TrafficState.apply))
-  }
 
   def empty: TrafficState = TrafficState(
     NonNegativeLong.zero,

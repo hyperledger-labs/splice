@@ -6,17 +6,19 @@ package com.digitalasset.canton.console.commands
 import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.daml.jwt.JwtDecoder
-import com.daml.jwt.domain.Jwt
+import com.daml.jwt.{AuthServiceJWTCodec, Jwt, JwtDecoder, StandardJWTPayload}
 import com.daml.ledger.api.v2.admin.command_inspection_service.CommandState
 import com.daml.ledger.api.v2.admin.package_management_service.PackageDetails
 import com.daml.ledger.api.v2.admin.party_management_service.PartyDetails as ProtoPartyDetails
-import com.daml.ledger.api.v2.checkpoint.Checkpoint
 import com.daml.ledger.api.v2.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.ledger.api.v2.interactive_submission_data.PreparedTransaction
+import com.daml.ledger.api.v2.interactive_submission_service.{
+  ExecuteSubmissionResponse as ExecuteResponseProto,
+  PrepareSubmissionResponse as PrepareResponseProto,
+}
 import com.daml.ledger.api.v2.reassignment.Reassignment as ReassignmentProto
 import com.daml.ledger.api.v2.state_service.{
   ActiveContract,
@@ -31,6 +33,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
   Filters,
   TransactionFilter as TransactionFilterProto,
 }
+import com.daml.ledger.javaapi as javab
 import com.daml.ledger.javaapi.data.{
   GetUpdateTreesResponse,
   GetUpdatesResponse,
@@ -39,11 +42,9 @@ import com.daml.ledger.javaapi.data.{
   TransactionFilter,
   TransactionTree,
 }
-import com.daml.ledger.javaapi as javab
 import com.daml.metrics.api.MetricsContext
 import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.CompletionWrapper
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.*
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.{
   WrappedContractEntry,
@@ -68,8 +69,8 @@ import com.digitalasset.canton.console.{
   ParticipantReference,
   RemoteParticipantReference,
 }
+import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
-import com.digitalasset.canton.ledger.api.auth.{AuthServiceJWTCodec, StandardJWTPayload}
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{
   IdentityProviderConfig,
@@ -110,7 +111,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
   protected val name: String
 
   protected lazy val applicationId: String = token
-    .flatMap { encodedToken => JwtDecoder.decode(Jwt(encodedToken)).toOption }
+    .flatMap(encodedToken => JwtDecoder.decode(Jwt(encodedToken)).toOption)
     .flatMap(decodedToken => AuthServiceJWTCodec.readFromString(decodedToken.payload).toOption)
     .map { case s: StandardJWTPayload =>
       s.userId
@@ -141,15 +142,15 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |until either `completeAfter` update trees have been received or `timeout` has elapsed.
           |The returned update trees can be filtered to be between the given offsets (default: no filtering).
           |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error."""
+          |this command fails with a `NOT_FOUND` error.
+          |If the beginOffset is empty then the participant begin is taken as beginning offset.
+          |If the endOffset is empty then a continuous stream is returned."""
       )
       def trees(
           partyIds: Set[PartyId],
           completeAfter: Int,
-          beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-          ),
-          endOffset: Option[ParticipantOffset] = None,
+          beginOffsetExclusive: String = "",
+          endOffsetInclusive: String = "",
           verbose: Boolean = true,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateTreeWrapper => Boolean = _ => true,
@@ -157,8 +158,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
         trees_with_tx_filter(
           filter = TransactionFilterProto(partyIds.map(_.toLf -> Filters()).toMap),
           completeAfter = completeAfter,
-          beginOffset = beginOffset,
-          endOffset = endOffset,
+          beginOffsetExclusive = beginOffsetExclusive,
+          endOffsetInclusive = endOffsetInclusive,
           verbose = verbose,
           timeout = timeout,
           resultFilter = resultFilter,
@@ -173,22 +174,22 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |this command fails with a `NOT_FOUND` error.
           |NOTE: As opposed to the flat transaction streams, the transaction filter provided for transaction trees DO NOT
           | filter the events in the tree, but decide instead the event payloads projection rules.
-          | (e.g. whether to include in the CreatedEvent the created event blob)."""
+          | (e.g. whether to include in the CreatedEvent the created event blob).
+          |If the beginOffset is empty then the participant begin is taken as beginning offset.
+          |If the endOffset is empty then a continuous stream is returned."""
       )
       def trees_with_tx_filter(
           filter: TransactionFilterProto,
           completeAfter: Int,
-          beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-          ),
-          endOffset: Option[ParticipantOffset] = None,
+          beginOffsetExclusive: String = "",
+          endOffsetInclusive: String = "",
           verbose: Boolean = true,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateTreeWrapper => Boolean = _ => true,
       ): Seq[UpdateTreeWrapper] = check(FeatureFlag.Testing)({
         val observer = new RecordingStreamObserver[UpdateTreeWrapper](completeAfter, resultFilter)
         mkResult(
-          subscribe_trees(observer, filter, beginOffset, endOffset, verbose),
+          subscribe_trees(observer, filter, beginOffsetExclusive, endOffsetInclusive, verbose),
           "getUpdateTrees",
           observer,
           timeout,
@@ -203,31 +204,30 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |Use `filter = TransactionFilter(Map(myParty.toLf -> Filters()))` to return all trees for `myParty: PartyId`.
           |The returned updates can be filtered to be between the given offsets (default: no filtering).
           |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error."""
+          |this command fails with a `NOT_FOUND` error.
+          |If the beginOffset is empty then the participant begin is taken as beginning offset.
+          |If the endOffset is empty then a continuous stream is returned."""
       )
       def subscribe_trees(
           observer: StreamObserver[UpdateTreeWrapper],
           filter: TransactionFilterProto,
-          beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-          ),
-          endOffset: Option[ParticipantOffset] = None,
+          beginOffsetExclusive: String = "",
+          endOffsetInclusive: String = "",
           verbose: Boolean = true,
-      ): AutoCloseable = {
+      ): AutoCloseable =
         check(FeatureFlag.Testing)(
           consoleEnvironment.run {
             ledgerApiCommand(
               LedgerApiCommands.UpdateService.SubscribeTrees(
                 observer,
-                beginOffset,
-                endOffset,
+                beginOffsetExclusive,
+                endOffsetInclusive,
                 filter,
                 verbose,
               )
             )
           }
         )
-      }
 
       @Help.Summary("Get flat updates", FeatureFlag.Testing)
       @Help.Description(
@@ -236,23 +236,34 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |The returned updates can be filtered to be between the given offsets (default: no filtering).
           |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error. If you need to specify filtering conditions for template IDs and
-          |including create event blobs for explicit disclosure, consider using `flat_with_tx_filter`."""
+          |including create event blobs for explicit disclosure, consider using `flat_with_tx_filter`.
+          |If the beginOffset is empty then the participant begin is taken as beginning offset.
+          |If the endOffset is empty then a continuous stream is returned."""
       )
       def flat(
           partyIds: Set[PartyId],
           completeAfter: Int,
-          beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-          ),
-          endOffset: Option[ParticipantOffset] = None,
+          beginOffsetExclusive: String = "",
+          endOffsetInclusive: String = "",
           verbose: Boolean = true,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateWrapper => Boolean = _ => true,
+          domainFilter: Option[DomainId] = None,
       ): Seq[UpdateWrapper] = check(FeatureFlag.Testing)({
-        val observer = new RecordingStreamObserver[UpdateWrapper](completeAfter, resultFilter)
+
+        val resultFilterWithDomain = domainFilter match {
+          case Some(domainId) =>
+            (update: UpdateWrapper) =>
+              resultFilter(update) && update.domainId == domainId.toProtoPrimitive
+          case None => resultFilter
+        }
+
+        val observer =
+          new RecordingStreamObserver[UpdateWrapper](completeAfter, resultFilterWithDomain)
+
         val filter = TransactionFilterProto(partyIds.map(_.toLf -> Filters()).toMap)
         mkResult(
-          subscribe_flat(observer, filter, beginOffset, endOffset, verbose),
+          subscribe_flat(observer, filter, beginOffsetExclusive, endOffsetInclusive, verbose),
           "getUpdates",
           observer,
           timeout,
@@ -266,22 +277,22 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |The returned transactions can be filtered to be between the given offsets (default: no filtering).
           |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error. If you only need to filter by a set of parties, consider using
-          |`flat` instead."""
+          |`flat` instead.
+          |If the beginOffset is empty then the participant begin is taken as beginning offset.
+          |If the endOffset is empty then a continuous stream is returned."""
       )
       def flat_with_tx_filter(
           filter: TransactionFilterProto,
           completeAfter: Int,
-          beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-          ),
-          endOffset: Option[ParticipantOffset] = None,
+          beginOffsetExclusive: String = "",
+          endOffsetInclusive: String = "",
           verbose: Boolean = true,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateWrapper => Boolean = _ => true,
       ): Seq[UpdateWrapper] = check(FeatureFlag.Testing)({
         val observer = new RecordingStreamObserver[UpdateWrapper](completeAfter, resultFilter)
         mkResult(
-          subscribe_flat(observer, filter, beginOffset, endOffset, verbose),
+          subscribe_flat(observer, filter, beginOffsetExclusive, endOffsetInclusive, verbose),
           "getUpdates",
           observer,
           timeout,
@@ -295,30 +306,29 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |Use `filter = TransactionFilter(Map(myParty.toLf -> Filters()))` to return all updates for `myParty: PartyId`.
           |The returned updates can be filtered to be between the given offsets (default: no filtering).
           |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error.""")
+          |this command fails with a `NOT_FOUND` error.
+          |If the beginOffset is empty then the participant begin is taken as beginning offset.
+          |If the endOffset is empty then a continuous stream is returned.""")
       def subscribe_flat(
           observer: StreamObserver[UpdateWrapper],
           filter: TransactionFilterProto,
-          beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-          ),
-          endOffset: Option[ParticipantOffset] = None,
+          beginOffsetExclusive: String = "",
+          endOffsetInclusive: String = "",
           verbose: Boolean = true,
-      ): AutoCloseable = {
+      ): AutoCloseable =
         check(FeatureFlag.Testing)(
           consoleEnvironment.run {
             ledgerApiCommand(
               LedgerApiCommands.UpdateService.SubscribeFlat(
                 observer,
-                beginOffset,
-                endOffset,
+                beginOffsetExclusive,
+                endOffsetInclusive,
                 filter,
                 verbose,
               )
             )
           }
         )
-      }
 
       @Help.Summary("Starts measuring throughput at the update service", FeatureFlag.Testing)
       @Help.Description(
@@ -385,7 +395,12 @@ trait BaseLedgerApiAdministration extends NoTracing {
           val filterParty = TransactionFilterProto(parties.map(_.toLf -> Filters()).toMap)
 
           logger.info(s"Start measuring throughput (metric: $metricName).")
-          subscribe_trees(observer, filterParty, state.end(), verbose = false)
+          subscribe_trees(
+            observer,
+            filterParty,
+            state.end(),
+            verbose = false,
+          )
         }
 
       @Help.Summary("Get a (tree) transaction by its ID", FeatureFlag.Testing)
@@ -401,6 +416,84 @@ trait BaseLedgerApiAdministration extends NoTracing {
             )
           )
         })
+    }
+
+    @Help.Summary("Interactive submission", FeatureFlag.Testing)
+    @Help.Group("Interactive Submission")
+    object interactive_submission extends Helpful {
+
+      @Help.Summary(
+        """Prepare a transaction for interactive submission
+           Note that the hash in the response is provided for convenience. Callers should re-compute the hash
+           of the transactions (and possibly compare it to the provided one) before signing it.
+          """
+      )
+      @Help.Description(
+        """Prepare a transaction for interactive submission.
+          |Similar to submit, except instead of submitting the transaction to the network,
+          |a serialized version of the transaction will be returned, along with a hash.
+          |This allows non-hosted parties to sign the hash with they private key before submitting it via the
+          |execute command. If you wish to directly submit a command instead without the external signing step,
+          |use submit instead."""
+      )
+      def prepare(
+          actAs: Seq[PartyId],
+          commands: Seq[Command],
+          domainId: Option[DomainId] = None,
+          commandId: String = UUID.randomUUID().toString,
+          minLedgerTimeAbs: Option[Instant] = None,
+          readAs: Seq[PartyId] = Seq.empty,
+          disclosedContracts: Seq[DisclosedContract] = Seq.empty,
+          applicationId: String = applicationId,
+          userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
+      ): PrepareResponseProto =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.InteractiveSubmissionService.PrepareCommand(
+              actAs.map(_.toLf),
+              readAs.map(_.toLf),
+              commands,
+              commandId,
+              minLedgerTimeAbs,
+              disclosedContracts,
+              domainId,
+              applicationId,
+              userPackageSelectionPreference,
+            )
+          )
+        }
+
+      @Help.Summary(
+        "Execute a prepared submission"
+      )
+      @Help.Description(
+        """
+          preparedTransaction: the prepared transaction bytestring, typically obtained from the preparedTransaction field of the [[prepare]] response.
+          transactionSignatures: the signatures of the hash of the transaction. The hash is typically obtained from the preparedTransactionHash field of the [[prepare]] response.
+            Note however that the caller should re-compute the hash and ensure it matches the one provided in [[prepare]], to be certain they're signing a hash that correctly represents
+            the transaction they want to submit.
+          """
+      )
+      def execute(
+          preparedTransaction: PreparedTransaction,
+          transactionSignatures: Map[PartyId, Seq[Signature]],
+          submissionId: String,
+          applicationId: String = applicationId,
+          workflowId: String = "",
+          deduplicationPeriod: Option[DeduplicationPeriod] = None,
+      ): ExecuteResponseProto =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.InteractiveSubmissionService.ExecuteCommand(
+              preparedTransaction,
+              transactionSignatures,
+              submissionId = submissionId,
+              applicationId = applicationId,
+              workflowId = workflowId,
+              deduplicationPeriod = deduplicationPeriod,
+            )
+          )
+        }
     }
 
     @Help.Summary("Submit commands", FeatureFlag.Testing)
@@ -715,10 +808,9 @@ trait BaseLedgerApiAdministration extends NoTracing {
           .list(
             partyId = submitter,
             atLeastNumCompletions = 1,
-            beginOffset = ledgerEndBefore.getAbsolute,
-            filter = _.completion.commandId == commandId,
+            beginOffsetExclusive = ledgerEndBefore,
+            filter = _.commandId == commandId,
           )(0)
-          .completion
           .updateId
         participants.foreach { case (participant, (queryingParty, from)) =>
           discard(waitForUpdateId(participant, from, queryingParty, completionUpdateId, timeout))
@@ -803,7 +895,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
     object state extends Helpful {
 
       @Help.Summary("Read the current ledger end offset", FeatureFlag.Testing)
-      def end(): ParticipantOffset =
+      def end(): String =
         check(FeatureFlag.Testing)(consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.StateService.LedgerEnd()
@@ -1222,7 +1314,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         }
       }
 
-      private def get(party: PartyId, identityProviderId: String = ""): ProtoPartyDetails = {
+      private def get(party: PartyId, identityProviderId: String = ""): ProtoPartyDetails =
         check(FeatureFlag.Testing)(consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.PartyManagementService.GetParty(
@@ -1231,7 +1323,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
             )
           )
         })
-      }
 
     }
 
@@ -1285,46 +1376,18 @@ trait BaseLedgerApiAdministration extends NoTracing {
       def list(
           partyId: PartyId,
           atLeastNumCompletions: Int,
-          beginOffset: String,
+          beginOffsetExclusive: String,
           applicationId: String = applicationId,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
-          filter: CompletionWrapper => Boolean = _ => true,
-      ): Seq[CompletionWrapper] =
+          filter: Completion => Boolean = _ => true,
+      ): Seq[Completion] =
         check(FeatureFlag.Testing)(consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.CommandCompletionService.CompletionRequest(
               partyId.toLf,
-              beginOffset,
+              beginOffsetExclusive,
               atLeastNumCompletions,
               timeout.asJavaApproximation,
-              applicationId,
-            )(filter, consoleEnvironment.environment.scheduler)
-          )
-        })
-
-      @Help.Summary(
-        "Lists command completions following the specified offset along with the checkpoints included in the completions",
-        FeatureFlag.Testing,
-      )
-      @Help.Description(
-        """If the participant has been pruned via `pruning.prune` and if `offset` is lower than
-          |the pruning offset, this command fails with a `NOT_FOUND` error."""
-      )
-      def list_with_checkpoint(
-          partyId: PartyId,
-          atLeastNumCompletions: Int,
-          beginExclusive: String,
-          applicationId: String = applicationId,
-          timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
-          filter: Completion => Boolean = _ => true,
-      ): Seq[(Completion, Option[Checkpoint])] =
-        check(FeatureFlag.Testing)(consoleEnvironment.run {
-          ledgerApiCommand(
-            LedgerApiCommands.CommandCompletionService.CompletionCheckpointRequest(
-              partyId.toLf,
-              beginExclusive,
-              atLeastNumCompletions,
-              timeout,
               applicationId,
             )(filter, consoleEnvironment.environment.scheduler)
           )
@@ -1340,24 +1403,23 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |this command fails with a `NOT_FOUND` error."""
       )
       def subscribe(
-          observer: StreamObserver[CompletionWrapper],
+          observer: StreamObserver[Completion],
           parties: Seq[PartyId],
-          beginOffset: String = "",
+          beginOffsetExclusive: String = "",
           applicationId: String = applicationId,
-      ): AutoCloseable = {
+      ): AutoCloseable =
         check(FeatureFlag.Testing)(
           consoleEnvironment.run {
             ledgerApiCommand(
               LedgerApiCommands.CommandCompletionService.Subscribe(
                 observer,
                 parties.map(_.toLf),
-                beginOffset,
+                beginOffsetExclusive,
                 applicationId,
               )
             )
           }
         )
-      }
     }
 
     @Help.Summary("Identity Provider Configuration Management", FeatureFlag.Testing)
@@ -1418,7 +1480,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
       @Help.Summary("Delete an identity provider configuration", FeatureFlag.Testing)
       @Help.Description("""Delete an existing identity provider configuration""")
-      def delete(identityProviderId: String): Unit = {
+      def delete(identityProviderId: String): Unit =
         check(FeatureFlag.Testing)(consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.IdentityProviderConfigs.Delete(
@@ -1426,7 +1488,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
             )
           )
         })
-      }
 
       @Help.Summary("Get an identity provider configuration", FeatureFlag.Testing)
       @Help.Description("""Get identity provider configuration by id""")
@@ -1466,6 +1527,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           primaryParty: the optional party that should be linked to this user by default
           readAs: the set of parties this user is allowed to read as
           participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api
+          identityProviderAdmin: flag (default false) indicating if the user is allowed to manage users and parties assigned to the same identity provider
           isActive: flag (default true) indicating if the user is active
           annotations: the set of key-value pairs linked to this user
           identityProviderId: identity provider id
@@ -1478,6 +1540,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           primaryParty: Option[PartyId] = None,
           readAs: Set[PartyId] = Set(),
           participantAdmin: Boolean = false,
+          identityProviderAdmin: Boolean = false,
           isActive: Boolean = true,
           annotations: Map[String, String] = Map.empty,
           identityProviderId: String = "",
@@ -1491,6 +1554,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               primaryParty = primaryParty.map(_.toLf),
               readAs = readAs.map(_.toLf),
               participantAdmin = participantAdmin,
+              identityProviderAdmin = identityProviderAdmin,
               isDeactivated = !isActive,
               annotations = annotations,
               identityProviderId = identityProviderId,
@@ -1633,7 +1697,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         }
       }
 
-      private def doGet(id: String, identityProviderId: String): LedgerApiUser = {
+      private def doGet(id: String, identityProviderId: String): LedgerApiUser =
         check(FeatureFlag.Testing)(consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.Users.Get(
@@ -1642,7 +1706,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
             )
           )
         })
-      }
 
       @Help.Summary("Manage Ledger Api User Rights", FeatureFlag.Testing)
       @Help.Group("Ledger Api User Rights")
@@ -1655,6 +1718,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           actAs: the set of parties this user is allowed to act as
           readAs: the set of parties this user is allowed to read as
           participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api
+          identityProviderAdmin: flag (default false) indicating if the user is allowed to manage users and parties assigned to the same identity provider
           identityProviderId: identity provider id
           readAsAnyParty: flag (default false) indicating if the user is allowed to read as any party
           """)
@@ -1663,6 +1727,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             actAs: Set[PartyId],
             readAs: Set[PartyId] = Set(),
             participantAdmin: Boolean = false,
+            identityProviderAdmin: Boolean = false,
             identityProviderId: String = "",
             readAsAnyParty: Boolean = false,
         ): UserRights =
@@ -1673,6 +1738,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 actAs = actAs.map(_.toLf),
                 readAs = readAs.map(_.toLf),
                 participantAdmin = participantAdmin,
+                identityProviderAdmin = identityProviderAdmin,
                 identityProviderId = identityProviderId,
                 readAsAnyParty = readAsAnyParty,
               )
@@ -1685,6 +1751,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           actAs: the set of parties this user should not be allowed to act as
           readAs: the set of parties this user should not be allowed to read as
           participantAdmin: if set to true, the participant admin rights will be removed
+          identityProviderAdmin: if set to true, the identity provider admin rights will be removed
           identityProviderId: identity provider id
           readAsAnyParty: flag (default false) indicating if the user is allowed to read as any party
           """)
@@ -1693,6 +1760,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             actAs: Set[PartyId],
             readAs: Set[PartyId] = Set(),
             participantAdmin: Boolean = false,
+            identityProviderAdmin: Boolean = false,
             identityProviderId: String = "",
             readAsAnyParty: Boolean = false,
         ): UserRights =
@@ -1703,6 +1771,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 actAs = actAs.map(_.toLf),
                 readAs = readAs.map(_.toLf),
                 participantAdmin = participantAdmin,
+                identityProviderAdmin = identityProviderAdmin,
                 identityProviderId = identityProviderId,
                 readAsAnyParty = readAsAnyParty,
               )
@@ -1798,6 +1867,48 @@ trait BaseLedgerApiAdministration extends NoTracing {
     @Help.Summary("Group of commands that utilize java bindings", FeatureFlag.Testing)
     @Help.Group("Ledger Api (Java bindings)")
     object javaapi extends Helpful {
+
+      @Help.Summary("Interactive submission", FeatureFlag.Testing)
+      @Help.Group("Interactive Submission")
+      object interactive_submission extends Helpful {
+
+        @Help.Summary(
+          "Prepare a transaction for interactive submission"
+        )
+        @Help.Description(
+          "Prepare a transaction for interactive submission"
+        )
+        def prepare(
+            actAs: Seq[PartyId],
+            commands: Seq[javab.data.Command],
+            domainId: Option[DomainId] = None,
+            workflowId: String = "",
+            commandId: String = "",
+            deduplicationPeriod: Option[DeduplicationPeriod] = None,
+            submissionId: String = "",
+            minLedgerTimeAbs: Option[Instant] = None,
+            readAs: Seq[PartyId] = Seq.empty,
+            disclosedContracts: Seq[javab.data.DisclosedContract] = Seq.empty,
+            applicationId: String = applicationId,
+            userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
+        ): PrepareResponseProto =
+          consoleEnvironment.run {
+            ledgerApiCommand(
+              LedgerApiCommands.InteractiveSubmissionService.PrepareCommand(
+                actAs.map(_.toLf),
+                readAs.map(_.toLf),
+                commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
+                commandId,
+                minLedgerTimeAbs,
+                disclosedContracts.map(c => DisclosedContract.fromJavaProto(c.toProto)),
+                domainId,
+                applicationId,
+                userPackageSelectionPreference,
+              )
+            )
+          }
+      }
+
       @Help.Summary("Submit commands (Java bindings)", FeatureFlag.Testing)
       @Help.Group("Command Submission (Java bindings)")
       object commands extends Helpful {
@@ -2032,21 +2143,29 @@ trait BaseLedgerApiAdministration extends NoTracing {
             |until either `completeAfter` update trees have been received or `timeout` has elapsed.
             |The returned update trees can be filtered to be between the given offsets (default: no filtering).
             |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-            |this command fails with a `NOT_FOUND` error."""
+            |this command fails with a `NOT_FOUND` error.
+            |If the beginOffset is empty then the participant begin is taken as beginning offset.
+            |If the endOffset is empty then a continuous stream is returned."""
         )
         def trees(
             partyIds: Set[PartyId],
             completeAfter: Int,
-            beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-              ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-            ),
-            endOffset: Option[ParticipantOffset] = None,
+            beginOffsetExclusive: String = "",
+            endOffsetInclusive: String = "",
             verbose: Boolean = true,
             timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
             resultFilter: UpdateTreeWrapper => Boolean = _ => true,
         ): Seq[GetUpdateTreesResponse] = check(FeatureFlag.Testing)(
           ledger_api.updates
-            .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout, resultFilter)
+            .trees(
+              partyIds,
+              completeAfter,
+              beginOffsetExclusive,
+              endOffsetInclusive,
+              verbose,
+              timeout,
+              resultFilter,
+            )
             .map {
               case tx: TransactionTreeWrapper =>
                 tx.transactionTree
@@ -2072,21 +2191,29 @@ trait BaseLedgerApiAdministration extends NoTracing {
             |The returned updates can be filtered to be between the given offsets (default: no filtering).
             |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
             |this command fails with a `NOT_FOUND` error. If you need to specify filtering conditions for template IDs and
-            |including create event blobs for explicit disclosure, consider using `flat_with_tx_filter`."""
+            |including create event blobs for explicit disclosure, consider using `flat_with_tx_filter`.
+            |If the beginOffset is empty then the participant begin is taken as beginning offset.
+            |If the endOffset is empty then a continuous stream is returned."""
         )
         def flat(
             partyIds: Set[PartyId],
             completeAfter: Int,
-            beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-              ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-            ),
-            endOffset: Option[ParticipantOffset] = None,
+            beginOffsetExclusive: String = "",
+            endOffsetInclusive: String = "",
             verbose: Boolean = true,
             timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
             resultFilter: UpdateWrapper => Boolean = _ => true,
         ): Seq[GetUpdatesResponse] = check(FeatureFlag.Testing)(
           ledger_api.updates
-            .flat(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout, resultFilter)
+            .flat(
+              partyIds,
+              completeAfter,
+              beginOffsetExclusive,
+              endOffsetInclusive,
+              verbose,
+              timeout,
+              resultFilter,
+            )
             .map {
               case tx: TransactionWrapper =>
                 tx.transaction
@@ -2112,15 +2239,15 @@ trait BaseLedgerApiAdministration extends NoTracing {
             |The returned transactions can be filtered to be between the given offsets (default: no filtering).
             |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
             |this command fails with a `NOT_FOUND` error. If you only need to filter by a set of parties, consider using
-            |`flat` instead."""
+            |`flat` instead.
+            |If the beginOffset is empty then the participant begin is taken as beginning offset.
+            |If the endOffset is empty then a continuous stream is returned."""
         )
         def flat_with_tx_filter(
             filter: TransactionFilter,
             completeAfter: Int,
-            beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-              ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-            ),
-            endOffset: Option[ParticipantOffset] = None,
+            beginOffsetExclusive: String = "",
+            endOffsetInclusive: String = "",
             verbose: Boolean = true,
             timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
             resultFilter: UpdateWrapper => Boolean = _ => true,
@@ -2129,8 +2256,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
             .flat_with_tx_filter(
               TransactionFilterProto.fromJavaProto(filter.toProto),
               completeAfter,
-              beginOffset,
-              endOffset,
+              beginOffsetExclusive,
+              endOffsetInclusive,
               verbose,
               timeout,
               resultFilter,
@@ -2166,6 +2293,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           @Help.Description(
             """This function can be used for contracts with a code-generated Java model.
               |You can refine your search using the `filter` function argument.
+              |You can restrict search to a domain by specifying the optional domain id.
               |The command will wait until the contract appears or throw an exception once it times out."""
           )
           def await[
@@ -2175,18 +2303,21 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ](companion: javab.data.codegen.ContractCompanion[TC, TCid, T])(
               partyId: PartyId,
               predicate: TC => Boolean = (_: TC) => true,
+              domainFilter: Option[DomainId] = None,
               timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           ): TC = check(FeatureFlag.Testing)({
             val result = new AtomicReference[Option[TC]](None)
             ConsoleMacros.utils.retry_until_true(timeout) {
-              val tmp = filter(companion)(partyId, predicate)
+              val tmp = filter(companion)(partyId, predicate, domainFilter)
               result.set(tmp.headOption)
               tmp.nonEmpty
             }
             consoleEnvironment.runE {
               result
                 .get()
-                .toRight(s"Failed to find contract of type ${companion.TEMPLATE_ID} after $timeout")
+                .toRight(
+                  s"Failed to find contract of type ${companion.getTemplateIdWithPackageId} after $timeout"
+                )
             }
           })
 
@@ -2196,7 +2327,8 @@ trait BaseLedgerApiAdministration extends NoTracing {
           )
           @Help.Description(
             """To use this function, ensure a code-generated Java model for the target template exists.
-              |You can refine your search using the `predicate` function argument."""
+              |You can refine your search using the `predicate` function argument.
+              |You can restrict search to a domain by specifying the optional domain id."""
           )
           def filter[
               TC <: javab.data.codegen.Contract[TCid, T],
@@ -2205,23 +2337,31 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ](templateCompanion: javab.data.codegen.ContractCompanion[TC, TCid, T])(
               partyId: PartyId,
               predicate: TC => Boolean = (_: TC) => true,
+              domainFilter: Option[DomainId] = None,
           ): Seq[TC] = check(FeatureFlag.Testing) {
-            val javaTemplateId = templateCompanion.TEMPLATE_ID
+            val javaTemplateId = templateCompanion.getTemplateIdWithPackageId
             val templateId = TemplateId(
-              javaTemplateId.getPackageId,
+              templateCompanion.PACKAGE.id,
               javaTemplateId.getModuleName,
               javaTemplateId.getEntityName,
             )
+
+            def domainPredicate(entry: WrappedContractEntry) =
+              domainFilter match {
+                case Some(_domainId) => entry.domainId == domainFilter
+                case None => true
+              }
+
             ledger_api.state.acs
               .of_party(partyId, filterTemplates = Seq(templateId))
-              .map(_.event)
-              .flatMap(ev =>
+              .collect { case entry if domainPredicate(entry) => entry.event }
+              .flatMap { ev =>
                 JavaDecodeUtil
                   .decodeCreated(templateCompanion)(
                     javab.data.CreatedEvent.fromProto(CreatedEvent.toJavaProto(ev))
                   )
                   .toList
-              )
+              }
               .filter(predicate)
           }
         }
@@ -2246,7 +2386,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
     private def waitForUpdateId(
         administration: BaseLedgerApiAdministration,
-        from: ParticipantOffset,
+        from: String,
         queryPartyId: PartyId,
         updateId: String,
         timeout: config.NonNegativeDuration,
@@ -2257,7 +2397,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         administration.ledger_api.updates
           .flat(
             partyIds = Set(queryPartyId),
-            beginOffset = from,
+            beginOffsetExclusive = from,
             completeAfter = 1,
             resultFilter = {
               case reassignmentW: ReassignmentWrapper =>
@@ -2319,7 +2459,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
       at: Map[ParticipantReference, PartyId],
       timeout: config.NonNegativeDuration,
   ): Unit = {
-    def scan() = {
+    def scan() =
       at.map { case (participant, party) =>
         (
           participant,
@@ -2327,7 +2467,6 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
           participant.ledger_api.updates.by_id(Set(party), transactionId).isDefined,
         )
       }
-    }
     ConsoleMacros.utils.retry_until_true(timeout)(
       scan().forall(_._3), {
         val res = scan().map { case (participant, party, res) =>
@@ -2348,12 +2487,11 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     // There's a race condition here, in the unlikely circumstance that the party->participant mapping on the domain
     // changes during the command's execution. We'll have to live with it for the moment, as there's no convenient
     // way to get the record time of the transaction to pass to the parties.list call.
-    val domainPartiesAndParticipants = {
+    val domainPartiesAndParticipants =
       consoleEnvironment.participants.all.iterator
         .filter(x => x.health.is_running() && x.health.initialized() && x.name == name)
         .flatMap(_.parties.list(filterDomain = txDomain.filterString))
         .toSet
-    }
 
     val domainParties = domainPartiesAndParticipants.map(_.party)
     // WARNING! this logic will become highly problematic if we introduce witness blinding based on topology events
@@ -2408,7 +2546,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
       txId: String,
       txDomainId: String,
       optTimeout: Option[config.NonNegativeDuration],
-  ): Tx = {
+  ): Tx =
     optTimeout match {
       case None => tx
       case Some(timeout) =>
@@ -2417,5 +2555,4 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
         awaitTransaction(txId, involved, timeout)
         tx
     }
-  }
 }

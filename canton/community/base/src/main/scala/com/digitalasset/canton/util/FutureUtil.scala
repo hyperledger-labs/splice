@@ -6,6 +6,7 @@ package com.digitalasset.canton.util
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
 import org.slf4j.event.Level
 
 import java.util.regex.Pattern
@@ -24,6 +25,7 @@ object FutureUtil {
       onFailure: Throwable => Unit = _ => (),
       level: => Level = Level.ERROR,
       closeContext: Option[CloseContext] = None,
+      ignorePassiveInstance: Boolean = false,
   )(implicit loggingContext: ErrorLoggingContext): Future[T] = {
     implicit val ec: ExecutionContext = DirectExecutionContext(loggingContext.noTracingLogger)
     future.recover {
@@ -38,7 +40,17 @@ object FutureUtil {
             err,
           )
         } else {
-          LoggerUtil.logThrowableAtLevel(level, failureMessage, err)
+          if (ignorePassiveInstance) {
+            err match {
+              case _: PassiveInstanceException =>
+                LoggerUtil.logThrowableAtLevel(
+                  Level.INFO,
+                  s"Logging the following failure on INFO instead of $level due to the instance becoming passive: $failureMessage",
+                  err,
+                )
+              case _ => LoggerUtil.logThrowableAtLevel(level, failureMessage, err)
+            }
+          } else LoggerUtil.logThrowableAtLevel(level, failureMessage, err)
         }
         try {
           onFailure(err)
@@ -57,6 +69,7 @@ object FutureUtil {
   }
 
   /** If the future fails, log the associated error and re-throw. The returned future completes after logging.
+    * @param logPassiveInstanceAtInfo: If true, log [[PassiveInstanceException]] at INFO instead of ERROR level. Default is false.
     */
   def logOnFailureUnlessShutdown[T](
       future: FutureUnlessShutdown[T],
@@ -64,11 +77,18 @@ object FutureUtil {
       onFailure: Throwable => Unit = _ => (),
       level: => Level = Level.ERROR,
       closeContext: Option[CloseContext] = None,
-  )(implicit loggingContext: ErrorLoggingContext): FutureUnlessShutdown[T] = {
+      logPassiveInstanceAtInfo: Boolean = false,
+  )(implicit loggingContext: ErrorLoggingContext): FutureUnlessShutdown[T] =
     FutureUnlessShutdown(
-      logOnFailure(future.unwrap, failureMessage, onFailure, level, closeContext)
+      logOnFailure(
+        future.unwrap,
+        failureMessage,
+        onFailure,
+        level,
+        closeContext,
+        logPassiveInstanceAtInfo,
+      )
     )
-  }
 
   /** Discard `future` and log an error if it does not complete successfully.
     * This is useful to document that a `Future` is intentionally not being awaited upon.
@@ -85,15 +105,14 @@ object FutureUtil {
 
   /** [[doNotAwait]] but for FUS
     */
-  def doNotAwaitUnlessShutdown(
-      future: FutureUnlessShutdown[?],
+  def doNotAwaitUnlessShutdown[A](
+      future: FutureUnlessShutdown[A],
       failureMessage: => String,
       onFailure: Throwable => Unit = _ => (),
       level: => Level = Level.ERROR,
       closeContext: Option[CloseContext] = None,
-  )(implicit loggingContext: ErrorLoggingContext): Unit = {
+  )(implicit loggingContext: ErrorLoggingContext): Unit =
     doNotAwait(future.unwrap, failureMessage, onFailure, level, closeContext)
-  }
 
   /** Variant of [[doNotAwait]] that also catches non-fatal errors thrown while constructing the future. */
   def catchAndDoNotAwait(

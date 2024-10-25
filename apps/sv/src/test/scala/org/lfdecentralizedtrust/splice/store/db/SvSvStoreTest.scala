@@ -31,8 +31,8 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       "find a ValidatorOnboarding by secret" in {
         val wanted = validatorOnboarding("good_secret")
         val unwanted = validatorOnboarding("bad_secret")
-        val firstOffset = "0101"
-        val secondOffset = "0202"
+        val firstOffset = 101L
+        val secondOffset = 202L
         for {
           store <- mkStore()
           _ <- dummyDomain.create(wanted, firstOffset, createdEventSignatories = Seq(storeSvParty))(
@@ -45,10 +45,10 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           )(store.multiDomainAcsStore)
         } yield {
           store.lookupValidatorOnboardingBySecretWithOffset("good_secret").futureValue should be(
-            QueryResult(secondOffset, Some(wanted))
+            QueryResult(Some(secondOffset), Some(wanted))
           )
           store.lookupValidatorOnboardingBySecretWithOffset("bad_secret").futureValue should be(
-            QueryResult(secondOffset, Some(unwanted))
+            QueryResult(Some(secondOffset), Some(unwanted))
           )
         }
       }
@@ -57,7 +57,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore()
           result <- store.lookupValidatorOnboardingBySecretWithOffset("whatever")
-        } yield result should be(QueryResult(acsOffset, None))
+        } yield result should be(QueryResult(Some(acsOffset), None))
       }
 
     }
@@ -67,8 +67,8 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       "find a UsedSecret by secret" in {
         val wanted = usedSecret("good_secret")
         val unwanted = usedSecret("bad_secret")
-        val firstOffset = "0101"
-        val secondOffset = "0202"
+        val firstOffset = 101L
+        val secondOffset = 202L
         for {
           store <- mkStore()
           _ <- dummyDomain.create(wanted, firstOffset, createdEventSignatories = Seq(storeSvParty))(
@@ -81,10 +81,10 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           )(store.multiDomainAcsStore)
         } yield {
           store.lookupUsedSecretWithOffset("good_secret").futureValue should be(
-            QueryResult(secondOffset, Some(wanted))
+            QueryResult(Some(secondOffset), Some(wanted))
           )
           store.lookupUsedSecretWithOffset("bad_secret").futureValue should be(
-            QueryResult(secondOffset, Some(unwanted))
+            QueryResult(Some(secondOffset), Some(unwanted))
           )
         }
       }
@@ -99,7 +99,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         secret,
         Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
       )
-    val templateId = vo.ValidatorOnboarding.TEMPLATE_ID
+    val templateId = vo.ValidatorOnboarding.TEMPLATE_ID_WITH_PACKAGE_ID
 
     contract(
       identifier = templateId,
@@ -112,7 +112,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
     val template =
       new UsedSecret(storeSvParty.toProtoPrimitive, secret, storeSvParty.toProtoPrimitive)
 
-    val templateId = vo.UsedSecret.TEMPLATE_ID
+    val templateId = vo.UsedSecret.TEMPLATE_ID_WITH_PACKAGE_ID
 
     contract(
       templateId,
@@ -163,7 +163,7 @@ class DbSvSvStoreTest
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(Some(acsOffset), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )

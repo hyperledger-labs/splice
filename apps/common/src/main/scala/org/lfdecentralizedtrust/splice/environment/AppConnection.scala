@@ -22,7 +22,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   ServerEnforcedTimeout,
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
-import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.Pretty

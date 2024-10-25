@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
-import org.lfdecentralizedtrust.splice.util.{Contract, PackageQualifiedName, SpliceUtil}
+import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -349,7 +349,9 @@ object AcsSnapshotStore {
   )
 
   private val holdingsTemplates =
-    Vector(Amulet.TEMPLATE_ID, LockedAmulet.TEMPLATE_ID).map(PackageQualifiedName(_))
+    Vector(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID, LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID).map(
+      PackageQualifiedName(_)
+    )
 
   private def decodeHoldingContract(createdEvent: CreatedEvent): Either[
     Contract[LockedAmulet.ContractId, LockedAmulet],
@@ -359,13 +361,15 @@ object AcsSnapshotStore {
       .withDescription(s"Failed to decode $createdEvent")
       .asRuntimeException()
     if (
-      PackageQualifiedName(createdEvent.getTemplateId) == PackageQualifiedName(Amulet.TEMPLATE_ID)
+      PackageQualifiedName(createdEvent.getTemplateId) == PackageQualifiedName(
+        Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
+      )
     ) {
       Right(Contract.fromCreatedEvent(Amulet.COMPANION)(createdEvent).getOrElse(failedToDecode))
     } else {
       if (
         PackageQualifiedName(createdEvent.getTemplateId) != PackageQualifiedName(
-          LockedAmulet.TEMPLATE_ID
+          LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID
         )
       ) {
         throw io.grpc.Status.INTERNAL
@@ -396,44 +400,6 @@ object AcsSnapshotStore {
         entry =>
           Some(entry.getOrElse(summaryZero).addLockedAmulet(amulet, asOfRound))
       })
-  }
-  case class HoldingsSummary(
-      totalUnlockedCoin: BigDecimal,
-      totalLockedCoin: BigDecimal,
-      totalCoinHoldings: BigDecimal,
-      accumulatedHoldingFeesUnlocked: BigDecimal,
-      accumulatedHoldingFeesLocked: BigDecimal,
-      accumulatedHoldingFeesTotal: BigDecimal,
-      totalAvailableCoin: BigDecimal,
-  ) {
-    def addAmulet(amulet: Amulet, asOfRound: Long): HoldingsSummary = {
-      val holdingFee = SpliceUtil.holdingFee(amulet, asOfRound)
-      HoldingsSummary(
-        totalUnlockedCoin = totalUnlockedCoin + amulet.amount.initialAmount,
-        totalCoinHoldings = totalCoinHoldings + amulet.amount.initialAmount,
-        accumulatedHoldingFeesUnlocked = accumulatedHoldingFeesUnlocked + holdingFee,
-        accumulatedHoldingFeesTotal = accumulatedHoldingFeesTotal + holdingFee,
-        totalAvailableCoin =
-          (totalUnlockedCoin + amulet.amount.initialAmount) - (accumulatedHoldingFeesUnlocked + holdingFee),
-        // unchanged
-        totalLockedCoin = totalLockedCoin,
-        accumulatedHoldingFeesLocked = accumulatedHoldingFeesLocked,
-      )
-    }
-    def addLockedAmulet(amulet: LockedAmulet, asOfRound: Long): HoldingsSummary = {
-      val holdingFee = SpliceUtil.holdingFee(amulet.amulet, asOfRound)
-      HoldingsSummary(
-        totalLockedCoin = totalLockedCoin + amulet.amulet.amount.initialAmount,
-        totalCoinHoldings = totalCoinHoldings + amulet.amulet.amount.initialAmount,
-        accumulatedHoldingFeesLocked = accumulatedHoldingFeesLocked + holdingFee,
-        accumulatedHoldingFeesTotal = accumulatedHoldingFeesTotal + holdingFee,
-        // unchanged
-        totalUnlockedCoin = totalUnlockedCoin,
-        accumulatedHoldingFeesUnlocked = accumulatedHoldingFeesUnlocked,
-        totalAvailableCoin = totalAvailableCoin,
-      )
-    }
-
   }
 
   def apply(

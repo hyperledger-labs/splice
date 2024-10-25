@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.plugins
 
 import org.lfdecentralizedtrust.splice.console.{ParticipantClientReference, SvAppBackendReference}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleMacros
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -56,8 +57,14 @@ final class ResetDecentralizedNamespace extends ResetTopologyStatePlugin {
               .assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
                 client.topology.decentralized_namespaces
                   .propose(
-                    Set(sv1ParticipantNamespace),
-                    PositiveInt.one,
+                    DecentralizedNamespaceDefinition
+                      .create(
+                        DecentralizedNamespaceDefinition
+                          .computeNamespace(Set(sv1ParticipantNamespace)),
+                        PositiveInt.one,
+                        NonEmpty(Set, sv1ParticipantNamespace),
+                      )
+                      .value,
                     store,
                     serial = Some(
                       existingDecentralizedNamespace.context.serial + PositiveInt.one

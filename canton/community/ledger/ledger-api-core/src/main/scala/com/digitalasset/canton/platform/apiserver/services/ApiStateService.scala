@@ -4,7 +4,6 @@
 package com.digitalasset.canton.platform.apiserver.services
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.state_service.*
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
@@ -103,14 +102,19 @@ final class ApiStateService(
   override def getConnectedDomains(
       request: GetConnectedDomainsRequest
   ): Future[GetConnectedDomainsResponse] = {
-    implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
-    FieldValidator
-      .requirePartyField(request.party, "party")
+    implicit val loggingContext: LoggingContextWithTrace =
+      LoggingContextWithTrace(loggerFactory, telemetry)
+    (for {
+      party <- FieldValidator
+        .requirePartyField(request.party, "party")
+      participantId <- FieldValidator
+        .optionalParticipantId(request.participantId, "participant_id")
+    } yield WriteService.ConnectedDomainRequest(party, participantId))
       .fold(
         t => Future.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
-        party =>
+        request =>
           writeService
-            .getConnectedDomains(WriteService.ConnectedDomainRequest(party))
+            .getConnectedDomains(request)
             .map(response =>
               GetConnectedDomainsResponse(
                 response.connectedDomains.flatMap { connectedDomain =>
@@ -143,11 +147,7 @@ final class ApiStateService(
       .currentLedgerEnd()
       .map(offset =>
         GetLedgerEndResponse(
-          Some(
-            ParticipantOffset(
-              ParticipantOffset.Value.Absolute(offset.value)
-            )
-          )
+          ApiOffset.assertFromStringToLongO(offset)
         )
       )
       .andThen(logger.logErrorsOnCall[GetLedgerEndResponse])
@@ -162,11 +162,8 @@ final class ApiStateService(
       .latestPrunedOffsets()
       .map { case (prunedUptoInclusive, divulgencePrunedUptoInclusive) =>
         GetLatestPrunedOffsetsResponse(
-          participantPrunedUpToInclusive =
-            Some(ParticipantOffset(ParticipantOffset.Value.Absolute(prunedUptoInclusive.value))),
-          allDivulgedContractsPrunedUpToInclusive = Some(
-            ParticipantOffset(ParticipantOffset.Value.Absolute(divulgencePrunedUptoInclusive.value))
-          ),
+          participantPrunedUpToInclusive = prunedUptoInclusive,
+          allDivulgedContractsPrunedUpToInclusive = divulgencePrunedUptoInclusive,
         )
       }
       .andThen(logger.logErrorsOnCall[GetLatestPrunedOffsetsResponse])

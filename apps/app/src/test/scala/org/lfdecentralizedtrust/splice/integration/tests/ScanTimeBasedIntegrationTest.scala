@@ -335,12 +335,9 @@ class ScanTimeBasedIntegrationTest
     )
 
     clue("Get total balances for round 0, 1 and 2") {
-      val total0 =
-        sv1ScanBackend.getTotalAmuletBalance(0).valueOrFail("Amulet balance not yet computed")
-      val total1 =
-        sv1ScanBackend.getTotalAmuletBalance(1).valueOrFail("Amulet balance not yet computed")
-      val total2 =
-        sv1ScanBackend.getTotalAmuletBalance(2).valueOrFail("Amulet balance not yet computed")
+      val total0 = sv1ScanBackend.getTotalAmuletBalance(0)
+      val total1 = sv1ScanBackend.getTotalAmuletBalance(1)
+      val total2 = sv1ScanBackend.getTotalAmuletBalance(2)
 
       val holdingFeeAfterOneRound = 1 * defaultHoldingFeeAmulet
       val holdingFeeAfterTwoRounds = 2 * defaultHoldingFeeAmulet
@@ -459,7 +456,10 @@ class ScanTimeBasedIntegrationTest
       CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
       migrationId,
       templates = Some(
-        Vector(PackageQualifiedName(Amulet.TEMPLATE_ID), PackageQualifiedName(AnsEntry.TEMPLATE_ID))
+        Vector(
+          PackageQualifiedName(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
+          PackageQualifiedName(AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID),
+        )
       ),
       partyIds = Some(Vector(aliceUserParty)),
     )
@@ -467,7 +467,7 @@ class ScanTimeBasedIntegrationTest
     inside(snapshotAfterData) { case Some(data) =>
       val (entries, coins) =
         data.createdEvents.partition(
-          _.templateId.contains(QualifiedName(AnsEntry.TEMPLATE_ID).toString)
+          _.templateId.contains(QualifiedName(AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID).toString)
         )
       val entry = AnsEntry
         .jsonDecoder()

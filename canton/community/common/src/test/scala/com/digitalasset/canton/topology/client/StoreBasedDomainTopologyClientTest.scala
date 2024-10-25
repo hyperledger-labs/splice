@@ -6,7 +6,7 @@ package com.digitalasset.canton.topology.client
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.SigningPublicKey
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.time.Clock
@@ -19,8 +19,8 @@ import com.digitalasset.canton.topology.store.{
   TopologyStoreId,
   ValidatedTopologyTransaction,
 }
-import com.digitalasset.canton.topology.transaction.ParticipantPermission.*
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.ParticipantPermission.*
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, SequencerCounter}
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -45,27 +45,23 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
     lazy val party1participant1 = mkAdd(
       PartyToParticipant.tryCreate(
         party1,
-        None,
         PositiveInt.one,
         Seq(HostingParticipant(participant1, Confirmation)),
-        groupAddressing = false,
       )
     )
     lazy val party2participant1_2 = mkAdd(
       PartyToParticipant.tryCreate(
         party2,
-        None,
         PositiveInt.one,
         Seq(
           HostingParticipant(participant1, Submission),
           HostingParticipant(participant2, Submission),
         ),
-        groupAddressing = false,
       )
     )
 
-    class Fixture() {
-      val store = mk()
+    class Fixture {
+      val store: TopologyStore[TopologyStoreId] = mk()
       val client =
         new StoreBasedDomainTopologyClient(
           mock[Clock],
@@ -81,8 +77,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
       def add(
           timestamp: CantonTimestamp,
           transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-      ): Future[Unit] = {
-
+      ): Future[Unit] =
         for {
           _ <- store.update(
             SequencedTime(timestamp),
@@ -95,14 +90,12 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
             .observed(timestamp, timestamp, SequencerCounter(1), transactions)
             .failOnShutdown(s"observe timestamp $timestamp")
         } yield ()
-      }
 
-      def advance(ts: CantonTimestamp): Unit = {
+      def advance(ts: CantonTimestamp): Unit =
         client
           .observed(SequencedTime(ts), EffectiveTime(ts), SequencerCounter(0), List())
           .failOnShutdown(s"advance to $ts")
           .futureValue
-      }
     }
 
     "waiting for snapshots" should {
@@ -125,7 +118,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
         val fixture = new Fixture()
         import fixture.*
         val tc = client
-        val wt = tc.awaitTimestamp(ts2, true)
+        val wt = tc.awaitTimestamp(ts2)
         wt match {
           case Some(fut) =>
             advance(ts1)
@@ -141,7 +134,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
         import fixture.*
         val tc = client
         advance(ts1)
-        val wt = tc.awaitTimestamp(ts1, waitForEffectiveTime = true)
+        val wt = tc.awaitTimestamp(ts1)
         wt shouldBe None
       }
 
@@ -155,7 +148,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
       val sp = client.trySnapshot(mrt)
       for {
         parties <- sp.activeParticipantsOf(party1.toLf)
-        keys <- sp.signingKeys(participant1)
+        keys <- sp.signingKeys(participant1, SigningKeyUsage.All)
       } yield {
         parties shouldBe empty
         keys shouldBe empty
@@ -195,7 +188,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
         recent = fixture.client.currentSnapshotApproximation
         party1Mappings <- recent.activeParticipantsOf(party1.toLf)
         party2Mappings <- recent.activeParticipantsOf(party2.toLf)
-        keys <- recent.signingKeys(participant1)
+        keys <- recent.signingKeys(participant1, SigningKeyUsage.All)
       } yield {
         party1Mappings.keySet shouldBe Set(participant1)
         party1Mappings.get(participant1).map(_.permission) shouldBe Some(
@@ -267,10 +260,10 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
         party2Ma <- snapshotA.activeParticipantsOf(party2.toLf)
         party2Mb <- snapshotB.activeParticipantsOf(party2.toLf)
         party2Mc <- snapshotC.activeParticipantsOf(party2.toLf)
-        keysMa <- snapshotA.signingKeys(mediatorId)
-        keysMb <- snapshotB.signingKeys(mediatorId)
-        keysSa <- snapshotA.signingKeys(sequencerId)
-        keysSb <- snapshotB.signingKeys(sequencerId)
+        keysMa <- snapshotA.signingKeys(mediatorId, SigningKeyUsage.All)
+        keysMb <- snapshotB.signingKeys(mediatorId, SigningKeyUsage.All)
+        keysSa <- snapshotA.signingKeys(sequencerId, SigningKeyUsage.All)
+        keysSb <- snapshotB.signingKeys(sequencerId, SigningKeyUsage.All)
         partPermA <- snapshotA.findParticipantState(participant1)
         partPermB <- snapshotB.findParticipantState(participant1)
         partPermC <- snapshotC.findParticipantState(participant1)
@@ -325,7 +318,7 @@ trait DbStoreBasedTopologySnapshotTest
   this: AsyncWordSpec with BaseTest with HasExecutionContext with DbTest =>
 
   "DbStoreBasedTopologySnapshot" should {
-    behave like topologySnapshot(() => createTopologyStore())
+    behave like topologySnapshot(() => createTopologyStore(DefaultTestIdentities.domainId))
   }
 
 }

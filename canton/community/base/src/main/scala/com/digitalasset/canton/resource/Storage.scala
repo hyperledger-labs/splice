@@ -9,22 +9,16 @@ import cats.syntax.functor.*
 import cats.{Eval, Functor, Monad}
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.CantonRequireTypes.String255
-import com.digitalasset.canton.config.RequireTypes.{PositiveInt, PositiveNumeric}
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.CantonRequireTypes.String255
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Salt
 import com.digitalasset.canton.health.{
   AtomicHealthComponent,
   CloseableHealthComponent,
   ComponentHealthState,
 }
-import com.digitalasset.canton.lifecycle.{
-  CloseContext,
-  FlagCloseable,
-  FutureUnlessShutdown,
-  HasCloseContext,
-  UnlessShutdown,
-}
+import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
@@ -35,7 +29,7 @@ import com.digitalasset.canton.logging.{
 import com.digitalasset.canton.metrics.{DbQueueMetrics, DbStorageMetrics}
 import com.digitalasset.canton.protocol.ContractIdSyntax.*
 import com.digitalasset.canton.protocol.{LfContractId, LfGlobalKey, LfHash}
-import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Oracle, Postgres}
+import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Postgres}
 import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile}
 import com.digitalasset.canton.resource.StorageFactory.StorageCreationException
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -43,10 +37,9 @@ import com.digitalasset.canton.store.db.{DbDeserializationException, DbSerializa
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryEither
-import com.digitalasset.canton.util.retry.RetryUtil.DbExceptionRetryable
-import com.digitalasset.canton.util.{Thereafter, *}
 import com.digitalasset.canton.{LfPackageId, LfPartyId}
 import com.google.protobuf.ByteString
 import com.typesafe.config.{Config, ConfigValueFactory}
@@ -58,20 +51,18 @@ import org.slf4j.event.Level
 import slick.SlickException
 import slick.dbio.*
 import slick.jdbc.JdbcBackend.Database
-import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.*
-import slick.jdbc.{ActionBasedSQLInterpolation as _, SQLActionBuilder as _, *}
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.hikaricp.HikariCPJdbcDataSource
+import slick.jdbc.{ActionBasedSQLInterpolation as _, SQLActionBuilder as _, *}
 import slick.lifted.Aliases
 import slick.util.{AsyncExecutor, AsyncExecutorWithMetrics, ClassLoaderUtil}
 
-import java.io.ByteArrayInputStream
 import java.sql.{Blob, SQLException, SQLTransientException, Statement}
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ScheduledExecutorService, TimeUnit}
 import javax.sql.rowset.serial.SerialBlob
-import scala.annotation.nowarn
 import scala.collection.immutable
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -201,39 +192,19 @@ trait DbStorage extends Storage { self: NamedLogging =>
 
   object DbStorageConverters {
 
-    /** We use `bytea` in Postgres and Oracle and `binary large object` in H2.
+    /** We use `bytea` in Postgres and `binary large object` in H2.
       * The reason is that starting from version 2.0, H2 imposes a limit of 1M
       * for the size of a `bytea`. Hence, depending on the profile, SetParameter
-      * and GetResult for `Array[Byte]` are different for H2 and Oracle/Postgres.
+      * and GetResult for `Array[Byte]` are different for H2 and Postgres.
       */
     private lazy val byteArraysAreBlobs = profile match {
       case _: H2 => true
       case _ => false
     }
 
-    /** We use .setBinaryStream for Oracle instead of .setBytes, due to an ORA-03146 code which happens sometimes with:
-      * - BLOB sql field
-      * - MERGE query
-      * - new field value of size > 32K
-      *
-      * Canton #11644, support case #4136
-      * Solution is based on:
-      * https://stackoverflow.com/questions/7794197/inserting-byte-array-as-blob-in-oracle-database-getting-ora-01460-unimplement
-      */
-    private lazy val bytesArraysSetBinaryStream = profile match {
-      case _: Oracle => true
-      case _ => false
-    }
-
     implicit val setParameterByteArray: SetParameter[Array[Byte]] = (v, pp) =>
       if (byteArraysAreBlobs) pp.setBlob(bytesToBlob(v))
-      else if (bytesArraysSetBinaryStream) {
-        val npos = pp.pos + 1
-        pp.ps.setBinaryStream(npos, new ByteArrayInputStream(v))
-        pp.pos = npos
-      } else {
-        pp.setBytes(v)
-      }
+      else pp.setBytes(v)
 
     implicit val getResultByteArray: GetResult[Array[Byte]] =
       if (byteArraysAreBlobs) GetResult(r => blobToBytes(r.nextBlob()))
@@ -263,16 +234,12 @@ trait DbStorage extends Storage { self: NamedLogging =>
     * Safe to use in a select slick query with #$... interpolation
     */
   def limit(numberOfItems: Int, skipItems: Long = 0L): String = profile match {
-    case _: DbStorage.Profile.Oracle =>
-      (if (skipItems != 0L) s"offset $skipItems rows "
-       else "") + s"fetch next $numberOfItems rows only"
     case _ => s"limit $numberOfItems" + (if (skipItems != 0L) s" offset $skipItems" else "")
   }
 
   /** Automatically performs #$ interpolation for a call to `limit` */
-  def limitSql(numberOfItems: Int, skipItems: Long = 0L): SQLActionBuilder = {
+  def limitSql(numberOfItems: Int, skipItems: Long = 0L): SQLActionBuilder =
     sql" #${limit(numberOfItems, skipItems)} "
-  }
 
   /** Runs the given `query` transactionally with synchronous commit replication if
     * the database provides the ability to configure synchronous commits per transaction.
@@ -287,8 +254,8 @@ trait DbStorage extends Storage { self: NamedLogging =>
       case _: Profile.Postgres =>
         val syncCommit = sqlu"set local synchronous_commit=on"
         syncCommit.andThen(query).transactionally
-      case _: Profile.H2 | _: Profile.Oracle =>
-        // Don't do anything for H2/Oracle. According to our docs it is up to the user to enforce synchronous replication.
+      case _: Profile.H2 =>
+        // Don't do anything for H2. According to our docs it is up to the user to enforce synchronous replication.
         // Any changes here are on a best-effort basis, but we won't guarantee they will be sufficient.
         query.transactionally
     }
@@ -330,7 +297,7 @@ trait DbStorage extends Storage { self: NamedLogging =>
           else dbConfig.parameters.connectionTimeout.asFiniteApproximation
         ),
       )
-      .unlessShutdown(body, DbExceptionRetryable)
+      .unlessShutdown(body, DbExceptionRetryPolicy)
       .thereafter { _ =>
         if (logOperations) {
           logger.debug(s"completed $action: $operationName")
@@ -445,7 +412,7 @@ trait DbStorage extends Storage { self: NamedLogging =>
           else dbConfig.parameters.connectionTimeout.asFiniteApproximation
         ),
       )
-      .apply(body, DbExceptionRetryable)
+      .apply(body, DbExceptionRetryPolicy)
       .thereafter { _ =>
         if (logOperations) {
           logger.debug(s"completed $action: $operationName")
@@ -585,13 +552,10 @@ object DbStorage {
 
   object Profile {
     final case class H2(jdbc: H2Profile) extends Profile {
-      override def pretty: Pretty[H2] = prettyOfObject[H2]
-    }
-    final case class Oracle(jdbc: OracleProfile) extends Profile with DbLockSupport {
-      override def pretty: Pretty[Oracle] = prettyOfObject[Oracle]
+      override protected def pretty: Pretty[H2] = prettyOfObject[H2]
     }
     final case class Postgres(jdbc: PostgresProfile) extends Profile with DbLockSupport {
-      override def pretty: Pretty[Postgres] = prettyOfObject[Postgres]
+      override protected def pretty: Pretty[Postgres] = prettyOfObject[Postgres]
     }
   }
 
@@ -634,10 +598,8 @@ object DbStorage {
       }
 
     implicit val getResultUuid: GetResult[UUID] = GetResult(r => UUID.fromString(r.nextString()))
-    @SuppressWarnings(Array("com.digitalasset.canton.SlickString")) // UUIDs are length-limited
     implicit val setParameterUuid: SetParameter[UUID] = (v, pp) => pp.setString(v.toString)
 
-    @SuppressWarnings(Array("com.digitalasset.canton.SlickString")) // LfPartyIds are length-limited
     implicit val setParameterLfPartyId: SetParameter[LfPartyId] = (v, pp) => pp.setString(v)
     implicit val getResultLfPartyId: GetResult[LfPartyId] = GetResult(r => r.nextString()).andThen {
       LfPartyId
@@ -669,7 +631,6 @@ object DbStorage {
     }
 
     // LfPackageIds are length-limited
-    @SuppressWarnings(Array("com.digitalasset.canton.SlickString"))
     implicit val setParameterLfPackageId: SetParameter[LfPackageId] = (v, pp) => pp.setString(v)
     implicit val getResultPackageId: GetResult[LfPackageId] =
       GetResult(r => r.nextString()).andThen {
@@ -730,29 +691,25 @@ object DbStorage {
   }
 
   class SQLActionBuilderChain(private val builders: Chain[SQLActionBuilder]) extends AnyVal {
-    def ++(a2: SQLActionBuilder): SQLActionBuilderChain = {
+    def ++(a2: SQLActionBuilder): SQLActionBuilderChain =
       new SQLActionBuilderChain(builders.append(a2))
-    }
-    def ++(other: SQLActionBuilderChain): SQLActionBuilderChain = {
+    def ++(other: SQLActionBuilderChain): SQLActionBuilderChain =
       new SQLActionBuilderChain(builders.concat(other.builders))
-    }
-    def ++(others: Seq[SQLActionBuilderChain]): SQLActionBuilderChain = {
+    def ++(others: Seq[SQLActionBuilderChain]): SQLActionBuilderChain =
       others.foldLeft(this)(_ ++ _)
-    }
-    def intercalate(item: SQLActionBuilder): SQLActionBuilderChain = {
+    def intercalate(item: SQLActionBuilder): SQLActionBuilderChain =
       new SQLActionBuilderChain(
         builders.foldLeft(Chain.empty[SQLActionBuilder]) { case (acc, elem) =>
           if (acc.isEmpty) Chain.one(elem)
           else acc.append(item).append(elem)
         }
       )
-    }
     def toActionBuilder: SQLActionBuilder = {
       val lst = builders.toList
       SQLActionBuilder(
-        builders.flatMap(x => Chain.fromSeq(x.queryParts)).toList,
+        builders.flatMap(x => Chain.one(x.sql)).foldLeft("")((acc, v) => acc.concat(v)),
         (p: Unit, pp: PositionedParameters) => {
-          lst.foreach(_.unitPConv.apply(p, pp))
+          lst.foreach(_.setParameter.apply(p, pp))
         },
       )
     }
@@ -777,8 +734,7 @@ object DbStorage {
     config match {
       case _: H2DbConfig => H2(H2Profile)
       case _: PostgresDbConfig => Postgres(PostgresProfile)
-      // TODO(i11009): assume unknown config is for oracle until we have proper oracle factory support
-      case _ => Oracle(OracleProfile)
+      case other => throw new IllegalArgumentException(s"Unsupported DbConfig: $other")
     }
 
   def createDatabase(
@@ -942,9 +898,6 @@ object DbStorage {
     * partial update counts therein and those update counts are not taken into consideration.
     *
     * This operation is idempotent if the statement is idempotent for each value.
-    *
-    * @throws java.lang.IllegalArgumentException if `statement` contains `"IGNORE_ROW_ON_DUPKEY_INDEX"`
-    *                                            (See UpsertTestOracle for details.)
     */
   def bulkOperation[A](
       statement: String,
@@ -952,17 +905,7 @@ object DbStorage {
       profile: Profile,
   )(
       setParams: PositionedParameters => A => Unit
-  )(implicit loggingContext: ErrorLoggingContext): DBIOAction[Array[Int], NoStream, Effect.All] = {
-    // Bail out if the statement contains IGNORE_ROW_ON_DUPKEY_INDEX, because update counts are known to be broken.
-    // Use MERGE instead.
-    // Ignoring update counts is not an option, because the JDBC driver reads them internally and may fail with
-    // low-level exceptions.
-    // See UpsertTestOracle for details.
-    ErrorUtil.requireArgument(
-      !statement.toUpperCase.contains("IGNORE_ROW_ON_DUPKEY_INDEX"),
-      s"Illegal usage of bulkOperation with IGNORE_ROW_ON_DUPKEY_INDEX. $statement",
-    )
-
+  )(implicit loggingContext: ErrorLoggingContext): DBIOAction[Array[Int], NoStream, Effect.All] =
     if (values.isEmpty) DBIOAction.successful(Array.empty)
     else {
       val action = SimpleJdbcAction { session =>
@@ -994,11 +937,6 @@ object DbStorage {
 
       import profile.DbStorageAPI.*
       profile match {
-        case _: Oracle =>
-          // Oracle has the habit of not properly rolling back, if an error occurs and
-          // there is no transaction (i.e. autoCommit = true). Further details on this can be found in UpsertTestOracle.
-          action.transactionally
-
         case _ if values.sizeCompare(1) <= 0 =>
           // Disable auto-commit for better performance.
           action
@@ -1006,7 +944,6 @@ object DbStorage {
         case _ => action.transactionally
       }
     }
-  }
 
   /** Same as [[bulkOperation]] except that no update counts are returned. */
   def bulkOperation_[A](
@@ -1028,40 +965,22 @@ object DbStorage {
     }
   }
 
-  /** Construct an in clause for a given field. If there are too many elements,
-    * splits the clause into several ones. We need to split into several terms
-    * because Oracle imposes a limit on the number of elements in an
-    * in-clause (currently: 1000).
+  /** Construct an in clause for a given field.
     *
     * @return An iterable of the grouped values and the in clause for the grouped values
     */
-  @nowarn("cat=unused") // somehow, f is wrongly reported as unused by the compiler
-  def toInClauses[T](
+  def toInClause[T](
       field: String,
       values: NonEmpty[Seq[T]],
-      maxValuesInSqlList: PositiveNumeric[Int],
-  )(implicit f: SetParameter[T]): immutable.Iterable[(Seq[T], SQLActionBuilder)] = {
+  )(implicit f: SetParameter[T]): SQLActionBuilder = {
     import DbStorage.Implicits.BuilderChain.*
+    sql"#$field in (" ++
+      values
+        .map(value => sql"$value")
+        .forgetNE
+        .intercalate(sql", ") ++ sql")"
 
-    values
-      .grouped(maxValuesInSqlList.unwrap)
-      .map { groupedValues =>
-        val inClause = sql"#$field in (" ++
-          groupedValues
-            .map(value => sql"$value")
-            .intercalate(sql", ") ++ sql")"
-
-        groupedValues -> inClause.toActionBuilder
-      }
-      .to(immutable.Iterable)
   }
-
-  def toInClauses_[T](
-      field: String,
-      values: NonEmpty[Seq[T]],
-      maxValuesSqlInListSize: PositiveNumeric[Int],
-  )(implicit f: SetParameter[T]): immutable.Iterable[SQLActionBuilder] =
-    toInClauses(field, values, maxValuesSqlInListSize).map { case (_, builder) => builder }
 
   class DbStorageCreationException(message: String) extends RuntimeException(message)
 
@@ -1091,10 +1010,9 @@ object DbStorage {
 }
 
 object Storage {
-  def threadsAvailableForWriting(storage: Storage): PositiveInt = {
+  def threadsAvailableForWriting(storage: Storage): PositiveInt =
     storage match {
       case _: MemoryStorage => PositiveInt.one
       case dbStorage: DbStorage => dbStorage.threadsAvailableForWriting
     }
-  }
 }

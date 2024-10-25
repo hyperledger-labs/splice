@@ -11,14 +11,14 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** Type aliases used throughout the package */
 package object platform {
-  import com.digitalasset.daml.lf.value.{Value as lfval}
+  import com.digitalasset.daml.lf.value.Value as lfval
   private[platform] type ContractId = lfval.ContractId
   private[platform] val ContractId = com.digitalasset.daml.lf.value.Value.ContractId
   private[platform] type Value = lfval.VersionedValue
   private[platform] type Contract = lfval.VersionedContractInstance
   private[platform] val Contract = lfval.VersionedContractInstance
 
-  import com.digitalasset.daml.lf.{transaction as lftx}
+  import com.digitalasset.daml.lf.transaction as lftx
   private[platform] type NodeId = lftx.NodeId
   private[platform] type Node = lftx.Node
   private[platform] type Create = lftx.Node.Create
@@ -26,7 +26,7 @@ package object platform {
   private[platform] type Key = lftx.GlobalKey
   private[platform] val Key = lftx.GlobalKey
 
-  import com.digitalasset.daml.lf.{data as lfdata}
+  import com.digitalasset.daml.lf.data as lfdata
   private[platform] type Party = lfdata.Ref.Party
   private[platform] val Party = lfdata.Ref.Party
   private[platform] type Identifier = lfdata.Ref.Identifier
@@ -39,8 +39,8 @@ package object platform {
   private[platform] val ModuleName = lfdata.Ref.ModuleName
   private[platform] type LedgerString = lfdata.Ref.LedgerString
   private[platform] val LedgerString = lfdata.Ref.LedgerString
-  private[platform] type TransactionId = lfdata.Ref.LedgerString
-  private[platform] val TransactionId = lfdata.Ref.LedgerString
+  private[platform] type UpdateId = lfdata.Ref.LedgerString
+  private[platform] val UpdateId = lfdata.Ref.LedgerString
   private[platform] type WorkflowId = lfdata.Ref.LedgerString
   private[platform] val WorkflowId = lfdata.Ref.LedgerString
   private[platform] type SubmissionId = lfdata.Ref.SubmissionId
@@ -60,8 +60,6 @@ package object platform {
   private[platform] type Relation[A, B] = lfdata.Relation[A, B]
   private[platform] type UserId = lfdata.Ref.UserId
   private[platform] val UserId = lfdata.Ref.UserId
-
-  private[platform] type FilterRelation = Relation[lfdata.Ref.Identifier, Party]
 
   import com.digitalasset.daml.lf.crypto
   private[platform] type Hash = crypto.Hash

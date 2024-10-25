@@ -7,7 +7,11 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  TransferPreapproval,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
@@ -17,9 +21,9 @@ import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesC
 import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.environment.{
   BaseAppConnection,
-  SpliceLedgerClient,
   RetryFor,
   RetryProvider,
+  SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{AnsEntry, MigrationSchedule}
@@ -39,8 +43,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.RetryUtil
-import com.digitalasset.canton.util.retry.RetryUtil.ExceptionRetryable
+import com.digitalasset.canton.util.retry.{ExceptionRetryPolicy, ErrorKind}
 import io.circe.Json
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
@@ -113,6 +116,17 @@ class BftScanConnection(
       _.getAmuletRulesWithState(cachedAmuletRules)
     )
 
+  override protected def runGetExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
+    bftCall(
+      _.getExternalPartyAmuletRules(cachedExternalPartyAmuletRules)
+    )
+
   override protected def runGetAnsRules(
       cachedAnsRules: Option[ContractWithState[AnsRules.ContractId, AnsRules]]
   )(implicit tc: TraceContext): Future[ContractWithState[AnsRules.ContractId, AnsRules]] = bftCall(
@@ -169,6 +183,12 @@ class BftScanConnection(
       ec: ExecutionContext,
       tc: TraceContext,
   ): OptionT[Future, MigrationSchedule] = OptionT(bftCall(_.getMigrationSchedule().value))
+
+  override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
+    bftCall(_.lookupTransferPreapprovalByParty(receiver))
 
   private def bftCall[T](
       call: SingleScanConnection => Future[T]
@@ -639,18 +659,15 @@ object BftScanConnection {
         s"Failed to reach consensus from $numRequests Scan nodes. Responses: $responses"
       )
 
-  object ConsensusNotReachedRetryable extends ExceptionRetryable {
-    override def retryOK(
-        outcome: Try[_],
-        logger: TracedLogger,
-        lastErrorKind: Option[RetryUtil.ErrorKind],
-    )(implicit tc: TraceContext): RetryUtil.ErrorKind = {
-      outcome match {
-        case Success(_) => RetryUtil.NoErrorKind
-        case Failure(c: ConsensusNotReached) =>
+  object ConsensusNotReachedRetryable extends ExceptionRetryPolicy {
+    override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = {
+      exception match {
+        case c: ConsensusNotReached =>
           logger.info("Consensus not reached. Will be retried.", c)
-          RetryUtil.SpuriousTransientErrorKind
-        case Failure(_) => RetryUtil.FatalErrorKind
+          ErrorKind.TransientErrorKind()
+        case _ => ErrorKind.FatalErrorKind
       }
     }
   }

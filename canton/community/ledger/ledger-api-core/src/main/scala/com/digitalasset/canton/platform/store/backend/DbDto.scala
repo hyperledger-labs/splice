@@ -14,7 +14,7 @@ object DbDto {
 
   final case class EventCreate(
       event_offset: String,
-      transaction_id: String,
+      update_id: String,
       ledger_effective_time: Long,
       command_id: Option[String],
       workflow_id: Option[String],
@@ -57,7 +57,9 @@ object DbDto {
       contract_id: String,
       template_id: String,
       package_name: String,
-      flat_event_witnesses: Set[String],
+      flat_event_witnesses: Set[
+        String
+      ], // only for consuming, for non-consuming exercise this field is omitted
       tree_event_witnesses: Set[String],
       create_key_value: Option[Array[Byte]],
       exercise_choice: String,
@@ -208,7 +210,7 @@ object DbDto {
   ) extends DbDto
 
   final case class TransactionMeta(
-      transaction_id: String,
+      update_id: String,
       event_offset: String,
       publication_time: Long,
       record_time: Long,

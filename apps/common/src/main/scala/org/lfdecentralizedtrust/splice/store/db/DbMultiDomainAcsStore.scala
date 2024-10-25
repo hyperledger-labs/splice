@@ -35,6 +35,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M,
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -326,7 +327,7 @@ final class DbMultiDomainAcsStore[TXE](
       limit: notOnDomainsTotalLimit.type,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
     val templateIdMap = companions
-      .map(c => QualifiedName(c.TEMPLATE_ID) -> c)
+      .map(c => QualifiedName(c.getTemplateIdWithPackageId) -> c)
       .toMap
     val templateIds = inClause(templateIdMap.keys)
     for {
@@ -495,7 +496,7 @@ final class DbMultiDomainAcsStore[TXE](
       }
   }
 
-  override protected def signalWhenIngestedOrShutdownImpl(offset: String)(implicit
+  override protected def signalWhenIngestedOrShutdownImpl(offset: Long)(implicit
       tc: TraceContext
   ): Future[Unit] = {
     state
@@ -517,7 +518,7 @@ final class DbMultiDomainAcsStore[TXE](
   override lazy val ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
     override def ingestionFilter: IngestionFilter = contractFilter.ingestionFilter
 
-    override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] = {
+    override def initialize()(implicit traceContext: TraceContext): Future[Option[Option[Long]]] = {
       // Notes:
       // - Postgres JSONB does not preserve white space, does not preserve the order of object keys, and does not keep duplicate object keys
       // - Postgres JSONB columns have a maximum size of 255MB
@@ -570,6 +571,7 @@ final class DbMultiDomainAcsStore[TXE](
           .getOrRaise(
             new RuntimeException(s"No row for $newStoreId found, which was just inserted!")
           )
+          .map(_.map(ApiOffset.assertFromStringToLongO(_)))
 
         _ <- cleanUpDataAfterDomainMigration(newStoreId)
 
@@ -616,14 +618,14 @@ final class DbMultiDomainAcsStore[TXE](
 
     // Note: returns a DBIOAction, as updating the offset needs to happen in the same SQL transaction
     // that modifies the ACS/TxLog.
-    private def updateOffset(offset: String): DBIOAction[Unit, NoStream, Effect.Write] =
+    private def updateOffset(offset: Option[Long]): DBIOAction[Unit, NoStream, Effect.Write] =
       sql"""
         update store_last_ingested_offsets
-        set last_ingested_offset = ${lengthLimited(offset)}
+        set last_ingested_offset = ${lengthLimited(ApiOffset.fromLongO(offset))}
         where store_id = $storeId and migration_id = $domainMigrationId
       """.asUpdate.andThen(DBIO.successful(()))
 
-    private def readOffset(): DBIOAction[Option[String], NoStream, Effect.Read] =
+    private def readOffset(): DBIOAction[Option[Option[Long]], NoStream, Effect.Read] =
       sql"""
         select last_ingested_offset
         from store_last_ingested_offsets
@@ -631,6 +633,7 @@ final class DbMultiDomainAcsStore[TXE](
       """
         .as[Option[String]]
         .head
+        .map(_.map(ApiOffset.assertFromStringToLongO(_)))
 
     /** Runs the given action to update the database with changes caused at the given offset.
       * The resulting action is guaranteed to be idempotent, even if the given action is not.
@@ -641,7 +644,7 @@ final class DbMultiDomainAcsStore[TXE](
       * SQL transaction.
       */
     private def ingestUpdateAtOffset[E <: Effect](
-        offset: String,
+        offset: Option[Long],
         action: DBIOAction[?, NoStream, Effect.Read & Effect.Write],
     )(implicit
         tc: TraceContext
@@ -666,7 +669,7 @@ final class DbMultiDomainAcsStore[TXE](
         .transactionally
     }
     override def ingestAcs(
-        offset: String,
+        offset: Option[Long],
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
@@ -781,20 +784,20 @@ final class DbMultiDomainAcsStore[TXE](
     ): Future[Unit] = {
       transfer match {
         case ReassignmentUpdate(reassignment) =>
-          ingestReassignment(reassignment.offset.getOffset, reassignment).map { summaryState =>
+          ingestReassignment(reassignment.offset, reassignment).map { summaryState =>
             state
               .getAndUpdate(s =>
                 s.withUpdate(
                   s.acsSize + summaryState.acsSizeDiff,
-                  reassignment.offset.getOffset,
+                  Some(reassignment.offset),
                 )
               )
-              .signalOffsetChanged(reassignment.offset.getOffset)
+              .signalOffsetChanged(Some(reassignment.offset))
             val summary =
               summaryState.toIngestionSummary(
                 updateId = None,
                 synchronizerId = Some(domain),
-                offset = reassignment.offset.getOffset,
+                offset = Some(reassignment.offset),
                 recordTime = Some(reassignment.recordTime),
                 newAcsSize = state.get().acsSize,
                 metrics,
@@ -803,20 +806,21 @@ final class DbMultiDomainAcsStore[TXE](
             handleIngestionSummary(summary)
           }
         case TransactionTreeUpdate(tree) =>
-          ingestTransactionTree(domain, tree).map { summaryState =>
+          val offset = tree.getOffset
+          ingestTransactionTree(domain, offset, tree).map { summaryState =>
             state
               .getAndUpdate(s =>
                 s.withUpdate(
                   s.acsSize + summaryState.acsSizeDiff,
-                  tree.getOffset,
+                  Some(offset),
                 )
               )
-              .signalOffsetChanged(tree.getOffset)
+              .signalOffsetChanged(Some(offset))
             val summary =
               summaryState.toIngestionSummary(
                 updateId = Some(tree.getUpdateId),
                 synchronizerId = Some(domain),
-                offset = tree.getOffset,
+                offset = Some(offset),
                 recordTime = Some(CantonTimestamp.assertFromInstant(tree.getRecordTime)),
                 newAcsSize = state.get().acsSize,
                 metrics,
@@ -828,7 +832,7 @@ final class DbMultiDomainAcsStore[TXE](
     }
 
     private def ingestReassignment(
-        offset: String,
+        offset: Long,
         reassignment: Reassignment[ReassignmentEvent],
     )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
       val summary = MutableIngestionSummary.empty
@@ -836,7 +840,7 @@ final class DbMultiDomainAcsStore[TXE](
         _ <- storage
           .queryAndUpdate(
             ingestUpdateAtOffset(
-              offset,
+              Some(offset),
               DBIO
                 .seq(
                   reassignment.event match {
@@ -882,7 +886,7 @@ final class DbMultiDomainAcsStore[TXE](
                           } else {
                             DBIO.seq(
                               doIngestAcsInsert(
-                                reassignment.offset.getOffset,
+                                Some(reassignment.offset),
                                 assign.createdEvent,
                                 stateRowDataFromAssign(assign),
                                 summary,
@@ -945,6 +949,7 @@ final class DbMultiDomainAcsStore[TXE](
 
     private def ingestTransactionTree(
         domainId: DomainId,
+        offset: Long,
         tree: TransactionTree,
     )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
       val summary = MutableIngestionSummary.empty
@@ -989,7 +994,7 @@ final class DbMultiDomainAcsStore[TXE](
         _ <- storage
           .queryAndUpdate(
             ingestUpdateAtOffset(
-              tree.getOffset,
+              Some(offset),
               DBIO
                 .sequence(
                   // TODO (#5643): batch inserts
@@ -1003,7 +1008,7 @@ final class DbMultiDomainAcsStore[TXE](
                           } else {
                             DBIO.seq(
                               doIngestAcsInsert(
-                                tree.getOffset,
+                                Some(offset),
                                 createdEvent,
                                 stateRowDataFromActiveContract(domainId, 0L),
                                 summary,
@@ -1017,7 +1022,7 @@ final class DbMultiDomainAcsStore[TXE](
                     ++ txLogEntries.map(txe =>
                       doIngestTxLogInsert(
                         domainId,
-                        tree.getOffset,
+                        offset,
                         CantonTimestamp.assertFromInstant(tree.getRecordTime),
                         txe,
                         summary,
@@ -1094,7 +1099,7 @@ final class DbMultiDomainAcsStore[TXE](
       else data.map(_._1).mkString(",", ", ", "")
 
     private def doIngestAcsInsert(
-        offset: String,
+        offset: Option[Long],
         createdEvent: CreatedEvent,
         stateData: ContractStateRowData,
         summary: MutableIngestionSummary,
@@ -1147,12 +1152,12 @@ final class DbMultiDomainAcsStore[TXE](
 
     private def doIngestTxLogInsert(
         domainId: DomainId,
-        offset: String,
+        offset: Long,
         recordTime: CantonTimestamp,
         txe: TXE,
         summary: MutableIngestionSummary,
     ) = {
-      val safeOffset = lengthLimited(offset)
+      val safeOffset = lengthLimited(ApiOffset.fromLong(offset))
       val (entryType, entryData) = txLogConfig.encodeEntry(txe)
       // Note: lengthLimited() uses String2066 which throws an exception if the string is longer than 2066 characters.
       // Here we use String256M to support larger TxLogEntry payloads.
@@ -1377,15 +1382,15 @@ object DbMultiDomainAcsStore {
     */
   private case class State(
       storeId: Option[Int],
-      offset: Option[String],
+      offset: Option[Option[Long]],
       acsSize: Int,
       offsetChanged: Promise[Unit],
-      offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
+      offsetIngestionsToSignal: SortedMap[Long, Promise[Unit]],
   ) {
     def withInitialState(
         storeId: Int,
         acsSizeInDb: Int,
-        lastIngestedOffset: Option[String],
+        lastIngestedOffset: Option[Option[Long]],
     ): State = {
       assert(
         !offset.exists(inMemoryOffset =>
@@ -1402,24 +1407,28 @@ object DbMultiDomainAcsStore {
       )
     }
 
-    def withUpdate(newAcsSize: Int, newOffset: String): State = {
-      val nextOffsetChanged = if (offset.contains(newOffset)) offsetChanged else Promise[Unit]()
+    def withUpdate(newAcsSize: Int, newOffsetO: Option[Long]): State = {
+      val nextOffsetChanged = if (offset.contains(newOffsetO)) offsetChanged else Promise[Unit]()
       this.copy(
         acsSize = newAcsSize,
-        offset = Some(newOffset),
+        offset = Some(newOffsetO),
         offsetChanged = nextOffsetChanged,
-        offsetIngestionsToSignal = offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
-          offsetToSignal > newOffset
-        },
+        offsetIngestionsToSignal = newOffsetO.fold(offsetIngestionsToSignal)(newOffset =>
+          offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
+            offsetToSignal > newOffset
+          }
+        ),
       )
     }
 
-    def signalOffsetChanged(newOffset: String): Unit = {
-      if (!offset.contains(newOffset)) {
+    def signalOffsetChanged(newOffsetO: Option[Long]): Unit = {
+      if (!offset.contains(newOffsetO)) {
         offsetChanged.success(())
-        offsetIngestionsToSignal.foreach { case (offsetToSignal, promise) =>
-          if (offsetToSignal <= newOffset) {
-            promise.success(())
+        newOffsetO.foreach { newOffset =>
+          offsetIngestionsToSignal.foreach { case (offsetToSignal, promise) =>
+            if (offsetToSignal <= newOffset) {
+              promise.success(())
+            }
           }
         }
       }
@@ -1429,9 +1438,9 @@ object DbMultiDomainAcsStore {
       * offset has already been requested, don't change the state.
       */
     def withOffsetToSignal(
-        offsetToSignal: String
+        offsetToSignal: Long
     ): State = {
-      if (offset.exists(_ >= offsetToSignal)) {
+      if (offset.exists(_.exists(_ >= offsetToSignal))) {
         this
       } else {
         offsetIngestionsToSignal.get(offsetToSignal) match {
@@ -1479,7 +1488,7 @@ object DbMultiDomainAcsStore {
     def toIngestionSummary(
         updateId: Option[String],
         synchronizerId: Option[DomainId],
-        offset: String,
+        offset: Option[Long],
         recordTime: Option[CantonTimestamp],
         newAcsSize: Int,
         metrics: StoreMetrics,

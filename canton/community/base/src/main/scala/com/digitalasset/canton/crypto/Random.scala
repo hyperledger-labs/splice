@@ -15,7 +15,7 @@ import scala.util.Random
 
 trait RandomOps {
 
-  protected def generateRandomBytes(length: Int): Array[Byte]
+  protected[crypto] def generateRandomBytes(length: Int): Array[Byte]
 
   def generateRandomByteString(length: Int): ByteString =
     ByteString.copyFrom(generateRandomBytes(length))
@@ -45,7 +45,7 @@ object SecureRandomness {
     */
   def fromByteString(
       expectedLength: Int
-  )(bytes: ByteString): Either[DeserializationError, SecureRandomness] = {
+  )(bytes: ByteString): Either[DeserializationError, SecureRandomness] =
     if (bytes.size != expectedLength)
       Left(
         DefaultDeserializationError(
@@ -53,7 +53,6 @@ object SecureRandomness {
         )
       )
     else Right(SecureRandomness(bytes))
-  }
 }
 
 /** Pseudo randomness, MUST NOT be used for security-relevant operations. */
@@ -64,5 +63,7 @@ object PseudoRandom {
   def randomAlphaNumericString(length: Int): String = rand.alphanumeric.take(length).mkString
 
   def randomUnsigned(maxValue: Int): Int = rand.between(0, maxValue)
+
+  def randomLong(n: Long): Long = rand.nextLong(n)
 
 }

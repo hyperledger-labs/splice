@@ -24,8 +24,8 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.store.SequencedEventStore.PossiblyIgnoredSequencedEvent.dbTypeOfEvent
 import com.digitalasset.canton.store.SequencedEventStore.*
+import com.digitalasset.canton.store.SequencedEventStore.PossiblyIgnoredSequencedEvent.dbTypeOfEvent
 import com.digitalasset.canton.store.db.DbSequencedEventStore
 import com.digitalasset.canton.store.db.DbSequencedEventStore.SequencedEventDbType
 import com.digitalasset.canton.store.memory.InMemorySequencedEventStore
@@ -94,9 +94,13 @@ trait SequencedEventStore extends PrunableByTime with NamedLogging with AutoClos
   /** Deletes all events with sequencer counter greater than or equal to `from`.
     */
   @VisibleForTesting
-  private[canton] def delete(from: SequencerCounter)(implicit
+  private[canton] def delete(fromInclusive: SequencerCounter)(implicit
       traceContext: TraceContext
   ): Future[Unit]
+
+  /** Purges all data from the store.
+    */
+  def purge()(implicit traceContext: TraceContext): Future[Unit] = delete(SequencerCounter.Genesis)
 }
 
 object SequencedEventStore {
@@ -146,7 +150,7 @@ object SequencedEventStore {
       s"Lower bound timestamp $lowerInclusive is after upper bound $upperInclusive",
     )
 
-    override def pretty: Pretty[ByTimestampRange] = prettyOfClass(
+    override protected def pretty: Pretty[ByTimestampRange] = prettyOfClass(
       param("lower inclusive", _.lowerInclusive),
       param("upper inclusive", _.upperInclusive),
     )
@@ -215,7 +219,7 @@ object SequencedEventStore {
       case None => this
     }
 
-    override def pretty: Pretty[IgnoredSequencedEvent[Envelope[?]]] =
+    override protected def pretty: Pretty[IgnoredSequencedEvent[Envelope[?]]] =
       prettyOfClass(
         param("timestamp", _.timestamp),
         param("counter", _.counter),
@@ -230,7 +234,7 @@ object SequencedEventStore {
     )(
         protocolVersion: ProtocolVersion,
         hashOps: HashOps,
-    ): WithOpeningErrors[IgnoredSequencedEvent[DefaultOpenEnvelope]] = {
+    ): WithOpeningErrors[IgnoredSequencedEvent[DefaultOpenEnvelope]] =
       event.underlying match {
         case Some(signedEvent) =>
           SignedContent
@@ -239,7 +243,6 @@ object SequencedEventStore {
         case None =>
           NoOpeningErrors(event.asInstanceOf[IgnoredSequencedEvent[DefaultOpenEnvelope]])
       }
-    }
   }
 
   /** Encapsulates an event received by the sequencer.
@@ -270,7 +273,7 @@ object SequencedEventStore {
 
     override def asOrdinaryEvent: PossiblyIgnoredSequencedEvent[Env] = this
 
-    override def pretty: Pretty[OrdinarySequencedEvent[Envelope[_]]] = prettyOfClass(
+    override protected def pretty: Pretty[OrdinarySequencedEvent[Envelope[_]]] = prettyOfClass(
       param("signedEvent", _.signedEvent)
     )
   }
@@ -279,11 +282,10 @@ object SequencedEventStore {
     def openEnvelopes(event: OrdinarySequencedEvent[ClosedEnvelope])(
         protocolVersion: ProtocolVersion,
         hashOps: HashOps,
-    ): WithOpeningErrors[OrdinarySequencedEvent[DefaultOpenEnvelope]] = {
+    ): WithOpeningErrors[OrdinarySequencedEvent[DefaultOpenEnvelope]] =
       SignedContent
         .openEnvelopes(event.signedEvent)(protocolVersion, hashOps)
         .map(evt => event.copy(signedEvent = evt)(event.traceContext))
-    }
   }
 
   object PossiblyIgnoredSequencedEvent {
@@ -361,11 +363,12 @@ final case class SequencedEventRangeOverlapsWithPruning(
     foundEvents: Seq[PossiblyIgnoredSerializedEvent],
 ) extends SequencedEventStoreError
     with PrettyPrinting {
-  override def pretty: Pretty[SequencedEventRangeOverlapsWithPruning.this.type] = prettyOfClass(
-    param("criterion", _.criterion),
-    param("pruning status", _.pruningStatus),
-    param("found events", _.foundEvents),
-  )
+  override protected def pretty: Pretty[SequencedEventRangeOverlapsWithPruning.this.type] =
+    prettyOfClass(
+      param("criterion", _.criterion),
+      param("pruning status", _.pruningStatus),
+      param("found events", _.foundEvents),
+    )
 }
 
 final case class ChangeWouldResultInGap(from: SequencerCounter, to: SequencerCounter)

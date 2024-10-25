@@ -32,7 +32,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_
   CRARC_MiningRound_Archive,
   CRARC_MiningRound_StartIssuing,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.sv.SvApp.{isDevNet, isSvName, isSvParty}
 import org.lfdecentralizedtrust.splice.util.AssignedContract
@@ -181,6 +181,14 @@ class ExecuteConfirmedActionTrigger(
                   )
                 )
             } yield isSvOnboardingConfirmed || isSvPartOfDso
+          case action: SRARC_CreateTransferCommandCounter =>
+            for {
+              transferCommandCounterO <- store.lookupTransferCommandCounterBySender(
+                PartyId.tryFromProtoPrimitive(
+                  action.dsoRules_CreateTransferCommandCounterValue.sender
+                )
+              )
+            } yield transferCommandCounterO.isDefined
           case action =>
             throw new UnsupportedOperationException(
               show"DsoRules $action is not yet supported"

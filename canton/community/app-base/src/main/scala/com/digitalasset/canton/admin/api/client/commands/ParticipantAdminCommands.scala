@@ -4,17 +4,19 @@
 package com.digitalasset.canton.admin.api.client.commands
 
 import cats.implicits.*
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.Value
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
   ServerEnforcedTimeout,
   TimeoutType,
 }
+import com.digitalasset.canton.admin.api.client.commands.StatusAdminCommands.NodeStatusCommand
 import com.digitalasset.canton.admin.api.client.data.{
   DarMetadata,
+  InFlightCount,
   ListConnectedDomainsResult,
+  NodeStatus,
   ParticipantPruningSchedule,
+  ParticipantStatus,
 }
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.admin.participant.v30.DomainConnectivityServiceGrpc.DomainConnectivityServiceStub
@@ -22,11 +24,12 @@ import com.digitalasset.canton.admin.participant.v30.EnterpriseParticipantReplic
 import com.digitalasset.canton.admin.participant.v30.InspectionServiceGrpc.InspectionServiceStub
 import com.digitalasset.canton.admin.participant.v30.PackageServiceGrpc.PackageServiceStub
 import com.digitalasset.canton.admin.participant.v30.ParticipantRepairServiceGrpc.ParticipantRepairServiceStub
+import com.digitalasset.canton.admin.participant.v30.ParticipantStatusServiceGrpc.ParticipantStatusServiceStub
+import com.digitalasset.canton.admin.participant.v30.PartyManagementServiceGrpc.PartyManagementServiceStub
 import com.digitalasset.canton.admin.participant.v30.PartyNameManagementServiceGrpc.PartyNameManagementServiceStub
 import com.digitalasset.canton.admin.participant.v30.PingServiceGrpc.PingServiceStub
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.ResourceManagementServiceGrpc.ResourceManagementServiceStub
-import com.digitalasset.canton.admin.participant.v30.TransferServiceGrpc.TransferServiceStub
 import com.digitalasset.canton.admin.participant.v30.{ResourceLimits as _, *}
 import com.digitalasset.canton.admin.pruning
 import com.digitalasset.canton.admin.pruning.v30.{NoWaitCommitmentsSetup, WaitCommitmentsSetup}
@@ -34,7 +37,6 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.participant.admin.ResourceLimits
-import com.digitalasset.canton.participant.admin.grpc.TransferSearchResult
 import com.digitalasset.canton.participant.admin.traffic.TrafficStateAdmin
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig as CDomainConnectionConfig
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
@@ -42,13 +44,11 @@ import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
   SentCmtState,
   SharedContractsState,
 }
-import com.digitalasset.canton.participant.sync.UpstreamOffsetConvert
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.protocol.messages.{AcsCommitment, CommitmentPeriod}
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.serialization.ProtoConverter.InstantConverter
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -212,12 +212,11 @@ object ParticipantAdminCommands {
 
       override def handleResponse(
           response: RemovePackageResponse
-      ): Either[String, Unit] = {
+      ): Either[String, Unit] =
         response.success match {
           case None => Left("unexpected empty response")
           case Some(_success) => Right(())
         }
-      }
 
     }
 
@@ -294,12 +293,11 @@ object ParticipantAdminCommands {
 
       override def handleResponse(
           response: RemoveDarResponse
-      ): Either[String, Unit] = {
+      ): Either[String, Unit] =
         response.success match {
           case None => Left("unexpected empty response")
           case Some(success) => Right(())
         }
-      }
 
     }
 
@@ -354,6 +352,40 @@ object ParticipantAdminCommands {
 
   }
 
+  object PartyManagement {
+
+    final case class StartPartyReplication(
+        id: Option[String],
+        party: PartyId,
+        sourceParticipant: ParticipantId,
+        domain: DomainId,
+    ) extends GrpcAdminCommand[StartPartyReplicationRequest, StartPartyReplicationResponse, Unit] {
+      override type Svc = PartyManagementServiceStub
+
+      override def createService(channel: ManagedChannel): PartyManagementServiceStub =
+        PartyManagementServiceGrpc.stub(channel)
+
+      override def createRequest(): Either[String, StartPartyReplicationRequest] =
+        Right(
+          StartPartyReplicationRequest(
+            id = id,
+            partyUid = party.uid.toProtoPrimitive,
+            sourceParticipantUid = sourceParticipant.uid.toProtoPrimitive,
+            domainUid = domain.uid.toProtoPrimitive,
+          )
+        )
+
+      override def submitRequest(
+          service: PartyManagementServiceStub,
+          request: StartPartyReplicationRequest,
+      ): Future[StartPartyReplicationResponse] =
+        service.startPartyReplication(request)
+
+      override def handleResponse(response: StartPartyReplicationResponse): Either[String, Unit] =
+        Right(())
+    }
+  }
+
   object PartyNameManagement {
 
     final case class SetPartyDisplayName(partyId: PartyId, displayName: String)
@@ -405,7 +437,7 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         ParticipantRepairServiceGrpc.stub(channel)
 
-      override def createRequest(): Either[String, ExportAcsRequest] = {
+      override def createRequest(): Either[String, ExportAcsRequest] =
         Right(
           ExportAcsRequest(
             parties.map(_.toLf).toSeq,
@@ -423,7 +455,6 @@ object ParticipantAdminCommands {
             partiesOffboarding = partiesOffboarding,
           )
         )
-      }
 
       override def submitRequest(
           service: ParticipantRepairServiceStub,
@@ -457,7 +488,7 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         ParticipantRepairServiceGrpc.stub(channel)
 
-      override def createRequest(): Either[String, ImportAcsRequest] = {
+      override def createRequest(): Either[String, ImportAcsRequest] =
         Right(
           ImportAcsRequest(
             acsChunk,
@@ -465,12 +496,11 @@ object ParticipantAdminCommands {
             allowContractIdSuffixRecomputation,
           )
         )
-      }
 
       override def submitRequest(
           service: ParticipantRepairServiceStub,
           request: ImportAcsRequest,
-      ): Future[ImportAcsResponse] = {
+      ): Future[ImportAcsResponse] =
         GrpcStreamingUtils.streamToServer(
           service.importAcs,
           (bytes: Array[Byte]) =>
@@ -481,7 +511,6 @@ object ParticipantAdminCommands {
             ),
           request.acsSnapshot,
         )
-      }
 
       override def handleResponse(
           response: ImportAcsResponse
@@ -507,7 +536,7 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         ParticipantRepairServiceGrpc.stub(channel)
 
-      override def createRequest(): Either[String, PurgeContractsRequest] = {
+      override def createRequest(): Either[String, PurgeContractsRequest] =
         Right(
           PurgeContractsRequest(
             domain = domain.toProtoPrimitive,
@@ -515,7 +544,6 @@ object ParticipantAdminCommands {
             ignoreAlreadyPurged = ignoreAlreadyPurged,
           )
         )
-      }
 
       override def submitRequest(
           service: ParticipantRepairServiceStub,
@@ -649,6 +677,32 @@ object ParticipantAdminCommands {
       override def handleResponse(response: UnignoreEventsResponse): Either[String, Unit] =
         Right(())
     }
+
+    final case class RollbackUnassignment(unassignId: String, source: DomainId, target: DomainId)
+        extends GrpcAdminCommand[RollbackUnassignmentRequest, RollbackUnassignmentResponse, Unit] {
+      override type Svc = ParticipantRepairServiceStub
+
+      override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
+        ParticipantRepairServiceGrpc.stub(channel)
+
+      override def createRequest(): Either[String, RollbackUnassignmentRequest] =
+        Right(
+          RollbackUnassignmentRequest(
+            unassignId = unassignId,
+            source = source.toProtoPrimitive,
+            target = target.toProtoPrimitive,
+          )
+        )
+
+      override def submitRequest(
+          service: ParticipantRepairServiceStub,
+          request: RollbackUnassignmentRequest,
+      ): Future[RollbackUnassignmentResponse] =
+        service.rollbackUnassignment(request)
+
+      override def handleResponse(response: RollbackUnassignmentResponse): Either[String, Unit] =
+        Right(())
+    }
   }
 
   object Ping {
@@ -667,7 +721,7 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): PingServiceStub =
         PingServiceGrpc.stub(channel)
 
-      override def createRequest(): Either[String, PingRequest] = {
+      override def createRequest(): Either[String, PingRequest] =
         Right(
           PingRequest(
             targets.toSeq,
@@ -679,7 +733,6 @@ object ParticipantAdminCommands {
             id,
           )
         )
-      }
 
       override def submitRequest(
           service: PingServiceStub,
@@ -889,60 +942,23 @@ object ParticipantAdminCommands {
         service.modifyDomain(request)
 
       override def handleResponse(response: ModifyDomainResponse): Either[String, Unit] = Right(())
-
     }
 
-  }
+    final case class Logout(domainAlias: DomainAlias)
+        extends Base[LogoutRequest, LogoutResponse, Unit] {
 
-  object Transfer {
-
-    abstract class Base[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Svc = TransferServiceStub
-
-      override def createService(channel: ManagedChannel): TransferServiceStub =
-        TransferServiceGrpc.stub(channel)
-    }
-
-    final case class TransferSearch(
-        targetDomain: DomainAlias,
-        sourceDomainFilter: Option[DomainAlias],
-        timestampFilter: Option[Instant],
-        submittingPartyFilter: Option[PartyId],
-        limit0: Int,
-    ) extends Base[
-          AdminTransferSearchQuery,
-          AdminTransferSearchResponse,
-          Seq[TransferSearchResult],
-        ] {
-
-      override def createRequest(): Either[String, AdminTransferSearchQuery] =
-        Right(
-          AdminTransferSearchQuery(
-            searchDomain = targetDomain.toProtoPrimitive,
-            filterOriginDomain = sourceDomainFilter.map(_.toProtoPrimitive).getOrElse(""),
-            filterTimestamp =
-              timestampFilter.map((value: Instant) => InstantConverter.toProtoPrimitive(value)),
-            filterSubmittingParty = submittingPartyFilter.fold("")(_.toLf),
-            limit = limit0.toLong,
-          )
-        )
+      override def createRequest(): Either[String, LogoutRequest] =
+        Right(LogoutRequest(domainAlias.toProtoPrimitive))
 
       override def submitRequest(
-          service: TransferServiceStub,
-          request: AdminTransferSearchQuery,
-      ): Future[AdminTransferSearchResponse] =
-        service.transferSearch(request)
+          service: DomainConnectivityServiceStub,
+          request: LogoutRequest,
+      ): Future[LogoutResponse] =
+        service.logout(request)
 
-      override def handleResponse(
-          response: AdminTransferSearchResponse
-      ): Either[String, Seq[TransferSearchResult]] =
-        response match {
-          case AdminTransferSearchResponse(results) =>
-            results.traverse(TransferSearchResult.fromProtoV30).leftMap(_.toString)
-        }
-
-      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
-
+      override def handleResponse(response: LogoutResponse): Either[String, Unit] = Right(
+        ()
+      )
     }
   }
 
@@ -963,9 +979,8 @@ object ParticipantAdminCommands {
       ): Future[v30.ResourceLimits] =
         service.getResourceLimits(request)
 
-      override def handleResponse(response: v30.ResourceLimits): Either[String, ResourceLimits] = {
+      override def handleResponse(response: v30.ResourceLimits): Either[String, ResourceLimits] =
         Right(ResourceLimits.fromProtoV30(response))
-      }
     }
 
     final case class SetResourceLimits(limits: ResourceLimits)
@@ -991,34 +1006,6 @@ object ParticipantAdminCommands {
         InspectionServiceGrpc.stub(channel)
     }
 
-    final case class LookupContractDomain(contractIds: Set[LfContractId])
-        extends Base[
-          v30.LookupContractDomain.Request,
-          v30.LookupContractDomain.Response,
-          Map[LfContractId, String],
-        ] {
-      override def createRequest() = Right(
-        v30.LookupContractDomain.Request(contractIds.toSeq.map(_.coid))
-      )
-
-      override def submitRequest(
-          service: InspectionServiceStub,
-          request: v30.LookupContractDomain.Request,
-      ): Future[v30.LookupContractDomain.Response] =
-        service.lookupContractDomain(request)
-
-      override def handleResponse(
-          response: v30.LookupContractDomain.Response
-      ): Either[String, Map[LfContractId, String]] = Right(
-        response.results.map { case (id, domain) =>
-          LfContractId.assertFromString(id) -> domain
-        }
-      )
-
-      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
-
-    }
-
     final case class LookupOffsetByTime(ts: Timestamp)
         extends Base[v30.LookupOffsetByTime.Request, v30.LookupOffsetByTime.Response, String] {
       override def createRequest() = Right(v30.LookupOffsetByTime.Request(Some(ts)))
@@ -1035,23 +1022,79 @@ object ParticipantAdminCommands {
         Right(response.offset)
     }
 
-    final case class LookupOffsetByIndex(index: Long)
-        extends Base[v30.LookupOffsetByIndex.Request, v30.LookupOffsetByIndex.Response, String] {
-      override def createRequest() = Right(v30.LookupOffsetByIndex.Request(index))
+    // TODO(#9557) R2 The code below should be sufficient
+    final case class OpenCommitment(
+        observer: StreamObserver[v30.OpenCommitment.Response],
+        commitment: AcsCommitment.CommitmentType,
+        domainId: DomainId,
+        computedForCounterParticipant: ParticipantId,
+        toInclusive: CantonTimestamp,
+    ) extends Base[
+          v30.OpenCommitment.Request,
+          CancellableContext,
+          CancellableContext,
+        ] {
+      override def createRequest() = Right(
+        v30.OpenCommitment
+          .Request(
+            AcsCommitment.commitmentTypeToProto(commitment),
+            domainId.toProtoPrimitive,
+            computedForCounterParticipant.toProtoPrimitive,
+            Some(toInclusive.toProtoTimestamp),
+          )
+      )
 
       override def submitRequest(
           service: InspectionServiceStub,
-          request: v30.LookupOffsetByIndex.Request,
-      ): Future[v30.LookupOffsetByIndex.Response] =
-        service.lookupOffsetByIndex(request)
+          request: v30.OpenCommitment.Request,
+      ): Future[CancellableContext] = {
+        val context = Context.current().withCancellation()
+        context.run(() => service.openCommitment(request, observer))
+        Future.successful(context)
+      }
 
       override def handleResponse(
-          response: v30.LookupOffsetByIndex.Response
-      ): Either[String, String] =
-        Right(response.offset)
+          response: CancellableContext
+      ): Either[String, CancellableContext] =
+        Right(response)
+
+      //  command might take a long time
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
     }
 
-    // TODO(#18451) R5: The code below should be sufficient.
+    // TODO(#9557) R2 The code below should be sufficient
+    final case class CommitmentContracts(
+        observer: StreamObserver[v30.InspectCommitmentContracts.Response],
+        contracts: Seq[LfContractId],
+    ) extends Base[
+          v30.InspectCommitmentContracts.Request,
+          CancellableContext,
+          CancellableContext,
+        ] {
+      override def createRequest() = Right(
+        v30.InspectCommitmentContracts.Request(
+          contracts.map(_.toBytes.toByteString)
+        )
+      )
+
+      override def submitRequest(
+          service: InspectionServiceStub,
+          request: v30.InspectCommitmentContracts.Request,
+      ): Future[CancellableContext] = {
+        val context = Context.current().withCancellation()
+        context.run(() => service.inspectCommitmentContracts(request, observer))
+        Future.successful(context)
+      }
+
+      override def handleResponse(
+          response: CancellableContext
+      ): Either[String, CancellableContext] =
+        Right(response)
+
+      //  command might take a long time
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+    }
+
     final case class LookupReceivedAcsCommitments(
         domainTimeRanges: Seq[DomainTimeRange],
         counterParticipants: Seq[ParticipantId],
@@ -1094,7 +1137,7 @@ object ParticipantAdminCommands {
       ): Either[
         String,
         Map[DomainId, Seq[ReceivedAcsCmt]],
-      ] = {
+      ] =
         if (response.received.size != response.received.map(_.domainId).toSet.size)
           Left(
             s"Some domains are not unique in the response: ${response.received}"
@@ -1110,7 +1153,6 @@ object ParticipantAdminCommands {
               } yield domainId -> receivedCmts
             )
             .map(_.toMap)
-      }
     }
 
     final case class TimeRange(startExclusive: CantonTimestamp, endInclusive: CantonTimestamp)
@@ -1127,7 +1169,7 @@ object ParticipantAdminCommands {
 
     private def fromIntervalToCommitmentPeriod(
         interval: Option[v30.Interval]
-    ): Either[String, CommitmentPeriod] = {
+    ): Either[String, CommitmentPeriod] =
       interval match {
         case None => Left("Interval is missing")
         case Some(v) =>
@@ -1151,11 +1193,10 @@ object ParticipantAdminCommands {
             )
           } yield CommitmentPeriod(fromSecond, len)
       }
-    }
 
     private def fromProtoToReceivedAcsCmt(
         cmt: v30.ReceivedAcsCommitment
-    ): Either[String, ReceivedAcsCmt] = {
+    ): Either[String, ReceivedAcsCmt] =
       for {
         state <- ReceivedCmtState.fromProtoV30(cmt.state).leftMap(_.toString)
         period <- fromIntervalToCommitmentPeriod(cmt.interval)
@@ -1177,9 +1218,7 @@ object ParticipantAdminCommands {
           .flatten,
         state,
       )
-    }
 
-    // TODO(#18451) R5: The code below should be sufficient.
     final case class LookupSentAcsCommitments(
         domainTimeRanges: Seq[DomainTimeRange],
         counterParticipants: Seq[ParticipantId],
@@ -1222,7 +1261,7 @@ object ParticipantAdminCommands {
       ): Either[
         String,
         Map[DomainId, Seq[SentAcsCmt]],
-      ] = {
+      ] =
         if (response.sent.size != response.sent.map(_.domainId).toSet.size)
           Left(
             s"Some domains are not unique in the response: ${response.sent}"
@@ -1236,7 +1275,6 @@ object ParticipantAdminCommands {
               } yield domainId -> sentCmts
             )
             .map(_.toMap)
-      }
     }
 
     final case class SentAcsCmt(
@@ -1249,7 +1287,7 @@ object ParticipantAdminCommands {
 
     private def fromProtoToSentAcsCmt(
         cmt: v30.SentAcsCommitment
-    ): Either[String, SentAcsCmt] = {
+    ): Either[String, SentAcsCmt] =
       for {
         state <- SentCmtState.fromProtoV30(cmt.state).leftMap(_.toString)
         period <- fromIntervalToCommitmentPeriod(cmt.interval)
@@ -1271,7 +1309,6 @@ object ParticipantAdminCommands {
           .flatten,
         state,
       )
-    }
 
     // TODO(#10436) R7: The code below should be sufficient.
     final case class SetConfigForSlowCounterParticipants(
@@ -1310,7 +1347,7 @@ object ParticipantAdminCommands {
         thresholdDefault: NonNegativeInt,
         participantsMetrics: Seq[ParticipantId],
     ) {
-      def toProtoV30: v30.SlowCounterParticipantDomainConfig = {
+      def toProtoV30: v30.SlowCounterParticipantDomainConfig =
         v30.SlowCounterParticipantDomainConfig(
           domainIds.map(_.toProtoPrimitive),
           distinguishedParticipants.map(_.toProtoPrimitive),
@@ -1318,7 +1355,6 @@ object ParticipantAdminCommands {
           thresholdDefault.value.toLong,
           participantsMetrics.map(_.toProtoPrimitive),
         )
-      }
     }
 
     object SlowCounterParticipantDomainConfig {
@@ -1406,7 +1442,7 @@ object ParticipantAdminCommands {
 
       override def handleResponse(
           response: v30.GetIntervalsBehindForCounterParticipants.Response
-      ): Either[String, Seq[CounterParticipantInfo]] = {
+      ): Either[String, Seq[CounterParticipantInfo]] =
         response.intervalsBehind.map { info =>
           for {
             domainId <- DomainId.fromString(info.domainId)
@@ -1428,7 +1464,37 @@ object ParticipantAdminCommands {
             asOf.toInstant,
           )
         }.sequence
-      }
+    }
+
+    final case class CountInFlight(domainId: DomainId)
+        extends Base[
+          v30.CountInFlight.Request,
+          v30.CountInFlight.Response,
+          InFlightCount,
+        ] {
+
+      override def createRequest(): Either[String, v30.CountInFlight.Request] =
+        Right(v30.CountInFlight.Request(domainId.toProtoPrimitive))
+
+      override def submitRequest(
+          service: InspectionServiceStub,
+          request: v30.CountInFlight.Request,
+      ): Future[v30.CountInFlight.Response] =
+        service.countInFlight(request)
+
+      override def handleResponse(
+          response: v30.CountInFlight.Response
+      ): Either[String, InFlightCount] =
+        for {
+          pendingSubmissions <- ProtoConverter
+            .parseNonNegativeInt("CountInFlight.pending_submissions", response.pendingSubmissions)
+            .leftMap(_.toString)
+          pendingTransactions <- ProtoConverter
+            .parseNonNegativeInt("CountInFlight.pending_transactions", response.pendingTransactions)
+            .leftMap(_.toString)
+        } yield {
+          InFlightCount(pendingSubmissions, pendingTransactions)
+        }
     }
 
   }
@@ -1441,18 +1507,14 @@ object ParticipantAdminCommands {
         PruningServiceGrpc.stub(channel)
     }
 
-    final case class GetSafePruningOffsetCommand(beforeOrAt: Instant, ledgerEnd: ParticipantOffset)
+    final case class GetSafePruningOffsetCommand(beforeOrAt: Instant, ledgerEnd: String)
         extends Base[v30.GetSafePruningOffsetRequest, v30.GetSafePruningOffsetResponse, Option[
-          ParticipantOffset
+          String
         ]] {
 
       override def createRequest(): Either[String, v30.GetSafePruningOffsetRequest] =
         for {
           beforeOrAt <- CantonTimestamp.fromInstant(beforeOrAt)
-          ledgerEnd <- ledgerEnd.value match {
-            case Value.Absolute(value) => Right(value)
-            case other => Left(s"Unable to convert ledger_end `$other` to absolute value")
-          }
         } yield v30.GetSafePruningOffsetRequest(Some(beforeOrAt.toProtoTimestamp), ledgerEnd)
 
       override def submitRequest(
@@ -1462,22 +1524,20 @@ object ParticipantAdminCommands {
 
       override def handleResponse(
           response: v30.GetSafePruningOffsetResponse
-      ): Either[String, Option[ParticipantOffset]] = response.response match {
+      ): Either[String, Option[String]] = response.response match {
         case v30.GetSafePruningOffsetResponse.Response.Empty => Left("Unexpected empty response")
 
         case v30.GetSafePruningOffsetResponse.Response.SafePruningOffset(offset) =>
-          Right(Some(UpstreamOffsetConvert.toParticipantOffset(offset)))
+          Right(Some(offset))
 
         case v30.GetSafePruningOffsetResponse.Response.NoSafePruningOffset(_) => Right(None)
       }
     }
 
-    final case class PruneInternallyCommand(pruneUpTo: ParticipantOffset)
+    final case class PruneInternallyCommand(pruneUpTo: String)
         extends Base[v30.PruneRequest, v30.PruneResponse, Unit] {
       override def createRequest(): Either[String, PruneRequest] =
-        pruneUpTo.value.absolute
-          .toRight("The pruneUpTo ledger offset needs to be absolute")
-          .map(v30.PruneRequest(_))
+        Right(v30.PruneRequest(pruneUpTo))
 
       override def submitRequest(
           service: PruningServiceStub,
@@ -1534,21 +1594,17 @@ object ParticipantAdminCommands {
     final case class SetNoWaitCommitmentsFrom(
         counterParticipants: Seq[ParticipantId],
         domainIds: Seq[DomainId],
-        startingAt: Either[Instant, ParticipantOffset],
+        startingAt: Either[Instant, String],
     ) extends Base[
           pruning.v30.SetNoWaitCommitmentsFrom.Request,
           pruning.v30.SetNoWaitCommitmentsFrom.Response,
           Map[ParticipantId, Seq[DomainId]],
         ] {
-      override def createRequest(): Either[String, pruning.v30.SetNoWaitCommitmentsFrom.Request] = {
+      override def createRequest(): Either[String, pruning.v30.SetNoWaitCommitmentsFrom.Request] =
         for {
           tsOrOffset <- startingAt match {
             case Right(offset) =>
-              offset.value match {
-                case Value.Absolute(value) =>
-                  Right(Right(value).withLeft[CantonTimestamp]).withLeft[String]
-                case other => Left(s"Unable to convert ledger_end `$other` to absolute value")
-              }
+              Right(Right(offset).withLeft[CantonTimestamp]).withLeft[String]
             case Left(ts) =>
               CantonTimestamp.fromInstant(ts) match {
                 case Left(value) => Left(value)
@@ -1566,7 +1622,6 @@ object ParticipantAdminCommands {
           },
           domainIds.map(_.toProtoPrimitive),
         )
-      }
 
       override def submitRequest(
           service: Svc,
@@ -1595,7 +1650,7 @@ object ParticipantAdminCommands {
     // TODO(#18453) R6: The code below should be sufficient.
     final case class NoWaitCommitments(
         counterParticipant: ParticipantId,
-        startingAt: Either[Instant, ParticipantOffset],
+        startingAt: Either[Instant, String],
         domains: Seq[DomainId],
         state: SharedContractsState,
     )
@@ -1611,7 +1666,7 @@ object ParticipantAdminCommands {
             }
             offset <- setup.timestampOrOffsetActive match {
               case NoWaitCommitmentsSetup.TimestampOrOffsetActive.PruningOffset(offset) =>
-                Right(UpstreamOffsetConvert.toParticipantOffset(offset))
+                Right(offset)
               case _ => Left("Conversion error for Offset in ignoredParticipants")
             }
             domains <- setup.domainIds.traverse(_.domainIds.traverse(DomainId.fromString))
@@ -1625,7 +1680,7 @@ object ParticipantAdminCommands {
             participantId,
             setup.timestampOrOffsetActive match {
               case NoWaitCommitmentsSetup.TimestampOrOffsetActive.SequencingTimestamp(_) =>
-                ts.toInstant.asLeft[ParticipantOffset]
+                ts.toInstant.asLeft[String]
               case _ => offset.asRight[Instant]
             },
             domains.getOrElse(Seq.empty),
@@ -1851,7 +1906,7 @@ object ParticipantAdminCommands {
 
       override def handleResponse(
           response: TrafficControlStateResponse
-      ): Either[String, TrafficState] = {
+      ): Either[String, TrafficState] =
         response.trafficState
           .map { trafficStatus =>
             TrafficStateAdmin
@@ -1859,7 +1914,41 @@ object ParticipantAdminCommands {
               .leftMap(_.message)
           }
           .getOrElse(Left("No traffic state available"))
-      }
+    }
+  }
+
+  object Health {
+    final case class ParticipantStatusCommand()
+        extends NodeStatusCommand[
+          ParticipantStatus,
+          ParticipantStatusRequest,
+          ParticipantStatusResponse,
+        ] {
+
+      override type Svc = ParticipantStatusServiceStub
+
+      override def createService(channel: ManagedChannel): ParticipantStatusServiceStub =
+        ParticipantStatusServiceGrpc.stub(channel)
+
+      override def getStatus(
+          service: ParticipantStatusServiceStub,
+          request: ParticipantStatusRequest,
+      ): Future[ParticipantStatusResponse] = service.participantStatus(request)
+
+      override def submitRequest(
+          service: ParticipantStatusServiceStub,
+          request: ParticipantStatusRequest,
+      ): Future[ParticipantStatusResponse] =
+        submitReq(service, request)
+
+      override def createRequest(): Either[String, ParticipantStatusRequest] = Right(
+        ParticipantStatusRequest()
+      )
+
+      override def handleResponse(
+          response: ParticipantStatusResponse
+      ): Either[String, NodeStatus[ParticipantStatus]] =
+        ParticipantStatus.fromProtoV30(response).leftMap(_.message)
     }
   }
 

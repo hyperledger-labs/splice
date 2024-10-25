@@ -5,6 +5,10 @@ package com.digitalasset.canton.ledger.participant.state
 
 import com.daml.logging.entries.{LoggingValue, ToLoggingValue}
 import com.digitalasset.canton.data.DeduplicationPeriod
+import com.digitalasset.canton.protocol.{
+  ExternallySignedTransaction,
+  TransactionAuthorizationPartySignatures,
+}
 import com.digitalasset.daml.lf.data.Ref
 
 /** Collects context information for a submission.
@@ -22,9 +26,9 @@ import com.digitalasset.daml.lf.data.Ref
   *                             within all the submissions by the same parties and application.
   * @param deduplicationPeriod  The deduplication period for the command submission.
   *                             Used for the deduplication guarantee described in the
-  *                            [[ReadService.stateUpdates]].
-  * @param submissionId        An identifier for the submission that allows an application to
-  *                            correlate completions to its submissions.
+  *                             [[Update]].
+  * @param submissionId         An identifier for the submission that allows an application to
+  *                             correlate completions to its submissions.
   */
 final case class SubmitterInfo(
     actAs: List[Ref.Party],
@@ -33,6 +37,7 @@ final case class SubmitterInfo(
     commandId: Ref.CommandId,
     deduplicationPeriod: DeduplicationPeriod,
     submissionId: Option[Ref.SubmissionId],
+    externallySignedTransaction: Option[ExternallySignedTransaction],
 ) {
 
   /** The ID for the ledger change */
@@ -50,6 +55,13 @@ final case class SubmitterInfo(
 }
 
 object SubmitterInfo {
+  implicit val `PartySignatures to LoggingValue`
+      : ToLoggingValue[TransactionAuthorizationPartySignatures] = {
+    case TransactionAuthorizationPartySignatures(signatures) =>
+      LoggingValue.Nested.fromEntries(
+        "parties" -> signatures.map(_._1.toProtoPrimitive)
+      )
+  }
   implicit val `SubmitterInfo to LoggingValue`: ToLoggingValue[SubmitterInfo] = {
     case SubmitterInfo(
           actAs,
@@ -58,6 +70,7 @@ object SubmitterInfo {
           commandId,
           deduplicationPeriod,
           submissionId,
+          externallySignedTransaction,
         ) =>
       LoggingValue.Nested.fromEntries(
         "actAs " -> actAs,
@@ -66,6 +79,7 @@ object SubmitterInfo {
         "commandId " -> commandId,
         "deduplicationPeriod " -> deduplicationPeriod,
         "submissionId" -> submissionId,
+        "partySignatures" -> externallySignedTransaction.map(_.signatures),
       )
   }
 }

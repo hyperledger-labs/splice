@@ -8,6 +8,7 @@ import cats.implicits.catsStdInstancesForFuture
 import cats.syntax.either.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
+import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -20,7 +21,12 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.ledger.participant.state.Update
+import com.digitalasset.canton.lifecycle.{
+  FutureUnlessShutdown,
+  PromiseUnlessShutdownFactory,
+  UnlessShutdown,
+}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
@@ -38,13 +44,12 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.{
   CommitSet,
   RequestTracker,
 }
-import com.digitalasset.canton.participant.protocol.submission.CommandDeduplicator.DeduplicationFailed
 import com.digitalasset.canton.participant.protocol.submission.*
+import com.digitalasset.canton.participant.protocol.submission.CommandDeduplicator.DeduplicationFailed
 import com.digitalasset.canton.participant.protocol.validation.RecipientsValidator
 import com.digitalasset.canton.participant.store
 import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
-import com.digitalasset.canton.participant.sync.TimestampedEvent
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.*
@@ -52,11 +57,11 @@ import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.{AsyncResult, HandlerResult}
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, SubmissionTopologyHelper}
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
 import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
-import com.digitalasset.canton.util.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 import com.google.common.annotations.VisibleForTesting
@@ -67,7 +72,7 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Success}
 
 /** The [[ProtocolProcessor]] orchestrates Phase 3, 4, and 7 of the synchronization protocol.
-  * For this, it combines [[ProcessingSteps]] specific to a particular kind of request (transaction / transfer)
+  * For this, it combines [[ProcessingSteps]] specific to a particular kind of request (transaction / reassignment)
   * with the common processing steps.
   *
   * @param steps The specific processing steps
@@ -93,17 +98,16 @@ abstract class ProtocolProcessor[
     crypto: DomainSyncCryptoClient,
     sequencerClient: SequencerClientSend,
     domainId: DomainId,
-    staticDomainParameters: StaticDomainParameters,
     protocolVersion: ProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
+    promiseFactory: PromiseUnlessShutdownFactory,
 )(implicit
     ec: ExecutionContext
 ) extends AbstractMessageProcessor(
       ephemeral,
       crypto,
       sequencerClient,
-      staticDomainParameters,
       protocolVersion,
     )
     with RequestProcessor[RequestViewType] {
@@ -321,8 +325,10 @@ abstract class ProtocolProcessor[
         // because the regular timely rejection mechanism has already emitted the command timeout
         // or ongoing processing of the message that triggers the timeout will anyway pick up the old or the updated
         // tracking data.
-        _ = if (maxSequencingTime > timestamp)
+        _ = if (maxSequencingTime > timestamp) {
+          logger.debug(s"Renotifying the in-flight submission tracker for timestamp $timestamp")
           ephemeral.timelyRejectNotifier.notifyIfInPastAsync(timestamp)
+        }
       } yield tracked.onDefinitiveFailure
       FutureUnlessShutdown.outcomeF(fut)
     }
@@ -334,7 +340,7 @@ abstract class ProtocolProcessor[
         mayHaveBeenSent: Boolean,
     )(
         continuation: A => FutureUnlessShutdown[SubmissionResult]
-    ): FutureUnlessShutdown[SubmissionResult] = {
+    ): FutureUnlessShutdown[SubmissionResult] =
       eitherT.value.transformWith {
         case Success(UnlessShutdown.Outcome(Right(a))) => continuation(a)
         case Success(UnlessShutdown.Outcome(Left(newTrackingData))) =>
@@ -363,7 +369,6 @@ abstract class ProtocolProcessor[
             observeSubmissionError(trackingData)
           }
       }
-    }
 
     def afterRegistration(
         deduplicationResult: Either[DeduplicationFailed, DeduplicationPeriod.DeduplicationOffset]
@@ -429,6 +434,8 @@ abstract class ProtocolProcessor[
     registeredF.mapK(FutureUnlessShutdown.outcomeK).map(afterRegistration)
   }
 
+  protected def metricsContextForSubmissionParam(submissionParam: SubmissionParam): MetricsContext
+
   /** Submit the batch to the sequencer.
     * Also registers `submissionParam` as pending submission.
     */
@@ -446,11 +453,12 @@ abstract class ProtocolProcessor[
     steps.SubmissionSendError,
     (SendResult, steps.SubmissionResultArgs),
   ] = {
-    def removePendingSubmission(): Unit = {
+    implicit val metricsContext: MetricsContext = metricsContextForSubmissionParam(submissionParam)
+
+    def removePendingSubmission(): Unit =
       steps
         .removePendingSubmission(steps.pendingSubmissions(ephemeral), submissionId)
         .discard[Option[steps.PendingSubmissionData]]
-    }
 
     for {
       // The pending submission must be registered before the request is sent, to avoid races
@@ -468,7 +476,11 @@ abstract class ProtocolProcessor[
       )
 
       // use the send callback and a promise to capture the eventual sequenced event read by the submitter
-      sendResultP = mkPromise[SendResult](
+      // We use a promise produced by the passed-in promise factory instead of `SendCallback.future` so that
+      // we stop waiting for the result as soon as the promise factory (typically the sync domain) is closed.
+      // This way, we can safely wrap the submission in a `performUnlessClosing*F` call without getting into
+      // tricky shutdown order dependencies.
+      sendResultP = promiseFactory.mkPromise[SendResult](
         "sequenced-event-send-result",
         futureSupervisor,
       )
@@ -523,34 +535,39 @@ abstract class ProtocolProcessor[
 
     val removeF = for {
       domainParameters <- crypto.ips
-        .awaitSnapshot(submissionTimestamp)
-        .flatMap(_.findDynamicDomainParameters())
-        .flatMap(_.toFuture(new RuntimeException(_)))
+        .awaitSnapshotUS(submissionTimestamp)
+        .flatMap(snapshot => FutureUnlessShutdown.outcomeF(snapshot.findDynamicDomainParameters()))
+        .flatMap(_.toFutureUS(new RuntimeException(_)))
 
       decisionTime <- domainParameters.decisionTimeForF(submissionTimestamp)
       _ = ephemeral.timeTracker.requestTick(decisionTime)
-      _ <- ephemeral.requestTracker.awaitTimestamp(decisionTime).getOrElse(Future.unit).map { _ =>
-        steps.removePendingSubmission(steps.pendingSubmissions(ephemeral), submissionId).foreach {
-          submissionData =>
-            logger.debug(s"Removing sent submission $submissionId without a result.")
-            steps.postProcessResult(
-              Verdict.ParticipantReject(
-                NonEmpty(
-                  List,
-                  Set.empty[LfPartyId] ->
-                    LocalRejectError.TimeRejects.LocalTimeout
-                      .Reject()
-                      .toLocalReject(protocolVersion),
-                ),
-                protocolVersion,
+      _ <- ephemeral.requestTracker
+        .awaitTimestampUS(decisionTime)
+        .getOrElse(FutureUnlessShutdown.unit)
+    } yield {
+      steps.removePendingSubmission(steps.pendingSubmissions(ephemeral), submissionId).foreach {
+        submissionData =>
+          logger.debug(s"Removing sent submission $submissionId without a result.")
+          steps.postProcessResult(
+            Verdict.ParticipantReject(
+              NonEmpty(
+                List,
+                Set.empty[LfPartyId] ->
+                  LocalRejectError.TimeRejects.LocalTimeout
+                    .Reject()
+                    .toLocalReject(protocolVersion),
               ),
-              submissionData,
-            )
-        }
+              protocolVersion,
+            ),
+            submissionData,
+          )
       }
-    } yield ()
+    }
 
-    FutureUtil.doNotAwait(removeF, s"Failed to remove the pending submission $submissionId")
+    FutureUtil.doNotAwaitUnlessShutdown(
+      removeF,
+      s"Failed to remove the pending submission $submissionId",
+    )
   }
 
   private def handlerResultForRequest(
@@ -560,12 +577,11 @@ abstract class ProtocolProcessor[
         steps.RequestError,
         EitherT[FutureUnlessShutdown, steps.RequestError, Unit],
       ],
-  )(implicit traceContext: TraceContext): HandlerResult = {
+  )(implicit traceContext: TraceContext): HandlerResult =
     // We discard the lefts because they are logged by `logRequestWarnings`
     logRequestWarnings(ts, result)
       .map(innerAsync => AsyncResult(innerAsync.getOrElse(())))
       .getOrElse(AsyncResult.immediate)
-  }
 
   private[this] def logRequestWarnings(
       resultTimestamp: CantonTimestamp,
@@ -599,7 +615,7 @@ abstract class ProtocolProcessor[
       sc: SequencerCounter,
       batch: steps.RequestBatch,
   )(implicit traceContext: TraceContext): HandlerResult = {
-    val RequestAndRootHashMessage(viewMessages, rootHashMessage, mediatorId, _isReceipt) = batch
+    val RequestAndRootHashMessage(_viewMessages, _rootHashMessage, _mediatorId, _isReceipt) = batch
     val requestId = RequestId(ts)
 
     if (precedesCleanReplay(requestId)) {
@@ -710,9 +726,8 @@ abstract class ProtocolProcessor[
               )
             )
         ).mapK(FutureUnlessShutdown.outcomeK)
-
         decryptedViews <- steps
-          .decryptViews(viewMessages, snapshot, ephemeral.sessionKeyStore)
+          .decryptViews(viewMessages, snapshot, ephemeral.sessionKeyStore.convertStore)
       } yield (snapshot, decryptedViews, domainParameters)
 
       for {
@@ -916,7 +931,7 @@ abstract class ProtocolProcessor[
       error: TransactionError,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, steps.RequestError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, steps.RequestError, Unit] =
     for {
       freshOwnTimelyTx <- EitherT.right(freshOwnTimelyTxF)
 
@@ -934,13 +949,8 @@ abstract class ProtocolProcessor[
         }
         .getOrElse((None, None))
 
-      _ <- EitherT.right(
-        FutureUnlessShutdown.outcomeF(
-          unlessCleanReplay(rc)(
-            ephemeral.recordOrderPublisher.schedulePublication(sc, rc, ts, eventO)
-          )
-        )
-      )
+      eventToPublishO = if (!isCleanReplay(rc)) eventO else None
+
       pendingSubmissionDataO = submissionIdO.flatMap(submissionId =>
         // This removal does not interleave with `schedulePendingSubmissionRemoval`
         // as the sequencer respects the max sequencing time of the request.
@@ -955,10 +965,9 @@ abstract class ProtocolProcessor[
       )
       _ <- EitherT.right[steps.RequestError] {
         requestDataHandle.complete(None)
-        invalidRequest(rc, sc, ts)
+        invalidRequest(rc, sc, ts, eventToPublishO)
       }
     } yield ()
-  }
 
   private def processRequestWithGoodViews(
       parsedRequest: steps.ParsedRequestType,
@@ -982,8 +991,7 @@ abstract class ProtocolProcessor[
         if (mediatorIsActive)
           for {
             activenessSet <- EitherT.fromEither[FutureUnlessShutdown](
-              steps
-                .computeActivenessSet(parsedRequest)
+              steps.computeActivenessSet(parsedRequest)
             )
             _ <- trackAndSendResponsesWellformed(
               parsedRequest,
@@ -1069,7 +1077,7 @@ abstract class ProtocolProcessor[
           val responses = EitherT.pure[FutureUnlessShutdown, steps.RequestError](
             Seq.empty[(ConfirmationResponse, Recipients)]
           )
-          val timeoutEvent = Either.right(Option.empty[TimestampedEvent])
+          val timeoutEvent = Either.right(Option.empty[Traced[Update]])
           EitherT.pure[FutureUnlessShutdown, steps.RequestError](
             (pendingData, responses, () => timeoutEvent)
           )
@@ -1081,7 +1089,7 @@ abstract class ProtocolProcessor[
 
             pendingDataAndResponses <- steps.constructPendingDataAndResponse(
               parsedRequest,
-              ephemeral.transferCache,
+              ephemeral.reassignmentCache,
               requestFuturesF.flatMap(_.activenessResult),
               engineController,
             )
@@ -1097,10 +1105,7 @@ abstract class ProtocolProcessor[
               _,
               _locallyRejected,
             ) = pendingData
-            _ = if (
-              pendingRequestCounter != rc
-              || pendingSequencerCounter != sc
-            )
+            _ = if (pendingRequestCounter != rc || pendingSequencerCounter != sc)
               throw new RuntimeException("Pending result data inconsistent with request")
 
           } yield (
@@ -1128,8 +1133,7 @@ abstract class ProtocolProcessor[
         .right(requestFutures.timeoutResult)
         .flatMap(
           handleTimeout(
-            requestId,
-            rc,
+            parsedRequest,
             sc,
             decisionTime,
             timeoutEvent(),
@@ -1152,7 +1156,7 @@ abstract class ProtocolProcessor[
         } else if (signedResponsesTo.nonEmpty) {
           val messageId = sequencerClient.generateMessageId
           logger.info(
-            s"Phase 4: Sending for request=${requestId.unwrap} with msgId=${messageId} ${val (approved, rejected) =
+            s"Phase 4: Sending for request=${requestId.unwrap} with msgId=$messageId ${val (approved, rejected) =
                 signedResponsesTo
                   .foldLeft((0, 0)) { case ((app, rej), (response, _)) =>
                     response.message.localVerdict match {
@@ -1160,7 +1164,7 @@ abstract class ProtocolProcessor[
                       case _: LocalReject => (app, rej + 1)
                     }
                   }
-              s"approved=${approved}, rejected=${rejected}" }"
+              s"approved=$approved, rejected=$rejected" }"
           )
           EitherT.right[steps.RequestError](
             sendResponses(requestId, signedResponsesTo, Some(messageId))
@@ -1221,7 +1225,7 @@ abstract class ProtocolProcessor[
         _ = requestDataHandle.complete(None)
 
         _ <- EitherT.right[steps.RequestError](
-          FutureUnlessShutdown.outcomeF(terminateRequest(rc, sc, ts, ts))
+          FutureUnlessShutdown.outcomeF(terminateRequest(rc, sc, ts, ts, None))
         )
       } yield ()
     }
@@ -1234,12 +1238,11 @@ abstract class ProtocolProcessor[
         steps.ResultError,
         EitherT[FutureUnlessShutdown, steps.ResultError, Unit],
       ],
-  )(implicit traceContext: TraceContext): HandlerResult = {
+  )(implicit traceContext: TraceContext): HandlerResult =
     // We discard the lefts because they are logged by `logResultWarnings`
     logResultWarnings(ts, result)
       .map(innerAsync => AsyncResult(innerAsync.getOrElse(())))
       .getOrElse(AsyncResult.immediate)
-  }
 
   override def processResult(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]]
@@ -1282,11 +1285,13 @@ abstract class ProtocolProcessor[
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, steps.ResultError, EitherT[FutureUnlessShutdown, steps.ResultError, Unit]] = {
-    ephemeral.recordOrderPublisher.tick(sc, resultTs)
-
     val snapshotTs = requestId.unwrap
 
     for {
+      _ <- EitherT.right(
+        ephemeral.recordOrderPublisher.tick(sc, resultTs, eventO = None, requestCounterO = None)
+      )
+
       snapshot <- EitherT.right(
         crypto.ips.awaitSnapshotSupervised(s"await crypto snapshot $snapshotTs")(snapshotTs)
       )
@@ -1378,10 +1383,12 @@ abstract class ProtocolProcessor[
 
     def filterInvalidSignature(
         pendingRequestData: PendingRequestData
-    ): Future[Boolean] =
+    ): FutureUnlessShutdown[Boolean] =
       for {
-        snapshot <- crypto.awaitSnapshot(requestId.unwrap)
-        res <- result.verifyMediatorSignatures(snapshot, pendingRequestData.mediator.group).value
+        snapshot <- crypto.awaitSnapshotUS(requestId.unwrap)
+        res <- FutureUnlessShutdown.outcomeF(
+          result.verifyMediatorSignatures(snapshot, pendingRequestData.mediator.group).value
+        )
       } yield {
         res match {
           case Left(err) =>
@@ -1399,7 +1406,7 @@ abstract class ProtocolProcessor[
 
     def filterInvalidRootHash(
         pendingRequestDataOrReplayData: PendingRequestData
-    ): Future[Boolean] = Future.successful {
+    ): FutureUnlessShutdown[Boolean] = FutureUnlessShutdown.pure {
       pendingRequestDataOrReplayData.rootHashO.forall { txRootHash =>
         val resultRootHash = unsignedResult.rootHash
         val rootHashMatches = resultRootHash == txRootHash
@@ -1419,7 +1426,7 @@ abstract class ProtocolProcessor[
       (prd: PendingRequestData) =>
         MonadUtil
           .foldLeftM(true, Seq(filterInvalidSignature _, filterInvalidRootHash _))((acc, x) =>
-            if (acc) x(prd) else Future.successful(acc)
+            if (acc) x(prd) else FutureUnlessShutdown.pure(acc)
           )
 
     // Wait until we have processed the corresponding request
@@ -1560,29 +1567,11 @@ abstract class ProtocolProcessor[
       )
 
       _ <- ifThenET(!cleanReplay) {
+        logger.info(
+          show"Finalizing ${steps.requestKind.unquoted} request=${requestId.unwrap} with event ${eventO
+              .map(_.value)}."
+        )
         for {
-          _unit <- {
-            logger.info(
-              show"Finalizing ${steps.requestKind.unquoted} request=${requestId.unwrap} with event $eventO."
-            )
-
-            // Schedule publication of the event with the associated causality update.
-            // Note that both fields are optional.
-            // Some events (such as rejection events) are not associated with causality updates.
-            // Additionally, we may process a causality update without an associated event (this happens on transfer-in)
-            EitherT.right[steps.ResultError](
-              FutureUnlessShutdown.outcomeF(
-                ephemeral.recordOrderPublisher
-                  .schedulePublication(
-                    requestSequencerCounter,
-                    requestCounter,
-                    requestId.unwrap,
-                    eventO,
-                  )
-              )
-            )
-          }
-
           commitSet <- EitherT.right[steps.ResultError](commitSetF)
           _ = ephemeral.recordOrderPublisher.scheduleAcsChangePublication(
             requestSequencerCounter,
@@ -1590,7 +1579,7 @@ abstract class ProtocolProcessor[
             requestCounter,
             commitSet,
           )
-          _ = logger.info(show"About to wrap up request ${requestId}")
+          _ = logger.info(show"About to wrap up request $requestId")
           requestTimestamp = requestId.unwrap
           _unit <- EitherT.right[steps.ResultError](
             FutureUnlessShutdown.outcomeF(
@@ -1599,18 +1588,19 @@ abstract class ProtocolProcessor[
                 requestSequencerCounter,
                 requestTimestamp,
                 commitTime,
+                eventO,
               )
             )
           )
         } yield pendingSubmissionDataO.foreach(steps.postProcessResult(verdict, _))
       }
-    } yield logger.info(show"Finished async result processing of request ${requestId}")
+    } yield logger.info(show"Finished async result processing of request $requestId")
   }
 
   private def checkContradictoryMediatorApprove(
       locallyRejected: Boolean,
       verdict: Verdict,
-  )(implicit traceContext: TraceContext): Unit = {
+  )(implicit traceContext: TraceContext): Unit =
     if (
       isApprovalContradictionCheckEnabled(
         loggerFactory.name
@@ -1618,7 +1608,6 @@ abstract class ProtocolProcessor[
     ) {
       ErrorUtil.invalidState(s"Mediator approved a request that we have locally rejected")
     }
-  }
 
   private[this] def logResultWarnings(
       resultTimestamp: CantonTimestamp,
@@ -1657,7 +1646,7 @@ abstract class ProtocolProcessor[
               show"${steps.requestKind.unquoted} request at $requestId: Received event at $resultTimestamp for request that is invalid"
             )
             Right(default)
-          case err => Left(processorError)
+          case _err => Left(processorError)
         }
       }
 
@@ -1713,20 +1702,20 @@ abstract class ProtocolProcessor[
     for {
       _ <- EitherT
         .fromEither[Future](ephemeral.requestTracker.addResult(rc, sc, resultTimestamp, commitTime))
-        .leftMap(e => {
+        .leftMap { e =>
           SyncServiceAlarm.Warn(s"Failed to add result for $requestId. $e").report()
           e
-        })
+        }
       commitSetF = commitSetOF.getOrElse(Future.successful(CommitSet.empty))
       commitSetT <- EitherT.right(commitSetF.transform(Success(_)))
       commitFuture <- EitherT
         .fromEither[Future](ephemeral.requestTracker.addCommitSet(rc, commitSetT))
-        .leftMap(e => {
+        .leftMap { e =>
           SyncServiceAlarm
             .Warn(s"Unexpected confirmation result message for $requestId. $e")
             .report()
           e: RequestTracker.RequestTrackerError
-        })
+        }
     } yield {
       commitFuture
         .valueOr(e =>
@@ -1739,39 +1728,37 @@ abstract class ProtocolProcessor[
   }
 
   private def handleTimeout(
-      requestId: RequestId,
-      requestCounter: RequestCounter,
+      parsedRequest: steps.ParsedRequestType,
       sequencerCounter: SequencerCounter,
       decisionTime: CantonTimestamp,
-      timeoutEvent: => Either[steps.ResultError, Option[TimestampedEvent]],
+      timeoutEvent: => Either[steps.ResultError, Option[Traced[Update]]],
   )(
       result: TimeoutResult
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, steps.ResultError, Unit] =
     if (result.timedOut) {
+      val requestId = parsedRequest.requestId
+      val requestCounter = parsedRequest.rc
+
       logger.info(
         show"${steps.requestKind.unquoted} request at $requestId timed out without a transaction result message."
       )
 
-      def publishEvent(): EitherT[Future, steps.ResultError, Unit] = {
+      def publishEvent(): EitherT[Future, steps.ResultError, Unit] =
         for {
           maybeEvent <- EitherT.fromEither[Future](timeoutEvent)
-          _ <- EitherT.right(
-            ephemeral.recordOrderPublisher
-              .schedulePublication(
-                sequencerCounter,
-                requestCounter,
-                requestId.unwrap,
-                maybeEvent,
-              )
-          )
           requestTimestamp = requestId.unwrap
           _unit <- EitherT.right[steps.ResultError](
-            terminateRequest(requestCounter, sequencerCounter, requestTimestamp, decisionTime)
+            terminateRequest(
+              requestCounter,
+              sequencerCounter,
+              requestTimestamp,
+              decisionTime,
+              maybeEvent,
+            )
           )
         } yield ()
-      }
 
       for {
         pendingRequestDataOrReplayData <- EitherT.right(
@@ -1792,6 +1779,8 @@ abstract class ProtocolProcessor[
 
         // No need to clean up the pending submissions because this is handled (concurrently) by schedulePendingSubmissionRemoval
         cleanReplay = isCleanReplay(requestCounter, pendingRequestDataOrReplayData)
+
+        _ <- steps.handleTimeout(parsedRequest)
 
         _ <- ifThenET(!cleanReplay)(publishEvent()).mapK(FutureUnlessShutdown.outcomeK)
       } yield ()
@@ -1870,20 +1859,20 @@ object ProtocolProcessor {
   final case class SequencerRequestError(sendError: SendAsyncClientError)
       extends SubmissionProcessingError
       with RequestProcessingError {
-    override def pretty: Pretty[SequencerRequestError] = prettyOfParam(_.sendError)
+    override protected def pretty: Pretty[SequencerRequestError] = prettyOfParam(_.sendError)
   }
 
   /** The sequencer refused to sequence the batch for delivery */
   final case class SequencerDeliverError(deliverError: DeliverError)
       extends SubmissionProcessingError
       with RequestProcessingError {
-    override def pretty: Pretty[SequencerDeliverError] = prettyOfParam(_.deliverError)
+    override protected def pretty: Pretty[SequencerDeliverError] = prettyOfParam(_.deliverError)
   }
 
   /** The identity snapshot does not list a mediator, so we cannot pick one. */
   final case class NoMediatorError(topologySnapshotTimestamp: CantonTimestamp)
       extends SubmissionProcessingError {
-    override def pretty: Pretty[NoMediatorError] = prettyOfClass(
+    override protected def pretty: Pretty[NoMediatorError] = prettyOfClass(
       param("topology snapshot timestamp", _.topologySnapshotTimestamp)
     )
   }
@@ -1894,13 +1883,15 @@ object ProtocolProcessor {
   final case class SequencerTimeoutError(timestamp: CantonTimestamp)
       extends SubmissionProcessingError
       with RequestProcessingError {
-    override def pretty: Pretty[SequencerTimeoutError] = prettyOfClass(unnamedParam(_.timestamp))
+    override protected def pretty: Pretty[SequencerTimeoutError] = prettyOfClass(
+      unnamedParam(_.timestamp)
+    )
   }
 
   final case class UnableToGetDynamicDomainParameters(domainId: DomainId, ts: CantonTimestamp)
       extends RequestProcessingError
       with ResultProcessingError {
-    override def pretty: Pretty[UnableToGetDynamicDomainParameters] = prettyOfClass(
+    override protected def pretty: Pretty[UnableToGetDynamicDomainParameters] = prettyOfClass(
       param("domain id", _.domainId),
       param("timestamp", _.ts),
     )
@@ -1909,37 +1900,45 @@ object ProtocolProcessor {
   final case class RequestTrackerError(error: RequestTracker.RequestTrackerError)
       extends RequestProcessingError
       with ResultProcessingError {
-    override def pretty: Pretty[RequestTrackerError] = prettyOfParam(_.error)
+    override protected def pretty: Pretty[RequestTrackerError] = prettyOfParam(_.error)
   }
 
   final case class ContractStoreError(error: NonEmptyChain[store.ContractStoreError])
       extends ResultProcessingError {
-    override def pretty: Pretty[ContractStoreError] = prettyOfParam(_.error.toChain.toList)
+    override protected def pretty: Pretty[ContractStoreError] = prettyOfParam(
+      _.error.toChain.toList
+    )
   }
 
   final case class DecisionTimeElapsed(requestId: RequestId, timestamp: CantonTimestamp)
       extends ResultProcessingError {
-    override def pretty: Pretty[DecisionTimeElapsed] = prettyOfClass(
+    override protected def pretty: Pretty[DecisionTimeElapsed] = prettyOfClass(
       param("request id", _.requestId),
       param("timestamp", _.timestamp),
     )
   }
 
   final case class UnknownPendingRequest(requestId: RequestId) extends ResultProcessingError {
-    override def pretty: Pretty[UnknownPendingRequest] = prettyOfClass(unnamedParam(_.requestId))
+    override protected def pretty: Pretty[UnknownPendingRequest] = prettyOfClass(
+      unnamedParam(_.requestId)
+    )
   }
 
   final case class InvalidPendingRequest(requestId: RequestId) extends ResultProcessingError {
-    override def pretty: Pretty[InvalidPendingRequest] = prettyOfClass(unnamedParam(_.requestId))
+    override protected def pretty: Pretty[InvalidPendingRequest] = prettyOfClass(
+      unnamedParam(_.requestId)
+    )
   }
 
   final case class TimeoutResultTooEarly(requestId: RequestId) extends ResultProcessingError {
-    override def pretty: Pretty[TimeoutResultTooEarly] = prettyOfClass(unnamedParam(_.requestId))
+    override protected def pretty: Pretty[TimeoutResultTooEarly] = prettyOfClass(
+      unnamedParam(_.requestId)
+    )
   }
 
   final case class DomainParametersError(domainId: DomainId, context: String)
       extends ProcessorError {
-    override def pretty: Pretty[DomainParametersError] = prettyOfClass(
+    override protected def pretty: Pretty[DomainParametersError] = prettyOfClass(
       param("domain", _.domainId),
       param("context", _.context.unquoted),
     )
@@ -1950,12 +1949,12 @@ object ProtocolProcessor {
   final case class ViewMessageError[VT <: ViewType](
       error: EncryptedViewMessageError
   ) extends MalformedPayload {
-    override def pretty: Pretty[ViewMessageError.this.type] = prettyOfParam(_.error)
+    override protected def pretty: Pretty[ViewMessageError.this.type] = prettyOfParam(_.error)
   }
 
   final case class WrongRootHash(viewTree: ViewTree, expectedRootHash: RootHash)
       extends MalformedPayload {
-    override def pretty: Pretty[WrongRootHash] = prettyOfClass(
+    override protected def pretty: Pretty[WrongRootHash] = prettyOfClass(
       param("view tree", _.viewTree),
       param("expected root hash", _.expectedRootHash),
     )
@@ -1965,7 +1964,7 @@ object ProtocolProcessor {
 
   final case class WrongRecipients(viewTree: ViewTree) extends WrongRecipientsBase {
 
-    override def pretty: Pretty[WrongRecipients] =
+    override protected def pretty: Pretty[WrongRecipients] =
       prettyOfClass(
         param("viewHash", _.viewTree.viewHash),
         param("viewPosition", _.viewTree.viewPosition),
@@ -1978,7 +1977,7 @@ object ProtocolProcessor {
   final case class WrongRecipientsDueToTopologyChange(viewTree: ViewTree)
       extends WrongRecipientsBase {
 
-    override def pretty: Pretty[WrongRecipientsDueToTopologyChange] =
+    override protected def pretty: Pretty[WrongRecipientsDueToTopologyChange] =
       prettyOfClass(
         param("viewHash", _.viewTree.viewHash),
         param("viewPosition", _.viewTree.viewPosition),
@@ -1989,7 +1988,7 @@ object ProtocolProcessor {
       position: ViewPosition
   ) extends MalformedPayload {
 
-    override def pretty: Pretty[IncompleteLightViewTree] =
+    override protected def pretty: Pretty[IncompleteLightViewTree] =
       prettyOfClass(param("position", _.position))
   }
 
@@ -1997,7 +1996,7 @@ object ProtocolProcessor {
       position: ViewPosition
   ) extends MalformedPayload {
 
-    override def pretty: Pretty[DuplicateLightViewTree] =
+    override protected def pretty: Pretty[DuplicateLightViewTree] =
       prettyOfClass(param("position", _.position))
   }
 }

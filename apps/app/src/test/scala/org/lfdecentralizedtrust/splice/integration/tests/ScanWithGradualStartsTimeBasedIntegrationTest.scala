@@ -152,10 +152,8 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
           ),
         )
       ) { (round, floor, ceil) =>
-        val total1 =
-          sv1ScanBackend.getTotalAmuletBalance(round).valueOrFail("Amulet balance not yet computed")
-        val total2 =
-          sv2ScanBackend.getTotalAmuletBalance(round).valueOrFail("Amulet balance not yet computed")
+        val total1 = sv1ScanBackend.getTotalAmuletBalance(round)
+        val total2 = sv2ScanBackend.getTotalAmuletBalance(round)
         total1 shouldBe total2
         total1 should beWithin(floor, ceil)
       }

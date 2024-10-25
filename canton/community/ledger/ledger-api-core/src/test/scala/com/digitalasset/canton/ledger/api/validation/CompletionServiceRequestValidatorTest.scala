@@ -5,6 +5,7 @@ package com.digitalasset.canton.ledger.api.validation
 
 import com.daml.error.{ContextualizedErrorLogger, NoLogging}
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamRequest as GrpcCompletionStreamRequest
+import com.digitalasset.canton.ledger.api.domain.ParticipantOffset
 import com.digitalasset.canton.ledger.api.messages.command.completion.CompletionStreamRequest
 import com.digitalasset.daml.lf.data.Ref
 import io.grpc.Status.Code.*
@@ -19,12 +20,12 @@ class CompletionServiceRequestValidatorTest
   private val grpcCompletionReq = GrpcCompletionStreamRequest(
     expectedApplicationId,
     List(party),
-    absoluteOffset,
+    offsetLong,
   )
   private val completionReq = CompletionStreamRequest(
     Ref.ApplicationId.assertFromString(expectedApplicationId),
     List(party).toSet,
-    absoluteOffset,
+    offset,
   )
 
   private val validator = new CompletionServiceRequestValidator(
@@ -55,14 +56,26 @@ class CompletionServiceRequestValidatorTest
         )
       }
 
-      "return the correct error on unknown begin boundary" in {
+      "return the correct error on zero begin exclusive offset" in {
         requestMustFailWith(
           request = validator.validateGrpcCompletionStreamRequest(
-            grpcCompletionReq.withBeginExclusive("@#!#$@")
+            grpcCompletionReq.withBeginExclusive(0)
           ),
           code = INVALID_ARGUMENT,
           description =
-            "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: non expected character 0x40 in Daml-LF Ledger String \"@#!#$@\"",
+            "NON_POSITIVE_OFFSET(8,0): Offset 0 in begin_exclusive is not a positive integer: the offset in begin_exclusive field has to be a positive integer (>0)",
+          metadata = Map.empty,
+        )
+      }
+
+      "return the correct error on negative begin exclusive offset" in {
+        requestMustFailWith(
+          request = validator.validateGrpcCompletionStreamRequest(
+            grpcCompletionReq.withBeginExclusive(-100)
+          ),
+          code = INVALID_ARGUMENT,
+          description =
+            "NON_POSITIVE_OFFSET(8,0): Offset -100 in begin_exclusive is not a positive integer: the offset in begin_exclusive field has to be a positive integer (>0)",
           metadata = Map.empty,
         )
       }
@@ -78,7 +91,7 @@ class CompletionServiceRequestValidatorTest
       "tolerate empty offset (participant begin)" in {
         inside(
           validator.validateGrpcCompletionStreamRequest(
-            grpcCompletionReq.withBeginExclusive("")
+            grpcCompletionReq.clearBeginExclusive
           )
         ) { case Right(req) =>
           req.applicationId shouldEqual expectedApplicationId
@@ -117,7 +130,7 @@ class CompletionServiceRequestValidatorTest
         requestMustFailWith(
           request = validator.validateCompletionStreamRequest(
             completionReq.copy(offset =
-              Ref.LedgerString.assertFromString((ledgerEnd.value.toInt + 1).toString)
+              ParticipantOffset.fromString((ledgerEnd.toInt + 1).toString)
             ),
             ledgerEnd,
           ),
@@ -131,7 +144,7 @@ class CompletionServiceRequestValidatorTest
       "tolerate empty offset (participant begin)" in {
         inside(
           validator.validateCompletionStreamRequest(
-            completionReq.copy(offset = ""),
+            completionReq.copy(offset = ParticipantOffset.ParticipantBegin),
             ledgerEnd,
           )
         ) { case Right(req) =>

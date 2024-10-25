@@ -10,6 +10,7 @@ import cats.syntax.parallel.*
 import com.daml.error.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse
+import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -23,7 +24,6 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.AdminWorkflowServices.AbortedDueToShutdownException
 import com.digitalasset.canton.participant.config.LocalParticipantConfig
-import com.digitalasset.canton.participant.ledger.api.CantonAdminToken
 import com.digitalasset.canton.participant.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerError
@@ -32,7 +32,7 @@ import com.digitalasset.canton.topology.TopologyManagerError.{
   NoAppropriateSigningKeyInStore,
   SecretKeyNotInStore,
 }
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, Spanning, TraceContext, Traced, TracerProvider}
 import com.digitalasset.canton.util.FutureInstances.*
@@ -48,15 +48,15 @@ import org.apache.pekko.stream.scaladsl.Flow
 import java.io.InputStream
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-/** Manages our admin workflow applications (ping, dar distribution).
-  * Currently each is individual application with their own ledger connection and acting independently.
+/** Manages our admin workflow applications (ping, party management).
+  * Currently each is an individual application with their own ledger connection and acting independently.
   */
 class AdminWorkflowServices(
     config: LocalParticipantConfig,
     parameters: ParticipantNodeParameters,
     packageService: PackageService,
     syncService: CantonSyncService,
-    adminPartyId: PartyId,
+    participantId: ParticipantId,
     adminToken: CantonAdminToken,
     futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
@@ -90,7 +90,7 @@ class AdminWorkflowServices(
   ) { connection =>
     new PingService(
       connection,
-      adminPartyId,
+      participantId.adminParty,
       parameters.adminWorkflow.bongTestMaxLevel,
       parameters.adminWorkflow.retries,
       NonNegativeFiniteDuration.fromConfig(parameters.adminWorkflow.maxBongDuration),
@@ -109,28 +109,57 @@ class AdminWorkflowServices(
     )
   }
 
-  protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](
-    AsyncCloseable(
-      "connection",
-      pingSubscription.map(conn => Lifecycle.close(conn)(logger)).recover { err =>
-        logger.warn(s"Skipping closing of defunct ping subscription due to ${err.getMessage}")
-      },
-      timeouts.unbounded,
-    ),
-    SyncCloseable(
-      "services",
-      Lifecycle.close(
-        ping
-      )(logger),
-    ),
-  )
+  val partyManagementO
+      : Option[(Future[ResilientLedgerSubscription[?, ?]], PartyReplicationCoordinator)] =
+    Option.when(config.parameters.unsafeEnableOnlinePartyReplication)(
+      createService(
+        "party-management",
+        // TODO(#20637): Don't resubscribe if the ledger api has been pruned as that would mean missing updates that
+        //  the PartyReplicationCoordinator cares about. Instead let the ledger subscription fail after logging an error.
+        resubscribeIfPruned = false,
+      ) { connection =>
+        new PartyReplicationCoordinator(
+          connection,
+          participantId,
+          syncService,
+          clock,
+          futureSupervisor,
+          timeouts,
+          loggerFactory,
+        )
+      }
+    )
+
+  protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    def adminServiceCloseables(
+        name: String,
+        subscription: Future[ResilientLedgerSubscription[?, ?]],
+        service: AdminWorkflowService,
+    ) =
+      Seq[AsyncOrSyncCloseable](
+        AsyncCloseable(
+          s"$name-subscription",
+          subscription.map(sub => Lifecycle.close(sub)(logger)).recover { err =>
+            logger.warn(s"Skipping closing of defunct $name subscription due to ${err.getMessage}")
+          },
+          timeouts.unbounded,
+        ),
+        SyncCloseable(s"$name-service", Lifecycle.close(service)(logger)),
+      )
+
+    adminServiceCloseables("ping", pingSubscription, ping) ++ partyManagementO
+      .fold(Seq.empty[AsyncOrSyncCloseable]) {
+        case (partyManagementSubscription, partyManagement) =>
+          adminServiceCloseables("party-management", partyManagementSubscription, partyManagement)
+      }
+  }
 
   private def checkPackagesStatus(
       pkgs: Map[PackageId, Ast.Package],
       lc: LedgerClient,
   ): Future[Boolean] =
     for {
-      pkgRes <- pkgs.keys.toList.parTraverse(lc.v2.packageService.getPackageStatus(_))
+      pkgRes <- pkgs.keys.toList.parTraverse(lc.packageService.getPackageStatus(_))
     } yield pkgRes.forall(pkgResponse => pkgResponse.packageStatus.isPackageStatusRegistered)
 
   private def handleDamlErrorDuringPackageLoading(
@@ -230,13 +259,13 @@ class AdminWorkflowServices(
     val service = createService(client)
 
     val startupF =
-      client.v2.stateService.getActiveContracts(service.filters).map { case (acs, offset) =>
-        logger.debug(s"Loading ${acs} $service")
+      client.stateService.getActiveContracts(service.filters).map { case (acs, offset) =>
+        logger.debug(s"Loading $acs $service")
         service.processAcs(acs)
         new ResilientLedgerSubscription(
-          subscribeOffset =>
-            client.v2.updateService.getUpdatesSource(subscribeOffset, service.filters),
-          Flow[GetUpdatesResponse]
+          makeSource = subscribeOffset =>
+            client.updateService.getUpdatesSource(subscribeOffset, service.filters),
+          consumingFlow = Flow[GetUpdatesResponse]
             .map(_.update)
             .map {
               case GetUpdatesResponse.Update.Transaction(tx) =>
@@ -247,10 +276,10 @@ class AdminWorkflowServices(
               case GetUpdatesResponse.Update.Empty => ()
             },
           subscriptionName = service.getClass.getSimpleName,
-          offset,
-          ResilientLedgerSubscription.extractOffsetFromGetUpdateResponse,
-          timeouts,
-          loggerFactory,
+          startOffset = offset,
+          extractOffset = ResilientLedgerSubscription.extractOffsetFromGetUpdateResponse,
+          timeouts = timeouts,
+          loggerFactory = loggerFactory,
           resubscribeIfPruned = resubscribeIfPruned,
         )
       }

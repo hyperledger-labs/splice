@@ -7,8 +7,8 @@ import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.api.v30
-import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.NamedLogging.loggerWithoutTracing
 import com.digitalasset.canton.metrics.SequencerClientMetrics
@@ -118,7 +118,7 @@ class GrpcSequencerSubscription[E, R: HasProtoTraceContext] private[transports] 
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     // Signal termination by client
-    val completionF = Future { complete(SubscriptionCloseReason.Closed) }
+    val completionF = Future(complete(SubscriptionCloseReason.Closed))
     val onTimeout = (ex: TimeoutException) => {
       logger.warn(s"Clean close of the ${this.getClass} timed out", ex)
       closeReasonPromise.tryFailure(ex).discard[Boolean]
@@ -197,7 +197,7 @@ class GrpcSequencerSubscription[E, R: HasProtoTraceContext] private[transports] 
       }
     }
 
-    override def onError(t: Throwable): Unit = {
+    override def onError(t: Throwable): Unit =
       t match {
         case s: StatusRuntimeException if s.getStatus.getCode == CANCELLED =>
           if (cancelledByClient.get()) {
@@ -229,7 +229,6 @@ class GrpcSequencerSubscription[E, R: HasProtoTraceContext] private[transports] 
           logger.error("The sequencer subscription failed unexpectedly.", t)
           complete(GrpcSubscriptionUnexpectedException(exception))
       }
-    }
 
     override def onCompleted(): Unit = {
       // Info level, as this occurs from time to time due to the invalidation of the authentication token.
@@ -274,7 +273,7 @@ object GrpcSequencerSubscription {
   private def deserializingSubscriptionHandler[E, R](
       handler: SerializedEventHandler[E],
       fromProto: (R, TraceContext) => ParsingResult[SubscriptionResponse],
-  ): Traced[R] => Future[Either[E, Unit]] = {
+  ): Traced[R] => Future[Either[E, Unit]] =
     withTraceContext { implicit traceContext => responseP =>
       fromProto(responseP, traceContext)
         .fold(
@@ -292,5 +291,4 @@ object GrpcSequencerSubscription {
           },
         )
     }
-  }
 }

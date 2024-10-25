@@ -74,7 +74,7 @@ final case class ViewCommonData private (
 
   override val hashPurpose: HashPurpose = HashPurpose.ViewCommonData
 
-  override def pretty: Pretty[ViewCommonData] = prettyOfClass(
+  override protected def pretty: Pretty[ViewCommonData] = prettyOfClass(
     param("view confirmation parameters", _.viewConfirmationParameters),
     param("salt", _.salt),
   )
@@ -99,7 +99,7 @@ object ViewCommonData
   override val name: String = "ViewCommonData"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.ViewCommonData)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ViewCommonData)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -171,12 +171,12 @@ final case class ViewConfirmationParameters private (
 ) extends PrettyPrinting
     with NoCopy {
 
-  override def pretty: Pretty[ViewConfirmationParameters] = prettyOfClass(
+  override protected def pretty: Pretty[ViewConfirmationParameters] = prettyOfClass(
     param("informees", _.informees),
     param("quorums", _.quorums),
   )
 
-  lazy val confirmers: Set[LfPartyId] = quorums.flatMap { _.confirmers.keys }.toSet
+  lazy val confirmers: Set[LfPartyId] = quorums.flatMap(_.confirmers.keys).toSet
 }
 
 object ViewConfirmationParameters {
@@ -208,14 +208,14 @@ object ViewConfirmationParameters {
     */
   def createOnlyWithConfirmers(
       confirmers: Map[LfPartyId, PositiveInt],
-      threshold: NonNegativeInt,
+      viewThreshold: NonNegativeInt,
   ): ViewConfirmationParameters =
     ViewConfirmationParameters(
       confirmers.keySet,
       Seq(
         Quorum(
           confirmers,
-          threshold,
+          viewThreshold,
         )
       ),
     )

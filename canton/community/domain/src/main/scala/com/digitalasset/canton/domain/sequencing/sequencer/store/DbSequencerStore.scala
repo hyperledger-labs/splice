@@ -4,16 +4,18 @@
 package com.digitalasset.canton.domain.sequencing.sequencer.store
 
 import cats.data.EitherT
+import cats.instances.future.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.catsinstances.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveNumeric}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.block.UninitializedBlockHeight
 import com.digitalasset.canton.domain.sequencing.sequencer.{
@@ -24,26 +26,25 @@ import com.digitalasset.canton.domain.sequencing.sequencer.{
 }
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.DbStorage.*
 import com.digitalasset.canton.resource.DbStorage.DbAction.ReadOnly
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.*
-import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Oracle, Postgres}
-import com.digitalasset.canton.resource.DbStorage.*
+import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Postgres}
+import com.digitalasset.canton.resource.{DbParameterUtils, DbStorage}
 import com.digitalasset.canton.sequencing.protocol.MessageId
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
-import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, retry}
+import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.{EitherTUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
-import com.zaxxer.hikari.pool.HikariProxyConnection
-import oracle.jdbc.{OracleArray, OracleConnection}
 import org.h2.api.ErrorCode as H2ErrorCode
 import org.postgresql.util.PSQLState
 import slick.jdbc.*
 
-import java.sql.{Connection, JDBCType, SQLException, SQLNonTransientException}
+import java.sql.SQLException
 import java.util.UUID
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedSet
@@ -56,11 +57,10 @@ import scala.util.{Failure, Success}
 class DbSequencerStore(
     storage: DbStorage,
     protocolVersion: ProtocolVersion,
-    maxInClauseSize: PositiveNumeric[Int],
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
     sequencerMember: Member,
-    unifiedSequencer: Boolean,
+    override val blockSequencerMode: Boolean,
     overrideCloseContext: Option[CloseContext] = None,
 )(protected implicit val executionContext: ExecutionContext)
     extends SequencerStore
@@ -78,81 +78,18 @@ class DbSequencerStore(
       .getOrElse(CloseContext(this))
 
   private implicit val setRecipientsArrayOParameter
-      : SetParameter[Option[NonEmpty[SortedSet[SequencerMemberId]]]] = (v, pp) => {
-    storage.profile match {
-      case _: Oracle =>
-        val OracleIntegerArray = "INTEGER_ARRAY"
-
-        val maybeArray: Option[Array[Int]] = v.map(_.toArray.map(_.unwrap))
-
-        // make sure we do the right thing whether we are using a connection pooled connection or not
-        val jdbcArray = maybeArray.map {
-          pp.ps.getConnection match {
-            case hikari: HikariProxyConnection =>
-              hikari.unwrap(classOf[OracleConnection]).createARRAY(OracleIntegerArray, _)
-            case oracle: OracleConnection =>
-              oracle.createARRAY(OracleIntegerArray, _)
-            case c: Connection =>
-              sys.error(
-                s"Unsupported connection type for creating Oracle integer array: ${c.getClass.getSimpleName}"
-              )
-          }
-        }
-
-        // we need to bypass the slick wrapper because we need to call the setNull method below tailored for
-        // user defined types since we are using a custom oracle array
-        def setOracleArrayOption(value: Option[AnyRef], sqlType: Int): Unit = {
-          val npos = pp.pos + 1
-          value match {
-            case Some(v) => pp.ps.setObject(npos, v, sqlType)
-            case None => pp.ps.setNull(npos, sqlType, OracleIntegerArray)
-          }
-          pp.pos = npos
-        }
-        setOracleArrayOption(jdbcArray, JDBCType.ARRAY.getVendorTypeNumber)
-
-      case _ =>
-        val jdbcArray = v
-          .map(_.toArray.map(id => Int.box(id.unwrap): AnyRef))
-          .map(pp.ps.getConnection.createArrayOf("integer", _))
-
-        pp.setObjectOption(jdbcArray, JDBCType.ARRAY.getVendorTypeNumber)
-
-    }
-  }
+      : SetParameter[Option[NonEmpty[SortedSet[SequencerMemberId]]]] =
+    (v, pp) => DbParameterUtils.setArrayIntOParameterDb(v.map(_.toArray.map(_.unwrap)), pp)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
   private implicit val getRecipientsArrayOResults
-      : GetResult[Option[NonEmpty[SortedSet[SequencerMemberId]]]] = {
-
-    def toInt(a: AnyRef) = a match {
-      case s: String => s.toInt
-      case null =>
-        throw new SQLNonTransientException(s"Cannot convert object array element null to Int")
-      case invalid =>
-        throw new SQLNonTransientException(
-          s"Cannot convert object array element (of type ${invalid.getClass.getName}) to Int"
-        )
-    }
-
-    storage.profile match {
-      case _: Oracle =>
-        GetResult(r => Option(r.rs.getArray(r.skip.currentPos)))
-          .andThen(_.map(_.asInstanceOf[OracleArray].getIntArray))
-          .andThen(_.map(_.map(SequencerMemberId(_))))
-          .andThen(_.map(arr => NonEmptyUtil.fromUnsafe(SortedSet(arr.toSeq*))))
-      case _: H2 =>
-        GetResult(r => Option(r.rs.getArray(r.skip.currentPos)))
-          .andThen(_.map(_.getArray.asInstanceOf[Array[AnyRef]].map(toInt)))
-          .andThen(_.map(_.map(SequencerMemberId(_))))
-          .andThen(_.map(arr => NonEmptyUtil.fromUnsafe(SortedSet(arr.toSeq*))))
-      case _: Postgres =>
-        GetResult(r => Option(r.rs.getArray(r.skip.currentPos)))
-          .andThen(_.map(_.getArray.asInstanceOf[Array[AnyRef]].map(Int.unbox)))
-          .andThen(_.map(_.map(SequencerMemberId(_))))
-          .andThen(_.map(arr => NonEmptyUtil.fromUnsafe(SortedSet(arr.toSeq*))))
-    }
-  }
+      : GetResult[Option[NonEmpty[SortedSet[SequencerMemberId]]]] =
+    DbParameterUtils
+      .getDataArrayOResultsDb[SequencerMemberId](
+        storage.profile,
+        deserialize = v => SequencerMemberId(v),
+      )
+      .andThen(_.map(arr => NonEmptyUtil.fromUnsafe(SortedSet(arr.toSeq*))))
 
   private implicit val setParameterTraceContext: SetParameter[SerializableTraceContext] =
     SerializableTraceContext.getVersionedSetParameter(protocolVersion)
@@ -172,7 +109,6 @@ class DbSequencerStore(
       all.find(_.value == value).toRight(s"Event type discriminator for value [$value] not found")
   }
 
-  @SuppressWarnings(Array("com.digitalasset.canton.SlickString"))
   private implicit val setEventTypeDiscriminatorParameter: SetParameter[EventTypeDiscriminator] =
     (etd, pp) => pp >> etd.value.toString
 
@@ -358,7 +294,6 @@ class DbSequencerStore(
       ("", " = any(events.recipients)")
     case _: H2 =>
       ("array_contains(events.recipients, ", ")")
-    case _: Oracle => sys.error("Oracle no longer supported")
   }
 
   override def registerMember(member: Member, timestamp: CantonTimestamp)(implicit
@@ -378,11 +313,6 @@ class DbSequencerStore(
                   values ($member, $timestamp)
                   on conflict (member) do nothing
              """
-          case _: Oracle =>
-            sqlu"""insert /*+  IGNORE_ROW_ON_DUPKEY_INDEX ( sequencer_members ( member ) ) */
-                   into sequencer_members (member, registered_ts)
-                   values ($member, $timestamp)
-             """
         }
         id <- sql"select id from sequencer_members where member = $member"
           .as[SequencerMemberId]
@@ -398,7 +328,7 @@ class DbSequencerStore(
       sql"""select id, registered_ts, enabled from sequencer_members where member = $member"""
         .as[(SequencerMemberId, CantonTimestamp, Boolean)]
         .headOption
-        .map(_.map(RegisteredMember.tupled)),
+        .map(_.map((RegisteredMember.apply _).tupled)),
       functionFullName,
     )
 
@@ -470,10 +400,6 @@ class DbSequencerStore(
     def insert(payloadsToInsert: NonEmpty[Seq[Payload]]): Future[Boolean] = {
       def isConstraintViolation(batchUpdateException: SQLException): Boolean = profile match {
         case Postgres(_) => batchUpdateException.getSQLState == PSQLState.UNIQUE_VIOLATION.getState
-        case Oracle(_) =>
-          // error code for a unique constraint violation
-          // see: https://docs.oracle.com/en/database/oracle/oracle-database/19/errmg/ORA-00000.html#GUID-27437B7F-F0C3-4F1F-9C6E-6780706FB0F6
-          batchUpdateException.getMessage.contains("ORA-00001")
         case H2(_) => batchUpdateException.getSQLState == H2ErrorCode.DUPLICATE_KEY_1.toString
       }
 
@@ -524,19 +450,14 @@ class DbSequencerStore(
     // has inserted a conflicting value.
     def listMissing(): EitherT[Future, SavePayloadsError, Seq[Payload]] = {
       val payloadIds = payloads.map(_.id)
-      // the max default config for number of payloads is around 50 and the max number of clauses that oracle supports is around 1000
-      // so we're really unlikely to need to this IN clause splitting, but lets support it just in case as Matthias has
-      // already done the heavy lifting :)
-      val queries = DbStorage
-        .toInClauses_("id", payloadIds, maxInClauseSize)
-        .map { in =>
-          (sql"select id, instance_discriminator from sequencer_payloads where " ++ in)
-            .as[(PayloadId, UUID)]
-        }
+      val query =
+        (sql"select id, instance_discriminator from sequencer_payloads where " ++ DbStorage
+          .toInClause("id", payloadIds))
+          .as[(PayloadId, UUID)]
 
       for {
         inserted <- EitherT.right {
-          storage.sequentialQueryAndCombine(queries, functionFullName)
+          storage.query(query, functionFullName)
         } map (_.toMap)
         // take all payloads we were expecting and then look up from inserted whether they are present and if they have
         // a matching instance discriminator (meaning we put them there)
@@ -584,7 +505,7 @@ class DbSequencerStore(
   override def savePayloads(payloads: NonEmpty[Seq[Payload]], instanceDiscriminator: UUID)(implicit
       traceContext: TraceContext
   ): EitherT[Future, SavePayloadsError, Unit] =
-    if (unifiedSequencer) {
+    if (blockSequencerMode) {
       savePayloadsUS(payloads, instanceDiscriminator)
     } else {
       savePayloadsResolvingConflicts(payloads, instanceDiscriminator)
@@ -593,24 +514,13 @@ class DbSequencerStore(
   override def saveEvents(instanceIndex: Int, events: NonEmpty[Seq[Sequenced[PayloadId]]])(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    val saveSql = storage.profile match {
-      case _: H2 | _: Postgres =>
-        """insert into sequencer_events (
-                                    |  ts, node_index, event_type, message_id, sender, recipients,
-                                    |  payload_id, topology_timestamp, trace_context, error
-                                    |)
-                                    |  values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                    |  on conflict do nothing""".stripMargin
-      case _: Oracle =>
-        """merge /*+ INDEX ( sequencer_events ( ts ) ) */
-          |into sequencer_events
-          |using (select ? ts from dual) input
-          |on (sequencer_events.ts = input.ts)
-          |when not matched then
-          |  insert (ts, node_index, event_type, message_id, sender, recipients, payload_id,
-          |  topology_timestamp, trace_context, error)
-          |  values (input.ts, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".stripMargin
-    }
+    val saveSql =
+      """insert into sequencer_events (
+        |  ts, node_index, event_type, message_id, sender, recipients,
+        |  payload_id, topology_timestamp, trace_context, error
+        |)
+        |  values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        |  on conflict do nothing""".stripMargin
 
     storage.queryAndUpdate(
       DbStorage.bulkOperation_(saveSql, events, storage.profile) { pp => event =>
@@ -664,14 +574,6 @@ class DbSequencerStore(
                   when not matched then
                     insert (node_index, watermark_ts, sequencer_online) values ($instanceIndex, $ts, ${false})
                 """
-        case _: Oracle =>
-          sqlu"""merge into sequencer_watermarks using dual
-                  on (node_index = $instanceIndex)
-                  when matched and watermark_ts >= $ts then
-                    update set watermark_ts = $ts, sequencer_online = ${false}
-                  when not matched then
-                    insert (node_index, watermark_ts, sequencer_online) values ($instanceIndex, $ts, ${false})
-                """
       }
 
     for {
@@ -686,7 +588,7 @@ class DbSequencerStore(
       _ = {
         if (updatedWatermark.online || updatedWatermark.timestamp != ts) {
           logger.debug(
-            s"Watermark was not reset to $ts as it is already set to an earlier date, kept ${updatedWatermark}"
+            s"Watermark was not reset to $ts as it is already set to an earlier date, kept $updatedWatermark"
           )
         }
       }
@@ -711,14 +613,6 @@ class DbSequencerStore(
                   on (node_index = $instanceIndex)
                   when matched and sequencer_online = ${true} then
                     update set watermark_ts = $ts
-                  when not matched then
-                    insert (node_index, watermark_ts, sequencer_online) values ($instanceIndex, $ts, ${true})
-                """
-        case _: Oracle =>
-          sqlu"""merge into sequencer_watermarks using dual
-                  on (node_index = $instanceIndex)
-                  when matched then
-                    update set watermark_ts = $ts where sequencer_online = ${true}
                   when not matched then
                     insert (node_index, watermark_ts, sequencer_online) values ($instanceIndex, $ts, ${true})
                 """
@@ -761,18 +655,7 @@ class DbSequencerStore(
                     from sequencer_watermarks
                     where node_index = $instanceIndex"""
           def watermark(row: (CantonTimestamp, Boolean)) = Watermark(row._1, row._2)
-
-          profile match {
-            case _: H2 | _: Postgres =>
-              query.as[(CantonTimestamp, Boolean)].headOption.map(_.map(watermark))
-            case _: Oracle =>
-              query
-                .as[(CantonTimestamp, Int)]
-                .headOption
-                .map(_.map { case (ts, onlineN) =>
-                  watermark((ts, onlineN != 0))
-                })
-          }
+          query.as[(CantonTimestamp, Boolean)].headOption.map(_.map(watermark))
         },
         functionFullName,
         maxRetries,
@@ -781,14 +664,7 @@ class DbSequencerStore(
 
   override def goOffline(instanceIndex: Int)(implicit traceContext: TraceContext): Future[Unit] =
     storage.update_(
-      {
-        profile match {
-          case _: H2 | _: Postgres =>
-            sqlu"update sequencer_watermarks set sequencer_online = false where node_index = $instanceIndex"
-          case _: Oracle =>
-            sqlu"update sequencer_watermarks set sequencer_online = 0 where node_index = $instanceIndex"
-        }
-      },
+      sqlu"update sequencer_watermarks set sequencer_online = false where node_index = $instanceIndex",
       functionFullName,
     )
 
@@ -809,7 +685,7 @@ class DbSequencerStore(
                on conflict (node_index) do
                  update set watermark_ts = $watermark, sequencer_online = true
                """
-            case _: H2 | _: Oracle =>
+            case _: H2 =>
               sqlu"""merge into sequencer_watermarks using dual
                   on (node_index = $instanceIndex)
                   when matched then
@@ -884,29 +760,6 @@ class DbSequencerStore(
 
         case _: H2 =>
           h2PostgresQueryEvents("array_contains(events.recipients, ", ")", safeWatermark)
-
-        case _: Oracle =>
-          sql"""
-          select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
-            events.recipients, payloads.id, payloads.content, events.topology_timestamp,
-            events.trace_context, events.error
-          from sequencer_events events
-          left join sequencer_payloads payloads
-            on events.payload_id = payloads.id
-          inner join sequencer_watermarks watermarks
-            on events.node_index = watermarks.node_index
-          where
-            ((events.recipients is null) or $memberId IN (SELECT * FROM TABLE(events.recipients)))
-            and (
-              -- inclusive timestamp bound that defaults to MinValue if unset
-              events.ts >= $inclusiveFromTimestamp
-                -- only consider events within the safe watermark
-                and events.ts <= $safeWatermark
-                -- if the sequencer that produced the event is offline, only consider up until its offline watermark
-                and (watermarks.sequencer_online <> 0 or events.ts <= watermarks.watermark_ts)
-              )
-          order by events.ts asc
-          fetch next $limit rows only""".stripMargin
       }
 
       query.as[Sequenced[Payload]]
@@ -929,8 +782,6 @@ class DbSequencerStore(
     val query = profile match {
       case _: H2 | _: Postgres =>
         sql"select min(watermark_ts) from sequencer_watermarks where sequencer_online = true"
-      case _: Oracle =>
-        sql"select min(watermark_ts) from sequencer_watermarks where sequencer_online <> 0"
     }
     // `min` may return null that is wrapped into None
     query.as[Option[CantonTimestamp]].headOption.map(_.flatten)
@@ -973,7 +824,7 @@ class DbSequencerStore(
 
   def checkpointsAtTimestamp(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[Map[Member, CounterCheckpoint]] = {
+  )(implicit traceContext: TraceContext): Future[Map[Member, CounterCheckpoint]] =
     for {
       sequencerIdO <- lookupMember(sequencerMember).map(_.map(_.memberId))
       query = for {
@@ -987,7 +838,7 @@ class DbSequencerStore(
               safeWatermark,
               id,
             )
-          case _ => DBIO.successful[Map[Member, CantonTimestamp]](Map())
+          case _ => DBIO.successful[Map[Member, Option[CantonTimestamp]]](Map())
         }
       } yield {
         checkpoints.map { case (member, checkpoint) =>
@@ -995,58 +846,118 @@ class DbSequencerStore(
             member,
             // TODO(i20011): make sure lastTopologyClientEventTimestamp is consistent
             checkpoint.copy(latestTopologyClientTimestamp =
-              latestSequencerTimestamps.get(member).orElse(checkpoint.latestTopologyClientTimestamp)
+              latestSequencerTimestamps
+                .get(member)
+                .flatten
+                .orElse(checkpoint.latestTopologyClientTimestamp)
             ),
           )
         }
       }
       result <- storage
-        .query(query.transactionally, functionFullName)
+        .queryUnlessShutdown(query.transactionally, functionFullName)
+        .onShutdown {
+          logger.debug("Cancelling checkpointsAtTimestamp due to shutdown")
+          Map.empty[Member, CounterCheckpoint]
+        }
     } yield result
-  }
 
   private def memberCheckpointsQuery(
-      timestamp: CantonTimestamp,
+      beforeInclusive: CantonTimestamp,
       safeWatermark: CantonTimestamp,
-  ) =
-    // this query returns checkpoints for all registered enabled members for the given timestamp.
+  ) = {
+    // this query returns checkpoints for all registered enabled members at the given timestamp
+    // it will produce checkpoints at exactly the `beforeInclusive` timestamp by assuming that the checkpoint's
+    // `timestamp` doesn't need to be exact as long as it's a valid lower bound for a given (member, counter).
     // it does this by taking existing events and checkpoints before or at the given timestamp in order to compute
     // the equivalent latest checkpoint for each member at or before this timestamp.
-    sql"""
-        -- the max counter for each member will be either the number of events -1 (because the index is 0 based)
-        -- or the checkpoint counter + number of events after that checkpoint
-        -- the timestamp for a member will be the maximum between the highest event timestamp and the checkpoint timestamp (if it exists)
-        select sequencer_members.member, coalesce(checkpoints.counter, - 1) + count(events.ts), coalesce(max(events.ts), checkpoints.ts), checkpoints.latest_sequencer_event_ts
-        from sequencer_members
-        left join (
-            -- if the member has checkpoints, let's find the one latest one that's still before or at the given timestamp.
-            -- using checkpoints is essential for cases where the db has been pruned
-            select member, max(counter) as counter, max(ts) as ts, max(latest_sequencer_event_ts) as latest_sequencer_event_ts
-            from sequencer_counter_checkpoints
-            where ts <= $timestamp
-            group by member
-        ) as checkpoints on checkpoints.member = sequencer_members.id
-        left join sequencer_events as events
-          on ((#$memberContainsBefore sequencer_members.id #$memberContainsAfter)
-                  -- we just want the events between the checkpoint and the requested timestamp
-                  -- and within the safe watermark
-                  and events.ts <= $timestamp and events.ts <= $safeWatermark
-                  -- if the checkpoint is defined, we only want events past it
-                  and ((checkpoints.ts is null) or (checkpoints.ts < events.ts)))
-        left join sequencer_watermarks watermarks
-          on (events.node_index is not null) and events.node_index = watermarks.node_index
-        where (
-            -- no need to consider disabled members since they can't be served events anymore
-            sequencer_members.enabled = true
-            -- consider the given timestamp
-            and sequencer_members.registered_ts <= $timestamp
-            and ((events.ts is null) or (
-                -- if the sequencer that produced the event is offline, only consider up until its offline watermark
-                 watermarks.watermark_ts is not null and (watermarks.sequencer_online = true or events.ts <= watermarks.watermark_ts)
-                ))
-          )
-        group by (sequencer_members.member, checkpoints.counter, checkpoints.ts, checkpoints.latest_sequencer_event_ts)
-        """.as[(Member, CounterCheckpoint)].map(_.toMap)
+    val query = storage.profile match {
+      case _: Postgres =>
+        sql"""
+            -- the max counter for each member will be either the number of events -1 (because the index is 0 based)
+            -- or the checkpoint counter + number of events after that checkpoint
+            -- the timestamp for a member will be the maximum between the highest event timestamp and the checkpoint timestamp (if it exists)
+            select sequencer_members.member, checkpoints.counter + count(events.ts), $beforeInclusive, checkpoints.latest_sequencer_event_ts
+            from sequencer_members
+            left join (
+                -- if the member has checkpoints, let's find the latest one that's still before or at the given timestamp.
+                -- using checkpoints is essential for cases where the db has been pruned and for performance (to avoid scanning complete events table)
+                -- the very negative number is CantonTimestamp.MinValue, it helps postgres to use the index on ts field (instead of IS NOT NULL check)
+              select m.id member, coalesce(cc.counter, -1) as counter, coalesce(cc.ts, -62135596800000000) as ts, cc.latest_sequencer_event_ts
+                from sequencer_members m
+                  left join lateral (
+                          select *
+                          from sequencer_counter_checkpoints
+                          where member = m.id and ts <= $beforeInclusive
+                          order by member, ts desc
+                          limit 1
+                      ) cc
+                      on true
+            ) as checkpoints on checkpoints.member = sequencer_members.id
+            left join sequencer_events as events
+              on ((sequencer_members.id = any(events.recipients))
+                      -- we just want the events between the checkpoint and the requested timestamp
+                      -- and within the safe watermark
+                      and events.ts <= $beforeInclusive and events.ts <= $safeWatermark
+                      -- start from closest checkpoint the checkpoint is defined, we only want events past it
+                      and events.ts > checkpoints.ts
+                      -- start from member's registration date
+                      and events.ts >= sequencer_members.registered_ts)
+            left join sequencer_watermarks watermarks
+              on (events.node_index is not null) and events.node_index = watermarks.node_index
+            where (
+                -- no need to consider disabled members since they can't be served events anymore
+                sequencer_members.enabled = true
+                -- consider the given timestamp
+                and sequencer_members.registered_ts <= $beforeInclusive
+                and ((events.ts is null) or (
+                    -- if the sequencer that produced the event is offline, only consider up until its offline watermark
+                     watermarks.watermark_ts is not null and (watermarks.sequencer_online = true or events.ts <= watermarks.watermark_ts)
+                    ))
+              )
+            group by (sequencer_members.member, checkpoints.counter, checkpoints.ts, checkpoints.latest_sequencer_event_ts)
+             """
+      case _ =>
+        sql"""
+            -- the max counter for each member will be either the number of events -1 (because the index is 0 based)
+            -- or the checkpoint counter + number of events after that checkpoint
+            -- the timestamp for a member will be the maximum between the highest event timestamp and the checkpoint timestamp (if it exists)
+            select sequencer_members.member, coalesce(checkpoints.counter, - 1) + count(events.ts), $beforeInclusive, checkpoints.latest_sequencer_event_ts
+            from sequencer_members
+            left join (
+                -- if the member has checkpoints, let's find the one latest one that's still before or at the given timestamp.
+                -- using checkpoints is essential for cases where the db has been pruned
+                select member, max(counter) as counter, max(ts) as ts, max(latest_sequencer_event_ts) as latest_sequencer_event_ts
+                from sequencer_counter_checkpoints
+                where ts <= $beforeInclusive
+                group by member
+            ) as checkpoints on checkpoints.member = sequencer_members.id
+            left join sequencer_events as events
+              on ((#$memberContainsBefore sequencer_members.id #$memberContainsAfter)
+                      -- we just want the events between the checkpoint and the requested timestamp
+                      -- and within the safe watermark
+                      and events.ts <= $beforeInclusive and events.ts <= $safeWatermark
+                      -- if the checkpoint is defined, we only want events past it
+                      and ((checkpoints.ts is null) or (checkpoints.ts < events.ts))
+                      -- start from member's registration date
+                      and events.ts >= sequencer_members.registered_ts)
+            left join sequencer_watermarks watermarks
+              on (events.node_index is not null) and events.node_index = watermarks.node_index
+            where (
+                -- no need to consider disabled members since they can't be served events anymore
+                sequencer_members.enabled = true
+                -- consider the given timestamp
+                and sequencer_members.registered_ts <= $beforeInclusive
+                and ((events.ts is null) or (
+                    -- if the sequencer that produced the event is offline, only consider up until its offline watermark
+                     watermarks.watermark_ts is not null and (watermarks.sequencer_online = true or events.ts <= watermarks.watermark_ts)
+                    ))
+              )
+            group by (sequencer_members.member, checkpoints.counter, checkpoints.ts, checkpoints.latest_sequencer_event_ts)
+            """
+    }
+    query.as[(Member, CounterCheckpoint)].map(_.toMap)
+  }
 
   private def memberLatestSequencerTimestampQuery(
       timestamp: CantonTimestamp,
@@ -1055,26 +966,86 @@ class DbSequencerStore(
   ) = {
     // in order to compute the latest sequencer event for each member at a timestamp, we find the latest event ts
     // for an event addressed both to the sequencer and that member
-    sql"""
-        select sequencer_members.member, max(events.ts)
-        from sequencer_members
-        left join sequencer_events as events
-          on ((#$memberContainsBefore sequencer_members.id #$memberContainsAfter)
-                  and (#$memberContainsBefore $sequencerId #$memberContainsAfter)
-                  and events.ts <= $timestamp and events.ts <= $safeWatermark)
-        left join sequencer_watermarks watermarks
-          on (events.node_index is not null) and events.node_index = watermarks.node_index
-        where (
-            -- no need to consider disabled members since they can't be served events anymore
-            sequencer_members.enabled = true
-            -- consider the given timestamp
-            and sequencer_members.registered_ts <= $timestamp
-            and events.ts is not null
-            -- if the sequencer that produced the event is offline, only consider up until its offline watermark
-            and  (watermarks.watermark_ts is not null and (watermarks.sequencer_online = true or events.ts <= watermarks.watermark_ts))
-          )
-        group by (sequencer_members.member, events.ts)
-        """.as[(Member, CantonTimestamp)].map(_.toMap)
+    val query = storage.profile match {
+      case _: Postgres =>
+        sql"""
+            -- for each member we scan the sequencer_events table
+            -- bounded above by the requested `timestamp`, watermark, registration date, etc...
+            -- bounded below by an existing sequencer counter (or by beginning of time)
+            -- this is crucial to avoid scanning the whole table and using the index on `ts` field
+            select sequencer_members.member, coalesce(max(events.ts), checkpoints.latest_sequencer_event_ts)
+            from sequencer_members
+            left join (
+                -- if the member has checkpoints, let's find the latest one that's still before or at the given timestamp.
+                -- using checkpoints is essential for cases where the db has been pruned
+                -- the very negative number is CantonTimestamp.MinValue
+              select
+                  m.id member,
+                  coalesce(cc.ts, -62135596800000000) as ts,
+                  cc.latest_sequencer_event_ts,
+                  0 as predicate_pushdown_barrier
+                from sequencer_members m
+                  left join lateral (
+                          select *
+                          from sequencer_counter_checkpoints
+                          where member = m.id and ts <= $timestamp
+                          order by member, ts desc
+                          limit 1
+                      ) cc
+                      on true
+            ) as checkpoints on checkpoints.member = sequencer_members.id
+            left join sequencer_events as events
+              on ((sequencer_members.id = any(events.recipients)) -- member is in recipients
+                    -- this sequencer itself is in recipients
+                    -- NOTE: we add predicate_pushdown_barrier (="0") here to prevent the query planner quirk,
+                    -- so that Postgres doesn't push down the predicate (and revert to Seq scan on events table)
+                    and ((checkpoints.predicate_pushdown_barrier + $sequencerId) = any(events.recipients))
+                    -- we just want the events between the checkpoint and the requested timestamp
+                    -- and within the safe watermark
+                    and events.ts <= $timestamp and events.ts <= $safeWatermark
+                    -- start from closest checkpoint, we only want events past it
+                    and events.ts > checkpoints.ts
+                    -- start from member's registration date
+                    and events.ts >= sequencer_members.registered_ts)
+            left join sequencer_watermarks watermarks
+              on (events.node_index is not null) and events.node_index = watermarks.node_index
+            where (
+                -- no need to consider disabled members since they can't be served events anymore
+                sequencer_members.enabled = true
+                -- consider the given timestamp
+                and sequencer_members.registered_ts <= $timestamp
+                and ((events.ts is null) or (
+                    -- if the sequencer that produced the event is offline, only consider up until its offline watermark
+                     watermarks.watermark_ts is not null and (watermarks.sequencer_online = true or events.ts <= watermarks.watermark_ts)
+                    ))
+              )
+            group by (sequencer_members.member, checkpoints.latest_sequencer_event_ts)
+             """
+      case _ =>
+        sql"""
+            select sequencer_members.member, max(events.ts)
+            from sequencer_members
+            left join sequencer_events as events
+              on ((#$memberContainsBefore sequencer_members.id #$memberContainsAfter)
+                      and (#$memberContainsBefore $sequencerId #$memberContainsAfter)
+                      and events.ts <= $timestamp and events.ts <= $safeWatermark
+                      -- start from member's registration date
+                      and events.ts >= sequencer_members.registered_ts)
+            left join sequencer_watermarks watermarks
+              on (events.node_index is not null) and events.node_index = watermarks.node_index
+            where (
+                -- no need to consider disabled members since they can't be served events anymore
+                sequencer_members.enabled = true
+                -- consider the given timestamp
+                and sequencer_members.registered_ts <= $timestamp
+                and events.ts is not null
+                -- if the sequencer that produced the event is offline, only consider up until its offline watermark
+                and  (watermarks.watermark_ts is not null and (watermarks.sequencer_online = true or events.ts <= watermarks.watermark_ts))
+              )
+            group by (sequencer_members.member, events.ts)
+            """
+    }
+    query.as[(Member, Option[CantonTimestamp])].map(_.toMap)
   }
 
   override def deleteEventsPastWatermark(
@@ -1090,13 +1061,11 @@ class DbSequencerStore(
       watermark = watermarkO.getOrElse(CantonTimestamp.MinValue)
       // TODO(#18401): Also cleanup payloads (beyond the payload to event margin)
       eventsRemoved <- storage.update(
-        {
-          sqlu"""
+        sqlu"""
             delete from sequencer_events
             where node_index = $instanceIndex
                 and ts > $watermark
-           """
-        },
+           """,
         functionFullName,
       )
     } yield {
@@ -1112,80 +1081,103 @@ class DbSequencerStore(
   )(implicit
       traceContext: TraceContext,
       externalCloseContext: CloseContext,
-  ): EitherT[Future, SaveCounterCheckpointError, Unit] = {
+  ): EitherT[Future, SaveCounterCheckpointError, Unit] =
+    EitherT.right(
+      saveCounterCheckpoints(Seq(memberId -> checkpoint))(traceContext, externalCloseContext)
+    )
 
-    EitherT {
+  override def saveCounterCheckpoints(
+      checkpoints: Seq[(SequencerMemberId, CounterCheckpoint)]
+  )(implicit
+      traceContext: TraceContext,
+      externalCloseContext: CloseContext,
+  ): Future[Unit] = {
+    def saveCounterCheckpointQuery(memberId: SequencerMemberId, checkpoint: CounterCheckpoint) = {
       val CounterCheckpoint(counter, ts, latestSequencerEventTimestamp) = checkpoint
-      CloseContext.withCombinedContext(closeContext, externalCloseContext, timeouts, logger)(
-        combinedCloseContext =>
-          storage.queryAndUpdate(
-            for {
-              _ <- profile match {
-                case _: Postgres =>
-                  sqlu"""insert into sequencer_counter_checkpoints (member, counter, ts, latest_sequencer_event_ts)
+      profile match {
+        case _: Postgres =>
+          sqlu"""insert into sequencer_counter_checkpoints (member, counter, ts, latest_sequencer_event_ts)
              values ($memberId, $counter, $ts, $latestSequencerEventTimestamp)
-             on conflict (member, counter) do nothing
+             on conflict (member, counter)
+             do update set ts = $ts, latest_sequencer_event_ts = $latestSequencerEventTimestamp
+             where excluded.ts >= sequencer_counter_checkpoints.ts
              """
-                case _: H2 =>
-                  sqlu"""merge into sequencer_counter_checkpoints using dual
+        case _: H2 =>
+          sqlu"""merge into sequencer_counter_checkpoints using dual
                     on member = $memberId and counter = $counter
                     when not matched then
                       insert (member, counter, ts, latest_sequencer_event_ts)
                       values ($memberId, $counter, $ts, $latestSequencerEventTimestamp)
+                    when matched and ts <= $ts then
+                      update set ts = $ts, latest_sequencer_event_ts = $latestSequencerEventTimestamp
                   """
-                case _: Oracle =>
-                  sqlu""" insert /*+  IGNORE_ROW_ON_DUPKEY_INDEX ( sequencer_counter_checkpoints ( member, counter ) ) */
-            into sequencer_counter_checkpoints (member, counter, ts, latest_sequencer_event_ts)
-          values ($memberId, $counter, $ts, $latestSequencerEventTimestamp)
-          """
-              }
-              id <- sql"""
-            select ts, latest_sequencer_event_ts
-              from sequencer_counter_checkpoints
-              where member = $memberId and counter = $counter
-              """
-                .as[(CantonTimestamp, Option[CantonTimestamp])]
-                .headOption
-            } yield id,
-            functionFullName,
-          )(traceContext, combinedCloseContext)
-      ) map {
-        case None =>
-          // we should always return a value from the db statement so this is a bug or unexpected behavior
-          ErrorUtil.internalError(
-            new RuntimeException(
-              s"saveCounterCheckpoint did not return a timestamp value as expected"
-            )
-          )
-
-        case Some((storedTs, storedLatestSequencerEventTimestampO)) =>
-          Either.cond(
-            storedTs == ts && (storedLatestSequencerEventTimestampO == latestSequencerEventTimestamp || storedLatestSequencerEventTimestampO.isEmpty),
-            (),
-            SaveCounterCheckpointError.CounterCheckpointInconsistent(
-              storedTs,
-              storedLatestSequencerEventTimestampO,
-            ),
-          )
       }
     }
+
+    // TODO(#18401): Use bulk insert here, as this is still not efficient for large numbers of checkpoints
+    val combinedQuery = DBIO.sequence(
+      checkpoints.map { case (memberId, checkpoint) =>
+        saveCounterCheckpointQuery(memberId, checkpoint)
+      }
+    )
+
+    CloseContext.withCombinedContext(closeContext, externalCloseContext, timeouts, logger)(
+      combinedCloseContext =>
+        storage
+          .update(combinedQuery, functionFullName)(traceContext, combinedCloseContext)
+          .map { updateCounts =>
+            checkpoints.foreach { case (memberId, checkpoint) =>
+              logger.debug(
+                s"Saved $checkpoint for member $memberId in the database"
+              )
+            }
+            logger.debug(s"Updated ${updateCounts.sum} counter checkpoints in the database")
+            ()
+          }
+    )
   }
 
   override def fetchClosestCheckpointBefore(memberId: SequencerMemberId, counter: SequencerCounter)(
       implicit traceContext: TraceContext
-  ): Future[Option[CounterCheckpoint]] =
-    storage
-      .query(
-        sql"""
-           select counter, ts, latest_sequencer_event_ts
-           from sequencer_counter_checkpoints
-           where member = $memberId
-             and counter < $counter
-           order by counter desc
-            #${storage.limit(1)}
-           """.as[CounterCheckpoint].headOption,
-        functionFullName,
-      )
+  ): Future[Option[CounterCheckpoint]] = {
+    val checkpointQuery = for {
+      // This query has been modified to use the safe watermark, due to a possibility that crash recovery resets the watermark,
+      // thus we prevent members from reading data after the watermark. This matters only for the db sequencer.
+      safeWatermarkO <- safeWaterMarkDBIO
+      safeWatermark = safeWatermarkO.getOrElse(CantonTimestamp.MaxValue)
+      checkpoint <- sql"""
+             select counter, ts, latest_sequencer_event_ts
+             from sequencer_counter_checkpoints
+             where member = $memberId
+               and counter < $counter
+               and ts <= $safeWatermark
+             order by counter desc
+              #${storage.limit(1)}
+             """.as[CounterCheckpoint].headOption
+    } yield checkpoint
+    storage.query(checkpointQuery, functionFullName)
+  }
+
+  override def fetchEarliestCheckpointForMember(memberId: SequencerMemberId)(implicit
+      traceContext: TraceContext
+  ): Future[Option[CounterCheckpoint]] = {
+    val checkpointQuery = for {
+      // This query has been modified to use the safe watermark, due to a possibility that crash recovery resets the watermark,
+      // thus we prevent members from reading data after the watermark. This matters only for the db sequencer.
+      safeWatermarkO <- safeWaterMarkDBIO
+      safeWatermark = safeWatermarkO.getOrElse(CantonTimestamp.MaxValue)
+      checkpoint <- sql"""
+             select counter, ts, latest_sequencer_event_ts
+             from sequencer_counter_checkpoints
+             where member = $memberId
+               and ts <= $safeWatermark
+             order by counter desc
+              #${storage.limit(1)}
+             """.as[CounterCheckpoint].headOption
+    } yield checkpoint
+    storage.query(checkpointQuery, functionFullName)
+
+  }
 
   override def acknowledge(
       member: SequencerMemberId,
@@ -1205,14 +1197,6 @@ class DbSequencerStore(
                     update set ts = $timestamp
                   when not matched then
                     insert values ($member, $timestamp)
-                """
-        case _: Oracle =>
-          sqlu"""merge into sequencer_acknowledgements using dual
-                  on (member = $member)
-                  when matched then
-                    update set ts = $timestamp where $timestamp > ts
-                  when not matched then
-                    insert (member, ts) values ($member, $timestamp)
                 """
       },
       functionFullName,
@@ -1242,7 +1226,7 @@ class DbSequencerStore(
 
   override def saveLowerBound(
       ts: CantonTimestamp
-  )(implicit traceContext: TraceContext): EitherT[Future, SaveLowerBoundError, Unit] = {
+  )(implicit traceContext: TraceContext): EitherT[Future, SaveLowerBoundError, Unit] =
     EitherT(
       storage.queryAndUpdate(
         (for {
@@ -1263,64 +1247,30 @@ class DbSequencerStore(
         "saveLowerBound",
       )
     )
-  }
-
-  override protected[store] def adjustPruningTimestampForCounterCheckpoints(
-      timestamp: CantonTimestamp,
-      disabledMembers: Seq[SequencerMemberId],
-  )(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]] = {
-
-    // query the lowest suitable timestamp for each member.
-    // it would probably be better to do the ignore and aggregation in sql
-    // however this way we don't have to deal with generating a `not in (..)` for
-    // ignoredMemberIds and the returned result set will only have as many rows
-    // as registered members.
-    storage
-      .query(
-        sql"""
-                    select members.id, coalesce(checkpoints.ts, members.registered_ts) ts
-                    from sequencer_members members
-                    left join (
-                     select member, max(ts) ts
-                     from sequencer_counter_checkpoints
-                     where ts < $timestamp
-                     group by member
-                    ) checkpoints
-                      on members.id = checkpoints.member
-                   """.as[(SequencerMemberId, CantonTimestamp)],
-        functionFullName,
-      )
-      .map(_.collect {
-        // exclude ignored members
-        case (memberId, ts) if !disabledMembers.contains(memberId) => ts
-      })
-      // just take the lowest
-      .map(_.minimumOption)
-  }
 
   override protected[store] def pruneEvents(
-      timestamp: CantonTimestamp
+      beforeExclusive: CantonTimestamp
   )(implicit traceContext: TraceContext): Future[Int] =
     storage.update(
-      sqlu"delete from sequencer_events where ts < $timestamp",
+      sqlu"delete from sequencer_events where ts < $beforeExclusive",
       functionFullName,
     )
 
   override protected[store] def prunePayloads(
-      timestamp: CantonTimestamp
+      beforeExclusive: CantonTimestamp
   )(implicit traceContext: TraceContext): Future[Int] =
     storage.update(
-      sqlu"delete from sequencer_payloads where id < $timestamp",
+      sqlu"delete from sequencer_payloads where id < $beforeExclusive",
       functionFullName,
     )
 
   override protected[store] def pruneCheckpoints(
-      timestamp: CantonTimestamp
+      beforeExclusive: CantonTimestamp
   )(implicit traceContext: TraceContext): Future[Int] =
     for {
       checkpointsRemoved <- storage.update(
         sqlu"""
-          delete from sequencer_counter_checkpoints where ts < $timestamp
+          delete from sequencer_counter_checkpoints where ts < $beforeExclusive
           """,
         functionFullName,
       )
@@ -1340,7 +1290,7 @@ class DbSequencerStore(
 
   override def status(
       now: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[SequencerPruningStatus] = {
+  )(implicit traceContext: TraceContext): Future[SequencerPruningStatus] =
     for {
       lowerBoundO <- fetchLowerBound()
       members <- storage.query(
@@ -1364,7 +1314,6 @@ class DbSequencerStore(
         }.toSet,
       )
     }
-  }
 
   override def markLaggingSequencersOffline(
       cutoffTime: CantonTimestamp
@@ -1426,9 +1375,6 @@ class DbSequencerStore(
       case H2(_) =>
         // we don't worry about replicas or commit modes in h2
         EitherTUtil.unit
-      case Oracle(_) =>
-        // TODO(#6942): unknown how to query the current commit mode for oracle
-        EitherTUtil.unit
       case Postgres(_) =>
         for {
           settingO <- EitherT.right(
@@ -1452,6 +1398,25 @@ class DbSequencerStore(
                 .mkString(",")}",
           )
         } yield ()
+    }
+  }
+
+  override def recordCounterCheckpointsAtTimestamp(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.debug(s"Recording counter checkpoints for all members at timestamp $timestamp")
+    val now = CantonTimestamp.now()
+    for {
+      checkpoints <- checkpointsAtTimestamp(timestamp)
+      checkpointsByMemberId <- checkpoints.toList
+        .parTraverseFilter { case (member, checkpoint) =>
+          lookupMember(member).map(_.map(_.memberId -> checkpoint))
+        }
+      _ <- saveCounterCheckpoints(checkpointsByMemberId)
+    } yield {
+      logger.debug(
+        s"Recorded counter checkpoints for all members at timestamp $timestamp in ${CantonTimestamp.now() - now}"
+      )
     }
   }
 }

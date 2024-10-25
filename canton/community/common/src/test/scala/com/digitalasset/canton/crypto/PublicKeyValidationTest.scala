@@ -13,23 +13,21 @@ trait PublicKeyValidationTest extends BaseTest with CryptoTestHelper { this: Asy
   private def modifyPublicKey(
       publicKey: PublicKey,
       newFormat: CryptoKeyFormat,
-  ): PublicKey = {
+  ): PublicKey =
     publicKey match {
       case EncryptionPublicKey(_format, key, scheme) =>
         new EncryptionPublicKey(newFormat, key, scheme)
-      case SigningPublicKey(_format, key, scheme) =>
-        new SigningPublicKey(newFormat, key, scheme)
+      case SigningPublicKey(_format, key, scheme, usage) =>
+        new SigningPublicKey(newFormat, key, scheme, usage)
       case _ => fail(s"unsupported key type")
     }
-  }
 
   private def keyValidationTest[K <: PublicKey](
       supportedCryptoKeyFormats: Set[CryptoKeyFormat],
       name: String,
       newCrypto: => Future[Crypto],
       newPublicKey: Crypto => Future[PublicKey],
-  ): Unit = {
-
+  ): Unit =
     // change format
     forAll(supportedCryptoKeyFormats) { format =>
       s"Validate $name public key with $format" in {
@@ -51,8 +49,6 @@ trait PublicKeyValidationTest extends BaseTest with CryptoTestHelper { this: Asy
       }
     }
 
-  }
-
   /** Test public key validation
     */
   def publicKeyValidationProvider(
@@ -60,15 +56,19 @@ trait PublicKeyValidationTest extends BaseTest with CryptoTestHelper { this: Asy
       supportedEncryptionKeySpecs: Set[EncryptionKeySpec],
       supportedCryptoKeyFormats: Set[CryptoKeyFormat],
       newCrypto: => Future[Crypto],
-  ): Unit = {
-
+  ): Unit =
     "Validate public keys" should {
       forAll(supportedSigningKeySchemes) { signingKeyScheme =>
         keyValidationTest[SigningPublicKey](
           supportedCryptoKeyFormats,
           signingKeyScheme.toString,
           newCrypto,
-          crypto => getSigningPublicKey(crypto, signingKeyScheme).failOnShutdown,
+          crypto =>
+            getSigningPublicKey(
+              crypto,
+              SigningKeyUsage.ProtocolOnly,
+              signingKeyScheme,
+            ).failOnShutdown,
         )
       }
 
@@ -81,7 +81,5 @@ trait PublicKeyValidationTest extends BaseTest with CryptoTestHelper { this: Asy
         )
       }
     }
-
-  }
 
 }

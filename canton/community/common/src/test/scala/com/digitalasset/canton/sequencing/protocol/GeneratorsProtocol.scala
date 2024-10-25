@@ -8,7 +8,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String73
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, GeneratorsData}
-import com.digitalasset.canton.protocol.TargetDomainId
+import com.digitalasset.canton.protocol.TransactionAuthorizationPartySignatures
 import com.digitalasset.canton.protocol.messages.{GeneratorsMessages, ProtocolMessage}
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.serialization.{
@@ -16,7 +16,8 @@ import com.digitalasset.canton.serialization.{
   HasCryptographicEvidence,
 }
 import com.digitalasset.canton.time.TimeProofTestUtil
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.version.{GeneratorsVersion, ProtocolVersion}
 import com.digitalasset.canton.{Generators, SequencerCounter}
 import com.google.protobuf.ByteString
@@ -87,7 +88,6 @@ final class GeneratorsProtocol(
       for {
         sender <- Arbitrary.arbitrary[Member]
         messageId <- Arbitrary.arbitrary[MessageId]
-        isRequest <- Arbitrary.arbitrary[Boolean]
         envelopes <- Generators.nonEmptyListGen[ClosedEnvelope](closedEnvelopeArb)
         batch = Batch(envelopes.map(_.closeEnvelope), protocolVersion)
         maxSequencingTime <- Arbitrary.arbitrary[CantonTimestamp]
@@ -113,6 +113,12 @@ final class GeneratorsProtocol(
       )
     )
 
+  implicit val partySignaturesArb: Arbitrary[TransactionAuthorizationPartySignatures] = Arbitrary(
+    for {
+      signatures <- Arbitrary.arbitrary[Map[PartyId, Seq[Signature]]]
+    } yield TransactionAuthorizationPartySignatures(signatures, protocolVersion)
+  )
+
   implicit val topologyStateForInitRequestArb: Arbitrary[TopologyStateForInitRequest] = Arbitrary(
     for {
       member <- Arbitrary.arbitrary[Member]
@@ -128,14 +134,13 @@ final class GeneratorsProtocol(
 
   private val sequencerDeliverErrorCodeArb: Arbitrary[SequencerDeliverErrorCode] = genArbitrary
 
-  private implicit val sequencerDeliverErrorArb: Arbitrary[SequencerDeliverError] = {
+  private implicit val sequencerDeliverErrorArb: Arbitrary[SequencerDeliverError] =
     Arbitrary(
       for {
         code <- sequencerDeliverErrorCodeArb.arbitrary
         message <- Arbitrary.arbitrary[String]
       } yield code.apply(message)
     )
-  }
 
   private implicit val deliverErrorArb: Arbitrary[DeliverError] = Arbitrary(
     for {
@@ -253,7 +258,7 @@ object GeneratorsProtocol {
     for {
       timestamp <- Arbitrary.arbitrary[CantonTimestamp]
       counter <- nonNegativeLongArb.arbitrary.map(_.unwrap)
-      targetDomain <- Arbitrary.arbitrary[TargetDomainId]
+      targetDomain <- Arbitrary.arbitrary[Target[DomainId]]
     } yield TimeProofTestUtil.mkTimeProof(timestamp, counter, targetDomain, protocolVersion)
   )
 }

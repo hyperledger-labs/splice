@@ -13,20 +13,15 @@ import com.digitalasset.canton.domain.sequencing.sequencer.reference.store.DbRef
 import com.digitalasset.canton.domain.sequencing.sequencer.reference.store.ReferenceBlockOrderingStore.TimestampedBlock
 import com.digitalasset.canton.domain.sequencing.sequencer.reference.store.v1 as proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Oracle, Postgres}
+import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Postgres}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
 import com.digitalasset.canton.tracing.{TraceContext, Traced, W3CTraceContext}
 import com.digitalasset.canton.util.retry
-import com.digitalasset.canton.util.retry.RetryUtil
-import com.digitalasset.canton.util.retry.RetryUtil.{
-  ErrorKind,
-  ExceptionRetryable,
-  FatalErrorKind,
-  TransientErrorKind,
-}
+import com.digitalasset.canton.util.retry.ErrorKind.{FatalErrorKind, TransientErrorKind}
+import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import org.postgresql.util.PSQLException
 import slick.jdbc.{GetResult, SetParameter, TransactionIsolation}
 
@@ -34,7 +29,6 @@ import java.util.UUID
 import scala.annotation.unused
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 class DbReferenceBlockOrderingStore(
     override protected val storage: DbStorage,
@@ -92,8 +86,6 @@ class DbReferenceBlockOrderingStore(
           sqlu"""merge into blocks (id, request, uuid)
                     values ($blockHeight, $tracedRequest, $uuid)
                       """
-        case _: Oracle =>
-          sys.error("reference sequencer does not support oracle database")
       },
       s"insert block with height $blockHeight",
     )
@@ -124,8 +116,6 @@ class DbReferenceBlockOrderingStore(
                               insert (id, request, uuid)
                               values (vals.new_id, $tracedRequest, $uuid)
                           """
-          case _: Oracle =>
-            sys.error("reference sequencer does not support oracle database")
         }).transactionally
           // serializable isolation level will avoid too much retrying due to key collisions
           .withTransactionIsolation(TransactionIsolation.Serializable),
@@ -145,29 +135,22 @@ class DbReferenceBlockOrderingStore(
       )
       .apply(
         insertBlock(),
-        new ExceptionRetryable {
-          override def retryOK(
-              outcome: Try[?],
+        new ExceptionRetryPolicy {
+          override protected def determineExceptionErrorKind(
+              exception: Throwable,
               logger: TracedLogger,
-              lastErrorKind: Option[ErrorKind],
           )(implicit
               tc: TraceContext
-          ): RetryUtil.ErrorKind = {
-            outcome match {
-              case util.Success(_) => RetryUtil.NoErrorKind
-              case util.Failure(exception) =>
-                exception match {
-                  // We want to retry on duplicate key violation because multiple sequencers may try to assign
-                  // the same block id (height) to a new block, in which case they should retry with a different
-                  // value.
-                  // This retry should not be hit very often due to us using serializable isolation level on this operation.
-                  // Error codes documented here: https://www.postgresql.org/docs/9.6/errcodes-appendix.html
-                  case exception: PSQLException if exception.getSQLState == "23505" =>
-                    logger.debug("Retrying block insert because of key collision")(tc)
-                    TransientErrorKind
-                  case _ => FatalErrorKind
-                }
-            }
+          ): ErrorKind = exception match {
+            // We want to retry on duplicate key violation because multiple sequencers may try to assign
+            // the same block id (height) to a new block, in which case they should retry with a different
+            // value.
+            // This retry should not be hit very often due to us using serializable isolation level on this operation.
+            // Error codes documented here: https://www.postgresql.org/docs/9.6/errcodes-appendix.html
+            case exception: PSQLException if exception.getSQLState == "23505" =>
+              logger.debug("Retrying block insert because of key collision")(tc)
+              TransientErrorKind()
+            case _ => FatalErrorKind
           }
         },
       )

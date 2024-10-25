@@ -5,6 +5,7 @@ package com.digitalasset.canton.domain.config
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{CommunityCryptoConfig, CryptoConfig, ProtocolConfig}
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.CryptoFactory.{
   selectAllowedEncryptionAlgorithmSpecs,
   selectAllowedEncryptionKeySpecs,
@@ -12,7 +13,6 @@ import com.digitalasset.canton.crypto.CryptoFactory.{
   selectAllowedSigningKeyScheme,
   selectAllowedSymmetricKeySchemes,
 }
-import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.version.ProtocolVersion
@@ -38,13 +38,14 @@ final case class DomainParametersConfig(
     requiredSymmetricKeySchemes: Option[NonEmpty[Set[SymmetricKeyScheme]]] = None,
     requiredHashAlgorithms: Option[NonEmpty[Set[HashAlgorithm]]] = None,
     requiredCryptoKeyFormats: Option[NonEmpty[Set[CryptoKeyFormat]]] = None,
-    override val alphaVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    override val alphaVersionSupport: Boolean = true,
     override val betaVersionSupport: Boolean = false,
     override val dontWarnOnDeprecatedPV: Boolean = false,
 ) extends ProtocolConfig
     with PrettyPrinting {
 
-  override def pretty: Pretty[DomainParametersConfig] = prettyOfClass(
+  override protected def pretty: Pretty[DomainParametersConfig] = prettyOfClass(
     param("requiredSigningKeySchemes", _.requiredSigningKeySchemes),
     param("requiredEncryptionAlgorithmSpecs", _.requiredEncryptionAlgorithmSpecs),
     param("requiredEncryptionKeySpecs", _.requiredEncryptionKeySpecs),

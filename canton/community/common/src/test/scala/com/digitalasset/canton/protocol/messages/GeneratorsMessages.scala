@@ -12,12 +12,12 @@ import com.digitalasset.canton.crypto.{
   SymmetricKeyScheme,
 }
 import com.digitalasset.canton.data.{
+  AssignmentViewTree,
   CantonTimestamp,
   CantonTimestampSecond,
   FullInformeeTree,
   GeneratorsData,
-  TransferInViewTree,
-  TransferOutViewTree,
+  UnassignmentViewTree,
   ViewPosition,
   ViewType,
 }
@@ -195,7 +195,6 @@ final class GeneratorsMessages(
       signatureO <- Gen.option(Arbitrary.arbitrary[Signature])
       viewHash <- Arbitrary.arbitrary[ViewHash]
       encryptedViewBytestring <- byteStringArb.arbitrary
-      randomness = Encrypted.fromByteString[SecureRandomness](encryptedViewBytestring)
       sessionKey <- Generators.nonEmptyListGen[AsymmetricEncrypted[SecureRandomness]]
       viewType <- viewTypeArb.arbitrary
       encryptedView = EncryptedView(viewType)(Encrypted.fromByteString(encryptedViewBytestring))
@@ -204,8 +203,7 @@ final class GeneratorsMessages(
     } yield EncryptedViewMessage.apply(
       submittingParticipantSignature = signatureO,
       viewHash = viewHash,
-      randomness = randomness,
-      sessionKey = sessionKey,
+      sessionKeys = sessionKey,
       encryptedView = encryptedView,
       domainId = domainId,
       viewEncryptionScheme = viewEncryptionScheme,
@@ -213,18 +211,18 @@ final class GeneratorsMessages(
     )
   )
 
-  private val transferInMediatorMessageArb: Arbitrary[TransferInMediatorMessage] = Arbitrary(
+  private val assignmentMediatorMessageArb: Arbitrary[AssignmentMediatorMessage] = Arbitrary(
     for {
-      tree <- Arbitrary.arbitrary[TransferInViewTree]
+      tree <- Arbitrary.arbitrary[AssignmentViewTree]
       submittingParticipantSignature <- Arbitrary.arbitrary[Signature]
-    } yield TransferInMediatorMessage(tree, submittingParticipantSignature)
+    } yield AssignmentMediatorMessage(tree, submittingParticipantSignature)
   )
 
-  private val transferOutMediatorMessageArb: Arbitrary[TransferOutMediatorMessage] = Arbitrary(
+  private val unassignmentMediatorMessageArb: Arbitrary[UnassignmentMediatorMessage] = Arbitrary(
     for {
-      tree <- Arbitrary.arbitrary[TransferOutViewTree]
+      tree <- Arbitrary.arbitrary[UnassignmentViewTree]
       submittingParticipantSignature <- Arbitrary.arbitrary[Signature]
-    } yield TransferOutMediatorMessage(tree, submittingParticipantSignature)
+    } yield UnassignmentMediatorMessage(tree, submittingParticipantSignature)
   )
 
   implicit val rootHashMessageArb: Arbitrary[RootHashMessage[RootHashMessagePayload]] =
@@ -266,8 +264,8 @@ final class GeneratorsMessages(
         rootHashMessageArb.arbitrary,
         informeeMessageArb.arbitrary,
         encryptedViewMessage.arbitrary,
-        transferInMediatorMessageArb.arbitrary,
-        transferOutMediatorMessageArb.arbitrary,
+        assignmentMediatorMessageArb.arbitrary,
+        unassignmentMediatorMessageArb.arbitrary,
         topologyTransactionsBroadcast.arbitrary,
       )
     )

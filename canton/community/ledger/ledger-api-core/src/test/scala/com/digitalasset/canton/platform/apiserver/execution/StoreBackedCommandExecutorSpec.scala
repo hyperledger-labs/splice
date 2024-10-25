@@ -7,9 +7,8 @@ import com.daml.logging.LoggingContext
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.crypto.{CryptoPureApi, Salt, SaltSeed}
-import com.digitalasset.canton.data.DeduplicationPeriod
-import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands}
+import com.digitalasset.canton.data.{DeduplicationPeriod, ProcessedDisclosedContract}
+import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands, DisclosedContract}
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.participant.state.WriteService
 import com.digitalasset.canton.ledger.participant.state.index.{ContractState, ContractStore}
@@ -20,12 +19,10 @@ import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingCon
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.InterpretationTimeExceeded
 import com.digitalasset.canton.protocol.{DriverContractMetadata, LfContractId, LfTransactionVersion}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, LfValue}
-import com.digitalasset.daml.lf.command.{
-  ApiCommands as LfCommands,
-  DisclosedContract as LfDisclosedContract,
-}
+import com.digitalasset.daml.lf.command.ApiCommands as LfCommands
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{Identifier, ParticipantId, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -33,7 +30,9 @@ import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.engine.*
 import com.digitalasset.daml.lf.transaction.test.TransactionBuilder
 import com.digitalasset.daml.lf.transaction.{
+  FatContractInstance,
   GlobalKeyWithMaintainers,
+  Node as LfNode,
   SubmittedTransaction,
   Transaction,
   Versioned,
@@ -61,7 +60,48 @@ class StoreBackedCommandExecutorSpec
   val identifier: Identifier =
     Ref.Identifier(Ref.PackageId.assertFromString("p"), Ref.QualifiedName.assertFromString("m:n"))
   val packageName: PackageName = PackageName.assertFromString("pkg-name")
-  private val processedDisclosedContracts = ImmArray()
+  private val disclosedContractId: LfContractId =
+    LfContractId.assertFromString("00" + "00" * 32 + "02")
+  private val disclosedCreateNode = LfNode.Create(
+    coid = disclosedContractId,
+    packageName = packageName,
+    packageVersion = None,
+    templateId = identifier,
+    arg = ValueTrue,
+    signatories = Set(Ref.Party.assertFromString("unexpectedSig")),
+    stakeholders = Set(
+      Ref.Party.assertFromString("unexpectedSig"),
+      Ref.Party.assertFromString("unexpectedObs"),
+    ),
+    keyOpt = Some(
+      GlobalKeyWithMaintainers.assertBuild(
+        templateId = identifier,
+        LfValue.ValueTrue,
+        Set(Ref.Party.assertFromString("unexpectedSig")),
+        packageName,
+      )
+    ),
+    version = LfTransactionVersion.StableVersions.max,
+  )
+  private val disclosedContractDomainId: DomainId = DomainId.tryFromString("x::domainId")
+  private val disclosedContractCreateTime = Time.Timestamp.now()
+  private val disclosedContract = DisclosedContract(
+    fatContractInstance = FatContractInstance.fromCreateNode(
+      disclosedCreateNode,
+      createTime = disclosedContractCreateTime,
+      cantonData = salt,
+    ),
+    domainIdO = Some(disclosedContractDomainId),
+  )
+
+  private val processedDisclosedContracts = ImmArray(
+    ProcessedDisclosedContract(
+      create = disclosedCreateNode,
+      createdAt = disclosedContractCreateTime,
+      driverMetadata = salt,
+      domainIdO = Some(disclosedContractDomainId),
+    )
+  )
 
   private val emptyTransactionMetadata = Transaction.Metadata(
     submissionSeed = None,
@@ -70,7 +110,7 @@ class StoreBackedCommandExecutorSpec
     dependsOnTime = false,
     nodeSeeds = ImmArray.Empty,
     globalKeyMapping = Map.empty,
-    disclosedEvents = processedDisclosedContracts,
+    disclosedEvents = ImmArray(disclosedCreateNode),
   )
 
   private val resultDone: ResultDone[(SubmittedTransaction, Transaction.Metadata)] =
@@ -87,7 +127,7 @@ class StoreBackedCommandExecutorSpec
         submitters = any[Set[Ref.Party]],
         readAs = any[Set[Ref.Party]],
         cmds = any[com.digitalasset.daml.lf.command.ApiCommands],
-        disclosures = any[ImmArray[LfDisclosedContract]],
+        disclosures = any[ImmArray[FatContractInstance]],
         participantId = any[ParticipantId],
         submissionSeed = any[Hash],
         engineLogger = any[Option[EngineLogger]],
@@ -111,7 +151,8 @@ class StoreBackedCommandExecutorSpec
         ledgerEffectiveTime = ledgerEffectiveTime,
         commandsReference = "",
       ),
-      disclosedContracts = ImmArray.empty,
+      disclosedContracts = ImmArray(disclosedContract),
+      domainId = None,
     )
 
   private val submissionSeed = Hash.hashPrivateKey("a key")
@@ -122,7 +163,6 @@ class StoreBackedCommandExecutorSpec
       Ref.ParticipantId.assertFromString("anId"),
       mock[WriteService],
       mock[ContractStore],
-      AuthorityResolver(),
       authenticateContract = _ => Right(()),
       metrics = LedgerApiServerMetrics.ForTesting,
       EngineLoggingConfig(),
@@ -222,27 +262,6 @@ class StoreBackedCommandExecutorSpec
 
     val archivedContractId: LfContractId = LfContractId.assertFromString("00" + "00" * 32 + "01")
 
-    val disclosedContractId: LfContractId = LfContractId.assertFromString("00" + "00" * 32 + "02")
-
-    val disclosedContract: domain.DisclosedContract = domain.DisclosedContract(
-      templateId = identifier,
-      packageName = packageName,
-      packageVersion = None,
-      contractId = disclosedContractId,
-      argument = ValueTrue,
-      createdAt = mock[Timestamp],
-      keyHash = None,
-      driverMetadata = salt,
-      signatories = Set(Ref.Party.assertFromString("unexpectedSig")),
-      stakeholders = Set(
-        Ref.Party.assertFromString("unexpectedSig"),
-        Ref.Party.assertFromString("unexpectedObs"),
-      ),
-      keyMaintainers = Some(Set(Ref.Party.assertFromString("unexpectedSig"))),
-      keyValue = Some(LfValue.ValueTrue),
-      transactionVersion = LfTransactionVersion.StableVersions.max,
-    )
-
     def doTest(
         contractId: Option[LfContractId],
         expected: Option[Option[String]],
@@ -284,7 +303,7 @@ class StoreBackedCommandExecutorSpec
           submitters = any[Set[Ref.Party]],
           readAs = any[Set[Ref.Party]],
           cmds = any[com.digitalasset.daml.lf.command.ApiCommands],
-          disclosures = any[ImmArray[LfDisclosedContract]],
+          disclosures = any[ImmArray[FatContractInstance]],
           participantId = any[ParticipantId],
           submissionSeed = any[Hash],
           engineLogger = any[Option[EngineLogger]],
@@ -306,6 +325,7 @@ class StoreBackedCommandExecutorSpec
           commandsReference = "",
         ),
         disclosedContracts = ImmArray.from(Seq(disclosedContract)),
+        domainId = None,
       )
       val submissionSeed = Hash.hashPrivateKey("a key")
 
@@ -333,7 +353,6 @@ class StoreBackedCommandExecutorSpec
         Ref.ParticipantId.assertFromString("anId"),
         mock[WriteService],
         store,
-        AuthorityResolver(),
         authenticateContract = _ => authenticationResult,
         metrics = LedgerApiServerMetrics.ForTesting,
         EngineLoggingConfig(),
@@ -380,7 +399,7 @@ class StoreBackedCommandExecutorSpec
 
     "disallow unauthorized disclosed contracts" in {
       val expected =
-        s"Upgrading contract with $disclosedContractId failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set(unexpectedObs) vs Set(observer)', 'key maintainers mismatch: Set(unexpectedSig) vs Set(signatory)', 'key value mismatch: Some(GlobalKey(p:m:n, pkg-name, ValueBool(true))) vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
+        s"Upgrading contract ${disclosedContractId.coid} failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: TreeSet(unexpectedSig) vs Set(signatory)', 'observers mismatch: TreeSet(unexpectedObs) vs Set(observer)', 'key maintainers mismatch: TreeSet(unexpectedSig) vs Set(signatory)', 'key value mismatch: Some(GlobalKey(p:m:n, pkg-name, ValueBool(true))) vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
       doTest(
         Some(disclosedContractId),
         Some(Some(expected)),
@@ -391,7 +410,7 @@ class StoreBackedCommandExecutorSpec
     "disallow unauthorized stakeholder contracts" in {
       val errorMessage = "Not authorized"
       val expected =
-        s"Upgrading contract with $stakeholderContractId failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set() vs Set(observer)', 'key maintainers mismatch: Set() vs Set(signatory)', 'key value mismatch: None vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
+        s"Upgrading contract ${stakeholderContractId.coid} failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set() vs Set(observer)', 'key maintainers mismatch: Set() vs Set(signatory)', 'key value mismatch: None vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
       doTest(
         Some(stakeholderContractId),
         Some(Some(expected)),

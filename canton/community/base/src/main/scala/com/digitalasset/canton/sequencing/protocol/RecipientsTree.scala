@@ -23,7 +23,7 @@ final case class RecipientsTree(
     children: Seq[RecipientsTree],
 ) extends PrettyPrinting {
 
-  override def pretty: Pretty[RecipientsTree] =
+  override protected def pretty: Pretty[RecipientsTree] =
     prettyOfClass(
       param("recipient group", _.recipientGroup.toList),
       paramIfNonEmpty("children", _.children),
@@ -81,23 +81,20 @@ object RecipientsTree {
   def ofMembers(
       recipientGroup: NonEmpty[Set[Member]],
       children: Seq[RecipientsTree],
-  ): RecipientsTree = RecipientsTree(recipientGroup.map(MemberRecipient), children)
+  ): RecipientsTree = RecipientsTree(recipientGroup.map(MemberRecipient.apply), children)
 
   def leaf(group: NonEmpty[Set[Member]]): RecipientsTree =
-    RecipientsTree(group.map(MemberRecipient), Seq.empty)
+    RecipientsTree(group.map(MemberRecipient.apply), Seq.empty)
 
   def recipientsLeaf(group: NonEmpty[Set[Recipient]]): RecipientsTree =
     RecipientsTree(group, Seq.empty)
 
   def fromProtoV30(
-      treeProto: v30.RecipientsTree,
-      supportGroupAddressing: Boolean,
-  ): ParsingResult[RecipientsTree] = {
+      treeProto: v30.RecipientsTree
+  ): ParsingResult[RecipientsTree] =
     for {
       members <- treeProto.recipients.traverse(str =>
-        if (supportGroupAddressing)
-          Recipient.fromProtoPrimitive(str, "RecipientsTreeProto.recipients")
-        else Member.fromProtoPrimitive(str, "RecipientsTreeProto.recipients").map(MemberRecipient)
+        Recipient.fromProtoPrimitive(str, "RecipientsTreeProto.recipients")
       )
       recipientsNonEmpty <- NonEmpty
         .from(members)
@@ -108,11 +105,10 @@ object RecipientsTree {
           )
         )
       children = treeProto.children
-      childTrees <- children.toList.traverse(fromProtoV30(_, supportGroupAddressing))
+      childTrees <- children.toList.traverse(fromProtoV30)
     } yield RecipientsTree(
       recipientsNonEmpty.toSet,
       childTrees,
     )
-  }
 
 }

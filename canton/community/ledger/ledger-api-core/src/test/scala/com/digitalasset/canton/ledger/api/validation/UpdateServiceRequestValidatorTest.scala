@@ -4,9 +4,6 @@
 package com.digitalasset.canton.ledger.api.validation
 
 import com.daml.error.{ContextualizedErrorLogger, NoLogging}
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.ParticipantBoundary
-import com.daml.ledger.api.v2.state_service.GetLedgerEndRequest
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
@@ -37,13 +34,9 @@ class UpdateServiceRequestValidatorTest
   private val templateId = Identifier(packageId, includedModule, includedTemplate)
 
   private def txReqBuilder(templateIdsForParty: Seq[Identifier]) = GetUpdatesRequest(
-    Some(
-      ParticipantOffset(
-        ParticipantOffset.Value.Boundary(ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN)
-      )
-    ),
-    Some(ParticipantOffset(ParticipantOffset.Value.Absolute(absoluteOffset))),
-    Some(
+    beginExclusive = "",
+    endInclusive = offset,
+    filter = Some(
       TransactionFilter(
         Map(
           party ->
@@ -74,31 +67,18 @@ class UpdateServiceRequestValidatorTest
         )
       )
     ),
-    verbose,
+    verbose = verbose,
   )
   private val txReq = txReqBuilder(Seq(templateId))
   private val txReqWithPackageNameScoping = txReqBuilder(
     Seq(templateId.copy(packageId = Ref.PackageRef.Name(packageName).toString))
   )
 
-  private val txTreeReq = GetUpdatesRequest(
-    Some(
-      ParticipantOffset(
-        ParticipantOffset.Value.Boundary(ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN)
-      )
-    ),
-    Some(ParticipantOffset(ParticipantOffset.Value.Absolute(absoluteOffset))),
-    Some(TransactionFilter(Map(party -> Filters.defaultInstance))),
-    verbose,
-  )
-
-  private val endReq = GetLedgerEndRequest()
-
   private val txByEvIdReq =
     GetTransactionByEventIdRequest(eventId, Seq(party))
 
   private val txByIdReq =
-    GetTransactionByIdRequest(transactionId, Seq(party))
+    GetTransactionByIdRequest(updateId, Seq(party))
 
   private val validator = new UpdateServiceRequestValidator(
     new PartyValidator(PartyNameChecker.AllowAllParties)
@@ -111,7 +91,7 @@ class UpdateServiceRequestValidatorTest
       "accept simple requests" in {
         inside(validator.validate(txReq, ledgerEnd)) { case Right(req) =>
           req.startExclusive shouldBe domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldBe Some(domain.ParticipantOffset.Absolute(absoluteOffset))
+          req.endInclusive shouldBe Some(offset)
           val filtersByParty = req.filter.filtersByParty
           filtersByParty should have size 1
           hasExpectedFilters(req)
@@ -162,67 +142,15 @@ class UpdateServiceRequestValidatorTest
         )
       }
 
-      "return the correct error on missing begin" in {
-        requestMustFailWith(
-          request = validator.validate(txReq.update(_.optionalBeginExclusive := None), ledgerEnd),
-          code = INVALID_ARGUMENT,
-          description =
-            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: begin",
-          metadata = Map.empty,
-        )
-      }
-
-      "return the correct error on empty begin " in {
-        requestMustFailWith(
-          request =
-            validator.validate(txReq.update(_.beginExclusive := ParticipantOffset()), ledgerEnd),
-          code = INVALID_ARGUMENT,
-          description =
-            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: begin.(boundary|value)",
-          metadata = Map.empty,
-        )
-      }
-
-      "return the correct error on empty end " in {
-        requestMustFailWith(
-          request = validator.validate(txReq.withEndInclusive(ParticipantOffset()), ledgerEnd),
-          code = INVALID_ARGUMENT,
-          description =
-            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: end.(boundary|value)",
-          metadata = Map.empty,
-        )
-      }
-
       "return the correct error on unknown begin boundary" in {
         requestMustFailWith(
           request = validator.validate(
-            txReq.withBeginExclusive(
-              ParticipantOffset(
-                ParticipantOffset.Value.Boundary(ParticipantBoundary.Unrecognized(7))
-              )
-            ),
+            txReq.withBeginExclusive("123@"),
             ledgerEnd,
           ),
           code = INVALID_ARGUMENT,
           description =
-            "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Unknown ledger boundary value '7' in field begin.boundary",
-          metadata = Map.empty,
-        )
-      }
-
-      "return the correct error on unknown end boundary" in {
-        requestMustFailWith(
-          request = validator.validate(
-            txReq.withEndInclusive(
-              ParticipantOffset(
-                ParticipantOffset.Value.Boundary(ParticipantBoundary.Unrecognized(7))
-              )
-            ),
-            ledgerEnd,
-          ),
-          code = INVALID_ARGUMENT,
-          description =
-            "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: Unknown ledger boundary value '7' in field end.boundary",
+            "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: cannot parse HexString 123@",
           metadata = Map.empty,
         )
       }
@@ -230,11 +158,7 @@ class UpdateServiceRequestValidatorTest
       "return the correct error when begin offset is after ledger end" in {
         requestMustFailWith(
           request = validator.validate(
-            txReq.withBeginExclusive(
-              ParticipantOffset(
-                ParticipantOffset.Value.Absolute((ledgerEnd.value.toInt + 1).toString)
-              )
-            ),
+            txReq.withBeginExclusive((ledgerEnd.toInt + 1).toString),
             ledgerEnd,
           ),
           code = OUT_OF_RANGE,
@@ -247,11 +171,7 @@ class UpdateServiceRequestValidatorTest
       "return the correct error when end offset is after ledger end" in {
         requestMustFailWith(
           request = validator.validate(
-            txReq.withEndInclusive(
-              ParticipantOffset(
-                ParticipantOffset.Value.Absolute((ledgerEnd.value.toInt + 1).toString)
-              )
-            ),
+            txReq.withEndInclusive((ledgerEnd.toInt + 1).toString),
             ledgerEnd,
           ),
           code = OUT_OF_RANGE,
@@ -262,7 +182,7 @@ class UpdateServiceRequestValidatorTest
       }
 
       "tolerate missing end" in {
-        inside(validator.validate(txReq.update(_.optionalEndInclusive := None), ledgerEnd)) {
+        inside(validator.validate(txReq.update(_.endInclusive := ""), ledgerEnd)) {
           case Right(req) =>
             req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
             req.endInclusive shouldEqual None
@@ -283,7 +203,7 @@ class UpdateServiceRequestValidatorTest
           )
         ) { case Right(req) =>
           req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
+          req.endInclusive shouldEqual Some(offset)
           val filtersByParty = req.filter.filtersByParty
           filtersByParty should have size 1
           inside(filtersByParty.headOption.value) { case (p, filters) =>
@@ -304,7 +224,7 @@ class UpdateServiceRequestValidatorTest
           )
         ) { case Right(req) =>
           req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
+          req.endInclusive shouldEqual Some(offset)
           val filtersByParty = req.filter.filtersByParty
           filtersByParty should have size 1
           inside(filtersByParty.headOption.value) { case (p, filters) =>
@@ -318,7 +238,7 @@ class UpdateServiceRequestValidatorTest
       "tolerate all fields filled out" in {
         inside(validator.validate(txReq, ledgerEnd)) { case Right(req) =>
           req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
+          req.endInclusive shouldEqual Some(offset)
           hasExpectedFilters(req)
           req.verbose shouldEqual verbose
         }
@@ -327,7 +247,7 @@ class UpdateServiceRequestValidatorTest
       "allow package-name scoped templates" in {
         inside(validator.validate(txReqWithPackageNameScoping, ledgerEnd)) { case Right(req) =>
           req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
+          req.endInclusive shouldEqual Some(offset)
           hasExpectedFilters(
             req,
             expectedTemplates =
@@ -340,7 +260,7 @@ class UpdateServiceRequestValidatorTest
       "still allow populated packageIds in templateIds (for backwards compatibility)" in {
         inside(validator.validate(txReq, ledgerEnd)) { case Right(req) =>
           req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(domain.ParticipantOffset.Absolute(absoluteOffset))
+          req.endInclusive shouldEqual Some(offset)
           hasExpectedFilters(req)
           req.verbose shouldEqual verbose
         }
@@ -389,7 +309,7 @@ class UpdateServiceRequestValidatorTest
                 ),
                 interfaceFilters = Set(
                   domain.InterfaceFilter(
-                    interfaceId = Ref.Identifier.assertFromString(
+                    interfaceTypeRef = Ref.TypeConRef.assertFromString(
                       "packageId:includedModule:includedTemplate"
                     ),
                     includeView = true,

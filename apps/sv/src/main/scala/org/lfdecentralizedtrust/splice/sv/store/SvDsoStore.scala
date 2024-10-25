@@ -944,6 +944,57 @@ trait SvDsoStore
     splice.ans.AnsEntryContext.ContractId,
     splice.ans.AnsEntryContext,
   ]]]
+
+  def lookupTransferPreapprovalByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[
+      splice.amuletrules.TransferPreapproval.ContractId,
+      splice.amuletrules.TransferPreapproval,
+    ]]
+  ]
+
+  def listAmuletsByOwner(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Seq[ContractWithState[
+      splice.amulet.Amulet.ContractId,
+      splice.amulet.Amulet,
+    ]]
+  ]
+
+  def lookupTransferCommandCounterBySenderWithOffset(partyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[
+    QueryResult[Option[ContractWithState[
+      splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
+      splice.externalpartyamuletrules.TransferCommandCounter,
+    ]]]
+  ]
+
+  def lookupTransferCommandCounterBySender(partyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[
+    Option[ContractWithState[
+      splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
+      splice.externalpartyamuletrules.TransferCommandCounter,
+    ]]
+  ] = lookupTransferCommandCounterBySenderWithOffset(partyId).map(_.value)
+
+  def listTransferCommandCounterConfirmationBySender(
+      confirmer: PartyId,
+      sender: PartyId,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+  ]
+
+  def listExpiredTransferPreapprovals: ListExpiredContracts[
+    splice.amuletrules.TransferPreapproval.ContractId,
+    splice.amuletrules.TransferPreapproval,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(
+      splice.amuletrules.TransferPreapproval.COMPANION
+    )
 }
 
 object SvDsoStore {
@@ -1000,6 +1051,7 @@ object SvDsoStore {
     splice.ans.AnsEntry.COMPANION,
     splice.ans.AnsEntryContext.COMPANION,
     splice.ans.AnsRules.COMPANION,
+    splice.amuletrules.TransferPreapproval.COMPANION,
     splice.dso.amuletprice.AmuletPriceVote.COMPANION,
     splice.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
   )
@@ -1236,6 +1288,7 @@ object SvDsoStore {
               _ => None,
               Some(_),
             ),
+          memberTrafficDomain = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
           totalTrafficPurchased = Some(contract.payload.totalPurchased),
         )
       },
@@ -1287,6 +1340,28 @@ object SvDsoStore {
         DsoAcsStoreRowData(
           contract,
           subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
+      mkFilter(splice.amuletrules.TransferPreapproval.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
+      },
+      mkFilter(splice.externalpartyamuletrules.TransferCommand.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract
+        )
+      },
+      mkFilter(splice.externalpartyamuletrules.TransferCommandCounter.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          walletParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sender)),
         )
       },
     )

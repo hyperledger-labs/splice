@@ -67,7 +67,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
   // created by the expiry test
   override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
-    codegen.AnsEntry.TEMPLATE_ID
+    codegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 
   "ans" should {
@@ -446,7 +446,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
     }
 
-    "na SV's CNS entry can be seen via scan api" in { implicit env =>
+    "an SV's CNS entry can be seen via scan api" in { implicit env =>
       val dsoRules = sv1Backend.getDsoInfo().dsoRules
       dsoRules.payload.svs.asScala.foreach { case (svParty, svInfo) =>
         val expectedSvEntry = svEntry(svInfo.name, svParty, ansAcronym)

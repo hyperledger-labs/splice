@@ -17,22 +17,25 @@ sealed trait MetricValue extends PrettyPrinting {
   def attributes: Map[String, String]
 
   def toCsvHeader(data: MetricData): String
-  def toCsvRow(ts: CantonTimestamp, data: MetricData): String
+  def toCsvRow(ts: CantonTimestamp, data: MetricData, unknownKeys: Seq[String]): String
 
   final def select[TargetType <: MetricValue](implicit
       M: ClassTag[TargetType]
   ): Option[TargetType] = M.unapply(this)
 
+  protected def renderUnknownKeys(unknownKeys: Seq[String]): String =
+    unknownKeys
+      .flatMap(k => attributes.get(k).map(v => s"$k=$v"))
+      .mkString(";")
 }
 
 object MetricValue {
 
-  def allFromMetricData(items: Iterable[MetricData]): Seq[(MetricValue, MetricData)] = {
+  def allFromMetricData(items: Iterable[MetricData]): Seq[(MetricValue, MetricData)] =
     items.flatMap { data =>
-      MetricValue.fromMetricData(data).map { value => (value, data) }
+      MetricValue.fromMetricData(data).map(value => (value, data))
     }.toSeq
-  }
-  def fromMetricData(item: MetricData): Seq[MetricValue] = {
+  def fromMetricData(item: MetricData): Seq[MetricValue] =
     item.getType match {
       case MetricDataType.LONG_GAUGE =>
         item.getLongGaugeData.getPoints.asScala.map(fromLongPoint).toSeq
@@ -48,7 +51,6 @@ object MetricValue {
       case MetricDataType.EXPONENTIAL_HISTOGRAM =>
         item.getHistogramData.getPoints.asScala.map(fromHistogramData).toSeq
     }
-  }
 
   import Pretty.*
 
@@ -68,20 +70,20 @@ object MetricValue {
 
     def value: T
 
-    override def toCsvHeader(data: MetricData): String = {
-      Seq("timestamp", "count").mkString(",")
-    }
+    override def toCsvHeader(data: MetricData): String =
+      (Seq("timestamp", "count", "attributes")).mkString(",")
 
-    override def toCsvRow(ts: CantonTimestamp, data: MetricData): String = {
-      Seq(ts.getEpochSecond.toString, value.toString).mkString(",")
-    }
-
+    override def toCsvRow(ts: CantonTimestamp, data: MetricData, unknownKeys: Seq[String]): String =
+      (Seq(ts.getEpochSecond.toString, value.toString) :+ renderUnknownKeys(
+        unknownKeys
+      ))
+        .mkString(",")
   }
 
   final case class LongPoint(value: Long, attributes: Map[String, String])
       extends MetricValue
       with Point[Long] {
-    override def pretty: Pretty[LongPoint] = prettyOfClass(
+    override protected def pretty: Pretty[LongPoint] = prettyOfClass(
       param("value", _.value),
       param(
         "attributes",
@@ -94,7 +96,7 @@ object MetricValue {
   final case class DoublePoint(value: Double, attributes: Map[String, String])
       extends MetricValue
       with Point[Double] {
-    override def pretty: Pretty[DoublePoint] = prettyOfClass(
+    override protected def pretty: Pretty[DoublePoint] = prettyOfClass(
       param("value", _.value.toString.unquoted),
       param(
         "attributes",
@@ -110,7 +112,7 @@ object MetricValue {
       quantiles: Seq[ValueAtQuantile],
       attributes: Map[String, String],
   ) extends MetricValue {
-    override def pretty: Pretty[Summary] = prettyOfClass(
+    override protected def pretty: Pretty[Summary] = prettyOfClass(
       param("sum", _.sum.toString.unquoted),
       param("count", _.count),
       param("quantiles", _.quantiles),
@@ -120,17 +122,17 @@ object MetricValue {
       ),
     )
 
-    override def toCsvHeader(data: MetricData): String = {
-      (Seq("timestamp", "sum", "count") ++ quantiles.map(_.getQuantile).map(x => s"p$x%2.0f"))
+    override def toCsvHeader(data: MetricData): String =
+      (Seq("timestamp", "sum", "count") ++ quantiles
+        .map(_.getQuantile)
+        .map(x => s"p$x%2.0f") :+ "attributes")
         .mkString(",")
-    }
 
-    override def toCsvRow(ts: CantonTimestamp, data: MetricData): String = {
+    override def toCsvRow(ts: CantonTimestamp, data: MetricData, unknownKeys: Seq[String]): String =
       (Seq(ts.getEpochSecond.toString, sum.toString, count.toString) ++ quantiles.map(
         _.getValue.toString
-      ))
+      ) :+ renderUnknownKeys(unknownKeys))
         .mkString(",")
-    }
 
   }
 
@@ -141,30 +143,29 @@ object MetricValue {
       boundaries: List[Double],
       attributes: Map[String, String],
   ) extends MetricValue {
-    def maxBoundary: Double = {
+    def maxBoundary: Double =
       counts.zipAll(boundaries, 0L, Double.MaxValue).foldLeft(0.0) {
         case (acc, (count, boundary)) =>
           if (count > 0L) boundary else acc
       }
-    }
 
     def average: Double = sum / Math.max(count, 1)
 
     def percentileBoundary(percentile: Double): Double = {
       require(percentile >= 0 && percentile <= 1, "percentile must be between 0 and 1")
       @tailrec
-      def go(remaining: List[(Long, Double)], aggregatedCount: Long): Double = {
+      def go(remaining: List[(Long, Double)], aggregatedCount: Long): Double =
         remaining match {
           case Nil => Double.MaxValue
-          case (count, boundary) :: tail =>
+          case head :: tail =>
+            val (count, boundary) = head
             val newCount = aggregatedCount + count
             if (newCount >= percentile * count) boundary else go(tail, newCount)
         }
-      }
       go(counts.zipAll(boundaries, 0, Double.MaxValue), 0)
     }
 
-    override def pretty: Pretty[Histogram] = prettyOfClass(
+    override protected def pretty: Pretty[Histogram] = prettyOfClass(
       param("sum", _.sum.toString.unquoted),
       param("count", _.count),
       param("counts", _.counts),
@@ -175,35 +176,32 @@ object MetricValue {
       ),
     )
 
-    override def toCsvHeader(data: MetricData): String = {
-      (Seq("timestamp", "sum", "count"))
+    override def toCsvHeader(data: MetricData): String =
+      (Seq("timestamp", "sum", "count", "attributes"))
         .mkString(",")
-    }
 
-    override def toCsvRow(ts: CantonTimestamp, data: MetricData): String = {
-      (Seq(ts.getEpochSecond.toString, sum.toString, count.toString))
+    override def toCsvRow(ts: CantonTimestamp, data: MetricData, unknownKeys: Seq[String]): String =
+      (Seq(ts.getEpochSecond.toString, sum.toString, count.toString) :+ renderUnknownKeys(
+        unknownKeys
+      ))
         .mkString(",")
-    }
 
   }
 
-  private def fromLongPoint(data: LongPointData): LongPoint = {
+  private def fromLongPoint(data: LongPointData): LongPoint =
     LongPoint(data.getValue, mapAttributes(data.getAttributes))
-  }
-  private def fromDoublePoint(data: DoublePointData): DoublePoint = {
+  private def fromDoublePoint(data: DoublePointData): DoublePoint =
     DoublePoint(data.getValue, mapAttributes(data.getAttributes))
-  }
 
-  private def fromSummaryValue(data: SummaryPointData): Summary = {
+  private def fromSummaryValue(data: SummaryPointData): Summary =
     Summary(
       data.getSum,
       data.getCount,
       data.getValues.asScala.toSeq,
       mapAttributes(data.getAttributes),
     )
-  }
 
-  private def fromHistogramData(data: HistogramPointData): Histogram = {
+  private def fromHistogramData(data: HistogramPointData): Histogram =
     Histogram(
       data.getSum,
       data.getCount,
@@ -211,17 +209,15 @@ object MetricValue {
       data.getBoundaries.asScala.map(_.doubleValue()).toList,
       mapAttributes(data.getAttributes),
     )
-  }
 
   private def mapAttributes(attributes: Attributes): Map[String, String] =
     attributes.asMap().asScala.map { case (k, v) => (k.getKey, v.toString) }.toMap
 
-  implicit val prettyMetricData: Pretty[MetricData] = {
+  implicit val prettyMetricData: Pretty[MetricData] =
     prettyOfClass(
       param("name", _.getName.singleQuoted),
       param("unit", _.getUnit.singleQuoted),
       param("type", _.getType.name().singleQuoted),
       param("values", x => fromMetricData(x)),
     )
-  }
 }

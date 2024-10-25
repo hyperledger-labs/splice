@@ -23,14 +23,8 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.retry.{Backoff, RetryUtil, Success}
-import com.digitalasset.canton.util.retry.RetryUtil.{
-  ErrorKind,
-  ExceptionRetryable,
-  FatalErrorKind,
-  NoErrorKind,
-  TransientErrorKind,
-}
+import com.digitalasset.canton.util.retry.{Backoff, ExceptionRetryPolicy, ErrorKind, Success}
+import ErrorKind.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.time.Clock
 import io.grpc.Status
@@ -520,7 +514,7 @@ object RetryProvider {
       metricsFactory: LabeledMetricsFactory,
       additionalMetricsLabels: Map[String, String],
       flagCloseable: FlagCloseable,
-  ) extends ExceptionRetryable {
+  ) extends ExceptionRetryPolicy {
     // Additional categories that are not marked as retryable but we
     // can safely retry since we know there are other apps or
     // processes that change the system state.
@@ -567,19 +561,17 @@ object RetryProvider {
         )
       )
 
-    override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
-        implicit tc: TraceContext
+    override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit
+        tc: TraceContext
     ): ErrorKind = {
-      val errorKind = if (flagCloseable.isClosing) {
+      val errorKind: ErrorKind = if (flagCloseable.isClosing) {
         logger.info(
-          s"The operation ${operationName.singleQuoted} failed due to shutdown in process (full stack trace omitted): $outcome"
+          s"The operation ${operationName.singleQuoted} failed due to shutdown in process (full stack trace omitted): $exception"
         )
-        TransientErrorKind
+        TransientErrorKind()
       } else {
-        outcome match {
-          case Failure(
-                ex @ GrpcException(status @ GrpcStatus(statusCode, someDescription), trailers)
-              ) =>
+        exception match {
+          case ex @ GrpcException(status @ GrpcStatus(statusCode, someDescription), trailers) =>
             val description = someDescription.getOrElse("No description provided")
             val errorCategory = someDescription.flatMap(ErrorCodeUtils.errorCategoryFromString)
             val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
@@ -611,7 +603,7 @@ object RetryProvider {
                     // the message of the exception is already in the error details, so we don't need to append it
                     .appendedAll(errorDetails.map(_.toString))
                 logger.info(msg.mkString("\n"))
-                TransientErrorKind
+                TransientErrorKind()
               case _
                   if retryableStatusCodes.contains(statusCode) ||
                     (
@@ -622,6 +614,12 @@ object RetryProvider {
                         // This can happen if the party allocation has not yet been propagated to the new domain.
                         statusCode == Status.Code.INVALID_ARGUMENT &&
                         raw"No participant of the party .* has confirmation permission on both domains at respective timestamps".r
+                          .findFirstMatchIn(description)
+                          .isDefined
+                        ||
+                        // This can happen if the party allocation has not yet been propagated to the new domain.
+                        statusCode == Status.Code.INVALID_ARGUMENT &&
+                        raw"The following parties are not active on the target domain".r
                           .findFirstMatchIn(description)
                           .isDefined
                         ||
@@ -677,31 +675,27 @@ object RetryProvider {
                   s"statusCode=$statusCode",
                 )
                 logger.info(msg.mkString("\n"))
-                TransientErrorKind
+                TransientErrorKind()
               case _ => fatalError
             }
 
-          case Failure(
-                ex: StreamTcpException
-              ) =>
+          case ex: StreamTcpException =>
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)
-            TransientErrorKind
-          case Failure(
-                ex: BaseAppConnection.UnexpectedHttpResponse
-              ) =>
+            TransientErrorKind()
+          case ex: BaseAppConnection.UnexpectedHttpResponse =>
             // TODO (tech-debt) Revisit whether we can provide more useful info here.
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)
-            TransientErrorKind
-          case Failure(ex @ HttpCommandException(_, status, _)) =>
+            TransientErrorKind()
+          case ex @ HttpCommandException(_, status, _) =>
             if (retryableHttpStatusCodes.contains(status)) {
               logger.info(
                 s"The operation ${operationName.singleQuoted} failed with a $transientDescription HTTP error: $ex"
               )
-              TransientErrorKind
+              TransientErrorKind()
             } else {
               logger.warn(
                 s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription HTTP error, $fatalBehavior: $ex"
@@ -709,15 +703,15 @@ object RetryProvider {
               FatalErrorKind
             }
           // Retry for transient DNS failures #10545
-          case Failure(ex: ConnectException) =>
+          case ex: ConnectException =>
             logger.info(
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             )
-            TransientErrorKind
+            TransientErrorKind()
           // We encounter this with toxiproxy if the upstream is not yet up.
           // The exception type is org.apache.pekko.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
           // but pekko-http does not expose that so we match on the message instead.
-          case Failure(ex: RuntimeException)
+          case ex: RuntimeException
               if Option(ex.getMessage).exists(
                 _.contains(
                   "The http server closed the connection unexpectedly before delivering responses"
@@ -726,25 +720,25 @@ object RetryProvider {
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)
-            TransientErrorKind
+            TransientErrorKind()
           // IOExceptions are checked exceptions that are typically raised when external systems or devices are acting up.
           // We add this default retry, as that is more likely to be helpful than failing fatally.
-          case Failure(ex: IOException) =>
+          case ex: IOException =>
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)
-            TransientErrorKind
-          case Failure(ex: java.util.concurrent.TimeoutException) =>
+            TransientErrorKind()
+          case ex: java.util.concurrent.TimeoutException =>
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)
-            TransientErrorKind
-          case Failure(ex: java.sql.SQLTransientConnectionException) =>
+            TransientErrorKind()
+          case ex: java.sql.SQLTransientConnectionException =>
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
             logger.info(msg)
-            TransientErrorKind
-          case Failure(ex: java.util.concurrent.CompletionException) =>
+            TransientErrorKind()
+          case ex: java.util.concurrent.CompletionException =>
             Option(ex.getCause) match {
               case None =>
                 logger.info(
@@ -753,26 +747,24 @@ object RetryProvider {
                 )
                 FatalErrorKind
               case Some(cause) =>
-                retryOK(Failure(cause), logger, lastErrorKind)
+                determineExceptionErrorKind(cause, logger)
             }
-          case Failure(ex: QuietNonRetryableException) =>
+          case ex: QuietNonRetryableException =>
             logger.info(
               s"The operation ${operationName.singleQuoted} failed with a non retryable error, $fatalBehavior",
               ex,
             )
             FatalErrorKind
-          case Failure(ex) =>
+          case ex =>
             logger.warn(s"$operationName failed with an unknown exception, $fatalBehavior", ex)
             FatalErrorKind
-          case util.Success(_) =>
-            NoErrorKind
         }
       }
       val errorKindLabel = errorKind match {
-        case RetryUtil.NoErrorKind => "no_kind"
-        case RetryUtil.FatalErrorKind => "fatal"
-        case RetryUtil.TransientErrorKind => "transient"
-        case RetryUtil.SpuriousTransientErrorKind => "spurious"
+        case FatalErrorKind => "fatal"
+        case TransientErrorKind(_) => "transient"
+        case NoSuccessErrorKind => "no_success"
+        case UnknownErrorKind => "unknown"
       }
       implicit val mc = MetricsContext(
         "error_kind" -> errorKindLabel
@@ -790,15 +782,15 @@ object RetryProvider {
         metricsFactory: LabeledMetricsFactory,
         additionalMetricsLabels: Map[String, String],
         flagCloseable: FlagCloseable,
-    ): ExceptionRetryable
+    ): ExceptionRetryPolicy
   }
 
   object Retryable {
-    implicit val function: Retryable[String => ExceptionRetryable] =
-      new Retryable[String => ExceptionRetryable] {
+    implicit val function: Retryable[String => ExceptionRetryPolicy] =
+      new Retryable[String => ExceptionRetryPolicy] {
         override def apply(
             operationName: String,
-            a: String => ExceptionRetryable,
+            a: String => ExceptionRetryPolicy,
             metricsFactory: LabeledMetricsFactory,
             additionalMetricsLabels: Map[String, String],
             flagCloseable: FlagCloseable,

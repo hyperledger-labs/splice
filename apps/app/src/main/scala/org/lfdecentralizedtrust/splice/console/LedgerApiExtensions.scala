@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.console
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.daml.ledger.api.v2.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v2.event.CreatedEvent
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
@@ -193,15 +192,13 @@ trait LedgerApiExtensions {
         def treesJava(
             partyIds: Set[PartyId],
             completeAfter: Int,
-            beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-              ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
-            ),
-            endOffset: Option[ParticipantOffset] = None,
+            beginOffset: String,
+            endOffset: Option[String] = None,
             verbose: Boolean = true,
             timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
         ): Seq[JavaTransactionTree] = {
           ledgerApi.ledger_api.updates
-            .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout)
+            .trees(partyIds, completeAfter, beginOffset, endOffset.getOrElse(""), verbose, timeout)
             .collect { case LedgerApiCommands.UpdateService.TransactionTreeWrapper(tree) =>
               JavaTransactionTree.fromProto(TransactionTree.toJavaProto(tree))
             }
@@ -235,7 +232,7 @@ trait LedgerApiExtensions {
               result
                 .get()
                 .toRight(
-                  s"Failed to find contract of type ${companion.TEMPLATE_ID} after ${timeout}"
+                  s"Failed to find contract of type ${companion.getTemplateIdWithPackageId} after ${timeout}"
                 )
             )
           }
@@ -257,7 +254,7 @@ trait LedgerApiExtensions {
             partyId: PartyId,
             predicate: TC => Boolean = (_: TC) => true,
         ): Seq[TC] = {
-          val filterIdentifier = PackageQualifiedName(templateCompanion.TEMPLATE_ID)
+          val filterIdentifier = PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId)
           val templateId = TemplateId(
             s"#${filterIdentifier.packageName}",
             filterIdentifier.qualifiedName.moduleName,

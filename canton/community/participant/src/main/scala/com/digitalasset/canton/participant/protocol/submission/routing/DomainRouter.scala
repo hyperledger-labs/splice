@@ -21,7 +21,7 @@ import com.digitalasset.canton.participant.protocol.TransactionProcessor.{
   TransactionSubmissionError,
   TransactionSubmissionResult,
 }
-import com.digitalasset.canton.participant.protocol.submission.routing.DomainRouter.inputContractRoutingParties
+import com.digitalasset.canton.participant.protocol.submission.routing.DomainRouter.inputContractsStakeholders
 import com.digitalasset.canton.participant.store.DomainConnectionConfigStore
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.{
   MultiDomainSupportNotEnabled,
@@ -37,8 +37,8 @@ import com.digitalasset.canton.participant.sync.TransactionRoutingError.{
   UnableToQueryTopologySnapshot,
 }
 import com.digitalasset.canton.participant.sync.{ConnectedDomainsLookup, TransactionRoutingError}
-import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
@@ -67,10 +67,10 @@ class DomainRouter(
     ) => EitherT[Future, TransactionRoutingError, FutureUnlessShutdown[
       TransactionSubmissionResult
     ]],
-    contractsTransferer: ContractsTransfer,
+    contractsReassigner: ContractsReassigner,
     snapshotProvider: DomainStateProvider,
     serializableContractAuthenticator: SerializableContractAuthenticator,
-    autoTransferTransaction: Boolean,
+    enableAutomaticReassignments: Boolean,
     domainSelectorFactory: DomainSelectorFactory,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -89,8 +89,7 @@ class DomainRouter(
       explicitlyDisclosedContracts: ImmArray[ProcessedDisclosedContract],
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionRoutingError, FutureUnlessShutdown[TransactionSubmissionResult]] = {
-
+  ): EitherT[Future, TransactionRoutingError, FutureUnlessShutdown[TransactionSubmissionResult]] =
     for {
       // do some sanity checks for invalid inputs (to not conflate these with broken nodes)
       _ <- EitherT.fromEither[Future](
@@ -106,10 +105,10 @@ class DomainRouter(
             inputDisclosedContracts <-
               explicitlyDisclosedContracts.toList
                 .parTraverse(SerializableContract.fromDisclosedContract)
-                .leftMap(MalformedInputErrors.InvalidDisclosedContract.Error)
+                .leftMap(MalformedInputErrors.InvalidDisclosedContract.Error.apply)
             _ <- inputDisclosedContracts
               .traverse_(serializableContractAuthenticator.authenticate)
-              .leftMap(MalformedInputErrors.DisclosedContractAuthenticationFailed.Error)
+              .leftMap(MalformedInputErrors.DisclosedContractAuthenticationFailed.Error.apply)
           } yield inputDisclosedContracts
         )
 
@@ -121,27 +120,27 @@ class DomainRouter(
             metaOptNodeSeeds = transactionMeta.optNodeSeeds,
           )
         )
-        .leftMap(RoutingInternalError.IllformedTransaction)
+        .leftMap(RoutingInternalError.IllformedTransaction.apply)
 
       wfTransaction <- EitherT.fromEither[Future](
         WellFormedTransaction
           .normalizeAndCheck(transaction, metadata, WithoutSuffixes)
-          .leftMap(RoutingInternalError.IllformedTransaction)
+          .leftMap(RoutingInternalError.IllformedTransaction.apply)
       )
 
-      contractRoutingParties = inputContractRoutingParties(wfTransaction.unwrap)
+      contractsStakeholders = inputContractsStakeholders(wfTransaction.unwrap)
 
       transactionData <- TransactionData.create(
         submitterInfo,
         transaction,
+        metadata.ledgerTime,
         snapshotProvider,
-        contractRoutingParties,
+        contractsStakeholders,
         inputDisclosedContracts.map(_.contractId),
         optDomainId,
       )
 
       domainSelector <- domainSelectorFactory.create(transactionData)
-
       inputDomains = transactionData.inputContractsDomainData.domains
 
       isMultiDomainTx <- isMultiDomainTx(inputDomains, transactionData.informees, optDomainId)
@@ -152,7 +151,7 @@ class DomainRouter(
             s"Choosing the domain as single-domain workflow for ${submitterInfo.commandId}"
           )
           domainSelector.forSingleDomain
-        } else if (autoTransferTransaction) {
+        } else if (enableAutomaticReassignments) {
           logger.debug(
             s"Choosing the domain as multi-domain workflow for ${submitterInfo.commandId}"
           )
@@ -164,7 +163,7 @@ class DomainRouter(
             ): TransactionRoutingError
           )
         }
-      _ <- contractsTransferer.transfer(
+      _ <- contractsReassigner.reassign(
         domainRankTarget,
         submitterInfo,
       )
@@ -178,7 +177,6 @@ class DomainRouter(
         inputDisclosedContracts.view.map(sc => sc.contractId -> sc).toMap,
       )
     } yield transactionSubmittedF
-  }
 
   private def allInformeesOnDomain(
       informees: Set[LfPartyId]
@@ -203,7 +201,7 @@ class DomainRouter(
   /** We have a multi-domain transaction if the input contracts are on more than one domain,
     * if the (single) input domain does not host all informees
     * or if the target domain is different than the domain of the input contracts
-    * (because we will need to transfer the contracts to a domain that that *does* host all informees.
+    * (because we will need to reassign the contracts to a domain that *does* host all informees.
     * Transactions without input contracts are always single-domain.
     */
   private def isMultiDomainTx(
@@ -235,17 +233,17 @@ class DomainRouter(
       }
     }
 
-    // Check that at least one submitter is a stakeholder so that we can transfer the contract if needed. This check
-    // is overly strict on behalf of contracts that turn out not to need to be transferred.
-    val submitterNotBeingStakeholder = contractData.filter { data =>
-      data.stakeholders.intersect(transactionData.submitters).isEmpty
+    // Check that at least one party listed in actAs or readAs is a stakeholder so that we can reassign the contract if needed.
+    // This check is overly strict on behalf of contracts that turn out not to need to be reassigned.
+    val readerNotBeingStakeholder = contractData.filter { data =>
+      data.stakeholders.intersect(transactionData.readers).isEmpty
     }
 
     for {
-      // Check: submitter
+      // Check: reader
       _ <- EitherTUtil.condUnitET[Future](
-        submitterNotBeingStakeholder.isEmpty,
-        SubmitterAlwaysStakeholder.Error(submitterNotBeingStakeholder.map(_.id)),
+        readerNotBeingStakeholder.isEmpty,
+        SubmitterAlwaysStakeholder.Error(readerNotBeingStakeholder.map(_.id)),
       )
 
       // Check: connected domains
@@ -276,8 +274,8 @@ object DomainRouter {
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): DomainRouter = {
 
-    val transfer =
-      new ContractsTransfer(
+    val reassigner =
+      new ContractsReassigner(
         connectedDomains,
         submittingParticipant = participantId,
         loggerFactory,
@@ -306,10 +304,10 @@ object DomainRouter {
 
     new DomainRouter(
       submit(connectedDomains),
-      transfer,
+      reassigner,
       domainStateProvider,
       serializableContractAuthenticator,
-      autoTransferTransaction = parameters.enablePreviewFeatures,
+      enableAutomaticReassignments = parameters.enablePreviewFeatures,
       domainSelectorFactory,
       parameters.processingTimeouts,
       loggerFactory,
@@ -368,7 +366,7 @@ object DomainRouter {
   )(implicit ec: ExecutionContext): EitherT[Future, TransactionRoutingError, T] =
     eitherT.leftMap(subm => TransactionRoutingError.SubmissionError(domainId, subm))
 
-  private[routing] def inputContractRoutingParties(
+  private[routing] def inputContractsStakeholders(
       tx: LfVersionedTransaction
   ): Map[LfContractId, Set[Ref.Party]] = {
 

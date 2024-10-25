@@ -16,15 +16,17 @@ option java_package = "com.daml.ledger.api.v2";
 // * detect time out of commands.
 // * provide an offset which can be used to restart consumption.
 message OffsetCheckpoint {
-  string offset = 1;
+  // The participant's offset (see below for more)
+  // Required, must be a valid absolute offset: positive integer
+  int64 offset = 1;
   repeated DomainTime domain_times = 2;
+}
 
-  message DomainTime {
-    // The id of the domain.
-    // Required
-    string domain_id = 1;
-    // All commands with a maximum record time below this value MUST be considered lost if their completion has not arrived before this checkpoint.
-    // Required
-    google.protobuf.Timestamp record_time = 2;
-  }
+message DomainTime {
+  // The id of the domain.
+  // Required
+  string domain_id = 1;
+  // All commands with a maximum record time below this value MUST be considered lost if their completion has not arrived before this checkpoint.
+  // Required
+  google.protobuf.Timestamp record_time = 2;
 }

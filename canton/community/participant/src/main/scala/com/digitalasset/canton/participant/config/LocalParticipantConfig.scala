@@ -5,13 +5,10 @@ package com.digitalasset.canton.participant.config
 
 import cats.syntax.option.*
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.tls.{TlsConfiguration, TlsVersion}
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.RequireTypes.*
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.environment.DefaultNodeParameters
-import com.digitalasset.canton.http.HttpApiConfig
+import com.digitalasset.canton.config.RequireTypes.*
+import com.digitalasset.canton.http.JsonApiConfig
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
 import com.digitalasset.canton.participant.config.LedgerApiServerConfig.DefaultRateLimit
@@ -23,6 +20,7 @@ import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
   IndexServiceConfig as LedgerIndexServiceConfig,
+  InteractiveSubmissionServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
@@ -32,7 +30,7 @@ import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.store.PrunableByTimeParameters
 import com.digitalasset.canton.time.EnrichedDurations.RichNonNegativeFiniteDurationConfig
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
-import io.netty.handler.ssl.{ClientAuth, SslContext}
+import io.netty.handler.ssl.SslContext
 import monocle.macros.syntax.lens.*
 
 /** Base for all participant configs - both local and remote */
@@ -57,7 +55,7 @@ trait LocalParticipantConfig extends BaseParticipantConfig with LocalNodeConfig 
     * Configuring this key will enable the HTTP JSON API server.
     * NOTE: This feature is experimental and MUST NOT be used in production code.
     */
-  def httpLedgerApiExperimental: Option[HttpApiConfig]
+  def httpLedgerApiExperimental: Option[JsonApiConfig]
 
   /** parameters of the interface used to administrate the participant */
   def adminApi: AdminServerConfig
@@ -113,7 +111,7 @@ final case class CommunityParticipantConfig(
     override val init: ParticipantInitConfig = ParticipantInitConfig(),
     override val crypto: CommunityCryptoConfig = CommunityCryptoConfig(),
     override val ledgerApi: LedgerApiServerConfig = LedgerApiServerConfig(),
-    override val httpLedgerApiExperimental: Option[HttpApiConfig] = None,
+    override val httpLedgerApiExperimental: Option[JsonApiConfig] = None,
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     override val testingTime: Option[TestingTimeServiceConfig] = None,
@@ -132,13 +130,12 @@ final case class CommunityParticipantConfig(
   def toRemoteConfig: RemoteParticipantConfig =
     RemoteParticipantConfig(clientAdminApi, clientLedgerApi)
 
-  override def withDefaults(ports: DefaultPorts): CommunityParticipantConfig = {
+  override def withDefaults(ports: DefaultPorts): CommunityParticipantConfig =
     this
       .focus(_.ledgerApi.internalPort)
       .modify(ports.ledgerApiPort.setDefaultPort)
       .focus(_.adminApi.internalPort)
       .modify(ports.participantAdminApiPort.setDefaultPort)
-  }
 }
 
 /** Configuration to connect the console to a participant running remotely.
@@ -161,44 +158,52 @@ final case class RemoteParticipantConfig(
   * @param address                   ledger api server host name.
   * @param internalPort              ledger api server port.
   * @param tls                       tls configuration setting from ledger api server.
-  * @param initSyncTimeout           ledger api server startup delay
-  * @param commandService            configurations pertaining to the ledger api server's "command service"
-  * @param managementServiceTimeout  ledger api server management service maximum duration. Duration has to be finite
-  *                                  as the ledger api server uses java.time.duration that does not support infinite scala durations.
-  * @param postgresDataSource        config for ledger api server when using postgres
   * @param authServices              type of authentication services used by ledger-api server. If empty, we use a wildcard.
   *                                  Otherwise, the first service response that does not say "unauthenticated" will be used.
+  * @param adminToken                token that should grant admin access when presented by a client on the ledger api
+  * @param jwtTimestampLeeway        leeway parameters for JWTs
   * @param keepAliveServer           keep-alive configuration for ledger api requests
   * @param maxInboundMessageSize     maximum inbound message size on the ledger api
-  * @param databaseConnectionTimeout database connection timeout
-  * @param additionalMigrationPaths  optional extra paths for the database migrations
   * @param rateLimit                 limit the ledger api server request rates based on system metrics
-  * @param enableExplicitDisclosure  enable usage of explicitly disclosed contracts in command submission and transaction validation.
+  * @param postgresDataSource        config for ledger api server when using postgres
+  * @param databaseConnectionTimeout database connection timeout
+  * @param initSyncTimeout           ledger api server startup delay
+  * @param indexService              configurations pertaining to the ledger api server's internal "index service"
+  * @param commandService            configurations pertaining to the ledger api server's "command service"
+  * @param userManagementService     configurations pertaining to the ledger api server's "user management service"
+  * @param partyManagementService    configurations pertaining to the ledger api server's "party management service"
+  * @param managementServiceTimeout  ledger api server management service maximum duration. Duration has to be finite
+  *                                  as the ledger api server uses java.time.duration that does not support infinite scala durations.
   * @param enableCommandInspection   enable command inspection service over the ledger api
+  * @param identityProviderManagement configurations pertaining to the ledger api server's "identity provider management service"
+  * @param interactiveSubmissionServiceConfig config for interactive submission service over the ledger api
   */
 final case class LedgerApiServerConfig(
     address: String = "127.0.0.1",
     internalPort: Option[Port] = None,
-    indexService: LedgerIndexServiceConfig = LedgerIndexServiceConfig(),
     tls: Option[TlsServerConfig] = None,
+    authServices: Seq[AuthServiceConfig] = Seq.empty,
+    adminToken: Option[String] = None,
+    jwtTimestampLeeway: Option[JwtTimestampLeeway] = None,
+    keepAliveServer: Option[KeepAliveServerConfig] = Some(KeepAliveServerConfig()),
+    maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
+    rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
+    postgresDataSource: PostgresDataSourceConfig = PostgresDataSourceConfig(),
+    databaseConnectionTimeout: config.NonNegativeFiniteDuration =
+      LedgerApiServerConfig.DefaultDatabaseConnectionTimeout,
     initSyncTimeout: config.NonNegativeFiniteDuration =
       LedgerApiServerConfig.DefaultInitSyncTimeout,
+    indexService: LedgerIndexServiceConfig = LedgerIndexServiceConfig(),
     commandService: CommandServiceConfig = CommandServiceConfig(),
     userManagementService: UserManagementServiceConfig = UserManagementServiceConfig(),
     partyManagementService: PartyManagementServiceConfig = PartyManagementServiceConfig(),
     managementServiceTimeout: config.NonNegativeFiniteDuration =
       LedgerApiServerConfig.DefaultManagementServiceTimeout,
-    postgresDataSource: PostgresDataSourceConfig = PostgresDataSourceConfig(),
-    authServices: Seq[AuthServiceConfig] = Seq.empty,
-    keepAliveServer: Option[KeepAliveServerConfig] = Some(KeepAliveServerConfig()),
-    maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
-    databaseConnectionTimeout: config.NonNegativeFiniteDuration =
-      LedgerApiServerConfig.DefaultDatabaseConnectionTimeout,
-    rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
     enableCommandInspection: Boolean = true,
-    adminToken: Option[String] = None,
     identityProviderManagement: IdentityProviderManagementConfig =
       LedgerApiServerConfig.DefaultIdentityProviderManagementConfig,
+    interactiveSubmissionService: InteractiveSubmissionServiceConfig =
+      InteractiveSubmissionServiceConfig.Default,
 ) extends CommunityServerConfig // We can't currently expose enterprise server features at the ledger api anyway
     {
 
@@ -206,7 +211,7 @@ final case class LedgerApiServerConfig(
     ClientConfig(address, port, tls.map(_.clientConfig))
 
   override def sslContext: Option[SslContext] =
-    tls.map(CantonServerBuilder.sslContext)
+    tls.map(CantonServerBuilder.sslContext(_))
 
   override def serverCertChainFile: Option[ExistingFile] =
     tls.map(_.certChainFile)
@@ -231,78 +236,6 @@ object LedgerApiServerConfig {
       minFreeHeapSpaceBytes = 0,
     )
 
-  /** the following case class match will help us detect any additional configuration options added.
-    * If the below match fails because there are more config options, add them to our "LedgerApiServerConfig".
-    */
-  private def _completenessCheck(
-      managementServiceTimeout: config.NonNegativeFiniteDuration,
-      tlsConfiguration: Option[TlsConfiguration],
-  ): Unit = {
-
-    def fromClientAuth(clientAuth: ClientAuth): ServerAuthRequirementConfig = {
-      import ServerAuthRequirementConfig.*
-      clientAuth match {
-        case ClientAuth.REQUIRE =>
-          None // not passing "require" as we need adminClientCerts in this case which are not available here
-        case ClientAuth.OPTIONAL => Optional
-        case ClientAuth.NONE => None
-      }
-    }
-
-    val tlsConfig = tlsConfiguration match {
-      case Some(
-            TlsConfiguration(
-              true,
-              Some(keyCertChainFile),
-              Some(keyFile),
-              trustCertCollectionFile,
-              authRequirement,
-              enableCertRevocationChecking,
-              optTlsVersion,
-            )
-          ) =>
-        Some(
-          TlsServerConfig(
-            certChainFile = ExistingFile.tryCreate(keyCertChainFile),
-            privateKeyFile = ExistingFile.tryCreate(keyFile),
-            trustCollectionFile = trustCertCollectionFile.map(x => ExistingFile.tryCreate(x)),
-            clientAuth = fromClientAuth(authRequirement),
-            minimumServerProtocolVersion = optTlsVersion.map(_.version),
-            enableCertRevocationChecking = enableCertRevocationChecking,
-          )
-        )
-      case _ => None
-    }
-
-    LedgerApiServerConfig(
-      tls = tlsConfig,
-      managementServiceTimeout = managementServiceTimeout,
-    ).discard
-  }
-
-  def ledgerApiServerTlsConfigFromCantonServerConfig(
-      tlsCantonConfig: TlsServerConfig
-  ): TlsConfiguration =
-    TlsConfiguration(
-      enabled = true,
-      certChainFile = Some(tlsCantonConfig.certChainFile.unwrap),
-      privateKeyFile = Some(tlsCantonConfig.privateKeyFile.unwrap),
-      trustCollectionFile = tlsCantonConfig.trustCollectionFile.map(_.unwrap),
-      clientAuth = tlsCantonConfig.clientAuth match {
-        case ServerAuthRequirementConfig.Require(_cert) => ClientAuth.REQUIRE
-        case ServerAuthRequirementConfig.Optional => ClientAuth.OPTIONAL
-        case ServerAuthRequirementConfig.None => ClientAuth.NONE
-      },
-      enableCertRevocationChecking = tlsCantonConfig.enableCertRevocationChecking,
-      minimumServerProtocolVersion = tlsCantonConfig.minimumServerProtocolVersion.map { v =>
-        Seq[TlsVersion.TlsVersion](TlsVersion.V1, TlsVersion.V1_1, TlsVersion.V1_2, TlsVersion.V1_3)
-          .find(_.version == v)
-          .getOrElse(
-            throw new IllegalArgumentException(s"Unknown TLS protocol version ${v}")
-          )
-      },
-    )
-
 }
 
 /** Optional ledger api time service configuration for demo and testing only */
@@ -325,7 +258,7 @@ object TestingTimeServiceConfig {
   * @param ledgerApiServer ledger api server parameters
   *
   * The following specialized participant node performance tuning parameters may be grouped once a more final set of configs emerges.
-  * @param transferTimeProofFreshnessProportion Proportion of the target domain exclusivity timeout that is used as a freshness bound when
+  * @param reassignmentTimeProofFreshnessProportion Proportion of the target domain exclusivity timeout that is used as a freshness bound when
   *                                             requesting a time proof. Setting to 3 means we'll take a 1/3 of the target domain exclusivity timeout
   *                                             and potentially we reuse a recent timeout if one exists within that bound, otherwise a new time proof
   *                                             will be requested.
@@ -350,15 +283,16 @@ final case class ParticipantNodeParameterConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
     stores: ParticipantStoreConfig = ParticipantStoreConfig(),
-    transferTimeProofFreshnessProportion: NonNegativeInt = NonNegativeInt.tryCreate(3),
+    reassignmentTimeProofFreshnessProportion: NonNegativeInt = NonNegativeInt.tryCreate(3),
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
-      ParticipantProtocolVersion(ProtocolVersion.v31)
+      ParticipantProtocolVersion(ProtocolVersion.v32)
     ),
     initialProtocolVersion: ParticipantProtocolVersion = ParticipantProtocolVersion(
       ProtocolVersion.latest
     ),
-    alphaVersionSupport: Boolean = false,
-    BetaVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    alphaVersionSupport: Boolean = true,
+    betaVersionSupport: Boolean = false,
     dontWarnOnDeprecatedPV: Boolean = false,
     warnIfOverloadedFor: Option[config.NonNegativeFiniteDuration] = Some(
       config.NonNegativeFiniteDuration.ofSeconds(20)
@@ -369,11 +303,11 @@ final case class ParticipantNodeParameterConfig(
     journalGarbageCollectionDelay: config.NonNegativeFiniteDuration =
       config.NonNegativeFiniteDuration.ofSeconds(0),
     disableUpgradeValidation: Boolean = false,
-    override val useUnifiedSequencer: Boolean = DefaultNodeParameters.UseUnifiedSequencer,
     allowForUnauthenticatedContractIds: Boolean = false,
     watchdog: Option[WatchdogConfig] = None,
     packageMetadataView: PackageMetadataViewConfig = PackageMetadataViewConfig(),
     commandProgressTracker: CommandProgressTrackerConfig = CommandProgressTrackerConfig(),
+    unsafeEnableOnlinePartyReplication: Boolean = false,
 ) extends LocalNodeParametersConfig
 
 /** Parameters for the participant node's stores
@@ -405,13 +339,12 @@ final case class JournalPruningConfig(
     initialInterval: config.NonNegativeFiniteDuration = JournalPruningConfig.DefaultInitialInterval,
     maxBuckets: PositiveInt = JournalPruningConfig.DefaultMaxBuckets,
 ) {
-  def toInternal: PrunableByTimeParameters = {
+  def toInternal: PrunableByTimeParameters =
     PrunableByTimeParameters(
       targetBatchSize,
       initialInterval = initialInterval.toInternal,
       maxBuckets = maxBuckets,
     )
-  }
 }
 
 object JournalPruningConfig {
@@ -425,13 +358,11 @@ object JournalPruningConfig {
   * @param contractIdSeeding  test-only way to override the contract-id seeding scheme. Must be Strong in production (and Strong is the default).
   *                           Only configurable to reduce the amount of secure random numbers consumed by tests and to avoid flaky timeouts during continuous integration.
   * @param indexer            parameters how the participant populates the index db used to serve the ledger api
-  * @param jwtTimestampLeeway leeway parameters for JWTs
   * @param tokenExpiryGracePeriodForStreams grace periods for streams that postpone termination beyond the JWT expiry
   */
 final case class LedgerApiServerParametersConfig(
     contractIdSeeding: Seeding = Seeding.Strong,
     indexer: IndexerConfig = IndexerConfig(),
-    jwtTimestampLeeway: Option[JwtTimestampLeeway] = None,
     tokenExpiryGracePeriodForStreams: Option[NonNegativeDuration] = None,
     contractLoader: ContractLoaderConfig = ContractLoaderConfig(),
 )

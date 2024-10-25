@@ -123,6 +123,13 @@ trait ScanStore
   ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
     getAmuletRulesWithState().map(_.contract)
 
+  def getExternalPartyAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules.ContractId,
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules,
+  ]]
+
   def getDecentralizedSynchronizerId()(implicit
       tc: TraceContext
   ): Future[DomainId] =
@@ -231,6 +238,24 @@ trait ScanStore
     Option[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
+  def lookupTransferPreapprovalByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[
+      splice.amuletrules.TransferPreapproval.ContractId,
+      splice.amuletrules.TransferPreapproval,
+    ]]
+  ]
+
+  def lookupTransferCommandCounterByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[
+      splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
+      splice.externalpartyamuletrules.TransferCommandCounter,
+    ]]
+  ]
+
   def listTransactions(
       pageEndEventId: Option[String],
       sortOrder: SortOrder,
@@ -246,6 +271,12 @@ trait ScanStore
   def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]]
+
+  def lookupLatestTransferCommandEvent(
+      contractId: splice.externalpartyamuletrules.TransferCommand.ContractId
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[TransferCommandTxLogEntry]]
 }
 
 object ScanStore {
@@ -382,6 +413,7 @@ object ScanStore {
                 _ => None,
                 Some(_),
               ),
+            memberTrafficDomain = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
             totalTrafficPurchased = Some(contract.payload.totalPurchased),
           )
         },
@@ -412,6 +444,29 @@ object ScanStore {
             voteRequesterName = Some(contract.payload.requester),
             voteRequestTrackingCid =
               Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
+          )
+        },
+        mkFilter(splice.amuletrules.TransferPreapproval.COMPANION)(co => co.payload.dso == dso) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract,
+              transferPreapprovalReceiver =
+                Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
+              transferPreapprovalValidFrom =
+                Some(Timestamp.assertFromInstant(contract.payload.validFrom)),
+            )
+        },
+        mkFilter(splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION)(co =>
+          co.payload.dso == dso
+        ) {
+          ScanAcsStoreRowData(_)
+        },
+        mkFilter(splice.externalpartyamuletrules.TransferCommandCounter.COMPANION)(co =>
+          co.payload.dso == dso
+        ) { contract =>
+          ScanAcsStoreRowData(
+            contract,
+            walletParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sender)),
           )
         },
       ),

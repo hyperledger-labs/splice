@@ -8,6 +8,7 @@ import cats.syntax.bifunctor.*
 import cats.syntax.foldable.*
 import com.daml.error.{ErrorCategory, ErrorCode, Explanation}
 import com.daml.nameof.NameOf.functionFullName
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.common.domain.grpc.SequencerInfoLoader
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -15,6 +16,7 @@ import com.digitalasset.canton.error.{CantonError, ParentCantonError}
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
+import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection.SyncStateInspectionError
 import com.digitalasset.canton.participant.admin.repair.RepairService
 import com.digitalasset.canton.participant.domain.{
   DomainAliasManager,
@@ -22,7 +24,6 @@ import com.digitalasset.canton.participant.domain.{
   DomainRegistryError,
   DomainRegistryHelpers,
 }
-import com.digitalasset.canton.participant.store.ActiveContractStore.AcsError
 import com.digitalasset.canton.participant.store.DomainConnectionConfigStore
 import com.digitalasset.canton.participant.sync.SyncServiceError.{
   MigrationErrors,
@@ -31,9 +32,7 @@ import com.digitalasset.canton.participant.sync.SyncServiceError.{
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.{DomainAlias, SequencerCounter}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -50,7 +49,6 @@ class SyncDomainMigration(
       Unit,
     ],
     sequencerInfoLoader: SequencerInfoLoader,
-    connectedDomainsLookup: ConnectedDomainsLookup,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -141,32 +139,21 @@ class SyncDomainMigration(
     FutureUnlessShutdown,
     SyncServiceError,
     SequencerInfoLoader.SequencerAggregatedInfo,
-  ] = {
-    def mustBeOffline(alias: DomainAlias, domainId: DomainId) = EitherT.cond[FutureUnlessShutdown](
-      !connectedDomainsLookup.isConnected(domainId),
-      (),
-      SyncServiceError.SyncServiceDomainMustBeOffline.Error(alias): SyncServiceError,
-    )
-
+  ] =
     for {
-      targetDomainInfo <- performUnlessClosingEitherU(functionFullName)(
+      targetDomainInfo <- performUnlessClosingEitherUSF(functionFullName)(
         sequencerInfoLoader
           .loadAndAggregateSequencerEndpoints(
             target.domain,
             target.domainId,
             target.sequencerConnections,
             SequencerConnectionValidation.Active,
-          )(
-            traceContext,
-            CloseContext(this),
-          )
-          .leftMap(DomainRegistryError.fromSequencerInfoLoaderError)
-          .leftMap[SyncServiceError](err =>
-            SyncServiceError.SyncServiceFailedDomainConnection(
-              target.domain,
-              DomainRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(err.cause),
-            )
-          )
+          )(traceContext, CloseContext(this))
+          .leftMap[SyncServiceError] { err =>
+            val error = DomainRegistryError.ConnectionErrors.FailedToConnectToSequencer
+              .Error(DomainRegistryError.fromSequencerInfoLoaderError(err).cause)
+            SyncServiceError.SyncServiceFailedDomainConnection(target.domain, error)
+          }
       )
       _ <- performUnlessClosingEitherU(functionFullName)(
         aliasManager
@@ -180,30 +167,15 @@ class SyncDomainMigration(
           )
       )
 
-      sourceDomainId <- EitherT.fromEither[FutureUnlessShutdown](
-        aliasManager
-          .domainIdForAlias(source)
-          .toRight(
-            SyncServiceError.SyncServiceUnknownDomain.Error(source): SyncServiceError
-          )
-      )
-      _ <- mustBeOffline(source, sourceDomainId)
-      _ <- mustBeOffline(target.domain, targetDomainInfo.domainId)
-
-      hasInFlightSubmissions <- performUnlessClosingEitherU(functionFullName)(
+      inFlights <- performUnlessClosingEitherU(functionFullName)(
         inspection
-          .hasInFlightSubmissions(source)
-          .leftMap(_ => SyncServiceUnknownDomain.Error(source))
-      )
-      hasDirtyRequests <- performUnlessClosingEitherU(functionFullName)(
-        inspection
-          .hasDirtyRequests(source)
+          .countInFlight(source)
           .leftMap(_ => SyncServiceUnknownDomain.Error(source))
       )
 
       _ <-
         if (force) {
-          if (hasInFlightSubmissions || hasDirtyRequests) {
+          if (inFlights.exists) {
             logger.info(
               s"Ignoring existing in-flight transactions on domain with alias ${source.unwrap} because of forced migration. This may lead to a ledger fork."
             )
@@ -212,13 +184,12 @@ class SyncDomainMigration(
         } else
           EitherT
             .cond[FutureUnlessShutdown](
-              !hasInFlightSubmissions,
+              !inFlights.exists,
               (),
               SyncServiceError.SyncServiceDomainMustNotHaveInFlightTransactions.Error(source),
             )
             .leftWiden[SyncServiceError]
     } yield targetDomainInfo
-  }
 
   /** Performs the domain migration.
     * Assumes that [[isDomainMigrationPossible]] was called before to check preconditions.
@@ -285,33 +256,6 @@ class SyncDomainMigration(
     } yield ()
   }
 
-  /*
-  This method lives here because it should be called only for a deactivated domain,
-  which happens only as part of the hard domain migration.
-  Moreover, we want this to be available in community, so it cannot be implemented in
-  the pruning processor.
-   */
-  def pruneSelectedDeactivatedDomainStores(
-      domainId: DomainId
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SyncDomainMigrationError, Unit] = {
-    performUnlessClosingEitherU("pruneSelectedDeactivatedDomainStores") {
-      logger.info(
-        s"About to prune deactivated sync domain $domainId sequenced event store'"
-      )
-      repair.syncDomainPersistentStateManager
-        .get(domainId)
-        .fold(EitherT.pure[Future, SyncDomainMigrationError](())) { state =>
-          EitherTUtil.fromFuture[SyncDomainMigrationError, Unit](
-            state.sequencedEventStore.delete(SequencerCounter.Genesis),
-            t =>
-              SyncDomainMigrationError.InternalError.PurgeDeactivatedDomain(domainId, t.getMessage),
-          )
-        }
-    }
-  }
-
   private def updateDomainStatus(
       alias: DomainAlias,
       state: DomainConnectionConfigStore.Status,
@@ -343,7 +287,7 @@ class SyncDomainMigration(
       _ = logger.info(
         s"Found ${acs.size} contracts in the ACS of $sourceAlias that need to be migrated"
       )
-      // move contracts from one domain to the other domain using repair service in batches of 1000
+      // move contracts from one domain to the other domain using repair service in batches of batchSize
       _ <- performUnlessClosingEitherU(functionFullName)(
         repair.changeAssignation(
           acs.keys.toSeq,
@@ -439,7 +383,7 @@ object SyncDomainMigrationError extends MigrationErrors() {
         )
         with SyncDomainMigrationError
 
-    final case class FailedReadingAcs(source: DomainAlias, err: AcsError)(implicit
+    final case class FailedReadingAcs(source: DomainAlias, err: SyncStateInspectionError)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = show"Failed reading the ACS"
@@ -451,11 +395,6 @@ object SyncDomainMigrationError extends MigrationErrors() {
     ) extends CantonError.Impl(
           cause = show"Migrating the ACS to the new domain failed unexpectedly!"
         )
-        with SyncDomainMigrationError
-
-    final case class PurgeDeactivatedDomain(source: DomainId, err: String)(implicit
-        val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(cause = show"The domain cannot be purged")
         with SyncDomainMigrationError
 
     final case class Generic(reason: String)(implicit

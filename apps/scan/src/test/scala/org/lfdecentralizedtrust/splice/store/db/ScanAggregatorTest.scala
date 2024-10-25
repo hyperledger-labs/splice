@@ -691,7 +691,7 @@ class ScanAggregatorTest
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(Some(nextOffset()), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )
@@ -709,10 +709,10 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(party, 0),
-        mkTransferResult(
+        mkTransferResultRecord(
           round = round,
           inputAppRewardAmount = 0,
           inputAmuletAmount = 0,
@@ -759,10 +759,10 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(rewardedParty, 0),
-        mkTransferResult(
+        mkTransferResultRecord(
           round = round,
           inputAppRewardAmount = rewardAmount,
           inputAmuletAmount = 0,
@@ -788,10 +788,10 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(rewardedParty, 0),
-        mkTransferResult(
+        mkTransferResultRecord(
           round = round,
           inputAppRewardAmount = 0,
           inputAmuletAmount = 0,

@@ -10,7 +10,8 @@ import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
 import com.digitalasset.canton.{HasExecutionContext, TestEssentials}
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.transaction.{GlobalKey, TransactionVersion, Versioned}
+import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.transaction.{GlobalKey, Versioned}
 import com.digitalasset.daml.lf.value.Value.{ContractInstance, ValueInt64, ValueRecord}
 import org.mockito.MockitoSugar
 import org.scalatest.OptionValues
@@ -115,7 +116,6 @@ class ContractStateCachesSpec
         ledgerEffectiveTime = Time.Timestamp(cId.toLong),
         stakeholders = Set(Ref.Party.assertFromString(s"party-$cId")),
         eventOffset = offset,
-        eventSequentialId = eventSequentialId,
         signatories = Set(Ref.Party.assertFromString(s"party-$cId")),
         keyMaintainers = None,
         driverMetadata = None,
@@ -132,7 +132,6 @@ class ContractStateCachesSpec
         globalKey = create.globalKey,
         stakeholders = create.stakeholders,
         eventOffset = offset,
-        eventSequentialId = eventSequentialId,
       )
   }
 
@@ -175,7 +174,7 @@ class ContractStateCachesSpec
     )
     val contractInstance =
       ContractInstance(packageName = packageName, template = templateId, arg = contractArgument)
-    Versioned(TransactionVersion.StableVersions.max, contractInstance)
+    Versioned(LanguageVersion.StableVersions(LanguageVersion.Major.V2).max, contractInstance)
   }
 
   private def offset(idx: Int) = Offset.fromByteArray(BigInt(idx.toLong).toByteArray)

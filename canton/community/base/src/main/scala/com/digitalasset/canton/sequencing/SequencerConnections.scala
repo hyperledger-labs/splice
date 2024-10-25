@@ -99,7 +99,7 @@ final case class SequencerConnections private (
   ): SequencerConnections =
     this.copy(submissionRequestAmplification = submissionRequestAmplification)
 
-  override def pretty: Pretty[SequencerConnections] =
+  override protected def pretty: Pretty[SequencerConnections] =
     prettyOfClass(
       param("connections", _.aliasToConnection.forgetNE),
       param("sequencer trust threshold", _.sequencerTrustThreshold),
@@ -209,7 +209,7 @@ object SequencerConnections
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v31,
+      ProtocolVersion.v32,
       supportedProtoVersion(v30.SequencerConnections)(fromProtoV30),
       _.toProtoV30.toByteString,
     )

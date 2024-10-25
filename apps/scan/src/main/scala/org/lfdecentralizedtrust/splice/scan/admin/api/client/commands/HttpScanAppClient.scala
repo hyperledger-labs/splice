@@ -13,6 +13,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
+  TransferPreapproval,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommand,
+  TransferCommandCounter,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
@@ -229,6 +235,49 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  ) extends InternalBaseCommand[
+        http.GetExternalPartyAmuletRulesResponse,
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      http.GetExternalPartyAmuletRulesResponse,
+    ] = {
+      import MultiDomainAcsStore.ContractState.*
+      client.getExternalPartyAmuletRules(
+        definitions.GetExternalPartyAmuletRulesRequest(
+          cachedExternalPartyAmuletRules.map(_.contractId.contractId),
+          cachedExternalPartyAmuletRules.flatMap(_.state match {
+            case Assigned(domain) => Some(domain.toProtoPrimitive)
+            case InFlight => None
+          }),
+        ),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetExternalPartyAmuletRulesResponse.OK(response) =>
+        for {
+          externalPartyAmuletRules <- ContractWithState.handleMaybeCached(
+            ExternalPartyAmuletRules.COMPANION
+          )(
+            cachedExternalPartyAmuletRules,
+            response.externalPartyAmuletRulesUpdate,
+          )
+        } yield externalPartyAmuletRules
+    }
+  }
+
   case class GetAnsRules(
       cachedAnsRules: Option[ContractWithState[AnsRules.ContractId, AnsRules]]
   ) extends InternalBaseCommand[
@@ -380,8 +429,77 @@ object HttpScanAppClient {
     }
   }
 
+  case class LookupTransferPreapprovalByParty(
+      party: PartyId
+  ) extends InternalBaseCommand[http.LookupTransferPreapprovalByPartyResponse, Option[
+        ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.lookupTransferPreapprovalByParty(party.toProtoPrimitive, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.LookupTransferPreapprovalByPartyResponse.OK(response) =>
+        ContractWithState
+          .fromHttp(TransferPreapproval.COMPANION)(response.transferPreapproval)
+          .map(Some(_))
+          .leftMap(_.toString)
+      case http.LookupTransferPreapprovalByPartyResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class LookupTransferCommandCounterByParty(
+      party: PartyId
+  ) extends InternalBaseCommand[http.LookupTransferCommandCounterByPartyResponse, Option[
+        ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.lookupTransferCommandCounterByParty(party.toProtoPrimitive, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.LookupTransferCommandCounterByPartyResponse.OK(response) =>
+        ContractWithState
+          .fromHttp(TransferCommandCounter.COMPANION)(response.transferCommandCounter)
+          .map(Some(_))
+          .leftMap(_.toString)
+      case http.LookupTransferCommandCounterByPartyResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class LookupTransferCommandStatus(
+      cid: TransferCommand.ContractId
+  ) extends InternalBaseCommand[http.LookupTransferCommandStatusResponse, Option[
+        definitions.LookupTransferCommandStatusResponse
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.lookupTransferCommandStatus(Codec.encodeContractId(cid), headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.LookupTransferCommandStatusResponse.OK(ev) =>
+        Right(Some(ev))
+      case http.LookupTransferCommandStatusResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
   case class GetTotalAmuletBalance(asOfEndOfRound: Long)
-      extends InternalBaseCommand[http.GetTotalAmuletBalanceResponse, Option[BigDecimal]] {
+      extends InternalBaseCommand[http.GetTotalAmuletBalanceResponse, BigDecimal] {
 
     override def submitRequest(
         client: Client,
@@ -391,9 +509,9 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetTotalAmuletBalanceResponse.OK(response) =>
-        Codec.decode(Codec.BigDecimal)(response.totalBalance).map(Some(_))
-      case http.GetTotalAmuletBalanceResponse.NotFound(_) =>
-        Right(None)
+        Codec.decode(Codec.BigDecimal)(response.totalBalance)
+      case http.GetTotalAmuletBalanceResponse.NotFound(err) =>
+        Left(err.error)
     }
   }
 

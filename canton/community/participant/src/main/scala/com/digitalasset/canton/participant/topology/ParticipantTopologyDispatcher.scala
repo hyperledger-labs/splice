@@ -23,22 +23,21 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainRegistryError
 import com.digitalasset.canton.participant.store.SyncDomainPersistentState
 import com.digitalasset.canton.participant.sync.SyncDomainPersistentStateManager
-import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.*
+import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 trait ParticipantTopologyDispatcherHandle {
 
@@ -89,7 +88,7 @@ class ParticipantTopologyDispatcher(
 
   def domainDisconnected(
       domain: DomainAlias
-  )(implicit traceContext: TraceContext): Unit = {
+  )(implicit traceContext: TraceContext): Unit =
     domains.remove(domain) match {
       case Some(outboxes) =>
         state.domainIdForAlias(domain).foreach(disconnectOutboxes)
@@ -97,11 +96,10 @@ class ParticipantTopologyDispatcher(
       case None =>
         logger.debug(s"Topology pusher already disconnected from $domain")
     }
-  }
 
   def awaitIdle(domain: DomainAlias, timeout: Duration)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] = {
+  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] =
     domains
       .get(domain)
       .fold(
@@ -116,7 +114,6 @@ class ParticipantTopologyDispatcher(
           x.forgetNE.parTraverse(_.awaitIdle(timeout)).map(_.forall(identity))
         )
       )
-  }
 
   private def getState(domainId: DomainId)(implicit
       traceContext: TraceContext
@@ -149,7 +146,7 @@ class ParticipantTopologyDispatcher(
     }
   })
 
-  def trustDomain(domainId: DomainId, parameters: StaticDomainParameters)(implicit
+  def trustDomain(domainId: DomainId)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] = {
     def alreadyTrustedInStore(
@@ -169,7 +166,7 @@ class ParticipantTopologyDispatcher(
                   filterNamespace = None,
                 )
                 .map(_.toTopologyState.exists {
-                  case DomainTrustCertificate(`participantId`, `domainId`, _, _) => true
+                  case DomainTrustCertificate(`participantId`, `domainId`) => true
                   case _ => false
                 })
             )
@@ -186,13 +183,11 @@ class ParticipantTopologyDispatcher(
               DomainTrustCertificate(
                 participantId,
                 domainId,
-                transferOnlyToGivenTargetDomains = false,
-                targetDomains = Seq.empty,
               ),
               serial = None,
               // TODO(#12390) auto-determine signing keys
               signingKeys = Seq(participantId.fingerprint),
-              protocolVersion = state.protocolVersion,
+              protocolVersion = state.staticDomainParameters.protocolVersion,
               expectFullAuthorization = true,
             )
             // TODO(#14048) improve error handling
@@ -218,7 +213,7 @@ class ParticipantTopologyDispatcher(
   )(implicit
       executionContext: ExecutionContextExecutor,
       traceContext: TraceContext,
-  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] = {
+  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] =
     getState(domainId).flatMap { _ =>
       DomainOnboardingOutbox
         .initiateOnboarding(
@@ -235,7 +230,6 @@ class ParticipantTopologyDispatcher(
           crypto,
         )
     }
-  }
 
   def createHandler(
       domain: DomainAlias,
@@ -356,10 +350,9 @@ private class DomainOnboardingOutbox(
   ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] = (for {
     initialTransactions <- loadInitialTransactionsFromStore()
     _ = logger.debug(
-      s"Sending ${initialTransactions.size} onboarding transactions to ${domain}"
+      s"Sending ${initialTransactions.size} onboarding transactions to $domain"
     )
     _result <- dispatch(initialTransactions)
-      .mapK(FutureUnlessShutdown.outcomeK)
       .leftMap(err =>
         DomainRegistryError.InitialOnboardingError.Error(err.toString): DomainRegistryError
       )
@@ -390,22 +383,21 @@ private class DomainOnboardingOutbox(
       }
     } yield convertedTxs
 
-  private def dispatch(
-      transactions: Seq[GenericSignedTopologyTransaction]
-  )(implicit traceContext: TraceContext): EitherT[Future, SequencerConnectClient.Error, Unit] = {
+  private def dispatch(transactions: Seq[GenericSignedTopologyTransaction])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SequencerConnectClient.Error, Unit] =
     sequencerConnectClient.registerOnboardingTopologyTransactions(
       domain,
       participantId,
       transactions,
     )
-  }
 
   private def initializedWith(
       initial: Seq[GenericSignedTopologyTransaction]
   )(implicit traceContext: TraceContext): Either[DomainRegistryError, Unit] = {
     val (haveEncryptionKey, haveSigningKey) =
       initial.map(_.mapping).foldLeft((false, false)) {
-        case ((haveEncryptionKey, haveSigningKey), OwnerToKeyMapping(`participantId`, _, keys)) =>
+        case ((haveEncryptionKey, haveSigningKey), OwnerToKeyMapping(`participantId`, keys)) =>
           (
             haveEncryptionKey || keys.exists(!_.isSigning),
             haveSigningKey || keys.exists(_.isSigning),

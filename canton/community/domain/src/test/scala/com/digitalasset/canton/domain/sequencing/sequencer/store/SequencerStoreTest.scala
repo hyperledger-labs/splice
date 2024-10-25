@@ -10,8 +10,8 @@ import cats.syntax.parallel.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.{CantonTimestamp, Counter}
-import com.digitalasset.canton.domain.sequencing.sequencer.DomainSequencingTestUtils.mockDeliverStoreEvent
 import com.digitalasset.canton.domain.sequencing.sequencer.*
+import com.digitalasset.canton.domain.sequencing.sequencer.DomainSequencingTestUtils.mockDeliverStoreEvent
 import com.digitalasset.canton.domain.sequencing.sequencer.store.SaveLowerBoundError.BoundLowerThanExisting
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext}
 import com.digitalasset.canton.sequencing.protocol.{MessageId, SequencerErrors}
@@ -19,12 +19,7 @@ import com.digitalasset.canton.store.db.DbTest
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{DefaultTestIdentities, Member, ParticipantId}
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.{
-  BaseTest,
-  ProtocolVersionChecksAsyncWordSpec,
-  SequencerCounter,
-  SequentialTestByKey,
-}
+import com.digitalasset.canton.{BaseTest, ProtocolVersionChecksAsyncWordSpec, SequencerCounter}
 import com.google.protobuf.ByteString
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
@@ -40,7 +35,6 @@ trait SequencerStoreTest
     with BaseTest
     with HasCloseContext
     with FlagCloseable
-    with SequentialTestByKey
     with ProtocolVersionChecksAsyncWordSpec {
 
   lazy val sequencerMember: Member = DefaultTestIdentities.sequencerId
@@ -173,7 +167,7 @@ trait SequencerStoreTest
           expectedRecipients: Set[Member],
           expectedPayload: Payload,
           expectedTopologyTimestamp: Option[CantonTimestamp] = None,
-      ): Future[Assertion] = {
+      ): Future[Assertion] =
         for {
           senderId <- lookupRegisteredMember(expectedSender)
           recipientIds <- expectedRecipients.toList.parTraverse(lookupRegisteredMember).map(_.toSet)
@@ -197,7 +191,6 @@ trait SequencerStoreTest
               fail(s"Expected deliver event but got $other")
           }
         }
-      }
 
       def assertReceiptEvent(
           event: Sequenced[Payload],
@@ -205,7 +198,7 @@ trait SequencerStoreTest
           expectedSender: Member,
           expectedMessageId: MessageId,
           expectedTopologyTimestamp: Option[CantonTimestamp],
-      ): Future[Assertion] = {
+      ): Future[Assertion] =
         for {
           senderId <- lookupRegisteredMember(expectedSender)
         } yield {
@@ -226,36 +219,6 @@ trait SequencerStoreTest
               fail(s"Expected deliver receipt but got $other")
           }
         }
-      }
-
-      def assertReceiptEvent(
-          event: Sequenced[Payload],
-          expectedTimestamp: CantonTimestamp,
-          expectedSender: Member,
-          expectedMessageId: MessageId,
-          expectedTopologyTimestamp: Option[CantonTimestamp],
-      ): Future[Assertion] = {
-        for {
-          senderId <- lookupRegisteredMember(expectedSender)
-        } yield {
-          event.timestamp shouldBe expectedTimestamp
-          event.event match {
-            case ReceiptStoreEvent(
-                  sender,
-                  messageId,
-                  topologyTimestampO,
-                  _traceContext,
-                ) =>
-              sender shouldBe senderId
-              messageId shouldBe expectedMessageId
-              event.event.members shouldBe Set(senderId)
-              event.event.payloadO shouldBe None
-              topologyTimestampO shouldBe expectedTopologyTimestamp
-            case other =>
-              fail(s"Expected deliver receipt but got $other")
-          }
-        }
-      }
 
       /** Save payloads using the default `instanceDiscriminator1` and expecting it to succeed */
       def savePayloads(payloads: NonEmpty[Seq[Payload]]): Future[Unit] =
@@ -450,11 +413,9 @@ trait SequencerStoreTest
           aliceId <- env.store.registerMember(alice, ts1)
           // lets write 20 deliver events - offsetting the second timestamp that is at epoch second 1
           events = NonEmptyUtil.fromUnsafe(
-            (0L until 20L)
-              .map(n => {
-                env.deliverEventWithDefaults(ts1.plusSeconds(n), sender = aliceId)()
-              })
-              .toSeq
+            (0L until 20L).map { n =>
+              env.deliverEventWithDefaults(ts1.plusSeconds(n), sender = aliceId)()
+            }.toSeq
           )
           payloads = DomainSequencingTestUtils.payloadsForEvents(events)
           _ <- env.store
@@ -483,9 +444,9 @@ trait SequencerStoreTest
         for {
           aliceId <- env.store.registerMember(alice, ts1)
           // lets write 20 events - offsetting the second timestamp that is at epoch second 1
-          events = (0L until 20L).map(n => {
+          events = (0L until 20L).map { n =>
             env.deliverEventWithDefaults(ts2.plusSeconds(n), sender = aliceId)()
-          })
+          }
           payloads = DomainSequencingTestUtils.payloadsForEvents(events)
           _ <- env.store
             .savePayloads(NonEmptyUtil.fromUnsafe(payloads), instanceDiscriminator1)
@@ -518,8 +479,10 @@ trait SequencerStoreTest
     }
 
     "save payloads" should {
-      "return an error if there is a conflicting id for database sequencer" onlyRunWhen (!testedUseUnifiedSequencer) in {
+      // TODO(#16087) enable test for database sequencer with blockSequencerMode=false
+      "return an error if there is a conflicting id for database sequencer" ignore {
         val env = Env()
+
         val Seq(p1, p2, p3) =
           0.until(3).map(n => Payload(PayloadId(ts(n)), ByteString.copyFromUtf8(n.toString)))
 
@@ -535,8 +498,10 @@ trait SequencerStoreTest
         } yield error shouldBe SavePayloadsError.ConflictingPayloadId(p2.id, instanceDiscriminator1)
       }
 
-      "succeed on a conflicting payload id for unified sequencer" onlyRunWhen (testedUseUnifiedSequencer) in {
+      // TODO(#16087) when bringing back database sequencer, only run this test if blockSequencerMode=true
+      "succeed on a conflicting payload id for unified sequencer" in {
         val env = Env()
+
         val Seq(p1, p2, p3) =
           0.until(3).map(n => Payload(PayloadId(ts(n)), ByteString.copyFromUtf8(n.toString)))
 
@@ -641,7 +606,7 @@ trait SequencerStoreTest
         }
       }
 
-      "should return error if there is an existing checkpoint with different timestamp" in {
+      "should update an existing checkpoint with different timestamps" in {
         val env = Env()
 
         val checkpoint1 = checkpoint(SequencerCounter(10), ts1)
@@ -650,32 +615,23 @@ trait SequencerStoreTest
           _ <- valueOrFail(env.store.saveCounterCheckpoint(aliceId, checkpoint1))(
             "save first checkpoint"
           )
-          wrongTimestamp <- env.store
+          updatedTimestamp <- env.store
             .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(10), ts2))
             .value // note different timestamp value
-          wrongTimestampAndTopologyTimestamp <- env.store
+          updatedTimestampAndTopologyTimestamp <- env.store
             .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(10), ts2, Some(ts2)))
             .value // note different timestamp value
           allowedDuplicateInsert <- env.store
-            .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(10), ts1, Some(ts2)))
+            .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(10), ts2, Some(ts2)))
             .value // note different topology client timestamp value
-          wrongTimestamp2 <- env.store
-            .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(10), ts2))
+          updatedTimestamp2 <- env.store
+            .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(10), ts2, Some(ts3)))
             .value // note different topology client timestamp value
         } yield {
-          wrongTimestamp shouldBe Left(
-            SaveCounterCheckpointError.CounterCheckpointInconsistent(ts1, None)
-          )
-          wrongTimestampAndTopologyTimestamp shouldBe Left(
-            SaveCounterCheckpointError.CounterCheckpointInconsistent(ts1, None)
-          )
-          // if we previously didn't have a latest topology timestamp, we allow a new 'insert'
+          updatedTimestamp shouldBe Right(())
+          updatedTimestampAndTopologyTimestamp shouldBe Right(())
           allowedDuplicateInsert shouldBe Right(())
-          // but we won't actually update the stored latest topology timestamp, as this only happens immediately
-          // after a migration without any activity on the domain
-          wrongTimestamp2 shouldBe Left(
-            SaveCounterCheckpointError.CounterCheckpointInconsistent(ts1, None)
-          )
+          updatedTimestamp2 shouldBe Right(())
         }
       }
     }
@@ -825,7 +781,7 @@ trait SequencerStoreTest
           recordCountsBefore <- store.countRecords
           pruningTimestamp = statusBefore.safePruningTimestamp
           _tsAndReport <- {
-            logger.debug(s"Pruning sequencer store from $pruningTimestamp")
+            logger.debug(s"Pruning sequencer store up to $pruningTimestamp")
             store
               .prune(pruningTimestamp, statusBefore, NonNegativeFiniteDuration.tryOfSeconds(1))
               .valueOrFail("prune")
@@ -836,11 +792,13 @@ trait SequencerStoreTest
           lowerBound <- store.fetchLowerBound()
         } yield {
           val removedCounts = recordCountsBefore - recordCountsAfter
-          removedCounts.counterCheckpoints shouldBe 1 // for alice's first checkpoint
-          removedCounts.events shouldBe 2 // the earlier deliver events
+          removedCounts.counterCheckpoints shouldBe 3
+          removedCounts.events shouldBe 3 // the earlier deliver events
           removedCounts.payloads shouldBe 1 // for the deliver event
           statusBefore.lowerBound shouldBe <(statusAfter.lowerBound)
-          lowerBound.value shouldBe ts(5) // to prevent reads from before this point
+          lowerBound.value shouldBe ts(
+            6
+          ) // to prevent reads from before this point
 
           val memberHeads = Map(
             (alice, Counter(recordCountsBefore.events - 1L)),
@@ -888,7 +846,11 @@ trait SequencerStoreTest
               deliverEventWithDefaults(ts(7))(recipients = NonEmpty(SortedSet, aliceId, bobId)),
             ),
           )
+          _ <- env.saveWatermark(ts(7)).valueOrFail("saveWatermark")
           // save an earlier counter checkpoint that should be removed
+          _ <- store
+            .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(0), ts(2)))
+            .valueOrFail("alice counter checkpoint")
           _ <- store
             .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(1), ts(4)))
             .valueOrFail("alice counter checkpoint")
@@ -907,7 +869,7 @@ trait SequencerStoreTest
           recordCountsBefore <- store.countRecords
           pruningTimestamp = ts(5)
           _tsAndReport <- {
-            logger.debug(s"Pruning sequencer store from $pruningTimestamp")
+            logger.debug(s"Pruning sequencer store up to $pruningTimestamp")
             store
               .prune(pruningTimestamp, statusBefore, NonNegativeFiniteDuration.tryOfSeconds(1))
               .valueOrFail("prune")
@@ -921,37 +883,13 @@ trait SequencerStoreTest
           oldestTimestamp shouldBe Some(ts(5))
           statusBefore.safePruningTimestamp shouldBe ts(7)
           val removedCounts = recordCountsBefore - recordCountsAfter
-          removedCounts.counterCheckpoints shouldBe 2 // Alice's and Bob's checkpoints from ts4
+          removedCounts.counterCheckpoints shouldBe 3
           removedCounts.events shouldBe 2 // the two deliver event earlier than ts5 from ts2 and ts4
           removedCounts.payloads shouldBe 1 // for payload1 from ts1
         }
       }
 
       "when adjusting the safe pruning timestamp" should {
-        "set it back to ensure we don't delete events that we'll still need to read to re-establish counters" in {
-          val env = Env()
-          import env.*
-
-          for {
-            aliceId <- store.registerMember(alice, ts(1))
-            _ <- store
-              .saveCounterCheckpoint(aliceId, checkpoint(SequencerCounter(3), ts(3)))
-              .valueOrFail("saveCounterCheckpoint")
-            _ <- store.acknowledge(aliceId, ts(5))
-            status <- store.status(ts(5))
-            safeTimestamp = status.safePruningTimestamp
-            _ = safeTimestamp shouldBe ts(5) // as alice has acknowledged the event
-            adjustedTimestampO <- store.adjustPruningTimestampForCounterCheckpoints(
-              safeTimestamp,
-              Seq.empty,
-            )
-          } yield {
-            adjustedTimestampO.value shouldBe ts(
-              3
-            ) // but we need to retain earlier events to not blow up the counter checkpoints
-          }
-        }
-
         "correctly consider clients when there are many" in {
           val env = Env()
           import env.*
@@ -968,14 +906,9 @@ trait SequencerStoreTest
             _ <- store.acknowledge(aliceId, ts(4))
             status <- store.status(ts(5))
             safeTimestamp = status.safePruningTimestamp
-            _ = safeTimestamp shouldBe ts(4) // due to the earlier client ack
-            adjustedTimestampO <- store.adjustPruningTimestampForCounterCheckpoints(
-              safeTimestamp,
-              Seq.empty,
-            )
-          } yield adjustedTimestampO.value shouldBe ts(
-            3
-          ) // as we need to keep the counter checkpoint immediately below the client we still need to serve
+          } yield {
+            safeTimestamp shouldBe ts(4) // due to the earlier client ack
+          }
         }
 
         "not worry about ignored members" in {
@@ -997,44 +930,8 @@ trait SequencerStoreTest
             _ <- store.disableMember(alice)
             status <- store.status(ts(6))
             safeTimestamp = status.safePruningTimestamp
-            _ = safeTimestamp shouldBe ts(6) // as alice is ignored
-            adjustedTimestampO <- store.adjustPruningTimestampForCounterCheckpoints(
-              safeTimestamp,
-              Seq(aliceId),
-            )
           } yield {
-            adjustedTimestampO.value shouldBe ts(
-              5
-            ) // the later counter checkpoint is sufficient to keep the non-ignored client working
-          }
-        }
-
-        "throw if we try to prune all data" in {
-          val env = Env()
-          import env.*
-
-          for {
-            _ <- store.registerMember(alice, ts(1))
-            _ <- store.registerMember(bob, ts(2))
-            _ <- store.disableMember(alice)
-            _ <- store.disableMember(bob)
-            status <- store.status(ts(3))
-            exception <- loggerFactory.assertLogs(
-              store
-                .prune(
-                  status.safePruningTimestamp,
-                  status,
-                  NonNegativeFiniteDuration.tryOfSeconds(1),
-                )
-                .valueOrFail("prune")
-                .failed,
-              _.errorMessage should include(
-                "Preventing pruning as it would remove all data from the Sequencer"
-              ),
-            )
-          } yield {
-            exception shouldBe an[RuntimeException]
-            exception.getMessage should include("Preventing pruning")
+            safeTimestamp shouldBe ts(6) // as alice is ignored
           }
         }
       }
@@ -1078,6 +975,128 @@ trait SequencerStoreTest
         for {
           _ <- valueOrFail(store.validateCommitMode(CommitMode.Synchronous))("validate commit mode")
         } yield succeed
+      }
+    }
+
+    "checkpointsAtTimestamp" should {
+      "produce correct checkpoints for any timestamp according to spec" in {
+        val env = Env()
+        import env.*
+
+        // we have 3 events with the one with ts=2 representing a topology change (addressed to the sequencer)
+        // we then request checkpoints for various timestamps around events and saved checkpoints
+        // and check the results to match the expected values
+
+        for {
+          sequencerId <- store.registerMember(sequencerMember, ts(0))
+          aliceId <- store.registerMember(alice, ts(0))
+          bobId <- store.registerMember(bob, ts(0))
+          memberMap = Map(alice -> aliceId, bob -> bobId, sequencerMember -> sequencerId)
+          mapToId = (memberCheckpoints: Map[Member, CounterCheckpoint]) => {
+            memberCheckpoints.map { case (member, checkpoint) =>
+              memberMap(member) -> checkpoint
+            }
+          }
+
+          _ <- store.saveEvents(
+            instanceIndex,
+            NonEmpty(
+              Seq,
+              deliverEventWithDefaults(ts(1))(recipients = NonEmpty(SortedSet, aliceId, bobId)),
+              deliverEventWithDefaults(ts(2))(recipients =
+                NonEmpty(SortedSet, aliceId, bobId, sequencerId)
+              ),
+              deliverEventWithDefaults(ts(3))(recipients = NonEmpty(SortedSet, aliceId)),
+            ),
+          )
+          _ <- saveWatermark(ts(3)).valueOrFail("saveWatermark")
+
+          checkpointsAt0 <- store.checkpointsAtTimestamp(ts(0))
+          checkpointsAt1predecessor <- store.checkpointsAtTimestamp(ts(1).immediatePredecessor)
+          _ <- store.saveCounterCheckpoints(mapToId(checkpointsAt0).toList)
+          checkpointsAt1predecessor_withCc <- store.checkpointsAtTimestamp(
+            ts(1).immediatePredecessor
+          )
+          checkpointsAt1 <- store.checkpointsAtTimestamp(ts(1))
+          checkpointsAt1successor <- store.checkpointsAtTimestamp(ts(1).immediateSuccessor)
+          _ <- store.saveCounterCheckpoints(mapToId(checkpointsAt1predecessor).toList)
+          _ <- store.saveCounterCheckpoints(mapToId(checkpointsAt1).toList)
+          checkpointsAt1_withCc <- store.checkpointsAtTimestamp(ts(1))
+          checkpointsAt1successor_withCc <- store.checkpointsAtTimestamp(ts(1).immediateSuccessor)
+          checkpointsAt1_5 <- store.checkpointsAtTimestamp(ts(1).plusMillis(500))
+          _ <- store.saveCounterCheckpoints(mapToId(checkpointsAt1_5).toList)
+          checkpointsAt1_5withCc <- store.checkpointsAtTimestamp(ts(1).plusMillis(500))
+          checkpointsAt2 <- store.checkpointsAtTimestamp(ts(2))
+          checkpointsAt2_5 <- store.checkpointsAtTimestamp(ts(2).plusMillis(500))
+          checkpointsAt3 <- store.checkpointsAtTimestamp(ts(3))
+          checkpointsAt4 <- store.checkpointsAtTimestamp(ts(4))
+        } yield {
+          checkpointsAt0 shouldBe Map(
+            alice -> CounterCheckpoint(Counter(-1L), ts(0), None),
+            bob -> CounterCheckpoint(Counter(-1L), ts(0), None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(0), None),
+          )
+          checkpointsAt1predecessor shouldBe Map(
+            alice -> CounterCheckpoint(Counter(-1L), ts(1).immediatePredecessor, None),
+            bob -> CounterCheckpoint(Counter(-1L), ts(1).immediatePredecessor, None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(1).immediatePredecessor, None),
+          )
+          checkpointsAt1predecessor_withCc shouldBe Map(
+            alice -> CounterCheckpoint(Counter(-1L), ts(1).immediatePredecessor, None),
+            bob -> CounterCheckpoint(Counter(-1L), ts(1).immediatePredecessor, None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(1).immediatePredecessor, None),
+          )
+          checkpointsAt1 shouldBe Map(
+            alice -> CounterCheckpoint(Counter(0L), ts(1), None),
+            bob -> CounterCheckpoint(Counter(0L), ts(1), None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(1), None),
+          )
+          checkpointsAt1successor shouldBe Map(
+            alice -> CounterCheckpoint(Counter(0L), ts(1).immediateSuccessor, None),
+            bob -> CounterCheckpoint(Counter(0L), ts(1).immediateSuccessor, None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(1).immediateSuccessor, None),
+          )
+          checkpointsAt1_withCc shouldBe Map(
+            alice -> CounterCheckpoint(Counter(0L), ts(1), None),
+            bob -> CounterCheckpoint(Counter(0L), ts(1), None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(1), None),
+          )
+          checkpointsAt1successor_withCc shouldBe Map(
+            alice -> CounterCheckpoint(Counter(0L), ts(1).immediateSuccessor, None),
+            bob -> CounterCheckpoint(Counter(0L), ts(1).immediateSuccessor, None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(1).immediateSuccessor, None),
+          )
+          checkpointsAt1_5 shouldBe Map(
+            alice -> CounterCheckpoint(Counter(0L), ts(1).plusMillis(500), None),
+            bob -> CounterCheckpoint(Counter(0L), ts(1).plusMillis(500), None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(1).plusMillis(500), None),
+          )
+          checkpointsAt1_5withCc shouldBe Map(
+            alice -> CounterCheckpoint(Counter(0L), ts(1).plusMillis(500), None),
+            bob -> CounterCheckpoint(Counter(0L), ts(1).plusMillis(500), None),
+            sequencerMember -> CounterCheckpoint(Counter(-1L), ts(1).plusMillis(500), None),
+          )
+          checkpointsAt2 shouldBe Map(
+            alice -> CounterCheckpoint(Counter(1L), ts(2), ts(2).some),
+            bob -> CounterCheckpoint(Counter(1L), ts(2), ts(2).some),
+            sequencerMember -> CounterCheckpoint(Counter(0L), ts(2), ts(2).some),
+          )
+          checkpointsAt2_5 shouldBe Map(
+            alice -> CounterCheckpoint(Counter(1L), ts(2).plusMillis(500), ts(2).some),
+            bob -> CounterCheckpoint(Counter(1L), ts(2).plusMillis(500), ts(2).some),
+            sequencerMember -> CounterCheckpoint(Counter(0L), ts(2).plusMillis(500), ts(2).some),
+          )
+          checkpointsAt3 shouldBe Map(
+            alice -> CounterCheckpoint(Counter(2L), ts(3), ts(2).some),
+            bob -> CounterCheckpoint(Counter(1L), ts(3), ts(2).some),
+            sequencerMember -> CounterCheckpoint(Counter(0L), ts(3), ts(2).some),
+          )
+          checkpointsAt4 shouldBe Map(
+            alice -> CounterCheckpoint(Counter(2L), ts(4), ts(2).some),
+            bob -> CounterCheckpoint(Counter(1L), ts(4), ts(2).some),
+            sequencerMember -> CounterCheckpoint(Counter(0L), ts(4), ts(2).some),
+          )
+        }
       }
     }
 
@@ -1201,13 +1220,13 @@ trait SequencerStoreTest
           stateAfterNewEvents shouldBe Map(
             (alice, CounterCheckpoint(Counter(3L), ts(6), Some(ts(4)))),
             (bob, CounterCheckpoint(Counter(2L), ts(6), Some(ts(4)))),
-            (sequencerMember, CounterCheckpoint(Counter(0L), ts(4), Some(ts(4)))),
+            (sequencerMember, CounterCheckpoint(Counter(0L), ts(6), Some(ts(4)))),
           )
 
           stateFromNewStoreAfterNewEvents shouldBe Map(
             (alice, CounterCheckpoint(Counter(3L), ts(6), Some(ts(5)))),
             (bob, CounterCheckpoint(Counter(1L), ts(6), None)),
-            (sequencerMember, CounterCheckpoint(Counter(1L), ts(5), Some(ts(5)))),
+            (sequencerMember, CounterCheckpoint(Counter(1L), ts(6), Some(ts(5)))),
           )
         }
       }
