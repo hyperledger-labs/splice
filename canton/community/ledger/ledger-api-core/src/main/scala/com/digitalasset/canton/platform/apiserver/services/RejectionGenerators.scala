@@ -11,9 +11,9 @@ import com.digitalasset.canton.ledger.error.groups.{
   RequestValidationErrors,
 }
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.daml.lf.data.Time
-import com.digitalasset.daml.lf.engine.Error.{Interpretation, Package, Preprocessing, Validation}
+import com.digitalasset.daml.lf.data.{Ref, Time}
 import com.digitalasset.daml.lf.engine.Error as LfError
+import com.digitalasset.daml.lf.engine.Error.{Interpretation, Package, Preprocessing, Validation}
 import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
 
 sealed abstract class ErrorCause extends Product with Serializable
@@ -39,9 +39,9 @@ object RejectionGenerators {
       case Package.Validation(validationError) =>
         CommandExecutionErrors.Package.PackageValidationFailed
           .Reject(validationError.pretty)
-      case Package.MissingPackage(packageId, context) =>
+      case Package.MissingPackage(packageRef, context) =>
         RequestValidationErrors.NotFound.Package
-          .InterpretationReject(packageId, context)
+          .InterpretationReject(packageRef, context)
       case Package.AllowedLanguageVersion(packageId, languageVersion, allowedLanguageVersions) =>
         CommandExecutionErrors.Package.AllowedLanguageVersions.Error(
           packageId,
@@ -54,6 +54,9 @@ object RejectionGenerators {
 
     def processPreprocessingError(err: LfError.Preprocessing.Error): DamlError = err match {
       case e: Preprocessing.Internal => LedgerApiErrors.InternalError.Preprocessing(e)
+      case Preprocessing.UnresolvedPackageName(pkgName, context) =>
+        RequestValidationErrors.NotFound.Package
+          .InterpretationReject(Ref.PackageRef.Name(pkgName), context)
       case e => CommandExecutionErrors.Preprocessing.PreprocessingFailed.Reject(e)
     }
 
@@ -66,11 +69,10 @@ object RejectionGenerators {
         err: com.digitalasset.daml.lf.interpretation.Error,
         renderedMessage: String,
         detailMessage: Option[String],
-    ): DamlError = {
+    ): DamlError =
       // detailMessage is only suitable for server side debugging but not for the user, so don't pass except on internal errors
 
       err match {
-        case LfInterpretationError.RejectedAuthorityRequest(_, _) => ??? // TODO(i12291): #15882
         case LfInterpretationError.ContractNotFound(cid) =>
           ConsistencyErrors.ContractNotFound
             .Reject(renderedMessage, cid)
@@ -134,7 +136,6 @@ object RejectionGenerators {
           CommandExecutionErrors.Interpreter.InterpretationDevError
             .Reject(renderedMessage, err)
       }
-    }
 
     def processInterpretationError(
         err: LfError.Interpretation.Error,

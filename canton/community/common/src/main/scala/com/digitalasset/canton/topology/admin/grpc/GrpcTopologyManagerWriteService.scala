@@ -19,18 +19,22 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.admin.v30.AuthorizeRequest.{Proposal, Type}
-import com.digitalasset.canton.topology.admin.v30.ImportTopologySnapshotRequest
+import com.digitalasset.canton.topology.admin.v30.{
+  GenerateTransactionsRequest,
+  GenerateTransactionsResponse,
+  ImportTopologySnapshotRequest,
+}
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactions, TopologyStoreId}
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
-import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.version.ProtocolVersionValidation
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class GrpcTopologyManagerWriteService(
-    managers: => Seq[TopologyManager[TopologyStoreId]],
+class GrpcTopologyManagerWriteService[PureCrypto <: CryptoPureApi](
+    managers: => Seq[TopologyManager[TopologyStoreId, PureCrypto]],
     crypto: Crypto,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
@@ -49,7 +53,7 @@ class GrpcTopologyManagerWriteService(
       case Type.TransactionHash(value) =>
         for {
           txHash <- EitherT
-            .fromEither[FutureUnlessShutdown](Hash.fromHexString(value).map(TxHash))
+            .fromEither[FutureUnlessShutdown](Hash.fromHexString(value).map(TxHash.apply))
             .leftMap(err => ProtoDeserializationFailure.Wrap(err.toProtoDeserializationError))
           manager <- targetManagerET(request.store)
           signingKeys <-
@@ -65,7 +69,6 @@ class GrpcTopologyManagerWriteService(
                 .leftMap(ProtoDeserializationFailure.Wrap(_): CantonError)
             )
           signedTopoTx <-
-            // TODO(#14067) understand when and why force needs to come in effect
             manager
               .accept(
                 txHash,
@@ -90,39 +93,7 @@ class GrpcTopologyManagerWriteService(
             request.signedBy.traverse(Fingerprint.fromProtoPrimitive)
           forceFlags <- ForceFlags
             .fromProtoV30(request.forceChanges)
-          validatedMapping <- mapping.mapping match {
-            case Mapping.Empty => FieldNotSet("mapping").asLeft
-            case Mapping.DecentralizedNamespaceDefinition(mapping) =>
-              DecentralizedNamespaceDefinition.fromProtoV30(mapping)
-            case Mapping.NamespaceDelegation(mapping) =>
-              NamespaceDelegation.fromProtoV30(mapping)
-            case Mapping.IdentifierDelegation(mapping) =>
-              IdentifierDelegation.fromProtoV30(mapping)
-            case Mapping.DomainParametersState(mapping) =>
-              DomainParametersState.fromProtoV30(mapping)
-            case Mapping.SequencingDynamicParametersState(mapping) =>
-              DynamicSequencingParametersState.fromProtoV30(mapping)
-            case Mapping.MediatorDomainState(mapping) =>
-              MediatorDomainState.fromProtoV30(mapping)
-            case Mapping.SequencerDomainState(mapping) =>
-              SequencerDomainState.fromProtoV30(mapping)
-            case Mapping.PartyToParticipant(mapping) =>
-              PartyToParticipant.fromProtoV30(mapping)
-            case Mapping.AuthorityOf(mapping) =>
-              AuthorityOf.fromProtoV30(mapping)
-            case Mapping.DomainTrustCertificate(mapping) =>
-              DomainTrustCertificate.fromProtoV30(mapping)
-            case Mapping.OwnerToKeyMapping(mapping) =>
-              OwnerToKeyMapping.fromProtoV30(mapping)
-            case Mapping.VettedPackages(mapping) =>
-              VettedPackages.fromProtoV30(mapping)
-            case Mapping.ParticipantPermission(mapping) =>
-              ParticipantDomainPermission.fromProtoV30(mapping)
-            case Mapping.PartyHostingLimits(mapping) =>
-              PartyHostingLimits.fromProtoV30(mapping)
-            case Mapping.PurgeTopologyTxs(mapping) =>
-              PurgeTopologyTransaction.fromProtoV30(mapping)
-          }
+          validatedMapping <- deserializeTopologyMapping(mapping.mapping)
         } yield {
           (op, serial, validatedMapping, signingKeys, forceFlags)
         }
@@ -151,30 +122,66 @@ class GrpcTopologyManagerWriteService(
     CantonGrpcUtil.mapErrNewEUS(result.map(tx => v30.AuthorizeResponse(Some(tx.toProtoV30))))
   }
 
+  private def deserializeTopologyMapping(mapping: Mapping) =
+    mapping match {
+      case Mapping.Empty => FieldNotSet("mapping").asLeft
+      case Mapping.DecentralizedNamespaceDefinition(mapping) =>
+        DecentralizedNamespaceDefinition.fromProtoV30(mapping)
+      case Mapping.NamespaceDelegation(mapping) =>
+        NamespaceDelegation.fromProtoV30(mapping)
+      case Mapping.IdentifierDelegation(mapping) =>
+        IdentifierDelegation.fromProtoV30(mapping)
+      case Mapping.DomainParametersState(mapping) =>
+        DomainParametersState.fromProtoV30(mapping)
+      case Mapping.SequencingDynamicParametersState(mapping) =>
+        DynamicSequencingParametersState.fromProtoV30(mapping)
+      case Mapping.MediatorDomainState(mapping) =>
+        MediatorDomainState.fromProtoV30(mapping)
+      case Mapping.SequencerDomainState(mapping) =>
+        SequencerDomainState.fromProtoV30(mapping)
+      case Mapping.PartyToParticipant(mapping) =>
+        PartyToParticipant.fromProtoV30(mapping)
+      case Mapping.DomainTrustCertificate(mapping) =>
+        DomainTrustCertificate.fromProtoV30(mapping)
+      case Mapping.OwnerToKeyMapping(mapping) =>
+        OwnerToKeyMapping.fromProtoV30(mapping)
+      case Mapping.VettedPackages(mapping) =>
+        VettedPackages.fromProtoV30(mapping)
+      case Mapping.ParticipantPermission(mapping) =>
+        ParticipantDomainPermission.fromProtoV30(mapping)
+      case Mapping.PartyHostingLimits(mapping) =>
+        PartyHostingLimits.fromProtoV30(mapping)
+      case Mapping.PurgeTopologyTxs(mapping) =>
+        PurgeTopologyTransaction.fromProtoV30(mapping)
+      case Mapping.PartyToKeyMapping(mapping) =>
+        PartyToKeyMapping.fromProtoV30(mapping)
+    }
+
   override def signTransactions(
-      request: v30.SignTransactionsRequest
+      requestP: v30.SignTransactionsRequest
   ): Future[v30.SignTransactionsResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    val res = for {
-      signedTxs <- EitherT.fromEither[FutureUnlessShutdown](
-        request.transactions
+    val requestE = for {
+      signedTxs <-
+        requestP.transactions
           .traverse(tx =>
             SignedTopologyTransaction.fromProtoV30(ProtocolVersionValidation.NoValidation, tx)
           )
-          .leftMap(ProtoDeserializationFailure.Wrap(_): CantonError)
-      )
       signingKeys <-
-        EitherT
-          .fromEither[FutureUnlessShutdown](
-            request.signedBy.traverse(Fingerprint.fromProtoPrimitive)
-          )
-          .leftMap(ProtoDeserializationFailure.Wrap(_): CantonError)
+        requestP.signedBy.traverse(Fingerprint.fromProtoPrimitive)
+      forceFlags <- ForceFlags.fromProtoV30(requestP.forceFlags)
+    } yield (signedTxs, signingKeys, forceFlags)
+
+    val res = for {
+      request <- EitherT
+        .fromEither[FutureUnlessShutdown](requestE)
+        .leftMap(ProtoDeserializationFailure.Wrap(_))
+      (signedTxs, signingKeys, forceFlags) = request
+
+      targetManager <- targetManagerET(requestP.store)
 
       extendedTransactions <- signedTxs.parTraverse(tx =>
-        signingKeys
-          .parTraverse(key => crypto.privateCrypto.sign(tx.hash.hash, key))
-          .leftMap(TopologyManagerError.InternalError.TopologySigningError(_): CantonError)
-          .map(tx.addSignatures)
+        targetManager.extendSignature(tx, signingKeys, forceFlags).leftWiden[CantonError]
       )
     } yield extendedTransactions
 
@@ -243,7 +250,7 @@ class GrpcTopologyManagerWriteService(
       store: String
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CantonError, TopologyManager[TopologyStoreId]] =
+  ): EitherT[FutureUnlessShutdown, CantonError, TopologyManager[TopologyStoreId, PureCrypto]] =
     for {
       targetStore <- EitherT.cond[FutureUnlessShutdown](
         store.nonEmpty,
@@ -259,4 +266,55 @@ class GrpcTopologyManagerWriteService(
         .leftWiden[CantonError]
     } yield manager
 
+  /** RPC to generate topology transactions that can be signed
+    */
+  override def generateTransactions(
+      request: GenerateTransactionsRequest
+  ): Future[GenerateTransactionsResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    val resultET = request.proposals.parTraverse { proposal =>
+      val v30.GenerateTransactionsRequest.Proposal(opP, serialP, mappingPO, store) = proposal
+      val validatedMappingE = for {
+        serial <- Option
+          .when(serialP != 0)(serialP)
+          .traverse(ProtoConverter.parsePositiveInt("serial", _))
+        op <- ProtoConverter.parseEnum(TopologyChangeOp.fromProtoV30, "operation", opP)
+        mappingP <- ProtoConverter.required("mapping", mappingPO)
+        mapping <- deserializeTopologyMapping(mappingP.mapping)
+      } yield (serial, op, mapping)
+
+      for {
+        serialOpMapping <- EitherT
+          .fromEither[FutureUnlessShutdown](validatedMappingE)
+          .leftMap(ProtoDeserializationFailure.Wrap(_))
+        (serial, op, mapping) = serialOpMapping
+        manager <- targetManagerET(store)
+        existingTransaction <- manager
+          .findExistingTransaction(mapping)
+          .mapK(
+            FutureUnlessShutdown.outcomeK
+          )
+        transaction <- manager
+          .build(
+            op,
+            mapping,
+            serial,
+            manager.managerVersion.serialization,
+            existingTransaction,
+          )
+          .mapK(FutureUnlessShutdown.outcomeK)
+          .leftWiden[CantonError]
+      } yield transaction.toByteString -> transaction.hash.hash.getCryptographicEvidence
+    }
+
+    CantonGrpcUtil.mapErrNewEUS(
+      resultET.map { txAndHashes =>
+        GenerateTransactionsResponse(
+          txAndHashes.map { case (serializedTransaction, hash) =>
+            GenerateTransactionsResponse.GeneratedTransaction(serializedTransaction, hash)
+          }
+        )
+      }
+    )
+  }
 }

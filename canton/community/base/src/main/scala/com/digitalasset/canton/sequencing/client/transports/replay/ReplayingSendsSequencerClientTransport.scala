@@ -12,12 +12,12 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.HashPurpose
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.{MetricValue, SequencerClientMetrics}
-import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.*
+import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.transports.{
   SequencerClientTransport,
   SequencerClientTransportCommon,
@@ -36,6 +36,7 @@ import com.digitalasset.canton.tracing.{NoTracing, TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, OptionUtil, PekkoUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import io.grpc.Status
 import io.opentelemetry.sdk.metrics.data.MetricData
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
@@ -181,6 +182,7 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
             logger.warn(
               s"Sequencer is overloaded and rejected our send. Please tune the sequencer to handle more concurrent requests."
             )
+            metrics.submissions.overloaded.inc()
 
           case Left(error) =>
             // log, increase error counter, then ignore
@@ -292,13 +294,12 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     )
     private val idleP = Promise[EventsReceivedReport]()
 
-    private def scheduleCheck(): Unit = {
+    private def scheduleCheck(): Unit =
       performUnlessClosing(functionFullName) {
         val nextCheckDuration =
           idlenessDuration.toJava.minus(durationFromLastEventToNow(stateRef.get()))
         val _ = materializer.scheduleOnce(nextCheckDuration.toScala, () => checkIfIdle())
       }.onShutdown(())
-    }
 
     scheduleCheck() // kick off checks
 
@@ -436,6 +437,9 @@ class ReplayingSendsSequencerClientTransportImpl(
     )
     with SequencerClientTransport
     with SequencerClientTransportPekko {
+  override def logout(): EitherT[FutureUnlessShutdown, Status, Unit] =
+    EitherT.pure(())
+
   override def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
       implicit traceContext: TraceContext
   ): SequencerSubscription[E] = new SequencerSubscription[E] {

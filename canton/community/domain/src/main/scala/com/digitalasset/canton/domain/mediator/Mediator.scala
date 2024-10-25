@@ -30,12 +30,7 @@ import com.digitalasset.canton.protocol.{DynamicDomainParametersWithValidity, Re
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.RichSequencerClient
 import com.digitalasset.canton.sequencing.handlers.DiscardIgnoredEvents
-import com.digitalasset.canton.sequencing.protocol.{
-  ClosedEnvelope,
-  Envelope,
-  OpenEnvelope,
-  SequencedEvent,
-}
+import com.digitalasset.canton.sequencing.protocol.{ClosedEnvelope, OpenEnvelope, SequencedEvent}
 import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.store.{SequencedEventStore, SequencerCounterTrackerStore}
@@ -184,9 +179,12 @@ private[mediator] class Mediator(
 
       domainParametersChanges <- EitherT
         .right(
-          topologyClient.awaitSnapshot(timestamp).flatMap(_.listDynamicDomainParametersChanges())
+          topologyClient
+            .awaitSnapshotUS(timestamp)
+            .flatMap(snapshot =>
+              FutureUnlessShutdown.outcomeF(snapshot.listDynamicDomainParametersChanges())
+            )
         )
-        .mapK(FutureUnlessShutdown.outcomeK)
 
       _ <- NonEmptySeq.fromSeq(domainParametersChanges) match {
         case Some(domainParametersChangesNes) =>
@@ -243,13 +241,10 @@ private[mediator] class Mediator(
     } yield ()
   }
 
-  private def handler: ApplicationHandler[Lambda[
-    `+X <: Envelope[_]` => Traced[Seq[OrdinarySequencedEvent[X]]]
-  ], ClosedEnvelope] =
-    new ApplicationHandler[Lambda[
-      `+X <: Envelope[_]` => Traced[Seq[OrdinarySequencedEvent[X]]]
-    ], ClosedEnvelope] {
-      override def name: String = s"mediator-${mediatorId}"
+  private def handler: ApplicationHandler[OrdinaryEnvelopeBox, ClosedEnvelope] =
+    new ApplicationHandler[OrdinaryEnvelopeBox, ClosedEnvelope] {
+
+      override def name: String = s"mediator-$mediatorId"
 
       override def subscriptionStartsAt(
           start: SubscriptionStart,
@@ -272,9 +267,7 @@ private[mediator] class Mediator(
               .flatMap(_.toFuture(new RuntimeException(_)))
           )
 
-          decisionTime <- FutureUnlessShutdown.outcomeF(
-            domainParameters.decisionTimeForF(timestamp)
-          )
+          decisionTime <- domainParameters.decisionTimeForF(timestamp)
           _ <- verdictSender.sendReject(
             requestId,
             None,
@@ -287,7 +280,7 @@ private[mediator] class Mediator(
 
       override def apply(
           tracedEvents: Traced[Seq[BoxedEnvelope[OrdinarySequencedEvent, ClosedEnvelope]]]
-      ): HandlerResult = {
+      ): HandlerResult =
         tracedEvents.withTraceContext { implicit traceContext => events =>
           val tracedOpenEventsWithRejectionsF = events.map { closedSignedEvent =>
             val closedEvent = closedSignedEvent.signedEvent.content
@@ -299,7 +292,7 @@ private[mediator] class Mediator(
 
             val rejectionsF = openingErrors.parTraverse_ { error =>
               val cause =
-                s"Received an envelope at ${closedEvent.timestamp} that cannot be opened. Discarding envelope... Reason: ${error}"
+                s"Received an envelope at ${closedEvent.timestamp} that cannot be opened. Discarding envelope... Reason: $error"
               val alarm = MediatorError.MalformedMessage.Reject(cause)
               alarm.report()
 
@@ -338,7 +331,6 @@ private[mediator] class Mediator(
 
           rejectionsF.sequence_.flatMap { case () => result }
         }
-      }
     }
 
   override def closeAsync() =

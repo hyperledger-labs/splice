@@ -87,6 +87,7 @@ object SvOnboardingConfig {
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
       initialPackageConfig: InitialPackageConfig = InitialPackageConfig.defaultInitialPackageConfig,
+      initialTransferPreapprovalFee: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

@@ -5,8 +5,8 @@ syntax = "proto3";
 
 package com.daml.ledger.api.v2;
 
-import "com/daml/ledger/api/v2/checkpoint.proto";
 import "com/daml/ledger/api/v2/completion.proto";
+import "com/daml/ledger/api/v2/offset_checkpoint.proto";
 
 option csharp_namespace = "Com.Daml.Ledger.Api.V2";
 option java_outer_classname = "CommandCompletionServiceOuterClass";
@@ -46,24 +46,15 @@ message CompletionStreamRequest {
   repeated string parties = 2;
 
   // This field indicates the minimum offset for completions. This can be used to resume an earlier completion stream.
-  // Optional, if not set the ledger uses the current ledger begin offset instead.
-  string begin_exclusive = 3;
+  // Optional, if not set the ledger uses the ledger begin offset instead.
+  // If specified, it must be a valid absolute offset (positive integer).
+  // If ledger has been pruned, this parameter must be specified and greater than the pruning offset.
+  optional int64 begin_exclusive = 3;
 }
 
 message CompletionStreamResponse {
-  // This checkpoint may be used to restart consumption.  The
-  // checkpoint belongs to the completion in this response.
-  // Required
-  Checkpoint checkpoint = 1;
-
-  // Required
-  Completion completion = 2;
-
-  // The sequencing domain.
-  // In case
-  //   - successful/failed transactions: identifies the sequencing domain of the transaction
-  //   - for successful/failed unassign commands: identifies the source domain
-  //   - for successful/failed assign commands: identifies the target domain
-  // Required
-  string domain_id = 3;
+  oneof completion_response {
+    Completion completion = 1;
+    OffsetCheckpoint offset_checkpoint = 2;
+  }
 }

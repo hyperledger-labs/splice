@@ -7,9 +7,12 @@ import com.daml.error.GrpcStatuses
 import com.daml.logging.entries.{LoggingEntry, LoggingValue, ToLoggingValue}
 import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.protocol.LfHash
 import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.{RequestCounter, data}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
+import com.digitalasset.daml.lf.engine.Blinding
 import com.digitalasset.daml.lf.transaction.{BlindingInfo, CommittedTransaction}
 import com.digitalasset.daml.lf.value.Value
 import com.google.rpc.status.Status as RpcStatus
@@ -18,11 +21,31 @@ import scala.concurrent.Promise
 
 /** An update to the (abstract) participant state.
   *
-  * [[Update]]'s are used in [[ReadService.stateUpdates]] to communicate
+  * [[Update]]'s are used in to communicate
   * changes to abstract participant state to consumers.
   *
   * We describe the possible updates in the comments of
   * each of the case classes implementing [[Update]].
+  *
+  * Deduplication guarantee:
+  * Let there be a [[Update.TransactionAccepted]] with [[CompletionInfo]]
+  * or a [[Update.CommandRejected]] with [[CompletionInfo]] at offset `off2`.
+  * If `off2`'s [[CompletionInfo.optDeduplicationPeriod]] is a [[com.digitalasset.canton.data.DeduplicationPeriod.DeduplicationOffset]],
+  * let `off1` be the first offset after the deduplication offset.
+  * If the deduplication period is a [[com.digitalasset.canton.data.DeduplicationPeriod.DeduplicationDuration]],
+  * let `off1` be the first offset whose record time is at most the duration before `off2`'s record time (inclusive).
+  * Then there is no other [[Update.TransactionAccepted]] with [[CompletionInfo]] for the same [[CompletionInfo.changeId]]
+  * between the offsets `off1` and `off2` inclusive.
+  *
+  * So if a command submission has resulted in a [[Update.TransactionAccepted]],
+  * other command submissions with the same [[SubmitterInfo.changeId]] must be deduplicated
+  * if the earlier's [[Update.TransactionAccepted]] falls within the latter's [[CompletionInfo.optDeduplicationPeriod]].
+  *
+  * Implementations MAY extend the deduplication period from [[SubmitterInfo]] arbitrarily
+  * and reject a command submission as a duplicate even if its deduplication period does not include
+  * the earlier's [[Update.TransactionAccepted]].
+  * A [[Update.CommandRejected]] completion does not trigger deduplication and implementations SHOULD
+  * process such resubmissions normally.
   */
 sealed trait Update extends Product with Serializable with PrettyPrinting {
 
@@ -43,6 +66,12 @@ sealed trait WithoutDomainIndex extends Update {
 
 object Update {
 
+  /** Produces a constant dummy transaction seed for transactions in which we cannot expose a seed. Essentially all of
+    * them. TransactionMeta.submissionSeed can no longer be set to None starting with Daml 1.3
+    */
+  def noOpSeed: LfHash =
+    LfHash.assertFromString("00" * LfHash.underlyingHashLength)
+
   /** Signal used only to increase the offset of the participant in the initialization stage. */
   final case class Init(
       recordTime: Timestamp,
@@ -50,7 +79,7 @@ object Update {
   ) extends Update
       with WithoutDomainIndex {
 
-    override def pretty: Pretty[Init] =
+    override protected def pretty: Pretty[Init] =
       prettyOfClass(
         param("recordTime", _.recordTime),
         indicateOmittedFields,
@@ -90,7 +119,7 @@ object Update {
       persisted: Promise[Unit] = Promise(),
   ) extends Update
       with WithoutDomainIndex {
-    override def pretty: Pretty[PartyAddedToParticipant] =
+    override protected def pretty: Pretty[PartyAddedToParticipant] =
       prettyOfClass(
         param("recordTime", _.recordTime),
         param("party", _.party),
@@ -139,7 +168,7 @@ object Update {
       persisted: Promise[Unit] = Promise(),
   ) extends Update
       with WithoutDomainIndex {
-    override def pretty: Pretty[PartyAllocationRejected] =
+    override protected def pretty: Pretty[PartyAllocationRejected] =
       prettyOfClass(
         param("recordTime", _.recordTime),
         param("participantId", _.participantId),
@@ -170,7 +199,7 @@ object Update {
     *                          completion event for this transaction. This in particular applies if
     *                          this participant has submitted the command to the [[WriteService]].
     *
-    *                          The [[ReadService]] implementation must ensure that command
+    *                          The Offset-order of Updates must ensure that command
     *                          deduplication guarantees are met.
     * @param transactionMeta   The metadata of the transaction that was provided by the submitter.
     *                          It is visible to all parties that can see the transaction.
@@ -189,7 +218,7 @@ object Update {
     *                          [[TransactionMeta.ledgerEffectiveTime]].
     * @param contractMetadata  For each contract created in this transaction, this map may contain
     *                          contract metadata assigned by the ledger implementation.
-    *                          This data is opaque and can only be used in [[com.digitalasset.daml.lf.command.DisclosedContract]]s
+    *                          This data is opaque and can only be used in [[com.digitalasset.daml.lf.transaction.FatContractInstance]]s
     *                          when submitting transactions trough the [[WriteService]].
     *                          If a contract created by this transaction is not element of this map,
     *                          its metadata is equal to the empty byte array.
@@ -198,9 +227,8 @@ object Update {
       completionInfoO: Option[CompletionInfo],
       transactionMeta: TransactionMeta,
       transaction: CommittedTransaction,
-      transactionId: Ref.TransactionId,
+      updateId: data.UpdateId,
       recordTime: Timestamp,
-      blindingInfoO: Option[BlindingInfo],
       hostedWitnesses: List[Ref.Party],
       contractMetadata: Map[Value.ContractId, Bytes],
       domainId: DomainId,
@@ -211,12 +239,13 @@ object Update {
   ) extends Update {
     // TODO(i20043) this will be simplified as Update refactoring is unconstrained by serialization
     assert(completionInfoO.forall(_.messageUuid.isEmpty))
-    // assert(domainIndex.exists(_.requestIndex.isDefined))
+    assert(domainIndex.exists(_.requestIndex.isDefined))
+    val blindingInfo: BlindingInfo = Blinding.blind(transaction)
 
-    override def pretty: Pretty[TransactionAccepted] =
+    override protected def pretty: Pretty[TransactionAccepted] =
       prettyOfClass(
         param("recordTime", _.recordTime),
-        param("transactionId", _.transactionId),
+        param("updateId", _.updateId),
         param("transactionMeta", _.transactionMeta),
         paramIfDefined("completion", _.completionInfoO),
         param("nodes", _.transaction.nodes.size),
@@ -239,9 +268,8 @@ object Update {
             completionInfoO,
             transactionMeta,
             _,
-            transactionId,
+            updateId,
             recordTime,
-            _,
             _,
             _,
             domainId,
@@ -251,7 +279,7 @@ object Update {
         LoggingValue.Nested.fromEntries(
           Logging.recordTime(recordTime),
           Logging.completionInfo(completionInfoO),
-          Logging.transactionId(transactionId),
+          Logging.updateId(updateId),
           Logging.ledgerTime(transactionMeta.ledgerEffectiveTime),
           Logging.workflowIdOpt(transactionMeta.workflowId),
           Logging.submissionTime(transactionMeta.submissionTime),
@@ -275,7 +303,7 @@ object Update {
   final case class ReassignmentAccepted(
       optCompletionInfo: Option[CompletionInfo],
       workflowId: Option[Ref.WorkflowId],
-      updateId: Ref.TransactionId,
+      updateId: data.UpdateId,
       recordTime: Timestamp,
       reassignmentInfo: ReassignmentInfo,
       reassignment: Reassignment,
@@ -286,9 +314,9 @@ object Update {
   ) extends Update {
     // TODO(i20043) this will be simplified as Update refactoring is unconstrained by serialization
     assert(optCompletionInfo.forall(_.messageUuid.isEmpty))
-    // assert(domainIndex.exists(_.requestIndex.isDefined))
+    assert(domainIndex.exists(_.requestIndex.isDefined))
 
-    override def pretty: Pretty[ReassignmentAccepted] =
+    override protected def pretty: Pretty[ReassignmentAccepted] =
       prettyOfClass(
         param("recordTime", _.recordTime),
         param("updateId", _.updateId),
@@ -328,7 +356,7 @@ object Update {
         LoggingValue.Nested.fromEntries(
           Logging.recordTime(recordTime),
           Logging.completionInfo(optCompletionInfo),
-          Logging.transactionId(updateId),
+          Logging.updateId(updateId),
           Logging.workflowIdOpt(workflowId),
         )
     }
@@ -350,16 +378,16 @@ object Update {
       persisted: Promise[Unit] = Promise(),
   ) extends Update {
     // TODO(i20043) this will be simplified as Update refactoring is unconstrained by serialization
-    /* assert(
+    assert(
       // rejection from sequencer should have the request sequencer counter
       (completionInfo.messageUuid.isEmpty && domainIndex.exists(
         _.requestIndex.exists(_.sequencerCounter.isDefined)
       ))
-      // rejection from participant (timout, unsequenced) should have the messageUuid, and no domainIndex
+      // rejection from participant (timeout, unsequenced) should have the messageUuid, and no domainIndex
         || (completionInfo.messageUuid.isDefined && domainIndex.isEmpty)
-    ) */
+    )
 
-    override def pretty: Pretty[CommandRejected] =
+    override protected def pretty: Pretty[CommandRejected] =
       prettyOfClass(
         param("recordTime", _.recordTime),
         param("completion", _.completionInfo),
@@ -368,7 +396,7 @@ object Update {
         param("domainId", _.domainId.uid),
       )
 
-    /** If true, the [[ReadService]]'s deduplication guarantees apply to this rejection.
+    /** If true, the deduplication guarantees apply to this rejection.
       * The participant state implementations should strive to set this flag to true as often as
       * possible so that applications get better guarantees.
       */
@@ -413,7 +441,7 @@ object Update {
       def status: RpcStatus
 
       /** Whether the rejection is a definite answer for the deduplication guarantees
-        * specified for [[ReadService.stateUpdates]].
+        * specified for [[Update]].
         */
       def definiteAnswer: Boolean
     }
@@ -442,17 +470,28 @@ object Update {
   final case class SequencerIndexMoved(
       domainId: DomainId,
       sequencerIndex: SequencerIndex,
+      requestCounterO: Option[RequestCounter],
       persisted: Promise[Unit] = Promise(),
   ) extends Update {
-    override def pretty: Pretty[SequencerIndexMoved] =
+    override protected def pretty: Pretty[SequencerIndexMoved] =
       prettyOfClass(
         param("domainId", _.domainId.uid),
         param("sequencerCounter", _.sequencerIndex.counter),
         param("sequencerTimestamp", _.sequencerIndex.timestamp),
+        paramIfDefined("requestCounter", _.requestCounterO),
       )
 
     override def domainIndexOpt: Option[(DomainId, DomainIndex)] = Some(
-      domainId -> DomainIndex.of(sequencerIndex)
+      domainId -> DomainIndex(
+        requestIndex = requestCounterO.map(requestCounter =>
+          RequestIndex(
+            counter = requestCounter,
+            sequencerCounter = Some(sequencerIndex.counter),
+            timestamp = sequencerIndex.timestamp,
+          )
+        ),
+        sequencerIndex = Some(sequencerIndex),
+      )
     )
 
     override def recordTime: Timestamp = sequencerIndex.timestamp.underlying
@@ -472,6 +511,20 @@ object Update {
         )
   }
 
+  final case class CommitRepair() extends Update {
+    override val persisted: Promise[Unit] = Promise()
+
+    override val domainIndexOpt: Option[(DomainId, DomainIndex)] = None
+
+    override protected def pretty: Pretty[CommitRepair] = prettyOfClass()
+
+    override def withRecordTime(recordTime: Timestamp): Update = throw new IllegalStateException(
+      "Record time is not supposed to be overridden for CommitRepair events"
+    )
+
+    override val recordTime: Timestamp = Timestamp.now()
+  }
+
   implicit val `Update to LoggingValue`: ToLoggingValue[Update] = {
     case update: Init =>
       Init.`Init to LoggingValue`.toLoggingValue(update)
@@ -487,6 +540,8 @@ object Update {
       ReassignmentAccepted.`ReassignmentAccepted to LoggingValue`.toLoggingValue(update)
     case update: SequencerIndexMoved =>
       SequencerIndexMoved.`SequencerIndexMoved to LoggingValue`.toLoggingValue(update)
+    case _: CommitRepair =>
+      LoggingValue.Empty
   }
 
   private object Logging {
@@ -508,8 +563,8 @@ object Update {
     def party(party: Ref.Party): LoggingEntry =
       "party" -> party
 
-    def transactionId(id: Ref.TransactionId): LoggingEntry =
-      "transactionId" -> id
+    def updateId(id: data.UpdateId): LoggingEntry =
+      "updateId" -> id
 
     def applicationId(id: Ref.ApplicationId): LoggingEntry =
       "applicationId" -> id

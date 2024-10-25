@@ -24,7 +24,7 @@ sealed trait ViewType extends Product with Serializable with PrettyPrinting {
 
   def toProtoEnum: v30.ViewType
 
-  override def pretty: Pretty[ViewType.this.type] = prettyOfObject[ViewType.this.type]
+  override protected def pretty: Pretty[ViewType.this.type] = prettyOfObject[ViewType.this.type]
 }
 
 // This trait is not sealed so that we can extend it for unit testing
@@ -34,8 +34,8 @@ object ViewType {
 
   def fromProtoEnum: v30.ViewType => ParsingResult[ViewType] = {
     case v30.ViewType.VIEW_TYPE_TRANSACTION => Right(TransactionViewType)
-    case v30.ViewType.VIEW_TYPE_TRANSFER_OUT => Right(TransferOutViewType)
-    case v30.ViewType.VIEW_TYPE_TRANSFER_IN => Right(TransferInViewType)
+    case v30.ViewType.VIEW_TYPE_UNASSIGNMENT => Right(UnassignmentViewType)
+    case v30.ViewType.VIEW_TYPE_ASSIGNMENT => Right(AssignmentViewType)
     case v30.ViewType.VIEW_TYPE_UNSPECIFIED => Left(FieldNotSet("view_type"))
     case v30.ViewType.Unrecognized(value) =>
       Left(ValueConversionError("view_type", s"Unrecognized value $value"))
@@ -52,21 +52,21 @@ object ViewType {
   }
   type TransactionViewType = TransactionViewType.type
 
-  sealed trait TransferViewType extends ViewType {
-    type View <: TransferViewTree with HasToByteString
+  sealed trait ReassignmentViewType extends ViewType {
+    type View <: ReassignmentViewTree with HasToByteString
     type FullView = View
-    override type ViewSubmitterMetadata = TransferSubmitterMetadata
+    override type ViewSubmitterMetadata = ReassignmentSubmitterMetadata
   }
 
-  case object TransferOutViewType extends TransferViewType {
-    override type View = FullTransferOutTree
-    override def toProtoEnum: v30.ViewType = v30.ViewType.VIEW_TYPE_TRANSFER_OUT
+  case object UnassignmentViewType extends ReassignmentViewType {
+    override type View = FullUnassignmentTree
+    override def toProtoEnum: v30.ViewType = v30.ViewType.VIEW_TYPE_UNASSIGNMENT
   }
-  type TransferOutViewType = TransferOutViewType.type
+  type UnassignmentViewType = UnassignmentViewType.type
 
-  case object TransferInViewType extends TransferViewType {
-    override type View = FullTransferInTree
-    override def toProtoEnum: v30.ViewType = v30.ViewType.VIEW_TYPE_TRANSFER_IN
+  case object AssignmentViewType extends ReassignmentViewType {
+    override type View = FullAssignmentTree
+    override def toProtoEnum: v30.ViewType = v30.ViewType.VIEW_TYPE_ASSIGNMENT
   }
-  type TransferInViewType = TransferInViewType.type
+  type AssignmentViewType = AssignmentViewType.type
 }

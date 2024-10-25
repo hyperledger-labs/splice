@@ -23,7 +23,7 @@ import com.digitalasset.canton.lifecycle.{
   HasCloseContext,
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.client.SequencerSubscriptionError.SequencedEventError
 import com.digitalasset.canton.sequencing.client.{
   SequencedEventValidator,
@@ -37,14 +37,14 @@ import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{DomainId, Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.PekkoUtil.CombinedKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
+import com.digitalasset.canton.util.PekkoUtil.{CombinedKillSwitch, KillSwitchFlagCloseable}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerCounter, config}
 import org.apache.pekko.stream.*
-import org.apache.pekko.stream.scaladsl.{Flow, GraphDSL, Keep, Sink, Source, WireTap}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.{Done, NotUsed}
 
 import java.sql.SQLTransientConnectionException
@@ -83,6 +83,7 @@ class SequencerReader(
     protocolVersion: ProtocolVersion,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
+    blockSequencerMode: Boolean,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging
     with FlagCloseable
@@ -90,8 +91,7 @@ class SequencerReader(
 
   def read(member: Member, offset: SequencerCounter)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, CreateSubscriptionError, Sequencer.EventSource] = {
-
+  ): EitherT[Future, CreateSubscriptionError, Sequencer.EventSource] =
     performUnlessClosingEitherT(
       functionFullName,
       CreateSubscriptionError.ShutdownError: CreateSubscriptionError,
@@ -160,7 +160,6 @@ class SequencerReader(
         reader.from(offset, initialReadState)
       }
     }
-  }
 
   private[SequencerReader] class EventsReader(
       member: Member,
@@ -173,7 +172,7 @@ class SequencerReader(
 
     private def unvalidatedEventsSourceFromCheckpoint(initialReadState: ReadState)(implicit
         traceContext: TraceContext
-    ): Source[(SequencerCounter, Sequenced[Payload]), NotUsed] = {
+    ): Source[(SequencerCounter, Sequenced[Payload]), NotUsed] =
       eventSignaller
         .readSignalsForMember(member, registeredMember.memberId)
         .via(
@@ -183,7 +182,6 @@ class SequencerReader(
             (state, _events) => !state.lastBatchWasFull,
           )
         )
-    }
 
     /** An Pekko flow that passes the [[UnsignedEventData]] untouched from input to output,
       * but asynchronously records every checkpoint interval.
@@ -198,14 +196,9 @@ class SequencerReader(
         // after we start closing the subscription, we create a flag closeable that gets closed when this
         // subscriptions kill switch is activated. This flag closeable is wrapped in a close context below
         // which is passed down to saveCounterCheckpoint.
-        val killSwitchFlagCloseable = new FlagCloseable {
-          override protected def timeouts: ProcessingTimeout = SequencerReader.this.timeouts
-          override protected def logger: TracedLogger = SequencerReader.this.logger
-        }
-        val closeContextKillSwitch = new KillSwitch {
-          override def shutdown(): Unit = killSwitchFlagCloseable.close()
-          override def abort(ex: Throwable): Unit = killSwitchFlagCloseable.close()
-        }
+        val killSwitchFlagCloseable =
+          FlagCloseable(SequencerReader.this.logger, SequencerReader.this.timeouts)
+        val closeContextKillSwitch = new KillSwitchFlagCloseable(killSwitchFlagCloseable)
         Flow[UnsignedEventData]
           .buffer(1, OverflowStrategy.dropTail) // we only really need one event and can drop others
           .throttle(1, config.checkpointInterval.underlying)
@@ -239,14 +232,7 @@ class SequencerReader(
           .toMat(Sink.ignore)(Keep.both)
       }
 
-      // Essentially the Source.wireTap implementation except that we return the completion future of the sink
-      Flow.fromGraph(GraphDSL.createGraph(recordCheckpointSink) {
-        implicit b: GraphDSL.Builder[(KillSwitch, Future[Done])] => recordCheckpointShape =>
-          import GraphDSL.Implicits.*
-          val bcast = b.add(WireTap[UnsignedEventData]())
-          bcast.out1 ~> recordCheckpointShape
-          FlowShape(bcast.in, bcast.out0)
-      })
+      Flow[UnsignedEventData].wireTapMat(recordCheckpointSink)(Keep.right)
     }
 
     private def signValidatedEvent(
@@ -452,7 +438,17 @@ class SequencerReader(
       val eventsSource = validatedEventSrc.dropWhile(_.event.counter < startAt)
 
       eventsSource
-        .viaMat(recordCheckpointFlow)(Keep.right)
+        .viaMat(
+          if (blockSequencerMode) {
+            // We don't need to reader-side checkpoints for the unified mode
+            // TODO(#20910): Remove this in favor of periodic checkpoints
+            Flow[UnsignedEventData].viaMat(KillSwitches.single) { case (_, killSwitch) =>
+              (killSwitch, Future.successful(Done))
+            }
+          } else {
+            recordCheckpointFlow
+          }
+        )(Keep.right)
         .viaMat(KillSwitches.single) { case ((checkpointKillSwitch, checkpointDone), killSwitch) =>
           (new CombinedKillSwitch(checkpointKillSwitch, killSwitch), checkpointDone)
         }
@@ -490,7 +486,7 @@ class SequencerReader(
         readState: ReadState
     )(implicit
         traceContext: TraceContext
-    ): Future[(ReadState, Seq[(SequencerCounter, Sequenced[Payload])])] = {
+    ): Future[(ReadState, Seq[(SequencerCounter, Sequenced[Payload])])] =
       for {
         readEvents <- store.readEvents(
           readState.memberId,
@@ -515,7 +511,6 @@ class SequencerReader(
         }
         (newReadState, eventsWithCounter)
       }
-    }
 
     private def signEvent(
         event: SequencedEvent[ClosedEnvelope],
@@ -524,7 +519,7 @@ class SequencerReader(
       FutureUnlessShutdown,
       SequencerSubscriptionError.TombstoneEncountered.Error,
       OrdinarySerializedEvent,
-    ] = {
+    ] =
       for {
         signedEvent <- SignedContent
           .create(
@@ -551,7 +546,6 @@ class SequencerReader(
               throw new IllegalStateException(s"Signing failed with an unexpected error: $err")
           }
       } yield OrdinarySequencedEvent(signedEvent)(traceContext)
-    }
 
     private def getTrafficReceipt(senderMemberId: SequencerMemberId, timestamp: CantonTimestamp)(
         implicit traceContext: TraceContext
@@ -631,7 +625,7 @@ class SequencerReader(
                           protocolVersion,
                         )
                         .map(_.ipsSnapshot)
-                    )(x => Future.successful(x))
+                    )(Future.successful)
                     resolvedGroupAddresses <- GroupAddressResolver.resolveGroupsToMembers(
                       groupRecipients,
                       topologySnapshot,
@@ -722,7 +716,7 @@ object SequencerReader {
 
     def changeString(previous: ReadState): Option[String] = {
       def build[T](a: T, b: T, name: String): Option[String] =
-        Option.when(a != b)(s"${name}=$a (from $b)")
+        Option.when(a != b)(s"$name=$a (from $b)")
       val items = Seq(
         build(nextReadTimestamp, previous.nextReadTimestamp, "nextReadTs"),
         build(nextCounterAccumulator, previous.nextCounterAccumulator, "nextCounterAcc"),
@@ -737,7 +731,7 @@ object SequencerReader {
     def update(
         readEvents: ReadEvents,
         batchSize: Int,
-    ): ReadState = {
+    ): ReadState =
       copy(
         // increment the counter by the number of events we've now processed
         nextCounterAccumulator = nextCounterAccumulator + readEvents.payloads.size.toLong,
@@ -747,19 +741,17 @@ object SequencerReader {
         // did we receive a full batch of events on this update
         lastBatchWasFull = readEvents.payloads.sizeCompare(batchSize) == 0,
       )
-    }
 
     /** Apply a previously recorded counter checkpoint so that we don't have to start from 0 on every subscription */
-    def startFromCheckpoint(checkpoint: CounterCheckpoint): ReadState = {
+    def startFromCheckpoint(checkpoint: CounterCheckpoint): ReadState =
       // with this checkpoint we'll start reading from this timestamp and as reads are not inclusive we'll receive the next event after this checkpoint first
       copy(
         nextCounterAccumulator = checkpoint.counter + 1,
         nextReadTimestamp = checkpoint.timestamp,
         latestTopologyClientRecipientTimestamp = checkpoint.latestTopologyClientTimestamp,
       )
-    }
 
-    override def pretty: Pretty[ReadState] = prettyOfClass(
+    override protected def pretty: Pretty[ReadState] = prettyOfClass(
       param("member", _.member),
       param("memberId", _.memberId),
       param("nextReadTimestamp", _.nextReadTimestamp),

@@ -108,7 +108,7 @@ class SequencerAggregatorPekko(
           )
       }
       .mapMaterializedValue { doneF =>
-        val doneAndClosedF = doneF.thereafter { _ => onShutdownRunner.close() }
+        val doneAndClosedF = doneF.thereafter(_ => onShutdownRunner.close())
         doneAndClosedF -> health
       }
   }
@@ -146,7 +146,7 @@ class SequencerAggregatorPekko(
   )(implicit traceContext: TraceContext): Unit =
     control match {
       case ActiveSourceTerminated(sequencerId, cause) =>
-        cause.foreach { ex => logger.error(s"Sequencer subscription for $sequencerId failed", ex) }
+        cause.foreach(ex => logger.error(s"Sequencer subscription for $sequencerId failed", ex))
       case NewConfiguration(_, _) =>
       case DeadlockDetected(elem, trigger) =>
         trigger match {
@@ -160,7 +160,7 @@ class SequencerAggregatorPekko(
             )
           case DeadlockTrigger.ElementBucketing =>
             logger.error(
-              show"Sequencer subscriptions have diverged and cannot reach the threshold for domain $domainId any more.\nReceived sequenced events: ${elem}"
+              show"Sequencer subscriptions have diverged and cannot reach the threshold for domain $domainId any more.\nReceived sequenced events: $elem"
             )
         }
     }
@@ -234,7 +234,7 @@ class SequencerAggregatorPekko(
     ): Source[OrdinarySerializedEvent, (KillSwitch, Future[Done], HealthComponent)] = {
       val prior = priorElement.collect { case event @ OrdinarySequencedEvent(_) => event }
       val eventValidator = createEventValidator(
-        SequencerClient.loggerFactoryWithSequencerConnection(loggerFactory, sequencerId)
+        SequencerClient.loggerFactoryWithSequencerId(loggerFactory, sequencerId)
       )
       val subscription = eventValidator
         .validatePekko(config.subscriptionFactory.create(exclusiveStart + 1L), prior, sequencerId)
@@ -284,7 +284,7 @@ object SequencerAggregatorPekko {
       contentHash: Hash,
       representativeProtocolVersion: RepresentativeProtocolVersion[SignedContent.type],
   ) extends PrettyPrinting {
-    override def pretty: Pretty[Bucket] =
+    override protected def pretty: Pretty[Bucket] =
       prettyOfClass(
         param("sequencer counter", _.sequencerCounter),
         param("content hash", _.contentHash),
@@ -325,7 +325,7 @@ object SequencerAggregatorPekko {
       }
     }
 
-    def updateHealth(control: SubscriptionControlInternal[?]): Unit = {
+    def updateHealth(control: SubscriptionControlInternal[?]): Unit =
       control match {
         case NewConfiguration(newConfig, _startingOffset) =>
           val currentlyRegisteredDependencies = getDependencies
@@ -348,9 +348,8 @@ object SequencerAggregatorPekko {
           additionalState.getAndUpdate(_.copy(deadlocked = true))
           refreshFromDependencies()(TraceContext.empty)
       }
-    }
 
-    override def pretty: Pretty[SequencerAggregatorHealth] = prettyOfClass(
+    override protected def pretty: Pretty[SequencerAggregatorHealth] = prettyOfClass(
       param("domain id", _.domainId),
       param("state", _.getState),
     )

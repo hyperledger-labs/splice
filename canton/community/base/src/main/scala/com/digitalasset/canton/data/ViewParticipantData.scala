@@ -150,7 +150,7 @@ final case class ViewParticipantData private (
     }
   }
 
-  def rootAction: RootAction =
+  val rootAction: RootAction =
     actionDescription match {
       case CreateActionDescription(contractId, _seed) =>
         val createdContract = createdCore.headOption.getOrElse(
@@ -219,7 +219,7 @@ final case class ViewParticipantData private (
         }
         RootAction(cmd, actors, failed, packagePreference)
 
-      case FetchActionDescription(inputContractId, actors, byKey, templateId) =>
+      case FetchActionDescription(inputContractId, actors, byKey, templateId, interfaceId) =>
         val inputContract = coreInputs.getOrElse(
           inputContractId,
           throw InvalidViewParticipantData(
@@ -237,7 +237,7 @@ final case class ViewParticipantData private (
             )
           LfFetchByKeyCommand(templateId = templateId, key = key)
         } else {
-          LfFetchCommand(templateId = templateId, coid = inputContractId)
+          LfFetchCommand(templateId = templateId, interfaceId = interfaceId, coid = inputContractId)
         }
         RootAction(cmd, actors, failed = false, packageIdPreference = Set.empty)
 
@@ -279,7 +279,7 @@ final case class ViewParticipantData private (
 
   override def hashPurpose: HashPurpose = HashPurpose.ViewParticipantData
 
-  override def pretty: Pretty[ViewParticipantData] = prettyOfClass(
+  override protected def pretty: Pretty[ViewParticipantData] = prettyOfClass(
     paramIfNonEmpty("core inputs", _.coreInputs),
     paramIfNonEmpty("created core", _.createdCore),
     paramIfNonEmpty("created in subview, archived in core", _.createdInSubviewArchivedInCore),
@@ -333,7 +333,7 @@ object ViewParticipantData
   override val name: String = "ViewParticipantData"
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.ViewParticipantData)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ViewParticipantData)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -471,7 +471,7 @@ object ViewParticipantData
           rollbackContext = rollbackContext,
           salt = salt,
         )(hashOps, rpv, Some(bytes))
-      ).leftMap(ProtoDeserializationError.OtherError)
+      ).leftMap(ProtoDeserializationError.OtherError.apply)
     } yield viewParticipantData
   }
 

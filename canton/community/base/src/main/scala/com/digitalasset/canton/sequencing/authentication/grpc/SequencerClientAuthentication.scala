@@ -18,9 +18,9 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
+import io.grpc.*
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener
-import io.grpc.*
 import io.grpc.internal.GrpcAttributes
 import io.grpc.stub.AbstractStub
 
@@ -95,10 +95,6 @@ private[grpc] class SequencerClientTokenAuthentication(
             applier.apply(generateMetadata(token, maybeEndpoint))
         }
     }
-
-    override def thisUsesUnstableApi(): Unit = {
-      // yes, we know - cheers grpc
-    }
   }
 
   /** Will invalidate the current token if an UNAUTHORIZED response is observed.
@@ -115,16 +111,14 @@ private[grpc] class SequencerClientTokenAuthentication(
         method: MethodDescriptor[ReqT, RespT],
         callOptions: CallOptions,
         next: Channel,
-    ): ClientCall[ReqT, RespT] = {
+    ): ClientCall[ReqT, RespT] =
       new ReauthorizeClientCall(next.newCall(method, callOptions))
-    }
 
     private class ReauthorizeClientCall[ReqT, RespT](call: ClientCall[ReqT, RespT])
         extends SimpleForwardingClientCall[ReqT, RespT](call) {
 
-      override def start(responseListener: ClientCall.Listener[RespT], headers: Metadata): Unit = {
+      override def start(responseListener: ClientCall.Listener[RespT], headers: Metadata): Unit =
         super.start(new ReauthorizeClientCallListener(responseListener), headers)
-      }
 
       private class ReauthorizeClientCallListener(responseListener: ClientCall.Listener[RespT])
           extends SimpleForwardingClientCallListener[RespT](responseListener) {

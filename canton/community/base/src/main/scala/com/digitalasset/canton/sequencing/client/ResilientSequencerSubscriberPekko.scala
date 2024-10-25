@@ -167,7 +167,10 @@ class ResilientSequencerSubscriberPekko[E](
     subscriptionFactory
       .create(nextCounter)
       .source
-      .statefulMap(() => TriageState(false, nextCounter))(triageError(config.health), _ => None)
+      .statefulMap(() => TriageState(hasPreviouslyReceivedEvents = false, nextCounter))(
+        triageError(config.health),
+        _ => None,
+      )
   }
 
   private def triageError(health: ResilientSequencerSubscriptionHealth)(
@@ -205,7 +208,7 @@ object ResilientSequencerSubscriberPekko {
       health: ResilientSequencerSubscriptionHealth,
   )(val traceContext: TraceContext)
       extends PrettyPrinting {
-    override def pretty: Pretty[RestartSourceConfig.this.type] = prettyOfClass(
+    override protected def pretty: Pretty[RestartSourceConfig.this.type] = prettyOfClass(
       param("starting counter", _.startingCounter)
     )
 

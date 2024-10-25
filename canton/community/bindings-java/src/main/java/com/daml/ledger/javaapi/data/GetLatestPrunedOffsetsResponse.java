@@ -7,42 +7,48 @@ import com.daml.ledger.api.v2.StateServiceOuterClass;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public final class GetLatestPrunedOffsetsResponse {
 
-  @NonNull private final ParticipantOffset participantPrunedUpToInclusive;
-  @NonNull private final ParticipantOffset allDivulgedContractsPrunedUpToInclusive;
+  @NonNull private final Optional<Long> participantPrunedUpToInclusive;
+  @NonNull private final Optional<Long> allDivulgedContractsPrunedUpToInclusive;
 
   public GetLatestPrunedOffsetsResponse(
-      @NonNull ParticipantOffset participantPrunedUpToInclusive,
-      @NonNull ParticipantOffset allDivulgedContractsPrunedUpToInclusive) {
+      @NonNull Optional<Long> participantPrunedUpToInclusive,
+      @NonNull Optional<Long> allDivulgedContractsPrunedUpToInclusive) {
     this.participantPrunedUpToInclusive = participantPrunedUpToInclusive;
     this.allDivulgedContractsPrunedUpToInclusive = allDivulgedContractsPrunedUpToInclusive;
   }
 
   @NonNull
-  public ParticipantOffset getParticipantPrunedUpToInclusive() {
+  public Optional<Long> getParticipantPrunedUpToInclusive() {
     return participantPrunedUpToInclusive;
   }
 
   @NonNull
-  public ParticipantOffset getAllDivulgedContractsPrunedUpToInclusive() {
+  public Optional<Long> getAllDivulgedContractsPrunedUpToInclusive() {
     return allDivulgedContractsPrunedUpToInclusive;
   }
 
   public static GetLatestPrunedOffsetsResponse fromProto(
       StateServiceOuterClass.GetLatestPrunedOffsetsResponse response) {
     return new GetLatestPrunedOffsetsResponse(
-        ParticipantOffset.fromProto(response.getParticipantPrunedUpToInclusive()),
-        ParticipantOffset.fromProto(response.getAllDivulgedContractsPrunedUpToInclusive()));
+        response.hasParticipantPrunedUpToInclusive()
+            ? Optional.of(response.getParticipantPrunedUpToInclusive())
+            : Optional.empty(),
+        response.hasAllDivulgedContractsPrunedUpToInclusive()
+            ? Optional.of(response.getAllDivulgedContractsPrunedUpToInclusive())
+            : Optional.empty());
   }
 
   public StateServiceOuterClass.GetLatestPrunedOffsetsResponse toProto() {
-    return StateServiceOuterClass.GetLatestPrunedOffsetsResponse.newBuilder()
-        .setParticipantPrunedUpToInclusive(participantPrunedUpToInclusive.toProto())
-        .setAllDivulgedContractsPrunedUpToInclusive(
-            allDivulgedContractsPrunedUpToInclusive.toProto())
-        .build();
+    StateServiceOuterClass.GetLatestPrunedOffsetsResponse.Builder builder =
+        StateServiceOuterClass.GetLatestPrunedOffsetsResponse.newBuilder();
+    participantPrunedUpToInclusive.ifPresent(builder::setParticipantPrunedUpToInclusive);
+    allDivulgedContractsPrunedUpToInclusive.ifPresent(
+        builder::setAllDivulgedContractsPrunedUpToInclusive);
+    return builder.build();
   }
 
   @Override

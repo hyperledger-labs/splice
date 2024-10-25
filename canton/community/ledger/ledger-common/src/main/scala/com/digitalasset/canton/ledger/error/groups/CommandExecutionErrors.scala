@@ -32,11 +32,10 @@ import scala.concurrent.duration.DurationInt
   "Errors raised during the command execution phase of the command submission evaluation."
 )
 object CommandExecutionErrors extends CommandExecutionErrorGroup {
-  def encodeValue(v: Value): Either[ValueCoder.EncodeError, String] = {
+  def encodeValue(v: Value): Either[ValueCoder.EncodeError, String] =
     ValueCoder
       .encodeValue(valueVersion = TransactionVersion.VDev, v0 = v)
       .map(bs => BaseEncoding.base64().encode(bs.toByteArray))
-  }
 
   def withEncodedValue(
       v: Value
@@ -50,6 +49,24 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       },
       f,
     )
+
+  @Explanation(
+    """This error occurs if the participant fails to serialize a prepared a transaction via the interactive submission service.
+      |"""
+  )
+  @Resolution("Inspect error details and report the error.")
+  object SubmissionPreparationSerializationError
+      extends ErrorCode(
+        id = "FAILED_TO_SERIALIZE_PREPARED_TRANSACTION",
+        ErrorCategory.InvalidIndependentOfSystemState,
+      ) {
+
+    final case class Reject(reason: String)(implicit
+        loggingContext: ContextualizedErrorLogger
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause = s"The participant failed to serialize the prepared transaction: $reason"
+        )
+  }
 
   @Explanation(
     """This error occurs if the participant fails to determine the max ledger time of the used
@@ -68,7 +85,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
           cause =
-            s"The participant failed to determine the max ledger time for this command: ${reason}"
+            s"The participant failed to determine the max ledger time for this command: $reason"
         )
   }
 

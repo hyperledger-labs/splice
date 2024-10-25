@@ -7,7 +7,6 @@ import com.daml.ledger.javaapi.data.{
   DamlRecord,
   ExercisedEvent,
   Identifier,
-  ParticipantOffset,
   TransactionTree,
   TreeEvent,
   Unit as damlUnit,
@@ -16,6 +15,7 @@ import com.daml.ledger.javaapi.data.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
+  externalpartyamuletrules as externalpartyamuletrulesCodegen,
   expiry as expiryCodegen,
   fees as feesCodegen,
   round as roundCodegen,
@@ -107,6 +107,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
   }
 
+  protected def time(n: Long): CantonTimestamp = CantonTimestamp.ofEpochSecond(n)
+
   private def schedule(
       initialTickDuration: Long
   ): scheduleCodegen.Schedule[Instant, AmuletConfig[USD]] = {
@@ -118,7 +120,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def amuletRules(initialTickDuration: Long = 10) = {
-    val templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID
+    val templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
 
     val template = new amuletrulesCodegen.AmuletRules(
       dsoParty.toProtoPrimitive,
@@ -132,8 +134,47 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  protected def externalPartyAmuletRules() = {
+    val templateId =
+      externalpartyamuletrulesCodegen.ExternalPartyAmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
+
+    val template = new externalpartyamuletrulesCodegen.ExternalPartyAmuletRules(
+      dsoParty.toProtoPrimitive
+    )
+    contract(
+      identifier = templateId,
+      contractId =
+        new externalpartyamuletrulesCodegen.ExternalPartyAmuletRules.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
+  protected def transferCommand(
+      sender: PartyId,
+      receiver: PartyId,
+      amount: BigDecimal,
+      expiresAt: Instant,
+      nonce: Long,
+  ) = {
+    val templateId = externalpartyamuletrulesCodegen.TransferCommand.TEMPLATE_ID_WITH_PACKAGE_ID
+
+    val template = new externalpartyamuletrulesCodegen.TransferCommand(
+      dsoParty.toProtoPrimitive,
+      sender.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      amount.bigDecimal,
+      expiresAt,
+      nonce,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new externalpartyamuletrulesCodegen.TransferCommand.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
   protected def ansRules() = {
-    val templateId = ansCodegen.AnsRules.TEMPLATE_ID
+    val templateId = ansCodegen.AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID
 
     val template = new ansCodegen.AnsRules(
       dsoParty.toProtoPrimitive,
@@ -167,7 +208,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
 
     contract(
-      roundCodegen.OpenMiningRound.TEMPLATE_ID,
+      roundCodegen.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID,
       new roundCodegen.OpenMiningRound.ContractId(round.toString),
       template,
     )
@@ -185,7 +226,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
 
     contract(
-      roundCodegen.ClosedMiningRound.TEMPLATE_ID,
+      roundCodegen.ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID,
       new roundCodegen.ClosedMiningRound.ContractId(nextCid()),
       template,
     )
@@ -251,7 +292,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId: String = nextCid(),
   ): Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon] =
     contract(
-      identifier = amuletCodegen.AppRewardCoupon.TEMPLATE_ID,
+      identifier = amuletCodegen.AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new amuletCodegen.AppRewardCoupon.ContractId(contractId),
       payload = new amuletCodegen.AppRewardCoupon(
         dsoParty.toProtoPrimitive,
@@ -271,7 +312,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       sponsor: PartyId,
       faucetState: Option[validatorLicenseCodegen.FaucetState] = None,
   ) = {
-    val templateId = validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID
+    val templateId = validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
     val dummyVersion = "0.1.0"
     val dummyContactPoint = s"${validator.uid.identifier}@example.com"
     val template = new validatorLicenseCodegen.ValidatorLicense(
@@ -304,7 +345,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     amuletCodegen.ValidatorRewardCoupon,
   ] =
     contract(
-      identifier = amuletCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
+      identifier = amuletCodegen.ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new amuletCodegen.ValidatorRewardCoupon.ContractId(nextCid()),
       payload = new amuletCodegen.ValidatorRewardCoupon(
         dsoParty.toProtoPrimitive,
@@ -316,7 +357,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def validatorFaucetCoupon(validator: PartyId, round: Long = 1L) = {
     contract(
-      identifier = validatorLicenseCodegen.ValidatorFaucetCoupon.TEMPLATE_ID,
+      identifier = validatorLicenseCodegen.ValidatorFaucetCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new validatorLicenseCodegen.ValidatorFaucetCoupon.ContractId(nextCid()),
       payload = new validatorLicenseCodegen.ValidatorFaucetCoupon(
         dsoParty.toProtoPrimitive,
@@ -368,7 +409,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       reference,
     )
     contract(
-      subCodegen.SubscriptionInitialPayment.TEMPLATE_ID,
+      subCodegen.SubscriptionInitialPayment.TEMPLATE_ID_WITH_PACKAGE_ID,
       paymentId,
       template,
     )
@@ -380,7 +421,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ) = {
     val template = new FeaturedAppRight(dsoParty.toProtoPrimitive, providerParty.toProtoPrimitive)
     contract(
-      FeaturedAppRight.TEMPLATE_ID,
+      FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID,
       new FeaturedAppRight.ContractId(contractId),
       template,
     )
@@ -394,7 +435,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId: String = nextCid(),
   ): Contract[amuletCodegen.SvRewardCoupon.ContractId, amuletCodegen.SvRewardCoupon] =
     contract(
-      identifier = amuletCodegen.SvRewardCoupon.TEMPLATE_ID,
+      identifier = amuletCodegen.SvRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new amuletCodegen.SvRewardCoupon.ContractId(contractId),
       payload = new amuletCodegen.SvRewardCoupon(
         dsoParty.toProtoPrimitive,
@@ -411,7 +452,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId: String = nextCid(),
   ): Contract[SvRewardState.ContractId, SvRewardState] =
     contract(
-      identifier = SvRewardState.TEMPLATE_ID,
+      identifier = SvRewardState.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId = new SvRewardState.ContractId(contractId),
       payload = new SvRewardState(
         dsoParty.toProtoPrimitive,
@@ -470,9 +511,54 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
 
     contract(
-      VoteRequest.TEMPLATE_ID,
+      VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
       cid,
       template,
+    )
+  }
+
+  protected def transferPreapproval(
+      receiver: PartyId,
+      provider: PartyId,
+      validFrom: CantonTimestamp,
+      expiresAt: CantonTimestamp,
+  ): Contract[
+    amuletrulesCodegen.TransferPreapproval.ContractId,
+    amuletrulesCodegen.TransferPreapproval,
+  ] = {
+    val templateId = amuletrulesCodegen.TransferPreapproval.TEMPLATE_ID
+    val template = new amuletrulesCodegen.TransferPreapproval(
+      dsoParty.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      provider.toProtoPrimitive,
+      validFrom.toInstant,
+      validFrom.toInstant,
+      expiresAt.toInstant,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new amuletrulesCodegen.TransferPreapproval.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
+  protected def transferCommandCounter(
+      sender: PartyId,
+      nextNonce: Long,
+  ): Contract[
+    externalpartyamuletrulesCodegen.TransferCommandCounter.ContractId,
+    externalpartyamuletrulesCodegen.TransferCommandCounter,
+  ] = {
+    val templateId = externalpartyamuletrulesCodegen.TransferCommandCounter.TEMPLATE_ID
+    val template = new externalpartyamuletrulesCodegen.TransferCommandCounter(
+      dsoParty.toProtoPrimitive,
+      sender.toProtoPrimitive,
+      nextNonce,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new externalpartyamuletrulesCodegen.TransferCommandCounter.ContractId(nextCid()),
+      payload = template,
     )
   }
 
@@ -684,18 +770,18 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def mkValidatorRewardCoupon(i: Int) = validatorRewardCoupon(i, userParty(i))
 
-  private var offsetCounter = 1
+  private var offsetCounter: Long = 1L
 
-  protected def nextOffset(): String = blocking {
+  protected def nextOffset(): Long = blocking {
     synchronized {
-      val offset = "%08d".format(offsetCounter)
+      val offset = offsetCounter
       offsetCounter += 1
       offset
     }
   }
 
   protected def mkCreateTx[TCid <: ContractId[T], T](
-      offset: String,
+      offset: Long,
       createRequests: Seq[Contract[TCid, T]],
       effectiveAt: Instant,
       createdEventSignatories: Seq[PartyId],
@@ -719,7 +805,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       acs: Seq[(Contract[?, ?], DomainId, Long)] = Seq.empty,
       incompleteOut: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
       incompleteIn: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
-      acsOffset: String = nextOffset(),
+      acsOffset: Option[Long] = Some(nextOffset()),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.initialize()
     _ <- store.testIngestionSink.ingestAcs(
@@ -792,7 +878,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     override def initialize()(implicit traceContext: TraceContext) =
       underlying.initialize()
     override def ingestAcs(
-        offset: String,
+        offset: Option[Long],
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
@@ -818,7 +904,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
     def create[TCid <: ContractId[T], T, Sink](
         c: Contract[TCid, T],
-        offset: String = nextOffset(),
+        offset: Long = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
@@ -846,7 +932,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
     def createMulti[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
-        offset: String = nextOffset(),
+        offset: Long = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
@@ -889,7 +975,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
 
     def ingest(
-        makeTx: String => TransactionTree
+        makeTx: Long => TransactionTree
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = makeTx(nextOffset())
       store.testIngestionSink
@@ -903,7 +989,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
 
     def ingestMulti(
-        makeTx: String => TransactionTree
+        makeTx: Long => TransactionTree
     )(implicit stores: Seq[HasIngestionSink]): Future[TransactionTree] = {
       val tx = makeTx(nextOffset())
       val txUpdate = TransactionTreeUpdate(tx)
@@ -923,7 +1009,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         reassignmentId: String,
         counter: Long,
         recordTime: CantonTimestamp = CantonTimestamp.Epoch,
-        offset: String = nextOffset(),
+        offset: Long = nextOffset(),
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Unassign]] = {
       val reassignment = mkReassignment(
         offset,
@@ -950,7 +1036,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         reassignmentId: String,
         counter: Long,
         recordTime: CantonTimestamp = CantonTimestamp.Epoch,
-        offset: String = nextOffset(),
+        offset: Long = nextOffset(),
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Assign]] = {
       val reassignment = mkReassignment(
         offset,
@@ -978,7 +1064,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         choiceName: String,
         choiceArgument: damlValue,
         exerciseResult: damlValue,
-        offset: String = nextOffset(),
+        offset: Long = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         recordTime: Instant = defaultEffectiveAt,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
@@ -1001,7 +1087,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   private def nextUpdateId(): String = java.util.UUID.randomUUID().toString.replace("-", "")
 
   protected def mkTx(
-      offset: String,
+      offset: Long,
       events: Seq[TreeEvent],
       domainId: DomainId,
       effectiveAt: Instant = defaultEffectiveAt,
@@ -1030,7 +1116,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def mkExerciseTx(
-      offset: String,
+      offset: Long,
       root: ExercisedEvent,
       children: Seq[TreeEvent],
       domainId: DomainId,
@@ -1059,13 +1145,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def mkReassignment[T <: ReassignmentEvent](
-      offset: String,
+      offset: Long,
       event: T,
       recordTime: CantonTimestamp = CantonTimestamp.Epoch,
   ): Reassignment[T] =
     Reassignment(
       updateId = nextUpdateId(),
-      offset = new ParticipantOffset.Absolute(offset),
+      offset = offset,
       recordTime = recordTime,
       event = event,
     )
@@ -1207,7 +1293,7 @@ object StoreTest {
     }
 
     override def error(
-        offset: String,
+        offset: Long,
         eventId: String,
         domainId: DomainId,
     ): Option[TestTxLogEntry] = None

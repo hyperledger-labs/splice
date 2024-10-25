@@ -4,9 +4,6 @@
 package com.digitalasset.canton.domain.sequencing.sequencer.store
 
 import com.daml.nameof.NameOf.functionFullName
-import com.digitalasset.canton.TestSemaphoreUtil
-import com.digitalasset.canton.config.RequireTypes.PositiveNumeric
-import com.digitalasset.canton.domain.sequencing.sequencer.store.DbSequencerStoreTest.MaxInClauseSize
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
@@ -25,30 +22,26 @@ trait DbSequencerStoreTest extends SequencerStoreTest with MultiTenantedSequence
       new DbSequencerStore(
         storage,
         testedProtocolVersion,
-        MaxInClauseSize,
         timeouts,
         loggerFactory,
         sequencerMember,
-        unifiedSequencer = testedUseUnifiedSequencer,
+        blockSequencerMode = true,
       )
     )
     behave like multiTenantedSequencerStore(() =>
       new DbSequencerStore(
         storage,
         testedProtocolVersion,
-        MaxInClauseSize,
         timeouts,
         loggerFactory,
         sequencerMember,
-        unifiedSequencer = testedUseUnifiedSequencer,
+        blockSequencerMode = true,
       )
     )
   }
 }
 
 object DbSequencerStoreTest {
-  // intentionally low to expose any problems with usage of IN builder
-  val MaxInClauseSize = PositiveNumeric.tryCreate(2)
 
   def cleanSequencerTables(
       storage: DbStorage
@@ -58,25 +51,22 @@ object DbSequencerStoreTest {
     storage.update(
       DBIO.seq(
         Seq(
-          "members",
-          "counter_checkpoints",
-          "payloads",
-          "watermarks",
-          "events",
-          "acknowledgements",
-          "lower_bound",
+          "sequencer_members",
+          "sequencer_counter_checkpoints",
+          "sequencer_payloads",
+          "sequencer_watermarks",
+          "sequencer_events",
+          "sequencer_acknowledgements",
+          "sequencer_lower_bound",
+          "seq_traffic_control_consumed_journal",
         )
-          .map(name => sqlu"truncate table sequencer_#$name")*
+          .map(name => sqlu"truncate table #$name")*
       ),
       functionFullName,
     )
   }
 }
 
-class SequencerStoreTestH2 extends DbSequencerStoreTest with H2Test {
-  override protected val semaphoreKey: Option[String] = TestSemaphoreUtil.SEQUENCER_DB_H2
-}
+class SequencerStoreTestH2 extends DbSequencerStoreTest with H2Test
 
-class SequencerStoreTestPostgres extends DbSequencerStoreTest with PostgresTest {
-  override protected val semaphoreKey: Option[String] = TestSemaphoreUtil.SEQUENCER_DB_PG
-}
+class SequencerStoreTestPostgres extends DbSequencerStoreTest with PostgresTest

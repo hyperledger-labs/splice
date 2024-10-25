@@ -8,11 +8,11 @@ import cats.syntax.foldable.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestampSecond
+import com.digitalasset.canton.ledger.participant.state.DomainIndex
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
-import com.digitalasset.canton.store.SequencerCounterTrackerStore
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
   */
 private[participant] class JournalGarbageCollector(
     requestJournalStore: RequestJournalStore,
-    sequencerCounterTrackerStore: SequencerCounterTrackerStore,
+    domainIndexF: TraceContext => Future[DomainIndex],
     sortedReconciliationIntervalsProvider: SortedReconciliationIntervalsProvider,
     acsCommitmentStore: AcsCommitmentStore,
     acs: ActiveContractStore,
@@ -47,32 +47,29 @@ private[participant] class JournalGarbageCollector(
       traceContext: TraceContext
   ): Unit = flush(traceContext)
 
-  override protected def run()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    performUnlessClosingF(functionFullName) {
+  override protected def run()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+    performUnlessClosingUSF(functionFullName) {
       for {
-        requestCounterCursorPrehead <- requestJournalStore.preheadClean
-        sequencerCounterCursorPrehead <- sequencerCounterTrackerStore.preheadSequencerCounter
+        domainIndex <- FutureUnlessShutdown.outcomeF(domainIndexF(implicitly))
         safeToPruneTsO <-
-          AcsCommitmentProcessor.safeToPrune(
+          PruningProcessor.latestSafeToPruneTick(
             requestJournalStore,
-            requestCounterCursorPrehead,
-            sequencerCounterCursorPrehead,
+            domainIndex,
             sortedReconciliationIntervalsProvider,
             acsCommitmentStore,
             inFlightSubmissionStore.value,
             domainId,
             checkForOutstandingCommitments = false,
           )
-        _ <- safeToPruneTsO.fold(Future.unit) { ts =>
+        _ <- safeToPruneTsO.fold(FutureUnlessShutdown.unit) { ts =>
           val maxDelay = (ts - CantonTimestampSecond.MinValue).toSeconds
           val cappedJournalGarbageCollectionDelay =
             journalGarbageCollectionDelay.duration.toSeconds.min(maxDelay)
 
-          prune(ts.minusSeconds(cappedJournalGarbageCollectionDelay))
+          FutureUnlessShutdown.outcomeF(prune(ts.minusSeconds(cappedJournalGarbageCollectionDelay)))
         }
       } yield ()
     }
-  }
 
   private def prune(pruneTs: CantonTimestampSecond)(implicit
       traceContext: TraceContext
@@ -133,11 +130,10 @@ private[pruning] object JournalGarbageCollector {
 
     private[pruning] def flush(
         traceContext: TraceContext
-    ): Unit = {
+    ): Unit =
       // set request flag and kick off pruning if flag was not already set
       if (!state.getAndUpdate(_.copy(requested = true)).requested)
         doFlush()(traceContext)
-    }
 
     /** Temporarily turn off journal pruning (in order to download an ACS)
       *
@@ -158,7 +154,7 @@ private[pruning] object JournalGarbageCollector {
       }
     }
 
-    private def doFlush()(implicit traceContext: TraceContext): Unit = {
+    private def doFlush()(implicit traceContext: TraceContext): Unit =
       // if we are not closing and not running, then we can start a new prune
       if (!isClosing) {
         val currentState = state.getAndUpdate {
@@ -180,7 +176,6 @@ private[pruning] object JournalGarbageCollector {
           FutureUtil.doNotAwait(runningF, "Periodic background journal pruning failed")
         }
       }
-    }
 
   }
 }

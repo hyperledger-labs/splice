@@ -70,7 +70,7 @@ final case class InFlightAggregation private (
       s"Cannot aggregate submission by $sender with sequencing timestamp $timestamp after the max sequencing time at $maxSequencingTimestamp",
     )
     for {
-      _ <- deliveredAt.toLeft(()).leftMap(AlreadyDelivered)
+      _ <- deliveredAt.toLeft(()).leftMap(AlreadyDelivered.apply)
       _ <- aggregatedSenders
         .get(sender)
         .toLeft(())
@@ -113,7 +113,7 @@ final case class InFlightAggregation private (
       _ <- Option.when(projectedSenders.nonEmpty)(())
     } yield new InFlightAggregation(projectedSenders, maxSequencingTimestamp, rule)
 
-  override def pretty: Pretty[this.type] = prettyOfClass(
+  override protected def pretty: Pretty[this.type] = prettyOfClass(
     param("aggregated senders", _.aggregatedSenders),
     param("max sequencing time", _.maxSequencingTimestamp),
     paramIfNonEmpty("sequencing timestamp", _.deliveredAt),
@@ -129,11 +129,10 @@ final case class InFlightAggregation private (
     InFlightAggregation.tryCreate(aggregatedSenders, maxSequencingTimestamp, rule)
 
   /** @throws java.lang.IllegalStateException if the class invariant does not hold */
-  def checkInvariant()(implicit loggingContext: NamedLoggingContext): Unit = {
+  def checkInvariant()(implicit loggingContext: NamedLoggingContext): Unit =
     InFlightAggregation
       .checkInvariant(aggregatedSenders, maxSequencingTimestamp, rule)
       .valueOr(err => ErrorUtil.invalidState(err))
-  }
 }
 
 object InFlightAggregation {
@@ -217,7 +216,7 @@ object InFlightAggregation {
       sequencingTimestamp: CantonTimestamp,
       signatures: Seq[Seq[Signature]],
   ) extends PrettyPrinting {
-    override def pretty: Pretty[this.type] = prettyOfClass(
+    override protected def pretty: Pretty[this.type] = prettyOfClass(
       param("sequencing timestamp", _.sequencingTimestamp),
       param("signatures", _.signatures),
     )

@@ -13,12 +13,12 @@ import com.digitalasset.canton.topology.processing.AuthorizedTopologyTransaction
   AuthorizedNamespaceDelegation,
   isRootDelegation,
 }
-import com.digitalasset.canton.topology.transaction.TopologyChangeOp.{Remove, Replace}
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.TopologyChangeOp.{Remove, Replace}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.common.graph.ValueGraphBuilder
+import com.google.common.graph.{MutableValueGraph, ValueGraphBuilder}
 
 import scala.collection.concurrent.TrieMap
 import scala.jdk.CollectionConverters.*
@@ -45,17 +45,15 @@ object AuthorizedTopologyTransaction {
     * A root certificate is defined by a namespace delegation that authorizes the
     * key f to act on the namespace spanned by f, authorized by f.
     */
-  def isRootCertificate(namespaceDelegation: AuthorizedNamespaceDelegation): Boolean = {
+  def isRootCertificate(namespaceDelegation: AuthorizedNamespaceDelegation): Boolean =
     NamespaceDelegation.isRootCertificate(namespaceDelegation.transaction)
-  }
 
   /** Returns true if the namespace delegation is a root certificate or a root delegation
     *
     * A root delegation is a namespace delegation whose target key may be used to authorize other namespace delegations.
     */
-  def isRootDelegation(namespaceDelegation: AuthorizedNamespaceDelegation): Boolean = {
+  def isRootDelegation(namespaceDelegation: AuthorizedNamespaceDelegation): Boolean =
     NamespaceDelegation.isRootDelegation(namespaceDelegation.transaction)
-  }
 
 }
 
@@ -102,50 +100,51 @@ class AuthorizationGraph(
     *     </ul>
     *   </li>
     *   <li>All edges incoming to `to` are labelled with the same NSD.</li>
+    *   <li>Each node has at least one incoming or outgoing edge.</li>
     * </ul>
     */
-  private val graph = ValueGraphBuilder
-    .directed()
-    .allowsSelfLoops(true) // we allow self loops for the root certificate
-    .build[Fingerprint, AuthorizedNamespaceDelegation]
+  private val graph: MutableValueGraph[Fingerprint, AuthorizedNamespaceDelegation] =
+    ValueGraphBuilder
+      .directed()
+      .allowsSelfLoops(true) // we allow self loops for the root certificate
+      .build[Fingerprint, AuthorizedNamespaceDelegation]
 
-  /** Authorized namespace delegations for namespace `this.namespace`, grouped by target */
-  private val cache =
-    new TrieMap[Fingerprint, AuthorizedNamespaceDelegation]()
-
-  /** Check if `item` is authorized and, if so, add its mapping to this graph.
-    *
-    * @throws java.lang.IllegalArgumentException if `item` does not refer to `namespace` or the operation is not REPLACE.
+  /** Authorized namespace delegations for namespace `this.namespace`, grouped by target.
+    * The namespace delegations carry the length of the valid certificate chain required to
+    * arrive at the root certificate
     */
-  def add(item: AuthorizedNamespaceDelegation)(implicit traceContext: TraceContext): Boolean = {
-    assertNamespaceAndOperation(item)
-    if (
-      AuthorizedTopologyTransaction.isRootCertificate(item) ||
-      this.existsAuthorizedKeyIn(item.signingKeys, requireRoot = true)
-    ) {
-      doAdd(item)
-      recompute()
-      true
-    } else false
-  }
+  private val cache =
+    new TrieMap[Fingerprint, (AuthorizedNamespaceDelegation, Int)]()
 
-  /** Add the mappings in `items` to this graph, regardless if they are authorized or not.
+  def nodes: Set[Fingerprint] = graph.nodes().asScala.toSet
+
+  def replace(item: AuthorizedNamespaceDelegation)(implicit traceContext: TraceContext): Unit =
+    replace(Seq(item))
+
+  /** Add the mappings in `items` to this graph and remove any existing mappings with the same target fingerprint.
     * If an unauthorized namespace delegation is added to the graph, the graph will contain nodes that are not connected to the root.
     * The target key of the unauthorized delegation will still be considered unauthorized.
     *
     * @throws java.lang.IllegalArgumentException if `item` does not refer to `namespace` or the operation is not REPLACE.
     */
-  def unauthorizedAdd(
+  def replace(
       items: Seq[AuthorizedNamespaceDelegation]
   )(implicit traceContext: TraceContext): Unit = {
-    items.foreach(doAdd)
+    items.foreach(doReplace)
     recompute()
   }
 
-  private def doAdd(
+  private def doReplace(
       item: AuthorizedNamespaceDelegation
   )(implicit traceContext: TraceContext): Unit = {
-    assertNamespaceAndOperation(item)
+    ErrorUtil.requireArgument(
+      item.mapping.namespace == namespace,
+      s"unable to add namespace delegation for ${item.mapping.namespace} to graph for $namespace",
+    )
+    ErrorUtil.requireArgument(
+      item.operation == Replace,
+      s"unable to add namespace delegation with operation ${item.operation} to graph for $namespace",
+    )
     val targetFingerprint = item.mapping.target.fingerprint
     // if the node already exists, remove all authorizing edges from item.signingKeys to item.target
     // to not leak previous authorizations
@@ -158,40 +157,22 @@ class AuthorizationGraph(
     }
   }
 
-  private def assertNamespaceAndOperation(
-      item: AuthorizedNamespaceDelegation
-  )(implicit traceContext: TraceContext): Unit = {
-    ErrorUtil.requireArgument(
-      item.mapping.namespace == namespace,
-      s"unable to add namespace delegation for ${item.mapping.namespace} to graph for $namespace",
-    )
-    ErrorUtil.requireArgument(
-      item.operation == Replace,
-      s"unable to add namespace delegation with operation ${item.operation} to graph for $namespace",
-    )
-  }
-
-  /** Check if `item` is authorized and, if so, remove all mappings with the same target key from this graph.
-    * Note that addition and removal of a namespace delegation can be authorized by different keys.
+  /** Remove all mappings with the same target key from this graph.
     *
     * @throws java.lang.IllegalArgumentException if `item` does not refer to `namespace` or the operation is not REMOVE.
     */
-  def remove(item: AuthorizedNamespaceDelegation)(implicit traceContext: TraceContext): Boolean = {
+  def remove(item: AuthorizedNamespaceDelegation)(implicit traceContext: TraceContext): Unit = {
     ErrorUtil.requireArgument(
       item.mapping.namespace == namespace,
       s"unable to remove namespace delegation for ${item.mapping.namespace} from graph for $namespace",
     )
-
     ErrorUtil.requireArgument(
       item.operation == Remove,
       s"unable to remove namespace delegation with operation ${item.operation} from graph for $namespace",
     )
 
-    if (existsAuthorizedKeyIn(item.signingKeys, requireRoot = true)) {
-      doRemove(item)
-      recompute()
-      true
-    } else false
+    doRemove(item)
+    recompute()
   }
 
   /** remove a namespace delegation
@@ -204,21 +185,20 @@ class AuthorizationGraph(
   )(implicit traceContext: TraceContext): Unit = {
     val keyToRemove = item.mapping.target.fingerprint
     if (graph.nodes().contains(keyToRemove)) {
-      // remove all edges labelled with item
-      graph
+      // The java.util.Set returned by predecessors is backed by the graph.
+      // Therefore we convert it into an immutable scala Set, so that removeEdge
+      // doesn't cause a ConcurrentModificationException
+      val predecessors = graph
         .predecessors(keyToRemove)
         .asScala
-        // The java.util.Set returned by predecessors is backed by the graph.
-        // Therefore we convert it into an immutable scala Set, so that removeEdge
-        // doesn't cause a ConcurrentModificationException
         .toSet[Fingerprint]
-        .foreach {
-          graph.removeEdge(_, keyToRemove).discard
-        }
 
-      // if item.target has no outgoing authorizations, remove it from the graph altogether
-      if (graph.outDegree(keyToRemove) == 0) {
-        graph.removeNode(keyToRemove).discard
+      // remove all edges that have the same target key fingerprint as item
+      predecessors.foreach(graph.removeEdge(_, keyToRemove).discard)
+
+      // Remove nodes without edges
+      (predecessors + keyToRemove).foreach { node =>
+        if (graph.degree(node) == 0) graph.removeNode(node).discard
       }
     } else {
       logger.warn(s"Superfluous removal of namespace delegation $item")
@@ -240,13 +220,14 @@ class AuthorizationGraph(
   protected def recompute()(implicit traceContext: TraceContext): Unit = {
     cache.clear()
     def go(
-        incoming: AuthorizedNamespaceDelegation
+        incoming: AuthorizedNamespaceDelegation,
+        level: Int,
     ): Unit = {
       val fingerprint = incoming.mapping.target.fingerprint
       // only proceed if we haven't seen this fingerprint yet,
       // so we terminate even if the graph has cycles.
       if (!cache.contains(fingerprint)) {
-        cache.update(fingerprint, incoming)
+        cache.update(fingerprint, (incoming, level))
         // only look at outgoing authorizations if item is a root delegation
         if (isRootDelegation(incoming)) {
           for {
@@ -256,7 +237,7 @@ class AuthorizationGraph(
             outgoingAuthorization <- graph.edgeValue(fingerprint, authorizedKey).toScala
           } {
             // descend into all outgoing authorizations
-            go(outgoingAuthorization)
+            go(outgoingAuthorization, level + 1)
           }
 
         }
@@ -264,7 +245,7 @@ class AuthorizationGraph(
     }
 
     // start at the root node, if it exists
-    rootNode.foreach(go)
+    rootNode.foreach(go(_, level = 1))
 
     report()
   }
@@ -275,7 +256,21 @@ class AuthorizationGraph(
         s"Namespace $namespace has no root node, therefore no namespace delegation is authorized."
       )
     }
-    val dangling = graph.nodes().asScala.diff(cache.keySet)
+    /* Only nodes that have an incoming edge are considered dangling:
+    Consider the following:
+    t0:
+      k1 -- NSD(ns1, target=k1, signed=k1) --> k1
+      k1 -- NSD(ns1, target=k2, signed=k1) --> k2
+      k2 -- NSD(ns1, target=k3, signed=k2) --> k3
+
+    t1: we remove the namespace delegation for k2:
+      k1 -- NSD(ns1, target=k1, signed=k1) --> k1
+      k2 -- NSD(ns1, target=k3, signed=k2) --> k3
+
+    We see that we still have the node k2, but only for the purpose of maintaining the edge k2->k3.
+    Since there is no more NSD with target=k2, we don't actually consider k2 dangling.
+     */
+    val dangling = graph.nodes().asScala.diff(cache.keySet).filter(!graph.predecessors(_).isEmpty)
     if (dangling.nonEmpty) {
       logger.warn(
         s"The following target keys of namespace $namespace are dangling: ${dangling.toList.sorted}"
@@ -285,10 +280,10 @@ class AuthorizationGraph(
       if (extraDebugInfo && logger.underlying.isDebugEnabled) {
         val str =
           cache.values
-            .map(nsd =>
+            .map { case (nsd, _) =>
               show"auth=${nsd.signingKeys}, target=${nsd.mapping.target.fingerprint}, root=${AuthorizedTopologyTransaction
                   .isRootDelegation(nsd)}"
-            )
+            }
             .mkString("\n  ")
         logger.debug(s"The authorization graph is given by:\n  $str")
       }
@@ -306,15 +301,20 @@ class AuthorizationGraph(
   ): Option[SigningPublicKey] =
     cache
       .get(authKey)
-      .filter { delegation =>
+      .filter { case (delegation, _) =>
         isRootDelegation(delegation) || !requireRoot
       }
-      .map(_.mapping.target)
+      .map { case (delegation, _) =>
+        delegation.mapping.target
+      }
 
   override def keysSupportingAuthorization(
       authKeys: Set[Fingerprint],
       requireRoot: Boolean,
   ): Set[SigningPublicKey] = authKeys.flatMap(getAuthorizedKey(_, requireRoot))
+
+  def authorizedDelegations(): Map[Namespace, Seq[(AuthorizedNamespaceDelegation, Int)]] =
+    Map(namespace -> cache.values.toSeq)
 
   override def toString: String = s"AuthorizationGraph($namespace)"
 }
@@ -336,46 +336,43 @@ trait AuthorizationCheck {
       authKeys: Set[Fingerprint],
       requireRoot: Boolean,
   ): Set[SigningPublicKey]
-}
 
-object AuthorizationCheck {
-  val empty: AuthorizationCheck = new AuthorizationCheck {
-    override def existsAuthorizedKeyIn(
-        authKeys: Set[Fingerprint],
-        requireRoot: Boolean,
-    ): Boolean = false
-
-    override def keysSupportingAuthorization(
-        authKeys: Set[Fingerprint],
-        requireRoot: Boolean,
-    ): Set[SigningPublicKey] = Set.empty
-
-    override def toString: String = "AuthorizationCheck.empty"
-  }
+  /** Per namespace (required for decentralized namespaces), a list of namespace delegations that have
+    * a gapless chain to the root certificate together with the length of the chain to the root certificate
+    * for each namespace delegation.
+    */
+  def authorizedDelegations(): Map[Namespace, Seq[(AuthorizedNamespaceDelegation, Int)]]
 }
 
 /** Authorization graph for a decentralized namespace.
   *
-  * @throws java.lang.IllegalArgumentException if `dnd` and `direct` refer to different namespaces.
+  * @throws java.lang.IllegalArgumentException if `dnd` and `ownerGraphs` refer to different namespaces.
   */
 final case class DecentralizedNamespaceAuthorizationGraph(
     dnd: DecentralizedNamespaceDefinition,
     ownerGraphs: Seq[AuthorizationGraph],
 ) extends AuthorizationCheck {
 
+  require(
+    dnd.owners.forgetNE == ownerGraphs.map(_.namespace).toSet,
+    s"The owner graphs refer to the wrong namespaces (expected: ${dnd.owners}), actual: ${ownerGraphs
+        .map(_.namespace)}).",
+  )
+
   override def existsAuthorizedKeyIn(
       authKeys: Set[Fingerprint],
       requireRoot: Boolean,
-  ): Boolean = {
+  ): Boolean =
     ownerGraphs.count(_.existsAuthorizedKeyIn(authKeys, requireRoot)) >= dnd.threshold.value
-  }
 
   override def keysSupportingAuthorization(
       authKeys: Set[Fingerprint],
       requireRoot: Boolean,
-  ): Set[SigningPublicKey] = {
+  ): Set[SigningPublicKey] =
     ownerGraphs
       .flatMap(_.keysSupportingAuthorization(authKeys, requireRoot))
       .toSet
-  }
+
+  override def authorizedDelegations(): Map[Namespace, Seq[(AuthorizedNamespaceDelegation, Int)]] =
+    ownerGraphs.flatMap(graph => graph.authorizedDelegations()).toMap
 }

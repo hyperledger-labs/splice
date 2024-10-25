@@ -444,12 +444,8 @@ class ScanFrontendTimeBasedIntegrationTest
       // so here we simply test that:
       // The total balance increased as a result of our tap by the tap amount minus some amount to account for holding fees
       // The frontend shows the balance from the backend
-      sv1ScanBackend
-        .getTotalAmuletBalance(firstRound + 1)
-        .valueOrFail("Amulet balance not yet computed") should
-        (be > (sv1ScanBackend
-          .getTotalAmuletBalance(firstRound)
-          .valueOrFail("Amulet balance not yet computed") + 99.0))
+      sv1ScanBackend.getTotalAmuletBalance(firstRound + 1) should
+        (be > (sv1ScanBackend.getTotalAmuletBalance(firstRound) + 99.0))
 
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
@@ -459,9 +455,7 @@ class ScanFrontendTimeBasedIntegrationTest
           "See valid total amulet balance",
           _ => {
             val totalText = seleniumText(find(id("total-amulet-balance-amulet")))
-            val totalBalance = sv1ScanBackend
-              .getTotalAmuletBalance(firstRound + 1)
-              .valueOrFail("Amulet balance not yet computed")
+            val totalBalance = sv1ScanBackend.getTotalAmuletBalance(firstRound + 1)
             parseAmountText(totalText, amuletNameAcronym) shouldBe totalBalance
             val totalUsdText = seleniumText(find(id("total-amulet-balance-usd")))
             val totalUsdBalance = totalBalance * amuletPrice

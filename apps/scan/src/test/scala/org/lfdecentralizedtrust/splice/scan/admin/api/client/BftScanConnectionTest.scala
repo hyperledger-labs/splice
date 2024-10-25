@@ -68,7 +68,7 @@ class BftScanConnectionTest
           Future.successful(
             ContractWithState(
               Contract(
-                amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
+                amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
                 new amuletrulesCodegen.AmuletRules.ContractId("whatever"),
                 new amuletrulesCodegen.AmuletRules(
                   partyIdA.toProtoPrimitive,

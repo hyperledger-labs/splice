@@ -143,7 +143,7 @@ class PrunableByTimeLogicTest
     // variable used to record which pruning intervals where invoked
     val pruningRequests =
       new AtomicReference[Seq[(CantonTimestamp, Option[CantonTimestamp])]](Seq.empty)
-    // variable used to signal how many rows were pruning
+    // variable used to signal how many rows we're pruning
     // depending on the return value, the intervals will be either shortened or extended
     val returnValues = new AtomicReference[Seq[Int]](Seq.empty)
 
@@ -159,7 +159,7 @@ class PrunableByTimeLogicTest
 
     def assertRequests(from: CantonTimestamp, until: CantonTimestamp, buckets: Long): Assertion = {
       val requests = pruningRequests.getAndSet(Seq.empty)
-      logger.debug(s"Had requests ${requests}")
+      logger.debug(s"Had requests $requests")
       requests should have length buckets
       requests.headOption.flatMap { case (_, from) => from } should contain(from)
       requests.lastOption.map { case (until, _) => until } should contain(until)
@@ -171,20 +171,19 @@ class PrunableByTimeLogicTest
         case (_, (next, _)) => Some(next)
       }
       forAll(requests) { case (next, prev) =>
-        assert(prev.valueOrFail(s"prev is empty for ${next}") < next)
+        assert(prev.valueOrFail(s"prev is empty for $next") < next)
       }
     }
 
     def runPruning(
         increments: Seq[Int],
         mult: Long = 10L,
-    ): Future[Unit] = {
+    ): Future[Unit] =
       MonadUtil
         .sequentialTraverse_(increments) { counter =>
           pruningRequests.getAndSet(Seq.empty)
           prune(ts0.plusSeconds(counter * mult))
         }
-    }
 
   }
 

@@ -6,8 +6,8 @@ package com.digitalasset.canton.metrics
 import com.daml.metrics.{MetricsFilter, MetricsFilterConfig}
 import io.opentelemetry.sdk.common.CompletableResultCode
 import io.opentelemetry.sdk.metrics.InstrumentType
-import io.opentelemetry.sdk.metrics.data.{AggregationTemporality, MetricData}
 import io.opentelemetry.sdk.metrics.`export`.{CollectionRegistration, MetricReader}
+import io.opentelemetry.sdk.metrics.data.{AggregationTemporality, MetricData}
 
 import java.util
 import java.util.stream.Collectors
@@ -19,13 +19,12 @@ class FilteringMetricsReader private (filters: Seq[MetricsFilterConfig], parent:
 
   override def register(registration: CollectionRegistration): Unit =
     parent.register(new CollectionRegistration {
-      override def collectAllMetrics(): util.Collection[MetricData] = {
+      override def collectAllMetrics(): util.Collection[MetricData] =
         registration
           .collectAllMetrics()
           .stream()
           .filter(x => filter.includeMetric(x.getName))
           .collect(Collectors.toList())
-      }
     })
 
   override def forceFlush(): CompletableResultCode = parent.forceFlush()

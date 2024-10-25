@@ -10,8 +10,8 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.{CantonTimestamp, TaskScheduler, TaskSchedulerMetrics}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.ActiveContractStore.ContractState
@@ -91,9 +91,8 @@ private[participant] class NaiveRequestTracker(
 
   override def tick(sc: SequencerCounter, timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Unit = {
+  ): Unit =
     taskScheduler.addTick(sc, timestamp)
-  }
 
   override def addRequest(
       rc: RequestCounter,
@@ -252,7 +251,7 @@ private[participant] class NaiveRequestTracker(
         ],
     ): Either[CommitSetError, EitherT[FutureUnlessShutdown, NonEmptyChain[
       RequestTrackerStoreError
-    ], Unit]] = {
+    ], Unit]] =
       // Complete the promise only if we're not shutting down.
       performUnlessClosing(functionFullName) {
         commitSetPromise.tryComplete(commitSet.map(UnlessShutdown.Outcome(_)))
@@ -288,7 +287,6 @@ private[participant] class NaiveRequestTracker(
             Left(CommitSetAlreadyExists(rc))
           }
       }
-    }
 
     for {
       data <- requests.get(rc).toRight(RequestNotFound(rc))
@@ -316,10 +314,10 @@ private[participant] class NaiveRequestTracker(
     val _ = requests.remove(rc)
   }
 
-  override def awaitTimestamp(timestamp: CantonTimestamp)(implicit
+  override def awaitTimestampUS(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Option[Future[Unit]] =
-    taskScheduler.scheduleBarrier(timestamp)
+  ): Option[FutureUnlessShutdown[Unit]] =
+    taskScheduler.scheduleBarrierUS(timestamp)
 
   /** Releases all locks that are held by the given request */
   private[this] def releaseAllLocks(rc: RequestCounter, requestTimestamp: CantonTimestamp)(implicit
@@ -357,9 +355,9 @@ private[participant] class NaiveRequestTracker(
       * <ul>
       *   <li>Check the activeness of the contracts in [[ActivenessSet.deactivations]] and [[ActivenessSet.usageOnly]].</li>
       *   <li>Check the non-existence of the contracts in [[ActivenessSet.creations]].</li>
-      *   <li>Check the inactivity of the contracts in [[ActivenessSet.transferIns]].</li>
+      *   <li>Check the inactivity of the contracts in [[ActivenessSet.assignments]].</li>
       *   <li>Lock all contracts to be deactivated.</li>
-      *   <li>Lock all contracts to be activated (created or transferred-in).</li>
+      *   <li>Lock all contracts to be activated (created or assigned).</li>
       *   <li>Fulfill the `activenessResult` promise with the result</li>
       * </ul>
       */
@@ -374,7 +372,7 @@ private[participant] class NaiveRequestTracker(
         }
       }.tapOnShutdown(activenessResult.shutdown())
 
-    override def pretty: Pretty[this.type] = prettyOfClass(
+    override protected def pretty: Pretty[this.type] = prettyOfClass(
       param("timestamp", _.timestamp),
       param("sequencerCounter", _.sequencerCounter),
       param("rc", _.rc),
@@ -426,7 +424,7 @@ private[participant] class NaiveRequestTracker(
         }
       } else { FutureUnlessShutdown.unit }
 
-    override def pretty: Pretty[this.type] =
+    override protected def pretty: Pretty[this.type] =
       prettyOfClass(
         param("timestamp", _.timestamp),
         param("sequencerCounter", _.sequencerCounter),
@@ -503,7 +501,7 @@ private[participant] class NaiveRequestTracker(
         }
       }
 
-    override def pretty: Pretty[this.type] =
+    override protected def pretty: Pretty[this.type] =
       prettyOfClass(
         param("timestamp", _.timestamp),
         param("sequencerCounter", _.sequencerCounter),

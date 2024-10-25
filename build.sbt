@@ -39,12 +39,15 @@ lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
 lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
+lazy val `canton-daml-jwt` = BuildCommon.`canton-daml-jwt`
+lazy val `canton-daml-grpc-utils` = BuildCommon.`canton-daml-grpc-utils`
 lazy val `canton-daml-tls` = BuildCommon.`canton-daml-tls`
 lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
 lazy val `canton-bindings-java` = BuildCommon.`canton-bindings-java`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
+lazy val `canton-transcode` = BuildCommon.`canton-transcode`
 
 lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extension`
 
@@ -354,7 +357,7 @@ lazy val `splice-wallet-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`splice-amulet-daml` / Compile / damlBuild).value ++ (`splice-wallet-payments-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-amulet-daml` / Compile / damlBuild).value ++ (`splice-wallet-payments-daml` / Compile / damlBuild).value ++ (`splice-amulet-name-service-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 

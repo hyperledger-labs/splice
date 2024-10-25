@@ -3,28 +3,11 @@
 
 package com.digitalasset.canton.participant
 
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveNumeric}
-import com.digitalasset.canton.config.{
-  ApiLoggingConfig,
-  BatchAggregatorConfig,
-  BatchingConfig,
-  CachingConfigs,
-  DefaultProcessingTimeouts,
-  LoggingConfig,
-}
-import com.digitalasset.canton.environment.{
-  CantonNodeParameters,
-  DefaultNodeParameters,
-  HasGeneralCantonNodeParameters,
-}
+import com.digitalasset.canton.environment.{CantonNodeParameters, HasGeneralCantonNodeParameters}
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
-import com.digitalasset.canton.participant.config.{
-  CantonEngineConfig,
-  LedgerApiServerParametersConfig,
-  ParticipantProtocolConfig,
-  ParticipantStoreConfig,
-  PartyNotificationConfig,
-}
+import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.participant.sync.CommandProgressTrackerConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -37,7 +20,7 @@ final case class ParticipantNodeParameters(
     adminWorkflow: AdminWorkflowConfig,
     maxUnzippedDarSize: Int,
     stores: ParticipantStoreConfig,
-    transferTimeProofFreshnessProportion: NonNegativeInt,
+    reassignmentTimeProofFreshnessProportion: NonNegativeInt,
     protocolConfig: ParticipantProtocolConfig,
     ledgerApiServerParameters: LedgerApiServerParametersConfig,
     excludeInfrastructureTransactions: Boolean,
@@ -46,6 +29,7 @@ final case class ParticipantNodeParameters(
     disableUpgradeValidation: Boolean,
     allowForUnauthenticatedContractIds: Boolean,
     commandProgressTracking: CommandProgressTrackerConfig,
+    unsafeEnableOnlinePartyReplication: Boolean,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
@@ -63,7 +47,8 @@ object ParticipantNodeParameters {
       logQueryCost = None,
       processingTimeouts = DefaultProcessingTimeouts.testing,
       enablePreviewFeatures = false,
-      nonStandardConfig = false,
+      // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+      nonStandardConfig = true,
       cachingConfigs = CachingConfigs(),
       batchingConfig = BatchingConfig(
         maxPruningBatchSize = PositiveNumeric.tryCreate(10),
@@ -72,7 +57,6 @@ object ParticipantNodeParameters {
       sequencerClient = SequencerClientConfig(),
       dbMigrateAndStart = false,
       exitOnFatalFailures = true,
-      useUnifiedSequencer = DefaultNodeParameters.UseUnifiedSequencer,
       watchdog = None,
     ),
     partyChangeNotification = PartyNotificationConfig.Eager,
@@ -81,10 +65,11 @@ object ParticipantNodeParameters {
     ),
     maxUnzippedDarSize = 10,
     stores = ParticipantStoreConfig(),
-    transferTimeProofFreshnessProportion = NonNegativeInt.tryCreate(3),
+    reassignmentTimeProofFreshnessProportion = NonNegativeInt.tryCreate(3),
     protocolConfig = ParticipantProtocolConfig(
       Some(testedProtocolVersion),
-      alphaVersionSupport = false,
+      // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+      alphaVersionSupport = true,
       betaVersionSupport = true,
       dontWarnOnDeprecatedPV = false,
     ),
@@ -95,5 +80,6 @@ object ParticipantNodeParameters {
     disableUpgradeValidation = false,
     allowForUnauthenticatedContractIds = false,
     commandProgressTracking = CommandProgressTrackerConfig(),
+    unsafeEnableOnlinePartyReplication = false,
   )
 }

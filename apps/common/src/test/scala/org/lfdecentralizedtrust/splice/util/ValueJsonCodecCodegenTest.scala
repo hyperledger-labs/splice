@@ -39,7 +39,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       // without optional field set
       val decodedOptionalNotSet: JavaApi.DamlRecord = ValueJsonCodecCodegen
         .deserializableContractPayload(
-          validatorlicenseCodegen.ValidatorLicense.TEMPLATE_ID,
+          validatorlicenseCodegen.ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID,
           """{"validator": "validator", "sponsor": "sponsor", "dso": "dso"}""",
         )
         .value
@@ -56,7 +56,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       // with (one) optional field set
       val decodedOptionalSet: JavaApi.DamlRecord = ValueJsonCodecCodegen
         .deserializableContractPayload(
-          validatorlicenseCodegen.ValidatorLicense.TEMPLATE_ID,
+          validatorlicenseCodegen.ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID,
           s"""{"validator": "validator", "sponsor": "sponsor", "dso": "dso", "lastActiveAt": "${Timestamp.Epoch.toString}"}""",
         )
         .value
@@ -89,7 +89,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       ).toValue
       val event = exercisedEvent(
         contractId = validContractId(3),
-        templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
+        templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
         interfaceId = None,
         choice = amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_DevNet_Tap.name,
         consuming = false,

@@ -3,15 +3,8 @@
 
 package com.digitalasset.canton.domain.sequencing.config
 
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.PositiveDouble
-import com.digitalasset.canton.config.{
-  BatchingConfig,
-  CachingConfigs,
-  LocalNodeParametersConfig,
-  ProtocolConfig,
-  WatchdogConfig,
-}
-import com.digitalasset.canton.environment.DefaultNodeParameters
 
 /** Various parameters for non-standard sequencer settings
   *
@@ -20,13 +13,14 @@ import com.digitalasset.canton.environment.DefaultNodeParameters
   * @param maxConfirmationRequestsBurstFactor how forgiving the rate limit is in case of bursts (so rate limit starts after observing an initial burst of factor * max_rate commands)
   */
 final case class SequencerNodeParameterConfig(
-    override val alphaVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    override val alphaVersionSupport: Boolean = true,
     override val betaVersionSupport: Boolean = false,
     override val dontWarnOnDeprecatedPV: Boolean = false,
     maxConfirmationRequestsBurstFactor: PositiveDouble = PositiveDouble.tryCreate(0.5),
     override val batching: BatchingConfig = BatchingConfig(),
     override val caching: CachingConfigs = CachingConfigs(),
-    override val useUnifiedSequencer: Boolean = DefaultNodeParameters.UseUnifiedSequencer,
     override val watchdog: Option[WatchdogConfig] = None,
+    unsafeEnableOnlinePartyReplication: Boolean = false,
 ) extends ProtocolConfig
     with LocalNodeParametersConfig

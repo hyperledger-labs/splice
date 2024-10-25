@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.platform.store.backend.common
 
-import anorm.SqlParser.{int, long, str}
+import anorm.SqlParser.{array, int, long, str}
 import anorm.{RowParser, ~}
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -144,6 +144,9 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
        SELECT event_offset as _offset, record_time, source_domain_id as domain_id FROM lapi_events_unassign
        UNION ALL
        SELECT event_offset as _offset, record_time, target_domain_id as domain_id FROM lapi_events_assign
+       UNION ALL
+       SELECT completion_offset as _offset, record_time, domain_id FROM lapi_command_completions
+         WHERE message_uuid is null -- it is not a timely reject (the record time there can be a source of violation: in corner cases it can move backwards)
        """.asVectorOf(
       offset("_offset") ~ long("record_time") ~ int("domain_id") map {
         case offset ~ recordTimeMicros ~ internedDomainId =>
@@ -220,6 +223,52 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
           )
         }
     }
+
+    // Verify no duplicate completion entry
+    SQL"""
+          SELECT
+            completion_offset,
+            application_id,
+            submitters,
+            command_id,
+            transaction_id,
+            submission_id,
+            message_uuid,
+            request_sequencer_counter,
+            domain_id
+          FROM lapi_command_completions
+      """
+      .asVectorOf(
+        offset("completion_offset") ~
+          str("application_id") ~
+          array[Int]("submitters") ~
+          str("command_id") ~
+          str("transaction_id").? ~
+          str("submission_id").? ~
+          str("message_uuid").? ~
+          long("request_sequencer_counter").? ~
+          long("domain_id") map {
+            case offset ~ applicationId ~ submitters ~ commandId ~ updateId ~ submissionId ~ messageUuid ~ requestSequencerCounter ~ domainId =>
+              (
+                applicationId,
+                submitters.toList,
+                commandId,
+                updateId,
+                submissionId,
+                messageUuid,
+                requestSequencerCounter,
+                domainId,
+              ) -> offset
+          }
+      )(connection)
+      .groupMapReduce(_._1)(entry => List(entry._2))(_ ::: _)
+      .find(_._2.size > 1)
+      .map(_._2)
+      .foreach(offsets =>
+        throw new RuntimeException(
+          s"duplicate entries found in lapi_command_completions at offsets (first 10 shown) ${offsets.take(10)}"
+        )
+      )
   } catch {
     case t: Throwable if !failForEmptyDB =>
       val failure = t.getMessage
@@ -238,7 +287,7 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
 
   override def onlyForTestingNumberOfAcceptedTransactionsFor(
       domainId: DomainId
-  )(connection: Connection): Int = {
+  )(connection: Connection): Int =
     SQL"""SELECT internal_id
           FROM lapi_string_interning
           WHERE external_string = ${"d|" + domainId.toProtoPrimitive}
@@ -250,7 +299,6 @@ private[backend] object IntegrityStorageBackendImpl extends IntegrityStorageBack
         WHERE domain_id = $internedDomainId
        """.asSingle(int("count"))(connection))
       .getOrElse(0)
-  }
 
   /**  ONLY FOR TESTING
     *  This is causing wiping of all LAPI event data.

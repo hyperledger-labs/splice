@@ -46,7 +46,7 @@ object JceJavaKeyConverter {
           .catchOnly[NoSuchAlgorithmException](
             KeyFactory.getInstance(keyInstance, JceSecurityProvider.bouncyCastleProvider)
           )
-          .leftMap(JceJavaKeyConversionError.GeneralError)
+          .leftMap(JceJavaKeyConversionError.GeneralError.apply)
         javaPublicKey <- Either
           .catchOnly[InvalidKeySpecException](keyFactory.generatePublic(x509KeySpec))
           .leftMap(err => JceJavaKeyConversionError.InvalidKey(show"$err"))
@@ -84,7 +84,7 @@ object JceJavaKeyConverter {
       for {
         keyFactory <- Either
           .catchOnly[NoSuchAlgorithmException](KeyFactory.getInstance(keyInstance, "BC"))
-          .leftMap(JceJavaKeyConversionError.GeneralError)
+          .leftMap(JceJavaKeyConversionError.GeneralError.apply)
         javaPrivateKey <- Either
           .catchOnly[InvalidKeySpecException](keyFactory.generatePrivate(pkcs8KeySpec))
           .leftMap(err => JceJavaKeyConversionError.InvalidKey(show"$err"))
@@ -148,18 +148,18 @@ sealed trait JceJavaKeyConversionError extends Product with Serializable with Pr
 object JceJavaKeyConversionError {
 
   final case class GeneralError(error: Exception) extends JceJavaKeyConversionError {
-    override def pretty: Pretty[GeneralError] =
+    override protected def pretty: Pretty[GeneralError] =
       prettyOfClass(unnamedParam(_.error))
   }
 
   final case class UnsupportedKeyFormat(format: CryptoKeyFormat, expectedFormat: CryptoKeyFormat)
       extends JceJavaKeyConversionError {
-    override def pretty: Pretty[UnsupportedKeyFormat] =
+    override protected def pretty: Pretty[UnsupportedKeyFormat] =
       prettyOfClass(param("format", _.format), param("expected format", _.expectedFormat))
   }
 
   final case class InvalidKey(error: String) extends JceJavaKeyConversionError {
-    override def pretty: Pretty[InvalidKey] =
+    override protected def pretty: Pretty[InvalidKey] =
       prettyOfClass(unnamedParam(_.error.unquoted))
   }
 

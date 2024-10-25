@@ -5,7 +5,11 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  TransferPreapproval,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
@@ -109,6 +113,27 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
+    )
+  }
+
+  override def getExternalPartyAmuletRules()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] = {
+    getExternalPartyAmuletRules(None)
+  }
+
+  def getExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetExternalPartyAmuletRules(cachedExternalPartyAmuletRules),
     )
   }
 
@@ -407,6 +432,15 @@ class SingleScanConnection private[client] (
       ),
     )
 
+  override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupTransferPreapprovalByParty(receiver),
+    )
+
   override def getMigrationInfo(migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[SourceMigrationInfo]] =
@@ -486,6 +520,18 @@ class CachedScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
+    )
+
+  override protected def runGetExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetExternalPartyAmuletRules(cachedExternalPartyAmuletRules),
     )
 
   override protected def runGetAnsRules(

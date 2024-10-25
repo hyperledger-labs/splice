@@ -17,20 +17,22 @@ import com.digitalasset.canton.domain.api.v30.SequencerAuthentication.{
   AuthenticateResponse,
   ChallengeRequest,
   ChallengeResponse,
+  LogoutRequest,
 }
 import com.digitalasset.canton.domain.api.v30.SequencerAuthenticationServiceGrpc.SequencerAuthenticationServiceStub
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
-import com.digitalasset.canton.util.retry.Pause
-import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable
+import com.digitalasset.canton.util.retry.ErrorKind.{FatalErrorKind, TransientErrorKind}
+import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy, Pause}
 import com.digitalasset.canton.version.ProtocolVersion
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 /** Configures authentication token fetching
   *
@@ -88,8 +90,24 @@ class AuthenticationTokenProvider(
           maxRetries = config.retries.value,
           delay = config.pauseRetries.underlying,
           operationName = "generate sequencer authentication token",
-        ).unlessShutdown(generateTokenET, NoExnRetryable)
-          .onShutdown(Left(shutdownStatus))
+        ).unlessShutdown(
+          generateTokenET,
+          new ExceptionRetryPolicy {
+            override protected def determineExceptionErrorKind(
+                exception: Throwable,
+                logger: TracedLogger,
+            )(implicit
+                tc: TraceContext
+            ): ErrorKind =
+              exception match {
+                // Ideally we would like to retry only on retryable gRPC status codes (such as `UNAVAILABLE`),
+                // but as this could be hard to get right, we compromise by retrying on all gRPC status codes,
+                // and use a finite number of retries.
+                case _: StatusRuntimeException => TransientErrorKind()
+                case _ => FatalErrorKind
+              }
+          },
+        ).onShutdown(Left(shutdownStatus))
       }
     }
   }
@@ -101,7 +119,7 @@ class AuthenticationTokenProvider(
       .challenge(
         ChallengeRequest(
           member.toProtoPrimitive,
-          supportedProtocolVersions.map(_.toProtoPrimitiveS),
+          supportedProtocolVersions.map(_.toProtoPrimitive),
         )
       )
       .map(response => response.value)
@@ -180,4 +198,22 @@ class AuthenticationTokenProvider(
       }.mapK(FutureUnlessShutdown.outcomeK)
     } yield token
 
+  def logout(
+      authenticationClient: SequencerAuthenticationServiceStub
+  ): EitherT[FutureUnlessShutdown, Status, Unit] =
+    for {
+      // Generate a new token to use as "entry point" to invalidate all tokens
+      tokenWithExpiry <- generateToken(authenticationClient)
+      token = tokenWithExpiry.token
+
+      _ <- EitherT(
+        authenticationClient
+          .logout(LogoutRequest(token.toProtoPrimitive))
+          .transform {
+            case Failure(exc: StatusRuntimeException) => Success(Left(exc.getStatus))
+            case Failure(exc) => Success(Left(Status.INTERNAL.withDescription(exc.getMessage)))
+            case Success(_) => Success(Right(()))
+          }
+      ).mapK(FutureUnlessShutdown.outcomeK)
+    } yield ()
 }

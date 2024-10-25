@@ -7,7 +7,7 @@ import cats.data.*
 import cats.syntax.all.*
 import com.daml.metrics.{Timed, Tracked}
 import com.digitalasset.canton.data.{CantonTimestamp, ProcessedDisclosedContract}
-import com.digitalasset.canton.ledger.api.domain.{Commands as ApiCommands, DisclosedContract}
+import com.digitalasset.canton.ledger.api.domain.Commands as ApiCommands
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.WriteService
@@ -30,6 +30,7 @@ import com.digitalasset.canton.util.Checked
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.engine.*
+import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.{ContractId, ContractInstance}
@@ -47,7 +48,6 @@ private[apiserver] final class StoreBackedCommandExecutor(
     participant: Ref.ParticipantId,
     writeService: WriteService,
     contractStore: ContractStore,
-    authorityResolver: AuthorityResolver,
     authenticateContract: AuthenticateContract,
     metrics: LedgerApiServerMetrics,
     config: EngineLoggingConfig,
@@ -60,7 +60,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
     with NamedLogging {
   private[this] val packageLoader = new DeduplicatingPackageLoader()
   // By unused here we mean that the TX version is not used by the verification
-  private val unusedTxVersion = TransactionVersion.StableVersions.max
+  private val unusedTxVersion = LanguageVersion.StableVersions(LanguageVersion.Major.V2).max
 
   override def execute(
       commands: ApiCommands,
@@ -93,7 +93,9 @@ private[apiserver] final class StoreBackedCommandExecutor(
         commands.actAs,
         commands.readAs,
         submissionResult,
-        commands.disclosedContracts.toList.map(c => c.contractId -> c).toMap,
+        commands.disclosedContracts.iterator
+          .map(c => c.fatContractInstance.contractId -> c.fatContractInstance)
+          .toMap,
         interpretationTimeNanos,
         commands.commands.ledgerEffectiveTime,
         ledgerTimeRecordTimeToleranceO,
@@ -121,7 +123,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
       interpretationTimeNanos: Long,
   ) = {
     val disclosedContractsMap =
-      commands.disclosedContracts.toSeq.view.map(d => d.contractId -> d).toMap
+      commands.disclosedContracts.toSeq.view.map(d => d.fatContractInstance.contractId -> d).toMap
     CommandExecutionResult(
       submitterInfo = state.SubmitterInfo(
         commands.actAs.toList,
@@ -130,6 +132,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
         commands.commandId.unwrap,
         commands.deduplicationPeriod,
         commands.submissionId.map(_.unwrap),
+        externallySignedTransaction = None,
       ),
       optDomainId = commands.domainId,
       transactionMeta = state.TransactionMeta(
@@ -152,9 +155,10 @@ private[apiserver] final class StoreBackedCommandExecutor(
       processedDisclosedContracts = meta.disclosedEvents.map { event =>
         val input = disclosedContractsMap(event.coid)
         ProcessedDisclosedContract(
-          event,
-          input.createdAt,
-          input.driverMetadata,
+          create = event,
+          createdAt = input.fatContractInstance.createdAt,
+          driverMetadata = input.fatContractInstance.cantonData,
+          domainIdO = input.domainIdO,
         )
       },
     )
@@ -183,7 +187,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
           submitters = commitAuthorizers,
           readAs = commands.readAs,
           cmds = commands.commands,
-          disclosures = commands.disclosedContracts.map(_.toLf),
+          disclosures = commands.disclosedContracts.map(_.fatContractInstance),
           participantId = participant,
           submissionSeed = submissionSeed,
           config.toEngineLogger(loggerFactory.append("phase", "submission")),
@@ -195,7 +199,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
       actAs: Set[Ref.Party],
       readAs: Set[Ref.Party],
       result: Result[A],
-      disclosedContracts: Map[ContractId, DisclosedContract],
+      disclosedContracts: Map[ContractId, FatContractInstance],
       interpretationTimeNanos: AtomicLong,
       ledgerEffectiveTime: Time.Timestamp,
       ledgerTimeRecordTimeToleranceO: Option[NonNegativeFiniteDuration],
@@ -311,33 +315,9 @@ private[apiserver] final class StoreBackedCommandExecutor(
               } else resume()
           }
 
-        case ResultNeedAuthority(holding @ _, requesting @ _, resume) =>
-          authorityResolver
-            // TODO(i12742) DomainId is required to be passed here
-            .resolve(AuthorityResolver.AuthorityRequest(holding, requesting, domainId = None))
-            .flatMap { response =>
-              val resumed = response match {
-                case AuthorityResolver.AuthorityResponse.MissingAuthorisation(parties) =>
-                  val receivedAuthorityFor = (parties -- requesting).mkString(",")
-                  val missingAuthority = parties.mkString(",")
-                  logger.debug(
-                    s"Authorisation failed. Missing authority: [$missingAuthority]. Received authority for: [$receivedAuthorityFor]"
-                  )
-                  false
-                case AuthorityResolver.AuthorityResponse.Authorized =>
-                  true
-              }
-              resolveStep(
-                Tracked.value(
-                  metrics.execution.engineRunning,
-                  trackSyncExecution(interpretationTimeNanos)(resume(resumed)),
-                )
-              )
-            }
-
         case ResultNeedUpgradeVerification(coid, signatories, observers, keyOpt, resume) =>
-          checkContractUpgradable(coid, signatories, observers, keyOpt, disclosedContracts).flatMap(
-            result => {
+          checkContractUpgradable(coid, signatories, observers, keyOpt, disclosedContracts)
+            .flatMap { result =>
               resolveStep(
                 Tracked.value(
                   metrics.execution.engineRunning,
@@ -345,7 +325,6 @@ private[apiserver] final class StoreBackedCommandExecutor(
                 )
               )
             }
-          )
       }
 
     resolveStep(result).andThen { case _ =>
@@ -374,7 +353,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
       signatories: Set[Ref.Party],
       observers: Set[Ref.Party],
       keyWithMaintainers: Option[GlobalKeyWithMaintainers],
-      disclosedContracts: Map[ContractId, DisclosedContract],
+      disclosedContracts: Map[ContractId, FatContractInstance],
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Option[String]] = {
@@ -400,7 +379,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
   private def checkContractUpgradable(
       coid: ContractId,
       recomputedContractMetadata: ContractMetadata,
-      disclosedContracts: Map[ContractId, DisclosedContract],
+      disclosedContracts: Map[ContractId, FatContractInstance],
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Option[String]] = {
@@ -447,7 +426,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
         ).left.map(e => s"Failed to construct SerializableContract($e)")
         _ <- authenticateContract(contract).leftMap { contractAuthenticationError =>
           val firstParticle =
-            s"Upgrading contract with ${upgradeVerificationContractData.contractId} failed authentication check with error: $contractAuthenticationError."
+            s"Upgrading contract ${upgradeVerificationContractData.contractId.coid} failed authentication check with error: $contractAuthenticationError."
           checkProvidedContractMetadataAgainstRecomputed(originalMetadata, recomputedMetadata)
             .leftMap(_.mkString_("['", "', '", "']"))
             .fold(
@@ -457,7 +436,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
         }
       } yield contract
 
-      EitherT.fromEither[Future](result).fold(UpgradeFailure, _ => Valid)
+      EitherT.fromEither[Future](result).fold(UpgradeFailure.apply, _ => Valid)
     }
 
     def lookupActiveContractVerificationData(): Result =
@@ -514,38 +493,27 @@ private[apiserver] final class StoreBackedCommandExecutor(
 
   private object UpgradeVerificationContractData {
     def fromDisclosedContract(
-        disclosedContract: DisclosedContract,
+        disclosedContract: FatContractInstance,
         recomputedMetadata: ContractMetadata,
     ): UpgradeVerificationContractData =
       UpgradeVerificationContractData(
         contractId = disclosedContract.contractId,
-        driverMetadataBytes = disclosedContract.driverMetadata.toByteArray,
+        driverMetadataBytes = disclosedContract.cantonData.toByteArray,
         contractInstance = Versioned(
-          disclosedContract.transactionVersion,
+          disclosedContract.version,
           ContractInstance(
             packageName = disclosedContract.packageName,
             packageVersion = disclosedContract.packageVersion,
             template = disclosedContract.templateId,
-            arg = disclosedContract.argument,
+            arg = disclosedContract.createArg,
           ),
         ),
         originalMetadata = ContractMetadata.tryCreate(
           signatories = disclosedContract.signatories,
           stakeholders = disclosedContract.stakeholders,
-          maybeKeyWithMaintainersVersioned =
-            (disclosedContract.keyValue zip disclosedContract.keyMaintainers).map {
-              case (value, maintainers) =>
-                Versioned(
-                  disclosedContract.transactionVersion,
-                  GlobalKeyWithMaintainers
-                    .assertBuild(
-                      disclosedContract.templateId,
-                      value,
-                      maintainers,
-                      disclosedContract.packageName,
-                    ),
-                )
-            },
+          maybeKeyWithMaintainersVersioned = disclosedContract.contractKeyWithMaintainers.map(
+            Versioned(disclosedContract.version, _)
+          ),
         ),
         recomputedMetadata = recomputedMetadata,
         ledgerTime = CantonTimestamp(disclosedContract.createdAt),

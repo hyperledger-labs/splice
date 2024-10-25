@@ -39,6 +39,7 @@ object TxLogEntry extends StoreErrors {
     val ValidatorRewardTxLogEntry = String3.tryCreate("vre")
     val SvRewardTxLogEntry = String3.tryCreate("sre")
     val VoteRequestTxLogEntry = String3.tryCreate("vot")
+    val TransferCommandTxLogEntry = String3.tryCreate("trc")
     // The following entry types correspond to entries that were removed from `scan_tx_log.proto`
     // Those entries might still exist in databases, but we don't produce new ones and we don't read them.
     // The values are only kept for documentation purposes.
@@ -60,6 +61,7 @@ object TxLogEntry extends StoreErrors {
       case _: ValidatorRewardTxLogEntry => EntryType.ValidatorRewardTxLogEntry
       case _: SvRewardTxLogEntry => EntryType.SvRewardTxLogEntry
       case _: VoteRequestTxLogEntry => EntryType.VoteRequestTxLogEntry
+      case _: TransferCommandTxLogEntry => EntryType.TransferCommandTxLogEntry
       case _ => throw txEncodingFailed()
     }
     val jsonValue = entry match {
@@ -84,6 +86,7 @@ object TxLogEntry extends StoreErrors {
         case EntryType.ValidatorRewardTxLogEntry => from[ValidatorRewardTxLogEntry](json)
         case EntryType.SvRewardTxLogEntry => from[ValidatorRewardTxLogEntry](json)
         case EntryType.VoteRequestTxLogEntry => from[VoteRequestTxLogEntry](json)
+        case EntryType.TransferCommandTxLogEntry => from[TransferCommandTxLogEntry](json)
         case _ => throw txLogIsOfWrongType(entryType.str)
       }
     } catch {
@@ -104,6 +107,13 @@ object TxLogEntry extends StoreErrors {
   }
 
   object Http {
+
+    object TransferCommandStatus {
+      val Created = "created"
+      val Sent = "sent"
+      val Failed = "failed"
+    }
+
     private def toResponse(data: SenderAmount) = httpDef.SenderAmount(
       party = data.party.toProtoPrimitive,
       inputAmuletAmount = Some(Codec.encode(data.inputAmuletAmount)),
@@ -189,6 +199,39 @@ object TxLogEntry extends StoreErrors {
         case entry: TapTxLogEntry => toTapResponseItem(entry)
         case entry: MintTxLogEntry => toMintResponseItem(entry)
         case _ => throw txLogIsOfWrongType(entry.getClass.getSimpleName)
+      }
+
+    def toResponse(
+        status: TransferCommandTxLogEntry.Status
+    ): httpDef.LookupTransferCommandStatusResponse =
+      status match {
+        case TransferCommandTxLogEntry.Status.Empty => throw txMissingField()
+        case _: TransferCommandTxLogEntry.Status.Created =>
+          httpDef.TransferCommandCreatedResponse(
+            status = TransferCommandStatus.Created
+          )
+        case _: TransferCommandTxLogEntry.Status.Sent =>
+          httpDef.TransferCommandSentResponse(
+            status = TransferCommandStatus.Sent
+          )
+        case _: TransferCommandTxLogEntry.Status.Withdrawn =>
+          httpDef.TransferCommandFailedResponse(
+            status = TransferCommandStatus.Failed,
+            failureKind = httpDef.TransferCommandFailedResponse.FailureKind.Withdrawn,
+            reason = "The TransferCommand has been withdrawn by the sender",
+          )
+        case _: TransferCommandTxLogEntry.Status.Expired =>
+          httpDef.TransferCommandFailedResponse(
+            status = TransferCommandStatus.Failed,
+            failureKind = httpDef.TransferCommandFailedResponse.FailureKind.Expired,
+            reason = "The TransferCommand has expired",
+          )
+        case status: TransferCommandTxLogEntry.Status.Failed =>
+          httpDef.TransferCommandFailedResponse(
+            status = TransferCommandStatus.Failed,
+            failureKind = httpDef.TransferCommandFailedResponse.FailureKind.Failed,
+            reason = status.value.reason,
+          )
       }
   }
 

@@ -17,14 +17,14 @@ object JavaDecodeUtil {
   def decodeCreated[TC](
       companion: ContractCompanion[TC, ?, ?]
   )(event: JavaCreatedEvent): Option[TC] =
-    if (QualifiedName(event.getTemplateId) == QualifiedName(companion.TEMPLATE_ID)) {
+    if (QualifiedName(event.getTemplateId) == QualifiedName(companion.getTemplateIdWithPackageId)) {
       Some(companion.fromCreatedEvent(event))
     } else None
 
   def decodeCreated[Id, View](
       companion: InterfaceCompanion[?, Id, View]
   )(event: JavaCreatedEvent): Option[Contract[Id, View]] =
-    if (event.getInterfaceViews.containsKey(companion.TEMPLATE_ID)) {
+    if (event.getInterfaceViews.containsKey(companion.getTemplateIdWithPackageId)) {
       Some(companion.fromCreatedEvent(event))
     } else None
 

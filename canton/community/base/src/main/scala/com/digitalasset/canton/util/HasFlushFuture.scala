@@ -30,9 +30,8 @@ trait HasFlushFuture
     */
   protected def addToFlushAndLogError(
       name: String
-  )(future: Future[_])(implicit loggingContext: ErrorLoggingContext): Unit = {
+  )(future: Future[_])(implicit loggingContext: ErrorLoggingContext): Unit =
     addToFlushWithoutLogging(name)(FutureUtil.logOnFailure(future, s"$name failed"))
-  }
 
   /** Adds the task `future` to the flush future so that [[doFlush]] completes only after `future` has completed.
     * The caller is responsible for logging any exceptions thrown inside the future.
@@ -78,13 +77,12 @@ trait HasFlushFuture
     // but for pretty-printing we want to build the description for each log message
     // so that we can filter out the already completed tasks.
     val future = flushFutureForSnapshot(snapshot)
-    def mkDescription(): String = {
+    def mkDescription(): String =
       s"$name with tasks ${snapshot.filter(!_.future.isCompleted).mkString(", ")}"
-    }
     SyncCloseable(name, timeout.await_(mkDescription())(future))
   }
 
-  private def flushFutureForSnapshot(snapshot: Iterable[HasFlushFuture.NamedTask]): Future[Unit] = {
+  private def flushFutureForSnapshot(snapshot: Iterable[HasFlushFuture.NamedTask]): Future[Unit] =
     snapshot.foldLeft(Future.unit) { (acc, task) =>
       val future = task.future
       if (future.isCompleted) acc
@@ -92,13 +90,12 @@ trait HasFlushFuture
         acc.zipWith(future)((_, _) => ())(directExecutionContext)
       }
     }
-  }
 }
 
 object HasFlushFuture {
   // Not a case class so that we get by-reference equality
   private class NamedTask(val name: String, val future: Future[_]) extends PrettyPrinting {
-    override def pretty: Pretty[NamedTask] =
+    override protected def pretty: Pretty[NamedTask] =
       prettyOfString(x => if (x.future.isCompleted) x.name + " (completed)" else x.name)
   }
 }

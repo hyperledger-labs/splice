@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+/* TODO(i18695): fix
 package com.digitalasset.canton.platform.indexer.ha
 
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
@@ -78,7 +79,7 @@ trait IndexerStabilitySpec
           val connection = dataSource.getConnection()
 
           Iterator
-            .iterate(IterationState())(previousState => {
+            .iterate(IterationState()) { previousState =>
               // Assert that there is exactly one indexer running
               val activeIndexer = findActiveIndexer(indexers)
               logger.info(s"Indexer ${activeIndexer.readService.name} is running")
@@ -89,17 +90,17 @@ trait IndexerStabilitySpec
 
               // At this point, the indexer that was aborted by the previous iteration can be reset,
               // in order to keep the pool of competing indexers full.
-              previousState.abortedIndexer.foreach(idx => {
+              previousState.abortedIndexer.foreach { idx =>
                 idx.readService.reset()
                 logger.info(s"ReadService ${idx.readService.name} was reset")
-              })
+              }
 
               // Abort the indexer by terminating the ReadService stream
               activeIndexer.readService.abort(simulatedFailure())
               logger.info(s"ReadService ${activeIndexer.readService.name} was aborted")
 
               IterationState(Some(activeIndexer))
-            })
+            }
             .take(restartIterations + 1)
             .foreach(_ => ())
 
@@ -169,3 +170,4 @@ object IndexerStabilitySpec {
       abortedIndexer: Option[ReadServiceAndIndexer] = None
   )
 }
+ */

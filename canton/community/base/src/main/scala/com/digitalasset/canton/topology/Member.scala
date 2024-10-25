@@ -5,10 +5,10 @@ package com.digitalasset.canton.topology
 
 import cats.kernel.Order
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.canton.config.CantonRequireTypes.{String255, String3, String300}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
@@ -29,7 +29,7 @@ sealed trait Identity
   /** returns the string representation used in console filters (maps to the uid) */
   def filterString: String = uid.toProtoPrimitive
 
-  override def pretty: Pretty[this.type] = prettyOfParam(_.uid)
+  override protected def pretty: Pretty[this.type] = prettyOfParam(_.uid)
 }
 
 sealed trait NodeIdentity extends Identity {
@@ -80,7 +80,7 @@ sealed trait Member extends Identity with Product with Serializable {
       s"${code.threeLetterId.unwrap}${UniqueIdentifier.delimiter}${uid.toProtoPrimitive}"
     )
 
-  override def pretty: Pretty[Member] =
+  override protected def pretty: Pretty[Member] =
     prettyOfString(inst =>
       inst.code.threeLetterId.unwrap + UniqueIdentifier.delimiter + inst.uid.show
     )
@@ -92,13 +92,12 @@ object Member {
     // The first three letters of the string identify the type of member
     val (typ, uidS) = member.splitAt(3)
 
-    def mapToType(code: MemberCode, uid: UniqueIdentifier): Either[String, Member] = {
+    def mapToType(code: MemberCode, uid: UniqueIdentifier): Either[String, Member] =
       code match {
         case MediatorId.Code => Right(MediatorId(uid))
         case ParticipantId.Code => Right(ParticipantId(uid))
         case SequencerId.Code => Right(SequencerId(uid))
       }
-    }
 
     // expecting COD::<uid>
     val dlen = UniqueIdentifier.delimiter.length
@@ -136,11 +135,11 @@ object Member {
     implicit val setParameterMember: SetParameter[Member] = (v: Member, pp) =>
       pp >> v.toLengthLimitedString
 
-    implicit val getResultMember: GetResult[Member] = GetResult(r => {
+    implicit val getResultMember: GetResult[Member] = GetResult { r =>
       Member
         .fromProtoPrimitive_(r.nextString())
         .valueOr(err => throw new DbDeserializationException(err))
-    })
+    }
   }
 
 }
@@ -210,9 +209,8 @@ object ParticipantId {
     * used in testing
     */
   @VisibleForTesting
-  def apply(addr: String): ParticipantId = {
+  def apply(addr: String): ParticipantId =
     ParticipantId(UniqueIdentifier.tryCreate(addr, "default"))
-  }
 
   implicit val ordering: Ordering[ParticipantId] = Ordering.by(_.uid.toProtoPrimitive)
 
@@ -259,6 +257,8 @@ object PartyId {
 
   def tryCreate(identifier: String, namespace: Namespace): PartyId =
     PartyId(UniqueIdentifier.tryCreate(identifier, namespace))
+  def tryCreate(identifier: String, fingerprint: Fingerprint): PartyId =
+    PartyId(UniqueIdentifier.tryCreate(identifier, fingerprint))
 
   def fromLfParty(lfParty: LfPartyId): Either[String, PartyId] =
     UniqueIdentifier.fromProtoPrimitive_(lfParty).map(PartyId(_)).leftMap(_.message)
@@ -280,14 +280,15 @@ object PartyId {
 
 }
 
-/** @param index uniquely identifies the group, just like [[MediatorId]] for single mediators.
+/** Represents a mediator group, containing only mediators that have at least 1 signing key.
+  * @param index uniquely identifies the group, just like [[MediatorId]] for single mediators.
   * @param active the active mediators belonging to the group
   * @param passive the passive mediators belonging to the group
   * @param threshold the minimum size of a quorum
   */
 final case class MediatorGroup(
     index: MediatorGroupIndex,
-    active: NonEmpty[Seq[MediatorId]],
+    active: Seq[MediatorId],
     passive: Seq[MediatorId],
     threshold: PositiveInt,
 ) {
@@ -329,8 +330,10 @@ object MediatorId {
 
 }
 
+/** Contains only sequencers from SequencerDomainState that also have at least 1 signing key.
+  */
 final case class SequencerGroup(
-    active: NonEmpty[Seq[SequencerId]],
+    active: Seq[SequencerId],
     passive: Seq[SequencerId],
     threshold: PositiveInt,
 )

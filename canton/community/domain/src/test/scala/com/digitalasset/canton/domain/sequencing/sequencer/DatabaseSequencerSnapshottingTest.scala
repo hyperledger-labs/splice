@@ -9,6 +9,7 @@ import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer as CantonSequencer
+import com.digitalasset.canton.domain.sequencing.sequencer.store.SequencerStore
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.MemoryStorage
@@ -25,11 +26,10 @@ class DatabaseSequencerSnapshottingTest extends SequencerApiTest {
   def createSequencer(
       crypto: DomainSyncCryptoClient
   )(implicit materializer: Materializer): CantonSequencer =
-    createSequencerWithSnapshot(crypto, None)
+    createSequencerWithSnapshot(None)
 
   def createSequencerWithSnapshot(
-      crypto: DomainSyncCryptoClient,
-      initialState: Option[SequencerInitialState],
+      initialState: Option[SequencerInitialState]
   )(implicit materializer: Materializer): DatabaseSequencer = {
     if (clock == null)
       clock = createClock()
@@ -40,11 +40,23 @@ class DatabaseSequencerSnapshottingTest extends SequencerApiTest {
     ).forOwnerAndDomain(owner = mediatorId, domainId)
     val metrics = SequencerMetrics.noop("database-sequencer-test")
 
+    val dbConfig = TestDatabaseSequencerConfig()
+    val storage = new MemoryStorage(loggerFactory, timeouts)
+    val sequencerStore = SequencerStore(
+      storage,
+      testedProtocolVersion,
+      timeouts,
+      loggerFactory,
+      sequencerId,
+      blockSequencerMode = false,
+    )
+
     DatabaseSequencer.single(
-      TestDatabaseSequencerConfig(),
+      dbConfig,
       initialState,
       DefaultProcessingTimeouts.testing,
-      new MemoryStorage(loggerFactory, timeouts),
+      storage,
+      sequencerStore,
       clock,
       domainId,
       sequencerId,
@@ -52,7 +64,6 @@ class DatabaseSequencerSnapshottingTest extends SequencerApiTest {
       crypto,
       metrics,
       loggerFactory,
-      unifiedSequencer = testedUseUnifiedSequencer,
       runtimeReady = FutureUnlessShutdown.unit,
     )(executorService, tracer, materializer)
   }
@@ -120,7 +131,6 @@ class DatabaseSequencerSnapshottingTest extends SequencerApiTest {
 
         // create a second separate sequencer from the snapshot
         secondSequencer = createSequencerWithSnapshot(
-          topologyFactory.forOwnerAndDomain(owner = mediatorId, domainId),
           Some(
             SequencerInitialState(
               domainId,
@@ -128,7 +138,7 @@ class DatabaseSequencerSnapshottingTest extends SequencerApiTest {
               latestSequencerEventTimestamp = None,
               initialTopologyEffectiveTimestamp = None,
             )
-          ),
+          )
         )
 
         // the snapshot from the second sequencer should look the same except that the lastTs will become the lower bound

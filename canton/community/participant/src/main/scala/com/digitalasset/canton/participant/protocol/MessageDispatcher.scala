@@ -9,9 +9,9 @@ import cats.syntax.functorFilter.*
 import cats.{Foldable, Monoid}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.ViewType.{
+  AssignmentViewType,
   TransactionViewType,
-  TransferInViewType,
-  TransferOutViewType,
+  UnassignmentViewType,
 }
 import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -21,18 +21,18 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
+import com.digitalasset.canton.participant.protocol.reassignment.{
+  AssignmentProcessor,
+  UnassignmentProcessor,
+}
 import com.digitalasset.canton.participant.protocol.submission.{
   InFlightSubmissionTracker,
   SequencedSubmission,
 }
-import com.digitalasset.canton.participant.protocol.transfer.{
-  TransferInProcessor,
-  TransferOutProcessor,
-}
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
-import com.digitalasset.canton.protocol.messages.ProtocolMessage.select
 import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.protocol.messages.ProtocolMessage.select
 import com.digitalasset.canton.protocol.{
   LocalRejectError,
   RequestAndRootHashMessage,
@@ -209,7 +209,7 @@ trait MessageDispatcher { this: NamedLogging =>
       // It is safe to not wedge repair requests with the sequenced events they're tagged to
       // because wedging affects only request counter allocation.
       repairProcessorResult <- repairProcessorWedging(ts)
-      transactionTransferResult <- processTransactionAndTransferMessages(
+      transactionReassignmentResult <- processTransactionAndReassignmentMessages(
         eventE,
         sc,
         ts,
@@ -221,7 +221,7 @@ trait MessageDispatcher { this: NamedLogging =>
         trafficResult,
         acsCommitmentResult,
         repairProcessorResult,
-        transactionTransferResult,
+        transactionReassignmentResult,
       )
     )
   }
@@ -249,7 +249,7 @@ trait MessageDispatcher { this: NamedLogging =>
       trafficProcessor.processSetTrafficPurchasedEnvelopes(ts, timestampOfSigningKeyO, envelopes),
     )
 
-  private def processTransactionAndTransferMessages(
+  private def processTransactionAndReassignmentMessages(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
       sc: SequencerCounter,
       ts: CantonTimestamp,
@@ -291,7 +291,10 @@ trait MessageDispatcher { this: NamedLogging =>
           case (viewType, messages) => alarmIfNonEmptySigned(ResultKind(viewType), messages)
         }
 
-        val containsTopologyTransactions = DefaultOpenEnvelopesFilter.containsTopology(envelopes)
+        val containsTopologyTransactions = DefaultOpenEnvelopesFilter.containsTopology(
+          envelopes = envelopes,
+          withExplicitTopologyTimestamp = event.event.content.topologyTimestampO.isDefined,
+        )
 
         val isReceipt = event.event.content.messageIdO.isDefined
         processEncryptedViewsAndRootHashMessages(
@@ -315,14 +318,13 @@ trait MessageDispatcher { this: NamedLogging =>
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
     def withNewRequestCounter(
         body: RequestCounter => FutureUnlessShutdown[ProcessingResult]
-    ): FutureUnlessShutdown[ProcessingResult] = {
+    ): FutureUnlessShutdown[ProcessingResult] =
       requestCounterAllocator.allocateFor(sc) match {
         case Some(rc) => body(rc)
         case None => FutureUnlessShutdown.pure(processingResultMonoid.empty)
       }
-    }
 
-    def processRequest(goodRequest: GoodRequest) = {
+    def processRequest(goodRequest: GoodRequest) =
       withNewRequestCounter { rc =>
         val rootHashMessage: goodRequest.rootHashMessage.type = goodRequest.rootHashMessage
         val viewType: rootHashMessage.viewType.type = rootHashMessage.viewType
@@ -339,7 +341,6 @@ trait MessageDispatcher { this: NamedLogging =>
           processor.processRequest(ts, rc, sc, batch),
         )
       }
-    }
 
     val checkedRootHashMessagesC = checkRootHashMessageAndViews(rootHashMessages, encryptedViews)
     checkedRootHashMessagesC.nonaborts.iterator.foreach(alarm(sc, ts, _))
@@ -491,7 +492,7 @@ trait MessageDispatcher { this: NamedLogging =>
       hasEncryptedViews: Boolean,
   ): Checked[FailedRootHashMessageCheck, String, OpenEnvelope[
     RootHashMessage[SerializedRootHashMessagePayload]
-  ]] = {
+  ]] =
     rootHashMessages match {
       case Seq(rootHashMessage) => Checked.result(rootHashMessage)
 
@@ -519,7 +520,6 @@ trait MessageDispatcher { this: NamedLogging =>
           ),
         )
     }
-  }
 
   /** Check that we received encrypted views with the same view type as the root hash message.
     * If there is no such view, return an aborting error; otherwise return those views.
@@ -581,9 +581,8 @@ trait MessageDispatcher { this: NamedLogging =>
       events: Seq[RawProtocolEvent]
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
     val receipts = events.mapFilter {
-      case Deliver(counter, timestamp, _domainId, messageIdO, batch, _, _) =>
+      case Deliver(counter, timestamp, _domainId, messageIdO, _batch, _, _) =>
         // The event was submitted by the current participant iff the message ID is set.
-        messageIdO.foreach(_ => recordEventDelivered())
         messageIdO.map(_ -> SequencedSubmission(counter, timestamp))
       case DeliverError(
             _counter,
@@ -614,22 +613,17 @@ trait MessageDispatcher { this: NamedLogging =>
 
   protected def observeDeliverError(
       error: DeliverError
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] =
     doProcess(
       DeliveryMessageKind,
       FutureUnlessShutdown.outcomeF(inFlightSubmissionTracker.observeDeliverError(error)),
     )
-  }
-
-  private def recordEventDelivered(): Unit = {
-    metrics.trafficControl.eventDelivered.mark()
-  }
 
   private def tickRecordOrderPublisher(sc: SequencerCounter, ts: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[ProcessingResult] = {
-    lazy val future = FutureUnlessShutdown.pure {
-      recordOrderPublisher.tick(sc, ts)
+    lazy val future = FutureUnlessShutdown.outcomeF {
+      recordOrderPublisher.tick(sc, ts, eventO = None, requestCounterO = None)
     }
     doProcess(UnspecifiedMessageKind, future)
   }
@@ -658,11 +652,10 @@ trait MessageDispatcher { this: NamedLogging =>
 
   protected def logTimeProof(sc: SequencerCounter, ts: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Unit = {
+  ): Unit =
     logger.debug(
-      show"Processing time-proof at sc=${sc}, ts=${ts}"
+      show"Processing time-proof at sc=$sc, ts=$ts"
     )
-  }
 
   private def withMsgId(msgId: Option[MessageId]): String = msgId match {
     case Some(id) => s", messageId=$id"
@@ -676,7 +669,7 @@ trait MessageDispatcher { this: NamedLogging =>
       err: WithOpeningErrors[SequencedEvent[DefaultOpenEnvelope]],
   )(implicit traceContext: TraceContext): Unit =
     logger.info(
-      show"Skipping faulty event at sc=${sc}, ts=${ts}${withMsgId(msgId)}, with errors=${err.openingErrors
+      show"Skipping faulty event at sc=$sc, ts=$ts${withMsgId(msgId)}, with errors=${err.openingErrors
           .map(_.message)} and contents=${err.event.envelopes
           .map(_.protocolMessage)}"
     )
@@ -687,7 +680,7 @@ trait MessageDispatcher { this: NamedLogging =>
       msgId: Option[MessageId],
       evt: SignedContent[SequencedEvent[DefaultOpenEnvelope]],
   )(implicit traceContext: TraceContext): Unit = logger.info(
-    show"Processing event at sc=${sc}, ts=${ts}${withMsgId(msgId)}, with contents=${evt.content.envelopes
+    show"Processing event at sc=$sc, ts=$ts${withMsgId(msgId)}, with contents=${evt.content.envelopes
         .map(_.protocolMessage)}"
   )
 
@@ -697,7 +690,7 @@ trait MessageDispatcher { this: NamedLogging =>
       msgId: MessageId,
       status: Status,
   )(implicit traceContext: TraceContext): Unit = logger.info(
-    show"Processing delivery error at sc=${sc}, ts=${ts}, messageId=$msgId, status=$status"
+    show"Processing delivery error at sc=$sc, ts=$ts, messageId=$msgId, status=$status"
   )
 
 }
@@ -746,16 +739,17 @@ private[participant] object MessageDispatcher {
   /** @tparam A The type returned by processors for the given kind
     */
   sealed trait MessageKind[A] extends Product with Serializable with PrettyPrinting {
-    override def pretty: Pretty[MessageKind.this.type] = prettyOfObject[MessageKind.this.type]
+    override protected def pretty: Pretty[MessageKind.this.type] =
+      prettyOfObject[MessageKind.this.type]
   }
 
   case object TopologyTransaction extends MessageKind[AsyncResult]
   case object TrafficControlTransaction extends MessageKind[Unit]
   final case class RequestKind(viewType: ViewType) extends MessageKind[AsyncResult] {
-    override def pretty: Pretty[RequestKind] = prettyOfParam(_.viewType)
+    override protected def pretty: Pretty[RequestKind] = prettyOfParam(_.viewType)
   }
   final case class ResultKind(viewType: ViewType) extends MessageKind[AsyncResult] {
-    override def pretty: Pretty[ResultKind] = prettyOfParam(_.viewType)
+    override protected def pretty: Pretty[ResultKind] = prettyOfParam(_.viewType)
   }
   case object AcsCommitment extends MessageKind[Unit]
   case object MalformedMessage extends MessageKind[Unit]
@@ -802,8 +796,8 @@ private[participant] object MessageDispatcher {
         participantId: ParticipantId,
         requestTracker: RequestTracker,
         transactionProcessor: TransactionProcessor,
-        transferOutProcessor: TransferOutProcessor,
-        transferInProcessor: TransferInProcessor,
+        unassignmentProcessor: UnassignmentProcessor,
+        assignmentProcessor: AssignmentProcessor,
         topologyProcessor: TopologyTransactionProcessor,
         trafficProcessor: TrafficControlProcessor,
         acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType,
@@ -818,8 +812,8 @@ private[participant] object MessageDispatcher {
       val requestProcessors = new RequestProcessors {
         override def getInternal[P](viewType: ViewType { type Processor = P }): Option[P] =
           viewType match {
-            case TransferInViewType => Some(transferInProcessor)
-            case TransferOutViewType => Some(transferOutProcessor)
+            case AssignmentViewType => Some(assignmentProcessor)
+            case UnassignmentViewType => Some(unassignmentProcessor)
             case TransactionViewType => Some(transactionProcessor)
             case _ => None
           }
@@ -862,7 +856,7 @@ private[participant] object MessageDispatcher {
         inFlightSubmissionTracker: InFlightSubmissionTracker,
         loggerFactory: NamedLoggerFactory,
         metrics: SyncDomainMetrics,
-    )(implicit ec: ExecutionContext, tracer: Tracer): MessageDispatcher = {
+    )(implicit ec: ExecutionContext, tracer: Tracer): MessageDispatcher =
       new DefaultMessageDispatcher(
         protocolVersion,
         domainId,
@@ -880,6 +874,5 @@ private[participant] object MessageDispatcher {
         loggerFactory,
         metrics,
       )
-    }
   }
 }

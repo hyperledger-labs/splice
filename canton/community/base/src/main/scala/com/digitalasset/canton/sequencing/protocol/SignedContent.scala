@@ -110,7 +110,7 @@ object SignedContent
   override def name: String = "SignedContent"
 
   override def supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.SignedContent)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.SignedContent)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -210,7 +210,14 @@ object SignedContent
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): FutureUnlessShutdown[SignedContent[A]] =
-    create(cryptoApi, cryptoPrivateApi, content, timestampOfSigningKey, purpose, protocolVersion)
+    create(
+      cryptoApi,
+      cryptoPrivateApi,
+      content,
+      timestampOfSigningKey,
+      purpose,
+      protocolVersion,
+    )
       .valueOr(err => throw new IllegalStateException(s"Failed to create signed content: $err"))
 
   def fromProtoV30(

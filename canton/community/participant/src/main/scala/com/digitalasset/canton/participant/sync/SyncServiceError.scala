@@ -19,6 +19,7 @@ import com.digitalasset.canton.error.{
 }
 import com.digitalasset.canton.ledger.participant.state.SubmissionResult
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.participant.admin.grpc.PruningServiceError
 import com.digitalasset.canton.participant.domain.DomainRegistryError
 import com.digitalasset.canton.participant.store.DomainConnectionConfigStore
 import com.digitalasset.canton.util.ShowUtil.*
@@ -125,6 +126,20 @@ object SyncServiceError extends SyncServiceErrorGroup {
         with SyncServiceError
   }
 
+  @Explanation("This error results if a admin command is submitted to the passive replica.")
+  @Resolution("Send the admin command to the active replica.")
+  object SyncServicePassiveReplica
+      extends ErrorCode(
+        id = "SYNC_SERVICE_PASSIVE_REPLICA",
+        ErrorCategory.TransientServerFailure,
+      ) {
+    final case class Error()(implicit val loggingContext: ErrorLoggingContext)
+        extends CantonError.Impl(
+          cause = "Cannot process submitted command. This participant is the passive replica."
+        )
+        with SyncServiceError
+  }
+
   @Explanation(
     """This error is reported in case of validation failures when attempting to register new or change existing
        sequencer connections. This can be caused by unreachable nodes, a bad TLS configuration, or in case of
@@ -143,7 +158,7 @@ object SyncServiceError extends SyncServiceErrorGroup {
     final case class Error(errors: Seq[LoadSequencerEndpointInformationResult.NotValid])(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = s"The provided sequencer connections are inconsistent: ${errors}."
+          cause = s"The provided sequencer connections are inconsistent: $errors."
         )
         with SyncServiceError
   }
@@ -223,26 +238,13 @@ object SyncServiceError extends SyncServiceErrorGroup {
         with SyncServiceError
   }
 
-  @Explanation(
-    "This error is logged when a sync domain is not inactive."
-  )
-  @Resolution(
-    """If you attempt to purge a domain that has not been deactivated, this error will be emitted.
-      |Please ensure that the specified domain has a status of `Inactive` before attempting to purge it."""
-  )
-  object SyncServiceDomainStatusMustBeInactive
-      extends ErrorCode(
-        "SYNC_SERVICE_DOMAIN_STATUS_MUST_BE_INACTIVE",
-        ErrorCategory.InvalidGivenCurrentSystemStateOther,
-      ) {
-
-    final case class Error(domain: DomainAlias, status: DomainConnectionConfigStore.Status)(implicit
-        val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause = s"$domain has status $status and therefore cannot be purged."
-        )
-        with SyncServiceError
-  }
+  final case class SyncServicePurgeDomainError(
+      domain: DomainAlias,
+      parent: PruningServiceError,
+  )(implicit
+      val loggingContext: ErrorLoggingContext
+  ) extends SyncServiceError
+      with ParentCantonError[PruningServiceError]
 
   @Explanation(
     "This error is logged when a sync domain is disconnected because the participant became passive."
@@ -264,17 +266,20 @@ object SyncServiceError extends SyncServiceErrorGroup {
   }
 
   @Explanation(
-    "This error is emitted when an operation is attempted such as repair that requires the domain connection to be disconnected and clean."
+    "This error is emitted when an operation is attempted such as repair that requires the domains to be disconnected and clean."
   )
-  @Resolution("Disconnect the domain before attempting the command.")
-  object SyncServiceDomainMustBeOffline
+  @Resolution("Disconnect the still connected domains before attempting the command.")
+  object SyncServiceDomainsMustBeOffline
       extends ErrorCode(
-        "SYNC_SERVICE_DOMAIN_MUST_BE_OFFLINE",
+        "SYNC_SERVICE_DOMAINS_MUST_BE_OFFLINE",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
 
-    final case class Error(domain: DomainAlias)(implicit val loggingContext: ErrorLoggingContext)
-        extends CantonError.Impl(cause = show"$domain must be disconnected for the given operation")
+    final case class Error(connectedDomains: Seq[DomainAlias])(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = show"$connectedDomains must be disconnected for the given operation"
+        )
         with SyncServiceError
 
   }
@@ -350,7 +355,7 @@ object SyncServiceError extends SyncServiceErrorGroup {
     final case class CleanHeadAwaitFailed(domain: DomainAlias, ts: CantonTimestamp, err: String)(
         implicit val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = s"Failed to await for clean-head at ${ts}: $err"
+          cause = s"Failed to await for clean-head at $ts: $err"
         )
         with SyncServiceError
   }

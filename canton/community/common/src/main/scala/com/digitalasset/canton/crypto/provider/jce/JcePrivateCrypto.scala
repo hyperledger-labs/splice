@@ -5,6 +5,7 @@ package com.digitalasset.canton.crypto.provider.jce
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreExtended
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -46,6 +47,7 @@ class JcePrivateCrypto(
   private def fromJavaSigningKeyPair(
       javaKeyPair: JKeyPair,
       scheme: SigningKeyScheme,
+      usage: NonEmpty[Set[SigningKeyUsage]],
   ): SigningKeyPair = {
     val rawKeyPair = fromJavaKeyPair(javaKeyPair)
     SigningKeyPair.create(
@@ -53,18 +55,20 @@ class JcePrivateCrypto(
       publicKeyBytes = rawKeyPair.publicKey,
       privateKeyBytes = rawKeyPair.privateKey,
       scheme = scheme,
+      usage = usage,
     )
   }
 
   private def generateEcDsaSigningKeyPair(
       curveType: CurveType,
       scheme: SigningKeyScheme,
+      usage: NonEmpty[Set[SigningKeyUsage]],
   ): Either[SigningKeyGenerationError, SigningKeyPair] =
     for {
       javaKeyPair <- Either
         .catchOnly[GeneralSecurityException](EllipticCurves.generateKeyPair(curveType))
-        .leftMap[SigningKeyGenerationError](SigningKeyGenerationError.GeneralError)
-    } yield fromJavaSigningKeyPair(javaKeyPair, scheme)
+        .leftMap[SigningKeyGenerationError](SigningKeyGenerationError.GeneralError.apply)
+    } yield fromJavaSigningKeyPair(javaKeyPair, scheme, usage)
 
   override protected[crypto] def generateEncryptionKeypair(keySpec: EncryptionKeySpec)(implicit
       traceContext: TraceContext
@@ -93,7 +97,7 @@ class JcePrivateCrypto(
                 kpGen.generateKeyPair()
               }
             )
-            .leftMap[EncryptionKeyGenerationError](EncryptionKeyGenerationError.GeneralError)
+            .leftMap[EncryptionKeyGenerationError](EncryptionKeyGenerationError.GeneralError.apply)
         case EncryptionKeySpec.Rsa2048 =>
           Either
             .catchOnly[GeneralSecurityException](
@@ -103,19 +107,22 @@ class JcePrivateCrypto(
                 kpGen.generateKeyPair()
               }
             )
-            .leftMap[EncryptionKeyGenerationError](EncryptionKeyGenerationError.GeneralError)
+            .leftMap[EncryptionKeyGenerationError](EncryptionKeyGenerationError.GeneralError.apply)
       }).map(convertJavaKeyPair)
     }
   }
 
-  override protected[crypto] def generateSigningKeypair(scheme: SigningKeyScheme)(implicit
+  override protected[crypto] def generateSigningKeypair(
+      scheme: SigningKeyScheme,
+      usage: NonEmpty[Set[SigningKeyUsage]],
+  )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SigningKeyGenerationError, SigningKeyPair] = scheme match {
     case SigningKeyScheme.Ed25519 =>
       for {
         rawKeyPair <- Either
           .catchOnly[GeneralSecurityException](Ed25519Sign.KeyPair.newKeyPair())
-          .leftMap[SigningKeyGenerationError](SigningKeyGenerationError.GeneralError)
+          .leftMap[SigningKeyGenerationError](SigningKeyGenerationError.GeneralError.apply)
           .toEitherT[FutureUnlessShutdown]
         publicKey = ByteString.copyFrom(rawKeyPair.getPublicKey)
         privateKey = ByteString.copyFrom(rawKeyPair.getPrivateKey)
@@ -125,14 +132,15 @@ class JcePrivateCrypto(
             publicKeyBytes = publicKey,
             privateKeyBytes = privateKey,
             scheme = scheme,
+            usage = usage,
           )
       } yield keyPair
 
     case SigningKeyScheme.EcDsaP256 =>
-      generateEcDsaSigningKeyPair(EllipticCurves.CurveType.NIST_P256, scheme).toEitherT
+      generateEcDsaSigningKeyPair(EllipticCurves.CurveType.NIST_P256, scheme, usage).toEitherT
 
     case SigningKeyScheme.EcDsaP384 =>
-      generateEcDsaSigningKeyPair(EllipticCurves.CurveType.NIST_P384, scheme).toEitherT
+      generateEcDsaSigningKeyPair(EllipticCurves.CurveType.NIST_P384, scheme, usage).toEitherT
 
     case unsupported =>
       EitherT.leftT(SigningKeyGenerationError.UnsupportedKeyScheme(unsupported))

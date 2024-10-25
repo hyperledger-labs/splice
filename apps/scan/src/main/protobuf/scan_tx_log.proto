@@ -200,3 +200,33 @@ message VoteRequestTxLogEntry {
   string event_id = 1;
   google.protobuf.Struct result = 2 [(scalapb.field).type = "org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult"];
 }
+
+message TransferCommandTxLogEntry {
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
+  string event_id = 1;
+  string contract_id = 3; // org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand.ContractId
+  oneof status {
+    TransferCommandCreated created = 7;
+    TransferCommandSent sent = 8;
+    TransferCommandFailed failed = 9;
+    TransferCommandExpired expired = 10;
+    TransferCommandWithdrawn withdrawn = 11;
+  };
+}
+
+message TransferCommandCreated {
+}
+
+message TransferCommandSent {
+}
+
+message TransferCommandFailed {
+  string reason = 1;
+}
+
+message TransferCommandExpired {
+}
+
+message TransferCommandWithdrawn {
+}

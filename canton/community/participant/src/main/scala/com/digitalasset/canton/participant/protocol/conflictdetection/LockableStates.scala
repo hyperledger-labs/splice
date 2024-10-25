@@ -296,12 +296,11 @@ private[conflictdetection] class LockableStates[
         }
     }
 
-    def lockOnly(id: Key)(versionedStateO: Option[StateChange[Status]]): Unit = {
+    def lockOnly(id: Key)(versionedStateO: Option[StateChange[Status]]): Unit =
       if (versionedStateO.isEmpty) {
         logger.trace(withRC(rc, s"${lockableStatus.kind} $id to be locked is unknown."))
         unknown += id
       }
-    }
 
     handle.fresh.foreach(checkLockAnd(_, doFreshUnlocked, doFreshLocked))
     handle.free.foreach(checkLockAnd(_, doFree))
@@ -485,16 +484,15 @@ private[conflictdetection] class LockableStates[
       }
     }
 
-    def assertLockedStatesArePrefetched(): Unit = {
+    def assertLockedStatesArePrefetched(): Unit =
       states.foreach { case (id, state) =>
         if (state.locked && state.versionedState.isEmpty)
           throw IllegalConflictDetectionStateException(
             show"${lockableStatus.kind.unquoted} $id is locked without a prefetched state."
           )
       }
-    }
 
-    def assertFreshStatesAreLockedAndHaveNoPendingWrites(): Unit = {
+    def assertFreshStatesAreLockedAndHaveNoPendingWrites(): Unit =
       states.foreach { case (id, state) =>
         if (state.versionedState.contains(None)) {
           if (!state.locked && !state.hasPendingActivenessChecks)
@@ -507,7 +505,6 @@ private[conflictdetection] class LockableStates[
             )
         }
       }
-    }
 
     def assertStatesAreLockedTheCorrectNumberOfTimes(): Unit = {
       states.foreach { case (id, state) =>
@@ -563,7 +560,7 @@ private[conflictdetection] class LockableStates[
     }
 
     def assertVersionedStateIsLatestIfNoPendingWrites(): Unit = {
-      val withoutPendingWrites = states.filterNot { case (id, state) => state.hasPendingWrites }
+      val withoutPendingWrites = states.filterNot { case (_id, state) => state.hasPendingWrites }
       // Await on the store Futures to make sure that there's no context switch in the conflict detection thread
       // This ensures that invariant checking runs atomically.
       val storeSnapshot =
@@ -649,7 +646,7 @@ private[conflictdetection] object LockableStates {
         .map(_.id)
         .toSet
 
-    override def pretty: Pretty[LockableStatesCheckHandle.this.type] = prettyOfClass(
+    override protected def pretty: Pretty[LockableStatesCheckHandle.this.type] = prettyOfClass(
       param("request counter", _.requestCounter)
     )
   }

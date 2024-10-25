@@ -6,10 +6,10 @@ package com.digitalasset.canton.platform.apiserver.validation
 import com.daml.error.*
 import com.daml.error.utils.ErrorDetails
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.auth.AuthorizationChecksErrors
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidDeduplicationPeriodField.ValidMaxDeduplicationFieldKey
 import com.digitalasset.canton.ledger.error.groups.{
   AdminServiceErrors,
-  AuthorizationChecksErrors,
   ConsistencyErrors,
   RequestValidationErrors,
 }
@@ -393,6 +393,33 @@ class ErrorFactoriesSpec
         details = Seq[ErrorDetails.ErrorDetail](
           ErrorDetails.ErrorInfoDetail(
             "NON_HEXADECIMAL_OFFSET",
+            Map("category" -> "8", "test" -> getClass.getSimpleName),
+          ),
+          expectedCorrelationIdRequestInfo,
+        ),
+        logLevel = Level.INFO,
+        logMessage = msg,
+        logErrorContextRegEx = expectedLocationRegex,
+      )
+    }
+
+    "return a nonPositiveOffset error" in {
+      val msg =
+        s"NON_POSITIVE_OFFSET(8,$truncatedCorrelationId): Offset -123 in fieldName123 is not a positive integer: message123"
+      assertError(
+        RequestValidationErrors.NonPositiveOffset
+          .Error(
+            fieldName = "fieldName123",
+            offsetValue = -123L,
+            message = "message123",
+          )(contextualizedErrorLogger)
+          .asGrpcError
+      )(
+        code = Code.INVALID_ARGUMENT,
+        message = msg,
+        details = Seq[ErrorDetails.ErrorDetail](
+          ErrorDetails.ErrorInfoDetail(
+            "NON_POSITIVE_OFFSET",
             Map("category" -> "8", "test" -> getClass.getSimpleName),
           ),
           expectedCorrelationIdRequestInfo,

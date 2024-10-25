@@ -3,19 +3,26 @@
 
 package com.digitalasset.canton.data
 
+import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.foldable.*
+import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.*
+import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.data.GenTransactionTree.ViewWithWitnessesAndRecipients
 import com.digitalasset.canton.data.MerkleTree.*
 import com.digitalasset.canton.data.ViewPosition.MerkleSeqIndexFromRoot
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.{v30, *}
+import com.digitalasset.canton.sequencing.protocol.Recipients
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.topology.client.TopologySnapshot
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherUtil, MonadUtil}
 import com.digitalasset.canton.version.*
 import com.google.common.annotations.VisibleForTesting
@@ -23,6 +30,7 @@ import monocle.Lens
 import monocle.macros.GenLens
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
 
 /** A DAML transaction, decomposed into views (cf. ViewDecomposition) and embedded in a Merkle tree.
   * Merkle tree nodes may or may not be blinded.
@@ -102,7 +110,7 @@ final case class GenTransactionTree private (
     */
   private[data] def tryBlindForTransactionViewTree(
       viewPos: ViewPositionFromRoot
-  ): GenTransactionTree = {
+  ): GenTransactionTree =
     viewPos.position match {
       case (head: MerkleSeqIndexFromRoot) +: tail =>
         val sm = if (viewPos.isTopLevel) submitterMetadata else submitterMetadata.blindFully
@@ -118,7 +126,6 @@ final case class GenTransactionTree private (
         )(hashOps)
       case _ => throw new UnsupportedOperationException(s"Invalid view position: $viewPos")
     }
-  }
 
   lazy val transactionId: TransactionId = TransactionId.fromRootHash(rootHash)
 
@@ -126,7 +133,7 @@ final case class GenTransactionTree private (
     * The resulting informee tree is full, only if every view common data is unblinded.
     */
   def tryFullInformeeTree(protocolVersion: ProtocolVersion): FullInformeeTree = {
-    val tree = blind({
+    val tree = blind {
       case _: GenTransactionTree => RevealIfNeedBe
       case _: SubmitterMetadata => RevealSubtree
       case _: CommonMetadata => RevealSubtree
@@ -134,7 +141,7 @@ final case class GenTransactionTree private (
       case _: TransactionView => RevealIfNeedBe
       case _: ViewCommonData => RevealSubtree
       case _: ViewParticipantData => BlindSubtree
-    }).tryUnwrap
+    }.tryUnwrap
     FullInformeeTree.tryCreate(tree, protocolVersion)
   }
 
@@ -165,69 +172,70 @@ final case class GenTransactionTree private (
         throw new IllegalArgumentException(s"No transaction view found with hash $viewHash")
       )
 
+  /** Returns subviews in pre-order so, in the end, the tree is in pre-order.
+    */
   lazy val allTransactionViewTrees: Seq[FullTransactionViewTree] = for {
     (rootView, index) <- rootViews.unblindedElementsWithIndex
     (_view, viewPos) <- rootView.allSubviewsWithPosition(index +: ViewPosition.root)
     genTransactionTree = tryBlindForTransactionViewTree(viewPos.reverse)
   } yield FullTransactionViewTree.tryCreate(genTransactionTree)
 
-  def allLightTransactionViewTrees(
-      protocolVersion: ProtocolVersion
-  ): Seq[LightTransactionViewTree] =
-    allTransactionViewTrees.map(tvt =>
-      LightTransactionViewTree.fromTransactionViewTree(tvt, protocolVersion)
-    )
-
-  /** All lightweight transaction trees in this [[GenTransactionTree]], accompanied by their witnesses and randomness
-    * suitable for deriving encryption keys for encrypted view messages.
+  /** All lightweight transaction trees in this [[GenTransactionTree]], accompanied by their recipients tree
+    * that will serve to group session keys to encrypt view messages.
     *
-    * The witnesses are useful for constructing the BCC-style recipient trees for the view messages.
-    * The lightweight transaction + BCC scheme requires that, for every non top-level view,
-    * the encryption key used to encrypt that view's lightweight transaction tree can be (deterministically) derived
-    * from the randomness used for the parent view. This function returns suitable randomness that is derived using
-    * a HKDF. For top-level views, the randomness is derived from the provided initial seed.
+    * The lightweight transaction + BCC scheme requires that each parent view contains the randomness for all
+    * its direct children, allowing it to derive the encryption key and subsequently decrypt those views.
+    * By default, the randomness is reused if views share the same recipients tree, and this information is stored in a
+    * temporary cache to be used in multiple transactions.
     *
-    * All the returned random values have the same length as the provided initial seed. The caller should ensure that
-    * the provided randomness is long enough to be used for the default HMAC implementation.
+    * The caller should ensure that the provided randomness is long enough to be used for the default HMAC
+    * implementation.
     */
-  def allLightTransactionViewTreesWithWitnessesAndSeeds(
-      initSeed: SecureRandomness,
-      hkdfOps: HkdfOps,
-      protocolVersion: ProtocolVersion,
-  ): Either[HkdfError, Seq[(LightTransactionViewTree, Witnesses, SecureRandomness)]] = {
-    val randomnessLength = initSeed.unwrap.size
-    val witnessAndSeedMapE =
-      allTransactionViewTrees.toList.foldLeftM(
-        Map.empty[ViewPosition, (Witnesses, SecureRandomness)]
+  def allTransactionViewTreesWithRecipients(topologySnapshot: TopologySnapshot)(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): EitherT[FutureUnlessShutdown, Witnesses.InvalidWitnesses, Seq[
+    ViewWithWitnessesAndRecipients
+  ]] = {
+    /* We first gather all witnesses for a view and then derive its recipients tree
+     * and that of its direct children.
+     * Later on, if a view shares the same recipients tree, we can use the same randomness/key.
+     */
+    val witnessMap =
+      allTransactionViewTrees.foldLeft(
+        Map.empty[ViewPosition, Witnesses]
       ) { case (ws, tvt) =>
         val parentPosition = ViewPosition(tvt.viewPosition.position.drop(1))
-        val (witnesses, parentSeed) = ws.get(parentPosition) match {
-          case Some((parentWitnesses, parentSeed)) =>
-            parentWitnesses.prepend(tvt.informees) -> parentSeed
-          case None if (parentPosition.position.isEmpty) =>
-            Witnesses(NonEmpty(Seq, tvt.informees)) -> initSeed
+        val witnesses = ws.get(parentPosition) match {
+          case Some(parentWitnesses) =>
+            parentWitnesses.prepend(tvt.informees)
+          case None if parentPosition.position.isEmpty =>
+            Witnesses(NonEmpty(Seq, tvt.informees))
           case None =>
             throw new IllegalStateException(
               s"Can't find the parent witnesses for position ${tvt.viewPosition}"
             )
         }
+        ws.updated(tvt.viewPosition, witnesses)
+      }
 
-        val viewIndex =
-          tvt.viewPosition.position.headOption
-            .getOrElse(throw new IllegalStateException("View with no position"))
-        val seedE = hkdfOps.computeHkdf(
-          parentSeed.unwrap,
-          randomnessLength,
-          HkdfInfo.subview(viewIndex),
-        )
-        seedE.map(seed => ws.updated(tvt.viewPosition, witnesses -> seed))
+    for {
+      allViewsWithMetadata <- allTransactionViewTrees.parTraverse { tvt =>
+        val viewWitnesses = witnessMap(tvt.viewPosition)
+        val parentPosition = ViewPosition(tvt.viewPosition.position.drop(1))
+        val parentWitnessesO = witnessMap.get(parentPosition)
+
+        // We return the witnesses for testing purposes. We will use the recipients to derive our view encryption key.
+        for {
+          viewRecipients <- viewWitnesses
+            .toRecipients(topologySnapshot)
+            .mapK(FutureUnlessShutdown.outcomeK)
+          parentRecipients <- parentWitnessesO
+            .traverse(_.toRecipients(topologySnapshot))
+            .mapK(FutureUnlessShutdown.outcomeK)
+        } yield ViewWithWitnessesAndRecipients(tvt, viewWitnesses, viewRecipients, parentRecipients)
       }
-    witnessAndSeedMapE.map { witnessAndSeedMap =>
-      allTransactionViewTrees.map { tvt =>
-        val (witnesses, seed) = witnessAndSeedMap(tvt.viewPosition)
-        (LightTransactionViewTree.fromTransactionViewTree(tvt, protocolVersion), witnesses, seed)
-      }
-    }
+    } yield allViewsWithMetadata
   }
 
   def toProtoV30: v30.GenTransactionTree =
@@ -241,7 +249,7 @@ final case class GenTransactionTree private (
   def mapUnblindedRootViews(f: TransactionView => TransactionView): GenTransactionTree =
     this.copy(rootViews = rootViews.mapM(f))
 
-  override def pretty: Pretty[GenTransactionTree] = prettyOfClass(
+  override protected def pretty: Pretty[GenTransactionTree] = prettyOfClass(
     param("submitter metadata", _.submitterMetadata),
     param("common metadata", _.commonMetadata),
     param("participant metadata", _.participantMetadata),
@@ -350,4 +358,11 @@ object GenTransactionTree {
         rootViews,
       )
       .leftMap(e => ProtoDeserializationError.OtherError(s"Unable to create transaction tree: $e"))
+
+  final case class ViewWithWitnessesAndRecipients(
+      view: FullTransactionViewTree,
+      witnesses: Witnesses,
+      recipients: Recipients,
+      parentRecipients: Option[Recipients],
+  )
 }

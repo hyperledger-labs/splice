@@ -17,9 +17,9 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.{
-  HealthAdministration,
   KeyAdministrationGroup,
   PartiesAdministrationGroup,
   TopologyAdministrationGroup,
@@ -35,7 +35,6 @@ import com.digitalasset.canton.console.{
   RemoteSequencerReference,
 }
 import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
-import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.NodeIdentity
@@ -61,17 +60,13 @@ trait AppReference extends InstanceReference {
   override protected val loggerFactory: NamedLoggerFactory =
     consoleEnvironment.environment.loggerFactory.append("app", name)
 
-  override type Status = SimpleStatus
+  override type Status = SpliceStatus
 
   // TODO(#736): remove/cleanup all the uninteresting console commands copied from Canton.
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
-  override def health =
-    new HealthAdministration[SimpleStatus](
-      this,
-      consoleEnvironment,
-      SimpleStatus.fromProtoV30,
-    )
+  // Doesn't make sense for splice
+  override def health = ???
 
   // clear_cache exists to invalidate topology caches which we don't have in our apps.
   override def clear_cache(): Unit = ()
@@ -95,16 +90,10 @@ trait AppReference extends InstanceReference {
   def waitForInitialization(
       timeout: NonNegativeDuration = spliceConsoleEnvironment.commandTimeouts.bounded,
       maxBackoff: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds),
-  ): Unit =
-    try {
-      ConsoleMacros.utils.retry_until_true(timeout, maxBackoff)(
-        health.status.successOption.exists(_.active)
-      )
-    } catch {
-      case NonFatal(e) =>
-        noTracingLogger.error(s"Timeout while waiting for initialization of ${name}", e)
-        throw e
-    }
+  ): Unit
+
+  // Doesn't make sense for Splice
+  override def adminToken = ???
 }
 
 trait HttpAppReference extends AppReference with HttpCommandRunner {

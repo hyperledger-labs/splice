@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.1.0-snapshot.20240717.13187.0.va47ab77f"
+  val version: String = "3.2.0-snapshot.20241014.13351.0.ve5b28791"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -23,6 +23,7 @@ object CantonDependencies {
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
+  lazy val apispec_version = "0.7.2"
   lazy val pekko_version = "1.0.1"
   lazy val pekko_http_version = "1.0.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
@@ -32,10 +33,10 @@ object CantonDependencies {
   lazy val logback_version = "1.4.5"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
-  lazy val ammonite_version = "2.5.9"
+  lazy val ammonite_version = "3.0.0"
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
-  lazy val slick_version = "3.3.3"
+  lazy val slick_version = "3.5.2"
   lazy val bouncy_castle_version = "1.70"
 
   lazy val pureconfig_version = "0.14.0"
@@ -44,6 +45,7 @@ object CantonDependencies {
 
   lazy val scalatest_version = "3.2.11"
   lazy val scalacheck_version = "1.15.4"
+  lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
 
   lazy val netty_version = "4.1.108.Final"
@@ -88,13 +90,13 @@ object CantonDependencies {
   lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
+  lazy val daml_lf_language = "com.daml" %% "daml-lf-language" % daml_libraries_version
   lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_compiler_version
   lazy val daml_lf_transaction_test_lib =
     "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
   lazy val daml_lf_api_type_signature =
     "com.daml" %% "daml-lf-api-type-signature" % daml_libraries_version
 
-  lazy val daml_grpc_utils = "com.daml" %% "grpc-utils" % daml_libraries_version
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
   lazy val daml_contextualized_logging =
@@ -104,7 +106,6 @@ object CantonDependencies {
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
   lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
-  lazy val daml_jwt = "com.daml" %% "jwt" % daml_libraries_version
   lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
   lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
   lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
@@ -115,6 +116,7 @@ object CantonDependencies {
   lazy val daml_ledger_api_value_java =
     "com.daml" % "ledger-api-value-java-proto" % daml_libraries_version
   lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
+  lazy val daml_libs_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
   lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % daml_libraries_version
   lazy val daml_rs_grpc_testing_utils =
     "com.daml" %% "rs-grpc-testing-utils" % daml_libraries_version
@@ -148,6 +150,7 @@ object CantonDependencies {
   lazy val scala_logging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
   lazy val scalacheck = "org.scalacheck" %% "scalacheck" % scalacheck_version
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
+  lazy val scalaz_core = "org.scalaz" %% "scalaz-core" % scalaz_version
   lazy val scalatestScalacheck =
     "org.scalatestplus" %% "scalacheck-1-15" % (scalatest_version + ".0")
   lazy val mockito_scala = "org.mockito" %% "mockito-scala" % mockito_scala_version
@@ -180,7 +183,7 @@ object CantonDependencies {
   lazy val cats_law = "org.typelevel" %% "cats-laws" % "2.6.1"
   lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.2.0"
 
-  lazy val chimney = "io.scalaland" %% "chimney" % "0.6.1"
+  lazy val chimney = "io.scalaland" %% "chimney" % "1.4.0"
 
   lazy val magnolia = "com.softwaremill.magnolia1_2" %% "magnolia" % "1.1.3"
   lazy val magnolify_shared = "com.spotify" % "magnolify-shared_2.13" % "0.6.2"
@@ -217,7 +220,7 @@ object CantonDependencies {
   lazy val opentelemetry_instrumentation_hikari =
     "io.opentelemetry.instrumentation" % "opentelemetry-hikaricp-3.0" % s"$opentelemetry_java_instrumentation_version-alpha"
 
-  lazy val better_files = "com.github.pathikrit" %% "better-files" % "3.8.0"
+  lazy val better_files = "com.github.pathikrit" %% "better-files" % "3.9.2"
 
   lazy val slick = "com.typesafe.slick" %% "slick" % slick_version
   lazy val slick_hikaricp = "com.typesafe.slick" %% "slick-hikaricp" % slick_version
@@ -235,6 +238,25 @@ object CantonDependencies {
   lazy val tapir_json_circe = "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % tapir_version
   lazy val tapir_pekko_http_server =
     "com.softwaremill.sttp.tapir" %% "tapir-pekko-http-server" % tapir_version
+  lazy val tapir_openapi_docs =
+    "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % tapir_version
+  lazy val tapir_asyncapi_docs =
+    "com.softwaremill.sttp.tapir" %% "tapir-asyncapi-docs" % tapir_version
+
+  lazy val sttp_apiscpec_openapi_circe_yaml =
+    "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml" % apispec_version
+
+  lazy val sttp_apiscpec_asyncapi_circe_yaml =
+    "com.softwaremill.sttp.apispec" %% "asyncapi-circe-yaml" % apispec_version
+
+  lazy val upickle_version = "4.0.2"
+
+  // Transcode dependencies
+  lazy val upickle = "com.lihaoyi" %% "upickle" % upickle_version
+
+  // We have to exclude conflicting parser version
+  lazy val ujson_circe =
+    "com.lihaoyi" %% "ujson-circe" % upickle_version exclude ("io.circe", "circe-parser_2.13")
 
   lazy val toxiproxy_java = "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4"
 

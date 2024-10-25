@@ -67,7 +67,7 @@ trait CommandDeduplicationStore extends AutoCloseable {
   /** Prunes all command deduplication entries whose [[CommandDeduplicationData.latestDefiniteAnswer]] offset
     * is less or equal to `upToInclusive`.
     *
-    * @param prunedPublicationTime The publication time of the given offset in the [[MultiDomainEventLog]].
+    * @param prunedPublicationTime The publication time of the given offset
     */
   def prune(upToInclusive: GlobalOffset, prunedPublicationTime: CantonTimestamp)(implicit
       traceContext: TraceContext
@@ -98,7 +98,7 @@ object CommandDeduplicationStore {
 
   final case class OffsetAndPublicationTime(offset: GlobalOffset, publicationTime: CantonTimestamp)
       extends PrettyPrinting {
-    override def pretty: Pretty[OffsetAndPublicationTime] = prettyOfClass(
+    override protected def pretty: Pretty[OffsetAndPublicationTime] = prettyOfClass(
       param("offset", _.offset),
       param("publication time", _.publicationTime),
     )
@@ -135,7 +135,7 @@ final case class CommandDeduplicationData private (
     }
   }
 
-  override def pretty: Pretty[CommandDeduplicationData] = prettyOfClass(
+  override protected def pretty: Pretty[CommandDeduplicationData] = prettyOfClass(
     param("change id", _.changeId),
     param("latest definite answer", _.latestDefiniteAnswer),
     paramIfDefined("latest acceptance", _.latestAcceptance),
@@ -183,7 +183,7 @@ object CommandDeduplicationData {
   }
 }
 
-/** @param offset A completion offset in the [[MultiDomainEventLog]]
+/** @param offset A completion offset
   * @param publicationTime The publication time associated with the `offset`
   * @param traceContext The trace context that created the completion offset.
   */
@@ -198,7 +198,7 @@ final case class DefiniteAnswerEvent(
   def serializableSubmissionId: Option[SerializableSubmissionId] =
     submissionIdO.map(SerializableSubmissionId(_))
 
-  override def pretty: Pretty[DefiniteAnswerEvent] = prettyOfClass(
+  override protected def pretty: Pretty[DefiniteAnswerEvent] = prettyOfClass(
     param("offset", _.offset),
     param("publication time", _.publicationTime),
     paramIfNonEmpty("submission id", _.submissionIdO),

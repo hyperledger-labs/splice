@@ -34,11 +34,8 @@ import com.digitalasset.canton.{RequestCounter, SequencerCounter}
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.transaction.{
-  CommittedTransaction,
-  TransactionVersion,
-  VersionedTransaction,
-}
+import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.transaction.{CommittedTransaction, VersionedTransaction}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
@@ -46,7 +43,7 @@ import org.slf4j.event.Level
 
 import java.sql.Connection
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Await, Future}
 
 class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with NamedLogging {
@@ -85,7 +82,7 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
 
   private val someEventCreated = DbDto.EventCreate(
     event_offset = "",
-    transaction_id = "",
+    update_id = "",
     ledger_effective_time = 15,
     command_id = None,
     workflow_id = None,
@@ -302,11 +299,10 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
       completionInfoO = Some(someCompletionInfo),
       transactionMeta = someTransactionMeta,
       transaction = CommittedTransaction(
-        VersionedTransaction(TransactionVersion.VDev, Map.empty, ImmArray.empty)
+        VersionedTransaction(LanguageVersion.v2_dev, Map.empty, ImmArray.empty)
       ),
-      transactionId = Ref.TransactionId.assertFromString("TransactionId"),
+      updateId = Ref.TransactionId.assertFromString("UpdateId"),
       recordTime = someRecordTime,
-      blindingInfoO = None,
       hostedWitnesses = Nil,
       contractMetadata = Map.empty,
       domainId = DomainId.tryFromString("da::default"),
@@ -869,6 +865,151 @@ class ParallelIndexerSubscriptionSpec extends AnyFlatSpec with Matchers with Nam
         Some(someSequencerIndex1),
       ),
     )
+  }
+
+  behavior of "aggregateLedgerEndForRepair"
+
+  private val someAggregatedLedgerEndForRepair: (LedgerEnd, Map[DomainId, DomainIndex]) =
+    ParameterStorageBackend.LedgerEnd(
+      lastOffset = offset(5),
+      lastEventSeqId = 2000,
+      lastStringInterningId = 300,
+      lastPublicationTime = CantonTimestamp.ofEpochMicro(5),
+    ) -> Map(
+      someDomainId -> DomainIndex(
+        None,
+        Some(
+          SequencerIndex(
+            counter = SequencerCounter(5),
+            timestamp = CantonTimestamp.ofEpochMicro(5),
+          )
+        ),
+      ),
+      someDomainId2 -> DomainIndex(
+        Some(someRequestIndex2),
+        Some(
+          SequencerIndex(
+            counter = SequencerCounter(4),
+            timestamp = CantonTimestamp.ofEpochMicro(4),
+          )
+        ),
+      ),
+    )
+
+  private val someBatchOfBatches: Vector[Batch[Unit]] = Vector(
+    Batch(
+      lastOffset = offset(10),
+      lastSeqEventId = 2010,
+      lastStringInterningId = 310,
+      lastRecordTime = someTime.toEpochMilli + 10,
+      publicationTime = CantonTimestamp.ofEpochMicro(15),
+      lastTraceContext = TraceContext.empty,
+      batch = (),
+      batchSize = 0,
+      offsetsUpdates = Vector(
+        offset(9) -> Traced(
+          Update.SequencerIndexMoved(
+            domainId = someDomainId,
+            sequencerIndex = someSequencerIndex1,
+            requestCounterO = None,
+          )
+        ),
+        offset(10) -> Traced(
+          Update.SequencerIndexMoved(
+            domainId = someDomainId2,
+            sequencerIndex = someSequencerIndex1,
+            requestCounterO = None,
+          )
+        ),
+      ),
+    ),
+    Batch(
+      lastOffset = offset(20),
+      lastSeqEventId = 2020,
+      lastStringInterningId = 320,
+      lastRecordTime = someTime.toEpochMilli + 20,
+      publicationTime = CantonTimestamp.ofEpochMicro(25),
+      lastTraceContext = TraceContext.empty,
+      batch = (),
+      batchSize = 0,
+      offsetsUpdates = Vector(
+        offset(19) -> Traced(
+          Update.SequencerIndexMoved(
+            domainId = someDomainId,
+            sequencerIndex = someSequencerIndex2,
+            requestCounterO = None,
+          )
+        ),
+        offset(20) -> Traced(
+          Update.SequencerIndexMoved(
+            domainId = someDomainId2,
+            sequencerIndex = someSequencerIndex2,
+            requestCounterO = None,
+          )
+        ),
+      ),
+    ),
+  )
+
+  it should "correctly aggregate if batch has no new domain-indexes" in {
+    val aggregateLedgerEndForRepairRef =
+      new AtomicReference[(LedgerEnd, Map[DomainId, DomainIndex])](someAggregatedLedgerEndForRepair)
+    ParallelIndexerSubscription
+      .aggregateLedgerEndForRepair(aggregateLedgerEndForRepairRef)
+      .apply(Vector.empty)
+    aggregateLedgerEndForRepairRef.get() shouldBe someAggregatedLedgerEndForRepair
+  }
+
+  it should "correctly aggregate if old state is empty" in {
+    val aggregateLedgerEndForRepairRef =
+      new AtomicReference[(LedgerEnd, Map[DomainId, DomainIndex])](
+        ParallelIndexerSubscription.DefaultAggregatedLedgerEndForRepair
+      )
+    ParallelIndexerSubscription
+      .aggregateLedgerEndForRepair(aggregateLedgerEndForRepairRef)
+      .apply(someBatchOfBatches)
+    aggregateLedgerEndForRepairRef.get() shouldBe
+      ParameterStorageBackend.LedgerEnd(
+        lastOffset = offset(20),
+        lastEventSeqId = 2020,
+        lastStringInterningId = 320,
+        lastPublicationTime = CantonTimestamp.ofEpochMicro(25),
+      ) -> Map(
+        someDomainId -> DomainIndex(
+          None,
+          Some(someSequencerIndex2),
+        ),
+        someDomainId2 -> DomainIndex(
+          None,
+          Some(someSequencerIndex2),
+        ),
+      )
+  }
+
+  it should "correctly aggregate old and new ledger-end and domain indexes" in {
+    val aggregateLedgerEndForRepairRef =
+      new AtomicReference[(LedgerEnd, Map[DomainId, DomainIndex])](
+        someAggregatedLedgerEndForRepair
+      )
+    ParallelIndexerSubscription
+      .aggregateLedgerEndForRepair(aggregateLedgerEndForRepairRef)
+      .apply(someBatchOfBatches)
+    aggregateLedgerEndForRepairRef.get() shouldBe
+      ParameterStorageBackend.LedgerEnd(
+        lastOffset = offset(20),
+        lastEventSeqId = 2020,
+        lastStringInterningId = 320,
+        lastPublicationTime = CantonTimestamp.ofEpochMicro(25),
+      ) -> Map(
+        someDomainId -> DomainIndex(
+          None,
+          Some(someSequencerIndex2),
+        ),
+        someDomainId2 -> DomainIndex(
+          Some(someRequestIndex2),
+          Some(someSequencerIndex2),
+        ),
+      )
   }
 
 }

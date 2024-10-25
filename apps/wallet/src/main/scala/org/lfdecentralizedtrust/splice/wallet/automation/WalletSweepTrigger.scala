@@ -20,7 +20,6 @@ import org.lfdecentralizedtrust.splice.util.SpliceUtil.{ccToDollars, dollarsToCC
 import org.lfdecentralizedtrust.splice.wallet.config.WalletSweepConfig
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.health.admin.data.SequencerHealthStatus.implicitPrettyString
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -263,7 +262,7 @@ object WalletSweepTrigger {
   ) extends PrettyPrinting {
     override def pretty: Pretty[Task] =
       prettyOfClass[Task](
-        param("Tracking Id", _.trackingId)
+        param("Tracking Id", _.trackingId.unquoted)
       )
   }
 }

@@ -20,9 +20,9 @@ import scala.util.chaining.*
 final case class DriverContractMetadata(salt: Salt)
     extends HasVersionedWrapper[DriverContractMetadata]
     with PrettyPrinting {
-  override protected def companionObj = DriverContractMetadata
+  override protected def companionObj: DriverContractMetadata.type = DriverContractMetadata
 
-  override def pretty: Pretty[DriverContractMetadata] = prettyOfClass(
+  override protected def pretty: Pretty[DriverContractMetadata] = prettyOfClass(
     param("contract salt", _.salt.forHashing)
   )
 
@@ -38,7 +38,7 @@ object DriverContractMetadata extends HasVersionedMessageCompanion[DriverContrac
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v31,
+      ProtocolVersion.v32,
       supportedProtoVersion(v30.DriverContractMetadata)(fromProtoV30),
       _.toProtoV30.toByteString,
     )

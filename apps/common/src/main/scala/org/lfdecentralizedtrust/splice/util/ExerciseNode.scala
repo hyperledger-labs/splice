@@ -90,7 +90,7 @@ object ExerciseNode {
   }
 
   private def isChoice(companion: ExerciseNodeCompanion)(event: ExercisedEvent) = {
-    QualifiedName(companion.template.TEMPLATE_ID) == QualifiedName(
+    QualifiedName(companion.template.getTemplateIdWithPackageId) == QualifiedName(
       event.getTemplateId
     ) && event.getChoice == companion.choice.name
   }
@@ -112,7 +112,7 @@ object ExerciseNode {
             field,
             show"""
             |Unexpectedly couldn't decode LF-value, did you specify the wrong type to decode to, or is there an upgrade incompatibility?
-            |  specified template: ${companion.template.TEMPLATE_ID}
+            |  specified template: ${companion.template.getTemplateIdWithPackageId}
             |  specified choice: ${companion.choice.name.unquoted}
             |  value: $value
             |""".stripMargin,

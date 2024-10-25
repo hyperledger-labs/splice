@@ -45,6 +45,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Codec,
   ConfigScheduleUtil,
   SplitwellTestUtil,
+  SynchronizerFeesTestUtil,
   TriggerTestUtil,
   UpdateHistoryTestUtil,
   WalletTestUtil,
@@ -79,6 +80,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     with SplitwellTestUtil
     with TriggerTestUtil
     with WalletTestUtil
+    with SynchronizerFeesTestUtil
     with UpdateHistoryTestUtil {
 
   // Does not currently handle multiple synchronizers.
@@ -202,6 +204,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
         ),
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
+        java.util.Optional.empty(),
       )
 
     // tap before the migration
@@ -457,9 +460,12 @@ class SoftDomainMigrationTopologySetupIntegrationTest
 
     clue("Alice validator tops up its traffic on new domain") {
       eventually(1.minute) {
+        val topupAmount =
+          getTopupParameters(aliceValidatorBackend, env.environment.clock.now).topupAmount
         aliceValidatorBackend.participantClient.traffic_control
           .traffic_state(newDomainId)
-          .extraTrafficPurchased shouldBe >(NonNegativeLong.zero)
+          .extraTrafficPurchased
+          .value shouldBe topupAmount
       }
     }
     clue("All SV participants have unlimited traffic on new domain") {

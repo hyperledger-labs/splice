@@ -57,7 +57,12 @@ object CometBftRequestSigner {
       fingerprint <-
         if (keysMetadata.isEmpty) {
           for {
-            keypair <- participantAdminConnection.generateKeyPair(name)
+            // None of the key usages really fit so we somewhat randomly pick ProtocolOnly which
+            // seems better than All at least.
+            keypair <- participantAdminConnection.generateKeyPair(
+              name,
+              SigningKeyUsage.ProtocolOnly,
+            )
           } yield {
             logger.info(s"Generating new $name keys with fingerprint ${keypair.id}.")
             keypair.id

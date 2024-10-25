@@ -4,20 +4,16 @@
 package com.digitalasset.canton.domain.sequencing.sequencer
 
 import cats.syntax.parallel.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
-import com.digitalasset.canton.domain.sequencing.sequencer.store.InMemorySequencerStore
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  FutureUnlessShutdown,
-  SyncCloseable,
+import com.digitalasset.canton.domain.sequencing.sequencer.store.{
+  InMemorySequencerStore,
+  SequencerStore,
 }
+import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.protocol.messages.{
   EnvelopeContent,
@@ -77,14 +73,14 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
     val store = new InMemorySequencerStore(
       protocolVersion = testedProtocolVersion,
       sequencerMember = topologyClientMember,
-      unifiedSequencer = testedUseUnifiedSequencer,
+      blockSequencerMode = true,
       loggerFactory = loggerFactory,
     )
     val clock = new WallClock(timeouts, loggerFactory = loggerFactory)
     val crypto: DomainSyncCryptoClient = valueOrFail(
       TestingTopology(
         sequencerGroup = SequencerGroup(
-          active = NonEmpty.mk(Seq, SequencerId(domainId.uid)),
+          active = Seq(SequencerId(domainId.uid)),
           passive = Seq.empty,
           threshold = PositiveInt.one,
         ),
@@ -101,12 +97,24 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
     )("building crypto")
     val metrics: SequencerMetrics = SequencerMetrics.noop("sequencer-test")
 
+    val dbConfig = CommunitySequencerConfig.Database()
+    val storage = new MemoryStorage(loggerFactory, timeouts)
+    val sequencerStore = SequencerStore(
+      storage,
+      testedProtocolVersion,
+      timeouts,
+      loggerFactory,
+      topologyClientMember,
+      blockSequencerMode = false,
+    )
+
     val sequencer: DatabaseSequencer =
       DatabaseSequencer.single(
-        CommunitySequencerConfig.Database(),
+        dbConfig,
         None,
         DefaultProcessingTimeouts.testing,
-        new MemoryStorage(loggerFactory, timeouts),
+        storage,
+        sequencerStore,
         clock,
         domainId,
         topologyClientMember,
@@ -114,7 +122,6 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
         crypto,
         metrics,
         loggerFactory,
-        unifiedSequencer = testedUseUnifiedSequencer,
         runtimeReady = FutureUnlessShutdown.unit,
       )(parallelExecutionContext, tracer, materializer)
 

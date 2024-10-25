@@ -13,8 +13,8 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.version.*
 
 import scala.reflect.ClassTag
@@ -24,9 +24,9 @@ final case class StoredTopologyTransactions[+Op <: TopologyChangeOp, +M <: Topol
 ) extends HasVersionedWrapper[StoredTopologyTransactions[TopologyChangeOp, TopologyMapping]]
     with PrettyPrinting {
 
-  override protected def companionObj = StoredTopologyTransactions
+  override protected def companionObj: StoredTopologyTransactions.type = StoredTopologyTransactions
 
-  override def pretty: Pretty[StoredTopologyTransactions.this.type] = prettyOfParam(
+  override protected def pretty: Pretty[StoredTopologyTransactions.this.type] = prettyOfParam(
     _.result
   )
 
@@ -55,34 +55,13 @@ final case class StoredTopologyTransactions[+Op <: TopologyChangeOp, +M <: Topol
       result.mapFilter(_.selectMapping[T])
     )
 
-  def collectOfMapping(
-      codes: TopologyMapping.Code*
-  ): StoredTopologyTransactions[TopologyChangeOp, TopologyMapping] = {
-    val codeSet = codes.toSet
-    StoredTopologyTransactions(
-      result.filter(tx => codeSet(tx.mapping.code))
-    )
-  }
-
   def filter(
       pred: StoredTopologyTransaction[Op, M] => Boolean
   ): StoredTopologyTransactions[Op, M] =
     StoredTopologyTransactions(result.filter(stored => pred(stored)))
 
-  def collectLatestByUniqueKey: StoredTopologyTransactions[Op, M] = {
-    val toRetain = result
-      .groupBy1(_.mapping.uniqueKey)
-      .view
-      .mapValues(_.maxBy1(_.serial).hash)
-      .values
-      .toSet
-
-    // filtering like this (instead of returning the values after groupBy1 directly)
-    // retains the original order of the topology transactions
-    StoredTopologyTransactions(
-      result.filter(tx => toRetain(tx.hash))
-    )
-  }
+  def collectLatestByUniqueKey: StoredTopologyTransactions[Op, M] =
+    StoredTopologyTransactions(TopologyTransactions.collectLatestByUniqueKey(result))
 
   def signedTransactions: SignedTopologyTransactions[Op, M] = SignedTopologyTransactions(
     result.map(_.transaction)
@@ -93,7 +72,7 @@ final case class StoredTopologyTransactions[+Op <: TopologyChangeOp, +M <: Topol
     .map(_.sequenced.value)
     .maxOption
 
-  def asSnapshotAtMaxEffectiveTime: StoredTopologyTransactions[Op, M] = {
+  def asSnapshotAtMaxEffectiveTime: StoredTopologyTransactions[Op, M] =
     result
       .map(_.validFrom.value)
       .maxOption
@@ -107,9 +86,8 @@ final case class StoredTopologyTransactions[+Op <: TopologyChangeOp, +M <: Topol
         })
       }
       .getOrElse(this) // this case is triggered by `result` being empty
-  }
 
-  def retainAuthorizedHistoryAndEffectiveProposals: StoredTopologyTransactions[Op, M] = {
+  def retainAuthorizedHistoryAndEffectiveProposals: StoredTopologyTransactions[Op, M] =
     // only retain transactions that are:
     filter(tx =>
       // * fully authorized
@@ -117,7 +95,6 @@ final case class StoredTopologyTransactions[+Op <: TopologyChangeOp, +M <: Topol
         // * proposals that are still effective
         tx.validUntil.isEmpty
     )
-  }
 }
 
 object StoredTopologyTransactions
@@ -132,7 +109,7 @@ object StoredTopologyTransactions
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v31,
+      ProtocolVersion.v32,
       supportedProtoVersion(v30.TopologyTransactions)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -143,7 +120,7 @@ object StoredTopologyTransactions
   ): ParsingResult[GenericStoredTopologyTransactions] = {
     def parseItem(
         item: v30.TopologyTransactions.Item
-    ): ParsingResult[GenericStoredTopologyTransaction] = {
+    ): ParsingResult[GenericStoredTopologyTransaction] =
       for {
         sequenced <- ProtoConverter.parseRequired(
           SequencedTime.fromProtoPrimitive,
@@ -163,7 +140,6 @@ object StoredTopologyTransactions
         validUntil,
         transaction,
       )
-    }
     value.items
       .traverse(parseItem)
       .map(StoredTopologyTransactions(_))
@@ -179,7 +155,7 @@ final case class SignedTopologyTransactions[+Op <: TopologyChangeOp, +M <: Topol
     result: Seq[SignedTopologyTransaction[Op, M]]
 ) extends PrettyPrinting {
 
-  override def pretty: Pretty[SignedTopologyTransactions.this.type] = prettyOfParam(
+  override protected def pretty: Pretty[SignedTopologyTransactions.this.type] = prettyOfParam(
     _.result
   )
 
@@ -217,14 +193,31 @@ object SignedTopologyTransactions {
       .collect { case (k, Some(v)) => k -> v }
       .toMap
 
-    val (compacted, _) = {
+    val (compacted, _) =
       txs.foldLeft((Vector.empty[GenericSignedTopologyTransaction], byHash)) {
         case ((result, byHash), tx) =>
           val newResult = byHash.get(tx.hash).map(result :+ _).getOrElse(result)
           val txHashRemoved = byHash.removed(tx.hash)
           (newResult, txHashRemoved)
       }
-    }
     compacted
   }
+}
+
+object TopologyTransactions {
+
+  /** Returns a list that only contains the latest serial per unique key without duplicates.
+    * The input transactions might be returned in a different order.
+    */
+  def collectLatestByUniqueKey[
+      T <: TopologyTransactionLike[TopologyChangeOp, TopologyMapping]
+  ](transactions: Seq[T]): Seq[T] =
+    transactions
+      .groupBy1(_.mapping.uniqueKey)
+      .view
+      .mapValues { transactionsForUniqueKey =>
+        transactionsForUniqueKey.maxBy1(_.serial)
+      }
+      .values
+      .toSeq
 }
