@@ -1367,7 +1367,7 @@ function subcmd_participant_console() {
         fi
       fi
     elif validator_app_pod=$(_get_single_pod "$namespace" "$validator_app_pod_label"); then
-      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$validator_app_pod" validaator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN); then
+      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$validator_app_pod" validator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN); then
         _info "Using Ledger API token from '$validator_app_pod'..."
       else
         _info "Getting Ledger API Auth0 credentials from '$validator_app_pod'..."
