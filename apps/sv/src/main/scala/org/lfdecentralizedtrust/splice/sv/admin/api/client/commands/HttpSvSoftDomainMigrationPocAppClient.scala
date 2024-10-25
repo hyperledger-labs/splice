@@ -6,9 +6,10 @@ package org.lfdecentralizedtrust.splice.sv.admin.api.client.commands
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
+import com.digitalasset.canton.config.NonNegativeDuration
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.{sv_soft_domain_migration_poc as http}
+import org.lfdecentralizedtrust.splice.http.v0.sv_soft_domain_migration_poc as http
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -25,7 +26,13 @@ object HttpSvSoftDomainMigrationPocAppClient {
         mat: Materializer,
     ): Client =
       http.SvSoftDomainMigrationPocClient.httpClient(
-        HttpClientBuilder().buildClient(),
+        HttpClientBuilder()(
+          httpClient.withOverrideParameters(
+            HttpClient.HttpRequestParameters(requestTimeout = NonNegativeDuration.ofMinutes(1))
+          ),
+          ec,
+          mat,
+        ).buildClient(),
         host,
       )
   }
