@@ -67,9 +67,9 @@ spec:
             canton.scan-apps.scan-app.domain-migration-id = {{ .Values.migration.id }}
         {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: SPLICE_APP_SCAN_PARTICIPANT_ADDRESS
-          value: {{ .Values.participantAddress | default "participant" | quote }}
+          value: {{ .Values.participantAddress | quote }}
         - name: SPLICE_APP_SCAN_SEQUENCER_ADDRESS
-          value: {{ .Values.sequencerAddress | default "global-domain-sequencer" | quote }}
+          value: {{ .Values.sequencerAddress | quote }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
         - name: SPLICE_APP_UI_NETWORK_NAME
