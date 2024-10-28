@@ -54,19 +54,29 @@ canton {
 In the ledger api protobufs we used strings to represent the offset of a participant.
 The integer approach replaces string representation in:
 - OffsetCheckpoint message: with int64
-- CompletionStreamRequest message of command completion service: with optional int64.
-  - If specified, it must be a valid absolute offset (positive integer).
+- CompletionStreamRequest message of command completion service: with int64.
+  - If specified, it must be a valid absolute offset (positive integer) or zero (ledger begin offset)..
   - If not set, the ledger uses the ledger begin offset instead.
-- GetLedgerEndResponse message: with optional int64
-  - If specified, it is a valid absolute offset (positive integer).
-  - If not set, it denotes the participant begin offset (there are no transactions yet).
-- GetLatestPrunedOffsetsResponse message: with optional int64
-  - If specified, it is a valid absolute offset (positive integer).
-  - If not set, no pruning has happened yet.
+- GetLedgerEndResponse message: with int64
+  - It will always be a non-negative integer.
+  - If zero, the participant view of the ledger is empty.
+  - If positive, the absolute offset of the ledger as viewed by the participant.
+- GetLatestPrunedOffsetsResponse message: with int64
+  - If positive, it is a valid absolute offset (positive integer).
+  - If zero, no pruning has happened yet.
 - SubmitAndWaitForUpdateIdResponse message: with int64
 - PruneRequest message (prune_up_to): with int64
 - Reassignment, TransactionTree, Transaction and Completion (offset, deduplication_offset) message: with int64
 - Commands message (deduplication_offset): with int64
+- GetActiveContractsRequest message (active_at_offset): with int64 (non-negative offset expected)
+  - If zero, the empty set will be returned
+  - Note that previously if this field was not set the current ledger end was implicitly derived. This is no longer possible.
+- GetActiveContractsResponse message: removed the offset field
+- GetUpdatesRequest message,
+  - begin_exclusive: with int64 (non-negative offset expected)
+  - end_inclusive: with optional int64
+    - If specified, it must be a valid absolute offset (positive integer).
+    - If not set, the stream will not terminate.
 
 ## Until 2024-09-16 (Exclusive)
 

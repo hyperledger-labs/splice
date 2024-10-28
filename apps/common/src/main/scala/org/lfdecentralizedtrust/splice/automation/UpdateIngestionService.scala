@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -61,7 +62,7 @@ class UpdateIngestionService(
                   )
                   _ <- ingestionSink
                     .ingestAcs(
-                      participantBegin,
+                      Some(participantBegin),
                       Seq.empty,
                       Seq.empty,
                       Seq.empty,
@@ -69,19 +70,19 @@ class UpdateIngestionService(
                 } yield participantBegin
               } else
                 for {
-                  acsOffsetO <- connection.ledgerEnd()
-                  _ = logger.debug(s"Starting ingestion from ledger end: $acsOffsetO")
-                  _ <- acsOffsetO match {
-                    case None =>
-                      // Not specifying an offset to the acs endpoint is not equivalent to ledger begin but to ledger end
-                      // which may have changed at this point already so we manually handle this here.
-                      ingestionSink.ingestAcs(None, Seq.empty, Seq.empty, Seq.empty)
-                    case Some(acsOffset) =>
-                      ingestAcsAndInFlight(acsOffset)
-                  }
-                } yield acsOffsetO
+                  acsOffset <- connection.ledgerEnd()
+                  _ = logger.debug(s"Starting ingestion from ledger end: $acsOffset")
+                  _ <- ingestAcsAndInFlight(acsOffset)
+                } yield acsOffset
           } yield offset
-        case Some(offset) =>
+        case Some(offsetO) =>
+          // Our store methods still return an Optional as that is what we may have stored for older migration ids.
+          // However, the most recent migration id (the only one ever used by this code) will never have an empty offset.
+          val offset = offsetO.getOrElse(
+            throw Status.INTERNAL
+              .withDescription("Last ingested offset was empty")
+              .asRuntimeException
+          )
           logger.debug(s"Resuming ingestion from offset: $offset")
           Future.successful(offset)
       }

@@ -1074,8 +1074,8 @@ object LedgerApiCommands {
 
       override def createRequest(): Either[String, GetUpdatesRequest] = Right {
         GetUpdatesRequest(
-          beginExclusive = beginExclusive,
-          endInclusive = endInclusive,
+          beginExclusive = ApiOffset.assertFromStringToLong(beginExclusive),
+          endInclusive = ApiOffset.assertFromStringToLongO(endInclusive),
           verbose = verbose,
           filter = Some(filter),
         )
@@ -1576,7 +1576,7 @@ object LedgerApiCommands {
       override def handleResponse(
           response: GetLedgerEndResponse
       ): Either[String, String] =
-        Right(ApiOffset.fromLongO(response.offset))
+        Right(ApiOffset.fromLong(response.offset))
     }
 
     final case class GetConnectedDomains(partyId: LfPartyId)
@@ -1606,7 +1606,7 @@ object LedgerApiCommands {
         parties: Set[LfPartyId],
         limit: PositiveInt,
         templateFilter: Seq[TemplateId] = Seq.empty,
-        activeAtOffset: String = "",
+        activeAtOffset: String,
         verbose: Boolean = true,
         timeout: FiniteDuration,
         includeCreatedEventBlob: Boolean = false,
@@ -1635,7 +1635,7 @@ object LedgerApiCommands {
           GetActiveContractsRequest(
             filter = Some(TransactionFilter(parties.map((_, filter)).toMap)),
             verbose = verbose,
-            activeAtOffset = activeAtOffset,
+            activeAtOffset = ApiOffset.assertFromStringToLong(activeAtOffset),
           )
         )
       }
@@ -1682,7 +1682,7 @@ object LedgerApiCommands {
           CompletionStreamRequest(
             applicationId = applicationId,
             parties = Seq(partyId),
-            beginExclusive = ApiOffset.assertFromStringToLongO(beginOffsetExclusive),
+            beginExclusive = ApiOffset.assertFromStringToLong(beginOffsetExclusive),
           )
         )
 
@@ -1724,7 +1724,7 @@ object LedgerApiCommands {
         CompletionStreamRequest(
           applicationId = applicationId,
           parties = parties,
-          beginExclusive = ApiOffset.assertFromStringToLongO(offset),
+          beginExclusive = ApiOffset.assertFromStringToLong(offset),
         )
       }
 

@@ -815,13 +815,6 @@ class HttpValidatorAdminHandler(
       }
       ledgerEnd <- storeWithIngestion.connection
         .ledgerEnd()
-        .map(
-          _.getOrElse(
-            throw Status.FAILED_PRECONDITION
-              .withDescription("Ledger end is still reporting as ledger begin, try again later")
-              .asRuntimeException
-          )
-        )
       acs <- storeWithIngestion.connection.activeContracts(
         com.daml.ledger.api.v2.transaction_filter.TransactionFilter(
           Map(

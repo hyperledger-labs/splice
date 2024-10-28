@@ -301,7 +301,7 @@ private[index] class IndexServiceImpl(
   override def getActiveContracts(
       transactionFilter: TransactionFilter,
       verbose: Boolean,
-      activeAtO: Option[Offset],
+      activeAt: Offset,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[GetActiveContractsResponse, NotUsed] = {
@@ -312,7 +312,6 @@ private[index] class IndexServiceImpl(
         _ <- checkUnknownIdentifiers(transactionFilter, currentPackageMetadata).left
           .map(_.asGrpcError)
         endOffset = ledgerEnd()
-        activeAt = activeAtO.getOrElse(endOffset)
         _ <- validatedAcsActiveAtOffset(activeAt = activeAt, ledgerEnd = endOffset)
       } yield {
         val activeContractsSource =
@@ -332,11 +331,6 @@ private[index] class IndexServiceImpl(
               )
           }
         activeContractsSource
-          .concat(
-            Source.single(
-              GetActiveContractsResponse(offset = ApiOffset.toApiString(activeAt))
-            )
-          )
           .buffered(metrics.index.activeContractsBufferSize, LedgerApiStreamsBufferSize)
       }
     }
@@ -513,11 +507,11 @@ private[index] class IndexServiceImpl(
 
   override def latestPrunedOffsets()(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[(Option[Long], Option[Long])] =
+  ): Future[(Long, Long)] =
     ledgerDao.pruningOffsets
       .map { case (prunedUpToInclusiveO, divulgencePrunedUpToO) =>
-        prunedUpToInclusiveO.map(_.toLong) ->
-          divulgencePrunedUpToO.map(_.toLong)
+        prunedUpToInclusiveO.map(_.toLong).getOrElse(0L) ->
+          divulgencePrunedUpToO.map(_.toLong).getOrElse(0L)
       }(directEc)
 }
 

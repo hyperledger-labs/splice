@@ -48,7 +48,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.{DomainId, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -90,12 +89,12 @@ class BaseLedgerConnection(
 
   def ledgerEnd()(implicit
       traceContext: TraceContext
-  ): Future[Option[Long]] =
+  ): Future[Long] =
     client.ledgerEnd()
 
   def latestPrunedOffset()(implicit
       traceContext: TraceContext
-  ): Future[Option[Long]] =
+  ): Future[Long] =
     client.latestPrunedOffset()
 
   def activeContracts(
@@ -110,7 +109,7 @@ class BaseLedgerConnection(
   ] = {
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
-        activeAtOffset = ApiOffset.fromLong(offset),
+        activeAtOffset = offset,
         filter = Some(filter),
       )
     )
@@ -152,11 +151,11 @@ class BaseLedgerConnection(
     client.getConnectedDomains(party)
 
   def updates(
-      beginOffset: Option[Long],
+      beginOffset: Long,
       filter: IngestionFilter,
   )(implicit tc: TraceContext): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
-      .updates(LedgerClient.GetUpdatesRequest(ApiOffset.fromLongO(beginOffset), None, filter))
+      .updates(LedgerClient.GetUpdatesRequest(beginOffset, None, filter))
 
   def getOptionalPrimaryParty(
       user: String,

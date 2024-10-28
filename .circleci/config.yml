@@ -4970,16 +4970,15 @@ workflows:
           test_names_file: "test-full-class-names-resource-intensive.log"
           start_canton_options: "-w"
           parallelism: 2
-      # TODO(#15250) Reenable once this is fixed in Canton.
-      # - scala_test_self_hosted:
-      #     <<: *notify-fail
-      #     context:
-      #       - artifactory
-      #       - slack-context
-      #     name: "scala_test sim time"
-      #     test_names_file: "test-full-class-names-sim-time.log"
-      #     start_canton_options: "-s"
-      #     parallelism: 5
+      - scala_test_self_hosted:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          name: "scala_test sim time"
+          test_names_file: "test-full-class-names-sim-time.log"
+          start_canton_options: "-s"
+          parallelism: 5
       - scala_test:
           <<: *notify-fail
           context:

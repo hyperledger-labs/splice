@@ -158,7 +158,7 @@ private[environment] class LedgerClient(
 
   def ledgerEnd()(implicit
       traceContext: TraceContext
-  ): Future[Option[Long]] = {
+  ): Future[Long] = {
     val req = lapi.state_service.GetLedgerEndRequest()
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
@@ -168,7 +168,7 @@ private[environment] class LedgerClient(
 
   def latestPrunedOffset()(implicit
       traceContext: TraceContext
-  ): Future[Option[Long]] = {
+  ): Future[Long] = {
     val req = lapi.state_service.GetLatestPrunedOffsetsRequest()
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
@@ -578,7 +578,7 @@ private[environment] class LedgerClient(
   def completions(
       applicationId: String,
       parties: Seq[PartyId],
-      begin: Option[Long],
+      begin: Long,
   )(implicit tc: TraceContext): Source[CompletionStreamResponse, NotUsed] =
     toSource(
       for {
@@ -659,14 +659,14 @@ object LedgerClient {
   }
 
   final case class GetUpdatesRequest(
-      begin: String,
-      end: Option[String],
+      begin: Long,
+      end: Option[Long],
       filter: IngestionFilter,
   ) {
     private[LedgerClient] def toProto: lapi.update_service.GetUpdatesRequest =
       lapi.update_service.GetUpdatesRequest(
         beginExclusive = begin,
-        endInclusive = end.getOrElse(""),
+        endInclusive = end,
         filter = Some(filter.toTransactionFilter),
       )
   }
@@ -683,11 +683,11 @@ object LedgerClient {
     import com.daml.ledger.javaapi.data as jdata
 
     val CompletionOffset: SubmitAndWaitFor[Long] =
-      impl((r: CSOC.SubmitAndWaitForUpdateIdResponse) => r.getCompletionOffset)(
+      impl((r: CSOC.SubmitAndWaitResponse) => r.getCompletionOffset)(
         { case (stub, r, ec) =>
           stub
-            .submitAndWaitForUpdateId(command_service.SubmitAndWaitRequest.fromJavaProto(r))
-            .map(r => command_service.SubmitAndWaitForUpdateIdResponse.toJavaProto(r))(ec)
+            .submitAndWait(command_service.SubmitAndWaitRequest.fromJavaProto(r))
+            .map(r => command_service.SubmitAndWaitResponse.toJavaProto(r))(ec)
         }
       )
 
