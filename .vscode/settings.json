@@ -1,5 +1,7 @@
 {
   "daml.extraArguments": "--studio-auto-run-all-scenarios=yes",
+  "typescript.tsdk": "./apps/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
   "files.watcherExclude": {
     "**/target": true
   },

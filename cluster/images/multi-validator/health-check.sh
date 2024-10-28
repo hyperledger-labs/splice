@@ -11,8 +11,12 @@ function check_endpoint() {
     local base_port=$(( 5000 + ( node_number * 100 ) ))
     local validator_admin_port=$(( base_port + 3 ))
 
-    local status
-    status=$(wget --server-response --quiet "http://127.0.0.1:${validator_admin_port}/$endpoint" 2>&1 | awk 'NR==1{print $2}')
+    local response
+    if ! response=$(wget --timeout=0.5 --server-response --quiet "http://127.0.0.1:${validator_admin_port}/$endpoint" 2>&1); then
+      echo "Connection to $validator_admin_port timed out"
+      exit 1
+    fi
+    status=$(echo "$response" | awk 'NR==1{print $2}')
 
     if [[ "$status" != "200" ]];
     then

@@ -1129,7 +1129,7 @@ commands:
                   echo "stack $STACK_NAME is successfully updated with commit $EXPECTED_GIT_COMMIT"
                   break
                 else
-                  echo "stack is currently on commit: $LAST_SUCCESSFUL_COMMIT. Waiting for the expecting commit $EXPECTED_GIT_COMMIT."
+                  echo "stack $STACK_NAME is currently on commit: $LAST_SUCCESSFUL_COMMIT. Waiting for the expecting commit $EXPECTED_GIT_COMMIT."
                 fi
                 # Check for timeout
                 CURRENT_TIME=$(date +%s)
@@ -1364,6 +1364,8 @@ commands:
           timeout: "35m"
           no_output_timeout: "20m"
       - execute_sbt_command:
+          # we don't care if some integration test happened to make the repo dirty
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
           cmd: "checkErrors"
 
   ##### Overall setup
@@ -1834,6 +1836,8 @@ jobs:
           gce_authenticate: true
           cmd: |
             gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MAX_NODES}
+            # infra pool max nodes as per `cluster/pulumi/cluster/src/nodePools.ts`
+            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-infra-pool --min-nodes=3
           cmd_retry_count: 5
 
   autoscaler_allow_scaledown:
@@ -1852,6 +1856,8 @@ jobs:
           gce_authenticate: true
           cmd: |
             gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MIN_NODES}
+            # infra pool min nodes as per `cluster/pulumi/cluster/src/nodePools.ts`
+            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-infra-pool --min-nodes=1
           cmd_retry_count: 5
 
   backup_cluster:
@@ -1939,6 +1945,8 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
+      migration_id:
+        type: integer
     executor: self_hosted
     environment:
       <<: *env
@@ -1950,7 +1958,7 @@ jobs:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "10m"
-          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "<< parameters.cluster >>"
+          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "<< parameters.cluster >>" "<< parameters.migration_id >>"
       - run:
           name: Add snapshot_array to env
           command: |
@@ -3003,6 +3011,7 @@ jobs:
             
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
             echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
+            echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
             
             cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
             cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
@@ -3334,10 +3343,6 @@ jobs:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
-    parameters:
-      push_helm_to_artifactory:
-        type: boolean
-        default: false
     steps:
       - checkout_with_retry
       - restore_frontend_builds
@@ -3386,7 +3391,7 @@ jobs:
           cmd_retry_count: 5
       - when:
           condition:
-            equal: [ true, "<< parameters.push_helm_to_artifactory >>" ]
+            equal: [ main, << pipeline.git.branch >> ]
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Push Helm Artifacts to artifactory
@@ -4420,6 +4425,14 @@ jobs:
                 cluster: << parameters.cluster >>
                 project: "validator-runbook"
                 when_env: "SPLICE_DEPLOY_VALIDATOR_RUNBOOK"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "validator1"
+                when_env: "SPLICE_DEPLOY_VALIDATOR1"
+            - preview_pulumi:
+                cluster: << parameters.cluster >>
+                project: "splitwell"
+                when_env: "SPLICE_DEPLOY_SPLITWELL"
       - when:
           condition: << parameters.deployment_only >>
           steps:
@@ -5980,7 +5993,6 @@ workflows:
           context:
             - artifactory
             - slack-context
-          push_helm_to_artifactory: true
       - autoscaler_prevent_scaledown:
           cluster: "ciperiodic"
           requires:
@@ -6061,19 +6073,17 @@ workflows:
           migration_id: 1
           requires:
             - migrate_cluster
-      # Re-enable once latest release is > 0.2.3
-      #      - preflight_sv_check:
-      #          name: "preflight_sv_check_migrated"
-      #          <<: *main-branch-only
-      #          context:
-      #            - artifactory
-      #            - canton-network-vpn
-      #            - slack-context
-      #          cluster: "ciperiodic"
-      #          cluster_version: << pipeline.parameters.upgrade-version >>
-      #          migration_id: 1
-      #          requires:
-      #            - migrate_cluster
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
       - post_migration_verify_identities:
           context:
             - artifactory
@@ -6112,8 +6122,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           requires:
-            # Re-enable once latest release is > 0.2.3
-            #            - preflight_sv_check_migrated
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - restore_node:
@@ -6133,10 +6142,9 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           requires:
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
-      #   Re-enable once latest release is > 0.2.3
-      #            - preflight_sv_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           context:
@@ -6801,7 +6809,7 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 3
+          migration_id: 2
           context:
             - artifactory
             - canton-network-vpn
@@ -6889,7 +6897,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 3
+          migration_id: 2
           requires:
             - wait_for_previous_pipeline
 
@@ -6918,7 +6926,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 3
+          migration_id: 2
           requires:
             - wait_for_previous_pipeline
 
@@ -6933,7 +6941,7 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 3
+          migration_id: 2
           context:
             - artifactory
             - canton-network-vpn
@@ -6945,6 +6953,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "devnet"
+          migration_id: 2
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context
@@ -7253,7 +7262,7 @@ workflows:
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           cluster: "mainnet"
           parallelism: 1
-          migration_id: 0
+          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -7265,6 +7274,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "mainnet"
+          migration_id: 1
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           alert_threshold: "4 hours ago"
           context:
@@ -7280,7 +7290,6 @@ workflows:
             - artifactory
             - slack-context
           cluster: << pipeline.parameters.cluster >>
-          enable_alerts: true
 
   preview_operator:
     when:
@@ -7423,6 +7432,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "testnet"
+          migration_id: 2
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context

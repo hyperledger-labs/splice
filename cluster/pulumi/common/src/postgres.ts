@@ -57,7 +57,8 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     alias: string,
     secretName: string,
     active: boolean = true,
-    disableProtection?: boolean
+    disableProtection?: boolean,
+    migrationId?: string
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
@@ -91,9 +92,14 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
             privateNetwork: privateNetwork.id,
             enablePrivatePathForGoogleCloudServices: true,
           },
-          userLabels: {
-            cluster: CLUSTER_BASENAME,
-          },
+          userLabels: migrationId
+            ? {
+                cluster: CLUSTER_BASENAME,
+                migration_id: migrationId,
+              }
+            : {
+                cluster: CLUSTER_BASENAME,
+              },
           locationPreference: {
             // it's fairly critical for performance that the sql instance is in the same zone as the GKE nodes
             zone:
@@ -233,12 +239,21 @@ export function installPostgres(
   instanceName: string,
   alias: string,
   uniqueSecretName = false,
-  isActive: boolean = true
+  isActive: boolean = true,
+  migrationId?: number
 ): Postgres {
   let ret: Postgres;
   const secretName = uniqueSecretName ? instanceName + '-secrets' : 'postgres-secrets';
   if (enableCloudSql) {
-    ret = new CloudPostgres(xns, instanceName, alias, secretName, isActive);
+    ret = new CloudPostgres(
+      xns,
+      instanceName,
+      alias,
+      secretName,
+      isActive,
+      undefined,
+      migrationId?.toString()
+    );
   } else {
     ret = new SplicePostgres(xns, instanceName, alias, secretName);
   }

@@ -15,7 +15,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-          push_helm_to_artifactory: true
       - autoscaler_prevent_scaledown:
           cluster: "ciperiodic"
           requires:
@@ -96,19 +95,17 @@ workflow:
           migration_id: 1
           requires:
             - migrate_cluster
-      # Re-enable once latest release is > 0.2.3
-      #      - preflight_sv_check:
-      #          name: "preflight_sv_check_migrated"
-      #          <<: *main-branch-only
-      #          context:
-      #            - artifactory
-      #            - canton-network-vpn
-      #            - slack-context
-      #          cluster: "ciperiodic"
-      #          cluster_version: << pipeline.parameters.upgrade-version >>
-      #          migration_id: 1
-      #          requires:
-      #            - migrate_cluster
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciperiodic"
+          cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
+          requires:
+            - migrate_cluster
       - post_migration_verify_identities:
           context:
             - artifactory
@@ -147,8 +144,7 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
-            # Re-enable once latest release is > 0.2.3
-            #            - preflight_sv_check_migrated
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - restore_node:
@@ -168,10 +164,9 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           requires:
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
-      #   Re-enable once latest release is > 0.2.3
-      #            - preflight_sv_check_migrated
       - preflight_sv_check:
           name: "preflight_sv_check_redeployed"
           context:

@@ -11,7 +11,7 @@ import {
   installAuth0UISecret,
   installSpliceHelmChart,
   spliceInstanceNames,
-  splitwellDarPath,
+  splitwellDarPaths,
   imagePullSecret,
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
@@ -94,7 +94,7 @@ export async function installValidator1(
     xns,
     dependencies: [],
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
-    appDars: [splitwellDarPath],
+    appDars: splitwellDarPaths,
     // TODO(#14199) Remove this with the next reset
     validatorPartyHint: spliceEnvConfig.envFlag('VALIDATOR_LEGACY_PARTY_HINT')
       ? `${name}_validator_service_user`

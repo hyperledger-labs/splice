@@ -1,8 +1,8 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+from collections.abc import Iterator
 from datetime import datetime, timezone, timedelta
-from itertools import chain
 import os
 import re
 import requests
@@ -49,6 +49,7 @@ class Workflow:
   pipeline_number: int
   # unfun fact: circleci docs says "not_run", but we've seen "not_running" in the wild, so we defensively allow both
   status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "not_running", "failed", "error", "failing", "on_hold", "canceled", "unauthorized"])})
+  created_at: datetime
   stopped_at: datetime | None
   class Meta:
     unknown = EXCLUDE
@@ -57,9 +58,24 @@ class Workflow:
     return self.status not in ["running", "failing"]
 
 @dataclass
+class InsightWorkflow:
+  id: str
+  status: str = field(metadata={"validate": marshmallow.validate.OneOf(["running", "success", "not_run", "not_running", "failed", "error", "failing", "on_hold", "canceled", "unauthorized"])})
+  stopped_at: datetime | None
+  class Meta:
+    unknown = EXCLUDE
+
+@dataclass
 class WorkflowsResponse:
   next_page_token: str | None
   items: list[Workflow]
+  class Meta:
+    unknown = EXCLUDE
+
+@dataclass
+class InsightWorkflowsResponse:
+  next_page_token: str | None
+  items: list[InsightWorkflow]
   class Meta:
     unknown = EXCLUDE
 
@@ -80,7 +96,7 @@ class JobsResponse:
   class Meta:
     unknown = EXCLUDE
 
-def fetch_paginated(url: str, schema: Schema, params = {}, halt = lambda x: False) -> list:
+def gen_fetch_paginated(url: str, schema: Schema, params = {}, halt = lambda x: False) -> Iterator:
   items = []
   next_page_token = None
   while True:
@@ -95,11 +111,15 @@ def fetch_paginated(url: str, schema: Schema, params = {}, halt = lambda x: Fals
       raise e
     next_page_token = response.next_page_token
     items += response.items
+    for item in response.items:
+      yield item
     if not next_page_token:
       break
     if halt(items):
       break
-  return items
+
+def fetch_paginated(url: str, schema: Schema, params = {}, halt = lambda x: False) -> list:
+  return list(gen_fetch_paginated(url, schema, params, halt))
 
 def fetch_previous_pipelines(current_pipeline_number: int, branch_filter: str, branch_filter_is_regex: bool, max_age_seconds: int) -> list[Pipeline]:
   cutoff_date = (datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)) if max_age_seconds > 0 else datetime.fromtimestamp(0)
@@ -134,6 +154,14 @@ def fetch_workflow(workflow_id: str) -> Workflow:
   raw_response.raise_for_status()
   return Workflow.Schema().load(raw_response.json())
 
+def gen_recent_workflow_runs(workflow_name: str, branch: str, start_date: datetime, end_date: datetime) -> Iterator[InsightWorkflow]:
+  url = f"{BASE_CCI_API_URL}/insights/github/{PROJECT_USERNAME}/{PROJECT_REPONAME}/workflows/{workflow_name}"
+  for wf in gen_fetch_paginated(url, InsightWorkflowsResponse.Schema(),
+                                {"branch": branch, "start-date": start_date, "end-date": end_date}):
+    # end-date is based on start time; API also delivers workflows prior to start-date
+    if start_date <= wf.stopped_at < end_date:
+      yield wf
+
 def cancel_workflow(workflow_id: str):
   url = f"{BASE_CCI_API_URL}/workflow/{workflow_id}/cancel"
   raw_response = requests.post(url, headers = HEADERS)
@@ -155,36 +183,23 @@ class SuccessStats:
 # Fetch statistics on similar past jobs.  Note this takes 5sec to run in local
 # tests, so consider passing around the results rather than re-calling
 def failures_and_last_success(pipeline_number: int, branch: str, workflow: Workflow, job_name: str):
+  prior_to_workflow_start = workflow.created_at - timedelta(seconds=1)
   failure_window = timedelta(hours=12)
-  window_pipelines = fetch_previous_pipelines(pipeline_number, branch, False, failure_window.total_seconds())
   failed_statuses = frozenset(("failed", "error", "failing"))
-  window_workflows = [wf for p in window_pipelines
-                      for wf in fetch_workflows(p.id)
-                      if wf.name == workflow.name]
-  failed_workflows = [wf for wf in window_workflows
+  failed_workflows = [wf for wf in gen_recent_workflow_runs(workflow.name, branch, prior_to_workflow_start - failure_window, prior_to_workflow_start)
                       if wf.status in failed_statuses]
   failed_jobs = [j for wf in failed_workflows
                  for j in fetch_jobs(wf)
                  if j.name == job_name and j.status in failed_statuses]
   success_window = timedelta(days=30)
-  assert success_window > failure_window
-  # this assumes that the last pipeline happened about failure_window ago,
-  # which isn't quite right but probably close enough
-  (past_pipeline, past_window) = ((window_pipelines[-1].number, success_window - failure_window)
-    if window_pipelines else (pipeline_number, success_window))
   last_success_wf = None
   last_success_job = None
-  # fetch more workflows to search for success only if there isn't a success
-  # in the failure window
-  for wf in chain(window_workflows,
-                  (wf
-                   for p in fetch_previous_pipelines(past_pipeline, branch, False, past_window.total_seconds())
-                   for wf in fetch_workflows(p.id)
-                   if wf.name == workflow.name)):
-    job_in_wf = [j for j in fetch_jobs(wf) if j.name == job_name]
-    if job_in_wf and job_in_wf[0].status == 'success':
-      last_success_job = job_in_wf[0]
-    if wf.status == 'success':
+  for wf in gen_recent_workflow_runs(workflow.name, branch, prior_to_workflow_start - success_window, prior_to_workflow_start):
+    if not last_success_job:
+      job_in_wf = [j for j in fetch_jobs(wf) if j.name == job_name]
+      if job_in_wf and job_in_wf[0].status == 'success':
+        last_success_job = job_in_wf[0]
+    if not last_success_wf and wf.status == 'success':
       last_success_wf = wf
     if last_success_wf and last_success_job:
       break

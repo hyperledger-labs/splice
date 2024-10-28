@@ -114,7 +114,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-validator",
@@ -156,7 +156,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -216,7 +216,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -256,7 +256,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "loopback",
     "provider": "",
@@ -387,10 +387,10 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-1",
+      "name": "participant-2",
       "namespace": "validator",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -433,7 +433,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 1
+            "id": 2
           }
         },
         "participantAdminUserNameFrom": {
@@ -444,7 +444,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_1",
+          "databaseName": "participant_2",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -458,9 +458,9 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
-    "name": "validator-participant-1",
+    "name": "validator-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -488,7 +488,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "postgres",
@@ -537,7 +537,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -564,7 +564,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator",
@@ -607,10 +607,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "1"
+          "id": "2"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "host": "postgres",
           "postgresName": "postgres",
@@ -641,7 +641,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator",
     "provider": "",

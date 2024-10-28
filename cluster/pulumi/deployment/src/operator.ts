@@ -40,6 +40,7 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
     },
     controller: {
       args: ['--zap-level=debug', '--zap-time-encoding=iso8601', '--zap-encoder=json'],
+      gracefulShutdownTimeoutDuration: '30m',
     },
     createClusterRole: true,
     serviceMonitor: {

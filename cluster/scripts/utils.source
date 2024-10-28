@@ -18,9 +18,51 @@ function get_stack_for_namespace() {
   local stack=""
   if [[ "${namespace}" =~ sv.* ]]; then
     stack="canton-network"
+  elif [ "$namespace" == "splitwell" ]; then
+      stack="canton-network"
   else
       stack="$namespace"
   fi
 
   echo $stack
+}
+
+function get_stack_for_namespace_component() {
+  local namespace=$1
+  local component=$2
+
+  local stack=""
+  if [[ "${namespace}" =~ sv.* ]]; then
+    if [[ "${component}" == participant ]]
+    then
+      stack="sv-canton"
+    elif [[ "${component}" == sequencer ]]
+    then
+      stack="sv-canton"
+    elif [[ "${component}" == mediator ]]
+    then
+      stack="sv-canton"
+    else
+      stack="canton-network"
+    fi
+  else
+      stack="$namespace"
+  fi
+
+  echo $stack
+}
+
+create_component_instance() {
+    local component="$1"
+    local migration_id="$2"
+    local namespace="$3"
+
+    if [[ ("$component" == "sequencer" || "$component" == "mediator" || "$component" == "participant")
+       && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv")]]; then
+        component_instance="${component}-${migration_id}"
+    else
+        component_instance="${component}"
+    fi
+
+    echo "$component_instance"
 }

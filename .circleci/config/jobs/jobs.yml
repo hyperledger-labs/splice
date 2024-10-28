@@ -172,10 +172,6 @@ jobs:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
-    parameters:
-      push_helm_to_artifactory:
-        type: boolean
-        default: false
     steps:
       - checkout_with_retry
       - restore_frontend_builds
@@ -224,7 +220,7 @@ jobs:
           cmd_retry_count: 5
       - when:
           condition:
-            equal: [ true, "<< parameters.push_helm_to_artifactory >>" ]
+            equal: [ main, << pipeline.git.branch >> ]
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Push Helm Artifacts to artifactory

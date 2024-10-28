@@ -84,6 +84,8 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
+      migration_id:
+        type: integer
     executor: self_hosted
     environment:
       <<: *env
@@ -95,7 +97,7 @@ jobs:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "10m"
-          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "<< parameters.cluster >>"
+          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "<< parameters.cluster >>" "<< parameters.migration_id >>"
       - run:
           name: Add snapshot_array to env
           command: |

@@ -67,6 +67,7 @@ import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
+import org.scalatest.time.{Minute, Span}
 
 import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.DurationInt
@@ -87,6 +88,8 @@ class SoftDomainMigrationTopologySetupIntegrationTest
   override def runUpdateHistorySanityCheck = false
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
+
+  override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   override def environmentDefinition =
     EnvironmentDefinition

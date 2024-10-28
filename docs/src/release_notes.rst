@@ -8,12 +8,14 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.2.6
+-----
+
+Note: 0.2.5 was skipped as it introduced a regression where the splice apps hardcoded the wrong log level.
 
 * Docs
 
-    * Updated docs to include a section on how to create a stand alone Canton Network for Development only. See :ref:`scratchnet`.
+    * Updated docs to include a section on how to create a standalone k8s-based Canton Network. This can be useful to test deployment changes, in particular for SVs. See :ref:`scratchnet`.
 
 * SV UI
 
@@ -40,7 +42,6 @@ Upcoming
 * Canton
 
   * Enabled slow future logging for all components to better debug stuck nodes.
-
   * Added a max time of 10 minutes for processing of a sequenced event before the node crashes to get restarted.
     This mitigates cases where nodes might get stuck due to a bug and a restart recovers them.
 
@@ -48,11 +49,6 @@ Upcoming
 
   * **Breaking** Every Helm chart with a name starting with ``cn-`` has been renamed, now
     starting with ``splice-`` instead, except for ``cn-docs``.
-  * **Breaking** For the Docker images, these input environment variables have been renamed,
-    replacing ``CN`` with ``SPLICE``:
-
-      * ``CN_APP_LEGACY_PARTY_HINT``
-
   * **Breaking** The script token.py was renamed to get-token.py to avoid conflicting with some
     imported modules.
   * ``imagePullPolicy`` is now unset by default corresponding to ``IfNotPresent``.
@@ -60,6 +56,11 @@ Upcoming
   * In ``paused-triggers`` settings, the trigger name prefix ``com.daml.network`` has been
     replaced by ``org.lfdecentralizedtrust.splice``. This also applies to stacktraces you may
     see in logs.
+  * ``domain.sequencerAddress``, ``domain.mediatorAddress`` and
+    ``participantAddress`` in the SV and Scan helm values are now
+    mandatory. The defaults did not include the migration id so are
+    almost always incorrect which means this likely has no impact as
+    SVs should already have this set explicitly.
 
 * Bugfixes
 
