@@ -1349,6 +1349,7 @@ abstract class ScanStoreTest
           new splice.externalpartyamuletrules.ExternalPartyAmuletRules_CreateTransferCommand(
             transferCmd.payload.sender,
             transferCmd.payload.receiver,
+            transferCmd.payload.delegate,
             transferCmd.payload.amount,
             transferCmd.payload.expiresAt,
             transferCmd.payload.nonce,
@@ -1368,6 +1369,7 @@ abstract class ScanStoreTest
           transferCmd = transferCommand(
             userParty(1),
             userParty(2),
+            userParty(3),
             42.0,
             Instant.EPOCH,
             0L,
@@ -1436,6 +1438,7 @@ abstract class ScanStoreTest
           transferCmd = transferCommand(
             userParty(1),
             userParty(2),
+            userParty(3),
             42.0,
             Instant.EPOCH,
             0L,
@@ -1489,6 +1492,7 @@ abstract class ScanStoreTest
           transferCmd = transferCommand(
             userParty(1),
             userParty(2),
+            userParty(3),
             42.0,
             Instant.EPOCH,
             0L,
@@ -1536,6 +1540,7 @@ abstract class ScanStoreTest
           transferCmd = transferCommand(
             userParty(1),
             userParty(2),
+            userParty(3),
             42.0,
             Instant.EPOCH,
             0L,

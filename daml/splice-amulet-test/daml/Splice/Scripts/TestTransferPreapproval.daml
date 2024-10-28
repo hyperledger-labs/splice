@@ -146,6 +146,7 @@ testTransferCommand = script do
     with
       sender = alice.primaryParty
       receiver = externalParty
+      delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 12
       nonce = 0
@@ -167,7 +168,10 @@ testTransferCommand = script do
   appRewards === []
 
   -- DSO party is checked
-  _ <- submitMustFail app.dso $ exerciseCmd transferCmd TransferCommand_Send
+  -- Note that the delegate is expected to have access to a node on which `alice` is
+  -- hosted at least with observer rights. The readAs right for the DSO party in the submission is just
+  -- shortcut to avoid packaging up the DSO party provided contracts (e.g. `AmuletRules`).
+  _ <- submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
       context
       inputs = [InputAmulet amulet]
@@ -175,14 +179,14 @@ testTransferCommand = script do
       transferCounterCid
 
   -- receiver is checked
-  _ <- submitMustFail app.dso $ exerciseCmd transferCmd TransferCommand_Send
+  _ <- submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
       context
       inputs = [InputAmulet amulet]
       transferPreapprovalCidO = Some transferPreapprovalWrongReceiverCid
       transferCounterCid
 
-  TransferCommand_SendResult (TransferCommandResultSuccess _) <- submit app.dso $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultSuccess _) <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -201,6 +205,7 @@ testTransferCommand = script do
     with
       sender = alice.primaryParty
       receiver = externalParty
+      delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 12
       nonce = 1
@@ -212,7 +217,7 @@ testTransferCommand = script do
   passTime (hours 13)
 
   -- Fails if time is after cmd expiry
-  submitMustFail app.dso $ exerciseCmd transferCmd TransferCommand_Send
+  submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -225,6 +230,7 @@ testTransferCommand = script do
     with
       sender = alice.primaryParty
       receiver = externalParty
+      delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 1
@@ -232,7 +238,7 @@ testTransferCommand = script do
   amulet <- tap app alice 10.0
 
   -- fails with out of funds
-  TransferCommand_SendResult (TransferCommandResultFailure reason) <- submit app.dso $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultFailure reason) <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso]  $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -250,6 +256,7 @@ testTransferCommand = script do
     with
       sender = alice.primaryParty
       receiver = externalParty
+      delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 2
@@ -263,6 +270,7 @@ testTransferCommand = script do
     with
       sender = alice.primaryParty
       receiver = externalParty
+      delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 2
@@ -281,11 +289,12 @@ testTransferCommand = script do
     with
       sender = alice.primaryParty
       receiver = externalParty
+      delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 1
 
-  TransferCommand_SendResult (TransferCommandResultFailure reason) <- submit app.dso $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultFailure reason) <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -298,13 +307,14 @@ testTransferCommand = script do
     with
       sender = alice.primaryParty
       receiver = externalParty
+      delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 3
 
   amulet <- tap app alice 50.0
 
-  _ <- submitMustFail app.dso $ exerciseCmd transferCmdFuture TransferCommand_Send
+  _ <- submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmdFuture TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -317,13 +327,14 @@ testTransferCommand = script do
     with
       sender = alice.primaryParty
       receiver = externalParty
+      delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 2
 
   amulet <- tap app alice 50.0
 
-  TransferCommand_SendResult (TransferCommandResultSuccess _) <- submit app.dso $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultSuccess _) <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -335,7 +346,7 @@ testTransferCommand = script do
   amulet <- tap app alice 50.0
 
   -- transferCmdFuture can now be submitted after the counter advanced
-  TransferCommand_SendResult (TransferCommandResultSuccess _) <- submit app.dso $ exerciseCmd transferCmdFuture TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultSuccess _) <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmdFuture TransferCommand_Send
     with
       context = context
       inputs = [InputAmulet amulet]
@@ -349,13 +360,14 @@ testTransferCommand = script do
   ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
       sender = alice.primaryParty
+      delegate = aliceValidator.primaryParty
       receiver = receiverNoPreapproval
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 4
 
   -- transferCmdFuture can now be submitted after the counter advanced
-  TransferCommand_SendResult (TransferCommandResultFailure msg) <- submit app.dso $ exerciseCmd transferCmd TransferCommand_Send
+  TransferCommand_SendResult (TransferCommandResultFailure msg) <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
       inputs = []
