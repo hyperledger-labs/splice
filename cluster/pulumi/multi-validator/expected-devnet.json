@@ -2538,7 +2538,7 @@
                   "failureThreshold": 5,
                   "initialDelaySeconds": 5,
                   "periodSeconds": 5,
-                  "timeoutSeconds": 3
+                  "timeoutSeconds": 10
                 },
                 "resources": {
                   "limits": {
@@ -2916,7 +2916,7 @@
                   "failureThreshold": 5,
                   "initialDelaySeconds": 5,
                   "periodSeconds": 5,
-                  "timeoutSeconds": 3
+                  "timeoutSeconds": 10
                 },
                 "resources": {
                   "limits": {
@@ -3294,7 +3294,7 @@
                   "failureThreshold": 5,
                   "initialDelaySeconds": 5,
                   "periodSeconds": 5,
-                  "timeoutSeconds": 3
+                  "timeoutSeconds": 10
                 },
                 "resources": {
                   "limits": {
@@ -3672,7 +3672,7 @@
                   "failureThreshold": 5,
                   "initialDelaySeconds": 5,
                   "periodSeconds": 5,
-                  "timeoutSeconds": 3
+                  "timeoutSeconds": 10
                 },
                 "resources": {
                   "limits": {
@@ -4050,7 +4050,7 @@
                   "failureThreshold": 5,
                   "initialDelaySeconds": 5,
                   "periodSeconds": 5,
-                  "timeoutSeconds": 3
+                  "timeoutSeconds": 10
                 },
                 "resources": {
                   "limits": {
