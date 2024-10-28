@@ -1836,7 +1836,8 @@ jobs:
           gce_authenticate: true
           cmd: |
             gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MAX_NODES}
-            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-infra-pool --min-nodes=${GCP_CLUSTER_MAX_NODES}
+            # infra pool max nodes as per `cluster/pulumi/cluster/src/nodePools.ts`
+            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-infra-pool --min-nodes=3
           cmd_retry_count: 5
 
   autoscaler_allow_scaledown:
@@ -1855,7 +1856,8 @@ jobs:
           gce_authenticate: true
           cmd: |
             gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-apps-pool --min-nodes=${GCP_CLUSTER_MIN_NODES}
-            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-infra-pool --min-nodes=${GCP_CLUSTER_MIN_NODES}
+            # infra pool min nodes as per `cluster/pulumi/cluster/src/nodePools.ts`
+            gcloud container node-pools update --cluster cn-${GCP_CLUSTER_BASENAME}net cn-infra-pool --min-nodes=1
           cmd_retry_count: 5
 
   backup_cluster:
