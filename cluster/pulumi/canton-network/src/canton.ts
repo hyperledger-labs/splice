@@ -35,6 +35,12 @@ export function installCanton(
   const activeMigrationId =
     decentralizedSynchronizerMigrationConfig.activeDatabaseId ||
     decentralizedSynchronizerMigrationConfig.active.id;
+  const migrationId = decentralizedSynchronizerMigrationConfig.allExternalMigrations
+    .map(e => e.id)
+    .includes(activeMigrationId)
+    ? activeMigrationId - 1
+    : activeMigrationId;
+
   const externalActiveMigration = {
     decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
       activeMigrationId,
@@ -51,30 +57,30 @@ export function installCanton(
       postgres.installPostgres(
         xns,
         `sequencer-pg`,
-        `sequencer-${activeMigrationId}-pg`,
+        `sequencer-${migrationId}-pg`,
         true,
         decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
-        activeMigrationId
+        migrationId
       );
     const mediatorPostgres =
       defaultPostgres ||
       postgres.installPostgres(
         xns,
         `mediator-pg`,
-        `mediator-${activeMigrationId}-pg`,
+        `mediator-${migrationId}-pg`,
         true,
         decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
-        activeMigrationId
+        migrationId
       );
     const participantPostgres =
       defaultPostgres ||
       postgres.installPostgres(
         xns,
         `participant-pg`,
-        `participant-${activeMigrationId}-pg`,
+        `participant-${migrationId}-pg`,
         true,
         decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
-        activeMigrationId
+        migrationId
       );
     const installedMigrations = migrationsContainedInStack.map(migration => {
       return {
