@@ -1557,11 +1557,11 @@ function subcmd_backup_nodes() {
         case "$node" in
             sv-1|sv-2|sv-3|sv-4)
                 _info "Backing up sv node $node"
-                "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id"
                 ;;
             validator1|splitwell)
                 _info "Backing up validator node $node"
-                "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id"
                 ;;
             *)
                 _error "Unknown node $node"
