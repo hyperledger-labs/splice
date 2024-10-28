@@ -1878,6 +1878,9 @@ jobs:
         default: 3
       migration_id:
         type: integer
+      internal_stack:
+        type: boolean
+        default: true
     executor: self_hosted
     environment:
       <<: *env
@@ -1928,7 +1931,7 @@ jobs:
             for ns in $(cat tests-to-run.txt); do
               cncluster wait $ns validator-app << parameters.migration_id >>
             done
-            cncluster backup_nodes << parameters.migration_id >> $(cat tests-to-run.txt)
+            cncluster backup_nodes << parameters.migration_id >> << parameters.internal_stack >> $(cat tests-to-run.txt)
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
@@ -6942,6 +6945,7 @@ workflows:
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           migration_id: 2
+          internal_stack: false
           context:
             - artifactory
             - canton-network-vpn

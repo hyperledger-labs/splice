@@ -143,6 +143,7 @@ workflow:
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
           migration_id: 2
+          internal_stack: false
           context:
             - artifactory
             - canton-network-vpn

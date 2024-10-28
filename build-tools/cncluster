@@ -1534,8 +1534,8 @@ subcommand_whitelist[backup_nodes]='Backup one or more CN nodes in the cluster'
 function subcmd_backup_nodes() {
     _cluster_must_exist
 
-    if [ "$#" -lt 1 ]; then
-       echo "Usage: $0 <migration_id> [node...]"
+    if [ "$#" -lt 2 ]; then
+       echo "Usage: $0 <migration_id> <internal_stack> [node...]"
        exit 1
     fi
 
@@ -1544,12 +1544,18 @@ function subcmd_backup_nodes() {
         _error "<migration_id> must be a positive integer"
     fi
 
-    migration_id=$1
+    if [[ "$1" == "true" || "$1" == "false" ]]; then
+        echo "Usage: $0 <internal_stack> [node...]"
+        _error "<internal_stack> must be either \"true\" or \"false\""
+    fi
 
-    if [ $# -eq 1 ]; then
+    migration_id=$1
+    internal_stack=$2
+
+    if [ $# -eq 2 ]; then
         nodes="sv-1 sv-2 sv-3 sv-4 validator1 splitwell"
     else
-        shift
+        shift 2
         nodes="$*"
     fi
 
@@ -1557,11 +1563,11 @@ function subcmd_backup_nodes() {
         case "$node" in
             sv-1|sv-2|sv-3|sv-4)
                 _info "Backing up sv node $node"
-                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
                 ;;
             validator1|splitwell)
                 _info "Backing up validator node $node"
-                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id" "$internal_stack"
                 ;;
             *)
                 _error "Unknown node $node"

@@ -188,13 +188,14 @@ function restore_cloudsql_postgres() {
   local -r component=$2
   local -r run_id=$3
   local -r migration_id=$4
+  local -r internal=$5
   MAX_RETRIES=20
   retry_count=0
 
   local stack
 
-  stack=$(get_stack_for_namespace_component "$namespace" "$component")
-  instance="$(create_component_instance "$component" "$migration_id" "$namespace")"
+  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
+  instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
   cloudsql_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack")
   backup_id=$(gcloud sql backups list --instance "$cloudsql_id" --filter="description=\"$run_id\"" --format=json | jq -r '.[].id')
 
@@ -244,10 +245,11 @@ function restore_component() {
   local -r component=$2
   local -r migration_id=$3
   local -r run_id=$4
+  local -r internal=$5
   local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
   local stack
 
-  stack=$(get_stack_for_namespace_component "$namespace" "$component")
+  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
 
   if [ "$component" == "cometbft" ]; then
     _info "Restoring cometbft"
@@ -256,14 +258,14 @@ function restore_component() {
     kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=1
   else
     _info "Restoring $component"
-    instance="$(create_component_instance "$component" "$migration_id" "$namespace")"
+    instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
     type=$(get_postgres_type "$namespace-$instance-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         restore_pvc_postgres "$namespace" "$component" "$run_id"
         ;;
       "canton:cloud:postgres")
-        restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id"
+        restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id" "$internal"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -275,9 +277,10 @@ function restore_component() {
 function wait_cloudsql_restore() {
   local -r namespace=$1
   local -r component=$2
+  local -r internal=$3
 
   local stack
-  stack=$(get_stack_for_namespace_component "$namespace" "$component")
+  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
   cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
 
   local -i i=0
@@ -299,20 +302,21 @@ function wait_cloudsql_restore() {
 function wait_restore_component() {
   local -r namespace=$1
   local -r component=$2
+  local -r internal=$3
   local stack
-  stack=$(get_stack_for_namespace_component "$namespace" "$component")
+  stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
 
   if [ "$component" == "cometbft" ]; then
     _info "Nothing to do, cometbft restore is currently synchronous"
   else
-    instance="$(create_component_instance "$component" "$migration_id" "$namespace")"
+    instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
     type=$(get_postgres_type "$namespace-$instance-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         _info "Nothing to do, self-hosted postgres restore is currently synchronous"
         ;;
       "canton:cloud:postgres")
-        wait_cloudsql_restore "$namespace" "$component"
+        wait_cloudsql_restore "$namespace" "$component" "$internal"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -326,7 +330,7 @@ function usage() {
 }
 
 function main() {
-  if [ "$#" -lt 4 ]; then
+  if [ "$#" -lt 5 ]; then
     usage
     exit 1
   fi
@@ -353,8 +357,9 @@ function main() {
   local -r namespace=$1
   local -r migration_id=$2
   local -r run_id=$3
+  local -r internal=$4
 
-  for component in "${@:4}"; do
+  for component in "${@:5}"; do
     # verify all components exist and have a mapping
     component_to_deployments "$component" "$migration_id"
   done
@@ -370,12 +375,12 @@ function main() {
 
   _info " ** Restoring ** "
   for component in "${@:4}"; do
-    restore_component "$namespace" "$component" "$migration_id" "$run_id"
+    restore_component "$namespace" "$component" "$migration_id" "$run_id" "$internal"
   done
 
   _info " ** Waiting for all restore operations to finish ** "
   for component in "${@:4}"; do
-    wait_restore_component "$namespace" "$component"
+    wait_restore_component "$namespace" "$component" "$internal"
   done
 
 
