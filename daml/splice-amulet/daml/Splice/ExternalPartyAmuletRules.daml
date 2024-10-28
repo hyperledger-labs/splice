@@ -25,6 +25,7 @@ template ExternalPartyAmuletRules
       with
         sender : Party
         receiver : Party
+        delegate : Party
         amount : Decimal
         expiresAt : Time
         nonce : Int
@@ -33,6 +34,7 @@ template ExternalPartyAmuletRules
            dso
            sender
            receiver
+           delegate
            amount
            -- We cannot enforce a max expiry as we cannot call getTime.
            expiresAt
@@ -74,6 +76,7 @@ template TransferCommand
     dso : Party
     sender : Party
     receiver : Party
+    delegate : Party -- ^ The delegate that actually executes the transfer
     amount : Decimal
     expiresAt : Time -- ^ Expiry of the command until when TransferCommand_Send must be called
     nonce : Int
@@ -94,7 +97,7 @@ template TransferCommand
         transferPreapprovalCidO : Optional (ContractId TransferPreapproval)
         -- Unspecified if the transfer preapproval does not exist. The transfer command will get rejected in that case
         transferCounterCid : ContractId TransferCommandCounter
-      controller dso
+      controller delegate
       do transferCounter <- fetchChecked (ForOwner with owner = sender, dso) transferCounterCid
          if | transferCounter.nextNonce > nonce ->
               -- Fail but archive the TransferCommand

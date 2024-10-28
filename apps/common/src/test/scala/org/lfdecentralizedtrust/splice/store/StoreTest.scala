@@ -152,6 +152,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def transferCommand(
       sender: PartyId,
       receiver: PartyId,
+      delegate: PartyId,
       amount: BigDecimal,
       expiresAt: Instant,
       nonce: Long,
@@ -162,6 +163,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       dsoParty.toProtoPrimitive,
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
+      delegate.toProtoPrimitive,
       amount.bigDecimal,
       expiresAt,
       nonce,
