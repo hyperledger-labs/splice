@@ -265,11 +265,6 @@ data DsoRules_CreateExternalPartyAmuletRulesResult = DsoRules_CreateExternalPart
     externalPartyAmuletRulesCid : ContractId ExternalPartyAmuletRules
   deriving (Show, Eq)
 
-data DsoRules_TransferCommand_SendResult = DsoRules_TransferCommand_SendResult
-  with
-    result : TransferCommandResult
-  deriving (Show, Eq)
-
 data DsoRules_CreateTransferCommandCounterResult = DsoRules_CreateTransferCommandCounterResult
   with
     transferCommandCounterCid : ContractId TransferCommandCounter
@@ -1236,15 +1231,6 @@ template DsoRules with
       controller dso
       do cid <- create ExternalPartyAmuletRules with dso
          pure (DsoRules_CreateExternalPartyAmuletRulesResult cid)
-
-    nonconsuming choice DsoRules_TransferCommand_Send : DsoRules_TransferCommand_SendResult
-      with
-        transferCommandCid : ContractId TransferCommand
-        choiceArgument : TransferCommand_Send
-      controller dsoDelegate
-      do _ <- fetchChecked (ForDso dso) transferCommandCid
-         TransferCommand_SendResult result <- exercise transferCommandCid choiceArgument
-         pure (DsoRules_TransferCommand_SendResult result)
 
     nonconsuming choice DsoRules_CreateTransferCommandCounter : DsoRules_CreateTransferCommandCounterResult
       with

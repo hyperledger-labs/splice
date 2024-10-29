@@ -435,7 +435,7 @@ testTransferPreapprovalSend = do
       amount = 42.0
       expiresAt = now `addRelTime` hours 12
       nonce = 0
-      delegate = dso
+      delegate = validator
 
   let action = ARC_DsoRules with
         dsoAction = SRARC_CreateTransferCommandCounter (DsoRules_CreateTransferCommandCounter alice.primaryParty)
@@ -454,21 +454,17 @@ testTransferPreapprovalSend = do
 
   [(transferCounterCid, _)] <- query @TransferCommandCounter app.dso
 
-  [(dsoRulesCid, _)] <- query @DsoRules dso
-
   context <- getPaymentTransferContext app alice
 
   amulet <- tap app alice 50.0
 
   [] <- query @Amulet externalParty
 
-  DsoRules_TransferCommand_SendResult (TransferCommandResultSuccess _) <- submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_TransferCommand_Send with
-    transferCommandCid = transferCmd
-    choiceArgument = TransferCommand_Send with
-      context
-      transferPreapprovalCidO = Some transferPreapprovalCid
-      inputs = [InputAmulet amulet]
-      transferCounterCid
+  TransferCommand_SendResult (TransferCommandResultSuccess _) <- submitMulti [validator] [app.dso] $ exerciseCmd transferCmd TransferCommand_Send with
+    context
+    transferPreapprovalCidO = Some transferPreapprovalCid
+    inputs = [InputAmulet amulet]
+    transferCounterCid
 
   amulets <- query @Amulet externalParty
   map snd amulets === [Amulet app.dso externalParty (ExpiringAmount 42.0 (Round 1) (RatePerRound 0.00002))]

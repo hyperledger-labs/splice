@@ -2909,15 +2909,6 @@ class State:
                     "TransferPreapproval_Send",
                 )
 
-    def handle_dso_rules_transfer_command_send(self, transaction, event):
-        for event_id in event.child_event_ids:
-            event = transaction.events_by_id[event_id]
-            if (
-                isinstance(event, ExercisedEvent)
-                and event.choice_name == "TransferCommand_Send"
-            ):
-                return handle_transfer_command_send(self, transaction, event)
-
     def handle_transfer_command_send(self, transaction, event):
         for event_id in event.child_event_ids:
             event = transaction.events_by_id[event_id]
@@ -3518,8 +3509,6 @@ class State:
                 return self.handle_renew_transfer_preapproval(transaction, event)
             case "TransferPreapproval_Send":
                 return self.handle_transfer_preapproval_send(transaction, event)
-            case "DsoRules_TransferCommand_Send":
-                return self.handle_dso_rules_transfer_command_send(transaction, event)
             case "TransferCommand_Send":
                 return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":

@@ -62,7 +62,9 @@ class TransferCommandSendTrigger(
       walletManager.lookupExternalPartyWallet(sender) match {
         case None =>
           Future.successful(
-            TaskSuccess(s"Sender of transfer command $sender is not an onboarded external party, skipping.")
+            TaskSuccess(
+              s"Sender of transfer command $sender is not an onboarded external party, skipping."
+            )
           )
         case Some(wallet) =>
           for {
