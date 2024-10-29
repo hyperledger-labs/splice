@@ -57,7 +57,7 @@ resource.labels.namespace_name=~"sv|validator|splitwell"
   AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
 -(resource.labels.container_name="postgres-exporter" AND jsonPayload.msg=~"Error loading config|Excluded databases")
 -jsonPayload.message=~"UnknownHostException"
--(resource.labels.container_name=~"participant|mediator" AND jsonPayload.message=~"Late processing (or clock skew) of batch")
+-(resource.labels.container_name=~"participant|mediator" AND jsonPayload.message=~"Late processing \\(or clock skew\\) of batch")
 -(resource.labels.container_name="sequencer" AND jsonPayload.stack_trace=~"UnresolvedAddressException")
 -(resource.labels.container_name="sequencer-pg" AND
   ("checkpoints are occurring too frequently" OR "Consider increasing the configuration parameter \\"max_wal_size\\"."))
