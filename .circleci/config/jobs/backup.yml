@@ -130,6 +130,9 @@ jobs:
         type: string
       migration_id:
         type: integer
+      internal_stack:
+        type: boolean
+        default: true
     environment:
       <<: *env
     steps:
@@ -142,7 +145,7 @@ jobs:
           no_output_timeout: "20m"
           cmd: |
             cncluster activate
-            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >>
+            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >> << parameters.internal_stack >>
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")

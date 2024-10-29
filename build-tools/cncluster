@@ -1618,15 +1618,16 @@ function subcmd_restore_node() {
 
     node="${1-}"
     migration_id="${2-}"
-    backup_run_id="${3-}"
+    internal_stack="${3-}"
+    backup_run_id="${4-}"
 
     if [ -z "$node" ] || [ -z "$migration_id" ]; then
-        _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> [<backup_run_id>]"
+        _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> <internal_stack> [<backup_run_id>]"
     fi
 
     if [ -z "$backup_run_id" ]; then
         _info "No backup run_id given, looking for the latest full backup"
-        backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id")
+        backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id" "$internal_stack")
         if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
             _error "No recent backup found for $node"
         fi
