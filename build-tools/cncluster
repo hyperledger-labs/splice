@@ -630,6 +630,12 @@ function subcmd_create() {
         _error "Cluster already exists."
     else
 
+        if [ -n "${CLOUDSDK_COMPUTE_ZONE:-}" ]; then
+            location_arg=(--node-locations "${CLOUDSDK_COMPUTE_ZONE}")
+        else
+            location_arg=(--region "${CLOUDSDK_COMPUTE_REGION}")
+        fi
+
         #### Cluster can be resized from deployment directories with the following command:
         ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
         gcloud container clusters create "${GCP_CLUSTER_NAME}" \
@@ -640,7 +646,6 @@ function subcmd_create() {
                --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
                --num-nodes 1 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
-               --node-locations "${CLOUDSDK_COMPUTE_ZONE}" \
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
                --addons=GcePersistentDiskCsiDriver \
                --addons=NodeLocalDNS \
@@ -650,6 +655,7 @@ function subcmd_create() {
                --min-nodes 0 \
                --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
                --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}" \
+               "${location_arg[@]}"
 
         #### Set maintenance window
         gcloud container clusters update "${GCP_CLUSTER_NAME}" \
@@ -678,7 +684,15 @@ function subcmd_create() {
     #### Open port 15017 in GKE firewall, see https://istio.io/latest/docs/setup/platform-setup/gke/
     _log "Opening port 15017 in GKE firewall"
     FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-master" --format=json | jq -r '.[].name')
-    gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
+    if [ -z "${FW_NAME}" ]; then
+        # For some reason, GKE recently stopped auto-creating the master firewall rule. We therefore recreate it here if it's missing.
+        _warning "Master firewall rule not found. Creating a new one."
+        FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-all" --format=json | jq -r '.[].name' | sed s/-all/-master/)
+        TAGS=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-all" --format=json | jq -r '.[].name' | sed s/-all/-node/)
+        gcloud compute firewall-rules create "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017 --source-ranges "${GCP_MASTER_IPV4_CIDR}" --target-tags "${TAGS}"
+    else
+        gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
+    fi
 
     # Create a kms key for pulumi.
     error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
@@ -695,14 +709,14 @@ function subcmd_create() {
       fi
     fi
 
+    subcmd_pulumi cluster up --yes --skip-preview
+
     _infra_up
 
 
     for stack in infra canton-network sv-runbook validator-runbook; do
       _uses_pulumi_stack $stack
     done
-
-    subcmd_pulumi cluster up --yes --skip-preview
 
     _log "Determining cluster ingress IP address"
     IPADDR=$(_cluster_ip)
