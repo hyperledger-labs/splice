@@ -189,6 +189,10 @@ class ExecuteConfirmedActionTrigger(
                 )
               )
             } yield transferCommandCounterO.isDefined
+          case _: SRARC_CreateExternalPartyAmuletRules =>
+            for {
+              rulesO <- store.lookupExternalPartyAmuletRules()
+            } yield rulesO.value.isDefined
           case action =>
             throw new UnsupportedOperationException(
               show"DsoRules $action is not yet supported"

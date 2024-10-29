@@ -395,6 +395,14 @@ class SvDsoAutomationService(
       )
     )
 
+    registerTrigger(
+      new ExternalPartyAmuletRulesTrigger(
+        triggerContext,
+        dsoStore,
+        connection,
+      )
+    )
+
     config.scan.foreach { scan =>
       registerTrigger(
         new PublishScanConfigTrigger(
@@ -535,5 +543,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReportValidatorLicenseMetricsExportTrigger],
       aTrigger[ReconcileDynamicDomainParametersTrigger],
       aTrigger[TransferCommandCounterTrigger],
+      aTrigger[ExternalPartyAmuletRulesTrigger],
     )
 }

@@ -1440,7 +1440,8 @@ printTests := {
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
   def isResourceIntensiveTest(name: String): Boolean =
     name.contains("SvReonboardingIntegration") ||
-      name.contains("DecentralizedSynchronizerMigrationIntegrationTest")
+      name.contains("DecentralizedSynchronizerMigrationIntegrationTest") ||
+      name.contains("BootstrapPackageConfigIntegrationTest")
   def isDockerBasedTest(name: String): Boolean =
     name contains "DockerCompose"
 

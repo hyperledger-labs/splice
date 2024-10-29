@@ -977,6 +977,21 @@ trait SvDsoStore
     multiDomainAcsStore.listExpiredFromPayloadExpiry(
       splice.amuletrules.TransferPreapproval.COMPANION
     )
+
+  def lookupExternalPartyAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[ContractWithState[
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules.ContractId,
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules,
+  ]]]] = multiDomainAcsStore.findAnyContractWithOffset(
+    splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION
+  )
+
+  def listExternalPartyAmuletRulesConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+  ]
 }
 
 object SvDsoStore {
@@ -1344,6 +1359,13 @@ object SvDsoStore {
         DsoAcsStoreRowData(
           contract,
           walletParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sender)),
+        )
+      },
+      mkFilter(splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract
         )
       },
     )

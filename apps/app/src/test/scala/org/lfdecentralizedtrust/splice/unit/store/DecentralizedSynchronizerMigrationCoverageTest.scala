@@ -173,7 +173,7 @@ object DecentralizedSynchronizerMigrationCoverageTest {
       externalpartyamuletrules.TransferCommandCounter.COMPANION ->
         reason("#15158", ScanStore, SvDsoStore),
       externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION ->
-        reason("#15158", ScanStore),
+        reason("#15158", ScanStore, SvDsoStore),
     ).view.map { case (c, reason) =>
       (PackageQualifiedName(c.getTemplateIdWithPackageId), reason)
     }.toMap

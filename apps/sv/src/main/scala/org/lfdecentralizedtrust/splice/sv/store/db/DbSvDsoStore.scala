@@ -1579,6 +1579,34 @@ class DbSvDsoStore(
         }
     }
 
+  override def listExternalPartyAmuletRulesConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.dsorules.Confirmation.ContractId,
+    splice.dsorules.Confirmation,
+  ]]] =
+    for {
+      // TODO(#14568) Hit indices for this instead of doing a linear search
+      confirmations <- multiDomainAcsStore.listContracts(
+        splice.dsorules.Confirmation.COMPANION
+      )
+    } yield {
+      confirmations
+        .map(_.contract)
+        .filter { c =>
+          c.payload.confirmer == confirmer.toProtoPrimitive &&
+          (c.payload.action match {
+            case action: splice.dsorules.actionrequiringconfirmation.ARC_DsoRules =>
+              action.dsoAction match {
+                case _: splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateExternalPartyAmuletRules =>
+                  true
+                case _ => false
+              }
+            case _ => false
+          })
+        }
+    }
+
   def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
       companion: C,
       recordTime: CantonTimestamp = CantonTimestamp.MinValue,

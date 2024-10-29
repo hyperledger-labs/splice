@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   TransferPreapproval,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
   TransferCommand,
   TransferCommandCounter,
 }
@@ -103,6 +104,15 @@ abstract class ScanAppReference(
   def getAmuletRules(): ContractWithState[AmuletRules.ContractId, AmuletRules] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetAmuletRules(None))
+    }
+
+  @Help.Summary(
+    "Returns the ExternalPartyAmuletRules."
+  )
+  def getExternalPartyAmuletRules()
+      : ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetExternalPartyAmuletRules(None))
     }
 
   @Help.Summary(
