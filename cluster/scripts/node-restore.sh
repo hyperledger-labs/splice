@@ -365,27 +365,27 @@ function main() {
   done
 
   _info " ** Scaling down ** "
-  for component in "${@:4}"; do
+  for component in "${@:5}"; do
     down "$namespace" "$component" "$migration_id"
   done
 
-  for component in "${@:4}"; do
+  for component in "${@:5}"; do
     wait_down "$namespace" "$component" "$migration_id"
   done
 
   _info " ** Restoring ** "
-  for component in "${@:4}"; do
+  for component in "${@:5}"; do
     restore_component "$namespace" "$component" "$migration_id" "$run_id" "$internal"
   done
 
   _info " ** Waiting for all restore operations to finish ** "
-  for component in "${@:4}"; do
+  for component in "${@:5}"; do
     wait_restore_component "$namespace" "$component" "$internal"
   done
 
 
   _info " ** Scaling up ** "
-  for component in "${@:4}"; do
+  for component in "${@:5}"; do
     up "$namespace" "$component" "$migration_id"
   done
 
