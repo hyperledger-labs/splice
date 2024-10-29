@@ -143,7 +143,7 @@ trait AcsQueries extends AcsJdbcTypes {
     val storeIdFromAcsRow = pp.<<[Option[Int]]
     val migrationIdFromAcsRow = pp.<<[Option[Long]]
     AcsQueries.SelectFromAcsTableResultWithOffset(
-      ApiOffset.assertFromStringToLongO(pp.<<[String]),
+      ApiOffset.assertFromStringToLong(pp.<<[String]),
       for {
         storeId <- storeIdFromAcsRow
         migration_id <- migrationIdFromAcsRow
@@ -208,7 +208,7 @@ trait AcsQueries extends AcsJdbcTypes {
       val storeIdFromAcsRow = pp.<<[Option[Int]]
       val migrationIdFromAcsRow = pp.<<[Option[Long]]
       AcsQueries.SelectFromAcsTableResultWithStateAndOffset(
-        ApiOffset.assertFromStringToLongO(pp.<<[String]),
+        ApiOffset.assertFromStringToLong(pp.<<[String]),
         for {
           storeId <- storeIdFromAcsRow
           migrationId <- migrationIdFromAcsRow
@@ -381,12 +381,12 @@ object AcsQueries {
   }
 
   case class SelectFromAcsTableResultWithOffset(
-      offset: Option[Long],
+      offset: Long,
       row: Option[SelectFromAcsTableResult],
   )
 
   case class SelectFromAcsTableResultWithStateAndOffset(
-      offset: Option[Long],
+      offset: Long,
       row: Option[SelectFromAcsTableWithStateResult],
   )
 }

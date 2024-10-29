@@ -164,7 +164,7 @@ class UpdateHistory(
 
       override def initialize()(implicit
           traceContext: TraceContext
-      ): Future[Option[Option[Long]]] = {
+      ): Future[Option[Long]] = {
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         // Notes:
@@ -225,7 +225,7 @@ class UpdateHistory(
             .getOrRaise(
               new RuntimeException(s"No row for $newHistoryId found, which was just inserted!")
             )
-            .map(_.map(ApiOffset.assertFromStringToLongO(_)))
+            .map(_.map(ApiOffset.assertFromStringToLong(_)))
 
           _ <- cleanUpDataAfterDomainMigration(newHistoryId)
         } yield {
@@ -249,7 +249,7 @@ class UpdateHistory(
         s"UpdateHistory(party=$updateStreamParty, participantId=$participantId, migrationId=$domainMigrationId, historyId=$historyId)"
 
       override def ingestAcs(
-          offset: Option[Long],
+          offset: Long,
           acs: Seq[ActiveContract],
           incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
           incompleteIn: Seq[IncompleteReassignmentEvent.Assign],

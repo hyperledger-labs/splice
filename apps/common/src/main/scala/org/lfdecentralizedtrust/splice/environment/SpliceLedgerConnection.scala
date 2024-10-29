@@ -799,9 +799,9 @@ class SpliceLedgerConnection(
         deadline,
       )
 
-    def withDedup(commandId: CommandId, deduplicationOffset: Option[Long])(implicit
+    def withDedup(commandId: CommandId, deduplicationOffset: Long)(implicit
         cid: DedupNotSpecifiedYet
-    ): submit[C, (CommandId, Option[Long]), DomId] =
+    ): submit[C, (CommandId, Long), DomId] =
       copy(
         commandIdDeduplicationOffset = (commandId, deduplicationOffset)
       )
@@ -1258,9 +1258,8 @@ object SpliceLedgerConnection {
       private[SpliceLedgerConnection] val split: CmdId => (String, DedupConfig)
   )
   object SubmitDedup {
-    implicit val dedupOffset: SubmitDedup[(CommandId, Option[Long])] = SubmitDedup {
-      case (cid, offset) =>
-        (cid.commandIdForSubmission, DedupOffset(offset))
+    implicit val dedupOffset: SubmitDedup[(CommandId, Long)] = SubmitDedup { case (cid, offset) =>
+      (cid.commandIdForSubmission, DedupOffset(offset))
     }
     implicit val dedupConfig: SubmitDedup[(CommandId, DedupConfig)] = SubmitDedup {
       case (cid, dc) =>

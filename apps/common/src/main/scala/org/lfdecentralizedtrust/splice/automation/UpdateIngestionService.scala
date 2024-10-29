@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -62,7 +61,7 @@ class UpdateIngestionService(
                   )
                   _ <- ingestionSink
                     .ingestAcs(
-                      Some(participantBegin),
+                      participantBegin,
                       Seq.empty,
                       Seq.empty,
                       Seq.empty,
@@ -75,14 +74,7 @@ class UpdateIngestionService(
                   _ <- ingestAcsAndInFlight(acsOffset)
                 } yield acsOffset
           } yield offset
-        case Some(offsetO) =>
-          // Our store methods still return an Optional as that is what we may have stored for older migration ids.
-          // However, the most recent migration id (the only one ever used by this code) will never have an empty offset.
-          val offset = offsetO.getOrElse(
-            throw Status.INTERNAL
-              .withDescription("Last ingested offset was empty")
-              .asRuntimeException
-          )
+        case Some(offset) =>
           logger.debug(s"Resuming ingestion from offset: $offset")
           Future.successful(offset)
       }
@@ -104,7 +96,7 @@ class UpdateIngestionService(
       // TODO(#5534): stream contracts instead of ingesting them as a single Seq
       (acs, incompleteOut, incompleteIn) <- connection.activeContracts(filter, offset)
       _ <- ingestionSink.ingestAcs(
-        Some(offset),
+        offset,
         acs,
         incompleteOut,
         incompleteIn,

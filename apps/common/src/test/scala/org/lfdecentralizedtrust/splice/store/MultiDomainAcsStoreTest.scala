@@ -343,7 +343,7 @@ abstract class MultiDomainAcsStoreTest[
       )
 
       for {
-        _ <- acs(acsOffset = Some(acsOffset))
+        _ <- acs(acsOffset = acsOffset)
         _ <- signal_010
         _ = notCompleted(signal_011, signal_012)
         _ <- d1.create(c(1), tx1Offset)

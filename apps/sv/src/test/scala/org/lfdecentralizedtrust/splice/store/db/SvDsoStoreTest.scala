@@ -114,7 +114,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           for {
             store <- mkStore()
             result <- fetch(store)
-          } yield result should be(QueryResult(Some(acsOffset), None))
+          } yield result should be(QueryResult(acsOffset, None))
         }
 
         offsetFreeLookupTest(create, noise)(fetch andThen (_ map (_.value)))
@@ -146,7 +146,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       ),
     )(
       _.lookupSvOnboardingRequestByCandidateParty(userParty(1)).map(
-        QueryResult(Some(acsOffset), _)
+        QueryResult(acsOffset, _)
       )
     )
     lookupTests("lookupSvOnboardingRequestByCandidateName")(
@@ -156,7 +156,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       ),
     )(
       _.lookupSvOnboardingRequestByCandidateName("good").map(
-        QueryResult(Some(acsOffset), _)
+        QueryResult(acsOffset, _)
       )
     )
     "lookupSvOnboardingConfirmedByParty" should {
@@ -1577,7 +1577,7 @@ class DbSvDsoStoreTest
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(Some(acsOffset), Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )

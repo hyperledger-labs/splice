@@ -56,7 +56,7 @@ final case object NoDedup extends DedupConfig {
   override def pretty = prettyOfObject[this.type]
 }
 
-final case class DedupOffset(offset: Option[Long]) extends DedupConfig {
+final case class DedupOffset(offset: Long) extends DedupConfig {
   override def pretty = prettyOfClass(
     param("offset", _.offset)
   )
@@ -235,10 +235,10 @@ private[environment] class LedgerClient(
       }
       .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
     deduplicationConfig match {
-      case DedupOffset(offsetO) =>
-        // Canton does not allow an empty offset (ledger begin) so just go for
+      case DedupOffset(offset) =>
+        // Canton does not allow a zero offset (ledger begin) so just go for
         // not specfying anything which means max deduplication duration.
-        offsetO.foreach { offset =>
+        if (offset > 0) {
           commandsBuilder.setDeduplicationOffset(offset)
         }
       case DedupDuration(duration) =>

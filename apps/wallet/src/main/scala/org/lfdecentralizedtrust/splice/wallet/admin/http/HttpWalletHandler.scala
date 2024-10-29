@@ -698,7 +698,7 @@ class HttpWalletHandler(
               proposalCid <- store.lookupTransferPreapprovalProposal() flatMap {
                 case QueryResult(_, Some(proposal)) => Future.successful(proposal.contractId)
                 case QueryResult(proposalOffSet, None) =>
-                  val dedupOffset = Ordering[Option[Long]].min(preapprovalOffset, proposalOffSet)
+                  val dedupOffset = Ordering[Long].min(preapprovalOffset, proposalOffSet)
                   createTransferPreapprovalProposal(wallet, domain, dedupOffset)
               }
               _ = logger.debug(
@@ -730,7 +730,7 @@ class HttpWalletHandler(
   private def createTransferPreapprovalProposal(
       wallet: UserWalletService,
       domain: DomainId,
-      dedupOffset: Option[Long],
+      dedupOffset: Long,
   )(implicit tc: TraceContext) = {
     val store = wallet.store
     wallet.connection

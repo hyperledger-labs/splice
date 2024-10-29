@@ -772,7 +772,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def mkValidatorRewardCoupon(i: Int) = validatorRewardCoupon(i, userParty(i))
 
-  private var offsetCounter: Long = 1L
+  private var offsetCounter: Long = 0L
 
   protected def nextOffset(): Long = blocking {
     synchronized {
@@ -807,7 +807,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       acs: Seq[(Contract[?, ?], DomainId, Long)] = Seq.empty,
       incompleteOut: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
       incompleteIn: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
-      acsOffset: Option[Long] = Some(nextOffset()),
+      acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.initialize()
     _ <- store.testIngestionSink.ingestAcs(
@@ -880,7 +880,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     override def initialize()(implicit traceContext: TraceContext) =
       underlying.initialize()
     override def ingestAcs(
-        offset: Option[Long],
+        offset: Long,
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],

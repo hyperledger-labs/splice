@@ -18,7 +18,7 @@ import com.digitalasset.canton.topology.DomainId
 final case class IngestionSummary(
     updateId: Option[String],
     synchronizerId: Option[DomainId],
-    offset: Option[Option[Long]],
+    offset: Option[Long],
     recordTime: Option[CantonTimestamp],
     newAcsSize: Int,
     ingestedCreatedEvents: Vector[CreatedEvent],

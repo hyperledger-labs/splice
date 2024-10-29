@@ -58,12 +58,12 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
       : GetResult[TxLogQueries.SelectFromTxLogTableResultWithOffset] = { (pp: PositionedResult) =>
     val storeIdFromTxLogRow = pp.<<[Option[Int]]
     TxLogQueries.SelectFromTxLogTableResultWithOffset(
-      ApiOffset.assertFromStringToLongO(pp.<<[String]),
+      ApiOffset.assertFromStringToLong(pp.<<[String]),
       storeIdFromTxLogRow.map { storeId =>
         SelectFromTxLogTableResult(
           storeId,
           pp.<<,
-          ApiOffset.assertFromStringToLongO(pp.<<[String]),
+          ApiOffset.assertFromStringToLong(pp.<<[String]),
           pp.<<,
           pp.<<,
           pp.<<,
@@ -86,7 +86,7 @@ object TxLogQueries {
   case class SelectFromTxLogTableResult(
       storeId: Int,
       entryNumber: Long,
-      offset: Option[Long],
+      offset: Long,
       domainId: DomainId,
       entryType: String3,
       entryData: String,
@@ -100,7 +100,7 @@ object TxLogQueries {
           (
             <<[Int],
             <<[Long],
-            ApiOffset.assertFromStringToLongO(<<[String]),
+            ApiOffset.assertFromStringToLong(<<[String]),
             <<[DomainId],
             <<[String3],
             <<[String],
@@ -118,7 +118,7 @@ object TxLogQueries {
   }
 
   case class SelectFromTxLogTableResultWithOffset(
-      offset: Option[Long],
+      offset: Long,
       row: Option[SelectFromTxLogTableResult],
   )
 

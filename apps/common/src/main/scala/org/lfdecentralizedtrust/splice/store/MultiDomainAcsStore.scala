@@ -439,7 +439,7 @@ object MultiDomainAcsStore {
 
   /** A query result computed as-of a specific set of per-domain ledger API offset. */
   final case class QueryResult[+A](
-      offset: Option[Long],
+      offset: Long,
       value: A,
   ) {
     def map[B](f: A => B): QueryResult[B] = copy(value = f(value))
@@ -586,10 +586,10 @@ object MultiDomainAcsStore {
     def ingestionFilter: IngestionFilter
 
     /** Must be the first method called. Returns the last ingested offset, if any. */
-    def initialize()(implicit traceContext: TraceContext): Future[Option[Option[Long]]]
+    def initialize()(implicit traceContext: TraceContext): Future[Option[Long]]
 
     def ingestAcs(
-        offset: Option[Long],
+        offset: Long,
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],

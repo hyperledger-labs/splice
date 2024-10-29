@@ -483,7 +483,7 @@ class HttpValidatorAdminHandler(
                             Seq(validatorServiceParty),
                             BaseLedgerConnection.sanitizeUserIdToPartyString(body.userPartyId),
                           ),
-                          DedupOffset(implicitly[Ordering[Option[Long]]].min(offsetESP, offsetTP)),
+                          DedupOffset(implicitly[Ordering[Long]].min(offsetESP, offsetTP)),
                         )
                       ),
                     )

@@ -45,10 +45,10 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           )(store.multiDomainAcsStore)
         } yield {
           store.lookupValidatorOnboardingBySecretWithOffset("good_secret").futureValue should be(
-            QueryResult(Some(secondOffset), Some(wanted))
+            QueryResult(secondOffset, Some(wanted))
           )
           store.lookupValidatorOnboardingBySecretWithOffset("bad_secret").futureValue should be(
-            QueryResult(Some(secondOffset), Some(unwanted))
+            QueryResult(secondOffset, Some(unwanted))
           )
         }
       }
@@ -57,7 +57,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore()
           result <- store.lookupValidatorOnboardingBySecretWithOffset("whatever")
-        } yield result should be(QueryResult(Some(acsOffset), None))
+        } yield result should be(QueryResult(acsOffset, None))
       }
 
     }
@@ -81,10 +81,10 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           )(store.multiDomainAcsStore)
         } yield {
           store.lookupUsedSecretWithOffset("good_secret").futureValue should be(
-            QueryResult(Some(secondOffset), Some(wanted))
+            QueryResult(secondOffset, Some(wanted))
           )
           store.lookupUsedSecretWithOffset("bad_secret").futureValue should be(
-            QueryResult(Some(secondOffset), Some(unwanted))
+            QueryResult(secondOffset, Some(unwanted))
           )
         }
       }
@@ -163,7 +163,7 @@ class DbSvSvStoreTest
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(Some(acsOffset), Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )

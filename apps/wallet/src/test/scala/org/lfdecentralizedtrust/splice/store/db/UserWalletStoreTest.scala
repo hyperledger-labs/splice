@@ -177,7 +177,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           result <- store.getLatestTransferOfferEventByTrackingId("nope")
         } yield {
-          result.offset.value should be(acsOffset)
+          result.offset should be(acsOffset)
           result.value should be(None)
         }
       }
@@ -240,7 +240,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store.getLatestTransferOfferEventByTrackingId("good")
         } yield {
-          result.offset.value should be(acceptedTree.getOffset)
+          result.offset should be(acceptedTree.getOffset)
           result.value.map(_.status) should be(
             Some(
               TransferOfferTxLogEntry.Status.Accepted(
@@ -263,7 +263,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           result <- store.getLatestBuyTrafficRequestEventByTrackingId("nope")
         } yield {
-          result.offset.value should be(acsOffset)
+          result.offset should be(acsOffset)
           result.value should be(None)
         }
       }
@@ -313,7 +313,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
         } yield {
-          result.offset.value should be(cancelledTree.getOffset)
+          result.offset should be(cancelledTree.getOffset)
           result.value.map(_.status) should be(
             Some(
               BuyTrafficRequestTxLogEntry.Status.Rejected(
@@ -344,7 +344,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store2.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
         } yield {
-          result.offset shouldBe Some(cancelledTree.getOffset)
+          result.offset shouldBe cancelledTree.getOffset
           result.value.map(_.status) should be(
             Some(
               BuyTrafficRequestTxLogEntry.Status.Rejected(
@@ -1610,7 +1610,7 @@ class DbUserWalletStoreTest
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(Some(acsOffset), Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )
