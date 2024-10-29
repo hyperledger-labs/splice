@@ -31,10 +31,12 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
   ExpireTransferPreapprovalsTrigger,
-  TransferCommandSendTrigger,
 }
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.validator.automation.RenewTransferPreapprovalTrigger
+import org.lfdecentralizedtrust.splice.validator.automation.{
+  RenewTransferPreapprovalTrigger,
+  TransferCommandSendTrigger,
+}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.*
@@ -332,7 +334,7 @@ class ExternalPartySetupProposalIntegrationTest
         update = preapproval.contractId.exerciseArchive(),
       )
     setTriggersWithin(triggersToPauseAtStart =
-      Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[TransferCommandSendTrigger])
+      Seq(aliceValidatorBackend.validatorAutomation.trigger[TransferCommandSendTrigger])
     ) {
       actAndCheck(
         "Submit signed TransferCommand creation",
@@ -366,7 +368,7 @@ class ExternalPartySetupProposalIntegrationTest
       )
       actAndCheck(
         "Resume DSO automation for TransferCommands",
-        sv1Backend.dsoDelegateBasedAutomation.trigger[TransferCommandSendTrigger].resume(),
+        aliceValidatorBackend.validatorAutomation.trigger[TransferCommandSendTrigger].resume(),
       )(
         "TransferCommand gets archived",
         _ => {

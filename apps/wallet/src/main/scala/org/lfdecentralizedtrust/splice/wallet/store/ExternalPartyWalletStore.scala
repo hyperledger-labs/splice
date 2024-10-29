@@ -3,7 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.wallet.store
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.{amulet as amuletCodegen}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, ValidatorRewardCoupon}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
@@ -33,8 +34,20 @@ trait ExternalPartyWalletStore extends AppStore with NamedLogging {
       activeIssuingRoundsO: Option[Set[Long]],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
-    Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]
+    Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]
   ]]
+
+  def listAmulets(limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[Amulet.ContractId, Amulet]]] =
+    multiDomainAcsStore.listContracts(Amulet.COMPANION, limit).map(_.map(_.contract))
+
+  def lookupTransferCommandCounter()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[TransferCommandCounter.ContractId, TransferCommandCounter]]] =
+    multiDomainAcsStore
+      .findAnyContractWithOffset(TransferCommandCounter.COMPANION)
+      .map(_.value.map(_.contract))
 }
 
 object ExternalPartyWalletStore {
@@ -91,12 +104,24 @@ object ExternalPartyWalletStore {
     SimpleContractFilter(
       key.externalParty,
       Map(
-        mkFilter(amuletCodegen.ValidatorRewardCoupon.COMPANION) { co =>
+        mkFilter(ValidatorRewardCoupon.COMPANION) { co =>
           co.payload.dso == dso &&
           co.payload.user == endUser
         }(co =>
           ExternalPartyWalletAcsStoreRowData(co, rewardCouponRound = Some(co.payload.round.number))
-        )
+        ),
+        mkFilter(Amulet.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.owner == endUser
+        }(ExternalPartyWalletAcsStoreRowData(_)),
+        mkFilter(Amulet.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.owner == endUser
+        }(ExternalPartyWalletAcsStoreRowData(_)),
+        mkFilter(TransferCommandCounter.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.sender == endUser
+        }(ExternalPartyWalletAcsStoreRowData(_)),
       ),
     )
   }

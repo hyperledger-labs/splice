@@ -2916,16 +2916,19 @@ class State:
                 isinstance(event, ExercisedEvent)
                 and event.choice_name == "TransferCommand_Send"
             ):
-                for event_id in event.child_event_ids:
-                    event = transaction.events_by_id[event_id]
-                    if (
-                        isinstance(event, ExercisedEvent)
-                        and event.choice_name == "TransferPreapproval_Send"
-                    ):
-                        return self.handle_transfer_preapproval_send(
-                            transaction,
-                            event,
-                        )
+                return handle_transfer_command_send(self, transaction, event)
+
+    def handle_transfer_command_send(self, transaction, event):
+        for event_id in event.child_event_ids:
+            event = transaction.events_by_id[event_id]
+            if (
+                isinstance(event, ExercisedEvent)
+                and event.choice_name == "TransferPreapproval_Send"
+            ):
+                return self.handle_transfer_preapproval_send(
+                    transaction,
+                    event,
+                )
         # This can happen when the transfer failed and the contract just got archived.
         return HandleTransactionResult.empty()
 
@@ -3517,6 +3520,8 @@ class State:
                 return self.handle_transfer_preapproval_send(transaction, event)
             case "DsoRules_TransferCommand_Send":
                 return self.handle_dso_rules_transfer_command_send(transaction, event)
+            case "TransferCommand_Send":
+                return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":
                 return self.handle_locked_amulet_unlock(transaction, event)
             case "LockedAmulet_OwnerExpireLock":

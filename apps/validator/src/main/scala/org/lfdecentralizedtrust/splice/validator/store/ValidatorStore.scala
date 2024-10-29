@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
+  externalpartyamuletrules as externalpartyamuletrulesCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
@@ -449,6 +450,9 @@ object ValidatorStore {
             userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         },
+        mkFilter(externalpartyamuletrulesCodegen.TransferCommand.COMPANION)(co =>
+          co.payload.delegate == validator && co.payload.dso == dso
+        ) { ValidatorAcsStoreRowData(_) },
         mkFilter(amuletCodegen.Amulet.COMPANION)(co =>
           co.payload.dso == dso &&
             co.payload.owner == validator

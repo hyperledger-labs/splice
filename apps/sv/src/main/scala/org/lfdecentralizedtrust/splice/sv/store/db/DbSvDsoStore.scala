@@ -1460,39 +1460,6 @@ class DbSvDsoStore(
         )
     } yield result.map(contractFromRow(SvRewardState.COMPANION)(_))
 
-  def listAmuletsByOwner(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    Seq[ContractWithState[
-      splice.amulet.Amulet.ContractId,
-      splice.amulet.Amulet,
-    ]]
-  ] =
-    for {
-      // TODO(#14568) Hit indices for this instead of doing a linear search
-      amulets <- multiDomainAcsStore.listContracts(splice.amulet.Amulet.COMPANION)
-    } yield {
-      amulets.filter(_.payload.owner == partyId.toProtoPrimitive)
-    }
-
-  def lookupTransferPreapprovalByParty(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[Option[ContractWithState[
-    splice.amuletrules.TransferPreapproval.ContractId,
-    splice.amuletrules.TransferPreapproval,
-  ]]] =
-    for {
-      // TODO(#14568) Hit indices for this instead of doing a linear search
-      transferPreapprovals <- multiDomainAcsStore.listContracts(
-        splice.amuletrules.TransferPreapproval.COMPANION
-      )
-    } yield {
-      transferPreapprovals
-        .filter(_.payload.receiver == partyId.toProtoPrimitive)
-        .sortBy(_.payload.validFrom)
-        .headOption
-    }
-
   private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
       companion: C,
       svPartyId: PartyId,

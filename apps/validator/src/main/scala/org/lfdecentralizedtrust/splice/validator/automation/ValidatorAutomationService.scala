@@ -176,6 +176,16 @@ class ValidatorAutomationService(
           domainMigrationId,
         )
       )
+
+    registerTrigger(
+      new TransferCommandSendTrigger(
+        triggerContext,
+        scanConnection,
+        store,
+        walletManager.externalPartyWalletManager,
+        connection,
+      )
+    )
   }
 
   backupDumpConfig.foreach(config =>

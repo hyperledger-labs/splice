@@ -169,7 +169,7 @@ object DecentralizedSynchronizerMigrationCoverageTest {
       trafficRequestCodegen.BuyTrafficRequest.COMPANION ->
         reason("tied to a specific domainId, never migrated", UserWalletStore),
       externalpartyamuletrules.TransferCommand.COMPANION ->
-        reason("#15158", SvDsoStore),
+        reason("#15158", SvDsoStore, ValidatorStore),
       externalpartyamuletrules.TransferCommandCounter.COMPANION ->
         reason("#15158", ScanStore, SvDsoStore),
       externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION ->

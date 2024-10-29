@@ -111,7 +111,7 @@ class ExternalPartyWalletManager(
     }
   })(TraceContext.empty)
 
-  final def lookupExternalPartytWallet(
+  final def lookupExternalPartyWallet(
       externalParty: PartyId
   ): Option[ExternalPartyWalletService] =
     externalPartyWalletsMap.get(externalParty).map(_._2)
@@ -210,7 +210,7 @@ class ExternalPartyWalletManager(
       ] = externalParties.toSeq
         .map(externalParty =>
           // TODO(M3-83): Avoid the application-level join and get the rewards in one go from the DB.
-          this.lookupExternalPartytWallet(externalParty) match {
+          this.lookupExternalPartyWallet(externalParty) match {
             case None =>
               logger.info(
                 show"Might miss validator rewards as the ExternalPartyWalletStore for external party ${externalParty} is not (yet) setup."

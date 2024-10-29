@@ -87,6 +87,7 @@ template TransferCommand
     -- that the external signature
     -- is visible to the SVs.
     signatory sender, dso
+    observer delegate
 
     choice TransferCommand_Send : TransferCommand_SendResult
       with

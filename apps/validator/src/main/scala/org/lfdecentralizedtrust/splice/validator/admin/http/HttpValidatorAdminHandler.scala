@@ -718,8 +718,7 @@ class HttpValidatorAdminHandler(
             _.exerciseExternalPartyAmuletRules_CreateTransferCommand(
               senderParty.toProtoPrimitive,
               receiverParty.toProtoPrimitive,
-              // TODO(#15686) Change this to the validator operator.
-              store.key.dsoParty.toProtoPrimitive,
+              store.key.validatorParty.toProtoPrimitive,
               body.amount.bigDecimal,
               body.expiresAt.toInstant,
               body.nonce,

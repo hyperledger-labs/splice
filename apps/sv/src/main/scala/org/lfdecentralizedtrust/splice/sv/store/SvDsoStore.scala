@@ -945,24 +945,6 @@ trait SvDsoStore
     splice.ans.AnsEntryContext,
   ]]]
 
-  def lookupTransferPreapprovalByParty(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    Option[ContractWithState[
-      splice.amuletrules.TransferPreapproval.ContractId,
-      splice.amuletrules.TransferPreapproval,
-    ]]
-  ]
-
-  def listAmuletsByOwner(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    Seq[ContractWithState[
-      splice.amulet.Amulet.ContractId,
-      splice.amulet.Amulet,
-    ]]
-  ]
-
   def lookupTransferCommandCounterBySenderWithOffset(partyId: PartyId)(implicit
       tc: TraceContext
   ): Future[

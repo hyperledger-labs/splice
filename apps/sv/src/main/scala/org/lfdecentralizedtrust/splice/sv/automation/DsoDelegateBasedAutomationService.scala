@@ -75,8 +75,6 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new PruneAmuletConfigScheduleTrigger(triggerContext, svTaskContext))
 
     registerTrigger(new MergeValidatorLicenseContractsTrigger(triggerContext, svTaskContext))
-
-    registerTrigger(new TransferCommandSendTrigger(triggerContext, svTaskContext))
   }
 
 }
@@ -109,6 +107,5 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[MergeSvRewardStateContractsTrigger],
     aTrigger[PruneAmuletConfigScheduleTrigger],
     aTrigger[MergeValidatorLicenseContractsTrigger],
-    aTrigger[TransferCommandSendTrigger],
   )
 }
