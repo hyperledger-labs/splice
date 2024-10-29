@@ -38,7 +38,7 @@ spec:
             {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "sv" "keyName" "sv" "fixedTokens" .Values.cluster.fixedTokens) | indent 12}}
             {{- include "splice-util-lib.auth0-user-env-var" (dict "appName" "validator" "keyName" "validator") | indent 12}}
             - name: SPLICE_APP_SV_PARTICIPANT_ADDRESS
-              value: {{ .Values.participantAddress | default "participant" | quote }}
+              value: {{ .Values.participantAddress | quote }}
             {{- if .Values.migration.migrating }}
             - name: ADDITIONAL_CONFIG_SV_ONBOARDING
               value: |
@@ -148,11 +148,11 @@ spec:
                 canton.sv-apps.sv.local-synchronizer-node {
                   sequencer {
                     admin-api {
-                      address = {{ .sequencerAddress | default "global-domain-sequencer" | quote }}
+                      address = {{ .sequencerAddress | quote }}
                       port = 5009
                     }
                     internal-api {
-                      address = {{ .sequencerAddress | default "global-domain-sequencer" | quote }}
+                      address = {{ .sequencerAddress | quote }}
                       port = 5008
                     }
                     external-public-api-url = {{ .sequencerPublicUrl | quote }}
@@ -165,7 +165,7 @@ spec:
                   }
                   mediator {
                     admin-api {
-                      address = {{ .mediatorAddress | default "global-domain-mediator" | quote }}
+                      address = {{ .mediatorAddress | quote }}
                       port = 5007
                     }
                   }

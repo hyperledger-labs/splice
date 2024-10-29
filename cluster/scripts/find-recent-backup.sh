@@ -66,12 +66,14 @@ function latest_full_backup_run_id_gcloud() {
   local num_components
   num_components=$(echo "$expected_components" | wc -w)
   local stack
-  stack=$(get_stack_for_namespace "$namespace")
 
   declare -A run_ids_dict
 
   for component in $expected_components; do
-    local full_component_instance="$namespace-$component-pg"
+    stack=$(get_stack_for_namespace_component "$namespace" "$component")
+    instance="$(create_component_instance "$component" "$migration_id" "$namespace")"
+    local full_component_instance="$namespace-$instance-pg"
+
     local cloudsql_id
     cloudsql_id=$(get_cloudsql_id "$full_component_instance" "$stack")
     # We always create backups with a description field while this field could be missing for automated backups done by Google Cloud.
@@ -118,7 +120,7 @@ function main() {
   local full_instance="$namespace-validator-pg"
   local expected_components="validator participant"
   local stack
-  stack=$(get_stack_for_namespace "$namespace")
+  stack=$(get_stack_for_namespace_component "$namespace" "participant")
 
   case "$namespace" in
       sv-1|sv-2|sv-3|sv-4)

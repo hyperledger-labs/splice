@@ -24,8 +24,7 @@ if ! prefix=$(git show "$sha":VERSION 2>&1); then
     prefix=$(cat VERSION)
 fi
 set -e
-show_commit_message_sha="${show_commit_message_sha:-$sha}"
-git_commit_message=$(git log -1 --pretty=format:%B "$show_commit_message_sha")
+git_commit_message=$(git log -1 --pretty=format:%B "$sha")
 if [[ $git_commit_message == *"[release]"* ]]; then
     # release commit - no suffixes
     echo "$prefix"

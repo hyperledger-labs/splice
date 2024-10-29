@@ -38,7 +38,7 @@ export function installNode(
     const isFirstSv = nodeConfig.nodeName === sv1Config.nodeName;
     installCantonComponents(
       // namespace lifecycle managed by the main canton-network stack
-      exactNamespace(nodeConfig.nodeName, false, true),
+      exactNamespace(nodeConfig.nodeName, true, true),
       migrationId,
       auth0Fetch,
       {

@@ -114,7 +114,7 @@ export class MultiValidator extends MultiNodeDeployment {
             initialDelaySeconds: 5,
             periodSeconds: 5,
             failureThreshold: 5,
-            timeoutSeconds: 3,
+            timeoutSeconds: 10,
           },
           resources: {
             requests: {

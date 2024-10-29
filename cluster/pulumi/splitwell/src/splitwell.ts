@@ -13,7 +13,7 @@ import {
   installSpliceHelmChart,
   ValidatorTopupConfig,
   config,
-  splitwellDarPath,
+  splitwellDarPaths,
   imagePullSecret,
   CnInput,
   activeVersion,
@@ -123,7 +123,7 @@ export async function installSplitwell(
       '  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
       '  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}',
       // We vet both versions to easily test upgrades.
-      `  dars = ["${splitwellDarPath}"]`,
+      `  dars = ["${splitwellDarPaths.join('", "')}"]`,
       '}',
     ].join('\n'),
     onboardingSecret,

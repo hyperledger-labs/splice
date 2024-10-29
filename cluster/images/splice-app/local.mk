@@ -5,14 +5,18 @@ dir := $(call current_dir)
 
 target-bundle := $(dir)/target/splice-node.tar.gz
 app-bundle := ${REPO_ROOT}/apps/app/target/release/splice-node.tar.gz
+target-logback := $(dir)/target/logback.xml
 
 include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
 
-$(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(dir)/target/LICENSE $(target-bundle)
+$(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(dir)/target/LICENSE $(target-bundle) $(target-logback)
 
 $(dir)/target/LICENSE: LICENSE
 	cp $< $@
 
 $(target-bundle): $(app-bundle)
 	mkdir -p $(@D)
+	cp $< $@
+
+$(target-logback): ${REPO_ROOT}/scripts/canton-logback.xml
 	cp $< $@

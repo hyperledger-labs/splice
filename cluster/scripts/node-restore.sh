@@ -187,12 +187,15 @@ function restore_cloudsql_postgres() {
   local -r namespace=$1
   local -r component=$2
   local -r run_id=$3
+  local -r migration_id=$4
   MAX_RETRIES=20
   retry_count=0
 
   local stack
-  stack=$(get_stack_for_namespace "$namespace")
-  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
+
+  stack=$(get_stack_for_namespace_component "$namespace" "$component")
+  instance="$(create_component_instance "$component" "$migration_id" "$namespace")"
+  cloudsql_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack")
   backup_id=$(gcloud sql backups list --instance "$cloudsql_id" --filter="description=\"$run_id\"" --format=json | jq -r '.[].id')
 
   _warning "This operation will restore the CloudSQL DB instance $cloudsql_id from backup, overwriting its current data."
@@ -243,7 +246,8 @@ function restore_component() {
   local -r run_id=$4
   local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
   local stack
-  stack=$(get_stack_for_namespace "$namespace")
+
+  stack=$(get_stack_for_namespace_component "$namespace" "$component")
 
   if [ "$component" == "cometbft" ]; then
     _info "Restoring cometbft"
@@ -252,13 +256,14 @@ function restore_component() {
     kubectl scale deployment -n "$namespace" "${deployment_names}" --replicas=1
   else
     _info "Restoring $component"
-    type=$(get_postgres_type "$namespace-$component-pg" "$stack")
+    instance="$(create_component_instance "$component" "$migration_id" "$namespace")"
+    type=$(get_postgres_type "$namespace-$instance-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         restore_pvc_postgres "$namespace" "$component" "$run_id"
         ;;
       "canton:cloud:postgres")
-        restore_cloudsql_postgres "$namespace" "$component" "$run_id"
+        restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -272,7 +277,7 @@ function wait_cloudsql_restore() {
   local -r component=$2
 
   local stack
-  stack=$(get_stack_for_namespace "$namespace")
+  stack=$(get_stack_for_namespace_component "$namespace" "$component")
   cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg" "$stack")
 
   local -i i=0
@@ -295,12 +300,13 @@ function wait_restore_component() {
   local -r namespace=$1
   local -r component=$2
   local stack
-  stack=$(get_stack_for_namespace "$namespace")
+  stack=$(get_stack_for_namespace_component "$namespace" "$component")
 
   if [ "$component" == "cometbft" ]; then
     _info "Nothing to do, cometbft restore is currently synchronous"
   else
-    type=$(get_postgres_type "$namespace-$component-pg" "$stack")
+    instance="$(create_component_instance "$component" "$migration_id" "$namespace")"
+    type=$(get_postgres_type "$namespace-$instance-pg" "$stack")
     case "$type" in
       "canton:network:postgres")
         _info "Nothing to do, self-hosted postgres restore is currently synchronous"
