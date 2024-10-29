@@ -185,7 +185,7 @@ function wait_for_postgres_backup() {
   local migration_id=$4
   local stack=$5
 
-  local full_instance="$namespace-$instance-pg"
+  local full_instance="$namespace-$instance"
 
   type=$(get_postgres_type "$full_instance" "$stack")
 
@@ -218,7 +218,7 @@ function backup_component() {
     else
       local db_name
       db_name=$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")
-      SPLICE_SV=$namespace SPLICE_MIGRATION_ID=$migration_id backup_postgres "$component" "$namespace" "$db_name" "$migration_id" "$stack"
+      SPLICE_SV=$namespace SPLICE_MIGRATION_ID=$migration_id backup_postgres "$component" "$namespace" "$db_name-pg" "$migration_id" "$stack"
     fi
   else
     _info "Skipping backup of $component, not requested"
@@ -240,7 +240,7 @@ function wait_for_backup() {
       wait_for_pvc_backup "cometBFT" "$namespace" "global-domain-$migration_id-cometbft-cometbft-data"
     else
       instance=$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")
-      wait_for_postgres_backup "$component" "$namespace" "$instance" "$migration_id" "$stack"
+      wait_for_postgres_backup "$component" "$namespace" "$instance-pg" "$migration_id" "$stack"
     fi
   else
     _info "Skipping waiting for backup of $component, not requested"
