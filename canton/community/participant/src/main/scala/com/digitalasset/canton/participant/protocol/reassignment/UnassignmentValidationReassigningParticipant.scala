@@ -6,12 +6,12 @@ package com.digitalasset.canton.participant.protocol.reassignment
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.data.FullUnassignmentTree
+import com.digitalasset.canton.data.{FullUnassignmentTree, ReassigningParticipants}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.ReassignmentProcessorError
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentProcessorError.*
 import com.digitalasset.canton.participant.protocol.submission.UsableDomain
-import com.digitalasset.canton.protocol.LfTemplateId
+import com.digitalasset.canton.protocol.{LfTemplateId, Stakeholders}
 import com.digitalasset.canton.sequencing.protocol.Recipients
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
@@ -24,15 +24,14 @@ import scala.concurrent.ExecutionContext
 
 // Additional validations for reassigning participants
 private[reassignment] sealed abstract case class UnassignmentValidationReassigningParticipant(
-    request: FullUnassignmentTree,
     expectedStakeholders: Set[LfPartyId],
     sourceProtocolVersion: Source[ProtocolVersion],
     sourceTopology: Source[TopologySnapshot],
     targetTopology: Target[TopologySnapshot],
     recipients: Recipients,
-) {
+)(request: FullUnassignmentTree) {
   private def checkReassigningParticipants(
-      expectedReassigningParticipants: Set[ParticipantId]
+      expectedReassigningParticipants: ReassigningParticipants
   )(implicit
       ec: ExecutionContext
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Unit] =
@@ -82,42 +81,41 @@ private[reassignment] sealed abstract case class UnassignmentValidationReassigni
 private[reassignment] object UnassignmentValidationReassigningParticipant {
 
   def apply(
-      request: FullUnassignmentTree,
-      expectedStakeholders: Set[LfPartyId],
+      expectedStakeholders: Stakeholders,
       expectedTemplateId: LfTemplateId,
       sourceProtocolVersion: Source[ProtocolVersion],
       sourceTopology: Source[TopologySnapshot],
       targetTopology: Target[TopologySnapshot],
       recipients: Recipients,
-  )(implicit
+  )(request: FullUnassignmentTree)(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Unit] = {
+
     val validation = new UnassignmentValidationReassigningParticipant(
-      request,
-      expectedStakeholders,
+      expectedStakeholders.all,
       sourceProtocolVersion,
       sourceTopology,
       targetTopology,
       recipients,
-    ) {}
+    )(request) {}
 
     for {
       unassignmentRequestRecipients <- sourceTopology.unwrap
-        .activeParticipantsOfAll(expectedStakeholders.toList)
+        .activeParticipantsOfAll(expectedStakeholders.all.toList)
         .mapK(FutureUnlessShutdown.outcomeK)
         .leftMap(inactiveParties =>
           StakeholderHostingErrors(s"The following stakeholders are not active: $inactiveParties")
         )
 
-      reassigningParticipants <- new ReassigningParticipants(
-        expectedStakeholders,
+      reassigningParticipants <- new ReassigningParticipantsComputation(
+        stakeholders = expectedStakeholders,
         sourceTopology,
         targetTopology,
       ).compute.mapK(FutureUnlessShutdown.outcomeK)
       _ <- validation.checkRecipients(unassignmentRequestRecipients)
       _ <- validation.checkReassigningParticipants(reassigningParticipants)
-      _ <- validation.checkVetted(expectedStakeholders, expectedTemplateId)
+      _ <- validation.checkVetted(expectedStakeholders.all, expectedTemplateId)
     } yield ()
   }
 

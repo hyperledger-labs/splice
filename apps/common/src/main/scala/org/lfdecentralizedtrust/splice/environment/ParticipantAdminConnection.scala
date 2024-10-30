@@ -11,8 +11,8 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.{
 }
 import org.lfdecentralizedtrust.splice.util.UploadablePackage
 import com.digitalasset.canton.admin.api.client.commands.{
+  GrpcAdminCommand,
   ParticipantAdminCommands,
-  StatusAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{
   ParticipantStatus,
@@ -65,8 +65,7 @@ class ParticipantAdminConnection(
 
   override protected type Status = ParticipantStatus
 
-  override protected def getStatusRequest
-      : StatusAdminCommands.NodeStatusCommand[ParticipantStatus, _, _] =
+  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
 
   private val hashOps = new HashOps {

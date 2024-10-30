@@ -5,9 +5,9 @@ package org.lfdecentralizedtrust.splice.environment
 
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import com.digitalasset.canton.admin.api.client.commands.{
+  GrpcAdminCommand,
   MediatorAdministrationCommands,
   MediatorAdminCommands,
-  StatusAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{MediatorStatus, NodeStatus}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
@@ -46,8 +46,7 @@ class MediatorAdminConnection(
 
   override protected type Status = MediatorStatus
 
-  override protected def getStatusRequest
-      : StatusAdminCommands.NodeStatusCommand[MediatorStatus, _, _] =
+  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[MediatorStatus]] =
     MediatorAdminCommands.Health.MediatorStatusCommand()
 
   def getMediatorId(implicit traceContext: TraceContext): Future[MediatorId] =

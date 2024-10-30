@@ -192,13 +192,13 @@ trait LedgerApiExtensions {
         def treesJava(
             partyIds: Set[PartyId],
             completeAfter: Int,
-            beginOffset: String,
-            endOffset: Option[String] = None,
+            beginOffset: Long,
+            endOffset: Option[Long] = None,
             verbose: Boolean = true,
             timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
         ): Seq[JavaTransactionTree] = {
           ledgerApi.ledger_api.updates
-            .trees(partyIds, completeAfter, beginOffset, endOffset.getOrElse(""), verbose, timeout)
+            .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout)
             .collect { case LedgerApiCommands.UpdateService.TransactionTreeWrapper(tree) =>
               JavaTransactionTree.fromProto(TransactionTree.toJavaProto(tree))
             }

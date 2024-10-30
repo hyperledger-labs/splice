@@ -9,7 +9,12 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  Lifecycle,
+  UnlessShutdown,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, TimeAwaiter}
 import com.digitalasset.canton.topology.DomainId
@@ -24,6 +29,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.google.common.annotations.VisibleForTesting
 
 import java.time.Duration as JDuration
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
@@ -121,20 +127,37 @@ class StoreBasedDomainTopologyClient(
 )(implicit val executionContext: ExecutionContext)
     extends DomainTopologyClientWithInit
     with TopologyAwaiter
-    with TimeAwaiter
     with NamedLogging {
+
+  private val effectiveTimeAwaiter =
+    new TimeAwaiter(
+      getCurrentKnownTime = () => topologyKnownUntilTimestamp,
+      timeouts,
+      loggerFactory,
+    )
+
+  private val sequencedTimeAwaiter =
+    new TimeAwaiter(
+      getCurrentKnownTime = () => head.get().sequencedTimestamp.value.immediateSuccessor,
+      timeouts,
+      loggerFactory,
+    )
 
   private val pendingChanges = new AtomicInteger(0)
 
   private case class HeadTimestamps(
+      sequencedTimestamp: SequencedTime,
       effectiveTimestamp: EffectiveTime,
       approximateTimestamp: ApproximateTime,
   ) {
     def update(
+        newSequencedTimestamp: SequencedTime,
         newEffectiveTimestamp: EffectiveTime,
         newApproximateTimestamp: ApproximateTime,
     ): HeadTimestamps =
       HeadTimestamps(
+        sequencedTimestamp =
+          SequencedTime(sequencedTimestamp.value.max(newSequencedTimestamp.value)),
         effectiveTimestamp =
           EffectiveTime(effectiveTimestamp.value.max(newEffectiveTimestamp.value)),
         approximateTimestamp =
@@ -143,23 +166,30 @@ class StoreBasedDomainTopologyClient(
   }
   private val head = new AtomicReference[HeadTimestamps](
     HeadTimestamps(
+      SequencedTime(CantonTimestamp.MinValue),
       EffectiveTime(CantonTimestamp.MinValue),
       ApproximateTime(CantonTimestamp.MinValue),
     )
   )
 
   override def updateHead(
+      sequencedTimestamp: SequencedTime,
       effectiveTimestamp: EffectiveTime,
       approximateTimestamp: ApproximateTime,
       potentialTopologyChange: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Unit = {
+    logger.debug(
+      s"Head update: sequenced=$sequencedTimestamp, effective=$effectiveTimestamp, approx=$approximateTimestamp, potentialTopologyChange=$potentialTopologyChange"
+    )
     val curHead =
-      head.updateAndGet(_.update(effectiveTimestamp, approximateTimestamp))
+      head.updateAndGet(_.update(sequencedTimestamp, effectiveTimestamp, approximateTimestamp))
+    sequencedTimeAwaiter.notifyAwaitedFutures(curHead.sequencedTimestamp.value.immediateSuccessor)
     // now notify the futures that wait for this update here. as the update is active at t+epsilon, (see most recent timestamp),
     // we'll need to notify accordingly
-    notifyAwaitedFutures(curHead.effectiveTimestamp.value.immediateSuccessor)
+    effectiveTimeAwaiter.notifyAwaitedFutures(curHead.effectiveTimestamp.value.immediateSuccessor)
+
     if (potentialTopologyChange)
       checkAwaitingConditions()
   }
@@ -169,10 +199,12 @@ class StoreBasedDomainTopologyClient(
       effectiveTimestamp: EffectiveTime,
       sequencerCounter: SequencerCounter,
       transactions: Seq[GenericSignedTopologyTransaction],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+    logger.debug(
+      s"Observed: sequenced=$sequencedTimestamp, effective=$effectiveTimestamp"
+    )
     observedInternal(sequencedTimestamp, effectiveTimestamp)
-
-  protected def currentKnownTime: CantonTimestamp = topologyKnownUntilTimestamp
+  }
 
   override def numPendingChanges: Int = pendingChanges.get()
 
@@ -190,6 +222,7 @@ class StoreBasedDomainTopologyClient(
 
     // we update the head timestamp approximation with the current sequenced timestamp, right now
     updateHead(
+      sequencedTimestamp,
       effectiveTimestamp,
       ApproximateTime(sequencedTimestamp.value),
       potentialTopologyChange = false,
@@ -207,6 +240,7 @@ class StoreBasedDomainTopologyClient(
             case Some(future) =>
               future.foreach { timestamp =>
                 updateHead(
+                  sequencedTimestamp,
                   EffectiveTime(timestamp),
                   ApproximateTime(timestamp),
                   potentialTopologyChange = true,
@@ -216,6 +250,7 @@ class StoreBasedDomainTopologyClient(
             // the effective timestamp has already been witnessed
             case None =>
               updateHead(
+                sequencedTimestamp,
                 effectiveTimestamp,
                 ApproximateTime(effectiveTimestamp.value),
                 potentialTopologyChange = true,
@@ -263,15 +298,37 @@ class StoreBasedDomainTopologyClient(
   override def awaitTimestampUS(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Option[FutureUnlessShutdown[Unit]] =
-    this.awaitKnownTimestampUS(timestamp)
+    effectiveTimeAwaiter.awaitKnownTimestampUS(timestamp)
+
+  @VisibleForTesting
+  private[client] def awaitSequencedTimestampUS(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Option[FutureUnlessShutdown[Unit]] =
+    sequencedTimeAwaiter.awaitKnownTimestampUS(timestamp)
+
+  override def awaitMaxTimestampUS(sequencedTime: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
+    for {
+      // We wait for the sequenced time to be processed to ensure that `maxTimestamp`'s output is stable.
+      _ <- awaitSequencedTimestampUS(sequencedTime).getOrElse(
+        FutureUnlessShutdown.unit
+      )
+      maxTimestamp <- FutureUnlessShutdown.outcomeF(
+        store.maxTimestamp(sequencedTime, includeRejected = false)
+      )
+    } yield maxTimestamp
 
   override def awaitTimestamp(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): Option[Future[Unit]] =
-    this.awaitKnownTimestamp(timestamp)
+    effectiveTimeAwaiter.awaitKnownTimestamp(timestamp)
 
   override protected def onClosed(): Unit = {
-    expireTimeAwaiter()
+    Lifecycle.close(
+      sequencedTimeAwaiter,
+      effectiveTimeAwaiter,
+    )(logger)
     super.onClosed()
   }
 

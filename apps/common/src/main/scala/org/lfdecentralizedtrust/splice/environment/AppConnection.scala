@@ -118,7 +118,7 @@ abstract class AppConnection(
   )(implicit traceContext: TraceContext): Future[Result] = {
     val dso =
       cmd
-        .createService(channel.channel)
+        .createServiceInternal(channel.channel)
         .withInterceptors(
           new ApiClientRequestLogger(
             loggerFactory,
@@ -149,11 +149,11 @@ abstract class AppConnection(
     }
 
     for {
-      req <- toFuture(cmd.createRequest())
+      req <- toFuture(cmd.createRequestInternal())
       response <- TraceContextGrpc.withGrpcContext(traceContext)(
-        cmd.submitRequest(withDeadline, req)
+        cmd.submitRequestInternal(withDeadline, req)
       )
-      result <- toFuture(cmd.handleResponse(response))
+      result <- toFuture(cmd.handleResponseInternal(response))
     } yield result
   }
 

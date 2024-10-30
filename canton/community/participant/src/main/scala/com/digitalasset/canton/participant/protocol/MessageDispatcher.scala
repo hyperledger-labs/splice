@@ -604,11 +604,10 @@ trait MessageDispatcher { this: NamedLogging =>
         map
       case (map, receipt) => map + receipt
     }
-    lazy val future =
-      FutureUnlessShutdown.outcomeF(
-        inFlightSubmissionTracker.observeSequencing(domainId, receiptsMap)
-      )
-    doProcess(DeliveryMessageKind, future)
+    doProcess(
+      DeliveryMessageKind,
+      inFlightSubmissionTracker.observeSequencing(domainId, receiptsMap),
+    )
   }
 
   protected def observeDeliverError(
@@ -616,7 +615,7 @@ trait MessageDispatcher { this: NamedLogging =>
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] =
     doProcess(
       DeliveryMessageKind,
-      FutureUnlessShutdown.outcomeF(inFlightSubmissionTracker.observeDeliverError(error)),
+      inFlightSubmissionTracker.observeDeliverError(error),
     )
 
   private def tickRecordOrderPublisher(sc: SequencerCounter, ts: CantonTimestamp)(implicit
@@ -839,40 +838,4 @@ private[participant] object MessageDispatcher {
     }
   }
 
-  object DefaultFactory extends Factory[MessageDispatcher] {
-    override def create(
-        protocolVersion: ProtocolVersion,
-        domainId: DomainId,
-        participantId: ParticipantId,
-        requestTracker: RequestTracker,
-        requestProcessors: RequestProcessors,
-        topologyProcessor: ParticipantTopologyProcessor,
-        trafficProcessor: TrafficControlProcessor,
-        acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType,
-        requestCounterAllocator: RequestCounterAllocator,
-        recordOrderPublisher: RecordOrderPublisher,
-        badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
-        repairProcessor: RepairProcessor,
-        inFlightSubmissionTracker: InFlightSubmissionTracker,
-        loggerFactory: NamedLoggerFactory,
-        metrics: SyncDomainMetrics,
-    )(implicit ec: ExecutionContext, tracer: Tracer): MessageDispatcher =
-      new DefaultMessageDispatcher(
-        protocolVersion,
-        domainId,
-        participantId,
-        requestTracker,
-        requestProcessors,
-        topologyProcessor,
-        trafficProcessor,
-        acsCommitmentProcessor,
-        requestCounterAllocator,
-        recordOrderPublisher,
-        badRootHashMessagesRequestProcessor,
-        repairProcessor,
-        inFlightSubmissionTracker,
-        loggerFactory,
-        metrics,
-      )
-  }
 }

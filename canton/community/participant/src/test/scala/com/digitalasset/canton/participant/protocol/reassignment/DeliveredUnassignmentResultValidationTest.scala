@@ -8,7 +8,7 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.crypto.SignatureCheckError.SignatureWithWrongKey
 import com.digitalasset.canton.crypto.{DomainSnapshotSyncCryptoApi, HashPurpose}
 import com.digitalasset.canton.data.ViewType.{AssignmentViewType, UnassignmentViewType}
-import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
+import com.digitalasset.canton.data.{CantonTimestamp, ReassigningParticipants, ViewType}
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.participant.protocol.reassignment.DeliveredUnassignmentResultValidation.{
   IncorrectDomain,
@@ -17,7 +17,7 @@ import com.digitalasset.canton.participant.protocol.reassignment.DeliveredUnassi
   IncorrectRootHash,
   IncorrectSignatures,
   ResultTimestampExceedsDecisionTime,
-  StakeholderNotHostedReassigningParticipant,
+  StakeholderNotHostedObservingReassigningParticipant,
 }
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.LockedContracts
@@ -56,7 +56,6 @@ class DeliveredUnassignmentResultValidationTest
     UniqueIdentifier.tryFromProtoPrimitive("signatory::party")
   ).toLf
 
-  // TODO(#21072) Revisit when confirmation is required only from signatories
   private val observer: LfPartyId = PartyId(
     UniqueIdentifier.tryFromProtoPrimitive("observer::party")
   ).toLf
@@ -96,9 +95,14 @@ class DeliveredUnassignmentResultValidationTest
   private val cryptoSnapshot = cryptoClient.currentSnapshotApproximation
 
   private lazy val contractId = ExampleTransactionFactory.suffixedId(10, 0)
+
+  private lazy val stakeholders = Set(signatory, observer)
+
   private lazy val contract = ExampleTransactionFactory.asSerializable(
     contractId,
     contractInstance = ExampleTransactionFactory.contractInstance(),
+    metadata =
+      ContractMetadata.tryCreate(signatories = Set(signatory), stakeholders = stakeholders, None),
   )
 
   private lazy val reassignmentId = ReassignmentId(sourceDomain, CantonTimestamp.Epoch)
@@ -111,15 +115,13 @@ class DeliveredUnassignmentResultValidationTest
   )
 
   private lazy val reassigningParticipants = NonEmpty.mk(Seq, submittingParticipant)
-  private lazy val stakeholders = Set(signatory, observer)
 
   private lazy val unassignmentRequest = reassignmentDataHelpers.unassignmentRequest(
     submitter = signatory,
     submittingParticipant = submittingParticipant,
     sourceMediator = sourceMediator,
   )(
-    stakeholders = stakeholders,
-    reassigningParticipants = reassigningParticipants.toSet,
+    reassigningParticipants = ReassigningParticipants.withConfirmers(reassigningParticipants.toSet)
   )
 
   private lazy val reassignmentData =
@@ -294,9 +296,8 @@ class DeliveredUnassignmentResultValidationTest
     "detect incorrect informees" in {
       val missingParty = Set(signatory)
       val tooManyParties = stakeholders + otherParty
-      val expectedRootHash = unassignmentResult.unwrap.rootHash
 
-      updateAndValidate(_.copy(rootHash = expectedRootHash)).value shouldBe ()
+      updateAndValidate(_.copy(informees = stakeholders)).value shouldBe ()
       updateAndValidate(_.copy(informees = missingParty)).left.value shouldBe IncorrectInformees(
         stakeholders,
         missingParty,
@@ -339,8 +340,8 @@ class DeliveredUnassignmentResultValidationTest
       ))
     }
 
-    "detect stakeholder not hosted on a reassigning participant" in {
-      // Stakeholder observer is not in this topology, which means that it will not have a reassigning participant
+    "detect stakeholder not hosted on some observing reassigning participant" in {
+      // Stakeholder observer is not in this topology, which means that it will not have an observing reassigning participant
       val observerMissing = TestingTopology()
         .withDomains(targetDomain.unwrap)
         .withReversedTopology(
@@ -378,7 +379,9 @@ class DeliveredUnassignmentResultValidationTest
       )(unassignmentResult).validate.value.futureValue
 
       validate(cryptoSnapshot.ipsSnapshot).value shouldBe ()
-      validate(observerMissing).left.value shouldBe StakeholderNotHostedReassigningParticipant(
+      validate(
+        observerMissing
+      ).left.value shouldBe StakeholderNotHostedObservingReassigningParticipant(
         observer
       )
     }

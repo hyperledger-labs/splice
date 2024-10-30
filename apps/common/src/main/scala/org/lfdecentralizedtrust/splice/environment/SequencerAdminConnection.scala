@@ -9,10 +9,10 @@ import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.Traf
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import com.digitalasset.canton.admin.api.client.commands.{
   SequencerAdminCommands,
-  StatusAdminCommands,
   TopologyAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatus}
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -59,8 +59,7 @@ class SequencerAdminConnection(
 
   override protected type Status = SequencerStatus
 
-  override protected def getStatusRequest
-      : StatusAdminCommands.NodeStatusCommand[SequencerStatus, _, _] =
+  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[SequencerStatus]] =
     SequencerAdminCommands.Health.SequencerStatusCommand()
 
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =

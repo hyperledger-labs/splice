@@ -230,9 +230,9 @@ trait MessageDispatcherTest {
           any[Map[MessageId, SequencedSubmission]],
         )(anyTraceContext)
       )
-        .thenReturn(Future.unit)
+        .thenReturn(FutureUnlessShutdown.unit)
       when(inFlightSubmissionTracker.observeDeliverError(any[DeliverError])(anyTraceContext))
-        .thenReturn(Future.unit)
+        .thenReturn(FutureUnlessShutdown.unit)
 
       val protocolProcessors = new RequestProcessors {
         override protected def getInternal[P](
@@ -1448,15 +1448,4 @@ private[protocol] object MessageDispatcherTest {
   case object UnknownTestViewType extends AbstractTestViewType
   type UnknownTestViewType = OtherTestViewType.type
 
-}
-
-class DefaultMessageDispatcherTest
-    extends AnyWordSpec
-    with BaseTest
-    with HasExecutorService
-    with MessageDispatcherTest {
-
-  "DefaultMessageDispatcher" should {
-    behave like messageDispatcher(MessageDispatcher.DefaultFactory.create)
-  }
 }

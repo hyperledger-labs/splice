@@ -4,6 +4,7 @@
 package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
+import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
@@ -318,7 +319,7 @@ class SequencersTransportState(
       .discard
   })
 
-  def logout(): EitherT[FutureUnlessShutdown, Status, Unit] =
+  def logout()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit] =
     states.values.toSeq.parTraverse_ { transportState =>
       transportState.transport.clientTransport.logout()
     }
@@ -348,7 +349,7 @@ class SequencersTransportState(
               Left(SequencerClient.CloseReason.PermissionDenied(s"$permissionDenied"))
             else {
               states.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
-              Right(())
+              Either.unit
             }
           })
         case subscriptionError: SubscriptionCloseReason.SubscriptionError =>
@@ -361,7 +362,7 @@ class SequencersTransportState(
               )
             else {
               states.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
-              Right(())
+              Either.unit
             }
           })
         case SubscriptionCloseReason.Closed =>
@@ -370,12 +371,12 @@ class SequencersTransportState(
               Left(SequencerClient.CloseReason.ClientShutdown)
             else {
               states.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
-              Right(())
+              Either.unit
             }
           })
         case SubscriptionCloseReason.Shutdown => Left(SequencerClient.CloseReason.ClientShutdown)
         case SubscriptionCloseReason.TransportChange =>
-          Right(()) // we don't want to close the sequencer client when changing transport
+          Either.unit // we don't want to close the sequencer client when changing transport
       }
 
     def complete(reason: Try[SequencerClient.CloseReason]): Unit = {

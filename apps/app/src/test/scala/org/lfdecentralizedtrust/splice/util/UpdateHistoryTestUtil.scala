@@ -40,7 +40,7 @@ import org.scalatest.Assertion
 
 trait UpdateHistoryTestUtil extends TestCommon {
   def updateHistoryFromParticipant(
-      beginExclusive: String,
+      beginExclusive: Long,
       partyId: PartyId,
       participant: ParticipantClientReference,
   ): Seq[GetTreeUpdatesResponse] = {
@@ -51,7 +51,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
         partyIds = Set(partyId),
         completeAfter = Int.MaxValue,
         beginOffsetExclusive = beginExclusive,
-        endOffsetInclusive = ledgerEnd,
+        endOffsetInclusive = Some(ledgerEnd),
         verbose = false,
       )
       .map {
@@ -76,7 +76,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
   def compareHistory(
       participant: ParticipantClientReference,
       updateHistory: UpdateHistory,
-      ledgerBegin: String,
+      ledgerBegin: Long,
       mustIncludeReassignments: Boolean = false,
   ): Assertion = {
     val actualUpdates =
@@ -158,7 +158,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
   }
 
   def compareHistoryViaScanApi(
-      ledgerBegin: String,
+      ledgerBegin: Long,
       svAppBackend: SvAppBackendReference,
       scanClient: ScanAppClientReference,
   ): Assertion = {

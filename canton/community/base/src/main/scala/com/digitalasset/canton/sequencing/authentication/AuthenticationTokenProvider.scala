@@ -6,6 +6,7 @@ package com.digitalasset.canton.sequencing.authentication
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -22,10 +23,11 @@ import com.digitalasset.canton.domain.api.v30.SequencerAuthentication.{
 import com.digitalasset.canton.domain.api.v30.SequencerAuthenticationServiceGrpc.SequencerAuthenticationServiceStub
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.{DomainId, Member}
-import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.ErrorKind.{FatalErrorKind, TransientErrorKind}
 import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy, Pause}
 import com.digitalasset.canton.version.ProtocolVersion
@@ -64,16 +66,13 @@ class AuthenticationTokenProvider(
     extends NamedLogging
     with FlagCloseable {
 
-  private def shutdownStatus =
-    Status.CANCELLED.withDescription("Aborted fetching token due to my node shutdown")
-
   def generateToken(
       authenticationClient: SequencerAuthenticationServiceStub
+  )(implicit
+      traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Status, AuthenticationTokenWithExpiry] = {
-    // this should be called by a grpc client interceptor
-    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    performUnlessClosingEitherU(functionFullName) {
-      def generateTokenET: FutureUnlessShutdown[Either[Status, AuthenticationTokenWithExpiry]] =
+    def generateTokenET: FutureUnlessShutdown[Either[Status, AuthenticationTokenWithExpiry]] =
+      performUnlessClosingUSF(functionFullName) {
         (for {
           challenge <- getChallenge(authenticationClient).mapK(FutureUnlessShutdown.outcomeK)
           nonce <- Nonce
@@ -82,60 +81,46 @@ class AuthenticationTokenProvider(
             .toEitherT[FutureUnlessShutdown]
           token <- authenticate(authenticationClient, nonce, challenge.fingerprints)
         } yield token).value
-
-      EitherT {
-        Pause(
-          logger,
-          this,
-          maxRetries = config.retries.value,
-          delay = config.pauseRetries.underlying,
-          operationName = "generate sequencer authentication token",
-        ).unlessShutdown(
-          generateTokenET,
-          new ExceptionRetryPolicy {
-            override protected def determineExceptionErrorKind(
-                exception: Throwable,
-                logger: TracedLogger,
-            )(implicit
-                tc: TraceContext
-            ): ErrorKind =
-              exception match {
-                // Ideally we would like to retry only on retryable gRPC status codes (such as `UNAVAILABLE`),
-                // but as this could be hard to get right, we compromise by retrying on all gRPC status codes,
-                // and use a finite number of retries.
-                case _: StatusRuntimeException => TransientErrorKind()
-                case _ => FatalErrorKind
-              }
-          },
-        ).onShutdown(Left(shutdownStatus))
       }
+
+    EitherT {
+      Pause(
+        logger,
+        this,
+        maxRetries = config.retries.value,
+        delay = config.pauseRetries.underlying,
+        operationName = "generate sequencer authentication token",
+      ).unlessShutdown(generateTokenET, AuthenticationTokenProvider.exceptionRetryPolicy)
     }
   }
 
   private def getChallenge(
       authenticationClient: SequencerAuthenticationServiceStub
-  ): EitherT[Future, Status, ChallengeResponse.Success] = EitherT {
-    authenticationClient
-      .challenge(
-        ChallengeRequest(
-          member.toProtoPrimitive,
-          supportedProtocolVersions.map(_.toProtoPrimitive),
-        )
-      )
-      .map(response => response.value)
-      .map {
-        case ChallengeResponse.Value.Success(success) => Right(success)
-        case ChallengeResponse.Value.Failure(ChallengeResponse.Failure(code, reason)) =>
-          Left(Status.fromCodeValue(code).withDescription(reason))
-        case ChallengeResponse.Value.Empty =>
-          Left(
-            Status.INTERNAL.withDescription(
-              "Problem with domain handshake with challenge. Received empty response from domain."
+  )(implicit traceContext: TraceContext): EitherT[Future, Status, ChallengeResponse.Success] =
+    EitherT {
+      CantonGrpcUtil
+        .sendGrpcRequestUnsafe(authenticationClient)(
+          _.challenge(
+            ChallengeRequest(
+              member.toProtoPrimitive,
+              supportedProtocolVersions.map(_.toProtoPrimitive),
             )
           )
-      }
-  }
-  import cats.syntax.traverse.*
+        )
+        .map(response => response.value)
+        .map {
+          case ChallengeResponse.Value.Success(success) => Right(success)
+          case ChallengeResponse.Value.Failure(ChallengeResponse.Failure(code, reason)) =>
+            Left(Status.fromCodeValue(code).withDescription(reason))
+          case ChallengeResponse.Value.Empty =>
+            Left(
+              Status.INTERNAL.withDescription(
+                "Problem with domain handshake with challenge. Received empty response from domain."
+              )
+            )
+        }
+    }
+
   private def authenticate(
       authenticationClient: SequencerAuthenticationServiceStub,
       nonce: Nonce,
@@ -165,12 +150,14 @@ class AuthenticationTokenProvider(
         )
         .leftMap(err => Status.INTERNAL.withDescription(err.toString))
       token <- EitherT {
-        authenticationClient
-          .authenticate(
-            AuthenticateRequest(
-              member = member.toProtoPrimitive,
-              signature = signature.toProtoV30.some,
-              nonce = nonce.toProtoPrimitive,
+        CantonGrpcUtil
+          .sendGrpcRequestUnsafe(authenticationClient)(
+            _.authenticate(
+              AuthenticateRequest(
+                member = member.toProtoPrimitive,
+                signature = signature.toProtoV30.some,
+                nonce = nonce.toProtoPrimitive,
+              )
             )
           )
           .map(response => response.value)
@@ -200,20 +187,39 @@ class AuthenticationTokenProvider(
 
   def logout(
       authenticationClient: SequencerAuthenticationServiceStub
-  ): EitherT[FutureUnlessShutdown, Status, Unit] =
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit] =
     for {
       // Generate a new token to use as "entry point" to invalidate all tokens
       tokenWithExpiry <- generateToken(authenticationClient)
       token = tokenWithExpiry.token
 
       _ <- EitherT(
-        authenticationClient
-          .logout(LogoutRequest(token.toProtoPrimitive))
+        CantonGrpcUtil
+          .sendGrpcRequestUnsafe(authenticationClient)(
+            _.logout(LogoutRequest(token.toProtoPrimitive))
+          )
           .transform {
             case Failure(exc: StatusRuntimeException) => Success(Left(exc.getStatus))
             case Failure(exc) => Success(Left(Status.INTERNAL.withDescription(exc.getMessage)))
-            case Success(_) => Success(Right(()))
+            case Success(_) => Success(Either.unit)
           }
       ).mapK(FutureUnlessShutdown.outcomeK)
     } yield ()
+}
+
+object AuthenticationTokenProvider {
+  private val exceptionRetryPolicy: ExceptionRetryPolicy =
+    new ExceptionRetryPolicy {
+      override protected def determineExceptionErrorKind(
+          exception: Throwable,
+          logger: TracedLogger,
+      )(implicit tc: TraceContext): ErrorKind =
+        exception match {
+          // Ideally we would like to retry only on retryable gRPC status codes (such as `UNAVAILABLE`),
+          // but as this could be hard to get right, we compromise by retrying on all gRPC status codes,
+          // and use a finite number of retries.
+          case _: StatusRuntimeException => TransientErrorKind()
+          case _ => FatalErrorKind
+        }
+    }
 }

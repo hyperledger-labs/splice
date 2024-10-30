@@ -3,6 +3,94 @@
 Canton CANTON_VERSION has been released on RELEASE_DATE. You can download the Daml Open Source edition from the Daml Connect [Github Release Section](https://github.com/digital-asset/daml/releases/tag/vCANTON_VERSION). The Enterprise edition is available on [Artifactory](https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-CANTON_VERSION.zip).
 Please also consult the [full documentation of this release](https://docs.daml.com/CANTON_VERSION/canton/about.html).
 
+## Until 2024-10-28 (Exclusive)
+- [Breaking Change] changed the `name` parameter of `rotate_node_key` from `Option` to `String`.
+- Added a `name: String` parameter to `rotate_kms_node_key`, allowing operators to specify a name for the new key.
+
+## Until 2024-10-23 (Exclusive)
+
+- Console commands use now integer offsets. The affected commands are the following:
+  - ledger_api.updates.{trees, trees_with_tx_filter, subscribe_trees}
+  - ledger_api.updates.{flat, flat_with_tx_filter, subscribe_flat}
+  - ledger_api.state.end
+  - ledger_api.state.acs.{of_party, active_contracts_of_party, incomplete_unassigned_of_party, incomplete_assigned_of_party, of_all}
+  - ledger_api.completions.{list, subscribe}
+  - ledger_api.javaapi.updates.{trees, flat, flat_with_tx_filter}
+  - pruning.{prune, find_safe_offset, get_offset_by_time, prune_internally}
+  - testing.state_inspection.lookupPublicationTime
+- In the canton's pruning and inspection services we used strings to represent the offset of a participant.
+  The integer approach replaces string representation in:
+  - pruning service:
+    - PruneRequest message: with int64
+    - GetSafePruningOffsetRequest message: with int64
+    - GetSafePruningOffsetResponse message: with int64
+  - inspection service:
+    - LookupOffsetByTime.Response: with optional int64.
+        - If specified, it must be a valid absolute offset (positive integer).
+        - If not set, no offset corresponding to the timestamp given exists.
+
+
+## Until 2024-10-23 (Exclusive)
+
+- Index DB schema changed in a non-backwards compatible fashion.
+- gRPC requests that are aborted due to shutdown server-side return `CANCELLED` instead of `FAILED_PRECONDITION`.
+- Added auto vacuuming defaults for sequencer tables for Postgres (will be set using database schema migrations).
+- Removed support for Postgres 11, 12
+- Made Postgres 14 default in the CI
+- Don't fetch payloads for events with `eventCounter < subscriptionStartCounter`.
+- Payloads are fetched behind a Caffeine cache.
+```hocon
+canton.sequencers.<sequencer>.parameters.caching {
+  sequencer-payload-cache {
+    expire-after-access="1 minute" // default value
+    maximum-size="1000" // default value
+  }
+}
+```
+- Payload fetching can be configured with the following config settings:
+```hocon
+canton.sequencers.<sequencer>.sequencer.block.reader {
+  // max number of payloads to fetch from the datastore in one page
+  payload-batch-size = 10 // default value
+  // max time window to wait for more payloads before fetching the current batch from the datastore
+  payload-batch-window = "5ms" // default value
+  // how many batches of payloads will be fetched in parallel
+  payload-fetch-parallelism = 2 // default value
+  // how many events will be generated from the fetched payloads in parallel
+  event-generation-parallelism = 4 // default value
+}
+```
+- Added sequencer in-memory fan out. Sequencer now holds last configurable number of events it has processed in memory.
+  In practice this is 1-5 seconds worth of data with the default max buffer size of 2000 events. If the read request for
+  a member subscription is within the fan out range, the sequencer will serve the event directly from memory, not performing
+  any database queries. This feature is enabled by default and can be configured with the following settings:
+```hocon
+canton.sequencers.<sequencer>.sequencer.writer {
+  type = high-throughput // NB: this is required for the writer config to be parsed properly
+  max-buffered-events-size = 2000 // Default value
+}
+```
+This feature greatly improves scalability of sequencer in the number of concurrent subscription, under an assumption that
+members are reading events in a timely manner. If the fan out range is exceeded, the sequencer will fall back to reading
+from the database. Longer fan out range can be configured, trading off memory usage for database load reduction.
+
+- CommandService.SubmitAndWaitForUpdateId becomes CommandService.SubmitAndWait in terms of semantics and request/response payloads. The legacy SubmitAndWait form that returns an Empty response is removed from the CommandService
+- Improved logging in case of sequencer connectivity problems as requested by Canton Network.
+- The block sequencer is now configurable under `canton.sequencers.<sequencer>.block`, including new checkpoint settings:
+```hocon
+// how often checkpoints should be written
+block.writer.checkpoint-interval = "30s"
+
+// how many checkpoints should be written when backfilling checkpoints at startup
+block.writer.checkpoint-backfill-parallelism = 2
+```
+
+- `IdentityInitializationService.CurrentTimeResponse` returns the current time in microseconds since epoch instead of a Google protobuf timestamp.
+- Commands.DisclosedContract is enriched with `domain_id` which specifies the ID of the domain where the contract is currently assigned.
+  This field is currently optional to ensure backwards compatibility. When specified, the domain-id of the disclosed contracts that
+  are used in command interpretation is used to route the command submission to the specified domain-id. In case of domain-id mismatches,
+  the possible errors are reported as command rejections with the either `DISCLOSED_CONTRACTS_DOMAIN_ID_MISMATCH` or `PRESCRIBED_DOMAIN_ID_MISMATCH` self-service error codes.
+
 ## Until 2024-10-16 (Exclusive)
 
 - New config option `parameters.timeouts.processing.sequenced-event-processing-bound` allows to specify a timeout for processing sequenced events. When processing takes longer on a node, the node will log an error or crash (depending on the `exit-on-fatal-failures` parameter).
@@ -317,6 +405,50 @@ We also changed the way this is configured in Canton, for example:
    `encryption.keys.default = rsa-2048`
 
 ### Bug Fixes
+
+#### (24-022, Moderate): Participant replica does not clear package service cache
+
+##### Issue Description
+
+When a participant replica becomes active, it does not refresh the package dependency cache. If a vetting attempt is made on the participant that fails because the package is not uploaded, the "missing package" response is cached. If the package is then uploaded to another replica, and we switch to the original participant, this package service cache will still record the package as nonexistent. When the package is used in a transaction, we will get a local model conformance error as the transaction validator cannot find the package, whereas other parts of the participant that don't use the package service can successfully locate it.
+
+##### Affected Deployments
+
+Participant
+
+##### Affected Versions
+3.0, 3.1
+
+##### Impact
+
+Replica crashes during transaction validation.
+
+##### Symptom
+
+Validating participant emits warning:
+```
+
+LOCAL_VERDICT_FAILED_MODEL_CONFORMANCE_CHECK(5,a2b60642): Rejected transaction due to a failed model conformance check: UnvettedPackages
+```
+And then emits an error:
+```
+An internal error has occurred.
+java.lang.IllegalStateException: Mediator approved a request that we have locally rejected
+```
+
+##### Workaround
+
+Restart recently active replica
+
+##### Likeliness
+
+Likely to happen in any replicated participant setup with frequent vetting attempts and switches between active and passive replicated participants between those vetting attempts.
+
+##### Recommendation
+
+Users are advised to upgrade to the next minor release (3.2) during their maintenance window.
+
+
 
 #### (24-015, Minor): Pointwise flat transaction Ledger API queries can unexpectedly return TRANSACTION_NOT_FOUND
 

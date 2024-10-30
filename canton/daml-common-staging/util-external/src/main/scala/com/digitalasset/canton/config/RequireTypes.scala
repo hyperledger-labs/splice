@@ -66,7 +66,7 @@ object RequireTypes {
 
     /** This instructs the server to automatically choose a free port.
       */
-    lazy val Dynamic = Port.tryCreate(0)
+    lazy val Dynamic: Port = Port.tryCreate(0)
   }
 
   sealed trait RefinedNumeric[T] extends Ordered[RefinedNumeric[T]] {
@@ -220,6 +220,9 @@ object RequireTypes {
 
     def *(other: PositiveNumeric[T]): PositiveNumeric[T] =
       PositiveNumeric.tryCreate(value * other.value)
+
+    def max(other: PositiveNumeric[T]): PositiveNumeric[T] =
+      PositiveNumeric.tryCreate(num.max(value, other.value))
 
     def increment: PositiveNumeric[T] = PositiveNumeric.tryCreate(value + num.one)
     def decrement: NonNegativeNumeric[T] = NonNegativeNumeric.tryCreate(value - num.one)

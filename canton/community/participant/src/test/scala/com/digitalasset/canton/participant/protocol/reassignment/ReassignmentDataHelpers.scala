@@ -13,7 +13,12 @@ import com.digitalasset.canton.crypto.{
   Signature,
   TestHash,
 }
-import com.digitalasset.canton.data.{CantonTimestamp, ReassignmentSubmitterMetadata, ViewType}
+import com.digitalasset.canton.data.{
+  CantonTimestamp,
+  ReassigningParticipants,
+  ReassignmentSubmitterMetadata,
+  ViewType,
+}
 import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentData.UnassignmentGlobalOffset
 import com.digitalasset.canton.participant.protocol.submission.SeedGenerator
@@ -37,7 +42,7 @@ import monocle.macros.syntax.lens.*
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 
-class ReassignmentDataHelpers(
+final case class ReassignmentDataHelpers(
     contract: SerializableContract,
     sourceDomain: Source[DomainId],
     targetDomain: Target[DomainId],
@@ -76,14 +81,13 @@ class ReassignmentDataHelpers(
       submittingParticipant: ParticipantId,
       sourceMediator: MediatorGroupRecipient,
   )(
-      stakeholders: Set[LfPartyId] = Set(submitter),
-      reassigningParticipants: Set[ParticipantId] = Set(submittingParticipant),
+      reassigningParticipants: ReassigningParticipants =
+        ReassigningParticipants.withConfirmers(Set(submittingParticipant))
   ): UnassignmentRequest = {
     val creatingTransactionId = ExampleTransactionFactory.transactionId(0)
 
     UnassignmentRequest(
       submitterMetadata = submitterInfo(submitter, submittingParticipant),
-      stakeholders = stakeholders,
       reassigningParticipants = reassigningParticipants,
       creatingTransactionId = creatingTransactionId,
       contract = contract,
@@ -138,12 +142,13 @@ class ReassignmentDataHelpers(
         requestId = RequestId(reassignmentData.unassignmentTs),
         rootHash = reassignmentData.unassignmentRequest.rootHash,
         verdict = Verdict.Approve(protocolVersion),
-        informees = reassignmentData.unassignmentRequest.stakeholders,
+        informees = reassignmentData.unassignmentRequest.stakeholders.all,
         protocolVersion,
       )
 
-    val recipients =
-      NonEmptyUtil.fromUnsafe(reassignmentData.unassignmentRequest.reassigningParticipants).toSeq
+    val recipients = NonEmptyUtil
+      .fromUnsafe(reassignmentData.unassignmentRequest.reassigningParticipants.observing)
+      .toSeq
 
     unassignmentResult(result, recipients)
   }

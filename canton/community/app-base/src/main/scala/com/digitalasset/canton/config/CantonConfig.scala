@@ -401,11 +401,11 @@ trait CantonConfig {
         journalGarbageCollectionDelay =
           participantParameters.journalGarbageCollectionDelay.toInternal,
         disableUpgradeValidation = participantParameters.disableUpgradeValidation,
-        allowForUnauthenticatedContractIds =
-          participantParameters.allowForUnauthenticatedContractIds,
         commandProgressTracking = participantParameters.commandProgressTracker,
         unsafeEnableOnlinePartyReplication =
           participantParameters.unsafeEnableOnlinePartyReplication,
+        // TODO(i21341) Remove the flag before going to production
+        experimentalEnableTopologyEvents = participantParameters.experimentalEnableTopologyEvents,
       )
     }
 

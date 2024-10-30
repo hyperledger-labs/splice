@@ -14,6 +14,7 @@ import com.digitalasset.canton.data.ViewType.UnassignmentViewType
 import com.digitalasset.canton.data.{
   CantonTimestamp,
   FullUnassignmentTree,
+  ReassigningParticipants,
   ReassignmentSubmitterMetadata,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -36,11 +37,16 @@ import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMess
   ViewHashAndRecipients,
   ViewKeyData,
 }
+import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.PackageUnknownTo
 import com.digitalasset.canton.participant.protocol.submission.{
   EncryptedViewMessageFactory,
   SeedGenerator,
 }
-import com.digitalasset.canton.participant.protocol.{EngineController, ProcessingStartingPoints}
+import com.digitalasset.canton.participant.protocol.{
+  EngineController,
+  ProcessingStartingPoints,
+  SerializableContractAuthenticator,
+}
 import com.digitalasset.canton.participant.store.memory.*
 import com.digitalasset.canton.participant.store.{
   ParticipantNodeEphemeralState,
@@ -76,7 +82,6 @@ import com.digitalasset.canton.{
   LedgerApplicationId,
   LedgerCommandId,
   LfPackageId,
-  LfPackageName,
   LfPartyId,
   ReassignmentCounter,
   RequestCounter,
@@ -120,11 +125,6 @@ final class UnassignmentProcessingStepsTest
   private lazy val submittingParticipant = ParticipantId(
     UniqueIdentifier.tryFromProtoPrimitive("submitting::participant")
   )
-
-  private lazy val templateId =
-    LfTemplateId.assertFromString("unassignmentprocessingstepstestpackage:template:id")
-  private lazy val packageName =
-    LfPackageName.assertFromString("unassignmentprocessingstepstestpackagename")
 
   private lazy val initialReassignmentCounter: ReassignmentCounter = ReassignmentCounter.Genesis
 
@@ -197,14 +197,24 @@ final class UnassignmentProcessingStepsTest
 
   private def createTestingTopologySnapshot(
       topology: Map[ParticipantId, Map[LfPartyId, ParticipantPermission]],
-      packages: Map[ParticipantId, Seq[LfPackageId]] = Map.empty,
-  ): TopologySnapshot =
-    createTestingIdentityFactory(topology, packages).topologySnapshot()
+      packagesOverride: Option[Map[ParticipantId, Seq[LfPackageId]]] = None,
+  ): TopologySnapshot = {
 
-  private def createCryptoFactory(packages: Seq[LfPackageId] = Seq(templateId.packageId)) = {
+    val defaultPackages = topology.keys
+      .map(_ -> Seq(ExampleTransactionFactory.packageId))
+      .toMap
+
+    val packages = packagesOverride.getOrElse(defaultPackages)
+    createTestingIdentityFactory(topology, packages).topologySnapshot()
+  }
+
+  private def createCryptoFactory(
+      packages: Seq[LfPackageId] = Seq(ExampleTransactionFactory.packageId)
+  ) = {
     val topology = Map(
       submittingParticipant -> Map(
         party1 -> ParticipantPermission.Submission,
+        submitter -> ParticipantPermission.Submission,
         submittingParticipant.adminParty.toLf -> ParticipantPermission.Submission,
       )
     )
@@ -237,7 +247,7 @@ final class UnassignmentProcessingStepsTest
       Some(cryptoSnapshot),
       Some(None),
       loggerFactory,
-      Seq(templateId.packageId),
+      Seq(ExampleTransactionFactory.packageId),
     )(directExecutionContext)
 
   private lazy val coordination: ReassignmentCoordination =
@@ -253,6 +263,7 @@ final class UnassignmentProcessingStepsTest
       reassignmentCoordination,
       seedGenerator,
       Source(defaultStaticDomainParameters),
+      SerializableContractAuthenticator(crypto.pureCrypto),
       Source(testedProtocolVersion),
       loggerFactory,
     )(executorService)
@@ -263,8 +274,8 @@ final class UnassignmentProcessingStepsTest
   private lazy val Seq(
     (participant1, admin1),
     (participant2, _),
-    (participant3, admin3),
-    (participant4, admin4),
+    (participant3, _),
+    (participant4, _),
   ) =
     (1 to 4).map { i =>
       val participant =
@@ -276,17 +287,15 @@ final class UnassignmentProcessingStepsTest
   private lazy val timeProof =
     TimeProofTestUtil.mkTimeProof(timestamp = CantonTimestamp.Epoch, targetDomain = targetDomain)
 
-  private lazy val contractId = ExampleTransactionFactory.suffixedId(10, 0)
-
-  private lazy val contract = ExampleTransactionFactory.asSerializable(
-    contractId,
-    contractInstance = ExampleTransactionFactory.contractInstance(templateId = templateId),
+  private lazy val contract = ExampleTransactionFactory.authenticatedSerializableContract(
     metadata = ContractMetadata.tryCreate(
       signatories = Set(submitter),
-      stakeholders = Set(submitter),
+      stakeholders = Set(submitter, party1),
       maybeKeyWithMaintainersVersioned = None,
-    ),
+    )
   )
+  private lazy val contractId = contract.contractId
+
   private lazy val creatingTransactionId = ExampleTransactionFactory.transactionId(0)
 
   def mkParsedRequest(
@@ -302,7 +311,8 @@ final class UnassignmentProcessingStepsTest
     signatureO,
     None,
     isFreshOwnTimelyRequest = true,
-    isReassigningParticipant = true,
+    isConfirmingReassigningParticipant = true,
+    isObservingReassigningParticipant = true,
     Seq.empty,
     sourceMediator,
     cryptoSnapshot,
@@ -315,25 +325,25 @@ final class UnassignmentProcessingStepsTest
         submittingParticipant -> Map(submitter -> Submission),
         participant1 -> Map(party1 -> Submission),
         participant2 -> Map(party2 -> Submission),
-      ),
-      packages = Seq(submittingParticipant, participant1, participant2)
-        .map(_ -> Seq(templateId.packageId))
-        .toMap,
+      )
     )
 
     def mkUnassignmentResult(
-        stakeholders: Set[LfPartyId],
         sourceTopologySnapshot: TopologySnapshot,
         targetTopologySnapshot: TopologySnapshot,
-    ): Either[ReassignmentProcessorError, UnassignmentRequestValidated] =
+        stakeholdersOverride: Option[Stakeholders] = None,
+    ): Either[ReassignmentProcessorError, UnassignmentRequestValidated] = {
+      val updatedContract = stakeholdersOverride.fold(contract)(stakeholders =>
+        contract.copy(metadata = ContractMetadata(stakeholders))
+      )
+
       UnassignmentRequest
         .validated(
           submittingParticipant,
           timeProof,
           creatingTransactionId,
-          contract,
+          updatedContract,
           submitterMetadata(submitter),
-          stakeholders,
           sourceDomain,
           Source(testedProtocolVersion),
           sourceMediator,
@@ -346,19 +356,33 @@ final class UnassignmentProcessingStepsTest
         .value
         .failOnShutdown
         .futureValue
+    }
 
     "fail if submitter is not a stakeholder" in {
-      val stakeholders = Set(party1, party2)
-      val result = mkUnassignmentResult(stakeholders, testingTopology, testingTopology)
-      result.left.value shouldBe a[UnassignmentSubmitterMustBeStakeholder]
+      val stakeholders = Stakeholders.tryCreate(Set(party1, party2), Set(party2))
+      mkUnassignmentResult(
+        testingTopology,
+        testingTopology,
+        stakeholdersOverride = Some(stakeholders),
+      ).left.value shouldBe UnassignmentSubmitterMustBeStakeholder(
+        contractId,
+        submitter,
+        stakeholders.all,
+      )
     }
 
     "fail if submitting participant does not have submission permission" in {
       val ipsNoSubmissionPermission =
         createTestingTopologySnapshot(Map(submittingParticipant -> Map(submitter -> Confirmation)))
 
-      val result = mkUnassignmentResult(Set(submitter), ipsNoSubmissionPermission, testingTopology)
-      result.left.value shouldBe a[NoReassignmentSubmissionPermission]
+      mkUnassignmentResult(
+        ipsNoSubmissionPermission,
+        testingTopology,
+      ).left.value shouldBe NoReassignmentSubmissionPermission(
+        s"Unassignment of $contractId",
+        submitter,
+        submittingParticipant,
+      )
     }
 
     "fail if a stakeholder cannot submit on target domain" in {
@@ -369,12 +393,17 @@ final class UnassignmentProcessingStepsTest
         )
       )
 
-      val stakeholders = Set(submitter, party1)
-      val result = mkUnassignmentResult(stakeholders, testingTopology, ipsNoSubmissionOnTarget)
-      result.left.value shouldBe a[PermissionErrors]
+      val stakeholders = Stakeholders.tryCreate(Set(submitter, party1), Set())
+      mkUnassignmentResult(
+        testingTopology,
+        ipsNoSubmissionOnTarget,
+        stakeholdersOverride = Some(stakeholders),
+      ).left.value shouldBe PermissionErrors(
+        s"For party $party1, no participant with submission permission on source domain has submission permission on target domain."
+      )
     }
 
-    "fail if a stakeholder cannot confirm on target domain" in {
+    "fail if a signatory is not hosted on a confirming reassigning participant" in {
       val ipsConfirmationOnSource = createTestingTopologySnapshot(
         Map(
           submittingParticipant -> Map(submitter -> Submission),
@@ -389,12 +418,16 @@ final class UnassignmentProcessingStepsTest
         )
       )
 
-      val stakeholders = Set(submitter, party1)
-      val result =
-        mkUnassignmentResult(stakeholders, ipsConfirmationOnSource, ipsNoConfirmationOnTarget)
+      val stakeholders =
+        Stakeholders.withSignatoriesAndObservers(Set(party1), Set(party1, submitter))
+      val result = mkUnassignmentResult(
+        ipsConfirmationOnSource,
+        ipsNoConfirmationOnTarget,
+        stakeholdersOverride = Some(stakeholders),
+      )
 
       val expectedError = StakeholderHostingErrors(
-        s"The following stakeholders are not hosted with confirmation rights on target domain: Set($party1)"
+        s"Signatory $party1 requires at least 1 reassigning participants, but only 0 are available"
       )
 
       result.left.value shouldBe expectedError
@@ -409,9 +442,14 @@ final class UnassignmentProcessingStepsTest
         )
       )
 
-      val stakeholders = Set(submitter, party1)
-      val result = mkUnassignmentResult(stakeholders, testingTopology, ipsDifferentParticipant)
-      result.left.value shouldBe a[PermissionErrors]
+      val stakeholders = Stakeholders.tryCreate(Set(submitter, party1), Set())
+      mkUnassignmentResult(
+        testingTopology,
+        ipsDifferentParticipant,
+        stakeholdersOverride = Some(stakeholders),
+      ).left.value shouldBe PermissionErrors(
+        s"For party $party1, no participant with submission permission on source domain has submission permission on target domain."
+      )
     }
 
     // TODO(i13201) This should ideally be covered in integration tests as well
@@ -422,9 +460,12 @@ final class UnassignmentProcessingStepsTest
             submittingParticipant -> Map(submitter -> Submission),
             participant1 -> Map(party1 -> Submission),
           ),
-          packages = Seq(submittingParticipant, participant1)
-            .map(_ -> Seq(templateId.packageId))
-            .toMap, // The package is known on the source domain
+          // The package is known on the source domain
+          packagesOverride = Some(
+            Seq(submittingParticipant, participant1)
+              .map(_ -> Seq(ExampleTransactionFactory.packageId))
+              .toMap
+          ),
         )
 
       val targetDomainTopology =
@@ -433,17 +474,25 @@ final class UnassignmentProcessingStepsTest
             submittingParticipant -> Map(submitter -> Submission),
             participant1 -> Map(party1 -> Submission),
           ),
-          packages = Map.empty, // The package is not known on the target domain
+          packagesOverride = Some(Map.empty), // The package is not known on the target domain
         )
 
-      val result =
-        mkUnassignmentResult(
-          stakeholders = Set(submitter, adminSubmitter, admin1),
-          sourceTopologySnapshot = sourceDomainTopology,
-          targetTopologySnapshot = targetDomainTopology,
-        )
+      val stakeholders = Stakeholders.tryCreate(Set(submitter, adminSubmitter, admin1), Set())
+      val result = mkUnassignmentResult(
+        sourceTopologySnapshot = sourceDomainTopology,
+        targetTopologySnapshot = targetDomainTopology,
+        stakeholdersOverride = Some(stakeholders),
+      )
 
-      result.left.value shouldBe a[PackageIdUnknownOrUnvetted]
+      val expectedError = PackageIdUnknownOrUnvetted(
+        contractId,
+        unknownTo = List(
+          PackageUnknownTo(ExampleTransactionFactory.packageId, submittingParticipant),
+          PackageUnknownTo(ExampleTransactionFactory.packageId, participant1),
+        ),
+      )
+
+      result.left.value shouldBe expectedError
     }
 
     "fail if the package for the contract being reassigned is unvetted on one non-reassigning participant connected to the target domain" in {
@@ -455,8 +504,9 @@ final class UnassignmentProcessingStepsTest
             participant1 -> Map(party1 -> Submission),
           ),
           // On the source domain, the package is vetted on all participants
-          packages =
-            Seq(submittingParticipant, participant1).map(_ -> Seq(templateId.packageId)).toMap,
+          packages = Seq(submittingParticipant, participant1)
+            .map(_ -> Seq(ExampleTransactionFactory.packageId))
+            .toMap,
         ).topologySnapshot()
 
       val targetDomainTopology =
@@ -466,19 +516,28 @@ final class UnassignmentProcessingStepsTest
             participant1 -> Map(party1 -> Submission),
           ),
           // On the target domain, the package is not vetted on `participant1`
-          packages = Map(submittingParticipant -> Seq(templateId.packageId)),
+          packages = Map(submittingParticipant -> Seq(ExampleTransactionFactory.packageId)),
         ).topologySnapshot()
 
       // `party1` is a stakeholder hosted on `participant1`, but it has not vetted `templateId.packageId` on the target domain
+      val stakeholders =
+        Stakeholders.tryCreate(Set(submitter, party1, adminSubmitter, admin1), Set())
+
       val result =
         mkUnassignmentResult(
-          stakeholders = Set(submitter, party1, adminSubmitter, admin1),
           sourceTopologySnapshot = sourceDomainTopology,
           targetTopologySnapshot = targetDomainTopology,
+          stakeholdersOverride = Some(stakeholders),
         )
 
-      result.left.value shouldBe a[PackageIdUnknownOrUnvetted]
+      val expectedError = PackageIdUnknownOrUnvetted(
+        contractId,
+        unknownTo = List(
+          PackageUnknownTo(ExampleTransactionFactory.packageId, participant1)
+        ),
+      )
 
+      result.left.value shouldBe expectedError
     }
 
     "pick the active confirming admin party" in {
@@ -489,15 +548,16 @@ final class UnassignmentProcessingStepsTest
           participant2 -> Map(party1 -> Observation), // Not reassigning (cannot confirm)
         )
       )
-      val result =
-        mkUnassignmentResult(Set(submitter, party1), ipsAdminNoConfirmation, testingTopology)
+      val result = mkUnassignmentResult(ipsAdminNoConfirmation, testingTopology)
 
       result.value shouldEqual
         UnassignmentRequestValidated(
           UnassignmentRequest(
             submitterMetadata = submitterMetadata(submitter),
-            stakeholders = Set(submitter, party1),
-            reassigningParticipants = Set(submittingParticipant, participant1),
+            reassigningParticipants = ReassigningParticipants.tryCreate(
+              Set(submittingParticipant),
+              Set(submittingParticipant, participant1),
+            ),
             creatingTransactionId = creatingTransactionId,
             contract = contract,
             sourceDomain = sourceDomain,
@@ -520,37 +580,27 @@ final class UnassignmentProcessingStepsTest
           participant2 -> Map(party1 -> Submission),
           participant3 -> Map(party1 -> Submission),
           participant4 -> Map(party1 -> Confirmation),
-        ),
-        packages = Seq(
-          submittingParticipant,
-          participant1,
-          participant2,
-          participant3,
-          participant4,
-        ).map(_ -> Seq(templateId.packageId)).toMap,
+        )
       )
       val ipsTarget = createTestingTopologySnapshot(
         Map(
           submittingParticipant -> Map(submitter -> Submission),
           participant1 -> Map(submitter -> Observation),
           participant3 -> Map(party1 -> Submission),
-          participant4 -> Map(party1 -> Confirmation),
-        ),
-        packages = Seq(
-          submittingParticipant,
-          participant1,
-          participant3,
-          participant4,
-        ).map(_ -> Seq(templateId.packageId)).toMap,
+          participant4 -> Map(party1 -> Observation),
+        )
       )
-      val stakeholders = Set(submitter, party1)
-      val result = mkUnassignmentResult(stakeholders, ipsSource, ipsTarget)
+
+      val result = mkUnassignmentResult(ipsSource, ipsTarget)
+
       result.value shouldEqual
         UnassignmentRequestValidated(
           UnassignmentRequest(
             submitterMetadata = submitterMetadata(submitter),
-            stakeholders = stakeholders,
-            reassigningParticipants = Set(submittingParticipant, participant3, participant4),
+            reassigningParticipants = ReassigningParticipants.tryCreate(
+              confirming = Set(submittingParticipant),
+              observing = Set(submittingParticipant, participant1, participant3, participant4),
+            ),
             creatingTransactionId = creatingTransactionId,
             contract = contract,
             sourceDomain = sourceDomain,
@@ -567,42 +617,46 @@ final class UnassignmentProcessingStepsTest
 
     "allow admin parties as stakeholders" in {
       val stakeholders = Set(submitter, adminSubmitter, admin1)
-
-      mkUnassignmentResult(stakeholders, testingTopology, testingTopology) shouldBe Right(
-        UnassignmentRequestValidated(
-          UnassignmentRequest(
-            submitterMetadata = submitterMetadata(submitter),
-            stakeholders = stakeholders,
-            // Because admin1 is a stakeholder, participant1 is reassigning
-            reassigningParticipants = Set(submittingParticipant, participant1),
-            creatingTransactionId = creatingTransactionId,
-            contract = contract,
-            sourceDomain = sourceDomain,
-            sourceProtocolVersion = Source(testedProtocolVersion),
-            sourceMediator = sourceMediator,
-            targetDomain = targetDomain,
-            targetProtocolVersion = Target(testedProtocolVersion),
-            targetTimeProof = timeProof,
-            reassignmentCounter = initialReassignmentCounter,
-          ),
-          Set(submittingParticipant, participant1),
+      val updatedContract = contract.copy(metadata =
+        ContractMetadata.tryCreate(
+          signatories = Set(),
+          stakeholders = stakeholders,
+          None,
         )
       )
+
+      val unassignmentResult = mkUnassignmentResult(
+        testingTopology,
+        testingTopology,
+        stakeholdersOverride = Some(Stakeholders(updatedContract.metadata)),
+      ).value
+
+      val expectedUnassignmentResult = UnassignmentRequestValidated(
+        UnassignmentRequest(
+          submitterMetadata = submitterMetadata(submitter),
+          // Because admin1 is a stakeholder, participant1 is reassigning
+          reassigningParticipants =
+            ReassigningParticipants.tryCreate(Set(), Set(submittingParticipant, participant1)),
+          creatingTransactionId = creatingTransactionId,
+          contract = updatedContract,
+          sourceDomain = sourceDomain,
+          sourceProtocolVersion = Source(testedProtocolVersion),
+          sourceMediator = sourceMediator,
+          targetDomain = targetDomain,
+          targetProtocolVersion = Target(testedProtocolVersion),
+          targetTimeProof = timeProof,
+          reassignmentCounter = initialReassignmentCounter,
+        ),
+        Set(submittingParticipant, participant1),
+      )
+
+      unassignmentResult shouldBe expectedUnassignmentResult
     }
   }
 
   "prepare submission" should {
     "succeed without errors" in {
       val state = mkState
-      val contract = ExampleTransactionFactory.asSerializable(
-        contractId,
-        contractInstance = ExampleTransactionFactory.contractInstance(templateId = templateId),
-        metadata = ContractMetadata.tryCreate(
-          signatories = Set(party1),
-          stakeholders = Set(party1),
-          maybeKeyWithMaintainersVersioned = None,
-        ),
-      )
       val transactionId = ExampleTransactionFactory.transactionId(1)
       val submissionParam =
         UnassignmentProcessingSteps.SubmissionParam(
@@ -673,8 +727,7 @@ final class UnassignmentProcessingStepsTest
   "receive request" should {
     val unassignmentRequest = UnassignmentRequest(
       submitterMetadata = submitterMetadata(party1),
-      Set(party1),
-      reassigningParticipants = Set(submittingParticipant),
+      reassigningParticipants = ReassigningParticipants.withConfirmers(Set(submittingParticipant)),
       creatingTransactionId,
       contract,
       sourceDomain,
@@ -726,17 +779,11 @@ final class UnassignmentProcessingStepsTest
         unassignmentProcessingSteps: UnassignmentProcessingSteps
     ) = {
       val state = mkState
-      val metadata = ContractMetadata.tryCreate(Set.empty, Set(party1), None)
-      val contract = ExampleTransactionFactory.asSerializable(
-        contractId,
-        contractInstance = ExampleTransactionFactory.contractInstance(templateId = templateId),
-        metadata = metadata,
-      )
       val transactionId = ExampleTransactionFactory.transactionId(1)
       val unassignmentRequest = UnassignmentRequest(
         submitterMetadata = submitterMetadata(party1),
-        Set(party1),
-        reassigningParticipants = Set(submittingParticipant),
+        reassigningParticipants =
+          ReassigningParticipants.withConfirmers(Set(submittingParticipant)),
         creatingTransactionId,
         contract,
         sourceDomain,
@@ -846,21 +893,20 @@ final class UnassignmentProcessingStepsTest
         assignmentExclusivity = domainParameters
           .assignmentExclusivityLimitFor(timeProof.timestamp)
           .value
-        pendingOut = PendingUnassignment(
+        pendingUnassignment = PendingUnassignment(
           RequestId(CantonTimestamp.Epoch),
           RequestCounter(1),
           SequencerCounter(1),
           rootHash,
           contractId,
           ReassignmentCounter.Genesis,
-          templateId = templateId,
-          packageName = packageName,
-          isReassigningParticipant = false,
+          templateId = ExampleTransactionFactory.templateId,
+          packageName = ExampleTransactionFactory.packageName,
           submitterMetadata = submitterMetadata(submitter),
           reassignmentId,
           targetDomain,
-          Set(party1),
-          Set(party1),
+          stakeholders = Set(party1),
+          hostedStakeholders = Set(party1),
           timeProof,
           Some(Target(assignmentExclusivity)),
           MediatorGroupRecipient(MediatorGroupIndex.one),
@@ -873,7 +919,7 @@ final class UnassignmentProcessingStepsTest
             .getCommitSetAndContractsToBeStoredAndEvent(
               NoOpeningErrors(signedContent),
               reassignmentResult.verdict,
-              pendingOut,
+              pendingUnassignment,
               state.pendingUnassignmentSubmissions,
               crypto.pureCrypto,
             )
@@ -906,7 +952,7 @@ final class UnassignmentProcessingStepsTest
           sessionKeyStore,
           testedProtocolVersion,
         )
-        .valueOrFailShutdown("cannot generate encryption key for transfer-out request")
+        .valueOrFailShutdown("cannot generate encryption key for unassignment request")
       ViewKeyData(_, viewKey, viewKeyMap) = viewsToKeyMap(tree.viewHash)
       encryptedTree <- EncryptedViewMessageFactory
         .create(UnassignmentViewType)(

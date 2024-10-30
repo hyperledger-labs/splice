@@ -27,9 +27,9 @@ final case class ParticipantNodeParameters(
     engine: CantonEngineConfig,
     journalGarbageCollectionDelay: NonNegativeFiniteDuration,
     disableUpgradeValidation: Boolean,
-    allowForUnauthenticatedContractIds: Boolean,
     commandProgressTracking: CommandProgressTrackerConfig,
     unsafeEnableOnlinePartyReplication: Boolean,
+    experimentalEnableTopologyEvents: Boolean,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
@@ -78,8 +78,8 @@ object ParticipantNodeParameters {
     engine = CantonEngineConfig(),
     journalGarbageCollectionDelay = NonNegativeFiniteDuration.Zero,
     disableUpgradeValidation = false,
-    allowForUnauthenticatedContractIds = false,
     commandProgressTracking = CommandProgressTrackerConfig(),
     unsafeEnableOnlinePartyReplication = false,
+    experimentalEnableTopologyEvents = true,
   )
 }

@@ -101,7 +101,7 @@ trait SequencerClient extends SequencerClientSend with FlagCloseable {
   /** Provides an entry point to revoke all the authentication tokens for a member on a given
     * sequencer, and close the connection to that sequencer.
     */
-  def logout(): EitherT[FutureUnlessShutdown, Status, Unit]
+  def logout()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit]
 
   /** The sequencer client computes the cost of submission requests sent to the sequencer,
     * and update the traffic state when receiving confirmation that the event has been sequenced.
@@ -219,7 +219,9 @@ abstract class SequencerClientImpl(
     with Spanning
     with HasCloseContext {
 
-  override def logout(): EitherT[FutureUnlessShutdown, Status, Unit] =
+  override def logout()(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, Status, Unit] =
     sequencersTransportState.logout()
 
   protected val sequencersTransportState: SequencersTransportState =
@@ -565,7 +567,7 @@ abstract class SequencerClientImpl(
                   )
               }
             }
-            FutureUnlessShutdown.pure(Right(()))
+            FutureUnlessShutdown.pure(Either.unit)
           case None =>
             Monad[FutureUnlessShutdown].tailRecM(nextState)(step)
           case Some(AbortedDueToShutdown) =>
@@ -605,7 +607,7 @@ abstract class SequencerClientImpl(
         case Right(()) =>
           // Do not await the patience. This would defeat the point of asynchronous send.
           scheduleAmplification()
-          Right(Right(()))
+          Right(Either.unit)
         case Left(error) =>
           handleSyncError(error)
       }
@@ -889,21 +891,19 @@ class RichSequencerClientImpl(
           s"Processing events from the SequencedEventStore from $replayStartTimeInclusive on"
         )
 
-        replayEvents <- FutureUnlessShutdown.outcomeF(
-          sequencedEventStore
-            .findRange(
-              SequencedEventStore
-                .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
-              limit = None,
-            )
-            .valueOr { overlap =>
-              ErrorUtil.internalError(
-                new IllegalStateException(
-                  s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
-                )
+        replayEvents <- sequencedEventStore
+          .findRange(
+            SequencedEventStore
+              .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
+            limit = None,
+          )
+          .valueOr { overlap =>
+            ErrorUtil.internalError(
+              new IllegalStateException(
+                s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
               )
-            }
-        )
+            )
+          }
         subscriptionStartsAt = replayEvents.headOption.fold(
           cleanPreheadTsO.fold(SubscriptionStart.FreshSubscription: SubscriptionStart)(
             SubscriptionStart.CleanHeadResubscriptionStart.apply
@@ -1312,7 +1312,7 @@ class RichSequencerClientImpl(
                   s"asynchronous event processing for event batch with sequencer counters $firstSc to $lastSc"
                 )(asyncSignalledF)
                 // we do not wait for the async results to finish, we are done here once the synchronous part is done
-                Success(Right(()))
+                Success(Either.unit)
               case Success(UnlessShutdown.AbortedDueToShutdown) =>
                 putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
                 Success(Left(ApplicationHandlerShutdown))
@@ -1515,21 +1515,20 @@ class SequencerClientImplPekko[E: Pretty](
           s"Processing events from the SequencedEventStore from $replayStartTimeInclusive on"
         )
 
-        replayEvents <- FutureUnlessShutdown.outcomeF(
-          sequencedEventStore
-            .findRange(
-              SequencedEventStore
-                .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
-              limit = None,
-            )
-            .valueOr { overlap =>
-              ErrorUtil.internalError(
-                new IllegalStateException(
-                  s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
-                )
+        replayEvents <- sequencedEventStore
+          .findRange(
+            SequencedEventStore
+              .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
+            limit = None,
+          )
+          .valueOr { overlap =>
+            ErrorUtil.internalError(
+              new IllegalStateException(
+                s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
               )
-            }
-        )
+            )
+          }
+
         subscriptionStartsAt = replayEvents.headOption.fold(
           cleanPreheadTsO.fold(SubscriptionStart.FreshSubscription: SubscriptionStart)(
             SubscriptionStart.CleanHeadResubscriptionStart.apply

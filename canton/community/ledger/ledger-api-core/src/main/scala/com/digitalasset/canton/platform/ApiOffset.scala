@@ -36,18 +36,18 @@ object ApiOffset {
     assertFromStringToLongO(s).getOrElse(0L)
 
   // TODO(#18685) remove converter as it should be unused
-  def fromLongO(longO: Option[Long]): String =
-    longO.map(fromLong).getOrElse("")
-
-  // TODO(#18685) remove converter as it should be unused
   def fromLong(l: Long): String =
     Offset.fromLong(l).toHexString
 
   def toApiString(offset: Offset): Ref.HexString =
     offset.toHexString
 
+  def toApiType(offset: Offset): Long =
+    offset.toLong
+
   implicit class ApiOffsetConverter(val offset: Offset) {
     def toApiString: Ref.HexString = ApiOffset.toApiString(offset)
+    def toApiType: Long = ApiOffset.toApiType(offset)
   }
 
 }

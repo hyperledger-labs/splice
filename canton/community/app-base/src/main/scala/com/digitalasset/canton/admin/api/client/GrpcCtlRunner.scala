@@ -39,15 +39,15 @@ class GrpcCtlRunner(
   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Result] = {
 
     val baseService: command.Svc = command
-      .createService(channel)
+      .createServiceInternal(channel)
       .withInterceptors(TraceContextGrpc.clientInterceptor)
 
     val service = token.fold(baseService)(AuthCallCredentials.authorizingStub(baseService, _))
 
     for {
-      request <- EitherT.fromEither[Future](command.createRequest())
+      request <- EitherT.fromEither[Future](command.createRequestInternal())
       response <- submitRequest(command)(instanceName, service, request, timeout, retryPolicy)
-      result <- EitherT.fromEither[Future](command.handleResponse(response))
+      result <- EitherT.fromEither[Future](command.handleResponseInternal(response))
     } yield result
   }
 
@@ -65,7 +65,7 @@ class GrpcCtlRunner(
   ): EitherT[Future, String, Res] = CantonGrpcUtil.shutdownAsGrpcErrorE(
     CantonGrpcUtil
       .sendGrpcRequest(service, instanceName)(
-        command.submitRequest(_, request),
+        command.submitRequestInternal(_, request),
         LoggerUtil.truncateString(maxRequestDebugLines, maxRequestDebugStringLength)(
           command.toString
         ),

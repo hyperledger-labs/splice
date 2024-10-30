@@ -86,12 +86,15 @@ object ContractMetadata
 
   final case class InvalidContractMetadata(message: String) extends RuntimeException(message)
 
+  def apply(stakeholders: Stakeholders): ContractMetadata =
+    ContractMetadata(stakeholders.signatories, stakeholders.all, None)
+
   def tryCreate(
       signatories: Set[LfPartyId],
       stakeholders: Set[LfPartyId],
       maybeKeyWithMaintainersVersioned: Option[LfVersioned[LfGlobalKeyWithMaintainers]],
   ): ContractMetadata =
-    new ContractMetadata(signatories, stakeholders, maybeKeyWithMaintainersVersioned)
+    ContractMetadata(signatories, stakeholders, maybeKeyWithMaintainersVersioned)
 
   def create(
       signatories: Set[LfPartyId],
@@ -117,10 +120,14 @@ object ContractMetadata
     ) =
       metadataP
     for {
-      nonMaintainerSignatories <- nonMaintainerSignatoriesP.traverse(ProtoConverter.parseLfPartyId)
-      nonSignatoryStakeholders <- nonSignatoryStakeholdersP.traverse(ProtoConverter.parseLfPartyId)
+      nonMaintainerSignatories <- nonMaintainerSignatoriesP.traverse(
+        ProtoConverter.parseLfPartyId(_, "non_maintainer_signatories")
+      )
+      nonSignatoryStakeholders <- nonSignatoryStakeholdersP.traverse(
+        ProtoConverter.parseLfPartyId(_, "non_signatory_stakeholders")
+      )
       keyVersionedO <- keyP.traverse(GlobalKeySerialization.fromProtoV30)
-      maintainersList <- maintainersP.traverse(ProtoConverter.parseLfPartyId)
+      maintainersList <- maintainersP.traverse(ProtoConverter.parseLfPartyId(_, "maintainers"))
       _ <- Either.cond(
         maintainersList.isEmpty || keyVersionedO.isDefined,
         (),

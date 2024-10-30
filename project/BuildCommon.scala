@@ -815,6 +815,7 @@ object BuildCommon {
         removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
+          pekko_actor_typed,
           scala_logging,
           scalatest % Test,
           scalacheck % Test,
@@ -973,6 +974,7 @@ object BuildCommon {
         sharedSettings,
         libraryDependencies ++= Seq(
           cats,
+          grpc_stub,
           mockito_scala % Test,
           scalatestMockito % Test,
           scalatest % Test,

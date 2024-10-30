@@ -4,6 +4,7 @@
 package com.digitalasset.canton.participant.sync
 
 import cats.data.EitherT
+import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.{Eval, Monad}
@@ -77,6 +78,7 @@ import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.topology.processing.{
   ApproximateTime,
   EffectiveTime,
+  SequencedTime,
   TopologyTransactionProcessor,
 }
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
@@ -84,7 +86,7 @@ import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{EitherUtil, ErrorUtil, FutureUtil, MonadUtil}
+import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.engine.Engine
 import io.grpc.Status
@@ -501,6 +503,7 @@ class SyncDomain(
       logger.debug(s"Initialising topology client at clean head=$resubscriptionTs")
       // startup with the resubscription-ts
       topologyClient.updateHead(
+        SequencedTime(resubscriptionTs),
         EffectiveTime(resubscriptionTs),
         ApproximateTime(resubscriptionTs),
         potentialTopologyChange = true,
@@ -520,6 +523,7 @@ class SyncDomain(
         .map { topologyChangeDelay =>
           // update client
           topologyClient.updateHead(
+            SequencedTime(resubscriptionTs),
             EffectiveTime(resubscriptionTs.plus(topologyChangeDelay.duration)),
             ApproximateTime(resubscriptionTs),
             potentialTopologyChange = true,
@@ -542,14 +546,12 @@ class SyncDomain(
       // but not yet removed from the in-flight submission store
       //
       // Remove and complete all in-flight submissions that have been published at the multi-domain event log.
-      _ <- EitherT
-        .right(
-          inFlightSubmissionTracker.recoverDomain(
-            domainId,
-            startingPoints.processing.prenextTimestamp,
-          )
+      _ <- EitherT.right(
+        inFlightSubmissionTracker.recoverDomain(
+          domainId,
+          startingPoints.processing.prenextTimestamp,
         )
-        .mapK(FutureUnlessShutdown.outcomeK)
+      )
 
       // Phase 2: Initialize the repair processor
       repairs <- EitherT
@@ -628,8 +630,9 @@ class SyncDomain(
         domainHandle.topologyClient
           .await(_.isParticipantActive(participantId), timeouts.verifyActive.duration)
           .map(isActive =>
-            EitherUtil.condUnitE(
+            Either.cond(
               isActive,
+              (),
               ParticipantDidNotBecomeActive(
                 s"Participant did not become active after ${timeouts.verifyActive.duration}"
               ),
@@ -787,7 +790,7 @@ class SyncDomain(
         // Continue completing reassignments that are after the last completed reassignment
         case Some(value) => Left(Some(value))
         // We didn't find any uncompleted reassignments, so stop
-        case None => Right(())
+        case None => Either.unit
       }
     }
 
@@ -908,7 +911,7 @@ class SyncDomain(
 
   def numberOfDirtyRequests(): Int = ephemeral.requestJournal.numberOfDirtyRequests
 
-  def logout(): EitherT[FutureUnlessShutdown, Status, Unit] =
+  def logout()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit] =
     sequencerClient.logout()
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
@@ -1065,7 +1068,7 @@ object SyncDomain {
         reassignmentCoordination,
         inFlightSubmissionTracker,
         commandProgressTracker,
-        MessageDispatcher.DefaultFactory,
+        ParallelMessageDispatcherFactory,
         clock,
         syncDomainMetrics,
         futureSupervisor,
