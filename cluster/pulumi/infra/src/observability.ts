@@ -657,6 +657,7 @@ function createGrafanaServiceAccount(
     auth: adminPassword.apply(pwd => `cn-admin:${pwd}`),
     url: grafanaPublicUrl,
   });
+
   const serviceAccountResource = new grafana.ServiceAccount(
     'grafanaSA',
     {
@@ -664,7 +665,7 @@ function createGrafanaServiceAccount(
     },
     {
       provider: grafanaProvider,
-      dependsOn: dependsOn,
+      dependsOn: [...dependsOn, grafanaProvider],
     }
   );
   const serviceAccountToken = new grafana.ServiceAccountToken(

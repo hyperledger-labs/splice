@@ -340,13 +340,8 @@ subcommand_whitelist[activate]='Ensure cncluster is correctly authenticated to a
 function subcmd_activate() {
     _cluster_must_exist
 
-  # only the mainnet GKE cluster is created in the specified zone
-  if (env-bool IS_MAINNET); then
+    # Only mainnet explicitly sets CLOUDSDK_COMPUTE_ZONE
     gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
-  else
-    # If the zone is set, the command will try to use it instead of the region for the cluster
-    env -u CLOUDSDK_COMPUTE_ZONE gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
-  fi
 }
 
 ###
@@ -626,8 +621,11 @@ subcommand_whitelist[create]='Create a cluster from scratch.'
 function subcmd_create() {
     _prompt_to_confirm --no-lock
 
+    # TODO -- new clusters in new regions need this created beforehand
+    CLOUDSDK_KMS_REGION="us-central1"
+
     if _cluster_exists; then
-        _error "Cluster already exists."
+        _warning "Cluster already exists."
     else
 
         if [ -n "${CLOUDSDK_COMPUTE_ZONE:-}" ]; then
@@ -695,16 +693,19 @@ function subcmd_create() {
     fi
 
     # Create a kms key for pulumi.
-    error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
+    set +e
+    error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_KMS_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
     exit_code=$?
+    set -e
 
     if [ $exit_code -ne 0 ]; then
       if [[ $error_message == *"ALREADY_EXISTS"* ]]; then
         # Rotate the key if it exists
-        echo "ALREADY_EXISTS error encountered. Rotating the key..."
-        gcloud kms keys versions create --key "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --primary
+        _log "ALREADY_EXISTS error encountered. Rotating the key..."
+        gcloud kms keys versions create --key "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_KMS_REGION" --keyring "pulumi" --primary
       else
-        echo "Failed to create a KMS key for Pulumi."
+        _warning "Failed to create a KMS key for Pulumi."
+        _log "$error_message"
         exit $exit_code
       fi
     fi
