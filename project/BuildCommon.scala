@@ -201,7 +201,7 @@ object BuildCommon {
           "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
-        // so we explicitly remove all CN DARs here, just in case
+        // so we explicitly remove all Splice DARs here, just in case
         addCommandAlias(
           "clean-cn",
           "; apps-common/clean; apps-common-sv/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; splice-util-daml/clean; splice-amulet-daml/clean; splice-dso-governance-daml/clean; splice-wallet-daml/clean; splice-wallet-payments-daml/clean; splice-amulet-name-service-daml/clean; splitwell-daml/clean; splice-validator-lifecycle-daml/clean; splice-app-manager-daml/clean; apps-frontends/clean; cleanCnDars; docs/clean",

@@ -14,7 +14,7 @@ trait AnsEntryTestUtil extends TestCommon with AnsTestUtil {
       wallet: WalletAppClientReference,
   ): Unit = {
     val (_, reqId) = actAndCheck(
-      show"Request CNS entry ${userName.singleQuoted} for $userParty",
+      show"Request ANS entry ${userName.singleQuoted} for $userParty",
       ansExternalApp.createAnsEntry(
         userName,
         testEntryUrl,

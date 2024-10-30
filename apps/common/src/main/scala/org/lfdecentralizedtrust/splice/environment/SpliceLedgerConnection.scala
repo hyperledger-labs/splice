@@ -1075,7 +1075,7 @@ object SpliceLedgerConnection {
     * @param parties       : list of parties whose method calls should be considered distinct,
     *                      e.g., "Seq(directoryProvider)"
     * @param discriminator : additional discriminator for method calls,
-    *                      e.g., "digitalasset.cn" in case of deduplicating directory entry requests relating to directory name "digitalasset.cn". Beware of naive concatenation
+    *                      e.g., "digitalasset.splice" in case of deduplicating directory entry requests relating to directory name "digitalasset.splice". Beware of naive concatenation
     *                      strings for discriminators. Always ensure that the encoding is injective.
     */
   case class CommandId(methodName: String, parties: Seq[PartyId], discriminator: String = "")

@@ -35,9 +35,9 @@ commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
 number_of_commits=$(git rev-list --count "$sha")
 commit_sha_8=$(git log -n1 --format=%h --abbrev=8 "$sha")
 
-if [ -n "${CNCLUSTER_STATIC_DIRTY_VERSION:-}" ]; then
+if [ -n "${SPLICECLUSTER_STATIC_DIRTY_VERSION:-}" ]; then
     if [ -n "${CI:-}" ]; then
-        >&2 echo "CNCLUSTER_STATIC_DIRTY_VERSION and CI must not be set together"
+        >&2 echo "SPLICECLUSTER_STATIC_DIRTY_VERSION and CI must not be set together"
         exit 1
     fi
     echo "$prefix-${USER}-dirty"

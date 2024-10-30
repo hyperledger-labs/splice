@@ -17,7 +17,7 @@ canton-amulet-dar := ${REPO_ROOT}/daml/splice-amulet/.daml/dist/splice-amulet-cu
 wallet-payments-dar := ${REPO_ROOT}/daml/splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 
 .PHONY: build
-build: $(app-bundle) $(load-tester) cluster/build ## Build the Canton Coin app bundle and ensure cluster scripts are ready to run.
+build: $(app-bundle) $(load-tester) cluster/build ## Build the Splice app bundle and ensure cluster scripts are ready to run.
 
 $(app-bundle): $(canton-amulet-dar) $(wallet-payments-dar)
 	sbt --batch bundle

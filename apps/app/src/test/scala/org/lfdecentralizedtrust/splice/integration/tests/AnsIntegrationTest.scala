@@ -106,7 +106,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       entry.name shouldBe testEntryName
     }
 
-    "register an entry despite there is an expired CNS entry with the same name" in {
+    "register an entry despite there is an expired ANS entry with the same name" in {
       implicit env =>
         clue("no user entries is created") {
           val userEntries = sv1ScanBackend
@@ -119,7 +119,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           userEntries shouldBe empty
         }
 
-        clue("Creating a CNS entry that expires immediately") {
+        clue("Creating an ANS entry that expires immediately") {
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
             .submitJava(
               actAs = Seq(dsoParty),
@@ -223,7 +223,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       val aliceRefs = setupUser(aliceStaticRefs)
 
       clue("invalid entries(bad descriptions) are rejected") {
-        val invalidDescriptions = Seq("Sample CNS Entry Description -" * 50)
+        val invalidDescriptions = Seq("Sample ANS Entry Description -" * 50)
         invalidDescriptions.foreach { desc =>
           loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
@@ -247,7 +247,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       val aliceStaticRefs = StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
       val aliceRefs = setupUser(aliceStaticRefs)
       val (subscriptionRequest, _) = actAndCheck(
-        "request CNS entry",
+        "request ANS entry",
         requestEntry(aliceRefs, testEntryName),
       )(
         "alice sees subscription request",
@@ -429,7 +429,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       }
     }
 
-    "the DSO party's CNS entry can be seen via scan api" in { implicit env =>
+    "the DSO party's ANS entry can be seen via scan api" in { implicit env =>
       val expectedDsoEntry = definitions.AnsEntry(
         None,
         dsoParty.toProtoPrimitive,
@@ -446,7 +446,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
     }
 
-    "na SV's CNS entry can be seen via scan api" in { implicit env =>
+    "no SV's ANS entry can be seen via scan api" in { implicit env =>
       val dsoRules = sv1Backend.getDsoInfo().dsoRules
       dsoRules.payload.svs.asScala.foreach { case (svParty, svInfo) =>
         val expectedSvEntry = svEntry(svInfo.name, svParty, ansAcronym)

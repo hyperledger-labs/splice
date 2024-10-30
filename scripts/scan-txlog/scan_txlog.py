@@ -3068,7 +3068,7 @@ class State:
         self._txinfo(
             transaction,
             "AnsEntryRequest",
-            f"Party {entry_user} requested CNS entry {entry_name}",
+            f"Party {entry_user} requested ANS entry {entry_name}",
             parties=[entry_user],
         )
         return HandleTransactionResult.for_open_round(0)

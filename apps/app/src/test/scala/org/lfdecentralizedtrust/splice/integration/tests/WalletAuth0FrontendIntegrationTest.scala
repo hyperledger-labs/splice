@@ -23,7 +23,7 @@ class WalletAuth0FrontendIntegrationTest
   override def environmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransform((_, cnNodeConfig) =>
+      .addConfigTransform((_, spliceConfig) =>
         updateAllValidatorConfigs_(conf =>
           conf
             .focus(_.auth)
@@ -33,7 +33,7 @@ class WalletAuth0FrontendIntegrationTest
                 new URL(s"https://${sys.env("SPLICE_OAUTH_TEST_AUTHORITY")}/.well-known/jwks.json"),
               )
             )
-        )(cnNodeConfig)
+        )(spliceConfig)
       )
   }
 
