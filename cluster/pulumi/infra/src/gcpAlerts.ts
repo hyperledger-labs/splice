@@ -33,7 +33,8 @@ export function installGcpLoggingAlerts(
     filter: `severity>=WARNING
 resource.type="k8s_container"
 resource.labels.cluster_name="${CLUSTER_NAME}"
-resource.labels.namespace_name=~"sv|validator|splitwell"
+-- Note that we ignore the validator runbook. This is because we reset it periodically, which sometimes produces noise.
+resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -(resource.labels.container_name=~"participant" AND jsonPayload.message=~"Instrument .* has recorded multiple values for the same attributes.")
 -- https://github.com/DACH-NY/canton-network-node/issues/10475
 -(resource.labels.container_name="cometbft" AND
