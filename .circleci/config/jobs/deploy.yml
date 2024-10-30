@@ -54,8 +54,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of SV runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
@@ -65,8 +63,9 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            export CI_IGNORE_DIRTY_REPO=1
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -138,8 +137,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of Validator runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
@@ -154,49 +151,11 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
-            # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            export CI_IGNORE_DIRTY_REPO=1
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
             cncluster activate
             cncluster ci_apply_validator $VERSION
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          channel_notify: << parameters.channel_notify >>
-          cluster: << parameters.cluster >>
-
-  deploy_multivalidator:
-    executor: self_hosted
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      deploy_retry_count:
-        type: integer
-        default: 2
-    steps:
-      - checkout_with_retry
-      - setup_nix_self_hosted
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
-          cluster: << parameters.cluster >>
-          cmd: |
-            make -j cluster/build
-          cmd_retry_count: 2
-      - run_bash_command_in_nix:
-          cmd_name: Apply multi-validator pulumi stack
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
-          gce_authenticate: true
-          cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: |
-            .circleci/post-slack-message.sh "Deployment of multi-validator pulumi stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
-          cmd: |
-            cncluster activate
-            cncluster ci_apply_multi
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
@@ -289,8 +248,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             cncluster activate
             # All CI-deployed clusters use split postgres instances per app, to support backups.
@@ -303,8 +260,9 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            export CI_IGNORE_DIRTY_REPO=1
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -398,8 +356,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run >> == true ]]; then
               cncluster activate
@@ -471,8 +427,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of infra stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             cncluster activate
             cncluster infra_up

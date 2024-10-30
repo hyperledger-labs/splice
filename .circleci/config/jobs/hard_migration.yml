@@ -83,8 +83,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             set -eou pipefail
 
@@ -93,6 +91,8 @@ jobs:
 
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=true
+            # cncluster hard_domain_migration_ commands can make the repo dirty
+            export CI_IGNORE_DIRTY_REPO=1
             echo "Running hard domain migration << parameters.action >> << parameters.scope >> from $base_version to $upgrade_version"
             cncluster activate
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
@@ -436,23 +436,23 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
             git branch -f $BASE_VERSION_BRANCH HEAD
             git checkout $BASE_VERSION_BRANCH
             git push -f origin $BASE_VERSION_BRANCH
             BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
-            RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF || true
-            
-            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"  
-            
+            RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
+            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF
+
+            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+
             echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
-            git add **/.envrc.vars            
+            git add **/.envrc.vars
             git add **/config.yaml
             git commit -m "Add migration config to deploy version $BASE_VERSION to << parameters.cluster >>"
             git push origin $BASE_VERSION_BRANCH
@@ -499,25 +499,25 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git branch -f $UPGRADE_VERSION_BRANCH HEAD
             git checkout $UPGRADE_VERSION_BRANCH
             git push -f origin $UPGRADE_VERSION_BRANCH
             BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
-            BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
-            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
+            BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-            
+
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
             echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
-            
+
             cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
             cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
-          
-            git add **/.envrc.vars          
+
+            git add **/.envrc.vars
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
@@ -550,11 +550,11 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
-            
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
+
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
             cncluster hard_domain_migration_update_config_to_migrate
 
@@ -590,15 +590,15 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
-            
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
+
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-            
+
             cncluster hard_domain_migration_update_config_to_archive_legacy_migration
-            
+
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
@@ -638,9 +638,9 @@ jobs:
 
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            
+
             export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='0,1'
-            
+
             cncluster ci_pdown_sv
           cmd_retry_count: 4
           cmd_retry_wait: 150
@@ -654,10 +654,10 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            
+
             cncluster hard_domain_migration_update_config_to_remove_migrating_from
 
             git add **/config.yaml || true
