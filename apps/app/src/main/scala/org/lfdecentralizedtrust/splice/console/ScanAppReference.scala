@@ -14,7 +14,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
-  TransferCommand,
   TransferCommandCounter,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
@@ -173,10 +172,11 @@ abstract class ScanAppReference(
 
   @Help.Summary("Lookup the status of a TransferCommand")
   def lookupTransferCommandStatus(
-      cid: TransferCommand.ContractId
+      sender: PartyId,
+      nonce: Long,
   ): Option[definitions.LookupTransferCommandStatusResponse] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.LookupTransferCommandStatus(cid))
+      httpCommand(HttpScanAppClient.LookupTransferCommandStatus(sender, nonce))
     }
 
   @Help.Summary(

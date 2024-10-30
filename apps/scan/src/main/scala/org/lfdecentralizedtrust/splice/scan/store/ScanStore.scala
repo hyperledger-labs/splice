@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.store.{
   VotesStore,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanStore,
@@ -272,11 +273,12 @@ trait ScanStore
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]]
 
-  def lookupLatestTransferCommandEvent(
-      contractId: splice.externalpartyamuletrules.TransferCommand.ContractId
+  def lookupLatestTransferCommandEvents(
+      sender: PartyId,
+      nonce: Long,
   )(implicit
       tc: TraceContext
-  ): Future[Option[TransferCommandTxLogEntry]]
+  ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]]
 }
 
 object ScanStore {

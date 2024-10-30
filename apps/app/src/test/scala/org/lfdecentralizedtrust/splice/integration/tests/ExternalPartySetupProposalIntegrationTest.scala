@@ -37,6 +37,7 @@ import org.lfdecentralizedtrust.splice.validator.automation.{
   RenewTransferPreapprovalTrigger,
   TransferCommandSendTrigger,
 }
+import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.*
@@ -184,7 +185,8 @@ class ExternalPartySetupProposalIntegrationTest
 
     // Lookup transfer command that does not exist
     sv1ScanBackend.lookupTransferCommandStatus(
-      new TransferCommand.ContractId("does-not-exist")
+      aliceParty,
+      0L,
     ) shouldBe None
 
     // Transfer 10.0 from Alice to Bob (with OutputFees: 6.1, SenderChangeFee: 6.0)
@@ -213,7 +215,7 @@ class ExternalPartySetupProposalIntegrationTest
         HexString.toHexString(alicePublicKey.key),
       ),
     )(
-      "DSO automation completes transfer",
+      "validator automation completes transfer",
       _ => {
         aliceValidatorBackend
           .getExternalPartyBalance(aliceParty)
@@ -227,12 +229,34 @@ class ExternalPartySetupProposalIntegrationTest
           .value
           .payload
           .nextNonce shouldBe 1
-        sv1ScanBackend.lookupTransferCommandStatus(
-          new TransferCommand.ContractId(prepareSend.transferCommandContractId)
-        ) shouldBe Some(
-          definitions.LookupTransferCommandStatusResponse.members.TransferCommandSentResponse(
+        val result = sv1ScanBackend
+          .lookupTransferCommandStatus(
+            aliceParty,
+            0L,
+          )
+          .value
+        result.transferCommandsByContractId.values.loneElement.status shouldBe definitions.TransferCommandContractStatus.members
+          .TransferCommandSentResponse(
             definitions.TransferCommandSentResponse(status = "sent")
           )
+        result.transferCommandsByContractId.keys.loneElement should startWith(
+          prepareSend.transferCommandContractIdPrefix
+        )
+        val payload = TransferCommand
+          .jsonDecoder()
+          .decode(
+            new JsonLfReader(
+              result.transferCommandsByContractId.values.loneElement.contract.payload.noSpaces
+            )
+          )
+        payload shouldBe new TransferCommand(
+          dsoParty.toProtoPrimitive,
+          aliceParty.toProtoPrimitive,
+          bobParty.toProtoPrimitive,
+          aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive,
+          BigDecimal(10.0).bigDecimal,
+          payload.expiresAt,
+          0L,
         )
       },
     )
@@ -336,7 +360,7 @@ class ExternalPartySetupProposalIntegrationTest
     setTriggersWithin(triggersToPauseAtStart =
       Seq(aliceValidatorBackend.validatorAutomation.trigger[TransferCommandSendTrigger])
     ) {
-      actAndCheck(
+      val (_, suffixedCid) = actAndCheck(
         "Submit signed TransferCommand creation",
         aliceValidatorBackend.submitTransferPreapprovalSend(
           aliceParty,
@@ -363,11 +387,13 @@ class ExternalPartySetupProposalIntegrationTest
             .filterJava(TransferCommand.COMPANION)(
               aliceParty,
               c => c.data.sender == aliceParty.toProtoPrimitive,
-            ) should have size (1)
+            )
+            .loneElement
+            .id
         },
       )
       actAndCheck(
-        "Resume DSO automation for TransferCommands",
+        "Resume validator automation for TransferCommands",
         aliceValidatorBackend.validatorAutomation.trigger[TransferCommandSendTrigger].resume(),
       )(
         "TransferCommand gets archived",
@@ -377,10 +403,14 @@ class ExternalPartySetupProposalIntegrationTest
               aliceParty,
               c => c.data.sender == aliceParty.toProtoPrimitive,
             ) shouldBe empty
-          sv1ScanBackend.lookupTransferCommandStatus(
-            new TransferCommand.ContractId(prepareSendNoPreapproval.transferCommandContractId)
-          ) shouldBe Some(
-            definitions.LookupTransferCommandStatusResponse.members.TransferCommandFailedResponse(
+          val result = sv1ScanBackend
+            .lookupTransferCommandStatus(
+              aliceParty,
+              1L,
+            )
+            .value
+          result.transferCommandsByContractId.values.loneElement.status shouldBe definitions.TransferCommandContractStatus.members
+            .TransferCommandFailedResponse(
               definitions.TransferCommandFailedResponse(
                 status = "failed",
                 failureKind = definitions.TransferCommandFailedResponse.FailureKind.members.Failed,
@@ -388,7 +418,7 @@ class ExternalPartySetupProposalIntegrationTest
                   s"ITR_Other(No TransferPreapproval for receiver '${sv1Party.toProtoPrimitive}')",
               )
             )
-          )
+          result.transferCommandsByContractId.keys.loneElement shouldBe suffixedCid.contractId
         },
       )
     }

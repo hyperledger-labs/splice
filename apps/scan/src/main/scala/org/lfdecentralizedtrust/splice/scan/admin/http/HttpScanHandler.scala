@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 import com.digitalasset.canton.data.CantonTimestamp
 import cats.data.OptionT
 import cats.syntax.either.*
+import cats.syntax.traverseFilter.*
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
@@ -1067,27 +1068,45 @@ class HttpScanHandler(
   def lookupTransferCommandStatus(
       respond: ScanResource.LookupTransferCommandStatusResponse.type
   )(
-      contractId: String
+      sender: String,
+      nonce: Long,
   )(extracted: TraceContext): Future[ScanResource.LookupTransferCommandStatusResponse] = {
     implicit val tc = extracted
+    val senderParty = PartyId.tryFromProtoPrimitive(sender)
     withSpan(s"$workflowId.lookupTransferCommandStatus") { _ => _ =>
       for {
-        txLogEntry <- store.lookupLatestTransferCommandEvent(
-          Codec.tryDecodeJavaContractId(TransferCommand.COMPANION)(contractId)
+        txLogEntryMap <- store.lookupLatestTransferCommandEvents(
+          senderParty,
+          nonce,
         )
-      } yield {
-        txLogEntry
-          .map(_.status)
-          .fold[v0.ScanResource.LookupTransferCommandStatusResponse](
-            v0.ScanResource.LookupTransferCommandStatusResponseNotFound(
-              definitions.ErrorResponse(
-                s"Couldn't find transfer command with contract id $contractId created in the last 24h"
+        filteredMap <- txLogEntryMap.view.toList
+          .traverseFilter { case (cid, entry) =>
+            // The update history ingests independently so this lookup can return None temporarily.
+            // We just filter out those contracts.
+            store.updateHistory
+              .lookupContractById(TransferCommand.COMPANION)(cid)
+              .map(
+                _.map(c =>
+                  cid.contractId -> definitions.TransferCommandContractWithStatus(
+                    c.toHttp,
+                    TxLogEntry.Http.toResponse(entry.status),
+                  )
+                )
               )
+          }
+          .map(_.toMap)
+      } yield {
+        if (filteredMap.isEmpty) {
+          v0.ScanResource.LookupTransferCommandStatusResponseNotFound(
+            definitions.ErrorResponse(
+              s"Couldn't find transfer command for sender $senderParty with nonce $nonce created in the last 24h"
             )
-          )(status =>
-            v0.ScanResource
-              .LookupTransferCommandStatusResponseOK(TxLogEntry.Http.toResponse(status))
           )
+        } else {
+          v0.ScanResource.LookupTransferCommandStatusResponseOK(
+            definitions.LookupTransferCommandStatusResponse(filteredMap)
+          )
+        }
       }
     }
   }

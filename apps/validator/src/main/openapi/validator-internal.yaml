@@ -1472,7 +1472,7 @@ components:
       required:
         - transaction
         - tx_hash
-        - transfer_command_contract_id
+        - transfer_command_contract_id_prefix
       properties:
         transaction:
           type: string
@@ -1484,8 +1484,11 @@ components:
         tx_hash:
           description: Hex-encoded hash of the transaction
           type: string
-        transfer_command_contract_id:
-          description: ContractId of the created TransferCommand. Matches the contract id of the corresponding `Create` node in the prepared transaction.
+        transfer_command_contract_id_prefix:
+          description: |
+            Prefix of the ContractId of the created TransferCommand. Matches the contract id of the corresponding `Create` node in the prepared transaction which
+            also only contains the prefix. The final transaction observed on the update stream or in the result of looking up the transfer command status on Scan
+            adds an additional suffix to the contract id.
           type: string
 
     SubmitTransferPreapprovalSendRequest:

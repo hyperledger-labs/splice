@@ -104,6 +104,8 @@ object ScanTables extends AcsTables {
       voteRequesterName: Option[String] = None,
       voteEffectiveAt: Option[String] = None,
       transferCommandContractId: Option[TransferCommand.ContractId] = None,
+      transferCommandSender: Option[PartyId] = None,
+      transferCommandNonce: Option[Long] = None,
   ) extends TxLogRowData {
 
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
@@ -122,6 +124,8 @@ object ScanTables extends AcsTables {
       "vote_requester_name" -> voteRequesterName.map(lengthLimited),
       "vote_effective_at" -> voteEffectiveAt.map(lengthLimited),
       "transfer_command_contract_id" -> transferCommandContractId,
+      "transfer_command_sender" -> transferCommandSender,
+      "transfer_command_nonce" -> transferCommandNonce,
     )
   }
 
@@ -217,9 +221,14 @@ object ScanTables extends AcsTables {
             entry = entry,
             transferCommandContractId = Some(
               new TransferCommand.ContractId(
-                // TODO(#15594) Remove this once Canton exposes the suffixed CIDs
-                entry.contractId.take(66)
+                entry.contractId
               )
+            ),
+            transferCommandSender = Some(
+              entry.sender
+            ),
+            transferCommandNonce = Some(
+              entry.nonce
             ),
           )
         case _ =>

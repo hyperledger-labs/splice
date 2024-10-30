@@ -460,7 +460,7 @@ testTransferPreapprovalSend = do
 
   [] <- query @Amulet externalParty
 
-  TransferCommand_SendResult (TransferCommandResultSuccess _) <- submitMulti [validator] [app.dso] $ exerciseCmd transferCmd TransferCommand_Send with
+  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submitMulti [validator] [app.dso] $ exerciseCmd transferCmd TransferCommand_Send with
     context
     transferPreapprovalCidO = Some transferPreapprovalCid
     inputs = [InputAmulet amulet]

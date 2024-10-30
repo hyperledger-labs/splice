@@ -102,7 +102,10 @@ template TransferCommand
       do transferCounter <- fetchChecked (ForOwner with owner = sender, dso) transferCounterCid
          if | transferCounter.nextNonce > nonce ->
               -- Fail but archive the TransferCommand
-              pure $ TransferCommand_SendResult $ TransferCommandResultFailure $ ITR_Other $ "Expected nonce " <> show nonce <> " is smaller than current counter " <> show transferCounter.nextNonce
+              pure TransferCommand_SendResult with
+                result = TransferCommandResultFailure $ ITR_Other $ "Expected nonce " <> show nonce <> " is smaller than current counter " <> show transferCounter.nextNonce
+                sender
+                nonce
             | transferCounter.nextNonce < nonce ->
               -- Fail but don't archive the command so it can be retried
               abort ("Expected nonce " <> show nonce <> " is bigger than current counter " <> show transferCounter.nextNonce)
@@ -118,7 +121,10 @@ template TransferCommand
                   -- For now we trust the DSO delegate to chose correctly. The other SVs can monitor
                   -- this and change the delegate or even remove the SV if it does not operate
                   -- correctly.
-                  pure $ TransferCommand_SendResult $ TransferCommandResultFailure $ ITR_Other $ "No TransferPreapproval for receiver " <> show receiver
+                  pure TransferCommand_SendResult with
+                    result = TransferCommandResultFailure $ ITR_Other $ "No TransferPreapproval for receiver " <> show receiver
+                    sender
+                    nonce
                 Some transferPreapprovalCid -> do
                   -- Verify that receiver and DSO party match. We don't validate that the reeiver's provider matches
                  -- as changing that should be up to the receiver and not require the sender to resign.
@@ -132,11 +138,16 @@ template TransferCommand
                     catch
                       (ex : InvalidTransfer) -> pure (TransferCommandResultFailure ex.reason)
                       (ex : AnyException) -> pure (TransferCommandResultFailure (ITR_Other $ message ex))
-                  pure (TransferCommand_SendResult result)
+                  pure TransferCommand_SendResult with
+                    result
+                    sender
+                    nonce
 
     choice TransferCommand_Withdraw : TransferCommand_WithdrawResult
       controller sender
-      do pure TransferCommand_WithdrawResult
+      do pure TransferCommand_WithdrawResult with
+           sender
+           nonce
 
     choice TransferCommand_Expire : TransferCommand_ExpireResult
       with
@@ -145,7 +156,9 @@ template TransferCommand
       do require "Controller is a stakeholder" (p `elem` stakeholder this)
          now <- getTime
          require "TransferCommand is expired" (expiresAt <= now)
-         pure TransferCommand_ExpireResult
+         pure TransferCommand_ExpireResult with
+           sender
+           nonce
 
 instance HasCheckedFetch TransferCommand ForDso where
   contractGroupId TransferCommand{..} = ForDso dso
@@ -153,6 +166,8 @@ instance HasCheckedFetch TransferCommand ForDso where
 data TransferCommand_SendResult = TransferCommand_SendResult
   with
     result : TransferCommandResult
+    sender : Party -- Returned to simplify tx log parsing
+    nonce : Int -- Returned to simplify tx log parsing
   deriving (Show, Eq)
 
 data TransferCommandResult
@@ -162,8 +177,14 @@ data TransferCommandResult
       result : TransferResult
   deriving (Show, Eq)
 
-data TransferCommand_WithdrawResult = TransferCommand_WithdrawResult {}
+data TransferCommand_WithdrawResult = TransferCommand_WithdrawResult
+  with
+    sender : Party -- Returned to simplify tx log parsing
+    nonce : Int -- Returned to simplify tx log parsing
   deriving (Show, Eq)
 
-data TransferCommand_ExpireResult = TransferCommand_ExpireResult {}
+data TransferCommand_ExpireResult = TransferCommand_ExpireResult
+  with
+    sender : Party -- Returned to simplify tx log parsing
+    nonce : Int -- Returned to simplify tx log parsing
   deriving (Show, Eq)

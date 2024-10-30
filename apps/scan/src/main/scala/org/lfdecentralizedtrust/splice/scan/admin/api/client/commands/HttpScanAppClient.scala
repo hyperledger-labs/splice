@@ -17,7 +17,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
-  TransferCommand,
   TransferCommandCounter,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
@@ -478,7 +477,8 @@ object HttpScanAppClient {
   }
 
   case class LookupTransferCommandStatus(
-      cid: TransferCommand.ContractId
+      sender: PartyId,
+      nonce: Long,
   ) extends InternalBaseCommand[http.LookupTransferCommandStatusResponse, Option[
         definitions.LookupTransferCommandStatusResponse
       ]] {
@@ -486,7 +486,7 @@ object HttpScanAppClient {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ) = client.lookupTransferCommandStatus(Codec.encodeContractId(cid), headers)
+    ) = client.lookupTransferCommandStatus(Codec.encode(sender), nonce, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder

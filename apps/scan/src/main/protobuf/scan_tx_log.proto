@@ -205,13 +205,15 @@ message TransferCommandTxLogEntry {
   option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry";
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
   string event_id = 1;
-  string contract_id = 3; // org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand.ContractId
+  string sender = 2 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];;
+  int64 nonce = 3;
+  string contract_id = 4; // org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand.ContractId
   oneof status {
-    TransferCommandCreated created = 7;
-    TransferCommandSent sent = 8;
-    TransferCommandFailed failed = 9;
-    TransferCommandExpired expired = 10;
-    TransferCommandWithdrawn withdrawn = 11;
+    TransferCommandCreated created = 5;
+    TransferCommandSent sent = 6;
+    TransferCommandFailed failed = 7;
+    TransferCommandExpired expired = 8;
+    TransferCommandWithdrawn withdrawn = 9;
   };
 }
 

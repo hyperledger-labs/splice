@@ -1010,22 +1010,34 @@ class DbScanStore(
     } yield result.map(contractFromRow(VoteRequest.COMPANION)(_))
   }
 
-  override def lookupLatestTransferCommandEvent(contractId: TransferCommand.ContractId)(implicit
+  override def lookupLatestTransferCommandEvents(sender: PartyId, nonce: Long)(implicit
       tc: TraceContext
-  ): Future[Option[TransferCommandTxLogEntry]] =
+  ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]] =
     waitUntilAcsIngested {
       for {
+        // This query is linear in the number of events that match (sender, nonce).
+        // Given that for each TransferCommand that's at most 2 and we expect few nonce conflicts
+        // this is acceptable.
         result <- storage
-          .querySingle(
-            selectFromTxLogTable(
-              ScanTables.txLogTableName,
-              storeId,
-              sql"entry_type = ${TxLogEntry.EntryType.TransferCommandTxLogEntry} and transfer_command_contract_id = ${contractId}",
-              sql"order by entry_number desc limit 1",
-            ).headOption,
+          .query(
+            sql"""
+              with ranked_rows as (
+                select #${TxLogQueries.SelectFromTxLogTableResult
+                .sqlColumnsCommaSeparated()}, rank() over (partition by transfer_command_contract_id order by entry_number desc) from #${ScanTables.txLogTableName}
+                where store_id = $storeId
+                  and entry_type = ${TxLogEntry.EntryType.TransferCommandTxLogEntry}
+                  and transfer_command_sender = ${sender}
+                  and transfer_command_nonce = $nonce
+              )
+              select #${TxLogQueries.SelectFromTxLogTableResult.sqlColumnsCommaSeparated()}
+              from ranked_rows
+              where rank = 1
+            """.toActionBuilder.as[TxLogQueries.SelectFromTxLogTableResult],
             "getLatestTransferCommandEventByContractId",
           )
-          .value
-      } yield result.map(txLogEntryFromRow[TransferCommandTxLogEntry](txLogConfig))
+      } yield result
+        .map(txLogEntryFromRow[TransferCommandTxLogEntry](txLogConfig))
+        .map(entry => new TransferCommand.ContractId(entry.contractId) -> entry)
+        .toMap
     }
 }

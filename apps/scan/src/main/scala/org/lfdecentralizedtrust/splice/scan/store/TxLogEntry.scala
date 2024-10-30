@@ -203,7 +203,7 @@ object TxLogEntry extends StoreErrors {
 
     def toResponse(
         status: TransferCommandTxLogEntry.Status
-    ): httpDef.LookupTransferCommandStatusResponse =
+    ): httpDef.TransferCommandContractStatus =
       status match {
         case TransferCommandTxLogEntry.Status.Empty => throw txMissingField()
         case _: TransferCommandTxLogEntry.Status.Created =>

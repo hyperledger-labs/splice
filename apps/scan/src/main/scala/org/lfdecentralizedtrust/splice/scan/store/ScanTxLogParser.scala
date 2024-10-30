@@ -118,10 +118,10 @@ class ScanTxLogParser(
             State.fromCreateTransferCommand(exercised.getEventId, node)
           case TransferCommand_Send(node) =>
             State.fromTransferCommand_Send(exercised, node)
-          case TransferCommand_Withdraw(_) =>
-            State.fromTransferCommand_Withdraw(exercised)
-          case TransferCommand_Expire(_) =>
-            State.fromTransferCommand_Expire(exercised)
+          case TransferCommand_Withdraw(node) =>
+            State.fromTransferCommand_Withdraw(exercised, node)
+          case TransferCommand_Expire(node) =>
+            State.fromTransferCommand_Expire(exercised, node)
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -760,6 +760,8 @@ object ScanTxLogParser {
           TransferCommandTxLogEntry(
             eventId,
             contractId = Codec.encodeContractId(node.result.value.transferCommandCid),
+            sender = PartyId.tryFromProtoPrimitive(node.argument.value.sender),
+            nonce = node.argument.value.nonce,
             status = TransferCommandTxLogEntry.Status.Created(TransferCommandCreated()),
           )
         )
@@ -775,6 +777,8 @@ object ScanTxLogParser {
           TransferCommandTxLogEntry(
             eventId = exercised.getEventId,
             contractId = exercised.getContractId,
+            sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
+            nonce = node.result.value.nonce,
             status = node.result.value.result match {
               case failure: TransferCommandResultFailure =>
                 TransferCommandTxLogEntry.Status.Failed(
@@ -791,13 +795,16 @@ object ScanTxLogParser {
     }
 
     def fromTransferCommand_Withdraw(
-        exercised: ExercisedEvent
+        exercised: ExercisedEvent,
+        node: ExerciseNode[TransferCommand_Withdraw.Arg, TransferCommand_Withdraw.Res],
     ): State = {
       State(
         immutable.Queue(
           TransferCommandTxLogEntry(
             eventId = exercised.getEventId,
             contractId = exercised.getContractId,
+            sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
+            nonce = node.result.value.nonce,
             status = TransferCommandTxLogEntry.Status.Withdrawn(TransferCommandWithdrawn()),
           )
         )
@@ -805,13 +812,16 @@ object ScanTxLogParser {
     }
 
     def fromTransferCommand_Expire(
-        exercised: ExercisedEvent
+        exercised: ExercisedEvent,
+        node: ExerciseNode[TransferCommand_Expire.Arg, TransferCommand_Expire.Res],
     ): State = {
       State(
         immutable.Queue(
           TransferCommandTxLogEntry(
             eventId = exercised.getEventId,
             contractId = exercised.getContractId,
+            sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
+            nonce = node.result.value.nonce,
             status = TransferCommandTxLogEntry.Status.Expired(TransferCommandExpired()),
           )
         )

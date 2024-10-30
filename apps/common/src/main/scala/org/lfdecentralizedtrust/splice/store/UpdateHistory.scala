@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.store
 import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -25,16 +25,11 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
   DestinationHistory,
   SourceMigrationInfo,
 }
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
-  ContractCompanion,
-  HasIngestionSink,
-  IngestionFilter,
-}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   DomainRecordTimeRange,
-  TemplateJsonDecoder,
   ValueJsonCodecProtobuf as ProtobufCodec,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
@@ -963,13 +958,6 @@ class UpdateHistory(
     }
   }
 
-  // TODO (#13511): implement or remove placeholder
-  def getCreateEvents()(implicit tc: TraceContext): Future[Seq[CreatedEvent]] = {
-    queryCreateEvents((1L to 100L).toSeq).map { result =>
-      result.values.flatten.map(_.toCreatedEvent).toSeq
-    }
-  }
-
   private def queryCreateEvents(
       transactionRowIds: Seq[Long]
   )(implicit tc: TraceContext): Future[Map[Long, Seq[SelectFromCreateEvents]]] = {
@@ -1000,6 +988,43 @@ class UpdateHistory(
         )
         .map(_.groupBy(_.updateRowId))
     }
+  }
+
+  def lookupContractById[TCId <: ContractId[_], T <: DamlRecord[_]](
+      companion: Contract.Companion.Template[TCId, T]
+  )(contractId: TCId)(implicit tc: TraceContext): Future[Option[Contract[TCId, T]]] = {
+    for {
+      // Annoyingly our index for contract id lookups does not include the history id.
+      // In production, we only ever have one history id per database but at least in tests
+      // postgres sometimes picks an index to filter by history_id and does a linear search over contract_id.
+      // The materialized CTE forces it to pick the contract_id index.
+      r <- storage
+        .querySingle(
+          sql"""
+            with unfiltered_contracts as materialized (select
+              update_row_id,
+              event_id,
+              contract_id,
+              created_at,
+              template_id_package_id,
+              template_id_module_name,
+              template_id_entity_name,
+              package_name,
+              create_arguments,
+              signatories,
+              observers,
+              contract_key,
+              history_id
+            from update_history_creates
+            where contract_id = $contractId)
+            select * from unfiltered_contracts where history_id = $historyId""".toActionBuilder
+            .as[SelectFromCreateEvents]
+            .headOption,
+          "lookupContractById",
+        )
+        .value
+        .map(_.map(_.toContract(companion)))
+    } yield r
   }
 
   private def queryExerciseEvents(
@@ -1584,29 +1609,15 @@ object UpdateHistory {
       contractKey: Option[String],
   ) {
 
-    def toContract[C, TCId <: ContractId[_], T](companion: C)(implicit
-        companionClass: ContractCompanion[C, TCId, T],
-        decoder: TemplateJsonDecoder,
+    def toContract[TCId <: ContractId[_], T <: DamlRecord[_]](
+        companion: Contract.Companion.Template[TCId, T]
     ): Contract[TCId, T] = {
-      companionClass
-        .fromJson(companion)(
-          new Identifier(
-            templatePackageId,
-            templateModuleName,
-            templateEntityName,
-          ),
-          contractId,
-          io.circe.parser
-            .parse(createArguments)
-            .getOrElse(
-              throw new IllegalStateException(s"Failed to parse create arguments: $createArguments")
-            ),
-          ByteString.EMPTY,
-          createdAt.toInstant,
-        )
-        .fold(
-          err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
-          identity,
+      Contract
+        .fromCreatedEvent(companion)(this.toCreatedEvent)
+        .getOrElse(
+          throw new IllegalStateException(
+            s"Stored a contract that cannot be decoded as ${companion.TEMPLATE_ID}: $this"
+          )
         )
     }
 
