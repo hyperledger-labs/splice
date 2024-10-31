@@ -142,6 +142,75 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/GetAnsRulesResponse"
+  /v0/scan-proxy/transfer-preapprovals/by-party/{party}:
+    get:
+      tags: [scan-proxy]
+      x-jvm-package: scanproxy
+      operationId: "lookupTransferPreapprovalByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupTransferPreapprovalByPartyResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/scan-proxy/transfer-command-counter/{party}:
+    get:
+      tags: [scan-proxy]
+      x-jvm-package: scanproxy
+      operationId: "lookupTransferCommandCounterByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupTransferCommandCounterByPartyResponse"
+        "404":
+          description: No TransferCommandCounter exists for this party. This means the nonce that should be used is 0.
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/scan-proxy/transfer-command/status:
+    get:
+      description: Retrieve the status of all transfer commands of the given sender for the specified nonce.
+      tags: [scan-proxy]
+      x-jvm-package: scanproxy
+      operationId: "lookupTransferCommandStatus"
+      parameters:
+        - name: sender
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupTransferCommandStatusResponse"
+        "404":
+          description: No TransferCommand exists with this contract id within the last 24h
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
 components:
   schemas:

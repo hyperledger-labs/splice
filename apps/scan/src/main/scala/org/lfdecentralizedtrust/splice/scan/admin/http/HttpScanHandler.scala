@@ -1065,7 +1065,7 @@ class HttpScanHandler(
     }
   }
 
-  def lookupTransferCommandStatus(
+  override def lookupTransferCommandStatus(
       respond: ScanResource.LookupTransferCommandStatusResponse.type
   )(
       sender: String,

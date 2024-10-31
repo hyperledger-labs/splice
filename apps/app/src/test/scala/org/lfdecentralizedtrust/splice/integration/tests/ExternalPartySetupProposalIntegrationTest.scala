@@ -153,7 +153,9 @@ class ExternalPartySetupProposalIntegrationTest
     createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, onboardingAlice)
     eventually() {
       aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceParty) should not be empty
-      sv1ScanBackend.lookupTransferPreapprovalByParty(aliceParty) should not be empty
+      aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
+        aliceParty
+      ) should not be empty
     }
 
     // Transfer 40.0 to Alice
@@ -174,17 +176,17 @@ class ExternalPartySetupProposalIntegrationTest
       createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, onboardingBob)
     eventually() {
       aliceValidatorBackend.lookupTransferPreapprovalByParty(bobParty) should not be empty
-      sv1ScanBackend.lookupTransferPreapprovalByParty(bobParty) should not be empty
+      aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(bobParty) should not be empty
     }
     aliceValidatorBackend
       .listTransferPreapprovals()
       .map(tp => tp.contract.contractId) contains cidBob
 
     // Lookup transfer command counter before any transfer command
-    sv1ScanBackend.lookupTransferCommandCounterByParty(aliceParty) shouldBe None
+    aliceValidatorBackend.scanProxy.lookupTransferCommandCounterByParty(aliceParty) shouldBe None
 
     // Lookup transfer command that does not exist
-    sv1ScanBackend.lookupTransferCommandStatus(
+    aliceValidatorBackend.scanProxy.lookupTransferCommandStatus(
       aliceParty,
       0L,
     ) shouldBe None
@@ -224,12 +226,12 @@ class ExternalPartySetupProposalIntegrationTest
           .getExternalPartyBalance(bobParty)
           .totalUnlockedCoin shouldBe "10.0000000000"
         // Transfer command counter gets created/incremented
-        sv1ScanBackend
+        aliceValidatorBackend.scanProxy
           .lookupTransferCommandCounterByParty(aliceParty)
           .value
           .payload
           .nextNonce shouldBe 1
-        val result = sv1ScanBackend
+        val result = aliceValidatorBackend.scanProxy
           .lookupTransferCommandStatus(
             aliceParty,
             0L,
@@ -335,8 +337,9 @@ class ExternalPartySetupProposalIntegrationTest
     )(
       "Preapproval is ingested by scan",
       _ =>
-        inside(sv1ScanBackend.lookupTransferPreapprovalByParty(sv1Party)) { case Some(_) =>
-          succeed
+        inside(aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(sv1Party)) {
+          case Some(_) =>
+            succeed
         },
     )
 
@@ -403,7 +406,7 @@ class ExternalPartySetupProposalIntegrationTest
               aliceParty,
               c => c.data.sender == aliceParty.toProtoPrimitive,
             ) shouldBe empty
-          val result = sv1ScanBackend
+          val result = aliceValidatorBackend.scanProxy
             .lookupTransferCommandStatus(
               aliceParty,
               1L,

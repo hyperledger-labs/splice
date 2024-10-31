@@ -12,7 +12,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   TransferContext,
   TransferPreapproval,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
@@ -29,7 +32,10 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.definitions.MigrationSchedule
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  LookupTransferCommandStatusResponse,
+  MigrationSchedule,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.*
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
@@ -234,6 +240,16 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       ec: ExecutionContext,
       tc: TraceContext,
   ): OptionT[Future, MigrationSchedule]
+
+  def lookupTransferCommandCounterByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]]
+
+  def lookupTransferCommandStatus(sender: PartyId, nonce: Long)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[LookupTransferCommandStatusResponse]]
 
   def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
       ec: ExecutionContext,

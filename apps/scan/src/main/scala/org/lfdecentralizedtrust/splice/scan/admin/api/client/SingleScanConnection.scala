@@ -9,7 +9,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
@@ -23,7 +26,10 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.definitions.MigrationSchedule
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  LookupTransferCommandStatusResponse,
+  MigrationSchedule,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{
   HttpScanAppClient,
   HttpScanSoftDomainMigrationPocAppClient,
@@ -439,6 +445,24 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.LookupTransferPreapprovalByParty(receiver),
+    )
+
+  override def lookupTransferCommandCounterByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupTransferCommandCounterByParty(receiver),
+    )
+
+  override def lookupTransferCommandStatus(sender: PartyId, nonce: Long)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[LookupTransferCommandStatusResponse]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupTransferCommandStatus(sender, nonce),
     )
 
   override def getMigrationInfo(migrationId: Long)(implicit

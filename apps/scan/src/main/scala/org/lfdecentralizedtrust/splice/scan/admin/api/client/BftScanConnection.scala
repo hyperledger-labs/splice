@@ -11,7 +11,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.ExternalPartyAmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
@@ -26,7 +29,11 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{AnsEntry, MigrationSchedule}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  AnsEntry,
+  LookupTransferCommandStatusResponse,
+  MigrationSchedule,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.{
   ConsensusNotReached,
   ConsensusNotReachedRetryable,
@@ -43,7 +50,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.{ExceptionRetryPolicy, ErrorKind}
+import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import io.circe.Json
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
@@ -183,6 +190,18 @@ class BftScanConnection(
       ec: ExecutionContext,
       tc: TraceContext,
   ): OptionT[Future, MigrationSchedule] = OptionT(bftCall(_.getMigrationSchedule().value))
+
+  override def lookupTransferCommandCounterByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]] =
+    bftCall(_.lookupTransferCommandCounterByParty(receiver))
+
+  override def lookupTransferCommandStatus(sender: PartyId, nonce: Long)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[LookupTransferCommandStatusResponse]] =
+    bftCall(_.lookupTransferCommandStatus(sender, nonce))
 
   override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
       ec: ExecutionContext,
