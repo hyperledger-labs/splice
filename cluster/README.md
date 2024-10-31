@@ -106,7 +106,7 @@
   - [Multi-architecture Docker Images](#multi-architecture-docker-images)
   - [Docker-compose](#docker-compose)
   - [Testing Performance-Critical Changes](#testing-performance-critical-changes)
-  - [Testing compatibility of Dev/Test/Mainnet topology with the next major Canton version](#testing-compatibility-of-dev/test/mainnet-topology-with-the-next-major-canton-version)
+  - [Testing compatibility of Dev/Test/Mainnet topology with the next major Canton version](#testing-compatibility-of-devtestmainnet-topology-with-the-next-major-canton-version)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -2164,7 +2164,7 @@ the validation of the topology state in Canton. The concrete steps are:
 
 1. create a directory to store the state export: `mkdir -p /tmp/state-export/keys`
 2. Start sequencer console on the version currently on the cluster connected to the target
-   cluster, e.g. `cncluster sequencer_console sv-1 3` run from
+   cluster, e.g. `cncluster sequencer_console sv-1 <migration id>` run from
    `cluster/deployment/devnet`. Adjust migration id to the current
    migration id on the cluster and the directory to the cluster you
    want to test. Note that you need to request PAM for that.
@@ -2180,7 +2180,7 @@ the validation of the topology state in Canton. The concrete steps are:
    ```
 5. Write the export to a file
    ```
-   synchronizerTopologyBytes.writeTo(new java.io.FileOutputStream("/home/moritz/tmp/state-export/genesis-state"))
+   synchronizerTopologyBytes.writeTo(new java.io.FileOutputStream("/tmp/state-export/genesis-state"))
    ```
 6. Export the synchronizer topology snapshot
    ```
@@ -2192,9 +2192,9 @@ the validation of the topology state in Canton. The concrete steps are:
    ```
 8. Get the sequencer id from `sequencer.id.toProtoPrimitive` and save it
 9. Switch to the target version you want to migrate to
-10. Disable auto-init by tweaking `simple-topology-canton.conf` and removing `${_autoInit_enabled}` and `globalSequencerSv1.init.identity.node-identifier.name = "sv1"`.
+10. Disable auto-init of globalSequencerSv1 by tweaking `simple-topology-canton.conf` and removing `${_autoInit_enabled}` and `globalSequencerSv1.init.identity.node-identifier.name = "sv1"`.
 11. Start canton using `./start-canton.sh -w` and switch to the tmux session running the Canton console.
-12. Double check the version using ` comdigitalasset.canton.buildinfo.BuildInfo.version`. This should be the version you are migrating to.
+12. Double check the version using `com.digitalasset.canton.buildinfo.BuildInfo.version`. This should be the version you are migrating to.
 13. Check that sequencer is not initialized
     ```
     @ globalSequencerSv1.id
@@ -2203,7 +2203,7 @@ the validation of the topology state in Canton. The concrete steps are:
     ```
 13. Import the keys
     ```
-    import keys better.files.File("/home/moritz/tmp/state-export/keys").glob("*").foreach(f => globalSequencerSv1.keys.secret.upload_from(f.toString, None))
+    better.files.File("/tmp/state-export/keys").glob("*").foreach(f => globalSequencerSv1.keys.secret.upload_from(f.toString, None))
     ```
 14. Initialize the sequencer with the sequencer id you previously saved (swap out the ID in the command)
     ```
@@ -2211,11 +2211,11 @@ the validation of the topology state in Canton. The concrete steps are:
     ```
 15. Import the authorized store snapshot
     ```
-    globalSequencerSv1.topology.transactions.import_topology_snapshot_from("/home/moritz/tmp/state-export/authorized", "Authorized")
+    globalSequencerSv1.topology.transactions.import_topology_snapshot_from("/tmp/state-export/authorized", "Authorized")
     ```
 16. Initialize the sequencer from the synchronizer topology snapshot
     ```
-    globalSequencerSv1.setup.assign_from_genesis_state(com.google.protobuf.ByteString.readFrom(new java.io.FileInputStream("/home/moritz/tmp/state-export/genesis-state")), StaticDomainParameters.defaults(globalSequencerSv1.config.crypto, ProtocolVersion.latest))
+    globalSequencerSv1.setup.assign_from_genesis_state(com.google.protobuf.ByteString.readFrom(new java.io.FileInputStream("/tmp/state-export/genesis-state")), StaticDomainParameters.defaults(globalSequencerSv1.config.crypto, ProtocolVersion.latest))
     ```
 17. Verify that the sequencer is initialized
     ```
