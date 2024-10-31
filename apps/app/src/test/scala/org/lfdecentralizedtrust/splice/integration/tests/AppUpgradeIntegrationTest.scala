@@ -84,13 +84,13 @@ class AppUpgradeIntegrationTest
 
         Using.resource(
           AppUpgradeIntegrationTest.MultiProcessResource("forUpgrade", loggerFactory)
-        )(cnProcs => {
+        )(spliceProcs => {
           // Do not start the old sv4 backend nor alice's validators, they will join only after upgrade
           Seq("sv1-node", "sv2-node", "sv3-node", "bobSplitwellValidators").foreach(conf => {
             val version = getBaseVersion()
             val bundledConfig = getConfigFileFromBundle(version, conf)
             val inputConfig = generateConfig(bundledConfig, version, testId)
-            cnProcs.startBundledSplice(conf, inputConfig)
+            spliceProcs.startBundledSplice(conf, inputConfig)
           })
 
           eventually(5.minute) {
@@ -133,7 +133,7 @@ class AppUpgradeIntegrationTest
             }
 
           clue("Upgrading bob's and splitwell validator") {
-            cnProcs.stopBundledSplice("bobSplitwellValidators")
+            spliceProcs.stopBundledSplice("bobSplitwellValidators")
             bobValidatorBackend.startSync()
             splitwellValidatorBackend.startSync()
             splitwellBackend.startSync()
@@ -149,9 +149,9 @@ class AppUpgradeIntegrationTest
           }
 
           clue("Upgrading sv-2 & sv-3") {
-            cnProcs.stopBundledSplice("sv2-node")
+            spliceProcs.stopBundledSplice("sv2-node")
             startAllSync(sv2Backend, sv2ScanBackend, sv2ValidatorBackend)
-            cnProcs.stopBundledSplice("sv3-node")
+            spliceProcs.stopBundledSplice("sv3-node")
             // No scan for sv3
             startAllSync(sv3Backend, sv3ValidatorBackend)
           }
@@ -170,7 +170,7 @@ class AppUpgradeIntegrationTest
           }
 
           clue("Upgrading also sv1") {
-            cnProcs.stopBundledSplice("sv1-node")
+            spliceProcs.stopBundledSplice("sv1-node")
             startAllSync(sv1Backend, sv1ValidatorBackend, sv1ScanBackend)
           }
 

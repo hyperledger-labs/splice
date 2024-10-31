@@ -38,7 +38,7 @@ class CometBftClientIntegrationTest
   lazy val client = new CometBftHttpRpcClient(connectionConfig, NamedLoggerFactory.root)
   private lazy val cometBftClient = new CometBftClient(client, loggerFactory)
 
-  "CometBFT Canton Network ABCI app" should {
+  "CometBFT Splice ABCI app" should {
     "get the initial network config state" in {
       cometBftClient
         .readNetworkConfig()

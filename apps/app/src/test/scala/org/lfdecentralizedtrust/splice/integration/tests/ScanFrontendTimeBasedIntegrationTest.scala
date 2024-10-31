@@ -126,7 +126,7 @@ class ScanFrontendTimeBasedIntegrationTest
       }
     }
 
-    "see DSO and Canton Coin Info" in { implicit env =>
+    "see DSO and Amulet Info" in { implicit env =>
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
           "Go to Scan homepage and switch to the Network Info Tab", {
@@ -134,7 +134,7 @@ class ScanFrontendTimeBasedIntegrationTest
             click on "navlink-/dso"
           },
         )(
-          "The tabs 'DSO Info' and 'Canton Coin Info' are visible",
+          "The tabs 'DSO Info' and 'Amulet Info' are visible",
           _ => {
             findAll(id("information-tab-dso-info")).length shouldBe 1
             findAll(id("information-tab-amulet-info")).length shouldBe 1
@@ -170,11 +170,11 @@ class ScanFrontendTimeBasedIntegrationTest
         )
 
         actAndCheck(
-          "Click on Canton Coin Info", {
+          "Click on Amulet Info", {
             click on "information-tab-amulet-info"
           },
         )(
-          "The Canton Coin info is visible",
+          "The Amulet info is visible",
           _ => {
             val amuletRules = sv1ScanBackend
               .getAmuletRules()
