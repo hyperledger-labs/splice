@@ -446,7 +446,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
       sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
     }
 
-    "no SV's ANS entry can be seen via scan api" in { implicit env =>
+    "an SV's ANS entry can be seen via scan api" in { implicit env =>
       val dsoRules = sv1Backend.getDsoInfo().dsoRules
       dsoRules.payload.svs.asScala.foreach { case (svParty, svInfo) =>
         val expectedSvEntry = svEntry(svInfo.name, svParty, ansAcronym)
