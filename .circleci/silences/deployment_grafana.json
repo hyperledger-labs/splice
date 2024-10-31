@@ -11,27 +11,27 @@
       },
       {
         "name": "report_publisher",
-        "value": "Digital-Asset-.*",
+        "value": ".*",
         "isEqual": true,
         "isRegex": true
       }
     ]
   },
   {
-    "createdBy": "ci (deploy_cluster)",
-    "comment": "An initial alert silence to cover the turburlent deployment period",
+    "createdBy": "ci (restore_node)",
+    "comment": "An initial alert silence to cover the restore period",
     "matchers": [
       {
         "name": "alertname",
-        "value": "Report Creation Time Lag",
+        "value": "SV Status - Node falling behind",
         "isEqual": true,
         "isRegex": false
       },
       {
         "name": "report_publisher",
-        "value": "DA-Helm-Test-Node",
+        "value": ".*",
         "isEqual": true,
-        "isRegex": false
+        "isRegex": true
       }
     ]
   }

@@ -326,6 +326,7 @@ workflow:
           # sv-3 chosen quite arbitrarily as one SV to restore from backup
           namespace_name: "sv-3"
           migration_id: 0
+          silence_deployment_alerts: true
           context:
             - artifactory
             - canton-network-vpn
@@ -355,6 +356,7 @@ workflow:
           cluster: "cidaily"
           namespace_name: "validator1"
           migration_id: 0
+          silence_deployment_alerts: true
           context:
             - artifactory
             - canton-network-vpn
