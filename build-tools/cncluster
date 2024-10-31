@@ -621,7 +621,7 @@ subcommand_whitelist[create]='Create a cluster from scratch.'
 function subcmd_create() {
     _prompt_to_confirm --no-lock
 
-    # TODO -- new clusters in new regions need this created beforehand
+    # TODO(#14069) -- new clusters in new regions need this created beforehand
     CLOUDSDK_KMS_REGION="us-central1"
 
     if _cluster_exists; then
