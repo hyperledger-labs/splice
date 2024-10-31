@@ -94,7 +94,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
     await goToGovernanceTabAndClickOnAction('Executed', action, user);
 
     //TODO(#14813): when an action is executed, the AmuletConfigSchedule is updated and actualized to now, therefore the diff is empty for the first change
-    screen.getByTestId('stringify-display');
+    await screen.findByTestId('stringify-display');
 
     // current comparison against vote result
     checkNumberNumberOfDiffs(1);
@@ -106,7 +106,7 @@ describe('SV can see config diffs of CRARC_AddFutureAmuletConfigSchedule', () =>
 
     await goToGovernanceTabAndClickOnAction('Rejected', action, user);
 
-    screen.getByTestId('stringify-display');
+    await screen.findByTestId('stringify-display');
 
     // current comparison against vote result
     checkNumberNumberOfDiffs(1);
