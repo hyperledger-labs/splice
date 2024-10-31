@@ -3,10 +3,10 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-CN App APIs
-===========
+Splice App APIs
+===============
 
-All CN applications (e.g., the validator app) expose HTTP APIs. The
+All Splice applications (e.g., the validator app) expose HTTP APIs. The
 port they are exposed on is configured under ``admin-api.port``, e.g.,
 this config file would expose the validator API on port 5003:
 
@@ -24,7 +24,7 @@ this config file would expose the validator API on port 5003:
 OpenAPI Specifications
 ----------------------
 
-The APIs are documented using `OpenAPI specifications <https://www.openapis.org/>`_. You can download the OpenAPI specification for Canton Networks applications here: |openapi_download_link|.
+The APIs are documented using `OpenAPI specifications <https://www.openapis.org/>`_. You can download the OpenAPI specification for Splice's applications here: |openapi_download_link|.
 
 API Stability
 -------------
@@ -50,7 +50,7 @@ same `schema used by the HTTP JSON API <https://docs.daml.com/json-api/lf-value-
 Authentication
 --------------
 
-Accessing CN App APIs requires a JWT of the form:
+Accessing Splice App APIs requires a JWT of the form:
 
 .. code-block:: json
 

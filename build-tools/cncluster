@@ -340,13 +340,8 @@ subcommand_whitelist[activate]='Ensure cncluster is correctly authenticated to a
 function subcmd_activate() {
     _cluster_must_exist
 
-  # only the mainnet GKE cluster is created in the specified zone
-  if (env-bool IS_MAINNET); then
+    # Only mainnet explicitly sets CLOUDSDK_COMPUTE_ZONE
     gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
-  else
-    # If the zone is set, the command will try to use it instead of the region for the cluster
-    env -u CLOUDSDK_COMPUTE_ZONE gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
-  fi
 }
 
 ###
@@ -626,9 +621,18 @@ subcommand_whitelist[create]='Create a cluster from scratch.'
 function subcmd_create() {
     _prompt_to_confirm --no-lock
 
+    # TODO -- new clusters in new regions need this created beforehand
+    CLOUDSDK_KMS_REGION="us-central1"
+
     if _cluster_exists; then
-        _error "Cluster already exists."
+        _warning "Cluster already exists."
     else
+
+        if [ -n "${CLOUDSDK_COMPUTE_ZONE:-}" ]; then
+            location_arg=(--node-locations "${CLOUDSDK_COMPUTE_ZONE}")
+        else
+            location_arg=(--region "${CLOUDSDK_COMPUTE_REGION}")
+        fi
 
         #### Cluster can be resized from deployment directories with the following command:
         ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
@@ -640,7 +644,6 @@ function subcmd_create() {
                --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
                --num-nodes 1 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
-               --node-locations "${CLOUDSDK_COMPUTE_ZONE}" \
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
                --addons=GcePersistentDiskCsiDriver \
                --addons=NodeLocalDNS \
@@ -650,6 +653,7 @@ function subcmd_create() {
                --min-nodes 0 \
                --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
                --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}" \
+               "${location_arg[@]}"
 
         #### Set maintenance window
         gcloud container clusters update "${GCP_CLUSTER_NAME}" \
@@ -678,22 +682,35 @@ function subcmd_create() {
     #### Open port 15017 in GKE firewall, see https://istio.io/latest/docs/setup/platform-setup/gke/
     _log "Opening port 15017 in GKE firewall"
     FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-master" --format=json | jq -r '.[].name')
-    gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
+    if [ -z "${FW_NAME}" ]; then
+        # For some reason, GKE recently stopped auto-creating the master firewall rule. We therefore recreate it here if it's missing.
+        _warning "Master firewall rule not found. Creating a new one."
+        FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-all" --format=json | jq -r '.[].name' | sed s/-all/-master/)
+        TAGS=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-all" --format=json | jq -r '.[].name' | sed s/-all/-node/)
+        gcloud compute firewall-rules create "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017 --source-ranges "${GCP_MASTER_IPV4_CIDR}" --target-tags "${TAGS}"
+    else
+        gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
+    fi
 
     # Create a kms key for pulumi.
-    error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
+    set +e
+    error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_KMS_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
     exit_code=$?
+    set -e
 
     if [ $exit_code -ne 0 ]; then
       if [[ $error_message == *"ALREADY_EXISTS"* ]]; then
         # Rotate the key if it exists
-        echo "ALREADY_EXISTS error encountered. Rotating the key..."
-        gcloud kms keys versions create --key "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --primary
+        _log "ALREADY_EXISTS error encountered. Rotating the key..."
+        gcloud kms keys versions create --key "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_KMS_REGION" --keyring "pulumi" --primary
       else
-        echo "Failed to create a KMS key for Pulumi."
+        _warning "Failed to create a KMS key for Pulumi."
+        _log "$error_message"
         exit $exit_code
       fi
     fi
+
+    subcmd_pulumi cluster up --yes --skip-preview
 
     _infra_up
 
@@ -701,8 +718,6 @@ function subcmd_create() {
     for stack in infra canton-network sv-runbook validator-runbook; do
       _uses_pulumi_stack $stack
     done
-
-    subcmd_pulumi cluster up --yes --skip-preview
 
     _log "Determining cluster ingress IP address"
     IPADDR=$(_cluster_ip)
@@ -1534,8 +1549,8 @@ subcommand_whitelist[backup_nodes]='Backup one or more CN nodes in the cluster'
 function subcmd_backup_nodes() {
     _cluster_must_exist
 
-    if [ "$#" -lt 1 ]; then
-       echo "Usage: $0 <migration_id> [node...]"
+    if [ "$#" -lt 2 ]; then
+       echo "Usage: $0 <migration_id> <internal_stack> [node...]"
        exit 1
     fi
 
@@ -1544,12 +1559,18 @@ function subcmd_backup_nodes() {
         _error "<migration_id> must be a positive integer"
     fi
 
-    migration_id=$1
+    if [[ "$1" == "true" || "$1" == "false" ]]; then
+        echo "Usage: $0 <internal_stack> [node...]"
+        _error "<internal_stack> must be either \"true\" or \"false\""
+    fi
 
-    if [ $# -eq 1 ]; then
+    migration_id=$1
+    internal_stack=$2
+
+    if [ $# -eq 2 ]; then
         nodes="sv-1 sv-2 sv-3 sv-4 validator1 splitwell"
     else
-        shift
+        shift 2
         nodes="$*"
     fi
 
@@ -1557,11 +1578,11 @@ function subcmd_backup_nodes() {
         case "$node" in
             sv-1|sv-2|sv-3|sv-4)
                 _info "Backing up sv node $node"
-                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
                 ;;
             validator1|splitwell)
                 _info "Backing up validator node $node"
-                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id" "$internal_stack"
                 ;;
             *)
                 _error "Unknown node $node"
@@ -1598,15 +1619,16 @@ function subcmd_restore_node() {
 
     node="${1-}"
     migration_id="${2-}"
-    backup_run_id="${3-}"
+    internal_stack="${3-}"
+    backup_run_id="${4-}"
 
     if [ -z "$node" ] || [ -z "$migration_id" ]; then
-        _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> [<backup_run_id>]"
+        _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> <internal_stack> [<backup_run_id>]"
     fi
 
     if [ -z "$backup_run_id" ]; then
         _info "No backup run_id given, looking for the latest full backup"
-        backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id")
+        backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id" "$internal_stack")
         if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
             _error "No recent backup found for $node"
         fi
@@ -1623,11 +1645,11 @@ function subcmd_restore_node() {
             _info "Silencing SV report creation alerts for $sv_name for 1 hour"
             subcmd_silence_grafana_alerts "1 hour" "alertname=Report Creation Time Lag" "report_publisher=$sv_name"
             _info "Restoring sv node $node"
-            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" cometbft sequencer participant mediator cn-apps
+            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" cometbft sequencer participant mediator cn-apps
             ;;
         validator1|splitwell)
             _info "Restoring validator node $node"
-            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" participant validator
+            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" participant validator
             ;;
         *)
             _error "Unknown node $node"

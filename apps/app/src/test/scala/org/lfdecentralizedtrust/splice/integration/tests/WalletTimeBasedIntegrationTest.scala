@@ -75,7 +75,7 @@ class WalletTimeBasedIntegrationTest
           for ((name, i) <- List("alice1", "alice2", "alice3").map(perTestCaseName).zipWithIndex) {
 
             val (_, requestId) = actAndCheck(
-              "Request CNS entry", {
+              "Request ANS entry", {
                 aliceAnsExternalClient
                   .createAnsEntry(name, testEntryUrl, testEntryDescription)
               },
@@ -227,7 +227,7 @@ class WalletTimeBasedIntegrationTest
         Range(1, 8).foreach(_ => advanceRoundsByOneTick)
       }
 
-      val respond = clue("Alice requests a CNS entry") {
+      val respond = clue("Alice requests an ANS entry") {
         aliceAnsExternalClient.createAnsEntry(
           testEntryName,
           testEntryUrl,
@@ -276,7 +276,7 @@ class WalletTimeBasedIntegrationTest
         )
 
         actAndCheck(
-          "Advance time until CNS entry is up for renewal", {
+          "Advance time until ANS entry is up for renewal", {
             // We time the advances so that automation doesn't trigger before payments can be made.
             // TODO (#7609): consider replacing with stopping and starting triggers
             advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(17)))

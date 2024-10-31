@@ -344,7 +344,7 @@ Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` 
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
-- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_CLUSTER`` with |splice_cluster|, per the cluster to which you are connecting.
 - For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-participant-values.yaml`` as follows:

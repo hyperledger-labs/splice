@@ -3,12 +3,17 @@ infra:
     extraWhitelistedIngress:
       - "35.225.102.103/32" # CI GKE cluster for CCI (for preflights)
 synchronizerMigration:
+  archived:
+    - id: 1
+      provider: internal
+      version: 0.2.4
   legacy:
-    id: 1
-    provider: internal
-    version: 0.2.5
-  active:
     id: 2
+    provider: external
+    version: 0.2.6
+    releaseReference: "refs/heads/release-line-0.2.6"
+  active:
+    id: 3
     provider: external
     version: 0.2.6
     releaseReference: "refs/heads/release-line-0.2.6"

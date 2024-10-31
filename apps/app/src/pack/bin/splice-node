@@ -130,7 +130,7 @@ if $mingw ; then
 fi
 
 
-PROG_NAME="Canton Coin app"
+PROG_NAME="Splice node app"
 PROG_VERSION=REPLACE_VERSION
 PROG_REVISION=REPLACE_REVISION
 

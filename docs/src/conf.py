@@ -26,7 +26,7 @@ from datetime import date
 
 # -- Project information -----------------------------------------------------
 
-project = "Canton Network"
+project = "Splice"
 copyright = f" {date.today().year}, Digital Asset"
 author = "Digital Asset"
 
@@ -127,8 +127,8 @@ rst_prolog = f"""
 .. role:: raw-html(raw)
    :format: html
 
-.. |cn_cluster| replace:: :raw-html:`<span class="cn-cluster">unknown_cluster</span>`
-.. |cn_cluster_literal| replace:: :raw-html:`<code class="literal"><span class="cn-cluster">unknown_cluster</span></code>`
+.. |splice_cluster| replace:: :raw-html:`<span class="splice-cluster">unknown_cluster</span>`
+.. |splice_cluster_literal| replace:: :raw-html:`<code class="literal"><span class="splice-cluster">unknown_cluster</span></code>`
 
 .. |version_literal| replace:: ``{version}``
 .. |chart_version_literal| replace:: ``{chart_version}``
@@ -139,7 +139,7 @@ rst_prolog = f"""
 
 .. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
 .. |image_tag_set| replace:: ``export IMAGE_TAG={version}``
-.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="cn-cluster">unknown_cluster</span>.global.canton.network.sync.global`
+.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-cluster">unknown_cluster</span>.global.canton.network.sync.global`
 
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_splice-node.tar.gz">Download Bundle</a>`
 .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_openapi.tar.gz">Download OpenAPI specs</a>`

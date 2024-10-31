@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const host = window.location.hostname;
   const hostParts = host.split(".");
   if (hostParts.length === 4) {
-    document.querySelectorAll(".cn-cluster").forEach((span) => {
+    document.querySelectorAll(".splice-cluster").forEach((span) => {
       span.textContent = hostParts[0];
     });
   } else {

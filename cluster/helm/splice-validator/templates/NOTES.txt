@@ -1,1 +1,1 @@
-Canton Network Validator Backend, Wallet Web UI and CNS Web UI
+Canton Network Validator Backend, Wallet Web UI and ANS Web UI
