@@ -106,6 +106,7 @@
   - [Multi-architecture Docker Images](#multi-architecture-docker-images)
   - [Docker-compose](#docker-compose)
   - [Testing Performance-Critical Changes](#testing-performance-critical-changes)
+  - [Testing compatibility of Dev/Test/Mainnet topology with the next major Canton version](#testing-compatibility-of-dev/test/mainnet-topology-with-the-next-major-canton-version)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -2149,6 +2150,96 @@ Validating performance consists of two steps:
       5. Scale up the sequencer `kubectl scale deployment -n sv-$i global-domain-3-sequencer --replicas=1`
       6. Check catchup performance in the [dashboard](https://grafana.cilr.global.canton.network.digitalasset.com/d/ca9df344-c699-4efe-83c2-5fb2639d96d9/global-domain-catchup?orgId=1&refresh=30s).
          As a rough guideline anything below 4x is concerning but double check what the current expected numbers are in #team-canton-network-internal.
+
+## Testing compatibility of Dev/Test/Mainnet topology with the next major Canton version
+
+Compatibility of the topology snapshot across major Canton versions is
+essential for the hard synchronizer migration to succeed.  It can
+therefore be useful to test this in advance before actually attempting
+the hard synchronizer migration. To do so, you can create exports
+explicitly and then try to initialize a sequencer locally from the
+export. The resulting sequencer will not be fully functional
+afterwards since you lack the other SVs but it is enough to go through
+the validation of the topology state in Canton. The concrete steps are:
+
+1. create a directory to store the state export: `mkdir -p /tmp/state-export/keys`
+2. Start sequencer console on the version currently on the cluster connected to the target
+   cluster, e.g. `cncluster sequencer_console sv-1 3` run from
+   `cluster/deployment/devnet`. Adjust migration id to the current
+   migration id on the cluster and the directory to the cluster you
+   want to test. Note that you need to request PAM for that.
+3. Export the keys
+   ```
+   sequencer.keys.secret.list().foreach(k => sequencer.keys.secret.download_to(k.publicKey.fingerprint, s"/tmp/state-export/keys/${k.publicKey.fingerprint}"))
+   ```
+   Note: We only export the sequencer keys which are relatively harmless and do not provide access to coin holdings. We also
+   delete them afterwards and this is only possible after requesting PAM.
+4. Export the authorized store
+   ```
+   val synchronizerTopologyBytes = sequencer.topology.transactions.genesis_state(filterDomainStore = sequencer.domain_id.filterString)
+   ```
+5. Write the export to a file
+   ```
+   synchronizerTopologyBytes.writeTo(new java.io.FileOutputStream("/home/moritz/tmp/state-export/genesis-state"))
+   ```
+6. Export the synchronizer topology snapshot
+   ```
+   val authorizedBytes = sequencer.topology.transactions.export_topology_snapshot("Authorized", filterMappings = Seq(TopologyMapping.Code.NamespaceDelegation, TopologyMapping.Code.OwnerToKeyMapping, TopologyMapping.Code.IdentifierDelegation, TopologyMapping.Code.VettedPackages), filterNamespace = sequencer.id.namespace.filterString)
+   ```
+7. Write the export to a file
+   ```
+   authorizedBytes.writeTo(new java.io.FileOutputStream("/tmp/state-export/authorized"))
+   ```
+8. Get the sequencer id from `sequencer.id.toProtoPrimitive` and save it
+9. Switch to the target version you want to migrate to
+10. Disable auto-init by tweaking `simple-topology-canton.conf` and removing `${_autoInit_enabled}` and `globalSequencerSv1.init.identity.node-identifier.name = "sv1"`.
+11. Start canton using `./start-canton.sh -w` and switch to the tmux session running the Canton console.
+12. Double check the version using ` comdigitalasset.canton.buildinfo.BuildInfo.version`. This should be the version you are migrating to.
+13. Check that sequencer is not initialized
+    ```
+    @ globalSequencerSv1.id
+    {"@timestamp":"2024-10-31T07:46:10.258Z","@version":"1","message":"Node is not initialized and therefore does not have an Id assigned yet.\n  Command SequencerReference.id invoked from cmd0.sc:1","logger_name":"c.d.c.c.EnterpriseConsoleEnvironment","thread_name":"main","level":"ERROR","level_value":40000}
+    com.digitalasset.canton.console.CommandFailure: Command execution failed.
+    ```
+13. Import the keys
+    ```
+    import keys better.files.File("/home/moritz/tmp/state-export/keys").glob("*").foreach(f => globalSequencerSv1.keys.secret.upload_from(f.toString, None))
+    ```
+14. Initialize the sequencer with the sequencer id you previously saved (swap out the ID in the command)
+    ```
+    globalSequencerSv1.topology.init_id(SequencerId.fromProtoPrimitive("SEQ::Digital-Asset-2::12201d30df6225faa982c022855941345c0e970a150cd653c4dfa78108d01de3b586", "").right.get.uid)
+    ```
+15. Import the authorized store snapshot
+    ```
+    globalSequencerSv1.topology.transactions.import_topology_snapshot_from("/home/moritz/tmp/state-export/authorized", "Authorized")
+    ```
+16. Initialize the sequencer from the synchronizer topology snapshot
+    ```
+    globalSequencerSv1.setup.assign_from_genesis_state(com.google.protobuf.ByteString.readFrom(new java.io.FileInputStream("/home/moritz/tmp/state-export/genesis-state")), StaticDomainParameters.defaults(globalSequencerSv1.config.crypto, ProtocolVersion.latest))
+    ```
+17. Verify that the sequencer is initialized
+    ```
+    @ globalSequencerSv1.health.status
+    res18: NodeStatus[globalSequencerSv1.Status] = Sequencer id: global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17
+    Domain id: global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17
+    Uptime: 10.552838s
+    Ports:
+            public: 5108
+            admin: 5109
+    Connected participants: None
+    Connected mediators: None
+    Sequencer: SequencerHealthStatus(active = true)
+    details-extra: None
+    Components:
+            db-storage : Ok()
+            sequencer : Ok()
+    Accepts admin changes: true
+    Version: 3.2.0-SNAPSHOT
+    Protocol version: 32
+    ```
+18. Check that there are no sketchy warnings or errors in the Canton logs in `log/canton.clog`
+18. Delete the export `rm -r /tmp/state-export`
+
 
 ## Appendix: Kubernetes and Other Deployment Resources
 
