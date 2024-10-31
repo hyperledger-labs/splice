@@ -19,7 +19,7 @@ if [ "$appname" == "pulumi-kubernetes-operator" ]; then
 fi
 
 if [ "${2-}" != "--artifactory" ]; then
-    echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:${version}"
+    echo "us-central1-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:${version}"
 else
     echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:${version}"
 fi

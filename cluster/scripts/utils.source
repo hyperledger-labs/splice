@@ -12,41 +12,24 @@ function get_cloudsql_id() {
   cncluster pulumi "$stack" stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
 }
 
-function get_stack_for_namespace() {
-  local namespace=$1
-
-  local stack=""
-  if [[ "${namespace}" =~ sv.* ]]; then
-    stack="canton-network"
-  elif [ "$namespace" == "splitwell" ]; then
-      stack="canton-network"
-  else
-      stack="$namespace"
-  fi
-
-  echo $stack
-}
-
 function get_stack_for_namespace_component() {
   local namespace=$1
   local component=$2
+  local internal=$3
 
   local stack=""
   if [[ "${namespace}" =~ sv.* ]]; then
-    if [[ "${component}" == participant ]]
-    then
+    if [[ "${component}" == "participant" && "${internal}" != "true" ]]; then
       stack="sv-canton"
-    elif [[ "${component}" == sequencer ]]
-    then
+    elif [[ "${component}" == "sequencer" && "${internal}" != "true" ]]; then
       stack="sv-canton"
-    elif [[ "${component}" == mediator ]]
-    then
+    elif [[ "${component}" == "mediator" && "${internal}" != "true" ]]; then
       stack="sv-canton"
     else
       stack="canton-network"
     fi
   else
-      stack="$namespace"
+    stack="$namespace"
   fi
 
   echo $stack
@@ -56,9 +39,11 @@ create_component_instance() {
     local component="$1"
     local migration_id="$2"
     local namespace="$3"
+    local internal="$4"
 
     if [[ ("$component" == "sequencer" || "$component" == "mediator" || "$component" == "participant")
-       && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv")]]; then
+       && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv")
+       && ("$internal" != "true") ]]; then
         component_instance="${component}-${migration_id}"
     else
         component_instance="${component}"

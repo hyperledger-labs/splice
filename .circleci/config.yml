@@ -698,8 +698,6 @@ commands:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
@@ -1878,6 +1876,9 @@ jobs:
         default: 3
       migration_id:
         type: integer
+      internal_stack:
+        type: boolean
+        default: true
     executor: self_hosted
     environment:
       <<: *env
@@ -1928,7 +1929,7 @@ jobs:
             for ns in $(cat tests-to-run.txt); do
               cncluster wait $ns validator-app << parameters.migration_id >>
             done
-            cncluster backup_nodes << parameters.migration_id >> $(cat tests-to-run.txt)
+            cncluster backup_nodes << parameters.migration_id >> << parameters.internal_stack >> $(cat tests-to-run.txt)
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
@@ -1988,6 +1989,12 @@ jobs:
         type: string
       migration_id:
         type: integer
+      internal_stack:
+        type: boolean
+        default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
     environment:
       <<: *env
     steps:
@@ -2000,7 +2007,13 @@ jobs:
           no_output_timeout: "20m"
           cmd: |
             cncluster activate
-            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >>
+
+            if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+              # silence specific alerts that may fire due to reset downtime
+              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+            fi
+
+            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >> << parameters.internal_stack >>
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
@@ -2073,8 +2086,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of SV runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
@@ -2084,8 +2095,9 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            export CI_IGNORE_DIRTY_REPO=1
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
               export APPROVE_SV_RUNBOOK=true
@@ -2157,8 +2169,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of Validator runbook to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run_upgrade_workarounds >> == true ]]; then
               # TODO (#14721): remove
@@ -2173,49 +2183,11 @@ jobs:
               export APPROVE_SV_RUNBOOK=true
               export PREAPPROVE_VALIDATOR_RUNBOOK=true
             fi
-            # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            export CI_IGNORE_DIRTY_REPO=1
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
             cncluster activate
             cncluster ci_apply_validator $VERSION
-      - print_gcloud_logs_commands:
-          cluster: <<parameters.cluster>>
-      - notify-cluster-fail:
-          channel_notify: << parameters.channel_notify >>
-          cluster: << parameters.cluster >>
-
-  deploy_multivalidator:
-    executor: self_hosted
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    parameters:
-      <<: *cluster-parameter
-      <<: *channel-notify-parameter
-      deploy_retry_count:
-        type: integer
-        default: 2
-    steps:
-      - checkout_with_retry
-      - setup_nix_self_hosted
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
-          cluster: << parameters.cluster >>
-          cmd: |
-            make -j cluster/build
-          cmd_retry_count: 2
-      - run_bash_command_in_nix:
-          cmd_name: Apply multi-validator pulumi stack
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
-          gce_authenticate: true
-          cmd_retry_count: << parameters.deploy_retry_count >>
-          cmd_before_retry: |
-            .circleci/post-slack-message.sh "Deployment of multi-validator pulumi stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
-          cmd: |
-            cncluster activate
-            cncluster ci_apply_multi
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
@@ -2308,8 +2280,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             cncluster activate
             # All CI-deployed clusters use split postgres instances per app, to support backups.
@@ -2322,8 +2292,9 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            # || true can be removed once base version > 0.2.1
-            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal || true
+            # cncluster hard_domain_migration_update_config makes the repo dirty
+            export CI_IGNORE_DIRTY_REPO=1
+            cncluster hard_domain_migration_update_config active << parameters.global_domain_active_migration_id >> internal
 
             if [[ << parameters.force_non_devnet >> == true ]]; then
               export IS_DEVNET=0
@@ -2417,8 +2388,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             if [[ << parameters.run >> == true ]]; then
               cncluster activate
@@ -2490,8 +2459,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of infra stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             cncluster activate
             cncluster infra_up
@@ -2582,8 +2549,6 @@ jobs:
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Hard migration action on cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
-            # TODO(#15454): remove this once we're more confident that pulumi won't make the repo dirty
-            .circleci/reset-repo-if-dirty.sh "cluster << parameters.cluster >>; <${CIRCLE_BUILD_URL}|CI Build>" || true
           cmd: |
             set -eou pipefail
 
@@ -2592,6 +2557,8 @@ jobs:
 
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=true
+            # cncluster hard_domain_migration_ commands can make the repo dirty
+            export CI_IGNORE_DIRTY_REPO=1
             echo "Running hard domain migration << parameters.action >> << parameters.scope >> from $base_version to $upgrade_version"
             cncluster activate
             cncluster hard_domain_migration_<< parameters.action >> << parameters.scope >> $base_version $upgrade_version --yes --skip-preview
@@ -2935,23 +2902,23 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
             git branch -f $BASE_VERSION_BRANCH HEAD
             git checkout $BASE_VERSION_BRANCH
             git push -f origin $BASE_VERSION_BRANCH
             BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
-            RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF || true
-            
-            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"  
-            
+            RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
+            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF
+
+            file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
+
             echo "export SPLIT_POSTGRES_INSTANCES=true" >> "$file"
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
-            git add **/.envrc.vars            
+            git add **/.envrc.vars
             git add **/config.yaml
             git commit -m "Add migration config to deploy version $BASE_VERSION to << parameters.cluster >>"
             git push origin $BASE_VERSION_BRANCH
@@ -2998,25 +2965,25 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git branch -f $UPGRADE_VERSION_BRANCH HEAD
             git checkout $UPGRADE_VERSION_BRANCH
             git push -f origin $UPGRADE_VERSION_BRANCH
             BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
-            BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH" 
-            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
+            BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-            
+
             file="${REPO_ROOT}/cluster/deployment/${TARGET_CLUSTER}/.envrc.vars"
             echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
-            
+
             cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
             cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
-          
-            git add **/.envrc.vars          
+
+            git add **/.envrc.vars
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
@@ -3049,11 +3016,11 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
-            
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
+
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
             cncluster hard_domain_migration_update_config_to_migrate
 
@@ -3089,15 +3056,15 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH" 
-            
+            UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
+
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
-            
+
             cncluster hard_domain_migration_update_config_to_archive_legacy_migration
-            
+
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
@@ -3137,9 +3104,9 @@ jobs:
 
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            
+
             export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='0,1'
-            
+
             cncluster ci_pdown_sv
           cmd_retry_count: 4
           cmd_retry_wait: 150
@@ -3153,10 +3120,10 @@ jobs:
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            
+
             UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
-            
+
             cncluster hard_domain_migration_update_config_to_remove_migrating_from
 
             git add **/config.yaml || true
@@ -5455,6 +5422,7 @@ workflows:
           # sv-3 chosen quite arbitrarily as one SV to restore from backup
           namespace_name: "sv-3"
           migration_id: 0
+          silence_deployment_alerts: true
           context:
             - artifactory
             - canton-network-vpn
@@ -5484,6 +5452,7 @@ workflows:
           cluster: "cidaily"
           namespace_name: "validator1"
           migration_id: 0
+          silence_deployment_alerts: true
           context:
             - artifactory
             - canton-network-vpn
@@ -6809,7 +6778,7 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 2
+          migration_id: 3
           context:
             - artifactory
             - canton-network-vpn
@@ -6897,7 +6866,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 2
+          migration_id: 3
           requires:
             - wait_for_previous_pipeline
 
@@ -6926,7 +6895,7 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 2
+          migration_id: 3
           requires:
             - wait_for_previous_pipeline
 
@@ -6941,7 +6910,8 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 2
+          migration_id: 3
+          internal_stack: false
           context:
             - artifactory
             - canton-network-vpn
@@ -6953,7 +6923,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "devnet"
-          migration_id: 2
+          migration_id: 3
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context

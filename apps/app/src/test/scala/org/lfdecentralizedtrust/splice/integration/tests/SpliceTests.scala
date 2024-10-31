@@ -305,7 +305,7 @@ object SpliceTests extends LazyLogging {
     protected def testEntryName(implicit env: SpliceTestConsoleEnvironment): String =
       s"mycoolentry.unverified.$ansAcronym"
     protected val testEntryUrl = "https://ans-dir-url.com"
-    protected val testEntryDescription = "Sample CNS Entry Description"
+    protected val testEntryDescription = "Sample ANS Entry Description"
 
     protected def initDso()(implicit env: SpliceTestConsoleEnvironment): Unit = {
       env.fullDsoApps.local.foreach(_.start())

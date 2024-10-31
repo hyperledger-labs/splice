@@ -2425,7 +2425,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "3"
                   },
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",
@@ -2803,7 +2803,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "3"
                   },
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",
@@ -3181,7 +3181,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "3"
                   },
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",
@@ -3559,7 +3559,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "3"
                   },
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",
@@ -3937,7 +3937,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
-                    "value": "2"
+                    "value": "3"
                   },
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",

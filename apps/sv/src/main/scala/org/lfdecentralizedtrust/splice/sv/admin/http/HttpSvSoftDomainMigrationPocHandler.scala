@@ -484,12 +484,21 @@ class HttpSvSoftDomainMigrationPocHandler(
         .map(sv => ParticipantId.tryFromProtoPrimitive(sv.participantId))
         .toSeq
       participantId <- participantAdminConnection.getParticipantId()
-      _ <- participantAdminConnection.proposeInitialPartyToParticipant(
-        TopologyStoreId.DomainStore(domainId),
-        dsoStore.key.dsoParty,
-        participantIds,
-        participantId.uid.namespace.fingerprint,
-        isProposal = true,
+      // We resign the PartyToParticipant mapping instead of replaying it to limit the topology
+      // transactions that need to be transferred across protocol versions to the bare minimum.
+      // We retry as it might take a bit until the SV participants are all known on the new domain
+      // and until they are this fails topology validation.
+      _ <- retryProvider.retryForClientCalls(
+        "sign_dso_party_to_participant",
+        "sign_dso_party_to_participant",
+        participantAdminConnection.proposeInitialPartyToParticipant(
+          TopologyStoreId.DomainStore(domainId),
+          dsoStore.key.dsoParty,
+          participantIds,
+          participantId.uid.namespace.fingerprint,
+          isProposal = true,
+        ),
+        logger,
       )
     } yield SvSoftDomainMigrationPocResource.SignDsoPartyToParticipantResponse.OK
   }

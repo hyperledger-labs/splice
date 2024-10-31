@@ -1,5 +1,5 @@
 # Do not tag local docker images with a git commit to simplify referencing these images from helm charts
-export CNCLUSTER_STATIC_DIRTY_VERSION=1
+export SPLICECLUSTER_STATIC_DIRTY_VERSION=1
 
 # Configure docker access for cluster and integration tests
 ## Read current credentials

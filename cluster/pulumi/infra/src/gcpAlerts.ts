@@ -33,7 +33,8 @@ export function installGcpLoggingAlerts(
     filter: `severity>=WARNING
 resource.type="k8s_container"
 resource.labels.cluster_name="${CLUSTER_NAME}"
-resource.labels.namespace_name=~"sv|validator|splitwell"
+-- Note that we ignore the validator runbook. This is because we reset it periodically, which sometimes produces noise.
+resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -(resource.labels.container_name=~"participant" AND jsonPayload.message=~"Instrument .* has recorded multiple values for the same attributes.")
 -- https://github.com/DACH-NY/canton-network-node/issues/10475
 -(resource.labels.container_name="cometbft" AND
@@ -57,7 +58,7 @@ resource.labels.namespace_name=~"sv|validator|splitwell"
   AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
 -(resource.labels.container_name="postgres-exporter" AND jsonPayload.msg=~"Error loading config|Excluded databases")
 -jsonPayload.message=~"UnknownHostException"
--(resource.labels.container_name="participant|mediator" AND jsonPayload.message=~"Late processing (or clock skew) of batch")
+-(resource.labels.container_name=~"participant|mediator" AND jsonPayload.message=~"Late processing \\(or clock skew\\) of batch")
 -(resource.labels.container_name="sequencer" AND jsonPayload.stack_trace=~"UnresolvedAddressException")
 -(resource.labels.container_name="sequencer-pg" AND
   ("checkpoints are occurring too frequently" OR "Consider increasing the configuration parameter \\"max_wal_size\\"."))
@@ -75,6 +76,15 @@ resource.labels.namespace_name=~"sv|validator|splitwell"
 -(resource.labels.container_name=~"postgres" AND resource.labels.namespace_name="multi-validator")
 -- TODO(#14570): Remove this once we have improved our sv onboarding logic
 -(resource.labels.container_name="sv-app" AND jsonPayload.stack_trace=~"io.grpc.StatusRuntimeException: FAILED_PRECONDITION: UNHANDLED_EXCEPTION.*SV party has not yet operated a node")
+-- TODO(#15716): Don't just ignore this - investigate!
+-(resource.labels.container_name="splitwell-app" AND jsonPayload.message=~"Waiting for domain Domain 'global' to be connected has not completed after")
+-- TODO(#15720): Don't just ignore this - investigate!
+-(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
+-- TODO(#15720): Don't just ignore this - investigate!
+-(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"Request to.*/accept resulted in a timeout")
+-- TODO(#15730): Don't just ignore this - investigate!
+-(resource.labels.container_name="sequencer" AND jsonPayload.message=~"Sending submission request.*has not completed after")
+
 ${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST")'
