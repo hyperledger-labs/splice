@@ -1614,7 +1614,7 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
 1. Partners' new sequencer nodes are reachable (before the actual migration has taken place). Hacky oneliner (with explanations below).
    ```
    curl -s https://sv.sv-2.$GCP_CLUSTER_HOSTNAME/api/sv/v0/dso | \
-     jq '.sv_node_states.[].payload.state.synchronizerNodes.[0].[1].sequencer.url | sub("sequencer-<old_migraion_id>"; "sequencer-<new_migration_id>") | sub("https://"; "")' -r | \
+     jq '.sv_node_states.[].contract.payload.state.synchronizerNodes.[0].[1].sequencer.url | sub("sequencer-<old_migration_id>"; "sequencer-<new_migration_id>") | sub("https://"; "")' -r | \
      xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; echo'
    ```
 
@@ -1638,7 +1638,7 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
 #### New domain readiness checks
 
 1. We have our expected amulet balance.
-1. "commitment correct" logs are visible from the other SVs via the new participant [GCloud Logs Example](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0Alabels.%22k8s-pod%2Fmigration_id%22%3D%221%22%0A%22commitment%20correct%22%0A;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:46:01.562157559Z;duration=PT30M?project=da-cn-devnet).
+1. "Commitment correct" logs are visible from the other SVs via the new participant [GCloud Logs Example](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0Alabels.%22k8s-pod%2Fmigration_id%22%3D%221%22%0A%22commitment%20correct%22%0A;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:46:01.562157559Z;duration=PT30M?project=da-cn-devnet).
 1. Alls SVs are in sync based on the "SV Status Reports" [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
 1. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
 
