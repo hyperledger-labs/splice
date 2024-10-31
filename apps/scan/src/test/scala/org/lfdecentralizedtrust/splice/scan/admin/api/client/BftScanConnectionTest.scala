@@ -1,11 +1,12 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
+import com.daml.ledger.api.v2.TraceContextOuterClass
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.{
   BaseAppConnection,
-  SpliceLedgerClient,
   RetryProvider,
+  SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
   DomainScans,
@@ -13,10 +14,17 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAp
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, Contract, ContractWithState}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  ContractWithState,
+  DomainRecordTimeRange,
+  SpliceUtil,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.daml.ledger.javaapi.data as javaApi
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
@@ -34,8 +42,11 @@ import org.scalatest.wordspec.AsyncWordSpec
 import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
+import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.slf4j.event.Level
 
 // mock verification triggers this
@@ -108,6 +119,60 @@ class BftScanConnectionTest
   def makeMockFail(mock: SingleScanConnection, failure: Throwable): Unit = {
     when(mock.getDsoPartyId()).thenReturn(Future.failed(failure))
   }
+  def makeMockReturnMigrationInfo(
+      mock: SingleScanConnection,
+      migrationId: Long,
+      info: Option[SourceMigrationInfo],
+  ): Unit = {
+    when(mock.getMigrationInfo(migrationId)).thenReturn(Future.successful(info))
+  }
+  def makeMockFailMigrationInfo(
+      mock: SingleScanConnection,
+      migrationId: Long,
+      failure: Throwable,
+  ): Unit = {
+    when(mock.getMigrationInfo(migrationId)).thenReturn(Future.failed(failure))
+  }
+  def makeMockReturnUpdatesBefore(
+      mock: SingleScanConnection,
+      migrationId: Long,
+      before: CantonTimestamp,
+      atOrAfter: CantonTimestamp,
+      updates: Seq[LedgerClient.GetTreeUpdatesResponse],
+      count: Int,
+  ): Unit = {
+    when(mock.getUpdatesBefore(migrationId, domainId, before, Some(atOrAfter), count))
+      .thenReturn(Future.successful(updates))
+  }
+  def makeMockFailUpdatesBefore(
+      mock: SingleScanConnection,
+      before: CantonTimestamp,
+      failure: Throwable,
+  ): Unit = {
+    when(mock.getUpdatesBefore(0, domainId, before, None, 2))
+      .thenReturn(Future.failed(failure))
+  }
+  private def jtime(n: Int) = Instant.EPOCH.plusSeconds(n.toLong)
+  private def ctime(n: Int) = CantonTimestamp.assertFromInstant(jtime(n))
+  private def testUpdate(n: Int): LedgerClient.GetTreeUpdatesResponse = {
+    LedgerClient.GetTreeUpdatesResponse(
+      update = TransactionTreeUpdate(
+        tree = new javaApi.TransactionTree(
+          s"updateId$n",
+          s"commandId$n",
+          s"workflowId$n",
+          jtime(n),
+          s"offset$n",
+          java.util.Map.of(),
+          java.util.List.of(),
+          domainId.toProtoPrimitive,
+          TraceContextOuterClass.TraceContext.getDefaultInstance,
+          jtime(n),
+        )
+      ),
+      domainId = domainId,
+    )
+  }
   def getBft(
       initialConnections: Seq[SingleScanConnection],
       connectionBuilder: Uri => Future[SingleScanConnection] = _ =>
@@ -121,6 +186,7 @@ class BftScanConnectionTest
         initialConnections,
         initialFailedConnections,
         connectionBuilder,
+        Bft.getScansInDsoRules,
         NonNegativeFiniteDuration.ofSeconds(1),
         retryProvider,
         loggerFactory,
@@ -130,6 +196,12 @@ class BftScanConnectionTest
       loggerFactory,
     )
   }
+  val notFoundFailure = new BaseAppConnection.UnexpectedHttpResponse(
+    HttpResponse(
+      StatusCodes.NotFound,
+      entity = HttpEntity(ContentTypes.`application/json`, """{"error":"not_found"}"""),
+    )
+  )
   val partyIdA = PartyId.tryFromProtoPrimitive("whatever::a")
   val partyIdB = PartyId.tryFromProtoPrimitive("whatever::b")
 
@@ -164,13 +236,7 @@ class BftScanConnectionTest
       connections.foreach(makeMockReturn(_, partyIdA))
       val bft = getBft(connections)
 
-      val failure = new BaseAppConnection.UnexpectedHttpResponse(
-        HttpResponse(
-          StatusCodes.NotFound,
-          entity = HttpEntity(ContentTypes.`application/json`, """{"error":"not_found"}"""),
-        )
-      )
-      connections.foreach(makeMockFail(_, failure))
+      connections.foreach(makeMockFail(_, notFoundFailure))
 
       for {
         failure <- bft.getDsoPartyId().failed
@@ -189,7 +255,7 @@ class BftScanConnectionTest
           failure <- bft.getDsoPartyId().failed
         } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
           code should be(StatusCodes.BadGateway)
-          message should include("Failed to reach consensus from 3 Scan nodes.") // 2f+1 = 3
+          message should include("Failed to reach consensus from 3 Scan nodes") // 2f+1 = 3
         },
         _.warningMessage should include("Consensus not reached."),
       )
@@ -232,11 +298,11 @@ class BftScanConnectionTest
         } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
           code should be(StatusCodes.BadGateway)
           message should include(
-            s"Only 1 scan instances are reachable (out of 4 configured ones), which are fewer than the necessary 2 to achieve BFT guarantees."
+            s"Only 1 scan instances can be used (out of 4 configured ones), which are fewer than the necessary 2 to achieve BFT guarantees."
           )
         },
         _.warningMessage should include(
-          s"Only 1 scan instances are reachable (out of 4 configured ones), which are fewer than the necessary 2 to achieve BFT guarantees."
+          s"Only 1 scan instances can be used (out of 4 configured ones), which are fewer than the necessary 2 to achieve BFT guarantees."
         ),
       )
     }
@@ -293,6 +359,227 @@ class BftScanConnectionTest
         connections.foreach(mockConnection => verify(mockConnection, atLeast(1)).getDsoPartyId())
         succeed
       }
+    }
+  }
+
+  "BftScanConnection for backfilling" should {
+    "return the migration info response when all agree" in {
+      val connections = getMockedConnections(n = 4)
+      val infoResponse =
+        Some(
+          SourceMigrationInfo(
+            None,
+            Map(domainId -> DomainRecordTimeRange(ctime(1), ctime(2))),
+            complete = true,
+          )
+        )
+      connections.foreach(makeMockReturnMigrationInfo(_, 0, infoResponse))
+      val bft = getBft(connections)
+
+      for {
+        migrationInfo <- bft.getMigrationInfo(0)
+      } yield migrationInfo should be(infoResponse)
+    }
+
+    "return the union migration info response when they don't agree" in {
+      val connections = getMockedConnections(n = 4)
+      def infoResponse(start: Int, complete: Boolean) =
+        Some(
+          SourceMigrationInfo(
+            if (complete) Some(0) else None,
+            Map(domainId -> DomainRecordTimeRange(ctime(start), ctime(10))),
+            complete = complete,
+          )
+        )
+      makeMockReturnMigrationInfo(connections(0), 1, None)
+      makeMockReturnMigrationInfo(connections(1), 1, infoResponse(1, true))
+      makeMockReturnMigrationInfo(connections(2), 1, infoResponse(2, false))
+      makeMockReturnMigrationInfo(connections(3), 1, infoResponse(3, false))
+      val bft = getBft(connections)
+
+      for {
+        migrationInfo <- bft.getMigrationInfo(1)
+      } yield migrationInfo should be(
+        Some(
+          SourceMigrationInfo(
+            Some(0),
+            Map(domainId -> DomainRecordTimeRange(ctime(1), ctime(10))),
+            complete = true,
+          )
+        )
+      )
+    }
+
+    "return the updates response when all agree" in {
+      val connections = getMockedConnections(n = 4)
+      val infoResponse =
+        Some(
+          SourceMigrationInfo(
+            None,
+            Map(domainId -> DomainRecordTimeRange(ctime(1), ctime(2))),
+            complete = true,
+          )
+        )
+      connections.foreach(makeMockReturnMigrationInfo(_, 0, infoResponse))
+      val updatesResponse = (1 to 2).map(testUpdate)
+      connections.foreach(makeMockReturnUpdatesBefore(_, 0, ctime(3), ctime(1), updatesResponse, 2))
+      val bft = getBft(connections)
+
+      for {
+        migrationInfo <- bft.getUpdatesBefore(0, domainId, ctime(3), None, 2)
+      } yield migrationInfo should be(updatesResponse)
+    }
+
+    "return the updates response when they have different time ranges" in {
+      val connections = getMockedConnections(n = 4)
+      def infoResponse(first: Int, last: Int, complete: Boolean) =
+        Some(
+          SourceMigrationInfo(
+            None,
+            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            complete = complete,
+          )
+        )
+
+      // We'll be asking for up to 10 updates before time 5.
+      // The BFT algorithm will only ask peer scans for updates between time 3 and 5,
+      // because that is the intersection of time ranges from the scans that have some data.
+      val updates3to5 = (3 to 5).map(testUpdate)
+
+      // SV0: doesn't know anything - should not be used
+      makeMockReturnMigrationInfo(connections(0), 0, None)
+
+      // SV1: has complete history (1 to 10)
+      makeMockReturnMigrationInfo(connections(1), 0, infoResponse(1, 10, true))
+      makeMockReturnUpdatesBefore(connections(1), 0, ctime(5), ctime(3), updates3to5, 10)
+
+      // SV2: has partial history (3 to 10)
+      makeMockReturnMigrationInfo(connections(2), 0, infoResponse(3, 10, false))
+      makeMockReturnUpdatesBefore(connections(2), 0, ctime(5), ctime(3), updates3to5, 10)
+
+      // SV3: has partial history (7 to 10) - should not be used
+      makeMockReturnMigrationInfo(connections(3), 0, infoResponse(7, 10, false))
+
+      val bft = getBft(connections)
+
+      for {
+        migrationInfo <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10)
+      } yield migrationInfo should be(updates3to5)
+    }
+
+    "return the updates response when only one scan has data" in {
+      val connections = getMockedConnections(n = 4)
+      def infoResponse(first: Int, last: Int, complete: Boolean) =
+        Some(
+          SourceMigrationInfo(
+            None,
+            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            complete = complete,
+          )
+        )
+
+      val updates1to5 = (1 to 5).map(testUpdate)
+
+      // SV1: has complete history (1 to 10)
+      makeMockReturnMigrationInfo(connections(0), 0, infoResponse(1, 10, true))
+      makeMockReturnUpdatesBefore(connections(0), 0, ctime(5), ctime(1), updates1to5, 10)
+
+      // SV2-4: has partial history (7 to 10) - should not be used
+      makeMockReturnMigrationInfo(connections(1), 0, infoResponse(7, 10, false))
+      makeMockReturnMigrationInfo(connections(2), 0, infoResponse(7, 10, false))
+      makeMockReturnMigrationInfo(connections(3), 0, infoResponse(7, 10, false))
+
+      val bft = getBft(connections)
+
+      // It's ok to accept the answer from a single scan, because all other scans claim to have no data.
+      for {
+        migrationInfo <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10)
+      } yield migrationInfo should be(updates1to5)
+    }
+
+    "return the updates response when just enough scans have data and the rest is unavailable" in {
+      val connections = getMockedConnections(n = 3)
+      def infoResponse(first: Int, last: Int, complete: Boolean) =
+        Some(
+          SourceMigrationInfo(
+            None,
+            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            complete = complete,
+          )
+        )
+
+      val updates1to5 = (1 to 5).map(testUpdate)
+
+      // SV1-3: has complete history (1 to 10)
+      (0 to 2).foreach { i =>
+        makeMockReturnMigrationInfo(connections(i), 0, infoResponse(1, 10, true))
+        makeMockReturnUpdatesBefore(connections(i), 0, ctime(5), ctime(1), updates1to5, 10)
+      }
+
+      // SV4-5: failed
+      val failedConnections = Map(
+        Uri("https://failure4.example.com") -> new RuntimeException("Failed"),
+        Uri("https://failure5.example.com") -> new RuntimeException("Failed"),
+      )
+
+      val bft = getBft(
+        connections,
+        initialFailedConnections = failedConnections,
+      )
+
+      // It's ok to accept the matching answer from the two scans, because we have f=1.
+      for {
+        migrationInfo <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10)
+      } yield migrationInfo should be(updates1to5)
+    }
+
+    "fail when not enough scans have data and the rest is unavailable" in {
+      val connections = getMockedConnections(n = 2)
+      def infoResponse(first: Int, last: Int, complete: Boolean) =
+        Some(
+          SourceMigrationInfo(
+            None,
+            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            complete = complete,
+          )
+        )
+
+      val updates1to5 = (1 to 5).map(testUpdate)
+
+      // SV1-2: has complete history (1 to 10)
+      (0 to 1).foreach { i =>
+        makeMockReturnMigrationInfo(connections(i), 0, infoResponse(1, 10, true))
+        makeMockReturnUpdatesBefore(connections(i), 0, ctime(5), ctime(1), updates1to5, 10)
+      }
+
+      // SV3-7: failed
+      val failedConnections = Map(
+        Uri("https://failure3.example.com") -> new RuntimeException("Failed"),
+        Uri("https://failure4.example.com") -> new RuntimeException("Failed"),
+        Uri("https://failure5.example.com") -> new RuntimeException("Failed"),
+        Uri("https://failure6.example.com") -> new RuntimeException("Failed"),
+        Uri("https://failure7.example.com") -> new RuntimeException("Failed"),
+      )
+
+      val bft = getBft(
+        connections,
+        initialFailedConnections = failedConnections,
+      )
+
+      // Can't accept the matching answer from the two remaining scans, we have f=2, and they could be both malicious
+      loggerFactory.assertLogs(
+        for {
+          failure <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10).failed
+        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
+          code should be(StatusCodes.BadGateway)
+          message should include(
+            s"Only 2 scan instances can be used (out of 7 configured ones), which are fewer than the necessary 3 to achieve BFT guarantees."
+          )
+        },
+        _.warningMessage should include(
+          s"Only 2 scan instances can be used (out of 7 configured ones), which are fewer than the necessary 3 to achieve BFT guarantees."
+        ),
+      )
     }
   }
 

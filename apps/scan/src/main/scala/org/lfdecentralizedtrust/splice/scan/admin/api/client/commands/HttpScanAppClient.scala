@@ -1159,6 +1159,7 @@ object HttpScanAppClient {
       migrationId: Long,
       domainId: DomainId,
       before: CantonTimestamp,
+      atOrAfter: Option[CantonTimestamp],
       count: Int,
   ) extends InternalBaseCommand[
         http.GetUpdatesBeforeResponse,
@@ -1177,6 +1178,7 @@ object HttpScanAppClient {
             migrationId,
             domainId.toProtoPrimitive,
             before.toInstant.atOffset(java.time.ZoneOffset.UTC),
+            atOrAfter.map(_.toInstant.atOffset(java.time.ZoneOffset.UTC)),
             count,
           ),
         headers,

@@ -640,8 +640,7 @@ class UpdateHistory(
     storage.update(action, "deleteRolledBackUpdateHistory")
   }
 
-  /** Deletes all updates on the given domain with a record time before the given time,
-    * by moving them to a different history id.
+  /** Deletes all updates on the given domain with a record time before the given time.
     */
   def deleteUpdatesBefore(
       domainId: DomainId,
@@ -907,9 +906,10 @@ class UpdateHistory(
       migrationId: Long,
       domainId: DomainId,
       beforeRecordTime: CantonTimestamp,
+      atOrAfterRecordTime: Option[CantonTimestamp],
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
-    val filters = beforeFilters(migrationId, domainId, beforeRecordTime, None)
+    val filters = beforeFilters(migrationId, domainId, beforeRecordTime, atOrAfterRecordTime)
     val orderBy = sql"record_time desc"
     for {
       txs <- getTxUpdates(filters, orderBy, limit)
@@ -1446,6 +1446,7 @@ class UpdateHistory(
           migrationId = migrationId,
           domainId = domainId,
           beforeRecordTime = before,
+          atOrAfterRecordTime = None,
           limit = PageLimit.tryCreate(count),
         ).map(_.map(_.update))
       }
