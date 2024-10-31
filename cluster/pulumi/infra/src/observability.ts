@@ -38,6 +38,7 @@ import {
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
 
+export const prometheusRetentionDuration = config.optionalEnv('PROMETHEUS_RETENTION_TIME') || '1y';
 export const prometheusRetentionSize = config.optionalEnv('PROMETHEUS_RETENTION_SIZE') || '500GB';
 export const prometheusStorageSize = config.optionalEnv('PROMETHEUS_STORAGE_SIZE') || '800Gi';
 
@@ -269,7 +270,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
               'promql-experimental-functions',
             ],
             enableRemoteWriteReceiver: true,
-            retention: '1y',
+            retention: prometheusRetentionDuration,
             retentionSize: prometheusRetentionSize,
             resources: {
               requests: {
