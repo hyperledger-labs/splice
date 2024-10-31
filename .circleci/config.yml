@@ -1992,6 +1992,9 @@ jobs:
       internal_stack:
         type: boolean
         default: true
+      silence_deployment_alerts:
+        type: boolean
+        default: false
     environment:
       <<: *env
     steps:
@@ -2004,6 +2007,12 @@ jobs:
           no_output_timeout: "20m"
           cmd: |
             cncluster activate
+
+            if [[ << parameters.silence_deployment_alerts >> == true ]]; then
+              # silence specific alerts that may fire due to reset downtime
+              cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
+            fi
+
             cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >> << parameters.internal_stack >>
 
             case "<< parameters.namespace_name >>" in
@@ -5413,6 +5422,7 @@ workflows:
           # sv-3 chosen quite arbitrarily as one SV to restore from backup
           namespace_name: "sv-3"
           migration_id: 0
+          silence_deployment_alerts: true
           context:
             - artifactory
             - canton-network-vpn
@@ -5442,6 +5452,7 @@ workflows:
           cluster: "cidaily"
           namespace_name: "validator1"
           migration_id: 0
+          silence_deployment_alerts: true
           context:
             - artifactory
             - canton-network-vpn
