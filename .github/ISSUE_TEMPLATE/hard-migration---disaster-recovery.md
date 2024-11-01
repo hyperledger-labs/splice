@@ -37,7 +37,7 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 
 - [ ] everyone scales down their CometBFT nodes with `kubectl scale deployment --replicas=0 -n <namespace> global-domain-<old-migration-id>-cometbft`
 - [ ] take backups with `cncluster backup_nodes`
-- [ ] agree on a timestamp based on logs (e.g., ask everyone for their latest `Commitment correct for sender` log entry on the participant ans use the min of that)
+- [ ] agree on a timestamp based on logs (e.g., ask everyone for their latest `Commitment correct for sender` log entry on the participant and use the min of that)
 - [ ] get the dumps with `cncluster take_disaster_recovery_dumps`
 - [ ] copy the dumps into our PVCs with `cncluster copy_disaster_recovery_dumps`
 - [ ] merge PR to migrate to higher migration ID
@@ -45,7 +45,7 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 
 ### Cleanup
 
-- [ ] unset `GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID` on the release branch so that future redeploys don't attempt to migrate
+- [ ] unset `synchronizerMigration.active.migratingFrom` on the release branch so that future redeploys don't attempt to migrate
 - [ ] patch periodic CI jobs
 - [ ] trigger periodic CI jobs manually once to make sure the patches worked
 - [ ] re-enable periodic CI jobs

@@ -1472,8 +1472,10 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    * set in `config.yaml` under the path `synchronizerMigration.upgrade.provider` the type of canton deployment used. `internal` for all the canton components in the `canton-network` or `sv-runbook` stack, `external` to create canton specific stacks for each sv for the migration
    * if using `external` as the provider, set in `config.yaml` under the path `synchronizerMigration.upgrade.releaseReference` the git tag or branch that will be used for the deployment code
    * environment variable `export DISABLE_COMETBFT_STATE_SYNC="true"` for a slightly faster migrate step
-   * if using `external` as the provider, deploy the operator from the deployment branch to create the new stacks CRs;
-     you will also likely need to commit the new Pulumi stack files - see [troubleshooting](#troubleshooting-external-stacks) below
+   * if using `external` as the provider, generate and commit the Pulumi secret provider configuration files for the
+     new stacks using the steps outlined in [troubleshooting external stacks](#troubleshooting-external-stacks) to
+     ensure the pulumi preview job on your PR succeeds.
+1. If using `external` as the provider, deploy the operator from the deployment branch to create the new stacks CRs.
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
@@ -1507,7 +1509,7 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 1. In the event of a disaster recovery, you need to agree on a timestamp (in the format “2024-04-17T19:12:02Z”) with the byzantine majority of the SVs and execute the following commands:
     - `cncluster take_disaster_recovery_dumps <timestamp> <new_migration_id> <output_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
     - `cncluster copy_disaster_recovery_dumps <dump_directory> sv-1 sv-2 sv-3 sv-4 sv validator validator1 splitwell`
-1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
+1. Note (or take a screenshot of) the amulet balance of one of our SVs (for post-migration [sanity check](#new-domain-readiness-checks))
 1. **Migrate:** Merge a PR against the target deployment branch (s.a.: [operator deployments](#operator-deployments)) that modifies the following config for your target cluster:
    * in `config.yaml` change `synchronizerMigration.active` to `synchronizerMigration.legacy`
    * in `config.yaml` change `synchronizerMigration.upgrade` to `synchronizerMigration.active`
