@@ -1228,8 +1228,14 @@ template DsoRules with
     -- external party
     -----------------
     nonconsuming choice DsoRules_CreateExternalPartyAmuletRules : DsoRules_CreateExternalPartyAmuletRulesResult
+      with
+        amuletName : Text
+        amuletNameAcronym : Text
       controller dso
-      do cid <- create ExternalPartyAmuletRules with dso
+      do cid <- create ExternalPartyAmuletRules with
+           dso
+           amuletName
+           amuletNameAcronym
          pure (DsoRules_CreateExternalPartyAmuletRulesResult cid)
 
     nonconsuming choice DsoRules_CreateTransferCommandCounter : DsoRules_CreateTransferCommandCounterResult

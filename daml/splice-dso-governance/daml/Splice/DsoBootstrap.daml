@@ -33,6 +33,8 @@ template DsoBootstrap with
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState
     isDevNet : Bool
+    optAmuletName : Optional Text
+    optAmuletNameAcronym : Optional Text
   where
     signatory dso
     observer sv1Party
@@ -47,7 +49,12 @@ template DsoBootstrap with
             initialValue = amuletConfig
             futureValues = []
           isDevNet
-        _ <- create ExternalPartyAmuletRules with dso
+        amuletName <- optional (fail "amuletName not specified") pure optAmuletName
+        amuletNameAcronym <- optional (fail "amuletNameAcronym not specified") pure optAmuletNameAcronym
+        _ <- create ExternalPartyAmuletRules with
+          dso
+          amuletName
+          amuletNameAcronym
         _ <- create AnsRules with
           dso
           config = ansRulesConfig

@@ -398,7 +398,9 @@ testCreateExternalPartyAmuletRules = script do
   None <- queryContractId app.dso externalPartyAmuletRulesCid
 
   let action = ARC_DsoRules with
-        dsoAction = SRARC_CreateExternalPartyAmuletRules DsoRules_CreateExternalPartyAmuletRules
+        dsoAction = SRARC_CreateExternalPartyAmuletRules DsoRules_CreateExternalPartyAmuletRules with
+          amuletName = "AmuletX"
+          amuletNameAcronym = "AMTX"
 
   confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
     result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
@@ -412,7 +414,9 @@ testCreateExternalPartyAmuletRules = script do
       amuletRulesCid = None
       confirmationCids
 
-  _ <- getExternalPartyAmuletRules app
+  (_, extRules) <- getExternalPartyAmuletRules app
+  extRules.amuletName === "AmuletX"
+  extRules.amuletNameAcronym === "AMTX"
 
   pure ()
 

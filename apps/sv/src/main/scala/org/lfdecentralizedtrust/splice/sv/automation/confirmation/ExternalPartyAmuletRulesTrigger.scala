@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -25,6 +26,7 @@ class ExternalPartyAmuletRulesTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
     connection: SpliceLedgerConnection,
+    spliceInstanceNames: SpliceInstanceNamesConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -81,6 +83,8 @@ class ExternalPartyAmuletRulesTrigger(
                       new ARC_DsoRules(
                         new SRARC_CreateExternalPartyAmuletRules(
                           new DsoRules_CreateExternalPartyAmuletRules(
+                            spliceInstanceNames.amuletName,
+                            spliceInstanceNames.amuletNameAcronym,
                           )
                         )
                       ),

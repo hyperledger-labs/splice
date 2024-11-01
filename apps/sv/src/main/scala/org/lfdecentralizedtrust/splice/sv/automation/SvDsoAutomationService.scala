@@ -400,6 +400,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         connection,
+        config.spliceInstanceNames,
       )
     )
 

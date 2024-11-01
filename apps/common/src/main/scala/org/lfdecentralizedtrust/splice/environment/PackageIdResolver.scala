@@ -11,6 +11,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, QualifiedName}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -294,4 +295,13 @@ object PackageIdResolver {
       PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
     amuletVersion >= DarResources.amulet_0_1_6.metadata.version
   }
+
+  def supportsAmuletNameInBootstrap(
+      packageConfig: PackageConfig
+  ): Boolean = {
+    val dsoVersion =
+      PackageVersion.assertFromString(packageConfig.dsoGovernance)
+    dsoVersion >= DarResources.dsoGovernance_0_1_9.metadata.version
+  }
+
 }

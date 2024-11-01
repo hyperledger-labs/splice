@@ -106,6 +106,8 @@ initDecentralizedSynchronizer isDevNet = do
       config
       initialTrafficState = Map.empty
       isDevNet
+      optAmuletName = Some "Amulet"
+      optAmuletNameAcronym = Some "AMT"
     DsoBootstrap_Bootstrap
 
   dsoUserId <- validateUserId "dso-user"

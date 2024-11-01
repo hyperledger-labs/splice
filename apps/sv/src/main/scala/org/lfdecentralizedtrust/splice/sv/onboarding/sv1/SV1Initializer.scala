@@ -93,6 +93,7 @@ import org.apache.pekko.stream.Materializer
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 /** Container for the methods required by the SvApp to initialize sv1. */
 class SV1Initializer(
@@ -553,6 +554,7 @@ class SV1Initializer(
                     show"This should never happen.\nAmuletRules: $amuletRules"
                 )
               case None =>
+                val packageConfig = sv1Config.initialPackageConfig.toPackageConfig
                 val amuletConfig = defaultAmuletConfig(
                   sv1Config.initialTickDuration,
                   sv1Config.initialMaxNumInputs,
@@ -562,7 +564,7 @@ class SV1Initializer(
                   sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
                   sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow,
                   sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
-                  sv1Config.initialPackageConfig.toPackageConfig,
+                  packageConfig,
                   sv1Config.initialHoldingFee,
                   sv1Config.initialTransferPreapprovalFee,
                 )
@@ -615,6 +617,16 @@ class SV1Initializer(
                           .toMap
                           .asJava,
                         sv1Config.isDevNet,
+                        Option
+                          .when(PackageIdResolver.supportsAmuletNameInBootstrap(packageConfig))(
+                            config.spliceInstanceNames.amuletName
+                          )
+                          .toJava,
+                        Option
+                          .when(PackageIdResolver.supportsAmuletNameInBootstrap(packageConfig))(
+                            (config.spliceInstanceNames.amuletNameAcronym)
+                          )
+                          .toJava,
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(
