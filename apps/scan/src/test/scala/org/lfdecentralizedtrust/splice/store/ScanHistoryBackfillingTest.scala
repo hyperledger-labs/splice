@@ -6,7 +6,6 @@ import org.lfdecentralizedtrust.splice.scan.store.ScanHistoryBackfilling
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConnection
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
-import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.DomainId
@@ -203,12 +202,11 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       logger,
     )
     val backfiller = new ScanHistoryBackfilling(
-      createScanConnection = () => Future.successful(connection),
+      connection = connection,
       destinationHistory = destination.destinationHistory,
       currentMigrationId = destination.domainMigrationInfo.currentMigrationId,
       batchSize = 1,
       loggerFactory = loggerFactory,
-      timeouts = DefaultProcessingTimeouts.testing,
       metricsFactory = NoOpMetricsFactory,
     )
     def go(i: Int): Future[Boolean] = {
@@ -273,6 +271,7 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
         migrationId: Long,
         domainId: DomainId,
         before: CantonTimestamp,
+        atOrAfter: Option[CantonTimestamp],
         count: Int,
     )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
       history
@@ -280,6 +279,7 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
           migrationId,
           domainId,
           before,
+          atOrAfter,
           PageLimit.tryCreate(count),
         )(tc)
         .map(

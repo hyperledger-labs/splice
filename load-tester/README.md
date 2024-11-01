@@ -1,8 +1,8 @@
 # Load Tester
 
-This directory contains the code for the CN Load Tester, built around `k6.io` scripts.
+This directory contains the code for the Splice Load Tester, built around `k6.io` scripts.
 
-Currently there is only one test, `generate-load.js`, whose purpose is to generate CN app load via repeated taps. It is deployed & run perpetually in CN clusters that have enabled the `K6_ENABLE_LOAD_GENERATOR` environment flag.
+Currently there is only one test, `generate-load.js`, whose purpose is to generate Splice app load via repeated taps. It is deployed & run perpetually in Splice clusters that have enabled the `K6_ENABLE_LOAD_GENERATOR` environment flag.
 
 It is possible to run this script in a developer initiated, ad-hoc manner via `cncluster load_test`.
 
@@ -40,7 +40,7 @@ These options are configured by passing in a JSON string via the environment, an
 
 ## Cluster Deployment
 
-The load test is used to generate continuous load against a Canton Network cluster that has it enabled. To enable it, the env flag `K6_ENABLE_LOAD_GENERATOR` must be set to `true`.
+The load test is used to generate continuous load against a Splice cluster that has it enabled. To enable it, the env flag `K6_ENABLE_LOAD_GENERATOR` must be set to `true`.
 
 Eventually we plan to run the load generator on the following clusters:
 
