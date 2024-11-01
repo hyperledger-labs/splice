@@ -61,8 +61,12 @@ def bootstrapOtherDomain(
               nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
             )
           ),
+          submissionTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofHours(24),
+          mediatorDeduplicationTimeout = NonNegativeFiniteDuration.ofHours(48),
         ),
       signedBy = Some(node.id.uid.namespace.fingerprint),
+      // This is test code so just force the change.
+      force = ForceFlags(ForceFlag.SubmissionTimeRecordTimeToleranceIncrease),
     )
   }
 }

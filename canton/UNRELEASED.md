@@ -5,6 +5,13 @@ Please also consult the [full documentation of this release](https://docs.daml.c
 
 ## Until 2024-11-09 (Exclusive)
 
+## Until 2024-10-31 (Exclusive)
+
+- Addition of a `submissionTimeRecordTimeTolerance` dynamic domain parameter, which defaults to the value of `ledgerTimRecordTimeTolerance`
+- `ledgerTimRecordTimeTolerance` is no longer unsafe to increase, however, `submissionTimeRecordTimeTolerance` now is, within the same restrictions as `ledgerTimRecordTimeTolerance` was before
+- Use of the flag `LedgerTimeRecordTimeToleranceIncrease` is now deprecated
+- A new flag `SubmissionTimeRecordTimeToleranceIncrease` has been added to forcefully increase the `submissionTimeRecordTimeTolerance` instead
+
 ## Until 2024-10-28 (Exclusive)
 
 - Split the current signing schemes into a key `([Encryption/Signing]KeySpec)` and algorithm `([Encryption/Signing]AlgorithmSpec)` specifications.

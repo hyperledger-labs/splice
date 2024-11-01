@@ -1447,6 +1447,8 @@ printTests := {
       name.contains("SvOffboardingIntegrationTest")
   def isDockerBasedTest(name: String): Boolean =
     name contains "DockerCompose"
+  def isRecordTimeToleranceTest(name: String): Boolean =
+    name contains "RecordTimeToleranceTimeBasedIntegrationTest"
 
   val allTestNames =
     definedTests
@@ -1546,6 +1548,11 @@ printTests := {
       "tests with wall clock time",
       "test-full-class-names.log",
       (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t),
+    ),
+    (
+      "tests to check record time tolerance",
+      "test-full-class-names-record-time-tolerance.log",
+      (t: String) => isRecordTimeToleranceTest(t),
     ),
     (
       "tests with simulated time",

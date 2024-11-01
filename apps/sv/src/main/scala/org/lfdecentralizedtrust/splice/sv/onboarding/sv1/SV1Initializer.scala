@@ -375,6 +375,10 @@ class SV1Initializer(
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
           acsCommitmentsCatchUpConfigParameter = Some(SvUtil.defaultAcsCommitmentsCatchUpConfig),
+          submissionTimeRecordTimeTolerance =
+            NonNegativeFiniteDuration.fromConfig(config.submissionTimeRecordTimeTolerance),
+          mediatorDeduplicationTimeout =
+            NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
         )
         val svKeyFingerprint = participantId.uid.namespace.fingerprint
         for {

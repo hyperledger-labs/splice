@@ -411,6 +411,7 @@ abstract class TopologyAdminConnection(
       serial = PositiveInt.one,
       isProposal = false,
       change = TopologyChangeOp.Replace,
+      forceChanges = ForceFlags.none,
     )
 
   private def listOwnerToKeyMapping(member: Member)(implicit
@@ -516,6 +517,7 @@ abstract class TopologyAdminConnection(
       serial: PositiveInt,
       isProposal: Boolean,
       change: TopologyChangeOp = TopologyChangeOp.Replace,
+      forceChanges: ForceFlags = ForceFlags.none,
   )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
     proposeMapping(
       store,
@@ -524,6 +526,7 @@ abstract class TopologyAdminConnection(
       serial,
       isProposal,
       change,
+      forceChanges,
     )
 
   def proposeMapping[M <: TopologyMapping: ClassTag](
@@ -533,6 +536,7 @@ abstract class TopologyAdminConnection(
       serial: PositiveInt,
       isProposal: Boolean,
       change: TopologyChangeOp,
+      forceChanges: ForceFlags,
   )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
     runCmd(
       TopologyAdminCommands.Write.Propose(
@@ -542,6 +546,7 @@ abstract class TopologyAdminConnection(
         serial = Some(serial),
         mustFullyAuthorize = !isProposal,
         change = change,
+        forceChanges = forceChanges,
       )
     )
 
@@ -558,6 +563,23 @@ abstract class TopologyAdminConnection(
       signedBy,
       serial,
       isProposal,
+    )
+
+  private def proposeMapping[M <: TopologyMapping: ClassTag](
+      store: TopologyStoreId,
+      mapping: Either[String, M],
+      signedBy: Fingerprint,
+      serial: PositiveInt,
+      isProposal: Boolean,
+      forceChanges: ForceFlags,
+  )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
+    proposeMapping(
+      store,
+      mapping.valueOr(err => throw new IllegalArgumentException(s"Invalid topology mapping: $err")),
+      signedBy,
+      serial,
+      isProposal,
+      forceChanges = forceChanges,
     )
 
   /** Prepare a transaction for external signing.
@@ -625,6 +647,7 @@ abstract class TopologyAdminConnection(
       isProposal: Boolean = false,
       recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
         RecreateOnAuthorizedStateChange.Recreate,
+      forceChanges: ForceFlags = ForceFlags.none,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
     withSpan("establish_topology_mapping") { implicit traceContext => _ =>
       logger.info(s"Ensuring that $description")
@@ -649,6 +672,7 @@ abstract class TopologyAdminConnection(
                     signedBy,
                     serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
                     isProposal = isProposal,
+                    forceChanges = forceChanges,
                   )
                 }
                 .flatMap { _ =>
@@ -1312,6 +1336,7 @@ abstract class TopologyAdminConnection(
       domainId: DomainId,
       parametersBuilder: DynamicDomainParameters => DynamicDomainParameters,
       signedBy: Fingerprint,
+      forceChanges: ForceFlags = ForceFlags.none,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[DomainParametersState]] =
@@ -1331,6 +1356,7 @@ abstract class TopologyAdminConnection(
       signedBy = signedBy,
       retryFor = RetryFor.ClientCalls,
       isProposal = true,
+      forceChanges = forceChanges,
     )
 
   def getDomainParametersState(
