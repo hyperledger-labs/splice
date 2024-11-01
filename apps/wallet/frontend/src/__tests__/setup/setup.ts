@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import crypto from 'crypto';
 import { beforeAll, afterAll, afterEach, vi } from 'vitest';
@@ -33,4 +34,5 @@ afterAll(() => server.close());
 afterEach(() => {
   cleanup();
   server.resetHandlers();
+  vi.clearAllMocks();
 });
