@@ -382,6 +382,7 @@ private[validator] object ValidatorUtil {
           publicKeyBytes,
           v30.SigningKeyScheme.SIGNING_KEY_SCHEME_ED25519,
           Seq.empty,
+          v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_CURVE25519,
         )
       )
       .valueOr(err =>

@@ -312,6 +312,7 @@ class HttpValidatorAdminHandler(
                 .asRuntimeException
             ),
           signedBy = publicKey.fingerprint,
+          signingAlgorithmSpec = None,
         ),
       ),
       isProposal = true,

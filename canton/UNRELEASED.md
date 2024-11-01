@@ -3,7 +3,13 @@
 Canton CANTON_VERSION has been released on RELEASE_DATE. You can download the Daml Open Source edition from the Daml Connect [Github Release Section](https://github.com/digital-asset/daml/releases/tag/vCANTON_VERSION). The Enterprise edition is available on [Artifactory](https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-CANTON_VERSION.zip).
 Please also consult the [full documentation of this release](https://docs.daml.com/CANTON_VERSION/canton/about.html).
 
+## Until 2024-11-09 (Exclusive)
+
 ## Until 2024-10-28 (Exclusive)
+
+- Split the current signing schemes into a key `([Encryption/Signing]KeySpec)` and algorithm `([Encryption/Signing]AlgorithmSpec)` specifications.
+  We also changed the way this is configured in Canton, for example, `signing.default = ec-dsa-p-256` is now represented as:
+  `signing.algorithms.default = ec-dsa-sha-256` and `signing.keys.default = ec-p-256`. This is not a breaking change because the old schemes are still accepted.
 - [Breaking Change] changed the `name` parameter of `rotate_node_key` from `Option` to `String`.
 - Added a `name: String` parameter to `rotate_kms_node_key`, allowing operators to specify a name for the new key.
 

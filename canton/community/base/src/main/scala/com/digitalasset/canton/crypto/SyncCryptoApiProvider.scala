@@ -18,9 +18,9 @@ import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervisio
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{CacheConfig, CachingConfigs, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SignatureCheckError.{
-  InvalidCryptoScheme,
   SignatureWithWrongKey,
   SignerHasNoValidKeys,
+  UnsupportedKeySpec,
 }
 import com.digitalasset.canton.crypto.SyncCryptoError.{KeyNotAvailable, SyncCryptoEncryptionError}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -540,13 +540,13 @@ class DomainSnapshotSyncCryptoApi(
     }
     validKeys.get(signature.signedBy) match {
       case Some(key) =>
-        if (staticDomainParameters.requiredSigningKeySchemes.contains(key.scheme))
+        if (staticDomainParameters.requiredSigningSpecs.keys.contains(key.keySpec))
           pureCrypto.verifySignature(hash, key, signature)
         else
           Left(
-            InvalidCryptoScheme(
-              s"The signing key scheme ${key.scheme} is not part of the " +
-                s"required schemes: ${staticDomainParameters.requiredSigningKeySchemes}"
+            UnsupportedKeySpec(
+              key.keySpec,
+              staticDomainParameters.requiredSigningSpecs.keys,
             )
           )
       case None =>

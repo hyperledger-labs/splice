@@ -25,7 +25,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         .generate_signing_key(
           UUID.randomUUID().toString,
           SigningKeyUsage.All,
-          Some(SigningKeyScheme.Ed25519),
+          Some(SigningKeySpec.EcCurve25519),
         )
     val signingKeyPairByteString = validatorBackend.participantClient.keys.secret
       .download(signingPublicKey.fingerprint, ProtocolVersion.dev)
@@ -68,6 +68,8 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
   // The parameters here are just defaults so don't really matter
   val crypto = new JcePureCrypto(
     CommunityCryptoProvider.Jce.symmetric.default,
+    CommunityCryptoProvider.Jce.signingAlgorithms.default,
+    CommunityCryptoProvider.Jce.signingAlgorithms.supported,
     CommunityCryptoProvider.Jce.encryptionAlgorithms.default,
     CommunityCryptoProvider.Jce.encryptionAlgorithms.supported,
     CommunityCryptoProvider.Jce.hash.default,
