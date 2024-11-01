@@ -1438,10 +1438,13 @@ printTests := {
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
   def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
+  // These are tests that are particularly resource intensive and need larger runners.
+  // Usually that is because they need to spin up an additional Canton instance within the test.
   def isResourceIntensiveTest(name: String): Boolean =
     name.contains("SvReonboardingIntegration") ||
       name.contains("DecentralizedSynchronizerMigrationIntegrationTest") ||
-      name.contains("BootstrapPackageConfigIntegrationTest")
+      name.contains("BootstrapPackageConfigIntegrationTest") ||
+      name.contains("SvOffboardingIntegrationTest")
   def isDockerBasedTest(name: String): Boolean =
     name contains "DockerCompose"
 
