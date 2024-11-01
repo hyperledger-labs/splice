@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.wallet
 
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -12,15 +11,10 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
-  Limit,
   LimitHelpers,
 }
-import org.lfdecentralizedtrust.splice.util.{Contract, HasHealth, TemplateJsonDecoder}
-import org.lfdecentralizedtrust.splice.wallet.store.{
-  ExternalPartyWalletStore,
-  UserWalletStore,
-  WalletStore,
-}
+import org.lfdecentralizedtrust.splice.util.{HasHealth, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.wallet.store.{ExternalPartyWalletStore, WalletStore}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -31,7 +25,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, blocking}
 
 /** Manages all services comprising an external party wallets. */
 class ExternalPartyWalletManager(
@@ -183,50 +177,6 @@ class ExternalPartyWalletManager(
     )
     (externalPartyRetryProvider, walletService)
   }
-
-  // NOTE: this function is exposed here in the ExternalPartyWalletManager, as it requires joining data from all per-party stores.
-  /** Lists the validator reward coupons collectable by the current user (i.e. where they are the validator). */
-  def listValidatorRewardCouponsCollectableBy(
-      validatorUserStore: UserWalletStore,
-      limit: Limit,
-      activeIssuingRounds: Option[Set[Long]],
-  )(implicit tc: TraceContext): Future[
-    Seq[
-      Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]
-    ]
-  ] =
-    for {
-      validatorRights <- validatorUserStore.getValidatorRightsWhereUserIsValidator()
-      externalParties = validatorRights
-        .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
-        .toSet
-      validatorRewardCouponsFs: Seq[
-        Future[Seq[
-          Contract[
-            amuletCodegen.ValidatorRewardCoupon.ContractId,
-            amuletCodegen.ValidatorRewardCoupon,
-          ]
-        ]]
-      ] = externalParties.toSeq
-        .map(externalParty =>
-          // TODO(M3-83): Avoid the application-level join and get the rewards in one go from the DB.
-          this.lookupExternalPartyWallet(externalParty) match {
-            case None =>
-              logger.info(
-                show"Might miss validator rewards as the ExternalPartyWalletStore for external party ${externalParty} is not (yet) setup."
-              )
-              Future.successful(Seq.empty)
-            case Some(externalPartyWallet) =>
-              externalPartyWallet.store
-                .listSortedValidatorRewards(activeIssuingRounds, limit)
-          }
-        )
-      validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
-    } yield applyLimit(
-      "listValidatorRewardCouponsCollectableBy",
-      limit,
-      validatorRewardCoupons.flatten,
-    )
 
   override def isHealthy: Boolean = externalPartyWalletsMap.values.forall(_._2.isHealthy)
 

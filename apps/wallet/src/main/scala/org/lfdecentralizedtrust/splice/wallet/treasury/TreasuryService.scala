@@ -53,7 +53,7 @@ import org.lfdecentralizedtrust.splice.util.{
   HasHealth,
   SpliceUtil,
 }
-import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
+import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.config.TreasuryConfig
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService.*
@@ -100,7 +100,6 @@ class TreasuryService(
     clock: Clock,
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
-    externalPartyWalletManager: ExternalPartyWalletManager,
     override protected[this] val retryProvider: RetryProvider,
     scanConnection: BftScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -703,26 +702,16 @@ class TreasuryService(
     (BigDecimal, Set[PartyId], Seq[(Round, BigDecimal, InputValidatorRewardCoupon)])
   ] = {
     for {
-      validatorRewardCouponsRawLocal <- walletManager
+      validatorRewardCoupons <- walletManager
         .listValidatorRewardCouponsCollectableBy(
           userStore,
           limit = PageLimit.tryCreate(validatorRewardCouponsLimit),
           Some(issuingRoundsMap.keySet.map(_.number)),
         )
-      validatorRewardCouponsRawExternal <- externalPartyWalletManager
-        .listValidatorRewardCouponsCollectableBy(
-          userStore,
-          limit = PageLimit.tryCreate(validatorRewardCouponsLimit),
-          Some(issuingRoundsMap.keySet.map(_.number)),
-        )
-      validatorRewardCouponsRaw =
-        (validatorRewardCouponsRawLocal ++ validatorRewardCouponsRawExternal).take(
-          validatorRewardCouponsLimit
-        )
-      validatorRewardCouponUsers = validatorRewardCouponsRaw
+      validatorRewardCouponUsers = validatorRewardCoupons
         .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
         .toSet
-      validatorRewardsWithAmuletQuantity = validatorRewardCouponsRaw.flatMap(rw => {
+      validatorRewardsWithAmuletQuantity = validatorRewardCoupons.flatMap(rw => {
         val issuingO = issuingRoundsMap.get(rw.payload.round)
         issuingO
           .map(i => {
