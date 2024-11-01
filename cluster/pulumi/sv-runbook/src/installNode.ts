@@ -40,6 +40,7 @@ import {
   DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
   helmChartNamesPrefix,
+  updateHistoryBackfillingValues,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -340,6 +341,7 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
+    ...updateHistoryBackfillingValues,
     metrics: {
       enable: true,
     },
