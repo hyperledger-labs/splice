@@ -301,7 +301,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     }
   }
 
-  "create and list CNS entries with multiple users for the same party" in { implicit env =>
+  "create and list ANS entries with multiple users for the same party" in { implicit env =>
     initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
     val aliceParty = aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
@@ -309,7 +309,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
     val name = s"alice.unverified.$ansAcronym"
     val url = "https://alice-url.com"
-    val description = "A test CNS entry for alice"
+    val description = "A test ANS entry for alice"
 
     val createResponse = aliceAnsExternalClient.createAnsEntry(name, url, description)
     createResponse.name shouldBe name
@@ -328,7 +328,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     clue("Onboard charlie backed by alice's party") {
       aliceValidatorBackend.onboardUser(charlieWalletClient.config.ledgerApiUser, Some(aliceParty))
     }
-    clue("Check CNS entries") {
+    clue("Check ANS entries") {
       charlieAnsExternalClient.listAnsEntries() shouldBe aliceEntries
     }
     clue("Compare wallet tx logs") {

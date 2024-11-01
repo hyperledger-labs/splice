@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
 }
+import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.{
   PackageIdResolver,
   RetryProvider,
@@ -40,6 +41,7 @@ class ScanAutomationService(
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
     svParty: PartyId,
+    upgradesConfig: UpgradesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -67,9 +69,11 @@ class ScanAutomationService(
     registerTrigger(
       new ScanHistoryBackfillingTrigger(
         store,
-        config.updateHistoryBackfillFromScanURL,
+        config.svUser,
+        ledgerClient,
         config.updateHistoryBackfillBatchSize,
         svParty,
+        upgradesConfig,
         triggerContext,
       )
     )

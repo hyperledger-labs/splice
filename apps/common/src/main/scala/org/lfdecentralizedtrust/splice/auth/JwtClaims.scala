@@ -19,7 +19,7 @@ object JwtClaims {
   /** Support two ways of specifying Daml user IDs in JWT tokens:
     *
     * 1: Set the standardized `subject` claim
-    * 2: Set the `daml_user` claim in custom Canton Network claim object.
+    * 2: Set the `daml_user` claim in custom Splice claim object.
     *    This will take precedence over `subject` if both claims are set
     *
     * @param token The decoded token claims

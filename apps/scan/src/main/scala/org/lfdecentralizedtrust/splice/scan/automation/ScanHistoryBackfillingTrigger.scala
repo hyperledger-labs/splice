@@ -10,9 +10,13 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.UpgradesConfig
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
+  BackfillingScanConnection,
+  BftScanConnection,
+}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.scan.store.ScanHistoryBackfilling.{
   FoundingTransactionTreeUpdate,
@@ -38,9 +42,11 @@ import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 
 class ScanHistoryBackfillingTrigger(
     store: ScanStore,
-    remoteScanURL: Option[String],
+    svName: String,
+    ledgerClient: SpliceLedgerClient,
     batchSize: Int,
     svParty: PartyId,
+    upgradesConfig: UpgradesConfig,
     override protected val context: TriggerContext,
 )(implicit
     override val ec: ExecutionContextExecutor,
@@ -59,6 +65,10 @@ class ScanHistoryBackfillingTrigger(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile
   private var findHistoryStartAfter: Option[(Long, CantonTimestamp)] = None
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  @volatile
+  private var connectionVar: Option[BftScanConnection] = None
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile
@@ -95,19 +105,6 @@ class ScanHistoryBackfillingTrigger(
       performBackfilling()
   }
 
-  private def createScanConnection(url: String) = {
-    implicit val tc: TraceContext = TraceContext.empty
-    ScanConnection.singleUncached(
-      ScanAppClientConfig(NetworkAppClientConfig(url = url)),
-      UpgradesConfig(failOnVersionMismatch = false),
-      context.clock,
-      context.retryProvider,
-      loggerFactory,
-      // this is a polling trigger so just retry next time
-      retryConnectionOnInitialFailure = false,
-    )
-  }
-
   private def initializeBackfillingFromUpdates(updates: Seq[TreeUpdateWithMigrationId])(implicit
       traceContext: TraceContext
   ) = {
@@ -134,7 +131,9 @@ class ScanHistoryBackfillingTrigger(
         case Some(JoiningTransactionTreeUpdate(treeUpdate, _)) =>
           for {
             // Joining SVs need to delete updates before the joining transaction, because they ingested those updates
-            // only with the visibility of the SV party and not the DSO party
+            // only with the visibility of the SV party and not the DSO party.
+            // Note that this will also delete the import updates because they have a record time of 0,
+            // which is good because we want to remove them.
             _ <- store.updateHistory.deleteUpdatesBefore(
               domainId = treeUpdate.update.domainId,
               migrationId = treeUpdate.migrationId,
@@ -184,67 +183,82 @@ class ScanHistoryBackfillingTrigger(
     }
   }
 
-  private def getOrCreateBackfilling()(implicit
-      traceContext: TraceContext
-  ): Option[ScanHistoryBackfilling] = blocking {
+  private def getOrCreateScanConnection()(implicit tc: TraceContext): Future[BftScanConnection] =
+    blocking {
+      synchronized {
+        connectionVar match {
+          case Some(connection) =>
+            Future.successful(connection)
+          case None =>
+            for {
+              connection <- BftScanConnection.peerScanConnection(
+                store,
+                svName,
+                ledgerClient,
+                scansRefreshInterval = ScanAppClientConfig.DefaultScansRefreshInterval,
+                amuletRulesCacheTimeToLive = ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
+                upgradesConfig,
+                context.clock,
+                context.retryProvider,
+                loggerFactory,
+              )
+            } yield {
+              connectionVar = Some(connection)
+              connection
+            }
+        }
+      }
+    }
+
+  private def getOrCreateBackfilling(
+      connection: BackfillingScanConnection
+  ): ScanHistoryBackfilling = blocking {
     synchronized {
       backfillingVar match {
         case Some(backfilling) =>
-          Some(backfilling)
+          backfilling
         case None =>
-          remoteScanURL match {
-            case None =>
-              // TODO(#14270): better treatment of this case - we hit this in all integration tests except for
-              // ScanBackfillingIntegrationTest where we have a remoteScanURL configured
-              logger.debug(
-                "This scan is missing parts of the update history, but no remoteScanURL is configured."
-              )
-              None
-            case Some(url) =>
-              val backfilling =
-                new ScanHistoryBackfilling(
-                  createScanConnection = () => createScanConnection(url),
-                  destinationHistory = store.updateHistory.destinationHistory,
-                  currentMigrationId = currentMigrationId,
-                  batchSize = batchSize,
-                  loggerFactory = loggerFactory,
-                  timeouts = context.timeouts,
-                  metricsFactory = context.metricsFactory,
-                )
-              backfillingVar = Some(backfilling)
-              backfillingVar
-          }
+          val backfilling =
+            new ScanHistoryBackfilling(
+              connection = connection,
+              destinationHistory = store.updateHistory.destinationHistory,
+              currentMigrationId = currentMigrationId,
+              batchSize = batchSize,
+              loggerFactory = loggerFactory,
+              metricsFactory = context.metricsFactory,
+            )
+          backfillingVar = Some(backfilling)
+          backfilling
       }
     }
   }
 
-  private def performBackfilling()(implicit traceContext: TraceContext): Future[TaskOutcome] = {
-    val backfillingO = getOrCreateBackfilling()
-    backfillingO match {
-      case None =>
-        // TODO(#14270): make this non-optional
-        Future.successful(TaskNoop)
-      case Some(backfilling) =>
-        backfilling.backfill().map {
-          case HistoryBackfilling.Outcome.MoreWorkAvailableNow =>
-            TaskSuccess("Backfilling step completed")
-          case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>
-            TaskNoop
-          case HistoryBackfilling.Outcome.BackfillingIsComplete =>
-            logger.info(
-              "UpdateHistory backfilling is complete, this trigger should not do any work ever again"
-            )
-            TaskSuccess("Backfilling completed")
-        }
+  private def performBackfilling()(implicit traceContext: TraceContext): Future[TaskOutcome] = for {
+    connection <- getOrCreateScanConnection()
+    backfilling = getOrCreateBackfilling(connection)
+    outcome <- backfilling.backfill().map {
+      case HistoryBackfilling.Outcome.MoreWorkAvailableNow =>
+        TaskSuccess("Backfilling step completed")
+      case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>
+        TaskNoop
+      case HistoryBackfilling.Outcome.BackfillingIsComplete =>
+        logger.info(
+          "UpdateHistory backfilling is complete, this trigger should not do any work ever again"
+        )
+        TaskSuccess("Backfilling completed")
     }
-  }
+  } yield outcome
 
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    super
-      .closeAsync()
-      .appended(
-        SyncCloseable("backfilling", backfillingVar.foreach(_.close()))
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    connectionVar
+      .map(connection =>
+        SyncCloseable(
+          "closing scan connection",
+          connection.close(),
+        )
       )
+      .toList
+  }
 }
 
 object ScanHistoryBackfillingTrigger {

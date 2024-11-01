@@ -16,7 +16,7 @@ Most of our tests share the same long-running Canton instance,
 see `./start-canton.sh` and `simple-topology-canton.conf`.
 Test isolation is implemented by each test using unique Daml party names and leveraging Daml privacy features.
 
-Most of our tests use the same definition of the Canton Network setup,
+Most of our tests use the same definition of the Splice setup,
 see `simple-topology.conf`.
 To avoid port collisions, tests run sequentially, see `ConcurrentEnvironmentLimiter`.
 
@@ -32,7 +32,7 @@ https://en.wikipedia.org/wiki/Ephemeral_port
 Consequently, we use the following port allocation scheme when manually allocating static ports:
 A port number has five digits and is of the form `<Network Index><Node Index><API Index>`, where:
 
-- `<Network Index>` is between 5 and 31 and uniquely identifies a canton network instance.
+- `<Network Index>` is between 5 and 31 and uniquely identifies a splice instance.
 - `<Node Index>` is between 0 and 9 and uniquely identifies the node within the network.
 - `<API Index>` is between 0 and 99 and uniquely identifies an API exposed by the node.
 
@@ -88,8 +88,8 @@ all network indices must be odd numbers.
 
 ### Examples
 
-- `5301` is the Ledger API of Participant 3 in Canton Network 5.
-- `17309` is the Admin API of Domain 3 in Canton Network 17.
+- `5301` is the Ledger API of Participant 3 in Splice network instance 5.
+- `17309` is the Admin API of Domain 3 in Splice network instance 17.
 
 ## Verifying port allocation
 

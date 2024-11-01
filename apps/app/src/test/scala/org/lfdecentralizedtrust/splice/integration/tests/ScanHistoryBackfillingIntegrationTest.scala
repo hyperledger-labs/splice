@@ -33,7 +33,7 @@ import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class ScanBackfillingIntegrationTest
+class ScanHistoryBackfillingIntegrationTest
     extends IntegrationTest
     with UpdateHistoryTestUtil
     with WalletTestUtil
@@ -75,13 +75,10 @@ class ScanBackfillingIntegrationTest
 
     val ledgerBeginSv1 = sv1Backend.participantClient.ledger_api.state.end()
 
-    clue(s"Backfilling is configured") {
+    clue(s"Backfilling is enabled") {
       // Configuration is set in `ConfigTransforms.enableScanHistoryBackfilling`
       sv1ScanBackend.config.updateHistoryBackfillEnabled should be(true)
-      sv1ScanBackend.config.updateHistoryBackfillFromScanURL should be(empty)
-
       sv2ScanBackend.config.updateHistoryBackfillEnabled should be(true)
-      sv2ScanBackend.config.updateHistoryBackfillFromScanURL should not be empty
     }
 
     clue(s"Starting Splice nodes: SV1 and Alice validator") {
@@ -131,7 +128,6 @@ class ScanBackfillingIntegrationTest
       },
     )
 
-    // TODO(#14270): Also start SV3 and SV4
     clue(s"Starting Splice nodes: SV2") {
       startAllSync(
         sv2Backend,
@@ -327,7 +323,7 @@ class ScanBackfillingIntegrationTest
   private def allUpdatesFromScanBackend(scanBackend: ScanAppBackendReference) = {
     // Need to use the store directly, as the HTTP endpoint refuses to return data unless it's completely backfilled
     scanBackend.appState.store.updateHistory
-      .getUpdates(None, false, PageLimit.tryCreate(1000))
+      .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
       .futureValue
   }
 

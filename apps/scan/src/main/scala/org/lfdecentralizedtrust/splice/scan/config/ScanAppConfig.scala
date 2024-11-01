@@ -47,9 +47,8 @@ case class ScanAppBackendConfig(
     // TODO(#13301) Remove this flag
     supportsSoftDomainMigrationPoc: Boolean = false,
     spliceInstanceNames: SpliceInstanceNamesConfig,
-    // TODO(#14270): Remove these flags and let the scan app periodically fetch all remote scans from DsoRules
+    // TODO(#15528): Enable by default
     updateHistoryBackfillEnabled: Boolean = false,
-    updateHistoryBackfillFromScanURL: Option[String] = None,
     updateHistoryBackfillBatchSize: Int = 100,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
@@ -76,5 +75,8 @@ case class ScanAppClientConfig(
 
 object ScanAppClientConfig {
   val DefaultAmuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofMinutes(10)
+
+  val DefaultScansRefreshInterval: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofMinutes(10)
 }
