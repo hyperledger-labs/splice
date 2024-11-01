@@ -16,8 +16,6 @@ import DA.Exception
 template ExternalPartyAmuletRules
   with
     dso : Party
-    amuletName : Text -- ^ Display name of the amulet.
-    amuletNameAcronym : Text -- ^ Acronym of the amulet name.
   where
     signatory dso
 

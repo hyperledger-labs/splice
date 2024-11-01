@@ -139,9 +139,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       externalpartyamuletrulesCodegen.ExternalPartyAmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
 
     val template = new externalpartyamuletrulesCodegen.ExternalPartyAmuletRules(
-      dsoParty.toProtoPrimitive,
-      "Amulet",
-      "AMT",
+      dsoParty.toProtoPrimitive
     )
     contract(
       identifier = templateId,

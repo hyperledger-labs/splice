@@ -68,10 +68,7 @@ genericSetupApp dsoPrefix = do
     isDevNet = True
     ..
 
-  _ <- submit dso $ createCmd ExternalPartyAmuletRules with
-      dso
-      amuletName = "Amulet"
-      amuletNameAcronym = "AMT"
+  _ <- submit dso $ createCmd ExternalPartyAmuletRules with dso
 
   submitExerciseAmuletRulesByKey app [dso] [] AmuletRules_Bootstrap_Rounds with
       amuletPrice = 1.0
