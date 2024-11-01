@@ -224,14 +224,14 @@ trait AppBackendReference extends AppReference with LocalInstanceReference {
         .toRight(s"NodeBootstrap does not exist.")
       node <- bootstrap.getNode
         .toRight(s"NodeBootstrap doesn't have any running node.")
-      cnNode <- node match {
+      spliceNode <- node match {
         case n: NB => Right(n)
         case other =>
           Left(
             s"Expected running node to be of type ${tag.runtimeClass.getSimpleName}, but found type ${other.getClass.getSimpleName}."
           )
       }
-      state <- cnNode.getState.toRight("Node doesn't have any app state.")
+      state <- spliceNode.getState.toRight("Node doesn't have any app state.")
     } yield state).fold(
       reason =>
         throw new RuntimeException(
