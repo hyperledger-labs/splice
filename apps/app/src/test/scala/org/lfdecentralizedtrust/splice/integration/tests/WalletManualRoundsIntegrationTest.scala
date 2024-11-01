@@ -208,7 +208,7 @@ class WalletManualRoundsIntegrationTest
         }
         val entryName = "alice"
         val (_, requestId) = actAndCheck(
-          "Request CNS entry", {
+          "Request ANS entry", {
             aliceAnsExternalClient
               .createAnsEntry(perTestCaseName(entryName), testEntryUrl, testEntryDescription)
           },

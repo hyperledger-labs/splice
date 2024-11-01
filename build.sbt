@@ -12,7 +12,7 @@ import scala.jdk.CollectionConverters.*
 import sbtassembly.{MergeStrategy, PathList}
 
 /*
- * sbt-settings that will be shared between all CN apps.
+ * sbt-settings that will be shared between all Splice apps.
  */
 
 BuildCommon.sbtSettings

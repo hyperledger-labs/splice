@@ -23,4 +23,4 @@ API Reference
 .. toctree::
 
    daml
-   cn_app_apis/index
+   splice_app_apis/index

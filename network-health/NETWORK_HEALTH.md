@@ -150,7 +150,7 @@ trying to get out of here is the missing nodes. So check which nodes are missing
 
 You can then compare this to the output of `cncluster list_sv_cometbft_addresses` to identify the names of those SVs.
 In this example, this would be LCV, GSF,SBI and Orb-1  (the following also currently requires port-forwarding
-permissions, which only the CN engineering team has).
+permissions, which only the Splice engineering team has).
 
 ```
 moritz@moritz-p5570 ~/c/c/c/d/devnet > cncluster list_sv_cometbft_addresses sv-1

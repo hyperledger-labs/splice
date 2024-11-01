@@ -713,7 +713,7 @@ class HttpScanHandler(
           PageLimit.tryCreate(pageSize),
         )
       } yield {
-        // TODO(#14270): instead of the below `if`, wait until UpdateHistory.getBackfillingState() says the history is complete
+        // TODO(#15528): instead of the below `if`, wait until UpdateHistory.getBackfillingState() says the history is complete
         // This needs to be done after backfilling is enabled by default, otherwise this endpoint won't even work on
         // the founding SV.
         if (
@@ -1083,6 +1083,7 @@ class HttpScanHandler(
               snapshotStore.currentMigrationId,
               domainId,
               CantonTimestamp.MaxValue,
+              None,
               PageLimit.tryCreate(1),
             )
             .map(
@@ -1573,6 +1574,8 @@ class HttpScanHandler(
           migrationId = body.migrationId,
           domainId = DomainId.tryFromString(body.synchronizerId),
           beforeRecordTime = CantonTimestamp.assertFromInstant(body.before.toInstant),
+          atOrAfterRecordTime =
+            body.atOrAfter.map(x => CantonTimestamp.assertFromInstant(x.toInstant)),
           limit = PageLimit.tryCreate(body.count),
         )
         .map { txs =>

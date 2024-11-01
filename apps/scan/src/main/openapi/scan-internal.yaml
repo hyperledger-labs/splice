@@ -2531,9 +2531,18 @@ components:
         synchronizer_id:
           type: string
         before:
+          description: |
+            Only return updates with a record time strictly smaller than this time.
+          type: string
+          format: date-time
+        at_or_after:
+          description: |
+            Only return updates with a record time equal to or greater than this time.
           type: string
           format: date-time
         count:
+          description: |
+            Return at most this many updates. The actual number of updates returned may be smaller.
           type: integer
           format: int32
 
