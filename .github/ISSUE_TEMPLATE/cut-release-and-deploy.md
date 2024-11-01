@@ -25,7 +25,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
   - Update `VERSION` and `LATEST_RELEASE` on main. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
 - [ ] Update the Open source repos, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
   - [ ] Merge the auto-generated PR in https://github.com/digital-asset/decentralized-canton-sync
-  - [ ] Copy the Daml code to [Splice](https://github.com/hyperledger-labs/splice), and create a PR for it
+  - [ ] Merge the auto-generated PR in https://github.com/hyperledger-labs/splice
 
 ## Upgrade our own nodes on DevNet
 
