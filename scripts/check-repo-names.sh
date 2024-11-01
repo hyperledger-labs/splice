@@ -32,7 +32,6 @@ function check_patterns_locally() {
   local exceptions=(
     '(\b|[`_])cn-docs'
     '@cn-load-tester\.com'
-    'clean-cn|cn-clean' # TODO (#15706) rename to clean-splice/splice-clean
     'cn-component' # TODO (#15707) rename label in charts to splice-component
     '^[^:]+(grafana-dashboards|WalletMetricsTest).*cn[._]|MetricName."cn"' # TODO (#15708) replace metrics prefix cn with splice
     'grafana-dashboards.*("(title|description)": "CN|by CN Apps)' # TODO (#15737) grafana descriptions
