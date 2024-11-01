@@ -44,7 +44,6 @@ function check_patterns_locally() {
     'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (#15747) auth0 env names
     'cluster/compose/validator/.*\.yaml' # TODO (#14303) old base-version
     '/helm/.*(Values\.ingress\.cns|cns: |name: cns-|- "cns\.)' # TODO (#15739) cns in splice-cluster-ingress-runbook
-    'ans-web-ui\.yaml:.*\$cnsWebUiLabel' # TODO (#15740) $cnsWebUiLabel in splice-validator template
     'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (#15741) new secret
     'Headers.scala:.*"cn-svc-configs"' # TODO (#15742) references to missing project subdirectory
     'package-lock\.json:.*("cns/frontend"|"name": "cns-frontend"|"cns/openapi-ts-client/dist"|"name": "cns-external-openapi")' # TODO (#15743) remove old versions from package-lock if possible
