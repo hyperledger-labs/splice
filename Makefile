@@ -35,7 +35,7 @@ clean: cluster/clean
 
 .PHONY: clean-all
 clean-all: clean ## Completely clean all local build state, including model codegen.
-	sbt --batch clean-cn
+	sbt --batch clean-splice
 	find . -type d -name ".daml" -exec rm -rf {} +
 	find . -type d -name "target" -exec rm -rf {} +
 
