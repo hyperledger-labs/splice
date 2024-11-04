@@ -60,6 +60,7 @@ import com.digitalasset.canton.logging.{
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import io.circe.Json
 import io.grpc.Status
@@ -67,6 +68,7 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
+import org.slf4j.event.Level
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
@@ -255,6 +257,10 @@ class BftScanConnection(
             previousMigrationId <- bftCall(
               connection => Future.successful(completeResponses(connection).previousMigrationId),
               BftCallConfig.forAvailableData(connections, completeResponses.contains),
+              // This method is very sensitive to unavailable SVs.
+              // Do not log warnings for failures to reach consensus, as this would be too noisy,
+              // and instead rely on metrics to situations when backfilling is not progressing.
+              Level.INFO,
             )
           } yield {
             @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -329,6 +335,10 @@ class BftScanConnection(
       result <- bftCall(
         connection => connection.getUpdatesBefore(migrationId, domainId, before, atOrAfter, count),
         BftCallConfig.forAvailableData(connections, connectionsWithData.contains),
+        // This method is very sensitive to unavailable SVs.
+        // Do not log warnings for failures to reach consensus, as this would be too noisy,
+        // and instead rely on metrics to situations when backfilling is not progressing.
+        Level.INFO,
       )
     } yield {
       result
@@ -338,6 +348,7 @@ class BftScanConnection(
   private def bftCall[T](
       call: SingleScanConnection => Future[T],
       callConfig: BftCallConfig = BftCallConfig.default(scanList.scanConnections),
+      consensusFailureLogLevel: Level = Level.WARN,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
     val connections = scanList.scanConnections
     if (!callConfig.enoughAvailableScans) {
@@ -348,7 +359,7 @@ class BftScanConnection(
         StatusCodes.BadGateway,
         msg,
       )
-      logger.warn(msg, exception)
+      LoggerUtil.logThrowableAtLevel(consensusFailureLogLevel, msg, exception)
       Future.failed(exception)
     } else {
       retryProvider
@@ -369,7 +380,7 @@ class BftScanConnection(
             StatusCodes.BadGateway,
             s"Failed to reach consensus from ${callConfig.requestsToDo} Scan nodes, requiring ${callConfig.targetSuccess} matching responses.",
           )
-          logger.warn(s"Consensus not reached.", c)
+          LoggerUtil.logThrowableAtLevel(consensusFailureLogLevel, s"Consensus not reached.", c)
           Future.failed(httpError)
         }
     }
@@ -508,7 +519,9 @@ object BftScanConnection {
       if (2 * f + 1 > requestsToDo) {
         loggingContext.debug(
           s"Making a BFT call with a modified config." +
-            s" Only ${connectionsWithData.size} out of ${connections.open} have data, requiring $targetSuccess out of $requestsToDo matching responses."
+            s" Out of ${connections.open.map(_.url)} connections, only ${connectionsWithData
+                .map(_.url)} have data and ${connections.failed} are failed, " +
+            s"requiring $targetSuccess out of $requestsToDo matching responses."
         )
       }
       BftCallConfig(
@@ -801,7 +814,7 @@ object BftScanConnection {
           // start with the latest scan list
           _ <- retryProvider.waitUntil(
             RetryFor.WaitingOnInitDependency,
-            "refresh_scan_list",
+            "refresh_initial_scan_list",
             "Scan list is refreshed.",
             bft
               .refresh(bftConnection)
