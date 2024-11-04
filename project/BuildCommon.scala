@@ -204,7 +204,34 @@ object BuildCommon {
         // so we explicitly remove all Splice DARs here, just in case
         addCommandAlias(
           "clean-splice",
-          "; apps-common/clean; apps-common-sv/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; splice-util-daml/clean; splice-amulet-daml/clean; splice-dso-governance-daml/clean; splice-wallet-daml/clean; splice-wallet-payments-daml/clean; splice-amulet-name-service-daml/clean; splitwell-daml/clean; splice-validator-lifecycle-daml/clean; splice-app-manager-daml/clean; apps-frontends/clean; cleanCnDars; docs/clean",
+          Seq(
+            "apps-common/clean",
+            "apps-common-sv/clean",
+            "apps-validator/clean",
+            "apps-scan/clean",
+            "apps-splitwell/clean",
+            "apps-sv/clean",
+            "apps-wallet/clean",
+            "apps-app/clean",
+            "splice-amulet-daml/clean",
+            "splice-amulet-name-service-daml/clean",
+            "splice-amulet-name-service-test-daml/clean",
+            "splice-amulet-test-daml/clean",
+            "splice-app-manager-daml/clean",
+            "splice-dso-governance-daml/clean",
+            "splice-dso-governance-test-daml/clean",
+            "splice-util-daml/clean",
+            "splice-validator-lifecycle-daml/clean",
+            "splice-validator-lifecycle-test-daml/clean",
+            "splice-wallet-daml/clean",
+            "splice-wallet-payments-daml/clean",
+            "splice-wallet-test-daml/clean",
+            "splitwell-daml/clean",
+            "splitwell-test-daml/clean",
+            "apps-frontends/clean",
+            "cleanCnDars",
+            "docs/clean",
+          ).map(";" + _).mkString(""),
         ) ++
         addCommandAlias("splice-clean", "; clean-splice")
     val buildSettings = inThisBuild(
