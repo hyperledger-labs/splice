@@ -672,6 +672,10 @@ jobs:
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
+      - run_bash_command_in_nix:
+          cmd_name: Check use of disallowed strings in OSS copy
+          cmd: |
+            scripts/check-repo-names.sh
       - clone_and_update_open_source
       - execute_sbt_command:
           working_dir: "/home/circleci/oss"

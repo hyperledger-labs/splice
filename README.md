@@ -333,7 +333,7 @@ Note that the entire command must be quoted in this case, especially if it has s
 (like the `testOnly` examples in the Test section below).
 
 - `clean`: deletes all generated files (in the target directory)
-- `clean-cn`: like clean but only for our own apps not for the Canton fork
+- `clean-splice`: like clean but only for our own apps not for the Canton fork
 - `compile`: compile production code (excluding test code)
 - `Test/compile`: compile production and test code
 - `apps-common/compile`: compile production code of the `apps-common` subproject
@@ -361,7 +361,7 @@ Test:
 
 Things sometimes go wrong with `sbt` in ways that are hard to debug. This section will list common tips&tricks for getting `sbt` to do what we want it to.
 - In case you see unexpected build failures after switching branches, run `sbt reload` to have sbt update its internal state.
-- In case you continue to see unexpected build failures, despite following every other trick in this section, you probably need to delete the sbt build files. If you suspect the build failures come from CN build files, run `sbt clean-cn` to delete all CN build files. If the error might come from the build files of the OS Canton dependency, run `sbt clean` to delete all build files managed by sbt. Subsequent `sbt Test/compile`s should then succeed.
+- In case you continue to see unexpected build failures, despite following every other trick in this section, you probably need to delete the sbt build files. If you suspect the build failures come from CN build files, run `sbt clean-splice` to delete all CN build files. If the error might come from the build files of the OS Canton dependency, run `sbt clean` to delete all build files managed by sbt. Subsequent `sbt Test/compile`s should then succeed.
 
 ## Contributing Changes
 
