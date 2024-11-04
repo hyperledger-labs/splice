@@ -172,6 +172,7 @@ class ScanApp(
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,
         serviceUserPrimaryParty,
+        amuletAppParameters.upgradesConfig,
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(

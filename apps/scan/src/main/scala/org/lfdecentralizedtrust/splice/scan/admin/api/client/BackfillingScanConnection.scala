@@ -22,6 +22,7 @@ trait BackfillingScanConnection extends FlagCloseableAsync {
       migrationId: Long,
       domainId: DomainId,
       before: CantonTimestamp,
+      atOrAfter: Option[CantonTimestamp],
       count: Int,
   )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]]
 }

@@ -9,21 +9,12 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, Tra
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConnection
 import org.lfdecentralizedtrust.splice.store.{HistoryBackfilling, TreeUpdateWithMigrationId}
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{Outcome, SourceMigrationInfo}
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  Lifecycle,
-  SyncCloseable,
-}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.control.NonFatal
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -35,25 +26,16 @@ import scala.jdk.OptionConverters.*
   * is eventually updated.
   */
 class ScanHistoryBackfilling(
-    createScanConnection: () => Future[BackfillingScanConnection],
+    connection: BackfillingScanConnection,
     destinationHistory: HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse],
     currentMigrationId: Long,
     batchSize: Int = 100,
     override val loggerFactory: NamedLoggerFactory,
-    override val timeouts: ProcessingTimeout,
     metricsFactory: LabeledMetricsFactory,
 )(implicit
     ec: ExecutionContextExecutor
-) extends FlagCloseableAsync
-    with NamedLogging {
+) extends NamedLogging {
 
-  import ScanHistoryBackfilling.*
-
-  // The state keeps track of all remote connections, along with "static data" for each migration id.
-  private val state = new AtomicReference[Option[State]](None)
-
-  // Most `sourceHistory` queries return static or slowly-changing data, and should be answered from the cache.
-  // The cache is updated on demand.
   private val sourceHistory =
     new HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] {
       def isReady: Boolean = true
@@ -61,17 +43,15 @@ class ScanHistoryBackfilling(
       def migrationInfo(migrationId: Long)(implicit
           tc: TraceContext
       ): Future[Option[SourceMigrationInfo]] =
-        getMigrationInfo(migrationId)
+        connection.getMigrationInfo(migrationId)
 
       def items(
           migrationId: Long,
           domainId: DomainId,
           before: CantonTimestamp,
           count: Int,
-      )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = for {
-        connection <- getState(migrationId).map(_.connection)
-        items <- connection.getUpdatesBefore(migrationId, domainId, before, count)
-      } yield items
+      )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
+        connection.getUpdatesBefore(migrationId, domainId, before, None, count)
     }
 
   private val backfilling =
@@ -85,62 +65,11 @@ class ScanHistoryBackfilling(
     )
 
   def backfill()(implicit tc: TraceContext): Future[Outcome] = {
-    // TODO(#14270): This should periodically reset the state
-    backfilling.backfill().recoverWith { case NonFatal(exception) =>
-      logger.warn("Backfilling failed, resetting state")
-      state.set(None)
-      Future.failed(new RuntimeException("Backfilling failed", exception))
-    }
+    backfilling.backfill()
   }
-
-  /** Returns the current state which is guaranteed to have static data for the given migration id. */
-  private def getState(migrationId: Long)(implicit tc: TraceContext): Future[State] = {
-    state.get() match {
-      case Some(s) =>
-        if (s.migrationInfos.contains(migrationId))
-          Future.successful(s)
-        else
-          for {
-            migrationInfo <- s.connection.getMigrationInfo(migrationId)
-            newState = s.withMigrationInfo(migrationId, migrationInfo)
-            _ = state.set(Some(newState))
-          } yield newState
-      case _ =>
-        for {
-          connection <- createScanConnection()
-          migrationInfo <- connection.getMigrationInfo(migrationId)
-          newState = State(connection, Map.empty, logger)
-            .withMigrationInfo(migrationId, migrationInfo)
-          _ = state.set(Some(newState))
-        } yield newState
-    }
-  }
-  private def getMigrationInfo(
-      migrationId: Long
-  )(implicit tc: TraceContext): Future[Option[SourceMigrationInfo]] =
-    getState(migrationId)
-      .map(_.migrationInfos.get(migrationId))
-
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
-    SyncCloseable("close state", state.getAndSet(None).foreach(_.close()))
-  )
 }
 
 object ScanHistoryBackfilling {
-  case class State(
-      // TODO(#14270): use connections from all scans (read from DsoRules contract)
-      connection: BackfillingScanConnection,
-      migrationInfos: Map[Long, SourceMigrationInfo],
-      logger: TracedLogger,
-  ) extends AutoCloseable {
-    def withMigrationInfo(migrationId: Long, migrationInfo: Option[SourceMigrationInfo]): State =
-      copy(migrationInfos = migrationInfos.updatedWith(migrationId)(_ => migrationInfo))
-
-    override def close(): Unit = {
-      Lifecycle.close(connection)(logger)
-    }
-  }
-
   sealed trait InitialTransactionTreeUpdate
   object InitialTransactionTreeUpdate {
     def fromTreeUpdate(

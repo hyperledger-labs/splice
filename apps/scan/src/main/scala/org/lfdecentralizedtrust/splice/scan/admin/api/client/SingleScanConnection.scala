@@ -479,6 +479,7 @@ class SingleScanConnection private[client] (
       migrationId: Long,
       domainId: DomainId,
       before: CantonTimestamp,
+      atOrAfter: Option[CantonTimestamp],
       count: Int,
   )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
     runHttpCmd(
@@ -487,6 +488,7 @@ class SingleScanConnection private[client] (
         migrationId,
         domainId,
         before,
+        atOrAfter,
         count,
       ),
     )

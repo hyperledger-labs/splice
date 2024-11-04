@@ -1426,7 +1426,7 @@ function subcmd_sequencer_console() {
     domain=${2:-0}
 
     if [ -z "${namespace}" ]; then
-        _error "Usage: $SCRIPTNAME sequencer_console <namespace-name>"
+        _error "Usage: $SCRIPTNAME sequencer_console <namespace-name> [<migration_id>]"
     fi
 
     app="global-domain-sequencer"
@@ -1434,7 +1434,7 @@ function subcmd_sequencer_console() {
     k8s_labels_for_app
 
     if ! sequencer_pod=$(_get_single_pod "$namespace" "$app"); then
-      _error "No sequencer found in namespace '$namespace'."
+      _error "No sequencer found in namespace '$namespace' for migration ID $domain."
     fi
 
     if (netstat -an | grep ".1100[12].*LISTEN"); then

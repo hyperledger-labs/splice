@@ -214,11 +214,7 @@ function take_sv_disaster_recovery_dump() {
     local output_directory="$3"
     local namespace="$4"
     echo "Taking dump of SV $namespace"
-    if [ "$namespace" = sv ]; then
-        token="$SV_RUNBOOK_TOKEN"
-    else
-        token=$(subcmd_get_token "$namespace" sv)
-    fi
+    token=$(subcmd_get_token "$namespace" sv)
 
     declare -A svIngressNames
     svIngressNames['sv-1']='sv-2'
@@ -230,6 +226,7 @@ function take_sv_disaster_recovery_dump() {
 
     data_dump_file="$output_directory/${namespace}_id_dump.json"
     id_dump_file="$output_directory/${namespace}_data_dump.json"
+    mkdir -p "$output_directory"
     curl -sSLf "https://sv.$svIngressName.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" \
          -H "Authorization: Bearer $token" > "$data_dump_file"
     curl -sSLf "https://sv.$svIngressName.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp&migration_id=$migration_id" \
