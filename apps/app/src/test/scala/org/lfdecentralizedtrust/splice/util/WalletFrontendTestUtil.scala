@@ -8,6 +8,8 @@ import org.scalatest.Assertion
 import scala.concurrent.duration.*
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 
+import org.openqa.selenium.support.ui.ExpectedConditions
+
 trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =>
 
   protected def tapAmulets(
@@ -223,6 +225,9 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     click on "create-offer-description"
     textArea("create-offer-description").underlying.sendKeys(description)
 
+    waitForCondition(id("create-offer-submit-button")) {
+      ExpectedConditions.elementToBeClickable(_)
+    }
     click on "create-offer-submit-button"
   }
 
