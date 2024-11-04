@@ -150,12 +150,9 @@ Assuming your identities data is in a file `identities.json`, copy it into a bas
     id=$(cat identities.json)
 
 We will now merge the two parts of the data dump into the format expected by the SV app.
-First, agree with the SVs on a migration ID. Similarly to the Synchronizer Upgrades with Downtime process,
-this will typically be the latest migration ID used in the synchronizer, incremented by one.
-We assume a migration ID of `1` in the following example.
 
-Create the migration dump file by merging the json structures from the identities dump, the data dump,
-and a `"migration_id": 1` field. You can use the `jq` tool for that as follows:
+Create the migration dump file by merging the json structures from the identities dump and the data dump.
+You can use the `jq` tool for that as follows:
 
 .. code-block:: bash
 
