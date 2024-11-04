@@ -248,10 +248,7 @@ export const autoInitValues = (
   }
 };
 
-export const splitwellDarPaths = fs
-  .readdirSync(`${REPO_ROOT}/daml/dars`)
-  .filter(file => file.match(/splitwell.*\.dar/))
-  .map(file => `splice-node/dars/${file}`);
+export const splitwellDarPath = 'splice-node/dars/splitwell-current.dar';
 
 export const DeploySvRunbook = config.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false);
 
