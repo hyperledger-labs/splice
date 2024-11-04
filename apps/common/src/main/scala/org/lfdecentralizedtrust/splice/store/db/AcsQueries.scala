@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import slick.jdbc.{GetResult, PositionedResult, SetParameter}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -28,8 +29,6 @@ import io.circe.Json
 import io.grpc.Status
 import slick.jdbc.canton.SQLActionBuilder
 import com.google.protobuf.ByteString
-
-import scala.annotation.nowarn
 
 trait AcsQueries extends AcsJdbcTypes {
 
@@ -144,7 +143,7 @@ trait AcsQueries extends AcsJdbcTypes {
     val storeIdFromAcsRow = pp.<<[Option[Int]]
     val migrationIdFromAcsRow = pp.<<[Option[Long]]
     AcsQueries.SelectFromAcsTableResultWithOffset(
-      pp.<<,
+      ApiOffset.assertFromStringToLong(pp.<<[String]),
       for {
         storeId <- storeIdFromAcsRow
         migration_id <- migrationIdFromAcsRow
@@ -209,7 +208,7 @@ trait AcsQueries extends AcsJdbcTypes {
       val storeIdFromAcsRow = pp.<<[Option[Int]]
       val migrationIdFromAcsRow = pp.<<[Option[Long]]
       AcsQueries.SelectFromAcsTableResultWithStateAndOffset(
-        pp.<<,
+        ApiOffset.assertFromStringToLong(pp.<<[String]),
         for {
           storeId <- storeIdFromAcsRow
           migrationId <- migrationIdFromAcsRow
@@ -245,8 +244,7 @@ trait AcsQueries extends AcsJdbcTypes {
   protected def sqlCommaSeparated[V](
       seq: Iterable[V]
   )(implicit
-      // used in the Slick macro
-      @nowarn("msg=parameter sp in method sqlCommaSeparated is never used") sp: SetParameter[V]
+      sp: SetParameter[V]
   ): SQLActionBuilder = {
     seq
       .map(v => sql"$v")
@@ -383,12 +381,12 @@ object AcsQueries {
   }
 
   case class SelectFromAcsTableResultWithOffset(
-      offset: String,
+      offset: Long,
       row: Option[SelectFromAcsTableResult],
   )
 
   case class SelectFromAcsTableResultWithStateAndOffset(
-      offset: String,
+      offset: Long,
       row: Option[SelectFromAcsTableWithStateResult],
   )
 }

@@ -3,10 +3,9 @@
 
 package com.digitalasset.canton.sequencing
 
-import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{MediatorGroup, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{MediatorGroup, Member}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -19,23 +18,10 @@ object GroupAddressResolver {
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[Map[GroupRecipient, Set[Member]]] = {
+  ): Future[Map[GroupRecipient, Set[Member]]] =
     if (groupRecipients.isEmpty) Future.successful(Map.empty)
     else
       for {
-        participantsOfParty <- {
-          val parties = groupRecipients.collect { case ParticipantsOfParty(party) =>
-            party.toLf
-          }
-          if (parties.isEmpty)
-            Future.successful(Map.empty[GroupRecipient, Set[Member]])
-          else
-            for {
-              mapping <-
-                topologyOrSequencingSnapshot
-                  .activeParticipantsOfParties(parties.toSeq)
-            } yield asGroupRecipientsToMembers(mapping)
-        }
         mediatorGroupByMember <- {
           val mediatorGroups = groupRecipients.collect { case MediatorGroupRecipient(group) =>
             group
@@ -68,33 +54,22 @@ object GroupAddressResolver {
                 topologyOrSequencingSnapshot
                   .sequencerGroup()
                   .map(
-                    _.map(group => (group.active.forgetNE ++ group.passive).toSet[Member])
+                    _.map(group => (group.active ++ group.passive).toSet[Member])
                       .getOrElse(Set.empty[Member])
                   )
             } yield Map((SequencersOfDomain: GroupRecipient) -> sequencers)
           } else
             Future.successful(Map.empty[GroupRecipient, Set[Member]])
         }
-      } yield participantsOfParty ++ mediatorGroupByMember ++ sequencersOfDomain ++ allRecipients
-  }
+      } yield mediatorGroupByMember ++ sequencersOfDomain ++ allRecipients
 
   def asGroupRecipientsToMembers(
       groups: Seq[MediatorGroup]
   ): Map[GroupRecipient, Set[Member]] =
     groups
       .map(group =>
-        MediatorGroupRecipient(group.index) -> (group.active.forgetNE ++ group.passive)
+        MediatorGroupRecipient(group.index) -> (group.active ++ group.passive)
           .toSet[Member]
       )
       .toMap[GroupRecipient, Set[Member]]
-
-  def asGroupRecipientsToMembers(
-      mapping: Map[LfPartyId, Set[ParticipantId]]
-  ): Map[GroupRecipient, Set[Member]] = {
-    mapping.map[GroupRecipient, Set[Member]] { case (party, participants) =>
-      ParticipantsOfParty(
-        PartyId.tryFromLfParty(party)
-      ) -> participants.toSet[Member]
-    }
-  }
 }

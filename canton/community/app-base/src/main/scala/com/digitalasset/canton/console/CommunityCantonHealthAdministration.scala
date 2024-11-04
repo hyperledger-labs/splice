@@ -7,10 +7,13 @@ import better.files.File
 import cats.data.NonEmptyList
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import com.digitalasset.canton.admin.api.client.data.{CantonStatus, CommunityCantonStatus}
+import com.digitalasset.canton.admin.api.client.data.{
+  CantonStatus,
+  CommunityCantonStatus,
+  NodeStatus,
+}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{NonNegativeDuration, Password}
-import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.NoTracing
@@ -81,9 +84,8 @@ trait CantonHealthAdministration[Status <: CantonStatus]
 
   protected def statusMap[A <: InstanceReference](
       nodes: NodeReferences[A, _, _]
-  ): Map[String, () => NodeStatus[A#Status]] = {
-    nodes.all.map { node => node.name -> (() => node.health.status) }.toMap
-  }
+  ): Map[String, () => NodeStatus[A#Status]] =
+    nodes.all.map(node => node.name -> (() => node.health.status)).toMap
 
   def status(): Status
 
@@ -111,7 +113,7 @@ trait CantonHealthAdministration[Status <: CantonStatus]
     }
 
     // Try to get a local dump by going through the local nodes and returning the first one that succeeds
-    def getLocalDump(nodes: NonEmptyList[InstanceReference]): Future[String] = {
+    def getLocalDump(nodes: NonEmptyList[InstanceReference]): Future[String] =
       Future {
         nodes.head.health.dump(
           File.newTemporaryFile(s"local-"),
@@ -129,7 +131,6 @@ trait CantonHealthAdministration[Status <: CantonStatus]
           case None => Future.failed(e)
         }
       }
-    }
 
     val localDump = NonEmptyList
       // The sorting is not necessary but makes testing easier
@@ -155,11 +156,10 @@ class CommunityCantonHealthAdministration(override val consoleEnv: ConsoleEnviro
     extends CantonHealthAdministration[CommunityCantonStatus] {
 
   @Help.Summary("Aggregate status info of all participants and domains")
-  def status(): CommunityCantonStatus = {
+  def status(): CommunityCantonStatus =
     CommunityCantonStatus.getStatus(
       statusMap[SequencerReference](consoleEnv.sequencers),
       statusMap[MediatorReference](consoleEnv.mediators),
       statusMap[ParticipantReference](consoleEnv.participants),
     )
-  }
 }

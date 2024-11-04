@@ -68,6 +68,7 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new ExpireElectionRequestsTrigger(triggerContext, svTaskContext))
     registerTrigger(new AnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredAnsEntryTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpireTransferPreapprovalsTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredAnsSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new MergeSvRewardStateContractsTrigger(triggerContext, svTaskContext))
@@ -100,6 +101,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpireElectionRequestsTrigger],
     aTrigger[AnsSubscriptionRenewalPaymentTrigger],
     aTrigger[ExpiredAnsEntryTrigger],
+    aTrigger[ExpireTransferPreapprovalsTrigger],
     aTrigger[ExpiredAnsSubscriptionTrigger],
     aTrigger[TerminatedSubscriptionTrigger],
     aTrigger[MergeSvRewardStateContractsTrigger],

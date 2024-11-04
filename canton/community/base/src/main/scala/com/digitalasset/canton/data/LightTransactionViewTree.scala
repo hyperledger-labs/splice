@@ -12,7 +12,6 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.version.*
 import monocle.PLens
 
@@ -30,7 +29,7 @@ import scala.collection.mutable
   */
 sealed abstract case class LightTransactionViewTree private[data] (
     tree: GenTransactionTree,
-    override val subviewHashes: Seq[ViewHash],
+    subviewHashesAndKeys: Seq[ViewHashAndKey],
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
       LightTransactionViewTree.type
@@ -39,11 +38,15 @@ sealed abstract case class LightTransactionViewTree private[data] (
     with HasProtocolVersionedWrapper[LightTransactionViewTree]
     with PrettyPrinting {
 
+  override val subviewHashes: Seq[ViewHash] = subviewHashesAndKeys.map {
+    case ViewHashAndKey(viewHash, _) => viewHash
+  }
+
   @tailrec
   private[data] override def findTheView(
       viewsWithIndex: Seq[(TransactionView, MerklePathElement)],
       viewPosition: ViewPosition = ViewPosition.root,
-  ): Either[String, (TransactionView, ViewPosition)] = {
+  ): Either[String, (TransactionView, ViewPosition)] =
     viewsWithIndex match {
       case Seq() =>
         Left("A light transaction view tree must contain an unblinded view.")
@@ -60,19 +63,16 @@ sealed abstract case class LightTransactionViewTree private[data] (
             s"${multipleViews.map(_._1)}"
         )
     }
-  }
 
   override def validated: Either[String, this.type] = for {
-
     _ <- super[TransactionViewTree].validated
-
     // Check that the subview hashes are consistent with the tree
-    _ <- EitherUtil.condUnitE(
+    _ <- Either.cond(
       view.subviewHashesConsistentWith(subviewHashes),
+      (),
       s"The provided subview hashes are inconsistent with the provided view (view: ${view.viewHash} " +
         s"at position: $viewPosition, subview hashes: $subviewHashes)",
     )
-
   } yield this
 
   @transient override protected lazy val companionObj: LightTransactionViewTree.type =
@@ -81,7 +81,9 @@ sealed abstract case class LightTransactionViewTree private[data] (
   def toProtoV30: v30.LightTransactionViewTree =
     v30.LightTransactionViewTree(
       tree = Some(tree.toProtoV30),
-      subviewHashes = subviewHashes.map(_.toProtoPrimitive),
+      subviewHashesAndKeys = subviewHashesAndKeys.map { case ViewHashAndKey(viewHash, key) =>
+        v30.ViewHashAndKey(viewHash.toProtoPrimitive, key.getCryptographicEvidence)
+      },
     )
 
   override lazy val pretty: Pretty[LightTransactionViewTree] = prettyOfClass(unnamedParam(_.tree))
@@ -90,12 +92,12 @@ sealed abstract case class LightTransactionViewTree private[data] (
 object LightTransactionViewTree
     extends HasProtocolVersionedWithContextAndValidationCompanion[
       LightTransactionViewTree,
-      HashOps,
+      (HashOps, Int),
     ] {
   override val name: String = "LightTransactionViewTree"
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.LightTransactionViewTree)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.LightTransactionViewTree)(
       supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),
       _.toProtoV30.toByteString,
     )
@@ -108,30 +110,43 @@ object LightTransactionViewTree
     */
   def tryCreate(
       tree: GenTransactionTree,
-      subviewHashes: Seq[ViewHash],
+      subviewHashesAndKeys: Seq[ViewHashAndKey],
       protocolVersion: ProtocolVersion,
   ): LightTransactionViewTree =
-    create(tree, subviewHashes, protocolVersionRepresentativeFor(protocolVersion)).valueOr(err =>
-      throw InvalidLightTransactionViewTree(err)
+    create(tree, subviewHashesAndKeys, protocolVersionRepresentativeFor(protocolVersion)).valueOr(
+      err => throw InvalidLightTransactionViewTree(err)
     )
 
   def create(
       tree: GenTransactionTree,
-      subviewHashes: Seq[ViewHash],
+      subviewHashesAndKeys: Seq[ViewHashAndKey],
       representativeProtocolVersion: RepresentativeProtocolVersion[LightTransactionViewTree.type],
   ): Either[String, LightTransactionViewTree] =
-    new LightTransactionViewTree(tree, subviewHashes)(representativeProtocolVersion) {}.validated
+    new LightTransactionViewTree(tree, subviewHashesAndKeys)(
+      representativeProtocolVersion
+    ) {}.validated
 
-  private def fromProtoV30(context: (HashOps, ProtocolVersion))(
+  private def fromProtoV30(context: ((HashOps, Int), ProtocolVersion))(
       protoT: v30.LightTransactionViewTree
   ): ParsingResult[LightTransactionViewTree] =
     for {
       protoTree <- ProtoConverter.required("tree", protoT.tree)
-      tree <- GenTransactionTree.fromProtoV30(context, protoTree)
-      subviewHashes <- protoT.subviewHashes.traverse(ViewHash.fromProtoPrimitive)
+      ((hashOps, expectedLength), protocolVersion) = context
+      tree <- GenTransactionTree.fromProtoV30((hashOps, protocolVersion), protoTree)
+      subviewHashesAndKeys <- protoT.subviewHashesAndKeys.traverse {
+        case v30.ViewHashAndKey(viewHashT, keyT) =>
+          for {
+            viewHash <- ViewHash.fromProtoPrimitive(viewHashT)
+            key <- SecureRandomness
+              .fromByteString(expectedLength)(keyT)
+              .leftMap[ProtoDeserializationError](
+                ProtoDeserializationError.CryptoDeserializationError.apply
+              )
+          } yield ViewHashAndKey(viewHash, key)
+      }
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
       result <- LightTransactionViewTree
-        .create(tree, subviewHashes, rpv)
+        .create(tree, subviewHashesAndKeys, rpv)
         .leftMap(e =>
           ProtoDeserializationError
             .InvariantViolation("tree", s"Unable to create transaction tree: $e")
@@ -186,7 +201,7 @@ object LightTransactionViewTree
       if (missingSubviews.isEmpty) {
         val fullSubviewsSeq = lightViewTree.subviewHashes.map(fullViewByHash)
         val fullSubviews = TransactionSubviews(fullSubviewsSeq)(protocolVersion, hashOps)
-        val fullView = lightViewTree.view.copy(subviews = fullSubviews)
+        val fullView = lightViewTree.view.tryCopy(subviews = fullSubviews)
         val fullViewTree = FullTransactionViewTree.tryCreate(
           lightViewTree.tree.mapUnblindedRootViews(_.replace(fullView.viewHash, fullView))
         )
@@ -226,13 +241,28 @@ object LightTransactionViewTree
   /** Turns a full transaction view tree into a lightweight one. Not stack-safe. */
   def fromTransactionViewTree(
       tvt: FullTransactionViewTree,
+      subviewKeys: Seq[SecureRandomness],
       protocolVersion: ProtocolVersion,
-  ): LightTransactionViewTree = {
-    val withBlindedSubviews = tvt.view.copy(subviews = tvt.view.subviews.blindFully)
+  ): Either[String, LightTransactionViewTree] = {
+    val withBlindedSubviews = tvt.view.tryCopy(subviews = tvt.view.subviews.blindFully)
     val genTransactionTree =
       tvt.tree.mapUnblindedRootViews(_.replace(tvt.viewHash, withBlindedSubviews))
-    // By definition, the view in a TransactionViewTree has all subviews unblinded
-    LightTransactionViewTree.tryCreate(genTransactionTree, tvt.subviewHashes, protocolVersion)
+    // you must have one key for each subview (to be able to decrypt them)
+    Either.cond(
+      subviewKeys.size == tvt.subviewHashes.size,
+      // By definition, the view in a TransactionViewTree has all subviews unblinded
+      LightTransactionViewTree.tryCreate(
+        genTransactionTree,
+        tvt.subviewHashes.lazyZip(subviewKeys).map { case (viewHash, key) =>
+          ViewHashAndKey(viewHash, key)
+        },
+        protocolVersion,
+      ),
+      s"Expected ${tvt.subviewHashes.size} subview keys, but got ${subviewKeys.size}",
+    )
   }
 
 }
+
+/** A view hash and its corresponding encryption key. */
+final case class ViewHashAndKey(viewHash: ViewHash, viewEncryptionKeyRandomness: SecureRandomness)

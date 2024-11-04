@@ -6,10 +6,10 @@ package org.lfdecentralizedtrust.splice.admin.http
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.environment.SpliceStatus
 import org.lfdecentralizedtrust.splice.http.v0.external.common_admin.CommonAdminResource
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.AdminServerConfig
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeParameters}
-import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import io.opentelemetry.api.trace.Tracer
@@ -60,9 +60,7 @@ object HttpAdminService {
 
     private def status(): Future[NodeStatus[SpliceStatus]] = node
       .map { n =>
-        n.status
-          .map(SpliceStatus.fromNodeStatus)
-          .map(NodeStatus.Success(_))
+        Future.successful(NodeStatus.Success(SpliceStatus.fromNodeStatus(n.status)))
       }
       .getOrElse(Future.successful(NodeStatus.NotInitialized(active = false, None)))
     private val logger = loggerFactory.getTracedLogger(this.getClass)

@@ -7,7 +7,14 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  TransferPreapproval,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
@@ -23,7 +30,11 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{AnsEntry, MigrationSchedule}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  AnsEntry,
+  LookupTransferCommandStatusResponse,
+  MigrationSchedule,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.{
   BftCallConfig,
   ConsensusNotReached,
@@ -49,8 +60,7 @@ import com.digitalasset.canton.logging.{
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.RetryUtil
-import com.digitalasset.canton.util.retry.RetryUtil.ExceptionRetryable
+import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import io.circe.Json
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
@@ -123,6 +133,17 @@ class BftScanConnection(
   )(implicit tc: TraceContext): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]] =
     bftCall(
       _.getAmuletRulesWithState(cachedAmuletRules)
+    )
+
+  override protected def runGetExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
+    bftCall(
+      _.getExternalPartyAmuletRules(cachedExternalPartyAmuletRules)
     )
 
   override protected def runGetAnsRules(
@@ -264,6 +285,24 @@ class BftScanConnection(
         }
     } yield result
   }
+
+  override def lookupTransferCommandCounterByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]] =
+    bftCall(_.lookupTransferCommandCounterByParty(receiver))
+
+  override def lookupTransferCommandStatus(sender: PartyId, nonce: Long)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[LookupTransferCommandStatusResponse]] =
+    bftCall(_.lookupTransferCommandStatus(sender, nonce))
+
+  override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
+    bftCall(_.lookupTransferPreapprovalByParty(receiver))
 
   override def getUpdatesBefore(
       migrationId: Long,
@@ -907,18 +946,15 @@ object BftScanConnection {
         s"Failed to reach consensus from $numRequests Scan nodes. Responses: $responses"
       )
 
-  object ConsensusNotReachedRetryable extends ExceptionRetryable {
-    override def retryOK(
-        outcome: Try[_],
-        logger: TracedLogger,
-        lastErrorKind: Option[RetryUtil.ErrorKind],
-    )(implicit tc: TraceContext): RetryUtil.ErrorKind = {
-      outcome match {
-        case Success(_) => RetryUtil.NoErrorKind
-        case Failure(c: ConsensusNotReached) =>
+  object ConsensusNotReachedRetryable extends ExceptionRetryPolicy {
+    override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = {
+      exception match {
+        case c: ConsensusNotReached =>
           logger.info("Consensus not reached. Will be retried.", c)
-          RetryUtil.SpuriousTransientErrorKind
-        case Failure(_) => RetryUtil.FatalErrorKind
+          ErrorKind.TransientErrorKind()
+        case _ => ErrorKind.FatalErrorKind
       }
     }
   }

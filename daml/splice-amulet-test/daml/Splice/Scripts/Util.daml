@@ -20,6 +20,7 @@ import Splice.AmuletRules
 import Splice.AmuletConfig (AmuletConfig(..))
 import qualified Splice.AmuletConfig as Unit
 import Splice.Expiry
+import Splice.ExternalPartyAmuletRules
 import Splice.Issuance
 import Splice.Round
 import Splice.Fees
@@ -66,6 +67,8 @@ genericSetupApp dsoPrefix = do
     configSchedule = defaultAmuletConfigSchedule
     isDevNet = True
     ..
+
+  _ <- submit dso $ createCmd ExternalPartyAmuletRules with dso
 
   submitExerciseAmuletRulesByKey app [dso] [] AmuletRules_Bootstrap_Rounds with
       amuletPrice = 1.0
@@ -115,16 +118,20 @@ data AmuletUser = AmuletUser
     primaryParty : Party
   deriving (Show, Eq, Ord)
 
-setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
-setupUser app name validator = do
+setupUserWithoutValidatorRight: AmuletApp -> Text -> Script AmuletUser
+setupUserWithoutValidatorRight app name = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
   -- TODO(#2957): remove read-as DSO party.
   createUser (User userId (Some user)) [CanActAs user, CanReadAs app.dso]
-  recordValidatorOf app user validator
-  let u = AmuletUser userId user
-  tap app u 1.0
-  return u
+  return (AmuletUser userId user)
+
+setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
+setupUser app name validator = do
+  user <- setupUserWithoutValidatorRight app name
+  recordValidatorOf app user.primaryParty validator
+  tap app user 1.0
+  return user
 
 setupSelfHostedUser: AmuletApp -> Text -> Script (AmuletUser, AmuletUser)
 setupSelfHostedUser app name = do
@@ -316,6 +323,14 @@ queryAmuletRulesByKey dso = do
 
 getAmuletRules : AmuletApp -> Script (ContractId AmuletRules, AmuletRules)
 getAmuletRules app = fetchAmuletRulesByKey app.dso
+
+getExternalPartyAmuletRules : AmuletApp -> Script (ContractId ExternalPartyAmuletRules, ExternalPartyAmuletRules)
+getExternalPartyAmuletRules app = do
+  externalPartyAmuletRules <- query @ExternalPartyAmuletRules app.dso
+  case externalPartyAmuletRules of
+    [externalPartyAmuletRules] -> pure externalPartyAmuletRules
+    _ -> abort ("Expected exactly one ExternalPartyAmuletRules contract but got: " <> show externalPartyAmuletRules)
+
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all amulets from
 -- the sender and transfers the desired amount off of them to the receiver.

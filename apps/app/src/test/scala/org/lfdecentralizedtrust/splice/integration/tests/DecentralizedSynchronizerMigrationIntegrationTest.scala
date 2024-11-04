@@ -988,7 +988,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   migrationId = 1L,
                   pageSize = 1000,
                   templates = Some(
-                    Vector(DsoRules.TEMPLATE_ID, AmuletRules.TEMPLATE_ID, AnsRules.TEMPLATE_ID).map(
+                    Vector(
+                      DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+                      AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+                      AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+                    ).map(
                       PackageQualifiedName(_)
                     )
                   ),

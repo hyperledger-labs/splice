@@ -6,9 +6,7 @@ package com.digitalasset.canton.domain.sequencing.sequencer.traffic
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencer.admin.v30
-import com.digitalasset.canton.sequencer.admin.v30.TrafficControlStateRequest.{
-  TimestampSelector as TimestampSelectorP
-}
+import com.digitalasset.canton.sequencer.admin.v30.TrafficControlStateRequest.TimestampSelector as TimestampSelectorP
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 
 object TimestampSelector {
@@ -38,12 +36,12 @@ object TimestampSelector {
 
   def fromProtoV30(
       selectorP: v30.TrafficControlStateRequest.TimestampSelector
-  ): ParsingResult[TimestampSelector] = {
+  ): ParsingResult[TimestampSelector] =
     selectorP match {
       // Empty defaults to LatestSafe
       case TimestampSelectorP.Empty => Right(LatestSafe)
       case TimestampSelectorP.ExactTimestamp(value) =>
-        CantonTimestamp.fromProtoPrimitive(value).map(ExactTimestamp)
+        CantonTimestamp.fromProtoPrimitive(value).map(ExactTimestamp.apply)
       case TimestampSelectorP.RelativeTimestamp(
             v30.TrafficControlStateRequest.RelativeTimestamp.RELATIVE_TIMESTAMP_LATEST_SAFE_UNSPECIFIED
           ) =>
@@ -61,5 +59,4 @@ object TimestampSelector {
           ) =>
         Left(ProtoDeserializationError.UnrecognizedEnum("relative_timestamp", v.unrecognizedValue))
     }
-  }
 }

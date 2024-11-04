@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.ledger.localstore
 
+import cats.syntax.either.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, ObjectMeta, User, UserRight}
 import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator
@@ -45,7 +46,7 @@ class InMemoryUserManagementStore(
       for {
         _ <- validateAnnotationsSize(user.metadata.annotations, user.id)
       } yield {
-        val userWithResourceVersion = {
+        val userWithResourceVersion =
           InMemUser(
             id = user.id,
             primaryParty = user.primaryParty,
@@ -54,7 +55,6 @@ class InMemoryUserManagementStore(
             annotations = user.metadata.annotations,
             identityProviderId = user.identityProviderId,
           )
-        }
         state.update(user.id, InMemUserInfo(userWithResourceVersion, rights))
         toDomainUser(userWithResourceVersion)
       }
@@ -62,7 +62,7 @@ class InMemoryUserManagementStore(
 
   override def updateUser(
       userUpdate: UserUpdate
-  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[User]] = {
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[User]] =
     withUser(userUpdate.id, userUpdate.identityProviderId) { userInfo =>
       val updatedPrimaryParty = userUpdate.primaryPartyUpdateO.getOrElse(userInfo.user.primaryParty)
       val updatedIsDeactivated =
@@ -103,7 +103,6 @@ class InMemoryUserManagementStore(
         toDomainUser(updatedUserInfo.user)
       }
     }
-  }
 
   override def deleteUser(
       id: Ref.UserId,
@@ -111,7 +110,7 @@ class InMemoryUserManagementStore(
   )(implicit loggingContext: LoggingContextWithTrace): Future[Result[Unit]] =
     withUser(id, identityProviderId) { _ =>
       state.remove(id).discard
-      Right(())
+      Either.unit
     }
 
   override def grantRights(
@@ -148,7 +147,7 @@ class InMemoryUserManagementStore(
       identityProviderId: IdentityProviderId,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Result[UsersPage]] = {
+  ): Future[Result[UsersPage]] =
     withState {
       val iter: Iterator[InMemUserInfo] = fromExcl match {
         case None => state.valuesIterator
@@ -161,24 +160,18 @@ class InMemoryUserManagementStore(
         .toSeq
       Right(UsersPage(users = users))
     }
-  }
-
-  def listAllUsers(): Future[List[User]] = withState(
-    state.valuesIterator.map(info => toDomainUser(info.user)).toList
-  )
 
   override def updateUserIdp(
       id: Ref.UserId,
       sourceIdp: IdentityProviderId,
       targetIdp: IdentityProviderId,
-  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[User]] = {
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[User]] =
     withUser(id = id, identityProviderId = sourceIdp) { info =>
       val user = info.user.copy(identityProviderId = targetIdp)
       val updated = info.copy(user = user)
       state.update(id, updated)
       Right(toDomainUser(updated.user))
     }
-  }
 
   private def withState[T](t: => T): Future[T] =
     blocking(
@@ -227,13 +220,12 @@ class InMemoryUserManagementStore(
   private def validateAnnotationsSize(
       annotations: Map[String, String],
       userId: Ref.UserId,
-  ): Result[Unit] = {
-    if (!ResourceAnnotationValidator.isWithinMaxAnnotationsByteSize(annotations)) {
-      Left(MaxAnnotationsSizeExceeded(userId))
-    } else {
-      Right(())
-    }
-  }
+  ): Result[Unit] =
+    Either.cond(
+      ResourceAnnotationValidator.isWithinMaxAnnotationsByteSize(annotations),
+      (),
+      MaxAnnotationsSizeExceeded(userId),
+    )
 
 }
 
@@ -249,14 +241,13 @@ object InMemoryUserManagementStore {
   )
   final case class InMemUserInfo(user: InMemUser, rights: Set[UserRight])
 
-  def toDomainUserInfo(info: InMemUserInfo): UserInfo = {
+  def toDomainUserInfo(info: InMemUserInfo): UserInfo =
     UserInfo(
       user = toDomainUser(info.user),
       rights = info.rights,
     )
-  }
 
-  def toDomainUser(user: InMemUser): User = {
+  def toDomainUser(user: InMemUser): User =
     User(
       id = user.id,
       primaryParty = user.primaryParty,
@@ -267,7 +258,6 @@ object InMemoryUserManagementStore {
       ),
       identityProviderId = user.identityProviderId,
     )
-  }
 
   private val AdminUser = InMemUserInfo(
     user = InMemUser(

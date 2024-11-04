@@ -8,7 +8,7 @@ package com.digitalasset.canton.protocol.v30;
 import "com/digitalasset/canton/crypto/v30/crypto.proto";
 import "com/digitalasset/canton/protocol/v30/domain_parameters.proto";
 import "com/digitalasset/canton/protocol/v30/sequencing_parameters.proto";
-import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
 import "scalapb/scalapb.proto";
 
 message Enums {
@@ -91,15 +91,29 @@ message IdentifierDelegation {
 
 // mapping a member (participant, mediator, sequencer) to a key
 // authorization: whoever controls the member uid
-// UNIQUE(member, domain)
+// UNIQUE(member)
 message OwnerToKeyMapping {
   // the sequencing process member
   string member = 1;
 
   // the designated keys
   repeated com.digitalasset.canton.crypto.v30.PublicKey public_keys = 2;
+
+  reserved 3; // was domain = 3;
+}
+
+// mapping a party to a key
+// authorization: whoever controls the party uid
+// UNIQUE(party, domain)
+message PartyToKeyMapping {
+  // the party
+  string party = 1;
   // optionally restricted to domain
-  string domain = 3;
+  string domain = 2;
+  // the authorization threshold
+  uint32 threshold = 3;
+  // the designated signing keys
+  repeated com.digitalasset.canton.crypto.v30.SigningPublicKey signing_keys = 4;
 }
 
 // the trust certificate issued by the participant confirming that the participant
@@ -113,13 +127,9 @@ message DomainTrustCertificate {
   // the uid of the domain that the participant trusts
   string domain = 2;
 
-  // if true, the participant restricts the domains to which it accepts transfer-outs
-  // TODO(#1252) implement transfer permissions
-  bool transfer_only_to_given_target_domains = 3;
+  reserved 3; // was bool reassignment_only_to_given_target_domains = 3;
 
-  // the uids of the target domains that this participants supports for transfer if transfer
-  // is restricted.
-  repeated string target_domains = 4;
+  reserved 4; // was repeated string target_domains = 4;
 }
 
 // the optional trust certificate of the domain towards the participant
@@ -138,35 +148,47 @@ message ParticipantDomainPermission {
   // optional earliest time when participant can log in (again)
   // used to temporarily disable participants
   // In microseconds of UTC time since Unix epoch
-  // TODO(#14049) implement participant deny list
-  google.protobuf.Int64Value login_after = 5;
+  optional int64 login_after = 5;
 }
 
 // the optional hosting limits for a party on a given domain
 // these limits can be used to limit the number of participants that can host a given party
 // authorization: whoever controls the domain uid
 // UNIQUE(domain,party)
-// TODO(#14050) implement me
 message PartyHostingLimits {
   string domain = 1;
   string party = 2;
-
-  // how many participants can be assigned to the given party
-  uint32 quota = 3;
+  reserved 3; // was quota = 3;
 }
 
 // list of packages supported by this participant
 // authorization: whoever controls the participant uid
-// UNIQUE(participant, domain)
+// UNIQUE(participant)
 message VettedPackages {
+  message VettedPackage {
+    // the hash of the vetted package
+    string package_id = 1;
+    // optional earliest ledger effective time (exclusive) as of which the package is considered valid.
+    // must be less than or equal to valid_until if both are present.
+    google.protobuf.Timestamp valid_from = 2;
+    // optional latest ledger effective time (inclusive) until which the package is considered valid.
+    // must be greater than or equal to valid_from if both are present.
+    google.protobuf.Timestamp valid_until = 3;
+  }
   // the participant vetting the packages
   string participant_uid = 1;
 
-  // the hash of the vetted packages
-  repeated string package_ids = 2;
+  // DEPRECATED: no longer used, but kept for backwards compatibility.
+  // the hashes of the vetted packages.
+  // package hashes may only be listed in one of the two fields: package_ids or packages.
+  // a package listed in package_ids is equivalent to a package listed in packages with unbounded validity.
+  repeated string package_ids = 2 [deprecated = true];
 
-  // optionally restricted to domain
-  string domain = 3;
+  // the hashes of vetted packages with a validity period.
+  // only one entry per package_id is permitted.
+  repeated VettedPackage packages = 4;
+
+  reserved 3; // was domain = 3;
 }
 
 // mapping that maps a party to a participant
@@ -177,7 +199,7 @@ message VettedPackages {
 //       enough participants to reach "threshold" during confirmation. The disassociating participant
 //       must lower the threshold by one, if otherwise the number of hosting participants would go
 //       below the threshold.
-// UNIQUE(party, domain)
+// UNIQUE(party)
 message PartyToParticipant {
   message HostingParticipant {
     // the target participant that the party should be mapped to
@@ -199,30 +221,9 @@ message PartyToParticipant {
   // if threshold > 1, must be Confirmation or Observation
   repeated HostingParticipant participants = 3;
 
-  // if true, then the canton transaction is addressed to the party (group broadcast)
-  // and not to the individual participants for efficiency reasons
-  bool group_addressing = 4;
+  reserved 4; // was group_addressing = 4;
 
-  // optionally restricted to domain
-  string domain = 5;
-}
-
-// which parties can exercise the authority over another party
-// authorization: whoever controls the consortium and all the owners of the parties that
-//   were not already present in the tx with serial = n - 1
-// UNIQUE(party, domain)
-message AuthorityOf {
-  // the party for which some other parties can gain authority
-  string party = 1;
-
-  // the signatory threshold required by the parties to be able to act on behalf of the consortium within Daml
-  uint32 threshold = 2;
-
-  // the list of parties which can gain authority
-  repeated string parties = 3;
-
-  // optionally restricted to domain
-  string domain = 4;
+  reserved 5; // was domain = 5;
 }
 
 // which dynamic domain parameters are supposed to be used on the given domain
@@ -280,9 +281,6 @@ message SequencerDomainState {
 
   // the list of observing sequencers (uid) within the group (read messages but don't respond)
   repeated string observers = 4;
-
-  // TODO(#14046) add payload for BFT-configuration
-  // bytes payload = 5;
 }
 
 // explicitly invalidate topology transactions for good
@@ -312,18 +310,20 @@ message TopologyMapping {
     VettedPackages vetted_packages = 8;
 
     PartyToParticipant party_to_participant = 9;
-    AuthorityOf authority_of = 10;
 
     DomainParametersState domain_parameters_state = 11;
     MediatorDomainState mediator_domain_state = 12;
     SequencerDomainState sequencer_domain_state = 13;
     PurgeTopologyTransaction purge_topology_txs = 14;
     DynamicSequencingParametersState sequencing_dynamic_parameters_state = 15;
+
+    PartyToKeyMapping party_to_key_mapping = 16;
   }
+  reserved 10; // was authority_of, but cannot be reserved inside the oneof
 }
 
 message TopologyTransaction {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   Enums.TopologyChangeOp operation = 1;
 
@@ -337,7 +337,7 @@ message TopologyTransaction {
 }
 
 message SignedTopologyTransaction {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   // serialized topology transaction (protobuf bytestring)
   bytes transaction = 1;
@@ -359,7 +359,7 @@ message SignedTopologyTransaction {
  * including the member the submitted the broadcast.
  */
 message TopologyTransactionsBroadcast {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   message Broadcast {
     string broadcast_id = 1;

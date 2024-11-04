@@ -7,16 +7,14 @@ import cats.syntax.option.*
 import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.CompletionInfo
+import com.digitalasset.canton.ledger.participant.state.{CompletionInfo, Update}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, HasLoggerName, NamedLoggingContext}
-import com.digitalasset.canton.participant.protocol.{ProcessingSteps, TransactionProcessor, v30}
+import com.digitalasset.canton.participant.protocol.{TransactionProcessor, v30}
 import com.digitalasset.canton.participant.store.{
   SerializableCompletionInfo,
   SerializableRejectionReasonTemplate,
 }
-import com.digitalasset.canton.participant.sync.LedgerSyncEvent
-import com.digitalasset.canton.participant.sync.LedgerSyncEvent.CommandRejected
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.DomainId
@@ -31,6 +29,8 @@ import com.digitalasset.canton.version.{
 }
 import com.google.protobuf.empty.Empty
 import com.google.rpc.status.Status
+
+import java.util.UUID
 
 /** The data of an in-flight unsequenced submission that suffices to produce a rejection reason.
   * This data is persisted in the [[com.digitalasset.canton.participant.store.InFlightSubmissionStore]]
@@ -50,9 +50,9 @@ trait SubmissionTrackingData
   protected def toProtoV30: v30.SubmissionTrackingData
 
   /** Produce a rejection event for the unsequenced submission using the given record time. */
-  def rejectionEvent(recordTime: CantonTimestamp)(implicit
+  def rejectionEvent(recordTime: CantonTimestamp, messageUuid: UUID)(implicit
       loggingContext: NamedLoggingContext
-  ): LedgerSyncEvent
+  ): Update
 
   /** Update the tracking data so that the deliver error [[com.google.rpc.status.Status]]
     * can be taken into account by [[rejectionEvent]].
@@ -69,13 +69,14 @@ object SubmissionTrackingData
     extends HasProtocolVersionedCompanion[SubmissionTrackingData]
     with ProtocolVersionedCompanionDbHelpers[SubmissionTrackingData] {
 
-  val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter
-      .storage(ReleaseProtocolVersion(ProtocolVersion.v31), v30.SubmissionTrackingData)(
-        supportedProtoVersion(_)(fromProtoV30),
-        _.toProtoV30.toByteString,
-      )
-  )
+  val supportedProtoVersions: SupportedProtoVersions =
+    SupportedProtoVersions(
+      ProtoVersion(30) -> VersionedProtoConverter
+        .storage(ReleaseProtocolVersion(ProtocolVersion.v32), v30.SubmissionTrackingData)(
+          supportedProtoVersion(_)(fromProtoV30),
+          _.toProtoV30.toByteString,
+        )
+    )
 
   override def name: String = "submission tracking data"
 
@@ -104,29 +105,29 @@ final case class TransactionSubmissionTrackingData(
     with HasLoggerName {
 
   override def rejectionEvent(
-      recordTime: CantonTimestamp
-  )(implicit loggingContext: NamedLoggingContext): LedgerSyncEvent = {
-
+      recordTime: CantonTimestamp,
+      messageUuid: UUID,
+  )(implicit loggingContext: NamedLoggingContext): Update = {
     val reasonTemplate = rejectionCause.asFinalReason(recordTime)
-    CommandRejected(
+    Update.CommandRejected(
       recordTime.toLf,
-      completionInfo,
+      // notification will be tracked based on this as a non-sequenced in-flight reference
+      completionInfo.copy(messageUuid = Some(messageUuid)),
       reasonTemplate,
-      ProcessingSteps.RequestType.Transaction,
       domainId,
+      domainIndex = None,
     )
   }
 
   override def updateOnNotSequenced(timestamp: CantonTimestamp, reason: Status)(implicit
       loggingContext: NamedLoggingContext
-  ): Option[UnsequencedSubmission] = {
+  ): Option[UnsequencedSubmission] =
     UnsequencedSubmission(
       timestamp,
       this.copy(rejectionCause = TransactionSubmissionTrackingData.CauseWithTemplate(reason))(
         representativeProtocolVersion
       ),
     ).some
-  }
 
   protected def toProtoV30: v30.SubmissionTrackingData = {
     val completionInfoP = SerializableCompletionInfo(completionInfo).toProtoV30
@@ -138,7 +139,7 @@ final case class TransactionSubmissionTrackingData(
     v30.SubmissionTrackingData(v30.SubmissionTrackingData.Tracking.Transaction(transactionTracking))
   }
 
-  override def pretty: Pretty[TransactionSubmissionTrackingData] = prettyOfClass(
+  override protected def pretty: Pretty[TransactionSubmissionTrackingData] = prettyOfClass(
     param("completion info", _.completionInfo),
     param("rejection cause", _.rejectionCause),
   )
@@ -179,7 +180,7 @@ object TransactionSubmissionTrackingData {
 
     def asFinalReason(observedTimestamp: CantonTimestamp)(implicit
         loggingContext: ErrorLoggingContext
-    ): CommandRejected.FinalReason
+    ): Update.CommandRejected.FinalReason
 
     def toProtoV30: v30.TransactionSubmissionTrackingData.RejectionCause
   }
@@ -205,10 +206,10 @@ object TransactionSubmissionTrackingData {
 
     override def asFinalReason(
         observedTimestamp: CantonTimestamp
-    )(implicit loggingContext: ErrorLoggingContext): CommandRejected.FinalReason = {
+    )(implicit loggingContext: ErrorLoggingContext): Update.CommandRejected.FinalReason = {
       val error = TransactionProcessor.SubmissionErrors.TimeoutError.Error(observedTimestamp)
       error.logWithContext()
-      CommandRejected.FinalReason(error.rpcStatus())
+      Update.CommandRejected.FinalReason(error.rpcStatus())
     }
 
     override def toProtoV30: v30.TransactionSubmissionTrackingData.RejectionCause =
@@ -216,57 +217,58 @@ object TransactionSubmissionTrackingData {
         cause = v30.TransactionSubmissionTrackingData.RejectionCause.Cause.Timeout(Empty())
       )
 
-    override def pretty: Pretty[TimeoutCause.type] = prettyOfObject[TimeoutCause.type]
+    override protected def pretty: Pretty[TimeoutCause.type] = prettyOfObject[TimeoutCause.type]
 
     def fromProtoV30(_empty: Empty): ParsingResult[TimeoutCause.type] = Right(
       this
     )
   }
 
-  final case class CauseWithTemplate(template: CommandRejected.FinalReason) extends RejectionCause {
+  final case class CauseWithTemplate(template: Update.CommandRejected.FinalReason)
+      extends RejectionCause {
     override def asFinalReason(_observedTimestamp: CantonTimestamp)(implicit
         loggingContext: ErrorLoggingContext
-    ): CommandRejected.FinalReason = template
+    ): Update.CommandRejected.FinalReason = template
 
     override def toProtoV30: v30.TransactionSubmissionTrackingData.RejectionCause =
       v30.TransactionSubmissionTrackingData.RejectionCause(
         cause = v30.TransactionSubmissionTrackingData.RejectionCause.Cause.RejectionReasonTemplate(
-          SerializableRejectionReasonTemplate(template).toProtoV30
+          SerializableRejectionReasonTemplate(template.status).toProtoV30
         )
       )
 
-    override def pretty: Pretty[CauseWithTemplate] = prettyOfClass(
-      unnamedParam(_.template)
+    override protected def pretty: Pretty[CauseWithTemplate] = prettyOfClass(
+      unnamedParam(_.template.status)
     )
   }
 
   object CauseWithTemplate {
 
     /** Log the `error` and then convert it into a
-      * [[com.digitalasset.canton.participant.sync.LedgerSyncEvent.CommandRejected.FinalReason]]
+      * [[com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.FinalReason]]
       */
     def apply(
         error: TransactionError
     )(implicit loggingContext: ErrorLoggingContext): CauseWithTemplate = {
       error.logWithContext()
-      CauseWithTemplate(CommandRejected.FinalReason(error.rpcStatus()))
+      CauseWithTemplate(Update.CommandRejected.FinalReason(error.rpcStatus()))
     }
 
     /** Log the `status` and then convert it into a
-      * [[com.digitalasset.canton.participant.sync.LedgerSyncEvent.CommandRejected.FinalReason]]
+      * [[com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.FinalReason]]
       */
     def apply(
         status: Status
     )(implicit loggingContext: ErrorLoggingContext): CauseWithTemplate = {
       loggingContext.info(status.message)
-      CauseWithTemplate(CommandRejected.FinalReason(status))
+      CauseWithTemplate(Update.CommandRejected.FinalReason(status))
     }
 
     def fromProtoV30(
         templateP: v30.CommandRejected.GrpcRejectionReasonTemplate
     ): ParsingResult[CauseWithTemplate] =
       for {
-        template <- SerializableRejectionReasonTemplate.fromProtoV30(templateP)
-      } yield CauseWithTemplate(template)
+        templateStatus <- SerializableRejectionReasonTemplate.fromProtoV30(templateP)
+      } yield CauseWithTemplate(Update.CommandRejected.FinalReason(templateStatus))
   }
 }

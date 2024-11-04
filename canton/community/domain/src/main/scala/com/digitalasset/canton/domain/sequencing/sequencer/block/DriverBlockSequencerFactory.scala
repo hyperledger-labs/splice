@@ -9,9 +9,13 @@ import com.digitalasset.canton.domain.block.data.SequencerBlockStore
 import com.digitalasset.canton.domain.block.{BlockSequencerStateManager, SequencerDriverFactory}
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.DatabaseSequencerConfig.TestingInterceptor
-import com.digitalasset.canton.domain.sequencing.sequencer.SequencerHealthConfig
 import com.digitalasset.canton.domain.sequencing.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerRateLimitManager
+import com.digitalasset.canton.domain.sequencing.sequencer.{
+  BlockSequencerConfig,
+  SequencerHealthConfig,
+  SequencerSnapshot,
+}
 import com.digitalasset.canton.domain.sequencing.traffic.store.TrafficPurchasedStore
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -32,6 +36,7 @@ import scala.jdk.CollectionConverters.*
 class DriverBlockSequencerFactory[C](
     sequencerDriverFactory: SequencerDriverFactory { type ConfigType = C },
     config: C,
+    blockSequencerConfig: BlockSequencerConfig,
     health: Option[SequencerHealthConfig],
     storage: Storage,
     protocolVersion: ProtocolVersion,
@@ -43,6 +48,7 @@ class DriverBlockSequencerFactory[C](
 )(implicit ec: ExecutionContext)
     extends BlockSequencerFactory(
       health: Option[SequencerHealthConfig],
+      blockSequencerConfig,
       storage,
       protocolVersion,
       sequencerId,
@@ -73,6 +79,7 @@ class DriverBlockSequencerFactory[C](
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
       initialBlockHeight: Option[Long],
+      sequencerSnapshot: Option[SequencerSnapshot],
       domainLoggerFactory: NamedLoggerFactory,
       runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
@@ -98,6 +105,8 @@ class DriverBlockSequencerFactory[C](
       sequencerId,
       stateManager,
       store,
+      sequencerStore,
+      blockSequencerConfig,
       balanceStore,
       storage,
       futureSupervisor,
@@ -106,13 +115,13 @@ class DriverBlockSequencerFactory[C](
       protocolVersion,
       rateLimitManager,
       orderingTimeFixMode,
+      nodeParameters.cachingConfigs,
       nodeParameters.processingTimeouts,
       nodeParameters.loggingConfig.eventDetails,
       nodeParameters.loggingConfig.api.printer,
       metrics,
       domainLoggerFactory,
       exitOnFatalFailures = nodeParameters.exitOnFatalFailures,
-      unifiedSequencer = nodeParameters.useUnifiedSequencer,
       runtimeReady = runtimeReady,
     )
 }
@@ -123,6 +132,7 @@ object DriverBlockSequencerFactory extends LazyLogging {
       driverName: String,
       driverVersion: Int,
       rawConfig: ConfigCursor,
+      blockSequencerConfig: BlockSequencerConfig,
       health: Option[SequencerHealthConfig],
       storage: Storage,
       protocolVersion: ProtocolVersion,
@@ -146,6 +156,7 @@ object DriverBlockSequencerFactory extends LazyLogging {
     new DriverBlockSequencerFactory[C](
       driverFactory,
       config,
+      blockSequencerConfig,
       health,
       storage,
       protocolVersion,
@@ -162,6 +173,7 @@ object DriverBlockSequencerFactory extends LazyLogging {
       driverName: String,
       driverVersion: Int,
       config: C,
+      blockSequencerConfig: BlockSequencerConfig,
       health: Option[SequencerHealthConfig],
       storage: Storage,
       protocolVersion: ProtocolVersion,
@@ -173,6 +185,7 @@ object DriverBlockSequencerFactory extends LazyLogging {
     new DriverBlockSequencerFactory[C](
       getSequencerDriverFactory(driverName, driverVersion),
       config,
+      blockSequencerConfig,
       health,
       storage,
       protocolVersion,

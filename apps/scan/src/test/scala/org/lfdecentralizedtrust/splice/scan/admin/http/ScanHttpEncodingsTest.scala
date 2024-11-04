@@ -34,11 +34,11 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
       val javaTree = mkExerciseTx(
-        offset = "%08d".format(99),
+        offset = 99,
         root = exercisedEvent(
           contractId = validContractId(1),
-          templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
-          interfaceId = Some(amuletCodegen.Amulet.TEMPLATE_ID),
+          templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+          interfaceId = Some(amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
           choice = amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_Mint.name,
           consuming = false,
           argument = new amuletrulesCodegen.AmuletRules_Mint(
@@ -80,7 +80,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
     val lapiAssignment = mkReassignment(
-      offset = "%08d".format(98),
+      offset = 98,
       event = ReassignmentEvent.Assign(
         unassignId = "unassignId",
         submitter = receiver,
@@ -113,7 +113,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val amuletContract = amulet(receiver, 42.0, 13L, 2.0)
 
     val lapiAssignment = mkReassignment(
-      offset = "%08d".format(97),
+      offset = 97,
       event = ReassignmentEvent.Unassign(
         unassignId = "unassignId",
         contractId = amuletContract.contractId,
@@ -146,7 +146,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       update = LedgerClient.GetTreeUpdatesResponse(
         update = TransactionTreeUpdate(
           mkCreateTx(
-            "000a",
+            10,
             Seq(
               amulet(mkPartyId("Alice"), 42.0, 13L, 2.0)
             ),
@@ -233,7 +233,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         recordTime = "2024-06-03T15:43:38.124Z",
         synchronizerId = "a::b",
         effectiveAt = "2024-06-03T15:43:38.124Z",
-        offset = "offset",
+        offset = "000000000000000001",
         rootEventIds = Vector(leftRootId, rightRootId),
         eventsById = Map(
           leftRootId -> mkExercise(

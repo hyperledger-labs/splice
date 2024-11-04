@@ -79,7 +79,7 @@ class BftScanConnectionTest
           Future.successful(
             ContractWithState(
               Contract(
-                amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
+                amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
                 new amuletrulesCodegen.AmuletRules.ContractId("whatever"),
                 new amuletrulesCodegen.AmuletRules(
                   partyIdA.toProtoPrimitive,
@@ -162,7 +162,7 @@ class BftScanConnectionTest
           s"commandId$n",
           s"workflowId$n",
           jtime(n),
-          s"offset$n",
+          n.toLong,
           java.util.Map.of(),
           java.util.List.of(),
           domainId.toProtoPrimitive,

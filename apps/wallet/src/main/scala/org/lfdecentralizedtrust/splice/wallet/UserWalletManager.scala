@@ -42,6 +42,7 @@ class UserWalletManager(
     ledgerClient: SpliceLedgerClient,
     val store: WalletStore,
     val validatorUser: String,
+    val externalPartyWalletManager: ExternalPartyWalletManager,
     automationConfig: AutomationConfig,
     private[splice] val clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
@@ -274,10 +275,16 @@ class UserWalletManager(
           // TODO(M3-83): Avoid the application-level join and get the rewards in one go from the DB.
           this.lookupEndUserPartyWallet(endUserParty) match {
             case None =>
-              logger.info(
-                show"Might miss validator rewards as the UserWalletStore for end-user party ${endUserParty} is not (yet) setup."
-              )
-              Future.successful(Seq.empty)
+              this.externalPartyWalletManager.lookupExternalPartyWallet(endUserParty) match {
+                case None =>
+                  logger.info(
+                    show"Might miss validator rewards as the party ${endUserParty} is not (yet) setup as either a local or external party."
+                  )
+                  Future.successful(Seq.empty)
+                case Some(walletOfExternalParty) =>
+                  walletOfExternalParty.store
+                    .listSortedValidatorRewards(activeIssuingRounds, limit)
+              }
             case Some(walletOfHostedUser) =>
               walletOfHostedUser.store
                 .listSortedValidatorRewards(activeIssuingRounds, limit)

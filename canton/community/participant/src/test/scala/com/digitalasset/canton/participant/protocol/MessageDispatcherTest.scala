@@ -21,6 +21,7 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.MediatorError
+import com.digitalasset.canton.ledger.participant.state.Update
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.PrettyUtil
 import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory}
@@ -34,10 +35,10 @@ import com.digitalasset.canton.participant.protocol.submission.{
 }
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
+import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedView.CompressedView
 import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast.Broadcast
 import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
-import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{
   LocalRejectError,
   RequestAndRootHashMessage,
@@ -56,10 +57,10 @@ import com.digitalasset.canton.sequencing.{
   SequencerTestUtils,
 }
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
-import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.processing.{SequencedTime, TopologyTransactionTestFactory}
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.*
@@ -89,8 +90,6 @@ trait MessageDispatcherTest {
   private val partyId = PartyId.tryFromProtoPrimitive("party::default")
   private val otherPartyId = PartyId.tryFromProtoPrimitive("party::other")
 
-  private val encryptedRandomnessTest =
-    Encrypted.fromByteString[SecureRandomness](ByteString.EMPTY)
   private val sessionKeyMapTest = NonEmpty(
     Seq,
     new AsymmetricEncrypted[SecureRandomness](
@@ -200,6 +199,15 @@ trait MessageDispatcherTest {
       val requestCounterAllocator =
         new RequestCounterAllocatorImpl(initRc, cleanReplaySequencerCounter, loggerFactory)
       val recordOrderPublisher = mock[RecordOrderPublisher]
+      when(
+        recordOrderPublisher.tick(
+          any[SequencerCounter],
+          any[CantonTimestamp],
+          any[Option[Traced[Update]]],
+          any[Option[RequestCounter]],
+        )(any[TraceContext])
+      )
+        .thenAnswer(Future.unit)
 
       val badRootHashMessagesRequestProcessor = mock[BadRootHashMessagesRequestProcessor]
       when(
@@ -222,9 +230,9 @@ trait MessageDispatcherTest {
           any[Map[MessageId, SequencedSubmission]],
         )(anyTraceContext)
       )
-        .thenReturn(Future.unit)
+        .thenReturn(FutureUnlessShutdown.unit)
       when(inFlightSubmissionTracker.observeDeliverError(any[DeliverError])(anyTraceContext))
-        .thenReturn(Future.unit)
+        .thenReturn(FutureUnlessShutdown.unit)
 
       val protocolProcessors = new RequestProcessors {
         override protected def getInternal[P](
@@ -308,8 +316,7 @@ trait MessageDispatcherTest {
     EncryptedViewMessage(
       None,
       ViewHash(TestHash.digest(9000)),
-      randomness = encryptedRandomnessTest,
-      sessionKey = sessionKeyMapTest,
+      sessionKeys = sessionKeyMapTest,
       encryptedTestView,
       domainId,
       SymmetricKeyScheme.Aes128Gcm,
@@ -321,8 +328,7 @@ trait MessageDispatcherTest {
     EncryptedViewMessage(
       submittingParticipantSignature = None,
       viewHash = ViewHash(TestHash.digest(9001)),
-      randomness = encryptedRandomnessTest,
-      sessionKey = sessionKeyMapTest,
+      sessionKeys = sessionKeyMapTest,
       encryptedView = encryptedOtherTestView,
       domainId = domainId,
       viewEncryptionScheme = SymmetricKeyScheme.Aes128Gcm,
@@ -462,7 +468,9 @@ trait MessageDispatcherTest {
         sc: SequencerCounter,
         ts: CantonTimestamp,
     ): Assertion = {
-      verify(sut.recordOrderPublisher).tick(isEq(sc), isEq(ts))(anyTraceContext)
+      verify(sut.recordOrderPublisher).tick(isEq(sc), isEq(ts), isEq(None), isEq(None))(
+        anyTraceContext
+      )
       succeed
     }
 
@@ -528,7 +536,7 @@ trait MessageDispatcherTest {
     ): Traced[Seq[WithOpeningErrors[PossiblyIgnoredProtocolEvent]]] =
       Traced(Seq(NoOpeningErrors(OrdinarySequencedEvent(signEvent(event))(traceContext))))
 
-    def handle(sut: Fixture, event: RawProtocolEvent)(checks: => Assertion): Future[Assertion] = {
+    def handle(sut: Fixture, event: RawProtocolEvent)(checks: => Assertion): Future[Assertion] =
       for {
         _ <- sut.messageDispatcher
           .handleAll(signAndTrace(event))
@@ -537,7 +545,6 @@ trait MessageDispatcherTest {
       } yield {
         checks
       }
-    }
 
     "handling a deliver event" should {
       "call the transaction processor after having informed the identity processor and tick the request tracker" in {
@@ -557,7 +564,7 @@ trait MessageDispatcherTest {
           sut.recordOrderPublisher.scheduleEmptyAcsChangePublication(
             any[SequencerCounter],
             any[CantonTimestamp],
-          )
+          )(any[TraceContext])
         )
           .thenAnswer {
             checkTickTopologyProcessor(sut, sc, ts).discard
@@ -568,7 +575,9 @@ trait MessageDispatcherTest {
           }
 
         handle(sut, deliver) {
-          verify(sut.recordOrderPublisher).scheduleEmptyAcsChangePublication(isEq(sc), isEq(ts))
+          verify(sut.recordOrderPublisher).scheduleEmptyAcsChangePublication(isEq(sc), isEq(ts))(
+            any[TraceContext]
+          )
           checkTicks(sut, sc, ts)
         }.futureValue
       }
@@ -796,8 +805,7 @@ trait MessageDispatcherTest {
         EncryptedViewMessage(
           None,
           ViewHash(TestHash.digest(9002)),
-          randomness = encryptedRandomnessTest,
-          sessionKey = sessionKeyMapTest,
+          sessionKeys = sessionKeyMapTest,
           encryptedUnknownTestView,
           domainId,
           SymmetricKeyScheme.Aes128Gcm,
@@ -1140,32 +1148,13 @@ trait MessageDispatcherTest {
             SerializedRootHashMessagePayload.empty,
           )
 
-        def mkRootHashMessageRecipients(recipients: NonEmpty[Seq[Recipient]]): Recipients =
-          Recipients.recipientGroups(
-            recipients.map(recipient => NonEmpty(Set, recipient, mediatorGroup))
-          )
-
         val goodBatches = List(
           Batch.of[ProtocolMessage](
             testedProtocolVersion,
             view -> Recipients.cc(participantId),
             rootHashMessage -> Recipients.cc(MemberRecipient(participantId), mediatorGroup),
             commitment -> Recipients.cc(participantId),
-          ) -> Seq(),
-          Batch.of[ProtocolMessage](
-            testedProtocolVersion,
-            view -> Recipients.cc(participantId),
-            rootHashMessage -> Recipients.cc(ParticipantsOfParty(partyId), mediatorGroup),
-            commitment -> Recipients.cc(participantId),
-          ) -> Seq(),
-          Batch.of[ProtocolMessage](
-            testedProtocolVersion,
-            view -> Recipients.cc(participantId),
-            rootHashMessage -> mkRootHashMessageRecipients(
-              NonEmpty(Seq, ParticipantsOfParty(partyId), ParticipantsOfParty(otherPartyId))
-            ),
-            commitment -> Recipients.cc(participantId),
-          ) -> Seq(),
+          ) -> Seq()
         )
 
         val badBatches = List(
@@ -1175,21 +1164,6 @@ trait MessageDispatcherTest {
             rootHashMessage -> Recipients.cc(participantId),
             rootHashMessage -> Recipients.cc(MemberRecipient(participantId), mediatorGroup),
           ) -> Seq("Received root hash messages that were not sent to a mediator"),
-          Batch.of[ProtocolMessage](
-            testedProtocolVersion,
-            view -> Recipients.cc(participantId),
-            rootHashMessage -> mkRootHashMessageRecipients(
-              NonEmpty(
-                Seq,
-                MemberRecipient(participantId),
-                ParticipantsOfParty(partyId),
-                ParticipantsOfParty(otherPartyId),
-              )
-            ),
-            commitment -> Recipients.cc(participantId),
-          ) -> Seq(
-            "The root hash message has more than one recipient group, not all using group addressing."
-          ),
           Batch.of[ProtocolMessage](
             testedProtocolVersion,
             view -> Recipients.cc(participantId),
@@ -1447,9 +1421,9 @@ trait MessageDispatcherTest {
 
 private[protocol] object MessageDispatcherTest {
 
-  final case class DisabledTransferTestData[A <: ViewType](
+  final case class DisabledReassignmentTestData[A <: ViewType](
       inOut: String,
-      viewType: ViewType.TransferViewType,
+      viewType: ViewType.ReassignmentViewType,
       view: EncryptedView[A],
   )
 
@@ -1474,15 +1448,4 @@ private[protocol] object MessageDispatcherTest {
   case object UnknownTestViewType extends AbstractTestViewType
   type UnknownTestViewType = OtherTestViewType.type
 
-}
-
-class DefaultMessageDispatcherTest
-    extends AnyWordSpec
-    with BaseTest
-    with HasExecutorService
-    with MessageDispatcherTest {
-
-  "DefaultMessageDispatcher" should {
-    behave like messageDispatcher(MessageDispatcher.DefaultFactory.create)
-  }
 }

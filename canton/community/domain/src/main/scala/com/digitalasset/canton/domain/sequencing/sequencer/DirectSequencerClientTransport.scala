@@ -16,8 +16,8 @@ import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, OnShutdownRunner
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.sequencing.SerializedEventHandler
-import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.*
+import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.transports.{
   SequencerClientTransport,
   SequencerClientTransportPekko,
@@ -38,6 +38,7 @@ import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, PekkoUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import io.grpc.Status
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.{Done, NotUsed}
@@ -61,6 +62,12 @@ class DirectSequencerClientTransport(
     with NamedLogging {
   import DirectSequencerClientTransport.*
 
+  override def logout()(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, Status, Unit] =
+    // In-process connection is not authenticated
+    EitherT.pure(())
+
   private val subscriptionFactory =
     new DirectSequencerSubscriptionFactory(sequencer, timeouts, loggerFactory)
 
@@ -72,26 +79,25 @@ class DirectSequencerClientTransport(
   ): EitherT[FutureUnlessShutdown, SendAsyncClientResponseError, Unit] =
     sequencer
       .sendAsyncSigned(request)
-      .leftMap(SendAsyncClientError.RequestRefused)
+      .leftMap(SendAsyncClientError.RequestRefused.apply)
 
   override def acknowledgeSigned(request: SignedContent[AcknowledgeRequest])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Boolean] =
     sequencer
       .acknowledgeSigned(request)
-      .map { _ => true }
+      .map(_ => true)
       .mapK(FutureUnlessShutdown.outcomeK)
 
   override def getTrafficStateForMember(request: GetTrafficStateForMemberRequest)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse] = {
+  ): EitherT[FutureUnlessShutdown, String, GetTrafficStateForMemberResponse] =
     sequencer
       .getTrafficStateAt(request.member, request.timestamp)
       .map { trafficStateO =>
         GetTrafficStateForMemberResponse(trafficStateO, protocolVersion)
       }
       .leftMap(_.toString)
-  }
 
   override def subscribe[E](request: SubscriptionRequest, handler: SerializedEventHandler[E])(
       implicit traceContext: TraceContext
@@ -115,7 +121,7 @@ class DirectSequencerClientTransport(
               case Right(event) => handler(event)
               case Left(error) =>
                 ErrorUtil.invalidState(
-                  s"Direct transport subscriptions must not trigger subscription errors such as ${error}"
+                  s"Direct transport subscriptions must not trigger subscription errors such as $error"
                 )
             },
           )
@@ -173,7 +179,7 @@ class DirectSequencerClientTransport(
             .mapMaterializedValue((_: NotUsed) =>
               (PekkoUtil.noOpKillSwitch, Future.successful(Done))
             )
-        case Right(source) => source.map(_.leftMap(SequencedEventError))
+        case Right(source) => source.map(_.leftMap(SequencedEventError.apply))
       }
     val health = new DirectSequencerClientTransportHealth(logger)
     val source = Source
@@ -210,7 +216,7 @@ class DirectSequencerClientTransport(
 
 object DirectSequencerClientTransport {
   sealed trait SubscriptionError extends Product with Serializable with PrettyPrinting {
-    override def pretty: Pretty[SubscriptionError.this.type] = adHocPrettyInstance
+    override protected def pretty: Pretty[SubscriptionError.this.type] = adHocPrettyInstance
   }
   final case class SubscriptionCreationError(error: CreateSubscriptionError)
       extends SubscriptionError

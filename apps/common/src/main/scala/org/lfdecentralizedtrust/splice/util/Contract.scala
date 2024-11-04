@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.http.v0.definitions.MaybeCachedContract
 import org.lfdecentralizedtrust.splice.util.JavaDecodeUtil
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
+import com.digitalasset.canton.ledger.api.validation.ValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
@@ -118,7 +118,7 @@ object Contract {
   def javaValueToLfValue(v: Value)(implicit elc: ErrorLoggingContext): lf.Value =
     // Disabling logging and instead logging the result
     // because LF uses a different logging library.
-    NoLoggingValueValidator
+    ValueValidator
       .validateValue(scalaValue.Value.fromJavaProto(v.toProto))
       .valueOr(err => ErrorUtil.internalError(err))
 
@@ -128,7 +128,12 @@ object Contract {
       decoder: TemplateJsonDecoder
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     val contractId = companion.toContractId(new ContractId[T](contract.contractId))
-    fromHttp(companion.TEMPLATE_ID, contractId, decoder.decodeTemplate(companion), contract)
+    fromHttp(
+      companion.getTemplateIdWithPackageId,
+      contractId,
+      decoder.decodeTemplate(companion),
+      contract,
+    )
   }
 
   def fromHttp[ICid <: ContractId[Marker], Marker, View <: DamlRecord[?]](
@@ -138,7 +143,7 @@ object Contract {
   ): Either[ProtoDeserializationError, Contract[ICid, View]] = {
     val contractId = interfaceCompanion.toContractId(new ContractId[Marker](contract.contractId))
     fromHttp(
-      interfaceCompanion.TEMPLATE_ID,
+      interfaceCompanion.getTemplateIdWithPackageId,
       contractId,
       decoder.decodeInterface(interfaceCompanion),
       contract,

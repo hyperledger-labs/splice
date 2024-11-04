@@ -6,7 +6,6 @@ syntax = "proto3";
 package com.daml.ledger.api.v2;
 
 import "com/daml/ledger/api/v2/event.proto";
-import "com/daml/ledger/api/v2/participant_offset.proto";
 import "com/daml/ledger/api/v2/reassignment.proto";
 import "com/daml/ledger/api/v2/transaction_filter.proto";
 
@@ -50,19 +49,12 @@ message GetActiveContractsRequest {
   // The offset at which the snapshot of the active contracts will be computed.
   // Must be no greater than the current ledger end offset.
   // Must be greater than or equal to the last pruning offset.
-  // If not set the current ledger end offset will be used.
-  // Optional
-  string active_at_offset = 3;
+  // Required, must be a valid absolute offset (positive integer) or ledger begin offset (zero).
+  // If zero, the empty set will be returned.
+  int64 active_at_offset = 3;
 }
 
 message GetActiveContractsResponse {
-  // Included only in the last message.
-  // The client should start consuming the transactions endpoint with this offset.
-  // On a participant that is not aware of any events in the ledger the offset returned could be the empty string.
-  // The empty string signifies that the offset returned is before the first transaction.
-  // The format of this field is described in ``participant_offset.proto``.
-  string offset = 1;
-
   // The workflow ID used in command submission which corresponds to the contract_entry. Only set if
   // the ``workflow_id`` for the command was set.
   // Must be a valid LedgerString (as described in ``value.proto``).
@@ -96,7 +88,7 @@ message GetActiveContractsResponse {
 
 message ActiveContract {
   // Required
-  com.daml.ledger.api.v2.CreatedEvent created_event = 1;
+  CreatedEvent created_event = 1;
 
   // A valid domain ID
   // Required
@@ -113,7 +105,7 @@ message ActiveContract {
 
 message IncompleteUnassigned {
   // Required
-  com.daml.ledger.api.v2.CreatedEvent created_event = 1;
+  CreatedEvent created_event = 1;
 
   // Required
   UnassignedEvent unassigned_event = 2;
@@ -129,6 +121,12 @@ message GetConnectedDomainsRequest {
   // Must be a valid PartyIdString (as described in ``value.proto``).
   // Required
   string party = 1;
+
+  // The id of a participant whose mapping of a party to connected domains is requested.
+  // Must be a valid participant-id retrieved through a prior call to getParticipantId.
+  // Defaults to the participant id of the host participant.
+  // Optional
+  string participant_id = 2;
 }
 
 message GetConnectedDomainsResponse {
@@ -165,8 +163,10 @@ enum ParticipantPermission {
 message GetLedgerEndRequest {}
 
 message GetLedgerEndResponse {
-  // The absolute offset of the current ledger end.
-  ParticipantOffset offset = 1;
+  // It will always be a non-negative integer.
+  // If zero, the participant view of the ledger is empty.
+  // If positive, the absolute offset of the ledger as viewed by the participant.
+  int64 offset = 1;
 }
 
 message GetLatestPrunedOffsetsRequest {
@@ -174,12 +174,17 @@ message GetLatestPrunedOffsetsRequest {
 }
 
 message GetLatestPrunedOffsetsResponse {
-  // The offset up to which the ledger has been pruned, disregarding the state of all divulged contracts pruning.
-  ParticipantOffset participant_pruned_up_to_inclusive = 1;
+  // It will always be a non-negative integer.
+  // If positive, the absolute offset up to which the ledger has been pruned,
+  // disregarding the state of all divulged contracts pruning.
+  // If zero, the ledger has not been pruned yet.
+  int64 participant_pruned_up_to_inclusive = 1;
 
-  // The offset up to which all divulged events have been pruned on the ledger. It can be at or before the
-  // ``participant_pruned_up_to_inclusive`` offset.
+  // It will always be a non-negative integer.
+  // If positive, the absolute offset up to which all divulged events have been pruned on the ledger.
+  // It can be at or before the ``participant_pruned_up_to_inclusive`` offset.
   // For more details about all divulged events pruning,
   // see ``PruneRequest.prune_all_divulged_contracts`` in ``participant_pruning_service.proto``.
-  ParticipantOffset all_divulged_contracts_pruned_up_to_inclusive = 2;
+  // If zero, the divulged events have not been pruned yet.
+  int64 all_divulged_contracts_pruned_up_to_inclusive = 2;
 }

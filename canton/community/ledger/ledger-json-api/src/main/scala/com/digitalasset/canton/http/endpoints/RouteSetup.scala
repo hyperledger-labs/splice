@@ -23,7 +23,7 @@ import com.digitalasset.canton.http.json.*
 import com.digitalasset.canton.http.Endpoints
 import com.digitalasset.canton.http.util.FutureUtil.{either, eitherT}
 import com.digitalasset.canton.http.util.Logging.{InstanceUUID, RequestID}
-import com.daml.jwt.domain.Jwt
+import com.daml.jwt.Jwt
 import com.daml.ledger.api.v2 as lav2
 import lav2.value.Value as ApiValue
 import scalaz.std.scalaFuture.*
@@ -143,7 +143,7 @@ private[http] final class RouteSetup(
   ): ET[(Jwt, JsValue)] =
     for {
       t2 <- eitherT(input(req)): ET[(Jwt, String)]
-      jsVal <- either(SprayJson.parse(t2._2).liftErr(InvalidUserInput)): ET[JsValue]
+      jsVal <- either(SprayJson.parse(t2._2).liftErr(InvalidUserInput.apply)): ET[JsValue]
     } yield (t2._1, jsVal)
 
   def findJwt(req: HttpRequest)(implicit

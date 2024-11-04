@@ -32,8 +32,8 @@ import com.daml.logging.LoggingContextOf
 import com.daml.metrics.Timed
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import com.digitalasset.canton.http.endpoints.{MeteringReportEndpoint, RouteSetup}
-import com.daml.jwt.domain.Jwt
-import com.digitalasset.canton.http.json2.V2Routes
+import com.daml.jwt.Jwt
+import com.digitalasset.canton.http.json.v2.V2Routes
 import com.digitalasset.canton.ledger.client.services.admin.UserManagementClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
@@ -104,7 +104,7 @@ class Endpoints(
   import json.JsonProtocol.*
   import util.ErrorOps.*
 
-  private def responseToRoute(res: Future[HttpResponse]): Route = _ => res map Complete
+  private def responseToRoute(res: Future[HttpResponse]): Route = _ => res map Complete.apply
   private def toRoute[T: MkHttpResponse](res: => T)(implicit
       lc: LoggingContextOf[InstanceUUID with RequestID]
   ): Route =
@@ -120,7 +120,7 @@ class Endpoints(
     val res = for {
       t <- routeSetup.inputJsVal(httpRequest): ET[(Jwt, JsValue)]
       (jwt, reqBody) = t
-      req <- either(SprayJson.decode[Req](reqBody).liftErr(InvalidUserInput)): ET[Req]
+      req <- either(SprayJson.decode[Req](reqBody).liftErr(InvalidUserInput.apply)): ET[Req]
       res <- eitherT(RouteSetup.handleFutureEitherFailure(fn(jwt, req).run)): ET[
         domain.SyncResponse[Res]
       ]
@@ -151,7 +151,7 @@ class Endpoints(
       fn: (Jwt, String) => Future[HttpResponse],
   )(implicit
       lc: LoggingContextOf[InstanceUUID with RequestID]
-  ): Route = {
+  ): Route =
     responseToRoute(
       httpResponse(
         extractJwt(httpRequest).flatMap { jwt =>
@@ -159,7 +159,6 @@ class Endpoints(
         }
       )
     )
-  }
 
   private def extractJwt(
       httpRequest: HttpRequest
@@ -210,7 +209,7 @@ class Endpoints(
         httpMessage: HttpMessage,
         msg: String,
         kind: String,
-    ): httpMessage.Self = {
+    ): httpMessage.Self =
       if (
         httpMessage
           .header[`Content-Type`]
@@ -222,7 +221,7 @@ class Endpoints(
             LoggingContextOf.label[RequestEntity],
             s"${kind}_body" -> body,
           )
-            .run { implicit lc => logger.info(s"$msg, ${lc.makeString}") }
+            .run(implicit lc => logger.info(s"$msg, ${lc.makeString}"))
         httpMessage.entity.contentLengthOption match {
           case Some(length) if length < maxBodySizeForLogging =>
             import org.apache.pekko.stream.scaladsl.*
@@ -253,7 +252,6 @@ class Endpoints(
         logger.info(s"$msg, ${lc.makeString}")
         httpMessage.self
       }
-    }
     logRequestResponseHelper(
       (request, remoteAddress) =>
         logWithHttpMessageBodyIfAvailable(
@@ -272,7 +270,7 @@ class Endpoints(
 
   def logRequestAndResultSimple(implicit
       lc: LoggingContextOf[InstanceUUID with RequestID]
-  ): Directive0 = {
+  ): Directive0 =
     logRequestResponseHelper(
       (request, remoteAddress) => {
         logger.info(s"${mkRequestLogMsg(request, remoteAddress)}, ${lc.makeString}")
@@ -283,7 +281,6 @@ class Endpoints(
         httpResponse
       },
     )
-  }
   val logRequestAndResultFn: LoggingContextOf[InstanceUUID with RequestID] => Directive0 =
     if (shouldLogHttpBodies) lc => logJsonRequestAndResult(lc)
     else lc => logRequestAndResultSimple(lc)
@@ -347,6 +344,7 @@ class Endpoints(
       path("livez") apply responseToRoute(Future.successful(HttpResponse(status = StatusCodes.OK))),
       path("readyz") apply responseToRoute(healthService.ready().map(_.toHttpResponse)),
       v2Routes.v2Routes,
+      v2Routes.docsRoute,
     )
   }
 

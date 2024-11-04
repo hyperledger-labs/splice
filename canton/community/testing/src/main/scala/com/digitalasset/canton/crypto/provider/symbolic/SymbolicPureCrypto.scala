@@ -29,24 +29,28 @@ class SymbolicPureCrypto extends CryptoPureApi {
   private val signatureCounter = new AtomicInteger
 
   @VisibleForTesting
-  def setRandomnessFlag(newValue: Boolean): Unit = {
+  def setRandomnessFlag(newValue: Boolean): Unit =
     neverRandomizeAsymmetricEncryption.set(newValue)
-  }
 
   // iv to pre-append to the asymmetric ciphertext
   private val ivForAsymmetricEncryptInBytes = 16
 
   // NOTE: The following schemes are not really used by Symbolic crypto, but we pretend to support them
   override val defaultSymmetricKeyScheme: SymmetricKeyScheme = SymmetricKeyScheme.Aes128Gcm
+  override val defaultSigningAlgorithmSpec: SigningAlgorithmSpec =
+    SigningAlgorithmSpec.Ed25519
+  override val supportedSigningAlgorithmSpecs: NonEmpty[Set[SigningAlgorithmSpec]] =
+    NonEmpty.mk(Set, SigningAlgorithmSpec.Ed25519)
   override val defaultEncryptionAlgorithmSpec: EncryptionAlgorithmSpec =
     EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm
   override val supportedEncryptionAlgorithmSpecs: NonEmpty[Set[EncryptionAlgorithmSpec]] =
     NonEmpty.mk(Set, EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm)
   override val defaultPbkdfScheme: PbkdfScheme = PbkdfScheme.Argon2idMode1
 
-  override protected[crypto] def sign(
+  override protected[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
+      signingAlgorithmSpec: SigningAlgorithmSpec = defaultSigningAlgorithmSpec,
   ): Either[SigningError, Signature] = {
     val counter = signatureCounter.getAndIncrement()
     Right(SymbolicPureCrypto.createSignature(bytes, signingKey.id, counter))
@@ -166,7 +170,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
       randomized = false,
     )
 
-  override protected def decryptWithInternal[M](
+  override protected[crypto] def decryptWithInternal[M](
       encrypted: AsymmetricEncrypted[M],
       privateKey: EncryptionPrivateKey,
   )(
@@ -210,7 +214,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
         (),
         DecryptionError.FailedToDecrypt(s"Payload contains more than key id and ciphertext"),
       )
-      message <- deserialize(plaintext).leftMap(DecryptionError.FailedToDeserialize)
+      message <- deserialize(plaintext).leftMap(DecryptionError.FailedToDeserialize.apply)
 
     } yield message
 
@@ -282,46 +286,11 @@ class SymbolicPureCrypto extends CryptoPureApi {
         (),
         DecryptionError.FailedToDecrypt(s"Payload contains more than key and ciphertext"),
       )
-      message <- deserialize(plaintext).leftMap(DecryptionError.FailedToDeserialize)
+      message <- deserialize(plaintext).leftMap(DecryptionError.FailedToDeserialize.apply)
 
     } yield message
 
-  override protected def computeHkdfInternal(
-      keyMaterial: ByteString,
-      outputBytes: Int,
-      info: HkdfInfo,
-      salt: ByteString,
-      algorithm: HmacAlgorithm,
-  ): Either[HkdfError, SecureRandomness] =
-    NonNegativeInt.create(outputBytes) match {
-      case Left(_) => Left(HkdfError.HkdfOutputNegative(outputBytes))
-      case Right(size) =>
-        Right(
-          SecureRandomness(
-            ByteStringUtil
-              .padOrTruncate(keyMaterial.concat(salt).concat(info.bytes), size)
-          )
-        )
-    }
-
-  override protected def hkdfExpandInternal(
-      keyMaterial: SecureRandomness,
-      outputBytes: Int,
-      info: HkdfInfo,
-      algorithm: HmacAlgorithm,
-  ): Either[HkdfError, SecureRandomness] =
-    Right(SecureRandomness(keyMaterial.unwrap.concat(info.bytes)))
-
-  override def computeHkdf(
-      keyMaterial: ByteString,
-      outputBytes: Int,
-      info: HkdfInfo,
-      salt: ByteString,
-      algorithm: HmacAlgorithm,
-  ): Either[HkdfError, SecureRandomness] =
-    computeHkdfInternal(keyMaterial, outputBytes, info, salt, algorithm)
-
-  override protected def generateRandomBytes(length: Int): Array[Byte] = {
+  override protected[crypto] def generateRandomBytes(length: Int): Array[Byte] = {
     // Not really random
     val random =
       DeterministicEncoding.encodeInt(randomnessCounter.getAndIncrement()).toByteArray.take(length)
@@ -368,5 +337,6 @@ object SymbolicPureCrypto {
       SignatureFormat.Raw,
       bytes.concat(DeterministicEncoding.encodeInt(counter)),
       signingKey,
+      None,
     )
 }

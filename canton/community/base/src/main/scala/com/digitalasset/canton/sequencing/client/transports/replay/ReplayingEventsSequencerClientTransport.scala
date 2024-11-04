@@ -9,9 +9,9 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.sequencing.client.*
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.SequencerClient.ReplayStatistics
-import com.digitalasset.canton.sequencing.client.*
 import com.digitalasset.canton.sequencing.client.transports.replay.ReplayingEventsSequencerClientTransport.ReplayingSequencerSubscription
 import com.digitalasset.canton.sequencing.client.transports.{
   SequencerClientTransport,
@@ -33,6 +33,7 @@ import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import io.grpc.Status
 
 import java.nio.file.Path
 import java.time.Duration as JDuration
@@ -52,6 +53,11 @@ class ReplayingEventsSequencerClientTransport(
     extends SequencerClientTransport
     with SequencerClientTransportPekko
     with NamedLogging {
+
+  override def logout()(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, Status, Unit] =
+    EitherT.pure(())
 
   /** Does nothing */
   override def sendAsyncSigned(

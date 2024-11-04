@@ -3,18 +3,29 @@
 
 package com.digitalasset.canton.console.commands
 
-import com.digitalasset.canton.admin.api.client.commands.EnterpriseSequencerAdminCommands
-import com.digitalasset.canton.admin.api.client.commands.EnterpriseSequencerAdminCommands.{
+import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.{
   InitializeFromGenesisState,
   InitializeFromOnboardingState,
 }
-import com.digitalasset.canton.admin.api.client.data.StaticDomainParameters
+import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, SequencerAdminCommands}
+import com.digitalasset.canton.admin.api.client.data.{
+  NodeStatus,
+  SequencerStatus,
+  StaticDomainParameters,
+}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
-import com.digitalasset.canton.console.{Help, SequencerReference}
+import com.digitalasset.canton.console.{
+  AdminCommandRunner,
+  ConsoleEnvironment,
+  FeatureFlagFilter,
+  Help,
+  SequencerReference,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.sequencer.admin.v30.OnboardingStateResponse
 import com.digitalasset.canton.topology.SequencerId
 import com.google.protobuf.ByteString
@@ -27,13 +38,12 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   @Help.Summary(
     "Download sequencer snapshot at given point in time to bootstrap another sequencer"
   )
-  def snapshot(timestamp: CantonTimestamp): SequencerSnapshot = {
-    // TODO(#14074) add something like "snapshot for sequencer-id", rather than timestamp based
-    //      we still need to keep the timestamp based such that we can provide recovery for corrupted sequencers
+  @Help.Description("""It is recommended to use onboarding_state_for_sequencer for onboarding
+      |a new sequencer.""")
+  def snapshot(timestamp: CantonTimestamp): SequencerSnapshot =
     consoleEnvironment.run {
-      runner.adminCommand(EnterpriseSequencerAdminCommands.Snapshot(timestamp))
+      runner.adminCommand(SequencerAdminCommands.Snapshot(timestamp))
     }
-  }
 
   @Help.Summary(
     "Download the onboarding state at a given point in time to bootstrap another sequencer"
@@ -41,14 +51,14 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   def onboarding_state_at_timestamp(
       timestamp: CantonTimestamp,
       timeout: NonNegativeDuration = timeouts.unbounded,
-  ): ByteString = {
+  ): ByteString =
     consoleEnvironment.run {
       val responseObserver =
         new ByteStringStreamObserver[OnboardingStateResponse](_.onboardingStateForSequencer)
 
       def call =
         runner.adminCommand(
-          EnterpriseSequencerAdminCommands.OnboardingState(
+          SequencerAdminCommands.OnboardingState(
             observer = responseObserver,
             sequencerOrTimestamp = Right(timestamp),
           )
@@ -56,7 +66,6 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
 
       processResult(call, responseObserver.resultBytes, timeout, "Downloading onboarding state")
     }
-  }
 
   @Help.Summary(
     "Download the onboarding state for a given sequencer"
@@ -64,21 +73,20 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   def onboarding_state_for_sequencer(
       sequencerId: SequencerId,
       timeout: NonNegativeDuration = timeouts.unbounded,
-  ): ByteString = {
+  ): ByteString =
     consoleEnvironment.run {
       val responseObserver =
         new ByteStringStreamObserver[OnboardingStateResponse](_.onboardingStateForSequencer)
 
       def call =
         runner.adminCommand(
-          EnterpriseSequencerAdminCommands.OnboardingState(
+          SequencerAdminCommands.OnboardingState(
             observer = responseObserver,
             sequencerOrTimestamp = Left(sequencerId),
           )
         )
       processResult(call, responseObserver.resultBytes, timeout, "Downloading onboarding state")
     }
-  }
 
   @Help.Summary(
     "Initialize a sequencer from the beginning of the event stream. This should only be called for " +
@@ -119,4 +127,17 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     }
   }
 
+}
+
+class SequencerHealthAdministration(
+    val runner: AdminCommandRunner,
+    val consoleEnvironment: ConsoleEnvironment,
+    override val loggerFactory: NamedLoggerFactory,
+) extends HealthAdministration[SequencerStatus](
+      runner,
+      consoleEnvironment,
+    )
+    with FeatureFlagFilter {
+  override protected def nodeStatusCommand: GrpcAdminCommand[?, ?, NodeStatus[SequencerStatus]] =
+    SequencerAdminCommands.Health.SequencerStatusCommand()
 }

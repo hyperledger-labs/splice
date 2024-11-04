@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.crypto
 
-import com.daml.nonempty.NonEmpty
+import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.CantonRequireTypes.String68
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
@@ -17,16 +17,18 @@ object GeneratorsCrypto {
   import Generators.*
   import org.scalatest.EitherValues.*
 
-  implicit val signingKeySchemeArb: Arbitrary[SigningKeyScheme] = genArbitrary
+  implicit val signingKeyUsageArb: Arbitrary[SigningKeyUsage] = genArbitrary
+  implicit val signingAlgorithmSpecArb: Arbitrary[SigningAlgorithmSpec] = genArbitrary
+  implicit val signingKeySpecArb: Arbitrary[SigningKeySpec] = genArbitrary
   implicit val symmetricKeySchemeArb: Arbitrary[SymmetricKeyScheme] = genArbitrary
-  implicit val encryptionKeySpecArb: Arbitrary[EncryptionKeySpec] = genArbitrary
   implicit val encryptionAlgorithmSpecArb: Arbitrary[EncryptionAlgorithmSpec] = genArbitrary
+  implicit val encryptionKeySpecArb: Arbitrary[EncryptionKeySpec] = genArbitrary
   implicit val hashAlgorithmArb: Arbitrary[HashAlgorithm] = genArbitrary
   implicit val saltAlgorithmArb: Arbitrary[SaltAlgorithm] = genArbitrary
   implicit val cryptoKeyFormatArb: Arbitrary[CryptoKeyFormat] = genArbitrary
 
-  implicit val signingKeySchemeNESArb: Arbitrary[NonEmpty[Set[SigningKeyScheme]]] =
-    Generators.nonEmptySet[SigningKeyScheme]
+  implicit val signingKeySpecsNESArb: Arbitrary[NonEmpty[Set[SigningKeySpec]]] =
+    Generators.nonEmptySet[SigningKeySpec]
   implicit val encryptionKeySpecsNESArb: Arbitrary[NonEmpty[Set[EncryptionKeySpec]]] =
     Generators.nonEmptySet[EncryptionKeySpec]
   implicit val symmetricKeySchemeNESArb: Arbitrary[NonEmpty[Set[SymmetricKeyScheme]]] =
@@ -73,9 +75,12 @@ object GeneratorsCrypto {
   // TODO(#15813): Change arbitrary signing keys to match real keys
   implicit val signingPublicKeyArb: Arbitrary[SigningPublicKey] = Arbitrary(for {
     key <- Arbitrary.arbitrary[ByteString]
-    scheme <- Arbitrary.arbitrary[SigningKeyScheme]
+    keySpec <- Arbitrary.arbitrary[SigningKeySpec]
     format = CryptoKeyFormat.Symbolic
-  } yield new SigningPublicKey(format, key, scheme))
+    usage <- Gen
+      .nonEmptyListOf[SigningKeyUsage](Arbitrary.arbitrary[SigningKeyUsage])
+      .map(usageAux => NonEmptyUtil.fromUnsafe(usageAux.toSet))
+  } yield new SigningPublicKey(format, key, keySpec, usage))
 
   // TODO(#15813): Change arbitrary encryption keys to match real keys
   implicit val encryptionPublicKeyArb: Arbitrary[EncryptionPublicKey] = Arbitrary(for {

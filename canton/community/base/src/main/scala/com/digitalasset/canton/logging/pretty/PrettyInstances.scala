@@ -50,7 +50,7 @@ trait PrettyInstances {
     if (inst == null) PrettyUtil.nullTree
     else {
       // Cast is required to make IDEA happy.
-      inst.pretty.treeOf(inst.asInstanceOf[inst.type])
+      inst.prettyInternal.treeOf(inst.asInstanceOf[inst.type])
     }
 
   implicit def prettyTree[T <: Tree]: Pretty[T] = identity
@@ -205,8 +205,8 @@ trait PrettyInstances {
       lfContractId.toString
   }
 
-  implicit def prettyLfTransactionVersion: Pretty[LfTransactionVersion] = prettyOfString(
-    _.protoValue
+  implicit def prettyLfLanguageVersion: Pretty[LfLanguageVersion] = prettyOfString(
+    _.pretty
   )
 
   implicit def prettyLfVersioned[A: Pretty]: Pretty[LfVersioned[A]] =

@@ -10,11 +10,10 @@ import org.scalatest.wordspec.AsyncWordSpec
 trait PrivateKeySerializationTest extends AsyncWordSpec with BaseTest with HasExecutionContext {
 
   def privateKeySerializerProvider(
-      supportedSigningKeySchemes: Set[SigningKeyScheme],
+      supportedSigningKeySpecs: Set[SigningKeySpec],
       supportedEncryptionKeySpecs: Set[EncryptionKeySpec],
       newCrypto: => FutureUnlessShutdown[Crypto],
-  ): Unit = {
-
+  ): Unit =
     s"Serialize and deserialize a private key via protobuf" should {
 
       forAll(supportedEncryptionKeySpecs) { encryptionKeySpec =>
@@ -37,14 +36,14 @@ trait PrivateKeySerializationTest extends AsyncWordSpec with BaseTest with HasEx
         }.failOnShutdown
       }
 
-      forAll(supportedSigningKeySchemes) { signingKeyScheme =>
-        s"for a $signingKeyScheme signing private key" in {
+      forAll(supportedSigningKeySpecs) { signingKeySpec =>
+        s"for a $signingKeySpec signing private key" in {
           for {
             crypto <- newCrypto
             cryptoPrivateStore = crypto.cryptoPrivateStore.toExtended
               .valueOrFail("crypto private store does not implement all necessary methods")
             publicKey <- crypto.privateCrypto
-              .generateSigningKey(signingKeyScheme)
+              .generateSigningKey(signingKeySpec)
               .valueOrFail("generate signing key")
             privateKey <- cryptoPrivateStore
               .signingKey(publicKey.id)
@@ -59,5 +58,4 @@ trait PrivateKeySerializationTest extends AsyncWordSpec with BaseTest with HasEx
         }.failOnShutdown
       }
     }
-  }
 }

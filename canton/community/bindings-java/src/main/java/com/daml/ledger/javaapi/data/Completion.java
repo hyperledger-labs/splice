@@ -27,12 +27,16 @@ public final class Completion {
 
   private final @NonNull String submissionId;
 
-  private final @NonNull Optional<String> deduplicationOffset;
+  private final @NonNull Optional<Long> deduplicationOffset;
 
   private final @NonNull Optional<Duration> deduplicationDuration;
 
   // model trace-context with its own class
   private final TraceContextOuterClass.@NonNull TraceContext traceContext;
+
+  private final @NonNull Long offset;
+
+  private final @NonNull DomainTime domainTime;
 
   private Completion(
       @NonNull String commandId,
@@ -41,9 +45,11 @@ public final class Completion {
       @NonNull String applicationId,
       @NonNull List<@NonNull String> actAs,
       @NonNull String submissionId,
-      @NonNull Optional<String> deduplicationOffset,
+      @NonNull Optional<Long> deduplicationOffset,
       @NonNull Optional<Duration> deduplicationDuration,
-      TraceContextOuterClass.@NonNull TraceContext traceContext) {
+      TraceContextOuterClass.@NonNull TraceContext traceContext,
+      @NonNull Long offset,
+      @NonNull DomainTime domainTime) {
     this.commandId = commandId;
     this.status = status;
     this.updateId = updateId;
@@ -53,6 +59,8 @@ public final class Completion {
     this.deduplicationOffset = deduplicationOffset;
     this.deduplicationDuration = deduplicationDuration;
     this.traceContext = traceContext;
+    this.offset = offset;
+    this.domainTime = domainTime;
   }
 
   public Completion(
@@ -62,8 +70,10 @@ public final class Completion {
       @NonNull String applicationId,
       @NonNull List<@NonNull String> actAs,
       @NonNull String submissionId,
-      @NonNull String deduplicationOffset,
-      TraceContextOuterClass.TraceContext traceContext) {
+      @NonNull Long deduplicationOffset,
+      TraceContextOuterClass.TraceContext traceContext,
+      @NonNull Long offset,
+      @NonNull DomainTime domainTime) {
     this(
         commandId,
         status,
@@ -73,7 +83,9 @@ public final class Completion {
         submissionId,
         Optional.of(deduplicationOffset),
         Optional.empty(),
-        traceContext);
+        traceContext,
+        offset,
+        domainTime);
   }
 
   public Completion(
@@ -84,7 +96,9 @@ public final class Completion {
       @NonNull List<@NonNull String> actAs,
       @NonNull String submissionId,
       @NonNull Duration deduplicationDuration,
-      TraceContextOuterClass.TraceContext traceContext) {
+      TraceContextOuterClass.TraceContext traceContext,
+      @NonNull Long offset,
+      @NonNull DomainTime domainTime) {
     this(
         commandId,
         status,
@@ -94,7 +108,9 @@ public final class Completion {
         submissionId,
         Optional.empty(),
         Optional.of(deduplicationDuration),
-        traceContext);
+        traceContext,
+        offset,
+        domainTime);
   }
 
   @NonNull
@@ -128,7 +144,7 @@ public final class Completion {
   }
 
   @NonNull
-  public Optional<String> getDeduplicationOffset() {
+  public Optional<Long> getDeduplicationOffset() {
     return deduplicationOffset;
   }
 
@@ -139,6 +155,16 @@ public final class Completion {
 
   public TraceContextOuterClass.@NonNull TraceContext getTraceContext() {
     return traceContext;
+  }
+
+  @NonNull
+  public Long getOffset() {
+    return offset;
+  }
+
+  @NonNull
+  public DomainTime getDomainTime() {
+    return domainTime;
   }
 
   @Override
@@ -154,7 +180,9 @@ public final class Completion {
         && Objects.equals(submissionId, that.submissionId)
         && Objects.equals(deduplicationOffset, that.deduplicationOffset)
         && Objects.equals(deduplicationDuration, that.deduplicationDuration)
-        && Objects.equals(traceContext, that.traceContext);
+        && Objects.equals(traceContext, that.traceContext)
+        && Objects.equals(offset, that.offset)
+        && Objects.equals(domainTime, that.domainTime);
   }
 
   @Override
@@ -168,7 +196,9 @@ public final class Completion {
         submissionId,
         deduplicationOffset,
         deduplicationDuration,
-        traceContext);
+        traceContext,
+        offset,
+        domainTime);
   }
 
   @Override
@@ -194,6 +224,11 @@ public final class Completion {
         + deduplicationDuration
         + ", traceContext="
         + traceContext
+        + ", offset='"
+        + offset
+        + ", domainTime="
+        + domainTime
+        + '\''
         + '}';
   }
 
@@ -206,7 +241,9 @@ public final class Completion {
             .setApplicationId(applicationId)
             .addAllActAs(actAs)
             .setSubmissionId(submissionId)
-            .setTraceContext(traceContext);
+            .setTraceContext(traceContext)
+            .setOffset(offset)
+            .setDomainTime(domainTime.toProto());
     deduplicationOffset.ifPresent(builder::setDeduplicationOffset);
     deduplicationDuration.ifPresent(
         duration -> builder.setDeduplicationDuration(Utils.durationToProto(duration)));
@@ -227,6 +264,8 @@ public final class Completion {
         completion.hasDeduplicationDuration()
             ? Optional.of(Utils.durationFromProto(completion.getDeduplicationDuration()))
             : Optional.empty(),
-        completion.getTraceContext());
+        completion.getTraceContext(),
+        completion.getOffset(),
+        DomainTime.fromProto(completion.getDomainTime()));
   }
 }

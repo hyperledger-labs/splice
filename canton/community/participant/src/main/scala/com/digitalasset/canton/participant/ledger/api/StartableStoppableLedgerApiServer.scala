@@ -7,31 +7,37 @@ import cats.Eval
 import com.daml.executors.executors.{NamedExecutor, QueueAwareExecutor}
 import com.daml.ledger.api.v2.experimental_features.ExperimentalCommandInspectionService
 import com.daml.ledger.api.v2.state_service.GetActiveContractsResponse
+import com.daml.ledger.api.v2.version_service.OffsetCheckpointFeature
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.logging.entries.LoggingEntries
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.tracing.Telemetry
+import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.auth.CantonAdminTokenAuthService
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.{MemoryStorageConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.http.HttpApiServer
 import com.digitalasset.canton.ledger.api.auth.CachedJwtVerifierLoader
-import com.digitalasset.canton.ledger.api.domain.{CumulativeFilter, TransactionFilter}
+import com.digitalasset.canton.ledger.api.domain
+import com.digitalasset.canton.ledger.api.domain.{
+  CumulativeFilter,
+  IdentityProviderId,
+  TransactionFilter,
+  UserRight,
+}
 import com.digitalasset.canton.ledger.api.health.HealthChecks
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.localstore.*
 import com.digitalasset.canton.ledger.localstore.api.UserManagementStore
-import com.digitalasset.canton.ledger.participant.state.InternalStateService
-import com.digitalasset.canton.ledger.participant.state.metrics.{
-  TimedReadService,
-  TimedWriteService,
-}
+import com.digitalasset.canton.ledger.participant.state.metrics.TimedWriteService
+import com.digitalasset.canton.ledger.participant.state.{InternalStateService, WriteService}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.{
@@ -40,29 +46,23 @@ import com.digitalasset.canton.networking.grpc.{
   ClientChannelBuilder,
 }
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.config.LedgerApiServerConfig
 import com.digitalasset.canton.participant.protocol.SerializableContractAuthenticator
-import com.digitalasset.canton.platform.LedgerApiServer
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.apiserver.execution.StoreBackedCommandExecutor.AuthenticateContract
 import com.digitalasset.canton.platform.apiserver.ratelimiting.{
   RateLimitingInterceptor,
   ThreadpoolCheck,
 }
+import com.digitalasset.canton.platform.apiserver.services.admin.ApiUserManagementService
 import com.digitalasset.canton.platform.apiserver.{ApiServiceOwner, LedgerFeatures}
 import com.digitalasset.canton.platform.config.IdentityProviderManagementConfig
 import com.digitalasset.canton.platform.index.IndexServiceOwner
-import com.digitalasset.canton.platform.indexer.parallel.ReassignmentOffsetPersistence
-import com.digitalasset.canton.platform.indexer.{
-  IndexerConfig,
-  IndexerServiceOwner,
-  IndexerStartupMode,
-}
 import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.dao.events.{ContractLoader, LfValueTranslation}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{FutureUtil, SimpleExecutionQueue}
-import com.digitalasset.canton.{LfPackageId, LfPartyId}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.engine.Engine
 import io.grpc.{BindableService, ServerInterceptor, ServerServiceDefinition}
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTelemetry
@@ -85,9 +85,8 @@ class StartableStoppableLedgerApiServer(
     futureSupervisor: FutureSupervisor,
     parameters: ParticipantNodeParameters,
     commandProgressTracker: CommandProgressTracker,
-    excludedPackageIds: Set[LfPackageId],
     ledgerApiStore: Eval[LedgerApiStore],
-    reassignmentOffsetPersistence: ReassignmentOffsetPersistence,
+    ledgerApiIndexer: Eval[LedgerApiIndexer],
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     actorSystem: ActorSystem,
@@ -123,7 +122,7 @@ class StartableStoppableLedgerApiServer(
     execQueue.execute(
       performUnlessClosingF(functionFullName) {
         ledgerApiResource.get match {
-          case Some(_ledgerApiAlreadyStarted) =>
+          case Some(_) =>
             logger.info(
               "Attempt to start ledger API server, but ledger API server already started. Ignoring."
             )
@@ -134,7 +133,7 @@ class StartableStoppableLedgerApiServer(
                 ResourceContext(executionContext)
               )
             FutureUtil.logOnFailure(
-              ledgerApiServerResource.asFuture.map { _unit =>
+              ledgerApiServerResource.asFuture.map { _ =>
                 ledgerApiResource.set(Some(ledgerApiServerResource))
               },
               "Failed to start ledger API server",
@@ -154,7 +153,7 @@ class StartableStoppableLedgerApiServer(
         case Some(ledgerApiServerToStop) =>
           config.syncService.unregisterInternalStateService()
           FutureUtil.logOnFailure(
-            ledgerApiServerToStop.release().map { _unit =>
+            ledgerApiServerToStop.release().map { _ =>
               logger.debug("Successfully stopped ledger API server")
               ledgerApiResource.set(None)
             },
@@ -181,21 +180,13 @@ class StartableStoppableLedgerApiServer(
     implicit val loggingContextWithTrace: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory, telemetry)
 
-    val startupMode: IndexerStartupMode = config.storageConfig match {
-      // ledger api server needs an H2 db to run in memory
-      case _: MemoryStorageConfig => IndexerStartupMode.MigrateAndStart
-      case _ => IndexerStartupMode.JustStart
-    }
-    val numIndexer = config.indexerConfig.ingestionParallelism.unwrap
-    logger.info(s"Creating indexer storage, num-indexer: $numIndexer")
-
     val indexServiceConfig = config.serverConfig.indexService
 
     val authService = new CantonAdminTokenAuthService(
-      config.adminToken,
+      Some(config.adminToken),
       parent = config.serverConfig.authServices.map(
         _.create(
-          config.cantonParameterConfig.ledgerApiServerParameters.jwtTimestampLeeway,
+          config.serverConfig.jwtTimestampLeeway,
           loggerFactory,
         )
       ),
@@ -209,46 +200,10 @@ class StartableStoppableLedgerApiServer(
         ApiInfoServiceGrpc.bindService(this, executionContext)
     }
     val dbSupport = ledgerApiStore.value.ledgerApiDbSupport
+    val inMemoryState = ledgerApiIndexer.value.inMemoryState
+    val timedWriteService = new TimedWriteService(config.syncService, config.metrics)
 
     for {
-      (inMemoryState, inMemoryStateUpdaterFlow) <-
-        LedgerApiServer.createInMemoryStateAndUpdater(
-          commandProgressTracker,
-          indexServiceConfig,
-          config.serverConfig.commandService.maxCommandsInFlight,
-          config.metrics,
-          executionContext,
-          tracer,
-          loggerFactory,
-        )(ledgerApiStore.value.ledgerEndCache, ledgerApiStore.value.stringInterningView)
-      timedWriteService = new TimedWriteService(config.syncService, config.metrics)
-      timedReadService = new TimedReadService(config.syncService, config.metrics)
-      indexerHealth <- new IndexerServiceOwner(
-        config.participantId,
-        DbSupport.ParticipantDataSourceConfig(ledgerApiStore.value.ledgerApiStorage.jdbcUrl),
-        timedReadService,
-        config.indexerConfig,
-        config.metrics,
-        inMemoryState,
-        inMemoryStateUpdaterFlow,
-        executionContext,
-        tracer,
-        loggerFactory,
-        startupMode = startupMode,
-        dataSourceProperties = DbSupport.DataSourceProperties(
-          connectionPool = IndexerConfig
-            .createConnectionPoolConfig(
-              ingestionParallelism = config.indexerConfig.ingestionParallelism.unwrap,
-              connectionTimeout = config.serverConfig.databaseConnectionTimeout.underlying,
-            ),
-          postgres = config.serverConfig.postgresDataSource,
-        ),
-        highAvailability = config.indexerHaConfig,
-        indexServiceDbDispatcher = Some(dbSupport.dbDispatcher),
-        excludedPackageIds,
-        config.clock,
-        reassignmentOffsetPersistence,
-      )
       contractLoader <- {
         import config.cantonParameterConfig.ledgerApiServerParameters.contractLoader.*
         ContractLoader.create(
@@ -289,7 +244,7 @@ class StartableStoppableLedgerApiServer(
       _ = timedWriteService.registerInternalStateService(new InternalStateService {
         override def activeContracts(
             partyIds: Set[LfPartyId],
-            validAt: Option[Offset],
+            validAt: Offset,
         )(implicit traceContext: TraceContext): Source[GetActiveContractsResponse, NotUsed] =
           indexService.getActiveContracts(
             filter = TransactionFilter(
@@ -298,7 +253,7 @@ class StartableStoppableLedgerApiServer(
               filtersForAnyParty = None,
             ),
             verbose = false,
-            activeAtO = validAt,
+            activeAt = validAt,
           )(new LoggingContextWithTrace(LoggingEntries.empty, traceContext))
       })
       userManagementStore = getUserManagementStore(dbSupport, loggerFactory)
@@ -310,12 +265,24 @@ class StartableStoppableLedgerApiServer(
         loggerFactory = loggerFactory,
       )
       serializableContractAuthenticator = SerializableContractAuthenticator(
-        config.syncService.pureCryptoApi,
-        parameters,
+        config.syncService.pureCryptoApi
       )
 
       authenticateContract: AuthenticateContract = c =>
         serializableContractAuthenticator.authenticate(c)
+
+      // TODO(i21582) The prepare endpoint of the interactive submission service does not suffix
+      // contract IDs of the transaction yet. This means enrichment of the transaction may fail
+      // when processing unsuffixed contract IDs. For that reason we disable this requirement via the flag below.
+      // When CIDs are suffixed, we can re-use the LfValueTranslation from the index service created above
+      lfValueTranslationForInteractiveSubmission = new LfValueTranslation(
+        metrics = config.metrics,
+        engineO =
+          Some(new Engine(config.engine.config.copy(requireSuffixedGlobalContractId = false))),
+        loadPackage = (packageId, loggingContext) =>
+          timedWriteService.getLfArchive(packageId)(loggingContext.traceContext),
+        loggerFactory = loggerFactory,
+      )
 
       _ <- ApiServiceOwner(
         indexService = indexService,
@@ -334,32 +301,29 @@ class StartableStoppableLedgerApiServer(
         managementServiceTimeout = config.serverConfig.managementServiceTimeout,
         userManagement = config.serverConfig.userManagementService,
         partyManagementServiceConfig = config.serverConfig.partyManagementService,
-        tls = config.serverConfig.tls
-          .map(LedgerApiServerConfig.ledgerApiServerTlsConfigFromCantonServerConfig),
+        tls = config.serverConfig.tls,
         address = Some(config.serverConfig.address),
         maxInboundMessageSize = config.serverConfig.maxInboundMessageSize.unwrap,
         port = config.serverConfig.port,
         seeding = config.cantonParameterConfig.ledgerApiServerParameters.contractIdSeeding,
         writeService = timedWriteService,
         healthChecks = new HealthChecks(
-          "read" -> timedReadService,
+          // TODO(i21015): Possible issues with health check reporting: disconnected sequencer can be reported as healthy; possibly reporting protocol processing/CantonSyncService general health needed
           "write" -> (() => config.syncService.currentWriteHealth()),
-          "indexer" -> indexerHealth,
+          "indexer" -> ledgerApiIndexer.value.indexerHealth,
         ),
         metrics = config.metrics,
         timeServiceBackend = config.testingTimeService,
         otherServices = Seq(apiInfoService),
         otherInterceptors = getInterceptors(dbSupport.dbDispatcher.executor),
         engine = config.engine,
-        authorityResolver = config.syncService.cantonAuthorityResolver,
         servicesExecutionContext = executionContext,
         checkOverloaded = config.syncService.checkOverloaded,
         ledgerFeatures = getLedgerFeatures,
         maxDeduplicationDuration = config.maxDeduplicationDuration,
         authService = authService,
         jwtVerifierLoader = jwtVerifierLoader,
-        jwtTimestampLeeway =
-          config.cantonParameterConfig.ledgerApiServerParameters.jwtTimestampLeeway,
+        jwtTimestampLeeway = config.serverConfig.jwtTimestampLeeway,
         tokenExpiryGracePeriodForStreams =
           config.cantonParameterConfig.ledgerApiServerParameters.tokenExpiryGracePeriodForStreams,
         meteringReportKey = config.meteringReportKey,
@@ -368,16 +332,17 @@ class StartableStoppableLedgerApiServer(
         loggerFactory = loggerFactory,
         authenticateContract = authenticateContract,
         dynParamGetter = config.syncService.dynamicDomainParameterGetter,
+        interactiveSubmissionServiceConfig = config.serverConfig.interactiveSubmissionService,
+        lfValueTranslation = lfValueTranslationForInteractiveSubmission,
       )
-      _ <- startHttpApiIfEnabled
-      _ <- {
-        config.serverConfig.userManagementService.additionalAdminUserId.fold(ResourceOwner.unit) {
-          rawUserId =>
-            ResourceOwner.forFuture { () =>
-              userManagementStore.createExtraAdminUser(rawUserId)
-            }
+      _ <- startHttpApiIfEnabled(timedWriteService)
+      _ <- config.serverConfig.userManagementService.additionalAdminUserId
+        .fold(ResourceOwner.unit) { rawUserId =>
+          ResourceOwner.forFuture { () =>
+            createExtraAdminUser(rawUserId, userManagementStore)
+          }
         }
-      }
+
     } yield ()
   }
 
@@ -406,7 +371,33 @@ class StartableStoppableLedgerApiServer(
       maxCacheSize = config.serverConfig.userManagementService.maxCacheSize,
       maxRightsPerUser = config.serverConfig.userManagementService.maxRightsPerUser,
       loggerFactory = loggerFactory,
+      flagCloseable = this,
     )(executionContext, traceContext)
+
+  private def createExtraAdminUser(rawUserId: String, userManagementStore: UserManagementStore)(
+      implicit loggingContext: LoggingContextWithTrace
+  ): Future[Unit] = {
+    import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
+    val userId = Ref.UserId.assertFromString(rawUserId)
+    userManagementStore
+      .createUser(
+        user = domain.User(
+          id = userId,
+          primaryParty = None,
+          identityProviderId = IdentityProviderId.Default,
+        ),
+        rights = Set(UserRight.ParticipantAdmin),
+      )
+      .flatMap {
+        case Left(UserManagementStore.UserExists(_)) =>
+          logger.info(
+            s"Creating admin user with id $userId failed. User with this id already exists"
+          )
+          Future.successful(())
+        case other =>
+          ApiUserManagementService.handleResult("creating extra admin user")(other).map(_ => ())
+      }
+  }
 
   private def getInterceptors(
       indexerExecutor: QueueAwareExecutor & NamedExecutor
@@ -447,17 +438,31 @@ class StartableStoppableLedgerApiServer(
     staticTime = config.testingTimeService.isDefined,
     commandInspectionService =
       ExperimentalCommandInspectionService.of(supported = config.enableCommandInspection),
+    offsetCheckpointFeature = OffsetCheckpointFeature.of(
+      maxOffsetCheckpointEmissionDelay = Some(
+        (config.serverConfig.indexService.offsetCheckpointCacheUpdateInterval + config.serverConfig.indexService.idleStreamOffsetCheckpointTimeout).toProtoPrimitive
+      )
+    ),
+    interactiveSubmissionService = config.serverConfig.interactiveSubmissionService.enabled,
   )
 
-  private def startHttpApiIfEnabled: ResourceOwner[Unit] =
+  private def startHttpApiIfEnabled(writeService: WriteService): ResourceOwner[Unit] =
     config.jsonApiConfig
       .fold(ResourceOwner.unit) { jsonApiConfig =>
         for {
           channel <- ResourceOwner
             .forReleasable(() =>
               ClientChannelBuilder.createChannelToTrustedServer(config.serverConfig.clientConfig)
-            ) { channel => Future(channel.shutdown().discard) }
-          _ <- HttpApiServer(jsonApiConfig, channel, loggerFactory)(config.jsonApiMetrics)
+            )(channel => Future(channel.shutdown().discard))
+          _ <- HttpApiServer(
+            jsonApiConfig,
+            config.serverConfig.tls,
+            channel,
+            writeService,
+            loggerFactory,
+          )(
+            config.jsonApiMetrics
+          )
         } yield ()
       }
 }

@@ -25,7 +25,6 @@ class GrpcIdentityInitializationService(
     with NamedLogging {
 
   override def initId(request: adminProto.InitIdRequest): Future[adminProto.InitIdResponse] = {
-    // TODO(#14048) propagate trace context
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val adminProto.InitIdRequest(uidP) = request
     // TODO(#14048) proper error reporting
@@ -60,7 +59,7 @@ class GrpcIdentityInitializationService(
   override def currentTime(
       request: adminProto.CurrentTimeRequest
   ): Future[adminProto.CurrentTimeResponse] =
-    Future.successful(adminProto.CurrentTimeResponse(Some(clock.now.toProtoTimestamp)))
+    Future.successful(adminProto.CurrentTimeResponse(clock.now.toProtoPrimitive))
 }
 
 object GrpcIdentityInitializationService {
