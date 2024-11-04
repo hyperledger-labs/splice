@@ -34,6 +34,7 @@ import {
   spliceInstanceNames,
   SvIdKey,
   validatorOnboardingSecretName,
+  updateHistoryBackfillingValues,
 } from 'splice-pulumi-common';
 import {
   DecentralizedSynchronizerNode,
@@ -488,6 +489,7 @@ function installScan(
     enablePostgresMetrics: true,
     // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
     clusterUrl: CLUSTER_HOSTNAME,
+    ...updateHistoryBackfillingValues,
   };
   const scan = installSpliceHelmChart(
     xns,

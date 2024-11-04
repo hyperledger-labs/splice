@@ -111,6 +111,23 @@ export const domainLivenessProbeInitialDelaySeconds: string | undefined = config
 
 export const svOnboardingPollingInterval = config.optionalEnv('SV_ONBOARDING_POLLING_INTERVAL');
 
+// TODO(#15528) Remove once backfilling is enabled by default
+export const ENABLE_UPDATE_HISTORY_BACKFILLING = config.envFlag(
+  'ENABLE_UPDATE_HISTORY_BACKFILLING',
+  false
+);
+export const UPDATE_HISTORY_BACKFILLING_BATCH_SIZE = parseInt(
+  config.optionalEnv('UPDATE_HISTORY_BACKFILLING_BATCH_SIZE') || '100'
+);
+export const updateHistoryBackfillingValues = ENABLE_UPDATE_HISTORY_BACKFILLING
+  ? {
+      updateHistoryBackfilling: {
+        enabled: true,
+        batchSize: UPDATE_HISTORY_BACKFILLING_BATCH_SIZE,
+      },
+    }
+  : {};
+
 /// Kubernetes Namespace
 
 // There is no way to read the logical name off a Namespace.  Exactly
