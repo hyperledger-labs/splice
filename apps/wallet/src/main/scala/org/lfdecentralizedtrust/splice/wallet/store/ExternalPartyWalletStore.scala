@@ -3,7 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.wallet.store
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, ValidatorRewardCoupon}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  Amulet,
+  LockedAmulet,
+  ValidatorRewardCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -41,6 +45,11 @@ trait ExternalPartyWalletStore extends AppStore with NamedLogging {
       tc: TraceContext
   ): Future[Seq[Contract[Amulet.ContractId, Amulet]]] =
     multiDomainAcsStore.listContracts(Amulet.COMPANION, limit).map(_.map(_.contract))
+
+  def listLockedAmulets(limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[LockedAmulet.ContractId, LockedAmulet]]] =
+    multiDomainAcsStore.listContracts(LockedAmulet.COMPANION, limit).map(_.map(_.contract))
 
   def lookupTransferCommandCounter()(implicit
       tc: TraceContext
@@ -114,9 +123,9 @@ object ExternalPartyWalletStore {
           co.payload.dso == dso &&
           co.payload.owner == endUser
         }(ExternalPartyWalletAcsStoreRowData(_)),
-        mkFilter(Amulet.COMPANION) { co =>
-          co.payload.dso == dso &&
-          co.payload.owner == endUser
+        mkFilter(LockedAmulet.COMPANION) { co =>
+          co.payload.amulet.dso == dso &&
+          co.payload.amulet.owner == endUser
         }(ExternalPartyWalletAcsStoreRowData(_)),
         mkFilter(TransferCommandCounter.COMPANION) { co =>
           co.payload.dso == dso &&

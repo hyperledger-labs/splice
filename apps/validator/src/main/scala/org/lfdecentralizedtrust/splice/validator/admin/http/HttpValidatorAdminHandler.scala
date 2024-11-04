@@ -789,71 +789,18 @@ class HttpValidatorAdminHandler(
   def getExternalPartyAmulets(partyId: PartyId)(implicit tc: TraceContext): Future[
     (Seq[Contract[Amulet.ContractId, Amulet]], Seq[Contract[LockedAmulet.ContractId, LockedAmulet]])
   ] = {
-    for {
-      domainId <- getAmuletRulesDomain()(tc)
-      participantId <- participantAdminConnection.getParticipantId()
-      results <- participantAdminConnection.listPartyToParticipant(
-        filterStore = TopologyStoreId.DomainStore(domainId).filterName,
-        filterParty = partyId.toProtoPrimitive,
-      )
-      _ = results match {
-        case Seq() =>
+    requireWalletEnabled { walletManager =>
+      val externalPartyWallet = walletManager.externalPartyWalletManager
+        .lookupExternalPartyWallet(partyId)
+        .getOrElse(
           throw Status.NOT_FOUND
-            .withDescription(s"Could not find topology mapping for party id $partyId")
+            .withDescription(s"No wallet for external party $partyId")
             .asRuntimeException
-        case Seq(result) =>
-          val hostingParticipants = result.mapping.participants.map(_.participantId)
-          if (!hostingParticipants.contains(participantId)) {
-            throw Status.INVALID_ARGUMENT
-              .withDescription(
-                s"Party $partyId is not hosted on participant $participantId but on participants $hostingParticipants"
-              )
-              .asRuntimeException
-          }
-        case _ =>
-          throw Status.INTERNAL
-            .withDescription(s"Invalid PartyToParticipant mapping: $results")
-            .asRuntimeException
-      }
-      ledgerEnd <- storeWithIngestion.connection
-        .ledgerEnd()
-      acs <- storeWithIngestion.connection.activeContracts(
-        com.daml.ledger.api.v2.transaction_filter.TransactionFilter(
-          Map(
-            partyId.toProtoPrimitive -> com.daml.ledger.api.v2.transaction_filter.Filters(
-              Seq(Amulet.TEMPLATE_ID, LockedAmulet.TEMPLATE_ID).map(templateId =>
-                com.daml.ledger.api.v2.transaction_filter.CumulativeFilter(
-                  com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
-                    .TemplateFilter(
-                      com.daml.ledger.api.v2.transaction_filter.TemplateFilter(
-                        Some(
-                          com.daml.ledger.api.v2.value.Identifier.fromJavaProto(templateId.toProto)
-                        )
-                      )
-                    )
-                )
-              )
-            )
-          )
-        ),
-        ledgerEnd,
-      )
-    } yield {
-      acs._1.partitionMap { c =>
-        (
-          Contract.fromCreatedEvent(Amulet.COMPANION)(c.createdEvent),
-          Contract.fromCreatedEvent(LockedAmulet.COMPANION)(c.createdEvent),
-        ) match {
-          case (Some(amulet), _) => Left(amulet)
-          case (_, Some(lockedAmulet)) => Right(lockedAmulet)
-          case _ =>
-            throw Status.INTERNAL
-              .withDescription(
-                s"Unexpected contract ${c.createdEvent}, expected either Amulet or LockedAmulet"
-              )
-              .asRuntimeException
-        }
-      }
+        )
+      for {
+        amulets <- externalPartyWallet.store.listAmulets()
+        lockedAmulets <- externalPartyWallet.store.listLockedAmulets()
+      } yield (amulets, lockedAmulets)
     }
   }
 
