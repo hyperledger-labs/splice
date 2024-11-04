@@ -45,7 +45,6 @@ function check_patterns_locally() {
     '/helm/.*(Values\.ingress\.cns|cns: |name: cns-|- "cns\.)' # TODO (#15739) cns in splice-cluster-ingress-runbook
     'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (#15741) new secret
     'Headers.scala:.*"cn-svc-configs"' # TODO (#15742) references to missing project subdirectory
-    'package-lock\.json:.*("cns/frontend"|"name": "cns-frontend"|"cns/openapi-ts-client/dist"|"name": "cns-external-openapi")' # TODO (#15743) remove old versions from package-lock if possible
     '(Validator|Sv)App\.scala:.*"canton network.*realm"' # TODO (#15744) remove 'canton network' from realm names
     'istio-gateway/.*gateway\.yaml:.*credentialName: cn-' # TODO (#15745) TLS credential names in istio-gateway
     'GcpConfig\.scala:' # cluster-specific
