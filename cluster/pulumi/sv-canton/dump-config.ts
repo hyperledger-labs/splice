@@ -4,7 +4,12 @@ import { DecentralizedSynchronizerUpgradeConfig, DomainMigrationIndex } from 'sp
 import { allSvsToDeploy } from 'splice-pulumi-common-sv';
 import { StaticSvConfig } from 'splice-pulumi-common-sv/src/config';
 
-import { initDumpConfig } from '../common/src/dump-config-common';
+import {
+  cantonNetworkAuth0Config,
+  initDumpConfig,
+  SecretsFixtureMap,
+  svRunbookAuth0Config,
+} from '../common/src/dump-config-common';
 
 async function main() {
   await initDumpConfig();
@@ -26,8 +31,15 @@ async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvCo
   // eslint-disable-next-line no-process-env
   process.env.SPLICE_MIGRATION_ID = migrationId.toString();
   const installNode = await import('./src/installNode');
+  const secrets = new SecretsFixtureMap();
   for (const sv of svs) {
-    installNode.installNode(migrationId, sv.nodeName, false);
+    installNode.installNode(migrationId, sv.nodeName, {
+      getSecrets: () => Promise.resolve(secrets),
+      /* eslint-disable @typescript-eslint/no-unused-vars */
+      getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
+        Promise.resolve('access_token'),
+      getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
+    });
   }
 }
 
