@@ -201,18 +201,26 @@ class BaseLedgerConnection(
   def ensureUserHasPrimaryParty(
       userId: String,
       partyId: PartyId,
-  )(implicit traceContext: TraceContext): Future[PartyId] =
-    retryProvider.ensureThatO(
-      RetryFor.WaitingOnInitDependency,
-      "primary_party_set",
-      s"User $userId has primary party",
-      check = getOptionalPrimaryParty(userId),
-      establish = for {
-        _ <- setUserPrimaryParty(userId, partyId)
-        _ <- grantUserRights(userId, actAsParties = Seq(partyId), readAsParties = Seq.empty)
-      } yield (),
-      logger,
-    )
+  )(implicit traceContext: TraceContext): Future[PartyId] = {
+    for {
+      partyId <- retryProvider.ensureThatO(
+        RetryFor.WaitingOnInitDependency,
+        "primary_party_set",
+        s"User $userId has primary party",
+        check = getOptionalPrimaryParty(userId),
+        establish = setUserPrimaryParty(userId, partyId),
+        logger,
+      )
+      _ <- retryProvider.ensureThatB(
+        RetryFor.WaitingOnInitDependency,
+        "act_as_rights_granted",
+        s"User $userId has actAs rights for $partyId",
+        check = getUserActAs(userId).map(_.contains(partyId)),
+        establish = grantUserRights(userId, actAsParties = Seq(partyId), readAsParties = Seq.empty),
+        logger,
+      )
+    } yield partyId
+  }
 
   def ensurePartyAllocated(
       store: TopologyStoreId,
