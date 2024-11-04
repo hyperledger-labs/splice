@@ -8,6 +8,29 @@
 Release Notes
 =============
 
+0.2.7
+-----
+
+* Scan
+
+  * Added new endpoints `/v1/updates` and `/v1/updates/{update_id}`. The updates endpoint returns all Daml transactions
+    and also all contract reassignments. Both Daml transactions and contract reassignments can be made up of multiple
+    smaller components: A single Daml transaction may be the top node of a tree of sub-transactions, and a contract
+    reassignment may actually be a batch of many reassignments.
+
+    Each Super Validator node assigns a unique counter, called an event ID, to each of the sub-transactions in the Daml
+    transaction tree. Because there's not just one way to assign a counter to the elements of a tree, each Super Validator
+    node gives different event IDs to the same elements of the transaction tree.
+
+    This means that applications that want to compare updates from more than one Super Validator can't match their event IDs.
+    So for the v1 version of these endpoints, we've added a method for tree node numbering in Scan, which consistently produces
+    the same event ids on each tree node, when given the same tree structure.
+
+    Applications that rely on an existing set of event IDs drawn from a single Super Validator may continue to use /v0/updates
+    and /v0/updates/{update_id}. This will return the single-Super Validator set of event IDs that they've used up to now.
+    Applications that want to compare the details of updates, including transaction trees and sub-transactions, across Super
+    Validators can use the v1 version of these endpoints.
+
 0.2.6
 -----
 
@@ -15,14 +38,14 @@ Note: 0.2.5 was skipped as it introduced a regression where the splice apps hard
 
 * Docs
 
-    * Updated docs to include a section on how to create a standalone k8s-based Canton Network. This can be useful to test deployment changes, in particular for SVs. See :ref:`scratchnet`.
+  * Updated docs to include a section on how to create a standalone k8s-based Canton Network. This can be useful to test deployment changes, in particular for SVs. See :ref:`scratchnet`.
 
 * SV UI
 
-    * Configuration changes for AmuletRules and DsoRules are diffed against the configuration it will replace and the in-flights proposals.
-      This makes it easier to see what changes are being proposed and what the current configuration is.
+  * Configuration changes for AmuletRules and DsoRules are diffed against the configuration it will replace and the in-flights proposals.
+    This makes it easier to see what changes are being proposed and what the current configuration is.
 
-    * When creating validator onboarding secrets through the SV UI, they will now have an expiration time of 48 hours.
+  * When creating validator onboarding secrets through the SV UI, they will now have an expiration time of 48 hours.
 
 * Scan
 

@@ -266,12 +266,12 @@ function commit_occurrences() {
 declare -A subcommand_whitelist
 
 
-subcommand_whitelist[cleanup_full]='Cleanup: run cn-clean, format all files, and update all lock files'
+subcommand_whitelist[cleanup_full]='Cleanup: run splice-clean, format all files, and update all lock files'
 
 function subcmd_cleanup_full() {
 
   if [[ $SKIP_CN_CLEAN != 1 ]]; then
-    sbt --client cn-clean
+    sbt --client splice-clean
   fi
 
   subcmd_cleanup_light

@@ -16,9 +16,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
   - [ ] Update the release notes (`docs/src/release_notes.rst`):
     - Replace `Upcoming` by the target version
     - Fix any spelling mistakes and make sure the RST rendering is not broken
-    - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.z..` (replace `0.x.z` with the preg version)
-  - [ ] Update `cluster/deployment/*/.envrc.vars`, bumping the release version.
-    - Currently, the affected env vars are `OVERRIDE_VERSION`, `CHARTS_VERSION`, and `MULTI_VALIDATOR_IMAGE_VERSION`.
+    - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.z..` (replace `0.x.z` with the prev version)
   - [ ] Make sure the merge commit has a `[release]` tag so it gets published as a non-snapshot version. You may have to edit the commit message when pressing the merge button in the GitHub UI.
 - [ ] Create a release branch called `release-line-0.x.y` from the merged commit with the `[release]` tag
   - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
@@ -27,7 +25,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
   - Update `VERSION` and `LATEST_RELEASE` on main. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
 - [ ] Update the Open source repos, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
   - [ ] Merge the auto-generated PR in https://github.com/digital-asset/decentralized-canton-sync
-  - [ ] Copy the Daml code to [Splice](https://github.com/hyperledger-labs/splice), and create a PR for it
+  - [ ] Merge the auto-generated PR in https://github.com/hyperledger-labs/splice
 
 ## Upgrade our own nodes on DevNet
 
@@ -42,6 +40,8 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
 - [ ] Merge a PR into `main` with the following changes:
   - [ ] Update the cluster `config.yaml` file by setting the new reference under `synchronizerMigration.active.releaseReference`.
   - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
+  - [ ] Update `cluster/deployment/devnet/.envrc.vars`, bumping the release version.
+    - Currently, the affected env vars are `OVERRIDE_VERSION`, `CHARTS_VERSION`, and `MULTI_VALIDATOR_IMAGE_VERSION`.
   - [ ] Before merging, review the changes to the `deployment` stack from the `preview_pulumi_changes` CircleCi workflow.
 - [ ] Trigger a CircleCI pipeline on main with `run-job: update-deployment` and `cluster: devnet`.
   - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.

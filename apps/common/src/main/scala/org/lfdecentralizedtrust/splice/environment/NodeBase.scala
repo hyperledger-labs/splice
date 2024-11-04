@@ -451,14 +451,14 @@ object NodeBase {
 
     override val components = Seq.empty
 
-    // Doesn't matter for CN but is required by the trait
+    // Doesn't matter for splice but is required by the trait
     override val topologyQueue =
       com.digitalasset.canton.health.admin.data.TopologyQueueStatus(0, 0, 0)
 
     override def pretty =
       prettyOfString(_ =>
         Seq(
-          s"CN node id: ${uid.toProtoPrimitive}",
+          s"Splice node id: ${uid.toProtoPrimitive}",
           show"Uptime: $uptime",
           s"Ports: ${com.digitalasset.canton.health.admin.data.NodeStatus.portsString(ports)}",
           s"Active: $active",

@@ -203,10 +203,10 @@ object BuildCommon {
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all Splice DARs here, just in case
         addCommandAlias(
-          "clean-cn",
+          "clean-splice",
           "; apps-common/clean; apps-common-sv/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; splice-util-daml/clean; splice-amulet-daml/clean; splice-dso-governance-daml/clean; splice-wallet-daml/clean; splice-wallet-payments-daml/clean; splice-amulet-name-service-daml/clean; splitwell-daml/clean; splice-validator-lifecycle-daml/clean; splice-app-manager-daml/clean; apps-frontends/clean; cleanCnDars; docs/clean",
         ) ++
-        addCommandAlias("cn-clean", "; clean-cn")
+        addCommandAlias("splice-clean", "; clean-splice")
     val buildSettings = inThisBuild(
       Seq(
         organization := "org.lfdecentralizedtrust.splice",
