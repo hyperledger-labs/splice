@@ -161,7 +161,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-sv",
@@ -209,7 +209,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -395,7 +395,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -435,7 +435,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "loopback",
     "provider": "",
@@ -445,7 +445,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-scan",
+      "chart": "splice-scan",
       "compat": "true",
       "maxHistory": 10,
       "name": "scan",
@@ -504,7 +504,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "scan",
     "provider": "",
@@ -650,7 +650,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "apps-pg",
@@ -699,7 +699,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -709,7 +709,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-sv-node",
+      "chart": "splice-sv-node",
       "compat": "true",
       "maxHistory": 10,
       "name": "sv-app",
@@ -857,7 +857,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "sv-app",
     "provider": "",
@@ -867,7 +867,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cometbft",
+      "chart": "splice-cometbft",
       "compat": "true",
       "maxHistory": 10,
       "name": "cometbft-global-domain-2",
@@ -961,7 +961,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "sv-cometbft-global-domain-2",
     "provider": "",
@@ -1021,7 +1021,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-global-domain",
+      "chart": "splice-global-domain",
       "compat": "true",
       "maxHistory": 10,
       "name": "global-domain-2",
@@ -1097,7 +1097,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "sv-global-domain-2",
     "provider": "",
@@ -1127,7 +1127,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "mediator-pg",
@@ -1176,7 +1176,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1186,7 +1186,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-2",
@@ -1259,7 +1259,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "sv-participant-2",
     "provider": "",
@@ -1289,7 +1289,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-pg",
@@ -1336,7 +1336,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1366,7 +1366,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "sequencer-pg",
@@ -1413,7 +1413,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1440,7 +1440,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator",
@@ -1527,7 +1527,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator",
     "provider": "",

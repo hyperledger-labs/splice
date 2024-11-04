@@ -329,7 +329,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-splitwell-uis",
@@ -417,7 +417,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -499,7 +499,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -542,7 +542,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -552,7 +552,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-2",
@@ -622,7 +622,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "splitwell-participant-2",
     "provider": "",
@@ -692,7 +692,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-splitwell-app",
+      "chart": "splice-splitwell-app",
       "compat": "true",
       "maxHistory": 10,
       "name": "splitwell-app",
@@ -751,7 +751,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -881,7 +881,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-splitwell",
@@ -1005,7 +1005,7 @@
         "validatorPartyHint": "digitalasset-splitwell-1",
         "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

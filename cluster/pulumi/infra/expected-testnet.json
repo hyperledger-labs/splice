@@ -478,7 +478,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-istio-gateway",
+      "chart": "splice-istio-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-gateway",
@@ -524,7 +524,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "cluster-gateway",
     "provider": "",

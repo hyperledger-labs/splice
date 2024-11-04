@@ -114,7 +114,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-validator",
@@ -156,7 +156,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -238,7 +238,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -278,7 +278,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "loopback",
     "provider": "",
@@ -409,7 +409,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-2",
@@ -480,7 +480,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator-participant-2",
     "provider": "",
@@ -510,7 +510,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-postgres",
+      "chart": "splice-postgres",
       "compat": "true",
       "maxHistory": 10,
       "name": "postgres",
@@ -559,7 +559,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -586,7 +586,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator",
@@ -675,7 +675,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator",
     "provider": "",
