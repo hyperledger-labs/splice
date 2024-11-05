@@ -469,9 +469,13 @@ abstract class WalletAppReference(
   @Help.Description(
     "Send the given amulet to the receiver using their TransferPreapproval contract, fails if they do not have one"
   )
-  def transferPreapprovalSend(receiver: PartyId, amount: BigDecimal): Unit =
+  def transferPreapprovalSend(
+      receiver: PartyId,
+      amount: BigDecimal,
+      deduplicationId: String,
+  ): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.TransferPreapprovalSend(receiver, amount))
+      httpCommand(HttpWalletAppClient.TransferPreapprovalSend(receiver, amount, deduplicationId))
     }
 }
 

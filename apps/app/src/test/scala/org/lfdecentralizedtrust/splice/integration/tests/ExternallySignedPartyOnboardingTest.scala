@@ -99,7 +99,7 @@ class ExternallySignedPartyOnboardingTest
           .receiver shouldBe partyId.toProtoPrimitive
       }
 
-      aliceValidatorWalletClient.transferPreapprovalSend(partyId, 40.0)
+      aliceValidatorWalletClient.transferPreapprovalSend(partyId, 40.0, UUID.randomUUID.toString)
       aliceValidatorBackend
         .getExternalPartyBalance(partyId)
         .totalUnlockedCoin shouldBe "40.0000000000"

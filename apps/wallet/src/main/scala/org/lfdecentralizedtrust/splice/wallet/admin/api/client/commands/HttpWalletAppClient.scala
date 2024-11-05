@@ -1004,13 +1004,17 @@ object HttpWalletAppClient {
         extends CreateTransferPreapprovalResponse
   }
 
-  final case class TransferPreapprovalSend(receiver: PartyId, amount: BigDecimal)
-      extends InternalBaseCommand[http.TransferPreapprovalSendResponse, Unit] {
+  final case class TransferPreapprovalSend(
+      receiver: PartyId,
+      amount: BigDecimal,
+      deduplicationId: String,
+  ) extends InternalBaseCommand[http.TransferPreapprovalSendResponse, Unit] {
     override def submitRequest(client: Client, headers: List[HttpHeader]) =
       client.transferPreapprovalSend(
         definitions.TransferPreapprovalSendRequest(
           receiverPartyId = Codec.encode(receiver),
           amount = Codec.encode(amount),
+          deduplicationId = deduplicationId,
         ),
         headers = headers,
       )

@@ -518,7 +518,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       validatorBackend
         .getExternalPartyBalance(externalParty)
         .totalUnlockedCoin shouldBe "0.0000000000"
-      walletClient.transferPreapprovalSend(externalParty, 40.0)
+      walletClient.transferPreapprovalSend(externalParty, 40.0, UUID.randomUUID.toString)
       validatorBackend
         .getExternalPartyBalance(externalParty)
         .totalUnlockedCoin shouldBe "40.0000000000"

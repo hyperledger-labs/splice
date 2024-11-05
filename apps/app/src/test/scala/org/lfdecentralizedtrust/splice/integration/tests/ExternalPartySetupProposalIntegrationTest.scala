@@ -48,6 +48,7 @@ import com.digitalasset.canton.util.HexString
 import monocle.macros.syntax.lens.*
 
 import java.time.{Duration, Instant}
+import java.util.UUID
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -162,7 +163,7 @@ class ExternalPartySetupProposalIntegrationTest
     aliceValidatorBackend
       .getExternalPartyBalance(aliceParty)
       .totalUnlockedCoin shouldBe "0.0000000000"
-    aliceValidatorWalletClient.transferPreapprovalSend(aliceParty, 40.0)
+    aliceValidatorWalletClient.transferPreapprovalSend(aliceParty, 40.0, UUID.randomUUID.toString)
     aliceValidatorBackend
       .getExternalPartyBalance(aliceParty)
       .totalUnlockedCoin shouldBe "40.0000000000"

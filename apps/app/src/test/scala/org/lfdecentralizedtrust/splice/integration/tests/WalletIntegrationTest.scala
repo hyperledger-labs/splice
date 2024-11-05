@@ -570,19 +570,24 @@ class WalletIntegrationTest
         )
         aliceWalletClient.createTransferPreapproval() shouldBe CreateTransferPreapprovalResponse
           .AlreadyExists(cid)
-        bobWalletClient.tap(walletAmuletToUsd(50.0))
-        bobWalletClient.balance().unlockedQty should beAround(50.0)
+        bobWalletClient.tap(walletAmuletToUsd(100.0))
+        bobWalletClient.balance().unlockedQty should beAround(100.0)
         aliceWalletClient.balance().unlockedQty should beAround(0.0)
+        val deduplicationId = UUID.randomUUID.toString
         actAndCheck(
           "Bob sends Alice 40.0 amulet",
-          bobWalletClient.transferPreapprovalSend(aliceUserParty, 40.0),
+          bobWalletClient.transferPreapprovalSend(aliceUserParty, 40.0, deduplicationId),
         )(
           "Alice and Bob's balance are updated",
           _ => {
-            // Fees eat up the remainder which is why we allow bob’s balance to drop to close to 0
-            bobWalletClient.balance().unlockedQty should beWithin(0.0, 10.0)
+            // Fees eat up quite a bit
+            bobWalletClient.balance().unlockedQty should beWithin(47, 48)
             aliceWalletClient.balance().unlockedQty should beAround(40.0)
           },
+        )
+        assertThrowsAndLogsCommandFailures(
+          bobWalletClient.transferPreapprovalSend(aliceUserParty, 40.0, deduplicationId),
+          _.errorMessage should include("409 Conflict"),
         )
     }
 

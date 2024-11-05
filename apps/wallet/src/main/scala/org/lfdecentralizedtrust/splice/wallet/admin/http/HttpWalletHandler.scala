@@ -52,8 +52,8 @@ import io.circe.Json
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.UUID
 import java.math.RoundingMode as JRM
+import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 import scala.reflect.ClassTag
@@ -787,6 +787,19 @@ class HttpWalletHandler(
                 r0.TransferPreapprovalSendResponse.OK,
               extraDisclosedContracts = wallet.connection.disclosedContracts(
                 preapproval
+              ),
+              dedupConfig = Some(
+                AmuletOperationDedupConfig(
+                  CommandId(
+                    "transferPreapprovalSend",
+                    Seq(wallet.store.key.endUserParty),
+                    body.deduplicationId,
+                  ),
+                  // Hardcoded to 24h
+                  DedupDuration(
+                    com.google.protobuf.Duration.newBuilder().setSeconds(60 * 60 * 24).build()
+                  ),
+                )
               ),
             )
           } yield result

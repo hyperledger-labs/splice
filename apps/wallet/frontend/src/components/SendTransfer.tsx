@@ -52,17 +52,17 @@ const SendTransfer: React.FC = () => {
 
   const ccAmount = useMemo(() => new BigNumber(ccAmountText), [ccAmountText]);
 
-  // Only set trackingId once. In the success case, it doesn't matter because of `isSending` & the `navigate`.
+  // Only set deduplication id once. In the success case, it doesn't matter because of `isSending` & the `navigate`.
   // But: if the transfer is accepted by the BE, but the response fails to reach the FE (e.g., timeout),
   // you need to make sure that if the user clicks "Send" again it will be with the same key to prevent double-sends.
-  const trackingId: string = useMemo(() => uuidv4(), []);
+  const deduplicationId: string = useMemo(() => uuidv4(), []);
 
   const navigate = useNavigate();
   const createTransferOfferMutation = useMutation({
     mutationFn: async () => {
       const now = new Date();
       const expires = addHours(now, Number(expDays) * 24);
-      return await createTransferOffer(receiver, ccAmount, description, expires, trackingId);
+      return await createTransferOffer(receiver, ccAmount, description, expires, deduplicationId);
     },
     onSuccess: () => {
       navigate('/transactions');
@@ -70,7 +70,7 @@ const SendTransfer: React.FC = () => {
     onError: error => {
       // TODO (#5491): show an error to the user.
       console.error(
-        `Failed to create transfer offer to ${receiver} of ${ccAmount} CC with trackingId ${trackingId}`,
+        `Failed to create transfer offer to ${receiver} of ${ccAmount} CC with trackingId ${deduplicationId}`,
         error
       );
     },
@@ -80,7 +80,7 @@ const SendTransfer: React.FC = () => {
 
   const transferPreapprovalSendMutation = useMutation({
     mutationFn: async () => {
-      return await transferPreapprovalSend(receiver, ccAmount);
+      return await transferPreapprovalSend(receiver, ccAmount, deduplicationId);
     },
     onSuccess: () => {
       navigate('/transactions');
@@ -88,7 +88,7 @@ const SendTransfer: React.FC = () => {
     onError: error => {
       // TODO (#5491): show an error to the user.
       console.error(
-        `Failed to send transfer to ${receiver} of ${ccAmount} CC with trackingId ${trackingId}`,
+        `Failed to send transfer to ${receiver} of ${ccAmount} CC with deduplicationId ${deduplicationId}`,
         error
       );
     },

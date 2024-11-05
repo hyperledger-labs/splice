@@ -156,4 +156,61 @@ describe('Wallet user can', () => {
     );
     expect(requestMocks.transferPreapprovalSend).not.toHaveBeenCalled();
   });
+
+  test('deduplication id is passed', async () => {
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+    expect(await screen.findByText('Transfer')).toBeDefined();
+
+    let transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
+    await user.click(transferOffersLink);
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
+
+    let receiverInput = screen
+      .getAllByRole('combobox')
+      .find(e => e.id === 'create-offer-receiver')!;
+    fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    requestMocks.transferPreapprovalSend.mockImplementationOnce(() => {
+      throw new Error('Request failed');
+    });
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledTimes(1);
+    const firstDeduplicationId =
+      requestMocks.transferPreapprovalSend.mock.lastCall![0].deduplication_id;
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledTimes(2);
+    const secondDeduplicationId =
+      requestMocks.transferPreapprovalSend.mock.lastCall![0].deduplication_id;
+    expect(firstDeduplicationId).toBe(secondDeduplicationId);
+
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+    expect(await screen.findByText('Transfer')).toBeDefined();
+
+    transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
+    await user.click(transferOffersLink);
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
+
+    receiverInput = screen.getAllByRole('combobox').find(e => e.id === 'create-offer-receiver')!;
+    fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    requestMocks.transferPreapprovalSend.mockImplementationOnce(() => {
+      throw new Error('Request failed');
+    });
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledTimes(3);
+    const thirdDeduplicationId =
+      requestMocks.transferPreapprovalSend.mock.lastCall![0].deduplication_id;
+    expect(thirdDeduplicationId).not.toBe(firstDeduplicationId);
+  }, 10000);
 });

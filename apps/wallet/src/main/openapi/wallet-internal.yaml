@@ -996,8 +996,14 @@ components:
       required:
         - receiver_party_id
         - amount
+        - deduplication_id
       properties:
         receiver_party_id:
           type: string
         amount:
+          type: string
+        deduplication_id:
+          description: |
+            Deduplication id, only one successful transfer with this id
+            will be accepted within a 24h period.
           type: string
