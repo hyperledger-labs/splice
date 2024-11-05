@@ -1315,6 +1315,7 @@ template TransferPreapproval
       controller sender
       do now <- getTime
          require "Contract is not expired" (now < expiresAt)
+         _ <- fetchChecked (ForDso dso) context.amuletRules
          transferResult <- exercisePaymentTransfer context Transfer with
            sender
            provider

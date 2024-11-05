@@ -100,6 +100,19 @@ template TransferCommand
         transferCounterCid : ContractId TransferCommandCounter
       controller delegate
       do transferCounter <- fetchChecked (ForOwner with owner = sender, dso) transferCounterCid
+
+         let mergeInputsAndReportError error = do
+             -- In the absence of automatic merging of inputs for external parties, it is possible for
+             -- a user to accumulate tons of small amulet holdings and be unable to do a transfer.
+             -- We do a self-transfer to merge inputs even in case of a failed transfer to guard against this.
+             _ <- fetchChecked (ForDso dso) context.amuletRules
+             _ <- exercisePaymentTransfer context Transfer with
+               sender
+               provider = delegate
+               inputs = inputs
+               outputs = []
+             pure (TransferCommandResultFailure error)
+
          if | transferCounter.nextNonce > nonce ->
               -- Fail but archive the TransferCommand
               pure TransferCommand_SendResult with
@@ -136,8 +149,8 @@ template TransferCommand
                       TransferPreapproval_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender)
                       pure (TransferCommandResultSuccess result)
                     catch
-                      (ex : InvalidTransfer) -> pure (TransferCommandResultFailure ex.reason)
-                      (ex : AnyException) -> pure (TransferCommandResultFailure (ITR_Other $ message ex))
+                      (ex : InvalidTransfer) -> mergeInputsAndReportError ex.reason
+                      (ex : AnyException) -> mergeInputsAndReportError (ITR_Other $ message ex)
                   pure TransferCommand_SendResult with
                     result
                     sender

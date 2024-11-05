@@ -210,7 +210,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 12
       nonce = 1
 
-  amulet <- tap app alice 50.0
+  allAmulets <- query @Amulet alice.primaryParty
 
   context <- getPaymentTransferContext app alice
 
@@ -220,7 +220,7 @@ testTransferCommand = script do
   submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
-      inputs = [InputAmulet amulet]
+      inputs = map (InputAmulet . fst) allAmulets
       transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
@@ -235,17 +235,20 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 1
       nonce = 1
 
-  amulet <- tap app alice 10.0
+  assert (length allAmulets > 1)
 
   -- fails with out of funds
   TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso]  $ exerciseCmd transferCmd TransferCommand_Send
     with
       context = context
-      inputs = [InputAmulet amulet]
+      inputs = map (InputAmulet . fst) allAmulets
       transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
-  reason === ITR_InsufficientFunds 32.45
+  reason === ITR_InsufficientFunds 33.93
+
+  -- amulets get merged even on failed transfers
+  [(amulet, _)] <- query @Amulet alice.primaryParty
 
   [(transferCounterCid, transferCounter)] <- query @TransferCommandCounter alice.primaryParty
   -- counter increases even on failed transfers
