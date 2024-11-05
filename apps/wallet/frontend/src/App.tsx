@@ -29,16 +29,19 @@ import Root from './routes/root';
 import Subscriptions from './routes/subscriptions';
 import Transactions from './routes/transactions';
 import Transfer from './routes/transfer';
-import { useWalletConfig } from './utils/config';
+import { useConfigPollInterval, useWalletConfig } from './utils/config';
 
 const App: React.FC = () => {
   const config = useWalletConfig();
+  const refetchInterval = useConfigPollInterval();
+
   const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     const config = useWalletConfig();
     const navigate = useNavigate();
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
+          refetchInterval,
           structuralSharing: replaceEqualDeep,
         },
       },

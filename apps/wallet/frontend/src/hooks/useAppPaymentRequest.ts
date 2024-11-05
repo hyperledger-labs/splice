@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { ContractWithState, PollingStrategy } from 'common-frontend-utils';
+import { ContractWithState } from 'common-frontend-utils';
 
 import { AppPaymentRequest } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 
@@ -12,7 +12,6 @@ export const useAppPaymentRequest = (
 ): UseQueryResult<ContractWithState<AppPaymentRequest>> => {
   const { getAppPaymentRequest } = useWalletClient();
   return useQuery({
-    refetchInterval: PollingStrategy.FIXED, // it might change domains, so we want to periodically update it
     queryKey: ['appPaymentRequest', cid],
     queryFn: async () => {
       return await getAppPaymentRequest(cid);

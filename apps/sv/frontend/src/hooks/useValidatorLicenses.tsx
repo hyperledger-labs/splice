@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { UseInfiniteQueryResult, useInfiniteQuery } from '@tanstack/react-query';
 import { ValidatorLicensesPage } from 'common-frontend';
-import { Contract, PollingStrategy } from 'common-frontend-utils';
+import { Contract } from 'common-frontend-utils';
 
 import { ValidatorLicense } from '@daml.js/splice-amulet/lib/Splice/ValidatorLicense/module';
 
@@ -13,7 +13,6 @@ export const useValidatorLicenses = (
 ): UseInfiniteQueryResult<ValidatorLicensesPage> => {
   const { listValidatorLicenses } = useSvAdminClient();
   return useInfiniteQuery({
-    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listValidatorLicenses', limit],
     queryFn: async ({ pageParam }) => {
       const page = await listValidatorLicenses(limit, pageParam);

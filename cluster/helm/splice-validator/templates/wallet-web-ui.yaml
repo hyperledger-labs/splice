@@ -53,6 +53,8 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
         - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
+        - name: SPLICE_APP_UI_POLL_INTERVAL
+          value: {{ .Values.uiPollInterval | quote }}
         image: "{{ .Values.imageRepo }}/wallet-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).wallet_web_ui) }}"
         {{- with .Values.imagePullPolicy }}
         imagePullPolicy: {{ . }}

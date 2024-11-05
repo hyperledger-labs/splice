@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+upcoming
+--------
+
+* Deployment
+
+  * An optional value ``uiPollInterval`` has been added to the Helm charts for ``splice-scan``, ``splice-sv-node``, and ``splice-validator``. This value allows you to configure the interval at which the deployed UIs poll the services for updates in milliseconds. If unspecified, the default value is 1000 (1 second).
+
+
 0.2.7
 -----
 

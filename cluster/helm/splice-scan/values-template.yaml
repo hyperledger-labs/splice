@@ -50,3 +50,6 @@ spliceInstanceNames:
 
 # k8s tolerations for all deployed pods (optional)
 # tolerations:
+
+# set the poll interval used by the UI in milliseconds (optional)
+# uiPollInterval:

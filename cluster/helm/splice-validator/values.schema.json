@@ -16,6 +16,10 @@
     "spliceInstanceNames": {
       "type": "object",
       "description": "The names unique for the splice instance, must be specified as provided in the docs"
+    },
+    "uiPollInterval": {
+      "type": "number",
+      "description": "The interval in milliseconds to poll the UI for updates"
     }
   },
   "allOf": [

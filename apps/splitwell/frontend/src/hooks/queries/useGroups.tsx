@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { QueryClient, UseQueryResult, useQuery } from '@tanstack/react-query';
-import { AssignedContract, PollingStrategy } from 'common-frontend-utils';
+import { AssignedContract } from 'common-frontend-utils';
 
 import { Group } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
@@ -17,7 +17,6 @@ export const getGroups = (party: string, queryClient: QueryClient): AssignedCont
 export const useGroups = (party: string): UseQueryResult<AssignedContract<Group>[]> => {
   const splitwellClient = useSplitwellClient();
   return useQuery({
-    refetchInterval: PollingStrategy.FIXED,
     queryKey: groupsQueryKey(party),
     queryFn: async () => {
       const newGroups = (await splitwellClient.listGroups(party)).groups;

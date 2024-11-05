@@ -26,15 +26,17 @@ import Root from './routes/root';
 import ScanValidatorLicenses from './routes/scanValidatorLicenses';
 import ValidatorFaucetsLeaderboard from './routes/validatorFaucetsLeaderboard';
 import ValidatorLeaderboard from './routes/validatorLeaderboard';
-import { useScanConfig } from './utils';
+import { useConfigPollInterval, useScanConfig } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const config = useScanConfig();
+  const refetchInterval = useConfigPollInterval();
+
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         // rounds update every 2.5 minutes, but for testing it's better to refresh more often, e.g. every 5 seconds
-        refetchInterval: 5 * 1000,
+        refetchInterval,
         structuralSharing: replaceEqualDeep,
       },
     },

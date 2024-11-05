@@ -22,13 +22,16 @@ import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
 import PostPayment from './routes/postPayment';
 import Root from './routes/root';
-import { useAnsConfig } from './utils';
+import { useAnsConfig, useConfigPollInterval } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const config = useAnsConfig();
+  const refetchInterval = useConfigPollInterval();
+
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
+        refetchInterval,
         structuralSharing: replaceEqualDeep,
       },
     },

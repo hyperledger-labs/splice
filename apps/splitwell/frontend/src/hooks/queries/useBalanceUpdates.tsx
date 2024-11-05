@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract } from 'common-frontend-utils';
-import { PollingStrategy } from 'common-frontend-utils';
 
 import { BalanceUpdate, Group } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
@@ -15,7 +14,6 @@ export const useBalanceUpdates = (
   const splitwellClient = useSplitwellClient();
 
   return useQuery({
-    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['balanceUpdates', group, party],
     queryFn: async () => {
       const balanceUpdates = (
