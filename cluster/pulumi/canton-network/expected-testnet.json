@@ -1419,7 +1419,7 @@
           {
             "name": "Orb-1-LP",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJjVrU8AbQM12OyHwsoI1uHNQrtOYO5IFbB7w46F+ivPWSIo+7nqh5nKYFkFoMNPEYGUwrO57N12rj8Dyb0ldDg==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 0
           },
           {
             "name": "MPC-Holding-Inc",
@@ -1429,7 +1429,7 @@
           {
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEM/I3om2cE1ccDhYdy3wwKys3afBskv/OsRe8Jr52RywZOke+TfNbqQYcltATswgDi3HPdJUG3IEgo4Fh2vfl+g==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {
