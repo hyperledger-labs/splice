@@ -30,6 +30,7 @@ import com.digitalasset.canton.protocol.{
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.DefaultTestIdentities.*
 import com.digitalasset.canton.topology.client.*
+import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.topology.store.{
@@ -37,8 +38,8 @@ import com.digitalasset.canton.topology.store.{
   TopologyStoreId,
   ValidatedTopologyTransaction,
 }
-import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Remove
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Remove
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.{ErrorUtil, MapsUtil}
 import com.digitalasset.canton.{BaseTest, LfPackageId, LfPartyId}
@@ -46,6 +47,8 @@ import com.digitalasset.canton.{BaseTest, LfPackageId, LfPartyId}
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Try
+
+import TestingTopology.*
 
 /** Utility functions to setup identity & crypto apis for testing purposes
   *
@@ -94,31 +97,15 @@ import scala.util.Try
   * @param keyPurposes The purposes of the keys that will be generated.
   */
 final case class TestingTopology(
-    domains: Set[DomainId] = Set(DefaultTestIdentities.domainId),
-    topology: Map[LfPartyId, Map[ParticipantId, ParticipantPermission]] = Map.empty,
-    mediatorGroups: Set[MediatorGroup] = Set(
-      MediatorGroup(
-        NonNegativeInt.zero,
-        NonEmpty.mk(Seq, DefaultTestIdentities.mediatorId),
-        Seq(),
-        PositiveInt.one,
-      )
-    ),
-    sequencerGroup: SequencerGroup = SequencerGroup(
-      active = NonEmpty.mk(Seq, DefaultTestIdentities.sequencerId),
-      passive = Seq.empty,
-      threshold = PositiveInt.one,
-    ),
+    domains: Set[DomainId] = defaultDomains,
+    topology: Map[LfPartyId, PartyInfo] = Map.empty,
+    mediatorGroups: Set[MediatorGroup] = defaultMediatorGroups,
+    sequencerGroup: SequencerGroup = defaultSequencerGroup,
     participants: Map[ParticipantId, ParticipantAttributes] = Map.empty,
-    packages: Map[ParticipantId, Seq[LfPackageId]] = Map.empty,
+    packages: Map[ParticipantId, Seq[VettedPackage]] = Map.empty,
     keyPurposes: Set[KeyPurpose] = KeyPurpose.All,
-    domainParameters: List[DomainParameters.WithValidity[DynamicDomainParameters]] = List(
-      DomainParameters.WithValidity(
-        validFrom = CantonTimestamp.Epoch,
-        validUntil = None,
-        parameter = DefaultTestIdentities.defaultDynamicDomainParameters,
-      )
-    ),
+    domainParameters: List[DomainParameters.WithValidity[DynamicDomainParameters]] =
+      defaultDomainParams,
     freshKeys: Boolean = false,
 ) {
   def mediators: Seq[MediatorId] = mediatorGroups.toSeq.flatMap(_.all)
@@ -132,7 +119,7 @@ final case class TestingTopology(
   def withDynamicDomainParameters(
       dynamicDomainParameters: DynamicDomainParameters,
       validFrom: CantonTimestamp = CantonTimestamp.Epoch,
-  ) = {
+  ) =
     copy(
       domainParameters = List(
         DomainParameters.WithValidity(
@@ -142,7 +129,6 @@ final case class TestingTopology(
         )
       )
     )
-  }
 
   /** Overwrites the `sequencerGroup` field.
     */
@@ -171,10 +157,10 @@ final case class TestingTopology(
   ): TestingTopology =
     this.copy(participants = participants.toMap)
 
-  def allParticipants(): Set[ParticipantId] = {
+  def allParticipants(): Set[ParticipantId] =
     (topology.values
+      .map(_.participants)
       .flatMap(x => x.keys) ++ participants.keys).toSet
-  }
 
   def withKeyPurposes(keyPurposes: Set[KeyPurpose]): TestingTopology =
     this.copy(keyPurposes = keyPurposes)
@@ -187,38 +173,49 @@ final case class TestingTopology(
       parties: Map[LfPartyId, ParticipantId],
       permission: ParticipantPermission = ParticipantPermission.Submission,
   ): TestingTopology = {
-    val tmp: Map[LfPartyId, Map[ParticipantId, ParticipantPermission]] = parties.toSeq
-      .map { case (party, participant) =>
-        (party, (participant, permission))
-      }
-      .groupBy(_._1)
-      .fmap(res => res.map(_._2).toMap)
-    this.copy(topology = tmp)
+    val topology: Map[LfPartyId, PartyInfo] = parties
+      .fmap(_ -> permission)
+      .groupMap(_._1)(_._2)
+      .fmap(participants => toPartyInfo(participants.toMap))
+
+    this.copy(topology = topology)
   }
 
   /** Define the topology as a map of participant to map of parties */
   def withReversedTopology(
       parties: Map[ParticipantId, Map[LfPartyId, ParticipantPermission]]
   ): TestingTopology = {
-    val converted = parties
+    val converted = parties.toSeq
       .flatMap { case (participantId, partyToPermission) =>
         partyToPermission.toSeq.map { case (party, permission) =>
-          (party, participantId, permission)
+          (party, (participantId, permission))
         }
       }
-      .groupBy(_._1)
-      .fmap(_.map { case (_, pid, permission) =>
-        (pid, permission)
-      }.toMap)
+      .groupMap(_._1)(_._2)
+      .fmap(participants => toPartyInfo(participants.toMap))
     copy(topology = converted)
   }
 
+  def withThreshold(
+      parties: Map[LfPartyId, (PositiveInt, Seq[ParticipantId])]
+  ): TestingTopology = {
+    val tmp: Map[LfPartyId, PartyInfo] = parties.map { case (party, (threshold, participants)) =>
+      party -> PartyInfo(
+        threshold,
+        participants
+          .map(pid => pid -> ParticipantAttributes(ParticipantPermission.Confirmation, None))
+          .toMap,
+      )
+    }
+    this.copy(topology = tmp)
+  }
+
   def withPackages(packages: Map[ParticipantId, Seq[LfPackageId]]): TestingTopology =
-    this.copy(packages = packages)
+    this.copy(packages = packages.view.mapValues(VettedPackage.unbounded).toMap)
 
   def build(
       loggerFactory: NamedLoggerFactory = NamedLoggerFactory("test-area", "crypto")
-  ): TestingIdentityFactory = {
+  ): TestingIdentityFactory =
     build(
       SymbolicCrypto.create(
         testedReleaseProtocolVersion,
@@ -227,13 +224,64 @@ final case class TestingTopology(
       ),
       loggerFactory,
     )
-  }
 
   def build(
       crypto: SymbolicCrypto,
       loggerFactory: NamedLoggerFactory,
   ): TestingIdentityFactory =
     new TestingIdentityFactory(this, crypto, loggerFactory, domainParameters)
+}
+
+object TestingTopology {
+
+  private val defaultDomains: Set[DomainId] = Set(DefaultTestIdentities.domainId)
+  private val defaultSequencerGroup: SequencerGroup = SequencerGroup(
+    active = Seq(DefaultTestIdentities.sequencerId),
+    passive = Seq.empty,
+    threshold = PositiveInt.one,
+  )
+  private val defaultMediatorGroups: Set[MediatorGroup] = Set(
+    MediatorGroup(
+      NonNegativeInt.zero,
+      Seq(DefaultTestIdentities.mediatorId),
+      Seq(),
+      PositiveInt.one,
+    )
+  )
+  private val defaultDomainParams = List(
+    DomainParameters.WithValidity(
+      validFrom = CantonTimestamp.Epoch,
+      validUntil = None,
+      parameter = DefaultTestIdentities.defaultDynamicDomainParameters,
+    )
+  )
+
+  def from(
+      domains: Set[DomainId] = defaultDomains,
+      topology: Map[LfPartyId, Map[ParticipantId, ParticipantPermission]] = Map.empty,
+      mediatorGroups: Set[MediatorGroup] = defaultMediatorGroups,
+      sequencerGroup: SequencerGroup = defaultSequencerGroup,
+      participants: Map[ParticipantId, ParticipantAttributes] = Map.empty,
+      packages: Map[ParticipantId, Seq[VettedPackage]] = Map.empty,
+      domainParameters: List[DomainParameters.WithValidity[DynamicDomainParameters]] =
+        defaultDomainParams,
+  ): TestingTopology =
+    new TestingTopology(
+      domains = domains,
+      topology = topology.fmap(toPartyInfo),
+      mediatorGroups = mediatorGroups,
+      sequencerGroup = sequencerGroup,
+      participants = participants,
+      packages = packages,
+      domainParameters = domainParameters,
+    )
+
+  private def toPartyInfo(participants: Map[ParticipantId, ParticipantPermission]): PartyInfo = {
+    val participantAttributes = participants.map { case (participantId, permission) =>
+      participantId -> ParticipantAttributes(permission, None)
+    }
+    PartyInfo(threshold = PositiveInt.one, participants = participantAttributes)
+  }
 }
 
 class TestingIdentityFactory(
@@ -249,7 +297,7 @@ class TestingIdentityFactory(
       owner: Member,
       availableUpToInclusive: CantonTimestamp = CantonTimestamp.MaxValue,
       currentSnapshotApproximationTimestamp: CantonTimestamp = CantonTimestamp.Epoch,
-  ): SyncCryptoApiProvider = {
+  ): SyncCryptoApiProvider =
     new SyncCryptoApiProvider(
       owner,
       ips(availableUpToInclusive, currentSnapshotApproximationTimestamp),
@@ -259,7 +307,6 @@ class TestingIdentityFactory(
       FutureSupervisor.Noop,
       loggerFactory,
     )
-  }
 
   def forOwnerAndDomain(
       owner: Member,
@@ -297,7 +344,10 @@ class TestingIdentityFactory(
         override def trySnapshot(timestamp: CantonTimestamp)(implicit
             traceContext: TraceContext
         ): TopologySnapshot = {
-          require(timestamp <= upToInclusive, "Topology information not yet available")
+          require(
+            timestamp <= upToInclusive,
+            s"Topology information not yet available for $timestamp",
+          )
           topologySnapshot(domainId, timestampForDomainParameters = timestamp)
         }
 
@@ -313,8 +363,8 @@ class TestingIdentityFactory(
         override def snapshotAvailable(timestamp: CantonTimestamp): Boolean =
           timestamp <= upToInclusive
 
-        override def awaitTimestamp(timestamp: CantonTimestamp, waitForEffectiveTime: Boolean)(
-            implicit traceContext: TraceContext
+        override def awaitTimestamp(timestamp: CantonTimestamp)(implicit
+            traceContext: TraceContext
         ): Option[Future[Unit]] = Option.when(timestamp > upToInclusive) {
           ErrorUtil.internalErrorAsync(
             new IllegalArgumentException(
@@ -323,10 +373,10 @@ class TestingIdentityFactory(
           )
         }
 
-        override def awaitTimestampUS(timestamp: CantonTimestamp, waitForEffectiveTime: Boolean)(
-            implicit traceContext: TraceContext
+        override def awaitTimestampUS(timestamp: CantonTimestamp)(implicit
+            traceContext: TraceContext
         ): Option[FutureUnlessShutdown[Unit]] =
-          awaitTimestamp(timestamp, waitForEffectiveTime).map(FutureUnlessShutdown.outcomeF)
+          awaitTimestamp(timestamp).map(FutureUnlessShutdown.outcomeF)
 
         override def approximateTimestamp: CantonTimestamp =
           currentSnapshotApproximation(TraceContext.empty).timestamp
@@ -352,6 +402,11 @@ class TestingIdentityFactory(
         override def snapshotUS(timestamp: CantonTimestamp)(implicit
             traceContext: TraceContext
         ): FutureUnlessShutdown[TopologySnapshot] = awaitSnapshotUS(timestamp)
+
+        override def awaitMaxTimestampUS(sequencedTime: CantonTimestamp)(implicit
+            traceContext: TraceContext
+        ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
+          FutureUnlessShutdown.pure(None)
       })
     )
     ips
@@ -376,8 +431,14 @@ class TestingIdentityFactory(
     )
 
     // Compute default participant permissions to be the highest granted to an individual party
+    val partyToParticipantPermission: Map[LfPartyId, Map[ParticipantId, ParticipantPermission]] =
+      topology.topology.map { case (partyId, partyInfo) =>
+        partyId -> partyInfo.participants.map { case (participantId, attributes) =>
+          participantId -> attributes.permission
+        }
+      }
     val defaultPermissionByParticipant: Map[ParticipantId, ParticipantPermission] =
-      topology.topology.foldLeft(Map.empty[ParticipantId, ParticipantPermission]) {
+      partyToParticipantPermission.foldLeft(Map.empty[ParticipantId, ParticipantPermission]) {
         case (acc, (_, permissionByParticipant)) =>
           MapsUtil.extendedMapWith(acc, permissionByParticipant)(ParticipantPermission.higherOf)
       }
@@ -385,7 +446,7 @@ class TestingIdentityFactory(
     val participantTxs = participantsTxs(defaultPermissionByParticipant, topology.packages)
 
     val domainMembers =
-      (topology.sequencerGroup.active.forgetNE ++ topology.sequencerGroup.passive ++ topology.mediators)
+      (topology.sequencerGroup.active ++ topology.sequencerGroup.passive ++ topology.mediators)
         .flatMap(m => genKeyCollection(m))
 
     val mediatorOnboarding = topology.mediatorGroups.map(group =>
@@ -408,7 +469,7 @@ class TestingIdentityFactory(
           .create(
             domainId,
             threshold = topology.sequencerGroup.threshold,
-            active = topology.sequencerGroup.active.forgetNE,
+            active = topology.sequencerGroup.active,
             observers = topology.sequencerGroup.passive,
           )
           .valueOr(err => sys.error(s"creating SequencerDomainState should not have failed: $err"))
@@ -510,7 +571,7 @@ class TestingIdentityFactory(
     NonEmpty
       .from(sigKey ++ encKey)
       .map { keys =>
-        mkAdd(OwnerToKeyMapping(owner, None, keys))
+        mkAdd(OwnerToKeyMapping(owner, keys))
       }
       .toList
   }
@@ -518,26 +579,23 @@ class TestingIdentityFactory(
   private def partyToParticipantTxs()
       : Iterable[SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]] =
     topology.topology
-      .map { case (lfParty, participants) =>
+      .map { case (lfParty, partyInfo) =>
         val partyId = PartyId.tryFromLfParty(lfParty)
-        val participantsForParty = participants.iterator.filter(_._1.uid != partyId.uid)
+        val participantsForParty = partyInfo.participants.filter(_._1.uid != partyId.uid)
         mkAdd(
-          PartyToParticipant
-            .tryCreate(
-              partyId,
-              None,
-              threshold = PositiveInt.one,
-              participantsForParty.map { case (id, permission) =>
-                HostingParticipant(id, permission)
-              }.toSeq,
-              groupAddressing = false,
-            )
+          PartyToParticipant.tryCreate(
+            partyId,
+            threshold = partyInfo.threshold,
+            participantsForParty.map { case (id, attributes) =>
+              HostingParticipant(id, attributes.permission)
+            }.toSeq,
+          )
         )
       }
 
   private def participantsTxs(
       defaultPermissionByParticipant: Map[ParticipantId, ParticipantPermission],
-      packages: Map[ParticipantId, Seq[LfPackageId]],
+      packages: Map[ParticipantId, Seq[VettedPackage]],
   ): Seq[SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]] = topology
     .allParticipants()
     .toSeq
@@ -554,14 +612,12 @@ class TestingIdentityFactory(
       val pkgs =
         packages
           .get(participantId)
-          .map(packages => mkAdd(VettedPackages(participantId, None, packages)))
+          .map(packages => mkAdd(VettedPackages.tryCreate(participantId, packages)))
           .toSeq
       pkgs ++ genKeyCollection(participantId) :+ mkAdd(
         DomainTrustCertificate(
           participantId,
           domainId,
-          transferOnlyToGivenTargetDomains = false,
-          targetDomains = Seq.empty,
         )
       ) :+ mkAdd(
         ParticipantDomainPermission(
@@ -589,6 +645,7 @@ class TestingOwnerWithKeys(
     implicit val ec: ExecutionContext = initEc
 
     val key1 = genSignKey("key1")
+    val key1_unsupportedSpec = genSignKey("key1", Some(SigningKeySpec.EcP384))
     val key2 = genSignKey("key2")
     val key3 = genSignKey("key3")
     val key4 = genSignKey("key4")
@@ -630,19 +687,17 @@ class TestingOwnerWithKeys(
     val id1k1 = mkAdd(IdentifierDelegation(uid, key1))
     val id2k2 = mkAdd(IdentifierDelegation(uid2, key2))
     val seq_okm_k2 = mkAddMultiKey(
-      OwnerToKeyMapping(sequencerId, None, NonEmpty(Seq, key2)),
+      OwnerToKeyMapping(sequencerId, NonEmpty(Seq, key2)),
       NonEmpty(Set, namespaceKey, key2),
     )
     val med_okm_k3 = mkAddMultiKey(
-      OwnerToKeyMapping(mediatorId, None, NonEmpty(Seq, key3)),
+      OwnerToKeyMapping(mediatorId, NonEmpty(Seq, key3)),
       NonEmpty(Set, namespaceKey, key3),
     )
     val dtc1m =
       DomainTrustCertificate(
         participant1,
         domainId,
-        transferOnlyToGivenTargetDomains = false,
-        targetDomains = Seq.empty,
       )
 
     private val defaultDomainParameters = TestDomainParameters.defaultDynamic
@@ -685,19 +740,19 @@ class TestingOwnerWithKeys(
       )
     )
 
-    val p1_dtc = mkAdd(DomainTrustCertificate(participant1, domainId, false, Seq.empty))
-    val p2_dtc = mkAdd(DomainTrustCertificate(participant2, domainId, false, Seq.empty))
-    val p3_dtc = mkAdd(DomainTrustCertificate(participant3, domainId, false, Seq.empty))
+    val p1_dtc = mkAdd(DomainTrustCertificate(participant1, domainId))
+    val p2_dtc = mkAdd(DomainTrustCertificate(participant2, domainId))
+    val p3_dtc = mkAdd(DomainTrustCertificate(participant3, domainId))
     val p1_otk = mkAddMultiKey(
-      OwnerToKeyMapping(participant1, None, NonEmpty(Seq, EncryptionKeys.key1, SigningKeys.key1)),
+      OwnerToKeyMapping(participant1, NonEmpty(Seq, EncryptionKeys.key1, SigningKeys.key1)),
       NonEmpty(Set, key1),
     )
     val p2_otk = mkAddMultiKey(
-      OwnerToKeyMapping(participant2, None, NonEmpty(Seq, EncryptionKeys.key2, SigningKeys.key2)),
+      OwnerToKeyMapping(participant2, NonEmpty(Seq, EncryptionKeys.key2, SigningKeys.key2)),
       NonEmpty(Set, key2),
     )
     val p3_otk = mkAddMultiKey(
-      OwnerToKeyMapping(participant3, None, NonEmpty(Seq, EncryptionKeys.key3, SigningKeys.key3)),
+      OwnerToKeyMapping(participant3, NonEmpty(Seq, EncryptionKeys.key3, SigningKeys.key3)),
       NonEmpty(Set, key3),
     )
 
@@ -724,10 +779,8 @@ class TestingOwnerWithKeys(
     val p1p1 = mkAdd(
       PartyToParticipant.tryCreate(
         PartyId(UniqueIdentifier.tryCreate("one", key1.id)),
-        None,
         PositiveInt.one,
         Seq(HostingParticipant(participant1, ParticipantPermission.Submission)),
-        groupAddressing = false,
       )
     )
 
@@ -827,12 +880,18 @@ class TestingOwnerWithKeys(
       signingKeys,
       isProposal,
     )
-  private def genSignKey(name: String): SigningPublicKey =
+  private def genSignKey(name: String, keySpecO: Option[SigningKeySpec] = None): SigningPublicKey =
     Await
       .result(
-        cryptoApi.crypto
-          .generateSigningKey(name = Some(KeyName.tryCreate(name)))
-          .value,
+        keySpecO.fold(
+          cryptoApi.crypto
+            .generateSigningKey(name = Some(KeyName.tryCreate(name)))
+            .value
+        )(keySpec =>
+          cryptoApi.crypto
+            .generateSigningKey(keySpec = keySpec, name = Some(KeyName.tryCreate(name)))
+            .value
+        ),
         30.seconds,
       )
       .onShutdown(sys.error("aborted due to shutdown"))
@@ -858,7 +917,7 @@ object TestingIdentityFactory {
       topology: Map[LfPartyId, Map[ParticipantId, ParticipantPermission]] = Map.empty,
   ): TestingIdentityFactory =
     TestingIdentityFactory(
-      TestingTopology(topology = topology),
+      TestingTopology.from(topology = topology),
       loggerFactory,
       TestDomainParameters.defaultDynamic,
       SymbolicCrypto
@@ -897,5 +956,4 @@ object TestingIdentityFactory {
       loggerFactory,
     ),
   )
-
 }

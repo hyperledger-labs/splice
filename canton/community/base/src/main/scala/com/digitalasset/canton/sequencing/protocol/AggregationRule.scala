@@ -47,7 +47,7 @@ final case class AggregationRule(
     threshold = threshold.value,
   )
 
-  override def pretty: Pretty[this.type] = prettyOfClass(
+  override protected def pretty: Pretty[this.type] = prettyOfClass(
     param("threshold", _.threshold),
     param("eligible members", _.eligibleSenders),
   )
@@ -72,7 +72,7 @@ object AggregationRule
   override def name: String = "AggregationRule"
 
   override def supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.AggregationRule)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.AggregationRule)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )

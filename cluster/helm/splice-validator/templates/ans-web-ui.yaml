@@ -1,20 +1,20 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-{{- $cnsWebUiLabel := "ans-web-ui" }}
+{{- $ansWebUiLabel := "ans-web-ui" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ $cnsWebUiLabel }}
+    app: {{ $ansWebUiLabel }}
     migration: {{ .Values.migration.id | quote }}
-  name: {{ $cnsWebUiLabel }}
+  name: {{ $ansWebUiLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ $cnsWebUiLabel }}
+      app: {{ $ansWebUiLabel }}
   strategy:
     type: Recreate
   template:
@@ -22,7 +22,7 @@ spec:
       annotations:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ $cnsWebUiLabel }}
+        app: {{ $ansWebUiLabel }}
         migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
@@ -58,6 +58,8 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
         - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
+        - name: SPLICE_APP_UI_POLL_INTERVAL
+          value: {{ .Values.uiPollInterval | quote }}
         ports:
         - containerPort: 80
           name: http
@@ -85,13 +87,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $cnsWebUiLabel }}
+  name: {{ $ansWebUiLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
     migration: {{ .Values.migration.id | quote }}
 spec:
   selector:
-    app: {{ $cnsWebUiLabel }}
+    app: {{ $ansWebUiLabel }}
   ports:
   - name: http
     port: 80

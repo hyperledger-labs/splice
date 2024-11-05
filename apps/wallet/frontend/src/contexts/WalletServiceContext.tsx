@@ -72,6 +72,11 @@ export interface WalletClient {
     expiresAt: Date,
     trackingId: string
   ) => Promise<void>;
+  transferPreapprovalSend: (
+    receiverPartyId: string,
+    amount: BigNumber,
+    deduplicationId: string
+  ) => Promise<void>;
   acceptTransferOffer: (offerContractId: string) => Promise<void>;
   withdrawTransferOffer: (offerContractId: string) => Promise<void>;
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
@@ -217,6 +222,18 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           tracking_id: trackingId,
         };
         await externalWalletClient.createTransferOffer(request);
+      },
+      transferPreapprovalSend: async (
+        receiverPartyId: string,
+        amount: BigNumber,
+        deduplicationId: string
+      ) => {
+        const request = {
+          receiver_party_id: receiverPartyId,
+          amount: amount.isInteger() ? amount.toFixed(1) : amount.toString(),
+          deduplication_id: deduplicationId,
+        };
+        await walletClient.transferPreapprovalSend(request);
       },
       listTransferOffers: async (): Promise<ListTransferOffersResponse> => {
         const res = await externalWalletClient.listTransferOffers();

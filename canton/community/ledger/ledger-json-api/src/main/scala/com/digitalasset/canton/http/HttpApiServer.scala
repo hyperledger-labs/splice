@@ -9,6 +9,7 @@ import com.daml.grpc.adapter.PekkoExecutionSequencerPool
 import com.digitalasset.canton.http.util.Logging.instanceUUIDLogCtx
 import com.daml.ledger.resources.ResourceOwner
 import com.digitalasset.canton.http.metrics.HttpApiMetrics
+import com.digitalasset.canton.ledger.participant.state.WriteService
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.NoTracing
 import io.grpc.Channel
@@ -17,10 +18,17 @@ import scalaz.std.option.*
 import scalaz.syntax.show.*
 
 import java.nio.file.Path
+import com.digitalasset.canton.config.TlsServerConfig
 
 object HttpApiServer extends NoTracing {
 
-  def apply(config: JsonApiConfig, channel: Channel, loggerFactory: NamedLoggerFactory)(implicit
+  def apply(
+      config: JsonApiConfig,
+      httpsConfiguration: Option[TlsServerConfig],
+      channel: Channel,
+      writeService: WriteService,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
       jsonApiMetrics: HttpApiMetrics
   ): ResourceOwner[Unit] = {
     val logger = loggerFactory.getTracedLogger(getClass)
@@ -31,7 +39,13 @@ object HttpApiServer extends NoTracing {
         new PekkoExecutionSequencerPool("httpPool")(actorSystem)
       )
       serverBinding <- instanceUUIDLogCtx(implicit loggingContextOf =>
-        new HttpService(config, channel, loggerFactory)(
+        new HttpService(
+          config,
+          httpsConfiguration,
+          channel,
+          writeService,
+          loggerFactory,
+        )(
           actorSystem,
           materializer,
           executionSequencerFactory,
@@ -41,13 +55,12 @@ object HttpApiServer extends NoTracing {
       )
     } yield {
       logger.info(
-        s"HTTP JSON API Server started with (address=${config.address: String}" +
-          s", configured httpPort=${config.httpPort.getOrElse(0)}" +
+        s"HTTP JSON API Server started with (address=${config.server.address: String}" +
+          s", configured httpPort=${config.server.port.getOrElse(0)}" +
           s", assigned httpPort=${serverBinding.localAddress.getPort}" +
-          s", portFile=${config.portFile: Option[Path]}" +
-          s", staticContentConfig=${config.staticContentConfig.shows}" +
-          s", allowNonHttps=${config.allowNonHttps.shows}" +
-          s", wsConfig=${config.wsConfig.shows}" +
+          s", portFile=${config.server.portFile: Option[Path]}" +
+          s", allowNonHttps=${config.allowInsecureTokens.shows}" +
+          s", wsConfig=${config.websocketConfig.shows}" +
           ")"
       )
     }

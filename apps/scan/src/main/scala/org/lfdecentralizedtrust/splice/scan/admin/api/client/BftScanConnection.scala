@@ -7,7 +7,14 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  TransferPreapproval,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
@@ -23,7 +30,11 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{AnsEntry, MigrationSchedule}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  AnsEntry,
+  LookupTransferCommandStatusResponse,
+  MigrationSchedule,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.{
   BftCallConfig,
   ConsensusNotReached,
@@ -49,14 +60,15 @@ import com.digitalasset.canton.logging.{
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.RetryUtil
-import com.digitalasset.canton.util.retry.RetryUtil.ExceptionRetryable
+import com.digitalasset.canton.util.LoggerUtil
+import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import io.circe.Json
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
+import org.slf4j.event.Level
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
@@ -123,6 +135,17 @@ class BftScanConnection(
   )(implicit tc: TraceContext): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]] =
     bftCall(
       _.getAmuletRulesWithState(cachedAmuletRules)
+    )
+
+  override protected def runGetExternalPartyAmuletRules(
+      cachedExternalPartyAmuletRules: Option[
+        ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]
+      ]
+  )(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
+    bftCall(
+      _.getExternalPartyAmuletRules(cachedExternalPartyAmuletRules)
     )
 
   override protected def runGetAnsRules(
@@ -234,6 +257,10 @@ class BftScanConnection(
             previousMigrationId <- bftCall(
               connection => Future.successful(completeResponses(connection).previousMigrationId),
               BftCallConfig.forAvailableData(connections, completeResponses.contains),
+              // This method is very sensitive to unavailable SVs.
+              // Do not log warnings for failures to reach consensus, as this would be too noisy,
+              // and instead rely on metrics to situations when backfilling is not progressing.
+              Level.INFO,
             )
           } yield {
             @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -265,6 +292,24 @@ class BftScanConnection(
     } yield result
   }
 
+  override def lookupTransferCommandCounterByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]] =
+    bftCall(_.lookupTransferCommandCounterByParty(receiver))
+
+  override def lookupTransferCommandStatus(sender: PartyId, nonce: Long)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[LookupTransferCommandStatusResponse]] =
+    bftCall(_.lookupTransferCommandStatus(sender, nonce))
+
+  override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
+    bftCall(_.lookupTransferPreapprovalByParty(receiver))
+
   override def getUpdatesBefore(
       migrationId: Long,
       domainId: DomainId,
@@ -290,6 +335,10 @@ class BftScanConnection(
       result <- bftCall(
         connection => connection.getUpdatesBefore(migrationId, domainId, before, atOrAfter, count),
         BftCallConfig.forAvailableData(connections, connectionsWithData.contains),
+        // This method is very sensitive to unavailable SVs.
+        // Do not log warnings for failures to reach consensus, as this would be too noisy,
+        // and instead rely on metrics to situations when backfilling is not progressing.
+        Level.INFO,
       )
     } yield {
       result
@@ -299,6 +348,7 @@ class BftScanConnection(
   private def bftCall[T](
       call: SingleScanConnection => Future[T],
       callConfig: BftCallConfig = BftCallConfig.default(scanList.scanConnections),
+      consensusFailureLogLevel: Level = Level.WARN,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
     val connections = scanList.scanConnections
     if (!callConfig.enoughAvailableScans) {
@@ -309,7 +359,7 @@ class BftScanConnection(
         StatusCodes.BadGateway,
         msg,
       )
-      logger.warn(msg, exception)
+      LoggerUtil.logThrowableAtLevel(consensusFailureLogLevel, msg, exception)
       Future.failed(exception)
     } else {
       retryProvider
@@ -330,7 +380,7 @@ class BftScanConnection(
             StatusCodes.BadGateway,
             s"Failed to reach consensus from ${callConfig.requestsToDo} Scan nodes, requiring ${callConfig.targetSuccess} matching responses.",
           )
-          logger.warn(s"Consensus not reached.", c)
+          LoggerUtil.logThrowableAtLevel(consensusFailureLogLevel, s"Consensus not reached.", c)
           Future.failed(httpError)
         }
     }
@@ -469,7 +519,9 @@ object BftScanConnection {
       if (2 * f + 1 > requestsToDo) {
         loggingContext.debug(
           s"Making a BFT call with a modified config." +
-            s" Only ${connectionsWithData.size} out of ${connections.open} have data, requiring $targetSuccess out of $requestsToDo matching responses."
+            s" Out of ${connections.open.map(_.url)} connections, only ${connectionsWithData
+                .map(_.url)} have data and ${connections.failed} are failed, " +
+            s"requiring $targetSuccess out of $requestsToDo matching responses."
         )
       }
       BftCallConfig(
@@ -762,7 +814,7 @@ object BftScanConnection {
           // start with the latest scan list
           _ <- retryProvider.waitUntil(
             RetryFor.WaitingOnInitDependency,
-            "refresh_scan_list",
+            "refresh_initial_scan_list",
             "Scan list is refreshed.",
             bft
               .refresh(bftConnection)
@@ -907,18 +959,15 @@ object BftScanConnection {
         s"Failed to reach consensus from $numRequests Scan nodes. Responses: $responses"
       )
 
-  object ConsensusNotReachedRetryable extends ExceptionRetryable {
-    override def retryOK(
-        outcome: Try[_],
-        logger: TracedLogger,
-        lastErrorKind: Option[RetryUtil.ErrorKind],
-    )(implicit tc: TraceContext): RetryUtil.ErrorKind = {
-      outcome match {
-        case Success(_) => RetryUtil.NoErrorKind
-        case Failure(c: ConsensusNotReached) =>
+  object ConsensusNotReachedRetryable extends ExceptionRetryPolicy {
+    override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = {
+      exception match {
+        case c: ConsensusNotReached =>
           logger.info("Consensus not reached. Will be retried.", c)
-          RetryUtil.SpuriousTransientErrorKind
-        case Failure(_) => RetryUtil.FatalErrorKind
+          ErrorKind.TransientErrorKind()
+        case _ => ErrorKind.FatalErrorKind
       }
     }
   }

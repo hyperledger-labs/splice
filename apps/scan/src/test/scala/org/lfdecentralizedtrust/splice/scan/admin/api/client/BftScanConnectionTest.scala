@@ -79,7 +79,7 @@ class BftScanConnectionTest
           Future.successful(
             ContractWithState(
               Contract(
-                amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
+                amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
                 new amuletrulesCodegen.AmuletRules.ContractId("whatever"),
                 new amuletrulesCodegen.AmuletRules(
                   partyIdA.toProtoPrimitive,
@@ -162,7 +162,7 @@ class BftScanConnectionTest
           s"commandId$n",
           s"workflowId$n",
           jtime(n),
-          s"offset$n",
+          n.toLong,
           java.util.Map.of(),
           java.util.List.of(),
           domainId.toProtoPrimitive,
@@ -567,19 +567,14 @@ class BftScanConnectionTest
       )
 
       // Can't accept the matching answer from the two remaining scans, we have f=2, and they could be both malicious
-      loggerFactory.assertLogs(
-        for {
-          failure <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10).failed
-        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-          code should be(StatusCodes.BadGateway)
-          message should include(
-            s"Only 2 scan instances can be used (out of 7 configured ones), which are fewer than the necessary 3 to achieve BFT guarantees."
-          )
-        },
-        _.warningMessage should include(
+      for {
+        failure <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
+        code should be(StatusCodes.BadGateway)
+        message should include(
           s"Only 2 scan instances can be used (out of 7 configured ones), which are fewer than the necessary 3 to achieve BFT guarantees."
-        ),
-      )
+        )
+      }
     }
   }
 

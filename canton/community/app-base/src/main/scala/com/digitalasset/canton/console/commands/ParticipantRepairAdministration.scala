@@ -99,14 +99,13 @@ class ParticipantRepairAdministration(
       source: DomainAlias,
       target: DomainConnectionConfig,
       force: Boolean = false,
-  ): Unit = {
+  ): Unit =
     consoleEnvironment.run {
       runner.adminCommand(
         ParticipantAdminCommands.ParticipantRepairManagement
           .MigrateDomain(source, target, force = force)
       )
     }
-  }
 
   @Help.Summary("Export active contracts for the given set of parties to a file.")
   @Help.Description(
@@ -139,7 +138,7 @@ class ParticipantRepairAdministration(
       contractDomainRenames: Map[DomainId, (DomainId, ProtocolVersion)] = Map.empty,
       force: Boolean = false,
       timeout: NonNegativeDuration = timeouts.unbounded,
-  ): Unit = {
+  ): Unit =
     check(FeatureFlag.Repair) {
       consoleEnvironment.run {
         val file = File(outputFile)
@@ -168,7 +167,6 @@ class ParticipantRepairAdministration(
         )
       }
     }
-  }
 
   @Help.Summary("Import active contracts from an Active Contract Set (ACS) snapshot file.")
   @Help.Description(
@@ -200,7 +198,7 @@ class ParticipantRepairAdministration(
       inputFile: String = ParticipantRepairAdministration.ExportAcsDefaultFile,
       workflowIdPrefix: String = "",
       allowContractIdSuffixRecomputation: Boolean = false,
-  ): Map[LfContractId, LfContractId] = {
+  ): Map[LfContractId, LfContractId] =
     check(FeatureFlag.Repair) {
       consoleEnvironment.run {
         runner.adminCommand(
@@ -212,7 +210,6 @@ class ParticipantRepairAdministration(
         )
       }
     }
-  }
 
   @Help.Summary("Add specified contracts to a specific domain on the participant.")
   @Help.Description(
@@ -246,7 +243,7 @@ class ParticipantRepairAdministration(
       contracts
         .traverse_ { repairContract =>
           val activeContract = ActiveContract
-            .create(domainId, repairContract.contract, repairContract.transferCounter)(
+            .create(domainId, repairContract.contract, repairContract.reassignmentCounter)(
               protocolVersion
             )
           activeContract.writeDelimitedTo(outputStream).map(_ => outputStream.flush())
@@ -270,14 +267,14 @@ class ParticipantRepairAdministration(
     }
   }
 
-  @Help.Summary("Purge select data of a deactivated domain.")
+  @Help.Summary("Purge the data of a deactivated domain.")
   @Help.Description(
-    """This command deletes selected domain data and helps to ensure that stale data in the specified, deactivated domain
+    """This command deletes domain data and helps to ensure that stale data in the specified, deactivated domain
        |is not acted upon anymore. The specified domain needs to be in the `Inactive` status for purging to occur.
        |Purging a deactivated domain is typically performed automatically as part of a hard domain migration via
        |``repair.migrate_domain``."""
   )
-  def purge_deactivated_domain(domain: DomainAlias): Unit = {
+  def purge_deactivated_domain(domain: DomainAlias): Unit =
     check(FeatureFlag.Repair) {
       consoleEnvironment.run {
         runner.adminCommand(
@@ -285,7 +282,6 @@ class ParticipantRepairAdministration(
         )
       }
     }
-  }
 
   @Help.Summary("Mark sequenced events as ignored.")
   @Help.Description(
@@ -407,6 +403,28 @@ abstract class LocalParticipantRepairAdministration(
         )(tc)
       )
     )
+
+  @Help.Summary("Rollback an unassignment by re-assigning the contract to the source domain.")
+  @Help.Description(
+    """This is a last resort command to recover from an unassignment that cannot be completed on the target domain.
+        Arguments:
+        - unassignId - set of contract ids that should change assignation to the new domain
+        - source - the source domain id
+        - target - alias of the target domain"""
+  )
+  def rollback_unassignment(
+      unassignId: String,
+      source: DomainId,
+      target: DomainId,
+  ): Unit =
+    check(FeatureFlag.Repair) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement
+            .RollbackUnassignment(unassignId = unassignId, source = source, target = target)
+        )
+      }
+    }
 }
 
 object ParticipantRepairAdministration {

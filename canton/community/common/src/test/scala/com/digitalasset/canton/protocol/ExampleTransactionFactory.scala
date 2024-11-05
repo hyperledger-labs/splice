@@ -12,20 +12,21 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
+import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.TransactionViewDecomposition.{NewView, SameView}
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
-import com.digitalasset.canton.data.*
+import com.digitalasset.canton.protocol.AuthenticatedContractIdVersionV10
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.transaction.ParticipantAttributes
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
   Confirmation,
   Observation,
   Submission,
 }
+import com.digitalasset.canton.topology.transaction.{ParticipantAttributes, VettedPackage}
 import com.digitalasset.canton.topology.{
   DomainId,
   ParticipantId,
@@ -41,8 +42,9 @@ import com.digitalasset.canton.util.LfTransactionUtil.{
 }
 import com.digitalasset.canton.util.{LfTransactionBuilder, LfTransactionUtil}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName}
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray}
+import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.transaction.Versioned
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.{
@@ -66,16 +68,18 @@ import DeduplicationPeriod.DeduplicationDuration
 /** Provides convenience methods for creating [[ExampleTransaction]]s and parts thereof.
   */
 object ExampleTransactionFactory {
-  val hkdfOps: HkdfOps = new SymbolicPureCrypto()
+  import EitherValues.*
+
+  val pureCrypto: CryptoPureApi = new SymbolicPureCrypto()
   // Helper methods for Daml-LF types
-  val languageVersion = LfTransactionBuilder.defaultLanguageVersion
-  val packageId = LfTransactionBuilder.defaultPackageId
-  val upgradePackageId = LfPackageId.assertFromString("upgraded-pkg-id")
-  val templateId = LfTransactionBuilder.defaultTemplateId
-  val packageName = LfTransactionBuilder.defaultPackageName
-  val someOptUsedPackages = Some(Set(packageId))
-  val defaultGlobalKey = LfTransactionBuilder.defaultGlobalKey
-  val transactionVersion = LfTransactionBuilder.defaultTransactionVersion
+  val languageVersion: LanguageVersion = LfTransactionBuilder.defaultLanguageVersion
+  val packageId: LfPackageId = LfTransactionBuilder.defaultPackageId
+  val upgradePackageId: LfPackageId = LfPackageId.assertFromString("upgraded-pkg-id")
+  val templateId: LfTemplateId = LfTransactionBuilder.defaultTemplateId
+  val packageName: PackageName = LfTransactionBuilder.defaultPackageName
+  val someOptUsedPackages: Option[Set[LfPackageId]] = Some(Set(packageId))
+  val defaultGlobalKey: LfGlobalKey = LfTransactionBuilder.defaultGlobalKey
+  val transactionVersion: LfLanguageVersion = LfTransactionBuilder.defaultTransactionVersion
 
   private val random = new Random(0)
 
@@ -98,6 +102,42 @@ object ExampleTransactionFactory {
       packageVersion = None,
       arg = versionedValueCapturing(capturedIds.toList),
     )
+
+  def authenticatedSerializableContract(
+      metadata: ContractMetadata,
+      instance: LfContractInst = ExampleTransactionFactory.contractInstance(),
+      ledgerTime: CantonTimestamp = CantonTimestamp.Epoch,
+  ): SerializableContract = {
+    val unicumGenerator = new UnicumGenerator(new SymbolicPureCrypto())
+    val contractIdVersion =
+      CantonContractIdVersion.fromProtocolVersion(BaseTest.testedProtocolVersion).value
+
+    val (contractSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
+      domainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("domain::da")),
+      mediator = MediatorGroupRecipient(MediatorGroupIndex.one),
+      transactionUuid = new UUID(1L, 1L),
+      viewPosition = ViewPosition(List.empty),
+      viewParticipantDataSalt = TestSalt.generateSalt(1),
+      createIndex = 0,
+      ledgerCreateTime = LedgerCreateTime(ledgerTime),
+      metadata = metadata,
+      suffixedContractInstance = ExampleTransactionFactory.asSerializableRaw(instance),
+      contractIdVersion = contractIdVersion,
+    )
+
+    val contractId = contractIdVersion.fromDiscriminator(
+      ExampleTransactionFactory.lfHash(1337),
+      unicum,
+    )
+
+    SerializableContract(
+      contractId = contractId,
+      contractInstance = instance,
+      metadata = metadata,
+      ledgerTime = ledgerTime,
+      contractSalt = Some(contractSalt.unwrap),
+    ).value
+  }
 
   val veryDeepValue: Value = {
     def deepValue(depth: Int): Value =
@@ -139,8 +179,9 @@ object ExampleTransactionFactory {
       observers: Set[LfPartyId] = Set.empty,
       key: Option[LfGlobalKeyWithMaintainers] = None,
       byKey: Boolean = false,
-      version: LfTransactionVersion = transactionVersion,
+      version: LfLanguageVersion = transactionVersion,
       templateId: LfTemplateId = templateId,
+      interfaceId: Option[LfTemplateId] = None,
   ): LfNodeFetch =
     LfNodeFetch(
       coid = cid,
@@ -152,6 +193,7 @@ object ExampleTransactionFactory {
       keyOpt = key,
       byKey = byKey,
       version = version,
+      interfaceId = interfaceId,
     )
 
   def createNode(
@@ -285,7 +327,7 @@ object ExampleTransactionFactory {
     TestHash.digest(s"transactionId$index")
   )
 
-  def unicum(index: Int) = Unicum(TestHash.digest(s"unicum$index"))
+  def unicum(index: Int): Unicum = Unicum(TestHash.digest(s"unicum$index"))
 
   def lfHash(index: Int): LfHash =
     LfHash.assertFromBytes(
@@ -323,14 +365,13 @@ object ExampleTransactionFactory {
   private def serializableFromCreate(
       node: LfNodeCreate,
       salt: Salt,
-  ): SerializableContract = {
+  ): SerializableContract =
     asSerializable(
       node.coid,
       node.versionedCoinst,
       metadataFromCreate(node),
       salt = salt,
     )
-  }
 
   // Parties and participants
 
@@ -352,7 +393,7 @@ object ExampleTransactionFactory {
   val workflowId: WorkflowId = WorkflowId.assertFromString("testWorkflowId")
 
   val defaultTestingTopology: TestingTopology =
-    TestingTopology(
+    TestingTopology.from(
       topology = Map(
         submitter -> Map(submittingParticipant -> Submission),
         signatory -> Map(
@@ -372,7 +413,7 @@ object ExampleTransactionFactory {
       packages =
         Seq(submittingParticipant, signatoryParticipant, observerParticipant, extraParticipant)
           .map(
-            _ -> Seq(ExampleTransactionFactory.packageId, upgradePackageId)
+            _ -> VettedPackage.unbounded(Seq(ExampleTransactionFactory.packageId, upgradePackageId))
           )
           .toMap,
     )
@@ -400,7 +441,7 @@ object ExampleTransactionFactory {
   * Also provides convenience methods for creating [[ExampleTransaction]]s and parts thereof.
   */
 class ExampleTransactionFactory(
-    val cryptoOps: HashOps with HmacOps with HkdfOps with RandomOps = new SymbolicPureCrypto,
+    val cryptoOps: HashOps with HmacOps with RandomOps = new SymbolicPureCrypto,
     versionOverride: Option[ProtocolVersion] = None,
 )(
     val transactionSalt: Salt = TestSalt.generateSalt(0),
@@ -432,10 +473,10 @@ class ExampleTransactionFactory(
     val submittingAdminPartyO =
       Option.when(isRoot)(submitterMetadata.submittingParticipant.adminParty.toLf)
     TransactionViewDecompositionFactory
-      .informeesParticipantsAndThreshold(rootNode, topologySnapshot)
+      .informeesParticipantsAndThreshold(rootNode, topologySnapshot, submittingAdminPartyO)
       .map { case (viewInformeesWithParticipantData, viewThreshold) =>
         val viewInformees = viewInformeesWithParticipantData.fmap(_._2)
-        val result = NewView(
+        NewView(
           rootNode,
           ViewConfirmationParameters.create(viewInformees, viewThreshold),
           rootSeed,
@@ -443,8 +484,6 @@ class ExampleTransactionFactory(
           tailNodes,
           rootRbContext,
         )
-
-        result.withSubmittingAdminParty(submittingAdminPartyO)
       }
   }
 
@@ -478,7 +517,7 @@ class ExampleTransactionFactory(
         capturedContractIds = Seq(suffixedId(-1, 0), suffixedId(-1, 1)),
         unsuffixedCapturedContractIds = Seq(suffixedId(-1, 0), suffixedId(-1, 1)),
       ),
-      SingleFetch(version = LfTransactionVersion.V31),
+      SingleFetch(version = LfLanguageVersion.v2_dev),
       SingleExercise(seed = deriveNodeSeed(0)),
       SingleExerciseWithNonstakeholderActor(seed = deriveNodeSeed(0)),
       MultipleRoots,
@@ -660,14 +699,11 @@ class ExampleTransactionFactory(
     val (rawInformeesWithParticipantData, rawThreshold) =
       Await.result(
         TransactionViewDecompositionFactory
-          .informeesParticipantsAndThreshold(node, topologySnapshot),
+          .informeesParticipantsAndThreshold(node, topologySnapshot, submittingAdminPartyO),
         10.seconds,
       )
     val rawInformees = rawInformeesWithParticipantData.fmap { case (_, weight) => weight }
-    val viewConfirmationParameters =
-      TransactionViewDecompositionFactory.withSubmittingAdminParty(submittingAdminPartyO)(
-        ViewConfirmationParameters.create(rawInformees, rawThreshold)
-      )
+    val viewConfirmationParameters = ViewConfirmationParameters.create(rawInformees, rawThreshold)
 
     viewInternal(
       node,
@@ -701,28 +737,29 @@ class ExampleTransactionFactory(
       val (rawInformeesWithParticipantData, rawThreshold) =
         Await.result(
           TransactionViewDecompositionFactory
-            .informeesParticipantsAndThreshold(nodeToMerge, topologySnapshot),
+            .informeesParticipantsAndThreshold(
+              nodeToMerge,
+              topologySnapshot,
+              Option.when(isRoot && nodeToMerge == node)(
+                submitterMetadata.submittingParticipant.adminParty.toLf
+              ),
+            ),
           10.seconds,
         )
       val rawInformees = rawInformeesWithParticipantData.fmap { case (_, weight) => weight }
       ViewConfirmationParameters.create(rawInformees, rawThreshold)
     }
 
-    val submittingAdminPartyO =
-      Option.when(isRoot)(submitterMetadata.submittingParticipant.adminParty.toLf)
-
     val viewConfirmationParameters =
-      TransactionViewDecompositionFactory.withSubmittingAdminParty(submittingAdminPartyO)(
-        ViewConfirmationParameters.tryCreate(
-          viewConfirmationParametersToMerge
-            .flatMap(_.informees)
-            .toSet,
-          viewConfirmationParametersToMerge
-            .flatMap(
-              _.quorums
-            )
-            .distinct,
-        )
+      ViewConfirmationParameters.tryCreate(
+        viewConfirmationParametersToMerge
+          .flatMap(_.informees)
+          .toSet,
+        viewConfirmationParametersToMerge
+          .flatMap(
+            _.quorums
+          )
+          .distinct,
       )
 
     viewInternal(
@@ -761,6 +798,7 @@ class ExampleTransactionFactory(
       DefaultDamlValues.submissionId().some,
       DeduplicationDuration(JDuration.ofSeconds(100)),
       ledgerTime.plusSeconds(100),
+      None,
       cryptoOps,
       protocolVersion,
     )
@@ -1105,7 +1143,7 @@ class ExampleTransactionFactory(
       lfContractId: LfContractId = suffixedId(-1, 0),
       contractId: LfContractId = suffixedId(-1, 0),
       fetchedContractInstance: LfContractInst = contractInstance(),
-      version: LfTransactionVersion = transactionVersion,
+      version: LfLanguageVersion = transactionVersion,
       salt: Salt = TestSalt.generateSalt(random.nextInt()),
   ) extends SingleNode(None) {
     override def created: Seq[SerializableContract] = Seq.empty
@@ -1286,7 +1324,7 @@ class ExampleTransactionFactory(
         contractId = create0.contractId,
         fetchedContractInstance = create0.contractInstance,
         version =
-          LfTransactionVersion.V31, // ensure we test merging transactions with different versions
+          LfLanguageVersion.v2_dev, // ensure we test merging transactions with different versions
         salt = create0.salt,
       )
     private val exercise4: SingleExercise =
@@ -1547,29 +1585,20 @@ class ExampleTransactionFactory(
           case _ => Set.empty
         }.toSet ++ v1Pre.viewConfirmationParameters.informees
 
-        val quorumsAux = {
-          val (quorumSubmittingParticipant, quorumOther) =
-            v1Pre.viewConfirmationParameters.quorums.partition(q =>
-              q == Quorum(
-                confirmers = Map(submitter -> PositiveInt.one),
-                threshold = NonNegativeInt.one,
-              )
-            )
-
-          /* the submitting participant quorum should only be added at the end after the other quorums have been merged
-           * to mimic what happens during view decomposition.
-           */
-          (quorumOther ++ v1TailNodes.mapFilter {
+        val quorumsAux =
+          (v1Pre.viewConfirmationParameters.quorums ++ v1TailNodes.mapFilter {
             case SameView(lfNode, nodeId, _) if !nodesNotChildren.contains(nodeId) =>
+              val confirmingParties =
+                LfTransactionUtil.signatoriesOrMaintainers(lfNode) | LfTransactionUtil
+                  .actingParties(lfNode)
               Some(
                 Quorum(
-                  confirmers = lfNode.requiredAuthorizers.map(pId => pId -> PositiveInt.one).toMap,
-                  threshold = NonNegativeInt.tryCreate(lfNode.requiredAuthorizers.size),
+                  confirmers = confirmingParties.map(pId => pId -> PositiveInt.one).toMap,
+                  threshold = NonNegativeInt.tryCreate(confirmingParties.size),
                 )
               )
             case _ => None
-          } ++ quorumSubmittingParticipant).distinct
-        }
+          }).distinct
 
         (informeesAux, quorumsAux)
       }

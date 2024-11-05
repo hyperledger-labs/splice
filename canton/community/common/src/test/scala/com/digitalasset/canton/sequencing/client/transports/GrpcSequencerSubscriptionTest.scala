@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.sequencing.client.transports
 
+import cats.syntax.either.*
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.crypto.v30 as cryptoproto
 import com.digitalasset.canton.domain.api.v30 as v30domain
@@ -69,6 +70,8 @@ class GrpcSequencerSubscriptionTest extends AnyWordSpec with BaseTest with HasEx
               format = cryptoproto.SignatureFormat.SIGNATURE_FORMAT_RAW,
               signature = ByteString.copyFromUtf8("not checked in this test"),
               signedBy = "not checked",
+              signingAlgorithmSpec =
+                cryptoproto.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_UNSPECIFIED,
             )
           ),
           timestampOfSigningKey = None,
@@ -86,7 +89,7 @@ class GrpcSequencerSubscriptionTest extends AnyWordSpec with BaseTest with HasEx
 
   def createSubscription(
       handler: v30domain.VersionedSubscriptionResponse => Future[Either[String, Unit]] = _ =>
-        Future.successful(Right(())),
+        Future.successful(Either.unit),
       context: CancellableContext = Context.ROOT.withCancellation(),
   ): GrpcSequencerSubscription[String, v30domain.VersionedSubscriptionResponse] =
     new GrpcSequencerSubscription[String, v30domain.VersionedSubscriptionResponse](
@@ -167,13 +170,13 @@ class GrpcSequencerSubscriptionTest extends AnyWordSpec with BaseTest with HasEx
 
       val sut = createSubscription(handler = _ => handlerCompleted.future)
 
-      val onNextF = Future { sut.observer.onNext(messageP) }
+      val onNextF = Future(sut.observer.onNext(messageP))
 
       eventuallyForever(timeUntilSuccess = 0.seconds, durationOfSuccess = 100.milliseconds) {
         !onNextF.isCompleted
       }
 
-      handlerCompleted.success(Right(()))
+      handlerCompleted.success(Either.unit)
 
       onNextF.futureValue
     }
@@ -188,7 +191,7 @@ class GrpcSequencerSubscriptionTest extends AnyWordSpec with BaseTest with HasEx
       })
 
       // Processing this message takes forever...
-      Future { sut.observer.onNext(messageP) }.failed
+      Future(sut.observer.onNext(messageP)).failed
         .foreach(logger.error("Unexpected exception", _))
 
       // Make sure that the handler has been invoked before doing the next step.
@@ -215,7 +218,7 @@ class GrpcSequencerSubscriptionTest extends AnyWordSpec with BaseTest with HasEx
 
     "not log a INTERNAL error at error level after having received some items" in {
       // we see this scenario when a load balancer between applications decides to reset the TCP stream, say for a timeout
-      val sut = createSubscription(handler = _ => Future.successful(Right(())))
+      val sut = createSubscription(handler = _ => Future.successful(Either.unit))
 
       loggerFactory.assertLoggedWarningsAndErrorsSeq(
         {
@@ -227,9 +230,7 @@ class GrpcSequencerSubscriptionTest extends AnyWordSpec with BaseTest with HasEx
           sut.observer.onError(Status.INTERNAL.asRuntimeException())
           sut.close()
         },
-        { logs =>
-          logs shouldBe empty
-        },
+        logs => logs shouldBe empty,
       )
     }
   }

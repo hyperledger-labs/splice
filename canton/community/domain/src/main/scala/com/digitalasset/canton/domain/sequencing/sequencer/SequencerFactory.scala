@@ -5,22 +5,20 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 
 import cats.data.EitherT
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{CachingConfigs, ProcessingTimeout}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.domain.block.SequencerDriver
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
-import com.digitalasset.canton.domain.sequencing.sequencer.SequencerWriterConfig.DefaultMaxSqlInListSize
 import com.digitalasset.canton.domain.sequencing.sequencer.block.DriverBlockSequencerFactory
 import com.digitalasset.canton.domain.sequencing.sequencer.store.SequencerStore
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{MemoryStorage, Storage}
+import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, Member, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -33,7 +31,7 @@ trait SequencerFactory extends FlagCloseable with HasCloseContext {
   def initialize(
       initialState: SequencerInitialState,
       sequencerId: SequencerId,
-  )(implicit ex: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Unit]
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Unit]
 
   def create(
       domainId: DomainId,
@@ -44,8 +42,8 @@ trait SequencerFactory extends FlagCloseable with HasCloseContext {
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
       runtimeReady: FutureUnlessShutdown[Unit],
+      sequencerSnapshot: Option[SequencerSnapshot],
   )(implicit
-      ec: ExecutionContext,
       traceContext: TraceContext,
       tracer: Tracer,
       actorMaterializer: Materializer,
@@ -53,49 +51,37 @@ trait SequencerFactory extends FlagCloseable with HasCloseContext {
 }
 
 abstract class DatabaseSequencerFactory(
+    config: DatabaseSequencerConfig,
     storage: Storage,
+    cachingConfigs: CachingConfigs,
     override val timeouts: ProcessingTimeout,
     protocolVersion: ProtocolVersion,
-) extends SequencerFactory
+    sequencerId: SequencerId,
+    blockSequencerMode: Boolean,
+)(implicit ec: ExecutionContext)
+    extends SequencerFactory
     with NamedLogging {
+
+  val sequencerStore: SequencerStore =
+    SequencerStore(
+      storage = storage,
+      protocolVersion = protocolVersion,
+      maxBufferedEventsSize = config.writer.maxBufferedEventsSize,
+      timeouts = timeouts,
+      loggerFactory = loggerFactory,
+      sequencerMember = sequencerId,
+      blockSequencerMode = blockSequencerMode,
+      cachingConfigs = cachingConfigs,
+      // Overriding the store's close context with the writers, so that when the writer gets closed, the store
+      // stops retrying forever
+      overrideCloseContext = Some(this.closeContext),
+    )
 
   override def initialize(
       initialState: SequencerInitialState,
       sequencerId: SequencerId,
-  )(implicit ex: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Unit] = {
-
-    // TODO(#18401): Parameterize DatabaseSequencer with the SequencerStore;
-    //  create it in this factory, and pass the same one to DBS and use here;
-    //  this will allow using in-memory stores for testing sequencer onboarding.
-    //  Close context then should be changed to the sequencer's close context.
-    storage match {
-      case _: MemoryStorage =>
-        ErrorUtil.internalError(
-          new UnsupportedOperationException(
-            "In-memory storage is not supported for database sequencer initialization"
-          )
-        )
-      case _ =>
-    }
-
-    val generalStore: SequencerStore =
-      SequencerStore(
-        storage,
-        protocolVersion,
-        DefaultMaxSqlInListSize,
-        timeouts,
-        loggerFactory,
-        sequencerId,
-        unifiedSequencer =
-          true, // // TODO(#18401): does not affect the usage below, but should be correctly set
-        // At the moment this store instance is only used for the sequencer initialization,
-        // if it is retrying a db operation and the factory is closed, the store will be closed as well;
-        // if request succeeds, the store will no be retrying and doesn't need to be closed
-        overrideCloseContext = Some(this.closeContext),
-      )
-
-    generalStore.initializeFromSnapshot(initialState)
-  }
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Unit] =
+    sequencerStore.initializeFromSnapshot(initialState)
 }
 
 class CommunityDatabaseSequencerFactory(
@@ -103,13 +89,18 @@ class CommunityDatabaseSequencerFactory(
     metrics: SequencerMetrics,
     storage: Storage,
     sequencerProtocolVersion: ProtocolVersion,
-    topologyClientMember: Member,
+    sequencerId: SequencerId,
     nodeParameters: CantonNodeParameters,
     override val loggerFactory: NamedLoggerFactory,
-) extends DatabaseSequencerFactory(
+)(implicit ec: ExecutionContext)
+    extends DatabaseSequencerFactory(
+      config,
       storage,
+      nodeParameters.cachingConfigs,
       nodeParameters.processingTimeouts,
       sequencerProtocolVersion,
+      sequencerId,
+      blockSequencerMode = false,
     ) {
 
   override def create(
@@ -121,8 +112,8 @@ class CommunityDatabaseSequencerFactory(
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
       runtimeReady: FutureUnlessShutdown[Unit],
+      sequencerSnapshot: Option[SequencerSnapshot],
   )(implicit
-      ec: ExecutionContext,
       traceContext: TraceContext,
       tracer: Tracer,
       actorMaterializer: Materializer,
@@ -132,14 +123,15 @@ class CommunityDatabaseSequencerFactory(
       None,
       nodeParameters.processingTimeouts,
       storage,
+      sequencerStore,
       clock,
       domainId,
-      topologyClientMember,
+      sequencerId,
       sequencerProtocolVersion,
       domainSyncCryptoApi,
+      nodeParameters.cachingConfigs,
       metrics,
       loggerFactory,
-      nodeParameters.useUnifiedSequencer,
       runtimeReady,
     )
 
@@ -165,7 +157,7 @@ trait MkSequencerFactory {
       loggerFactory: NamedLoggerFactory,
   )(
       sequencerConfig: SequencerConfig
-  )(implicit executionContext: ExecutionContext): SequencerFactory
+  )(implicit ececutionContext: ExecutionContext): SequencerFactory
 
 }
 
@@ -195,11 +187,16 @@ object CommunitySequencerFactory extends MkSequencerFactory {
         loggerFactory,
       )
 
-    case CommunitySequencerConfig.External(sequencerType, config, testingInterceptor) =>
+    case CommunitySequencerConfig.External(
+          sequencerType,
+          blockSequencerConfig,
+          config,
+        ) =>
       DriverBlockSequencerFactory(
         sequencerType,
         SequencerDriver.DriverApiVersion,
         config,
+        blockSequencerConfig,
         health,
         storage,
         protocolVersion,
@@ -207,7 +204,7 @@ object CommunitySequencerFactory extends MkSequencerFactory {
         nodeParameters,
         metrics,
         loggerFactory,
-        testingInterceptor,
+        blockSequencerConfig.testingInterceptor,
       )
 
     case config: SequencerConfig =>

@@ -7,9 +7,17 @@ import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  TransferPreapproval,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
+  ExternalPartyAmuletRules,
+  TransferCommand,
+  TransferCommandCounter,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
@@ -26,6 +34,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
   ScanTxLogParser,
   TxLogEntry,
+  TransferCommandTxLogEntry,
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
@@ -65,6 +74,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.github.benmanes.caffeine.cache as caffeine
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
+import io.grpc.Status
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -184,8 +194,9 @@ class DbScanStore(
               ScanTables.acsTableName,
               storeId,
               domainMigrationId,
-              where =
-                sql"""template_id_qualified_name = ${QualifiedName(AmuletRules.TEMPLATE_ID)}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(
+                  AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupAmuletRules",
@@ -195,6 +206,35 @@ class DbScanStore(
           contractWithStateFromRow(AmuletRules.COMPANION)(_)
         )
       } yield contractWithState
+    }
+
+  override def getExternalPartyAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              ScanTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""template_id_qualified_name = ${QualifiedName(
+                  ExternalPartyAmuletRules.TEMPLATE_ID
+                )}""",
+              orderLimit = sql"""order by event_number desc limit 1""",
+            ).headOption,
+            "lookupExternalPartyAmuletRules",
+          )
+          .value
+        contractWithState = row.map(
+          contractWithStateFromRow(ExternalPartyAmuletRules.COMPANION)(_)
+        )
+      } yield contractWithState.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription("No active ExternalPartyAmuletRules contract")
+          .asRuntimeException
+      )
     }
 
   override def lookupAnsRules()(implicit
@@ -208,7 +248,9 @@ class DbScanStore(
               ScanTables.acsTableName,
               storeId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(AnsRules.TEMPLATE_ID)}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(
+                  AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupAnsRules",
@@ -239,7 +281,7 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                AnsEntry.COMPANION.TEMPLATE_ID
+                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
               )} and ans_entry_name ^@ $limitedPrefix
               and acs.contract_expires_at >= $now
             """,
@@ -270,7 +312,7 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                AnsEntry.COMPANION.TEMPLATE_ID
+                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                 and ans_entry_owner = $partyId
                 and ans_entry_name >= ''
@@ -300,7 +342,7 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                AnsEntry.COMPANION.TEMPLATE_ID
+                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and ans_entry_name = ${lengthLimited(name)}
               and acs.contract_expires_at >= $now
@@ -310,6 +352,58 @@ class DbScanStore(
           "lookupEntryByName",
         )
     } yield contractWithStateFromRow(AnsEntry.COMPANION)(row)).value
+  }
+
+  override def lookupTransferPreapprovalByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]
+  ] = waitUntilAcsIngested {
+    (for {
+      row <- storage
+        .querySingle(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                TransferPreapproval.COMPANION.TEMPLATE_ID
+              )}
+                and transfer_preapproval_receiver = $partyId
+            """,
+            orderLimit = sql"""
+                order by transfer_preapproval_valid_from desc limit 1
+            """,
+          ).headOption,
+          "lookupTransferPreapprovalReceiver",
+        )
+    } yield contractWithStateFromRow(TransferPreapproval.COMPANION)(row)).value
+  }
+
+  override def lookupTransferCommandCounterByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]
+  ] = waitUntilAcsIngested {
+    (for {
+      row <- storage
+        .querySingle(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                TransferCommandCounter.COMPANION.TEMPLATE_ID
+              )}
+                and wallet_party = $partyId
+            """,
+            orderLimit = sql"limit 1",
+          ).headOption,
+          "lookupTransferCommandCounterReceiver",
+        )
+    } yield contractWithStateFromRow(TransferCommandCounter.COMPANION)(row)).value
   }
 
   override def listTransactions(
@@ -379,7 +473,9 @@ class DbScanStore(
               storeId,
               domainMigrationId,
               where = sql"""
-                  template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
+                  template_id_qualified_name = ${QualifiedName(
+                  FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
                     and featured_app_right_provider = $providerPartyId
                  """,
               orderLimit = sql"limit 1",
@@ -675,8 +771,9 @@ class DbScanStore(
             ScanTables.acsTableName,
             storeId,
             domainMigrationId,
-            where =
-              sql"""template_id_qualified_name = ${QualifiedName(ValidatorLicense.TEMPLATE_ID)}""",
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}""",
             orderLimit =
               sql"""order by validator_license_rounds_collected desc limit ${sqlLimit(limit)}""",
           ),
@@ -725,8 +822,11 @@ class DbScanStore(
                from #${ScanTables.acsTableName}
                where store_id = $storeId
                 and migration_id = $domainMigrationId
-                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
+                and template_id_qualified_name = ${QualifiedName(
+              MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
+            )}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
+                and member_traffic_domain = ${lengthLimited(domainId.toProtoPrimitive)}
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",
         )
@@ -909,4 +1009,35 @@ class DbScanStore(
         .value
     } yield result.map(contractFromRow(VoteRequest.COMPANION)(_))
   }
+
+  override def lookupLatestTransferCommandEvents(sender: PartyId, nonce: Long)(implicit
+      tc: TraceContext
+  ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]] =
+    waitUntilAcsIngested {
+      for {
+        // This query is linear in the number of events that match (sender, nonce).
+        // Given that for each TransferCommand that's at most 2 and we expect few nonce conflicts
+        // this is acceptable.
+        result <- storage
+          .query(
+            sql"""
+              with ranked_rows as (
+                select #${TxLogQueries.SelectFromTxLogTableResult
+                .sqlColumnsCommaSeparated()}, rank() over (partition by transfer_command_contract_id order by entry_number desc) from #${ScanTables.txLogTableName}
+                where store_id = $storeId
+                  and entry_type = ${TxLogEntry.EntryType.TransferCommandTxLogEntry}
+                  and transfer_command_sender = ${sender}
+                  and transfer_command_nonce = $nonce
+              )
+              select #${TxLogQueries.SelectFromTxLogTableResult.sqlColumnsCommaSeparated()}
+              from ranked_rows
+              where rank = 1
+            """.toActionBuilder.as[TxLogQueries.SelectFromTxLogTableResult],
+            "getLatestTransferCommandEventByContractId",
+          )
+      } yield result
+        .map(txLogEntryFromRow[TransferCommandTxLogEntry](txLogConfig))
+        .map(entry => new TransferCommand.ContractId(entry.contractId) -> entry)
+        .toMap
+    }
 }

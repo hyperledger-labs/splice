@@ -8,8 +8,8 @@ import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{Crypto, SyncCryptoApi, SyncCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLoggingContext}
@@ -150,7 +150,16 @@ object SequencerClientFactory {
                 sequencerTransportsMap.forgetNE,
                 sequencerConnections.sequencerTrustThreshold,
                 _.getTrafficStateForMember(
-                  GetTrafficStateForMemberRequest(member, ts, domainParameters.protocolVersion)
+                  // Request the traffic state at the timestamp immediately following the last sequenced event timestamp
+                  // That's because we will not re-process that event, but if it was a traffic purchase, the sequencer
+                  // would return a state with the previous extra traffic value, because traffic purchases only become
+                  // valid _after_ they've been sequenced. This ensures the participant doesn't miss a traffic purchase
+                  // if it gets disconnected just after reading one.
+                  GetTrafficStateForMemberRequest(
+                    member,
+                    ts.immediateSuccessor,
+                    domainParameters.protocolVersion,
+                  )
                 ).map(_.trafficState),
                 identity,
               )
@@ -177,6 +186,7 @@ object SequencerClientFactory {
             futureSupervisor,
             processingTimeout,
             metrics.trafficConsumption,
+            domainId,
           )
           sendTracker = new SendTracker(
             initialPendingSends,
@@ -245,7 +255,7 @@ object SequencerClientFactory {
           traceContext: TraceContext,
       ): SequencerClientTransport & SequencerClientTransportPekko = {
         val loggerFactoryWithSequencerAlias =
-          SequencerClient.loggerFactoryWithSequencerConnection(
+          SequencerClient.loggerFactoryWithSequencerAlias(
             loggerFactory,
             connection.sequencerAlias,
           )
@@ -300,7 +310,7 @@ object SequencerClientFactory {
           executionContext: ExecutionContextExecutor
       ): ManagedChannel = {
         val channelBuilder = ClientChannelBuilder(
-          SequencerClient.loggerFactoryWithSequencerConnection(loggerFactory, conn.sequencerAlias)
+          SequencerClient.loggerFactoryWithSequencerAlias(loggerFactory, conn.sequencerAlias)
         )
         GrpcSequencerChannelBuilder(
           channelBuilder,
@@ -323,10 +333,7 @@ object SequencerClientFactory {
       private def grpcSequencerClientAuth(
           connection: GrpcSequencerConnection,
           member: Member,
-      )(implicit
-          executionContext: ExecutionContextExecutor,
-          traceContext: TraceContext,
-      ): GrpcSequencerClientAuth = {
+      )(implicit executionContext: ExecutionContextExecutor): GrpcSequencerClientAuth = {
         val channelPerEndpoint = connection.endpoints.map { endpoint =>
           val subConnection = connection.copy(endpoints = NonEmpty.mk(Seq, endpoint))
           endpoint -> createChannel(subConnection)
@@ -340,7 +347,7 @@ object SequencerClientFactory {
           config.authToken,
           clock,
           processingTimeout,
-          SequencerClient.loggerFactoryWithSequencerConnection(
+          SequencerClient.loggerFactoryWithSequencerAlias(
             loggerFactory,
             connection.sequencerAlias,
           ),
@@ -351,7 +358,6 @@ object SequencerClientFactory {
           executionContext: ExecutionContextExecutor,
           executionSequencerFactory: ExecutionSequencerFactory,
           materializer: Materializer,
-          traceContext: TraceContext,
       ): SequencerClientTransport & SequencerClientTransportPekko = {
         val channel = createChannel(connection)
         val auth = grpcSequencerClientAuth(connection, member)
@@ -363,7 +369,7 @@ object SequencerClientFactory {
           metrics,
           processingTimeout,
           SequencerClient
-            .loggerFactoryWithSequencerConnection(loggerFactory, connection.sequencerAlias),
+            .loggerFactoryWithSequencerAlias(loggerFactory, connection.sequencerAlias),
           domainParameters.protocolVersion,
         )
       }

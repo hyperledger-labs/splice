@@ -22,7 +22,7 @@ import org.slf4j.event.Level
 import org.slf4j.event.Level.*
 
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 import scala.annotation.nowarn
 import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
@@ -141,14 +141,13 @@ class ApiRequestLoggerTest extends AnyWordSpec with BaseTest with HasExecutionCo
       serverStatus: Status,
       serverTrailers: Metadata = new Metadata(),
       clientCause: Throwable = null,
-  ): Assertion = {
+  ): Assertion =
     inside(clientCompletion.failed.futureValue) { case sre: StatusRuntimeException =>
       sre.getStatus.getCode shouldBe serverStatus.getCode
       sre.getStatus.getDescription shouldBe serverStatus.getDescription
       sre.getCause shouldBe clientCause
       sre.getTrailers shouldEqual serverTrailers
     }
-  }
 
   val requestTraceContext: TraceContext = TraceContext.withNewTraceContext(tc => tc)
 
@@ -386,20 +385,31 @@ class ApiRequestLoggerTest extends AnyWordSpec with BaseTest with HasExecutionCo
               // since our latest gRPC upgrade (https://github.com/DACH-NY/canton/pull/15304),
               // the client might log one additional "completed" message before or after the
               // fatal error being logged by gRPC
-              val capturedCompletedMessages = new AtomicInteger(0)
-              if (capturingLogger.tryToPollMessage(createExpectedLogMessage("completed"), DEBUG)) {
-                capturedCompletedMessages.getAndIncrement()
-              }
+              val capturedComplete = new AtomicBoolean(false)
+              capturedComplete.set(
+                capturingLogger.tryToPollMessage(createExpectedLogMessage("completed"), DEBUG)
+              )
               capturingLogger.assertNextMessageIs(
                 s"A fatal error has occurred in $executionContextName. Terminating thread.",
                 ERROR,
                 throwable,
               )
-              if (capturingLogger.tryToPollMessage(createExpectedLogMessage("completed"), DEBUG)) {
-                capturedCompletedMessages.getAndIncrement()
-              }
-              withClue("the 'completed' message should appear at most once:") {
-                capturedCompletedMessages.get() should be <= 1
+              if (!capturedComplete.get()) {
+                // The last "completed" message can appear spuriously
+                // so wait a bit to ensure it's captured here and not in the subsequent assertNoMoreEvents
+                //
+                // It is fine to poll here since this test does not expect subsequent events
+                Option(capturingLogger.eventQueue.poll(100L, TimeUnit.MILLISECONDS))
+                  .foreach {
+                    case event
+                        if capturingLogger.eventMatches(
+                          event,
+                          createExpectedLogMessage("completed"),
+                          DEBUG,
+                        ) =>
+                    case other =>
+                      fail(s"Unexpected event $other")
+                  }
               }
           }
         }
@@ -431,7 +441,7 @@ class ApiRequestLoggerTest extends AnyWordSpec with BaseTest with HasExecutionCo
             val receivedRequestP = Promise[Unit]()
             val sendResponseP = Promise[Unit]()
 
-            when(service.hello(Request)).thenAnswer[Hello.Request](_ => {
+            when(service.hello(Request)).thenAnswer[Hello.Request] { _ =>
               receivedRequestP.success(())
               sendResponseP.future.map(_ =>
                 afterCancelAction match {
@@ -439,17 +449,17 @@ class ApiRequestLoggerTest extends AnyWordSpec with BaseTest with HasExecutionCo
                   case response: Hello.Response => response
                 }
               )
-            })
+            }
 
             val context = Context.current().withCancellation()
-            context.run(() => {
+            context.run { () =>
               val requestF = client.hello(Request)
 
               receivedRequestP.future.futureValue
               context.cancel(Exception)
 
               assertClientFailure(requestF, ClientCancelsStatus, clientCause = Exception)
-            })
+            }
 
             assertRequestLogged
             capturingLogger.assertNextMessageIs(createExpectedLogMessage("cancelled"), INFO)
@@ -692,14 +702,14 @@ class ApiRequestLoggerTest extends AnyWordSpec with BaseTest with HasExecutionCo
             }
 
             val context = Context.current().withCancellation()
-            context.run(() => {
+            context.run { () =>
               receivedRequestP.future.onComplete(_ => context.cancel(Exception))
               callStreamedServiceAndCheckClientFailure(
                 ClientCancelsStatus,
                 clientCause = Exception,
                 checkResponses = false, // Some responses may get discarded due to cancellation.
               )
-            })
+            }
 
             assertRequestAndResponsesLogged
             capturingLogger.assertNextMessageIs(createExpectedLogMessage("cancelled"), INFO)

@@ -30,21 +30,13 @@ class DbSendTrackerStore_Unused(
 
   override def savePendingSend(messageId: MessageId, maxSequencingTime: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SavePendingSendError, Unit] = {
+  ): EitherT[Future, SavePendingSendError, Unit] =
     for {
       rowsUpdated <- EitherT.right(
         storage.update(
-          storage.profile match {
-            case _: DbStorage.Profile.Oracle =>
-              sqlu"""insert
-                       /*+  IGNORE_ROW_ON_DUPKEY_INDEX ( sequencer_client_pending_sends ( message_id, domain_id ) ) */
-                       into sequencer_client_pending_sends (domain_id, message_id, max_sequencing_time)
-                       values ($indexedDomain, $messageId, $maxSequencingTime)"""
-            case _ =>
-              sqlu"""insert into sequencer_client_pending_sends (domain_id, message_id, max_sequencing_time)
-                       values ($indexedDomain, $messageId, $maxSequencingTime)
-                       on conflict do nothing"""
-          },
+          sqlu"""insert into sequencer_client_pending_sends (domain_idx, message_id, max_sequencing_time)
+                 values ($indexedDomain, $messageId, $maxSequencingTime)
+                 on conflict do nothing""",
           operationName = s"${this.getClass}: save pending send",
         )
       )
@@ -56,7 +48,7 @@ class DbSendTrackerStore_Unused(
           EitherT(for {
             existingMaxSequencingTimeO <- storage.query(
               sql"""select max_sequencing_time from sequencer_client_pending_sends
-                    where domain_id = $indexedDomain and message_id = $messageId"""
+                    where domain_idx = $indexedDomain and message_id = $messageId"""
                 .as[CantonTimestamp]
                 .headOption,
               functionFullName,
@@ -70,27 +62,24 @@ class DbSendTrackerStore_Unused(
           })
         }
     } yield ()
-  }
 
   override def fetchPendingSends(implicit
       traceContext: TraceContext
-  ): Future[Map[MessageId, CantonTimestamp]] = {
+  ): Future[Map[MessageId, CantonTimestamp]] =
     for {
       items <- storage.query(
-        sql"select message_id, max_sequencing_time from sequencer_client_pending_sends where domain_id = $indexedDomain"
+        sql"select message_id, max_sequencing_time from sequencer_client_pending_sends where domain_idx = $indexedDomain"
           .as[(MessageId, CantonTimestamp)],
         functionFullName,
       )
     } yield items.toMap
-  }
 
   override def removePendingSend(
       messageId: MessageId
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] =
     storage.update_(
-      sqlu"delete from sequencer_client_pending_sends where domain_id = $indexedDomain and message_id = $messageId",
+      sqlu"delete from sequencer_client_pending_sends where domain_idx = $indexedDomain and message_id = $messageId",
       functionFullName,
     )
-  }
 
 }

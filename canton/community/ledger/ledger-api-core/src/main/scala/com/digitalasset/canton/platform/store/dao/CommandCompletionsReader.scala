@@ -9,7 +9,7 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.CompletionStorageBackend
 import com.digitalasset.canton.platform.store.dao.events.QueryValidRange
-import com.digitalasset.canton.platform.{ApiOffset, ApplicationId, Party}
+import com.digitalasset.canton.platform.{ApplicationId, Party}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -30,10 +30,9 @@ private[dao] final class CommandCompletionsReader(
   private val paginatingAsyncStream = new PaginatingAsyncStream(loggerFactory)
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def offsetFor(response: CompletionStreamResponse): Offset = {
+  private def offsetFor(response: CompletionStreamResponse): Offset =
     // It would be nice to obtain the offset such that it's obvious that it always exists (rather then relaying on calling .get)
-    ApiOffset.assertFromString(response.checkpoint.get.offset)
-  }
+    Offset.fromLong(response.completionResponse.completion.get.offset)
 
   override def getCommandCompletions(
       startExclusive: Offset,
@@ -49,9 +48,9 @@ private[dao] final class CommandCompletionsReader(
           minOffsetExclusive = startExclusive,
           maxOffsetInclusive = endInclusive,
           errorPruning = (prunedOffset: Offset) =>
-            s"Command completions request from ${startExclusive.toHexString} to ${endInclusive.toHexString} overlaps with pruned offset ${prunedOffset.toHexString}",
+            s"Command completions request from ${startExclusive.toLong} to ${endInclusive.toLong} overlaps with pruned offset ${prunedOffset.toLong}",
           errorLedgerEnd = (ledgerEndOffset: Offset) =>
-            s"Command completions request from ${startExclusive.toHexString} to ${endInclusive.toHexString} is beyond ledger end offset ${ledgerEndOffset.toHexString}",
+            s"Command completions request from ${startExclusive.toLong} to ${endInclusive.toLong} is beyond ledger end offset ${ledgerEndOffset.toLong}",
         ) {
           storageBackend.commandCompletions(
             startExclusive = range.startExclusive,

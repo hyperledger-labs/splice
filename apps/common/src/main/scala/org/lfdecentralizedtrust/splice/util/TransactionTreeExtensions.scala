@@ -72,7 +72,7 @@ private[splice] object TransactionTreeExtensions {
       choice: jcg.Choice[Marker, ?, Res],
   ): Option[Res] =
     Option.when(
-      QualifiedName(event.getTemplateId) == QualifiedName(tpl.TEMPLATE_ID)
+      QualifiedName(event.getTemplateId) == QualifiedName(tpl.getTemplateIdWithPackageId)
         && event.getChoice == choice.name
     )(choice.returnTypeDecoder.decode(event.getExerciseResult))
 }

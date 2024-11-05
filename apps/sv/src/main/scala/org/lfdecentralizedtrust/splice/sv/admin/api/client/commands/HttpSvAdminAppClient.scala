@@ -36,7 +36,7 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
   SynchronizerNodeIdentities,
 }
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext

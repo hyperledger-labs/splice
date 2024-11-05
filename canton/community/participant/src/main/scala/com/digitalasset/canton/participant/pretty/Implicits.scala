@@ -4,13 +4,10 @@
 package com.digitalasset.canton.participant.pretty
 
 import com.daml.ledger.api.v2.completion.Completion
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.ParticipantBoundary
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.participant.state.ChangeId
 import com.digitalasset.canton.logging.pretty.Pretty
-import pprint.Tree
 
 object Implicits {
   import com.digitalasset.canton.logging.pretty.Pretty.*
@@ -18,23 +15,8 @@ object Implicits {
   implicit val prettyReadServiceOffset: Pretty[Offset] = prettyOfString(
     // Do not use `toReadableHash` because this is not a hash but a hex-encoded string
     // whose end contains the most important information
-    _.toHexString
+    _.toLong.toString
   )
-
-  implicit val prettyLedgerBoundary: Pretty[ParticipantBoundary] = {
-    case ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN =>
-      Tree.Literal("PARTICIPANT_BOUNDARY_BEGIN")
-    case ParticipantBoundary.PARTICIPANT_BOUNDARY_END => Tree.Literal("PARTICIPANT_BOUNDARY_END")
-    case ParticipantBoundary.Unrecognized(value) => Tree.Literal(s"Unrecognized($value)")
-  }
-
-  implicit val prettyLedgerOffset: Pretty[ParticipantOffset] = {
-    case ParticipantOffset(ParticipantOffset.Value.Absolute(absolute)) =>
-      Tree.Apply("AbsoluteOffset", Iterator(Tree.Literal(absolute)))
-    case ParticipantOffset(ParticipantOffset.Value.Boundary(boundary)) =>
-      Tree.Apply("Boundary", Iterator(boundary.toTree))
-    case ParticipantOffset(ParticipantOffset.Value.Empty) => Tree.Literal("Empty")
-  }
 
   implicit def prettyChangeId: Pretty[ChangeId] = prettyOfClass(
     param("application Id", _.applicationId),

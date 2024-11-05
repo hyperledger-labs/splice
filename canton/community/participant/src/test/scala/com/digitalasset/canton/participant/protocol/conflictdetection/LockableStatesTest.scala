@@ -524,7 +524,8 @@ class LockableStatesTest extends AsyncWordSpec with BaseTest with HasExecutorSer
 
 object LockableStatesTest {
   final case class Status(status: Int) extends PrettyPrinting with HasPrunable {
-    override def pretty: Pretty[Status.this.type] = status => Pretty[Int].treeOf(status.status)
+    override protected def pretty: Pretty[Status.this.type] = status =>
+      Pretty[Int].treeOf(status.status)
     override def prunable: Boolean = status < 0
   }
   object Status {
@@ -570,5 +571,7 @@ object LockableStatesTest {
     )(implicit
         traceContext: TraceContext
     ): Future[Int] = Future.successful(0)
+
+    override def purge()(implicit traceContext: TraceContext): Future[Unit] = Future.unit
   }
 }

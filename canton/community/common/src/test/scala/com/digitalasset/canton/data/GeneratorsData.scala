@@ -17,14 +17,14 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.{
   ConfirmationResultMessage,
-  DeliveredTransferOutResult,
+  DeliveredUnassignmentResult,
   SignedProtocolMessage,
   Verdict,
 }
 import com.digitalasset.canton.sequencing.protocol.{Batch, MediatorGroupRecipient, SignedContent}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.SeqUtil
-import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.version.{ProtocolVersion, RepresentativeProtocolVersion}
 import com.digitalasset.canton.{LfInterfaceId, LfPackageId, LfPartyId, LfVersioned}
 import com.digitalasset.daml.lf.value.Value.ValueInt64
@@ -40,12 +40,12 @@ final class GeneratorsData(
     generatorsProtocol: GeneratorsProtocol,
 ) {
   import com.digitalasset.canton.Generators.*
-  import com.digitalasset.canton.sequencing.protocol.GeneratorsProtocol.*
   import com.digitalasset.canton.GeneratorsLf.*
   import com.digitalasset.canton.config.GeneratorsConfig.*
   import com.digitalasset.canton.crypto.GeneratorsCrypto.*
   import com.digitalasset.canton.data.GeneratorsDataTime.*
   import com.digitalasset.canton.ledger.api.GeneratorsApi.*
+  import com.digitalasset.canton.sequencing.protocol.GeneratorsProtocol.*
   import com.digitalasset.canton.topology.GeneratorsTopology.*
   import generatorsProtocol.*
   import org.scalatest.OptionValues.*
@@ -112,7 +112,7 @@ final class GeneratorsData(
       submissionId <- Gen.option(ledgerSubmissionIdArb.arbitrary)
       dedupPeriod <- Arbitrary.arbitrary[DeduplicationPeriod]
       maxSequencingTime <- Arbitrary.arbitrary[CantonTimestamp]
-      hashOps = TestHash // Not used for serialization
+      externalAuthorization <- Gen.option(Arbitrary.arbitrary[ExternalAuthorization])
     } yield SubmitterMetadata(
       actAs,
       applicationId,
@@ -122,7 +122,8 @@ final class GeneratorsData(
       submissionId,
       dedupPeriod,
       maxSequencingTime,
-      hashOps,
+      externalAuthorization,
+      hashOps = TestHash, // Not used for serialization
       protocolVersion,
     )
   )
@@ -189,8 +190,8 @@ final class GeneratorsData(
       packagePreference <- Gen.containerOf[Set, LfPackageId](Arbitrary.arbitrary[LfPackageId])
 
       // We consider only this specific value because the goal is not exhaustive testing of LF (de)serialization
-      chosenValue <- Gen.long.map(ValueInt64)
-      version <- Arbitrary.arbitrary[LfTransactionVersion]
+      chosenValue <- Gen.long.map(ValueInt64.apply)
+      version <- Arbitrary.arbitrary[LfLanguageVersion]
 
       actors <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
       seed <- Arbitrary.arbitrary[LfHash]
@@ -219,7 +220,8 @@ final class GeneratorsData(
       actors <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
       byKey <- Gen.oneOf(true, false)
       templateId <- Arbitrary.arbitrary[LfTemplateId]
-    } yield FetchActionDescription(inputContractId, actors, byKey, templateId)(rpv)
+      interfaceId <- Gen.option(Arbitrary.arbitrary[LfInterfaceId])
+    } yield FetchActionDescription(inputContractId, actors, byKey, templateId, interfaceId)(rpv)
 
   private def lookupByKeyActionDescriptionGenFor(
       rpv: RepresentativeProtocolVersion[ActionDescription.type]
@@ -255,38 +257,90 @@ final class GeneratorsData(
 
   implicit val viewParticipantDataArb: Arbitrary[ViewParticipantData] = Arbitrary(
     for {
+      actionDescription <- actionDescriptionArb.arbitrary
 
-      coreInputs <- Gen
-        .listOf(
-          Gen.zip(
-            generatorsProtocol.serializableContractArb(canHaveEmptyKey = false).arbitrary,
-            Gen.oneOf(true, false),
-          )
-        )
-        .map(_.map(InputContract.apply tupled))
+      coreInputs <- actionDescription match {
+        case ex: ExerciseActionDescription =>
+          for {
+            c <- Gen
+              .zip(
+                generatorsProtocol
+                  .serializableContractArb(canHaveEmptyKey = false)
+                  .arbitrary
+                  .map(_.copy(contractId = ex.inputContractId)),
+                Gen.oneOf(true, false),
+              )
+              .map(InputContract.apply tupled)
 
-      createdCore <- Gen
-        .listOf(
-          Gen.zip(
-            generatorsProtocol.serializableContractArb(canHaveEmptyKey = false).arbitrary,
-            Gen.oneOf(true, false),
-            Gen.oneOf(true, false),
-          )
-        )
-        .map(_.map(CreatedContract.tryCreate tupled))
-        // Deduplicating on contract id
-        .map(
-          _.groupBy(_.contract.contractId).flatMap { case (_, contracts) => contracts.headOption }
-        )
+            others <- Gen
+              .listOf(
+                Gen.zip(
+                  generatorsProtocol.serializableContractArb(canHaveEmptyKey = false).arbitrary,
+                  Gen.oneOf(true, false),
+                )
+              )
+              .map(_.map(InputContract.apply tupled))
+          } yield (c +: others).groupBy(_.contractId).flatMap { case (_, contracts) =>
+            contracts.headOption
+          }
 
-      createdCoreIds = createdCore.map(_.contract.contractId).toSet
+        case fetch: FetchActionDescription =>
+          generatorsProtocol
+            .serializableContractArb(canHaveEmptyKey = false)
+            .arbitrary
+            .map(c =>
+              List(InputContract(c.copy(contractId = fetch.inputContractId), consumed = false))
+            )
+        case _: CreateActionDescription | _: LookupByKeyActionDescription => Gen.const(List.empty)
+      }
+
+      createdCore <- actionDescription match {
+        case created: CreateActionDescription =>
+          Gen
+            .zip(
+              generatorsProtocol
+                .serializableContractArb(canHaveEmptyKey = false)
+                .arbitrary,
+              Gen.oneOf(true, false),
+            )
+            .map { case (c, rolledBack) =>
+              List(
+                CreatedContract.tryCreate(
+                  c.copy(contractId = created.contractId),
+                  consumedInCore = false,
+                  rolledBack = rolledBack,
+                )
+              )
+            }
+
+        case _: ExerciseActionDescription =>
+          Gen
+            .listOf(
+              Gen.zip(
+                generatorsProtocol.serializableContractArb(canHaveEmptyKey = false).arbitrary,
+                Gen.oneOf(true, false),
+                Gen.oneOf(true, false),
+              )
+            )
+            .map(_.map(CreatedContract.tryCreate tupled))
+            // Deduplicating on contract id
+            .map(
+              _.groupBy(_.contract.contractId).flatMap { case (_, contracts) =>
+                contracts.headOption
+              }
+            )
+
+        case _: LookupByKeyActionDescription | _: FetchActionDescription => Gen.const(List.empty)
+      }
+
+      notTransient = (createdCore.map(_.contract.contractId) ++ coreInputs.map(_.contractId)).toSet
 
       createdInSubviewArchivedInCore <- Gen
         .containerOf[Set, LfContractId](
           Arbitrary.arbitrary[LfContractId]
         )
-        // createdInSubviewArchivedInCore and createdCore should be disjoint
-        .map(_.intersect(createdCoreIds))
+        // createdInSubviewArchivedInCore and notTransient should be disjoint
+        .map(_ -- notTransient)
 
       /*
         Resolved keys
@@ -301,15 +355,22 @@ final class GeneratorsData(
           val key = contract.contract.metadata.maybeKeyWithMaintainersVersioned.value
           Gen
             .zip(key, AssignedKey(contract.contractId))
-            .map({ case (LfVersioned(v, k), r) => (k.globalKey, LfVersioned(v, r)) })
+            .map { case (LfVersioned(v, k), r) => (k.globalKey, LfVersioned(v, r)) }
       })
-      freeResolvedKeys <- Gen.listOf(
-        Gen
-          .zip(Arbitrary.arbitrary[LfGlobalKey], Arbitrary.arbitrary[LfVersioned[FreeKey]])
-      )
+      freeResolvedKeys <- actionDescription match {
+        case _: CreateActionDescription | _: FetchActionDescription => Gen.const(List.empty)
+
+        case _: ExerciseActionDescription =>
+          Gen.listOf(
+            Gen
+              .zip(Arbitrary.arbitrary[LfGlobalKey], Arbitrary.arbitrary[LfVersioned[FreeKey]])
+          )
+
+        case LookupByKeyActionDescription(key) =>
+          Arbitrary.arbitrary[LfVersioned[FreeKey]].map(res => List(key.unversioned -> res))
+      }
 
       resolvedKeys = assignedResolvedKeys ++ freeResolvedKeys
-      actionDescription <- actionDescriptionArb.arbitrary
       rollbackContext <- Arbitrary.arbitrary[RollbackContext]
       salt <- Arbitrary.arbitrary[Salt]
 
@@ -330,15 +391,15 @@ final class GeneratorsData(
   {
     ((_: ViewType) match {
       case ViewType.TransactionViewType => ()
-      case _: ViewType.TransferViewType => ()
+      case _: ViewType.ReassignmentViewType => ()
       case _: ViewTypeTest => () // Only for tests, so we don't use it in the generator
     }).discard
   }
   implicit val viewTypeArb: Arbitrary[ViewType] = Arbitrary(
     Gen.oneOf[ViewType](
       ViewType.TransactionViewType,
-      ViewType.TransferInViewType,
-      ViewType.TransferOutViewType,
+      ViewType.AssignmentViewType,
+      ViewType.UnassignmentViewType,
     )
   )
 
@@ -429,10 +490,10 @@ final class GeneratorsData(
    */
   private implicit val ec: ExecutionContext = ExecutionContext.global
 
-  private val sourceProtocolVersion = SourceProtocolVersion(protocolVersion)
-  private val targetProtocolVersion = TargetProtocolVersion(protocolVersion)
+  private val sourceProtocolVersion = Source(protocolVersion)
+  private val targetProtocolVersion = Target(protocolVersion)
 
-  implicit val transferSubmitterMetadataArb: Arbitrary[TransferSubmitterMetadata] =
+  implicit val reassignmentSubmitterMetadataArb: Arbitrary[ReassignmentSubmitterMetadata] =
     Arbitrary(
       for {
         submitter <- Arbitrary.arbitrary[LfPartyId]
@@ -442,7 +503,7 @@ final class GeneratorsData(
         submissionId <- Gen.option(ledgerSubmissionIdArb.arbitrary)
         workflowId <- Gen.option(workflowIdArb.arbitrary.map(_.unwrap))
 
-      } yield TransferSubmitterMetadata(
+      } yield ReassignmentSubmitterMetadata(
         submitter,
         submittingParticipant,
         commandId,
@@ -452,21 +513,33 @@ final class GeneratorsData(
       )
     )
 
-  implicit val transferInCommonDataArb: Arbitrary[TransferInCommonData] = Arbitrary(
+  implicit val reassigningParticipantsArb: Arbitrary[ReassigningParticipants] = Arbitrary(for {
+    confirming <- Gen.containerOf[Set, ParticipantId](
+      Arbitrary.arbitrary[ParticipantId]
+    )
+    pureObserving <- Gen.containerOf[Set, ParticipantId](
+      Arbitrary.arbitrary[ParticipantId]
+    )
+    observing = confirming.union(pureObserving)
+  } yield ReassigningParticipants.tryCreate(confirming, observing))
+
+  implicit val assignmentCommonDataArb: Arbitrary[AssignmentCommonData] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
-      targetDomain <- Arbitrary.arbitrary[TargetDomainId]
+      targetDomain <- Arbitrary.arbitrary[Target[DomainId]]
 
       targetMediator <- Arbitrary.arbitrary[MediatorGroupRecipient]
 
-      stakeholders <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      stakeholders <- Arbitrary.arbitrary[Stakeholders]
+
       uuid <- Gen.uuid
 
-      submitterMetadata <- Arbitrary.arbitrary[TransferSubmitterMetadata]
+      submitterMetadata <- Arbitrary.arbitrary[ReassignmentSubmitterMetadata]
+      reassigningParticipants <- Arbitrary.arbitrary[ReassigningParticipants]
 
       hashOps = TestHash // Not used for serialization
 
-    } yield TransferInCommonData
+    } yield AssignmentCommonData
       .create(hashOps)(
         salt,
         targetDomain,
@@ -475,51 +548,54 @@ final class GeneratorsData(
         uuid,
         submitterMetadata,
         targetProtocolVersion,
+        reassigningParticipants,
       )
   )
 
-  implicit val transferOutCommonData: Arbitrary[TransferOutCommonData] = Arbitrary(
+  implicit val unassignmentCommonData: Arbitrary[UnassignmentCommonData] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
-      sourceDomain <- Arbitrary.arbitrary[SourceDomainId]
+      sourceDomain <- Arbitrary.arbitrary[Source[DomainId]]
 
       sourceMediator <- Arbitrary.arbitrary[MediatorGroupRecipient]
 
-      stakeholders <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
-      adminParties <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      stakeholders <- Arbitrary.arbitrary[Stakeholders]
+
+      reassigningParticipants <- Arbitrary.arbitrary[ReassigningParticipants]
+
       uuid <- Gen.uuid
 
-      submitterMetadata <- Arbitrary.arbitrary[TransferSubmitterMetadata]
+      submitterMetadata <- Arbitrary.arbitrary[ReassignmentSubmitterMetadata]
 
       hashOps = TestHash // Not used for serialization
 
-    } yield TransferOutCommonData
+    } yield UnassignmentCommonData
       .create(hashOps)(
         salt,
         sourceDomain,
         sourceMediator,
         stakeholders,
-        adminParties,
+        reassigningParticipants,
         uuid,
         submitterMetadata,
         sourceProtocolVersion,
       )
   )
 
-  private def deliveryTransferOutResultGen(
+  private def deliveryUnassignmentResultGen(
       contract: SerializableContract,
-      sourceProtocolVersion: SourceProtocolVersion,
-  ): Gen[DeliveredTransferOutResult] =
+      sourceProtocolVersion: Source[ProtocolVersion],
+  ): Gen[DeliveredUnassignmentResult] =
     for {
-      sourceDomain <- Arbitrary.arbitrary[SourceDomainId]
+      sourceDomain <- Arbitrary.arbitrary[Source[DomainId]]
       requestId <- Arbitrary.arbitrary[RequestId]
       rootHash <- Arbitrary.arbitrary[RootHash]
-      protocolVersion = sourceProtocolVersion.v
+      protocolVersion = sourceProtocolVersion.unwrap
       verdict = Verdict.Approve(protocolVersion)
 
       result = ConfirmationResultMessage.create(
-        sourceDomain.id,
-        ViewType.TransferOutViewType,
+        sourceDomain.unwrap,
+        ViewType.UnassignmentViewType,
         requestId,
         rootHash,
         verdict,
@@ -532,7 +608,7 @@ final class GeneratorsData(
           result,
           protocolVersion,
           GeneratorsCrypto.sign(
-            "TransferOutResult-mediator",
+            "UnassignmentResult-mediator",
             TestHash.testHashPurpose,
           ),
         )
@@ -542,53 +618,55 @@ final class GeneratorsData(
       batch = Batch.of(protocolVersion, signedResult -> recipients)
       deliver <- deliverGen(sourceDomain.unwrap, batch, protocolVersion)
 
-      transferOutTimestamp <- Arbitrary.arbitrary[CantonTimestamp]
-    } yield DeliveredTransferOutResult {
-      SignedContent(
-        deliver,
-        sign("TransferOutResult-sequencer", TestHash.testHashPurpose),
-        Some(transferOutTimestamp),
-        protocolVersion,
+      unassignmentTs <- Arbitrary.arbitrary[CantonTimestamp]
+    } yield DeliveredUnassignmentResult
+      .create(
+        SignedContent(
+          deliver,
+          sign("UnassignmentResult-sequencer", TestHash.testHashPurpose),
+          Some(unassignmentTs),
+          protocolVersion,
+        )
       )
-    }
+      .value
 
-  implicit val transferInViewArb: Arbitrary[TransferInView] = Arbitrary(
+  implicit val assignmentViewArb: Arbitrary[AssignmentView] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
       contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
       creatingTransactionId <- Arbitrary.arbitrary[TransactionId]
-      transferOutResultEvent <- deliveryTransferOutResultGen(contract, sourceProtocolVersion)
-      transferCounter <- transferCounterGen
+      unassignmentResultEvent <- deliveryUnassignmentResultGen(contract, sourceProtocolVersion)
+      reassignmentCounter <- reassignmentCounterGen
 
       hashOps = TestHash // Not used for serialization
 
-    } yield TransferInView
+    } yield AssignmentView
       .create(hashOps)(
         salt,
         contract,
         creatingTransactionId,
-        transferOutResultEvent,
+        unassignmentResultEvent,
         sourceProtocolVersion,
         targetProtocolVersion,
-        transferCounter,
+        reassignmentCounter,
       )
       .value
   )
 
-  implicit val transferOutViewArb: Arbitrary[TransferOutView] = Arbitrary(
+  implicit val unassignmentViewArb: Arbitrary[UnassignmentView] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
 
       creatingTransactionId <- Arbitrary.arbitrary[TransactionId]
       contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
 
-      targetDomain <- Arbitrary.arbitrary[TargetDomainId]
+      targetDomain <- Arbitrary.arbitrary[Target[DomainId]]
       timeProof <- timeProofArb(protocolVersion).arbitrary
-      transferCounter <- transferCounterGen
+      reassignmentCounter <- reassignmentCounterGen
 
       hashOps = TestHash // Not used for serialization
 
-    } yield TransferOutView
+    } yield UnassignmentView
       .create(hashOps)(
         salt,
         contract,
@@ -597,32 +675,32 @@ final class GeneratorsData(
         timeProof,
         sourceProtocolVersion,
         targetProtocolVersion,
-        transferCounter,
+        reassignmentCounter,
       )
   )
 
-  implicit val transferInViewTreeArb: Arbitrary[TransferInViewTree] = Arbitrary(
+  implicit val assignViewTreeArb: Arbitrary[AssignmentViewTree] = Arbitrary(
     for {
-      commonData <- transferInCommonDataArb.arbitrary
-      transferInView <- transferInViewArb.arbitrary
+      commonData <- assignmentCommonDataArb.arbitrary
+      assignmentView <- assignmentViewArb.arbitrary
       hash = TestHash
-    } yield TransferInViewTree(
+    } yield AssignmentViewTree(
       commonData,
-      transferInView.blindFully,
-      TargetProtocolVersion(protocolVersion),
+      assignmentView.blindFully,
+      Target(protocolVersion),
       hash,
     )
   )
 
-  implicit val transferOutViewTreeArb: Arbitrary[TransferOutViewTree] = Arbitrary(
+  implicit val unassignmentViewTreeArb: Arbitrary[UnassignmentViewTree] = Arbitrary(
     for {
-      commonData <- transferOutCommonData.arbitrary
-      transferOutView <- transferOutViewArb.arbitrary
+      commonData <- unassignmentCommonData.arbitrary
+      unassignmentView <- unassignmentViewArb.arbitrary
       hash = TestHash
-    } yield TransferOutViewTree(
+    } yield UnassignmentViewTree(
       commonData,
-      transferOutView.blindFully,
-      SourceProtocolVersion(protocolVersion),
+      unassignmentView.blindFully,
+      Source(protocolVersion),
       hash,
     )
   )
@@ -645,7 +723,7 @@ final class GeneratorsData(
     )
   )
 
-  private var unblindedSubviewHashesForLightTransactionTree: Seq[ViewHash] = _
+  private var unblindedSubviewHashesForLightTransactionTree: Seq[ViewHashAndKey] = _
 
   private val transactionViewForLightTransactionTreeArb: Arbitrary[TransactionView] = Arbitrary(
     for {
@@ -657,8 +735,15 @@ final class GeneratorsData(
       subviews = TransactionSubviews
         .apply(Seq(transactionViewWithEmptySubview))(protocolVersion, hashOps)
       subviewHashes = subviews.trySubviewHashes
+      pureCrypto = ExampleTransactionFactory.pureCrypto
+      subviewHashesAndKeys = subviewHashes.map { hash =>
+        ViewHashAndKey(
+          hash,
+          pureCrypto.generateSecureRandomness(pureCrypto.defaultSymmetricKeyScheme.keySizeInBytes),
+        )
+      }
     } yield {
-      unblindedSubviewHashesForLightTransactionTree = subviewHashes
+      unblindedSubviewHashesForLightTransactionTree = subviewHashesAndKeys
       TransactionView.tryCreate(hashOps)(
         viewCommonData = viewCommonData,
         viewParticipantData = viewParticipantData,

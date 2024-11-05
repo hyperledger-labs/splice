@@ -11,6 +11,7 @@ window.splice_config = {
       url: "https://" + window.location.host + "/api/validator",
     },
   },
+  pollInterval: "${SPLICE_APP_UI_POLL_INTERVAL}",
   spliceInstanceNames: {
     networkName: "${SPLICE_APP_UI_NETWORK_NAME}",
     networkFaviconUrl: "${SPLICE_APP_UI_NETWORK_FAVICON_URL}",

@@ -15,6 +15,8 @@ import Splice.Round
 import Splice.Types
 import Splice.Amulet
 import Splice.AmuletRules
+import Splice.ExternalPartyAmuletRules
+import Splice.Fees
 
 import Splice.DsoRules
 import Splice.Util
@@ -23,6 +25,7 @@ import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
 import Splice.Ans
 import Splice.Scripts.AnsRulesParameters
+import Splice.Scripts.TestTransferPreapproval
 import Splice.Wallet.Subscriptions
 
 
@@ -384,4 +387,107 @@ terminatedSubscriptionCanBeCleanedUp = script do
 
   terminatedSubscriptions <- query @TerminatedSubscription app.dso
   terminatedSubscriptions === []
+  pure ()
+
+testCreateExternalPartyAmuletRules : Script ()
+testCreateExternalPartyAmuletRules = script do
+  (app, dso, (sv1, sv2, sv3, _)) <- initDevNet
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  (externalPartyAmuletRulesCid, _) <- getExternalPartyAmuletRules app
+  submit dso $ exerciseCmd externalPartyAmuletRulesCid Archive
+  None <- queryContractId app.dso externalPartyAmuletRulesCid
+
+  let action = ARC_DsoRules with
+        dsoAction = SRARC_CreateExternalPartyAmuletRules DsoRules_CreateExternalPartyAmuletRules
+
+  confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
+    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = svParty
+      action
+    return result.confirmation
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+    DsoRules_ExecuteConfirmedAction with
+      action
+      amuletRulesCid = None
+      confirmationCids
+
+  _ <- getExternalPartyAmuletRules app
+
+  pure ()
+
+testTransferPreapprovalSend : Script ()
+testTransferPreapprovalSend = do
+  (app, dso, (sv1, sv2, sv3, _)) <- initDevNet
+  validator <- setupValidator app "validator"
+  alice <- setupUser app "alice" validator
+  externalParty <- allocateParty "externalParty"
+  (externalPartyAmuletRulesCid, _) <- getExternalPartyAmuletRules app
+  now <- getTime
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  transferPreapprovalCid <- createTransferPreapproval externalParty validator dso  (now `addRelTime` hours 24)
+
+  ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+    with
+      sender = alice.primaryParty
+      receiver = externalParty
+      amount = 42.0
+      expiresAt = now `addRelTime` hours 12
+      nonce = 0
+      delegate = validator
+
+  let action = ARC_DsoRules with
+        dsoAction = SRARC_CreateTransferCommandCounter (DsoRules_CreateTransferCommandCounter alice.primaryParty)
+
+  confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
+    result <- submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = svParty
+      action
+    return result.confirmation
+
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
+    DsoRules_ExecuteConfirmedAction with
+      action
+      amuletRulesCid = None
+      confirmationCids
+
+  [(transferCounterCid, _)] <- query @TransferCommandCounter app.dso
+
+  context <- getPaymentTransferContext app alice
+
+  amulet <- tap app alice 50.0
+
+  [] <- query @Amulet externalParty
+
+  TransferCommand_SendResult (TransferCommandResultSuccess _) _ _ <- submitMulti [validator] [app.dso] $ exerciseCmd transferCmd TransferCommand_Send with
+    context
+    transferPreapprovalCidO = Some transferPreapprovalCid
+    inputs = [InputAmulet amulet]
+    transferCounterCid
+
+  amulets <- query @Amulet externalParty
+  map snd amulets === [Amulet app.dso externalParty (ExpiringAmount 42.0 (Round 1) (RatePerRound 0.00002))]
+
+  pure ()
+
+testTransferPreapprovalExpiry: Script ()
+testTransferPreapprovalExpiry = do
+  (app, dso, (sv1, _, _, _)) <- initDevNet
+  validator <- setupValidator app "validator"
+  externalParty <- allocateParty "externalParty"
+  now <- getTime
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  transferPreapprovalCid <- createTransferPreapproval externalParty validator dso  (now `addRelTime` days 1)
+
+  -- Fails before expiry
+  submitMultiMustFail [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
+    transferPreapprovalCid
+  -- Expire the TransferPreapproval
+  passTime (days 1)
+  -- Succeeds after expiry
+  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExpireTransferPreapproval with
+    transferPreapprovalCid
+
   pure ()

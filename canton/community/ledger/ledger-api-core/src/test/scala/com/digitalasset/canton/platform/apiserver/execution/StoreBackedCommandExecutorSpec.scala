@@ -3,13 +3,13 @@
 
 package com.digitalasset.canton.platform.apiserver.execution
 
+import cats.syntax.either.*
 import com.daml.logging.LoggingContext
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.crypto.{CryptoPureApi, Salt, SaltSeed}
-import com.digitalasset.canton.data.DeduplicationPeriod
-import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands}
+import com.digitalasset.canton.data.{DeduplicationPeriod, ProcessedDisclosedContract}
+import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands, DisclosedContract}
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.participant.state.WriteService
 import com.digitalasset.canton.ledger.participant.state.index.{ContractState, ContractStore}
@@ -17,15 +17,15 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackageName
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
+import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.InterpretationTimeExceeded
 import com.digitalasset.canton.protocol.{DriverContractMetadata, LfContractId, LfTransactionVersion}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, LfValue}
-import com.digitalasset.daml.lf.command.{
-  ApiCommands as LfCommands,
-  DisclosedContract as LfDisclosedContract,
-}
+import com.digitalasset.daml.lf.command.ApiCommands as LfCommands
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{Identifier, ParticipantId, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -33,7 +33,9 @@ import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.engine.*
 import com.digitalasset.daml.lf.transaction.test.TransactionBuilder
 import com.digitalasset.daml.lf.transaction.{
+  FatContractInstance,
   GlobalKeyWithMaintainers,
+  Node as LfNode,
   SubmittedTransaction,
   Transaction,
   Versioned,
@@ -61,7 +63,54 @@ class StoreBackedCommandExecutorSpec
   val identifier: Identifier =
     Ref.Identifier(Ref.PackageId.assertFromString("p"), Ref.QualifiedName.assertFromString("m:n"))
   val packageName: PackageName = PackageName.assertFromString("pkg-name")
-  private val processedDisclosedContracts = ImmArray()
+  private val disclosedContractId: LfContractId = TransactionBuilder.newCid
+  private def mkCreateNode(contractId: Value.ContractId = disclosedContractId) =
+    LfNode.Create(
+      coid = contractId,
+      packageName = packageName,
+      packageVersion = None,
+      templateId = identifier,
+      arg = ValueTrue,
+      signatories = Set(Ref.Party.assertFromString("unexpectedSig")),
+      stakeholders = Set(
+        Ref.Party.assertFromString("unexpectedSig"),
+        Ref.Party.assertFromString("unexpectedObs"),
+      ),
+      keyOpt = Some(
+        GlobalKeyWithMaintainers.assertBuild(
+          templateId = identifier,
+          LfValue.ValueTrue,
+          Set(Ref.Party.assertFromString("unexpectedSig")),
+          packageName,
+        )
+      ),
+      version = LfTransactionVersion.StableVersions.max,
+    )
+  private val disclosedCreateNode = mkCreateNode()
+  private val disclosedContractDomainId: DomainId = DomainId.tryFromString("x::domainId")
+  private val disclosedContractCreateTime = Time.Timestamp.now()
+
+  private val disclosedContract = DisclosedContract(
+    fatContractInstance = FatContractInstance.fromCreateNode(
+      disclosedCreateNode,
+      createTime = disclosedContractCreateTime,
+      cantonData = salt,
+    ),
+    domainIdO = Some(disclosedContractDomainId),
+  )
+
+  private def mkProcessedDisclosedContract(
+      createNode: LfNode.Create = disclosedCreateNode,
+      domainIdO: Option[DomainId] = Some(disclosedContractDomainId),
+  ) =
+    ProcessedDisclosedContract(
+      create = createNode,
+      createdAt = disclosedContractCreateTime,
+      driverMetadata = salt,
+      domainIdO = domainIdO,
+    )
+
+  private val processedDisclosedContracts = ImmArray(mkProcessedDisclosedContract())
 
   private val emptyTransactionMetadata = Transaction.Metadata(
     submissionSeed = None,
@@ -70,7 +119,7 @@ class StoreBackedCommandExecutorSpec
     dependsOnTime = false,
     nodeSeeds = ImmArray.Empty,
     globalKeyMapping = Map.empty,
-    disclosedEvents = processedDisclosedContracts,
+    disclosedEvents = ImmArray.empty,
   )
 
   private val resultDone: ResultDone[(SubmittedTransaction, Transaction.Metadata)] =
@@ -87,7 +136,7 @@ class StoreBackedCommandExecutorSpec
         submitters = any[Set[Ref.Party]],
         readAs = any[Set[Ref.Party]],
         cmds = any[com.digitalasset.daml.lf.command.ApiCommands],
-        disclosures = any[ImmArray[LfDisclosedContract]],
+        disclosures = any[ImmArray[FatContractInstance]],
         participantId = any[ParticipantId],
         submissionSeed = any[Hash],
         engineLogger = any[Option[EngineLogger]],
@@ -96,7 +145,11 @@ class StoreBackedCommandExecutorSpec
       .thenReturn(result)
   }
 
-  private def mkCommands(ledgerEffectiveTime: Time.Timestamp) =
+  private def mkCommands(
+      ledgerEffectiveTime: Time.Timestamp,
+      disclosedContracts: ImmArray[DisclosedContract] = ImmArray(disclosedContract),
+      domainIdO: Option[DomainId] = None,
+  ) =
     Commands(
       workflowId = None,
       applicationId = Ref.ApplicationId.assertFromString("applicationId"),
@@ -111,7 +164,8 @@ class StoreBackedCommandExecutorSpec
         ledgerEffectiveTime = ledgerEffectiveTime,
         commandsReference = "",
       ),
-      disclosedContracts = ImmArray.empty,
+      disclosedContracts = disclosedContracts,
+      domainId = domainIdO,
     )
 
   private val submissionSeed = Hash.hashPrivateKey("a key")
@@ -122,8 +176,7 @@ class StoreBackedCommandExecutorSpec
       Ref.ParticipantId.assertFromString("anId"),
       mock[WriteService],
       mock[ContractStore],
-      AuthorityResolver(),
-      authenticateContract = _ => Right(()),
+      authenticateContract = _ => Either.unit,
       metrics = LedgerApiServerMetrics.ForTesting,
       EngineLoggingConfig(),
       loggerFactory = loggerFactory,
@@ -142,7 +195,9 @@ class StoreBackedCommandExecutorSpec
 
   "StoreBackedCommandExecutor" should {
     "add interpretation time and used disclosed contracts to result" in {
-      val mockEngine = mkMockEngine(resultDone)
+      val mockEngine = mkMockEngine(resultDone.map { case (tx, meta) =>
+        tx -> meta.copy(disclosedEvents = ImmArray(disclosedCreateNode))
+      })
       val commands = mkCommands(Time.Timestamp.Epoch)
 
       val sut = mkSut(NonNegativeFiniteDuration.Zero, mockEngine)
@@ -215,39 +270,18 @@ class StoreBackedCommandExecutorSpec
       globalKey = None,
       maintainers = None,
       // Filled below conditionally
-      driverMetadata = None,
+      driverMetadata = Array.empty,
     )
 
     val divulgedContractId: LfContractId = LfContractId.assertFromString("00" + "00" * 32 + "00")
 
     val archivedContractId: LfContractId = LfContractId.assertFromString("00" + "00" * 32 + "01")
 
-    val disclosedContractId: LfContractId = LfContractId.assertFromString("00" + "00" * 32 + "02")
-
-    val disclosedContract: domain.DisclosedContract = domain.DisclosedContract(
-      templateId = identifier,
-      packageName = packageName,
-      packageVersion = None,
-      contractId = disclosedContractId,
-      argument = ValueTrue,
-      createdAt = mock[Timestamp],
-      keyHash = None,
-      driverMetadata = salt,
-      signatories = Set(Ref.Party.assertFromString("unexpectedSig")),
-      stakeholders = Set(
-        Ref.Party.assertFromString("unexpectedSig"),
-        Ref.Party.assertFromString("unexpectedObs"),
-      ),
-      keyMaintainers = Some(Set(Ref.Party.assertFromString("unexpectedSig"))),
-      keyValue = Some(LfValue.ValueTrue),
-      transactionVersion = LfTransactionVersion.StableVersions.max,
-    )
-
     def doTest(
         contractId: Option[LfContractId],
         expected: Option[Option[String]],
-        authenticationResult: Either[String, Unit] = Right(()),
-        stakeholderContractDriverMetadata: Option[Array[Byte]] = Some(salt.toByteArray),
+        authenticationResult: Either[String, Unit] = Either.unit,
+        stakeholderContractDriverMetadata: Array[Byte] = salt.toByteArray,
     ): Future[Assertion] = {
       val ref: AtomicReference[Option[Option[String]]] = new AtomicReference(None)
       val mockEngine = mock[Engine]
@@ -284,7 +318,7 @@ class StoreBackedCommandExecutorSpec
           submitters = any[Set[Ref.Party]],
           readAs = any[Set[Ref.Party]],
           cmds = any[com.digitalasset.daml.lf.command.ApiCommands],
-          disclosures = any[ImmArray[LfDisclosedContract]],
+          disclosures = any[ImmArray[FatContractInstance]],
           participantId = any[ParticipantId],
           submissionSeed = any[Hash],
           engineLogger = any[Option[EngineLogger]],
@@ -306,6 +340,7 @@ class StoreBackedCommandExecutorSpec
           commandsReference = "",
         ),
         disclosedContracts = ImmArray.from(Seq(disclosedContract)),
+        domainId = None,
       )
       val submissionSeed = Hash.hashPrivateKey("a key")
 
@@ -333,7 +368,6 @@ class StoreBackedCommandExecutorSpec
         Ref.ParticipantId.assertFromString("anId"),
         mock[WriteService],
         store,
-        AuthorityResolver(),
         authenticateContract = _ => authenticationResult,
         metrics = LedgerApiServerMetrics.ForTesting,
         EngineLoggingConfig(),
@@ -380,7 +414,7 @@ class StoreBackedCommandExecutorSpec
 
     "disallow unauthorized disclosed contracts" in {
       val expected =
-        s"Upgrading contract with $disclosedContractId failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set(unexpectedObs) vs Set(observer)', 'key maintainers mismatch: Set(unexpectedSig) vs Set(signatory)', 'key value mismatch: Some(GlobalKey(p:m:n, pkg-name, ValueBool(true))) vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
+        s"Upgrading contract ${disclosedContractId.coid} failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: TreeSet(unexpectedSig) vs Set(signatory)', 'observers mismatch: TreeSet(unexpectedObs) vs Set(observer)', 'key maintainers mismatch: TreeSet(unexpectedSig) vs Set(signatory)', 'key value mismatch: Some(GlobalKey(p:m:n, pkg-name, ValueBool(true))) vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
       doTest(
         Some(disclosedContractId),
         Some(Some(expected)),
@@ -391,24 +425,103 @@ class StoreBackedCommandExecutorSpec
     "disallow unauthorized stakeholder contracts" in {
       val errorMessage = "Not authorized"
       val expected =
-        s"Upgrading contract with $stakeholderContractId failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set() vs Set(observer)', 'key maintainers mismatch: Set() vs Set(signatory)', 'key value mismatch: None vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
+        s"Upgrading contract ${stakeholderContractId.coid} failed authentication check with error: Not authorized. The following upgrading checks failed: ['signatories mismatch: Set(unexpectedSig) vs Set(signatory)', 'observers mismatch: Set() vs Set(observer)', 'key maintainers mismatch: Set() vs Set(signatory)', 'key value mismatch: None vs Some(GlobalKey(p:m:n, pkg-name, ValueRecord(None,ImmArray((None,ValueParty(signatory)),(None,ValueText(some key))))))']"
       doTest(
         Some(stakeholderContractId),
         Some(Some(expected)),
         authenticationResult = Left(errorMessage),
       )
     }
+  }
 
-    "fail upgrade on stakeholder contracts without contract driver metadata" in {
-      val errorMessage = "Doesn't matter"
-      val expected =
-        s"Contract with $stakeholderContractId is missing the driver metadata and cannot be upgraded. This can happen for contracts created with older Canton versions"
-      doTest(
-        Some(stakeholderContractId),
-        Some(Some(expected)),
-        authenticationResult = Left(errorMessage),
-        stakeholderContractDriverMetadata = None,
-      )
+  "Disclosed contract domain-id consideration" should {
+    val domainId1 = DomainId.tryFromString("x::domain1")
+    val domainId2 = DomainId.tryFromString("x::domain2")
+    val disclosedContractId1 = TransactionBuilder.newCid
+    val disclosedContractId2 = TransactionBuilder.newCid
+    val discCreate1 = mkCreateNode(disclosedContractId1)
+    val discCreate2 = mkCreateNode(disclosedContractId2)
+
+    implicit val traceContext: TraceContext = TraceContext.empty
+
+    "not influence the prescribed domain-id if no disclosed contracts are attached" in {
+      val result = for {
+        domainId_from_no_prescribed_no_disclosed <- StoreBackedCommandExecutor
+          .considerDisclosedContractsDomainId(
+            prescribedDomainIdO = None,
+            disclosedContractsUsedInInterpretation = ImmArray.Empty,
+            logger,
+          )
+        domainId_from_prescribed_no_disclosed <-
+          StoreBackedCommandExecutor.considerDisclosedContractsDomainId(
+            prescribedDomainIdO = Some(domainId1),
+            disclosedContractsUsedInInterpretation = ImmArray.Empty,
+            logger,
+          )
+      } yield {
+        domainId_from_no_prescribed_no_disclosed shouldBe None
+        domainId_from_prescribed_no_disclosed shouldBe Some(domainId1)
+      }
+
+      result.value
+    }
+
+    "use the disclosed contracts domain id" in {
+      StoreBackedCommandExecutor
+        .considerDisclosedContractsDomainId(
+          prescribedDomainIdO = None,
+          disclosedContractsUsedInInterpretation = ImmArray(
+            mkProcessedDisclosedContract(discCreate1, Some(domainId1)),
+            mkProcessedDisclosedContract(discCreate2, Some(domainId1)),
+          ),
+          logger,
+        )
+        .map(_ shouldBe Some(domainId1))
+        .value
+    }
+
+    "return an error if domain-ids of disclosed contracts mismatch" in {
+      def test(prescribedDomainIdO: Option[DomainId]) =
+        inside(
+          StoreBackedCommandExecutor
+            .considerDisclosedContractsDomainId(
+              prescribedDomainIdO = prescribedDomainIdO,
+              disclosedContractsUsedInInterpretation = ImmArray(
+                mkProcessedDisclosedContract(discCreate1, Some(domainId1)),
+                mkProcessedDisclosedContract(discCreate2, Some(domainId2)),
+              ),
+              logger,
+            )
+        ) { case Left(error: ErrorCause.DisclosedContractsDomainIdsMismatch) =>
+          error.mismatchingDisclosedContractDomainIds shouldBe Map(
+            disclosedContractId1 -> domainId1,
+            disclosedContractId2 -> domainId2,
+          )
+        }
+
+      test(prescribedDomainIdO = None)
+      test(prescribedDomainIdO = Some(DomainId.tryFromString("x::anotherOne")))
+    }
+
+    "return an error if the domain-id of the disclosed contracts does not match the prescribed domain-id" in {
+      val domainIdOfDisclosedContracts = domainId1
+      val prescribedDomainId = domainId2
+
+      inside(
+        StoreBackedCommandExecutor
+          .considerDisclosedContractsDomainId(
+            prescribedDomainIdO = Some(prescribedDomainId),
+            disclosedContractsUsedInInterpretation = ImmArray(
+              mkProcessedDisclosedContract(discCreate1, Some(domainIdOfDisclosedContracts)),
+              mkProcessedDisclosedContract(discCreate2, Some(domainIdOfDisclosedContracts)),
+            ),
+            logger,
+          )
+      ) { case Left(error: ErrorCause.PrescribedDomainIdMismatch) =>
+        error.commandsDomainId shouldBe prescribedDomainId
+        error.domainIdOfDisclosedContracts shouldBe domainIdOfDisclosedContracts
+        error.disclosedContractIds shouldBe Set(disclosedContractId1, disclosedContractId2)
+      }
     }
   }
 

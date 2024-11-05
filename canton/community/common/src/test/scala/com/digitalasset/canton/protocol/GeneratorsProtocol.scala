@@ -14,7 +14,8 @@ import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.sequencing.TrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.transaction.ParticipantDomainLimits
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.transaction.Versioned
 import com.google.protobuf.ByteString
@@ -32,18 +33,19 @@ final class GeneratorsProtocol(
   import com.digitalasset.canton.topology.GeneratorsTopology.*
   import org.scalatest.EitherValues.*
 
-  implicit val staticDomainParametersArb: Arbitrary[StaticDomainParameters] = {
+  implicit val staticDomainParametersArb: Arbitrary[StaticDomainParameters] =
     Arbitrary(for {
-      requiredSigningKeySchemes <- nonEmptySetGen[SigningKeyScheme]
+      requiredSigningAlgorithmSpecs <- nonEmptySetGen[SigningAlgorithmSpec]
+      requiredSigningKeySpecs <- nonEmptySetGen[SigningKeySpec]
       requiredEncryptionAlgorithmSpecs <- nonEmptySetGen[EncryptionAlgorithmSpec]
-      requiredKeySpecs <- nonEmptySetGen[EncryptionKeySpec]
+      requiredEncryptionKeySpecs <- nonEmptySetGen[EncryptionKeySpec]
       requiredSymmetricKeySchemes <- nonEmptySetGen[SymmetricKeyScheme]
       requiredHashAlgorithms <- nonEmptySetGen[HashAlgorithm]
       requiredCryptoKeyFormats <- nonEmptySetGen[CryptoKeyFormat]
 
       parameters = StaticDomainParameters(
-        requiredSigningKeySchemes,
-        RequiredEncryptionSpecs(requiredEncryptionAlgorithmSpecs, requiredKeySpecs),
+        RequiredSigningSpecs(requiredSigningAlgorithmSpecs, requiredSigningKeySpecs),
+        RequiredEncryptionSpecs(requiredEncryptionAlgorithmSpecs, requiredEncryptionKeySpecs),
         requiredSymmetricKeySchemes,
         requiredHashAlgorithms,
         requiredCryptoKeyFormats,
@@ -51,13 +53,12 @@ final class GeneratorsProtocol(
       )
 
     } yield parameters)
-  }
 
   implicit val dynamicDomainParametersArb: Arbitrary[DynamicDomainParameters] = Arbitrary(
     for {
       confirmationResponseTimeout <- Arbitrary.arbitrary[NonNegativeFiniteDuration]
       mediatorReactionTimeout <- Arbitrary.arbitrary[NonNegativeFiniteDuration]
-      transferExclusivityTimeout <- Arbitrary.arbitrary[NonNegativeFiniteDuration]
+      assignmentExclusivityTimeout <- Arbitrary.arbitrary[NonNegativeFiniteDuration]
       topologyChangeDelay <- Arbitrary.arbitrary[NonNegativeFiniteDuration]
 
       mediatorDeduplicationMargin <- Arbitrary.arbitrary[NonNegativeFiniteDuration]
@@ -69,7 +70,6 @@ final class GeneratorsProtocol(
       representativePV = DynamicDomainParameters.protocolVersionRepresentativeFor(protocolVersion)
 
       reconciliationInterval <- Arbitrary.arbitrary[PositiveSeconds]
-      confirmationRequestsMaxRate <- Arbitrary.arbitrary[NonNegativeInt]
       maxRequestSize <- Arbitrary.arbitrary[MaxRequestSize]
 
       trafficControlConfig <- Gen.option(Arbitrary.arbitrary[TrafficControlParameters])
@@ -79,6 +79,8 @@ final class GeneratorsProtocol(
 
       sequencerAggregateSubmissionTimeout <- Arbitrary.arbitrary[NonNegativeFiniteDuration]
       onboardingRestriction <- Arbitrary.arbitrary[OnboardingRestriction]
+
+      participantDomainLimits <- Arbitrary.arbitrary[ParticipantDomainLimits]
 
       acsCommitmentsCatchupConfig <-
         for {
@@ -96,20 +98,26 @@ final class GeneratorsProtocol(
           else None
         }
 
+      // Because of the potential multiplication by 2 below, we want a reasonably small value
+      submissionTimeRecordTimeTolerance <- Gen
+        .choose(0L, 10000L)
+        .map(NonNegativeFiniteDuration.tryOfMicros)
+
       dynamicDomainParameters = DynamicDomainParameters.tryCreate(
         confirmationResponseTimeout,
         mediatorReactionTimeout,
-        transferExclusivityTimeout,
+        assignmentExclusivityTimeout,
         topologyChangeDelay,
         ledgerTimeRecordTimeTolerance,
         updatedMediatorDeduplicationTimeout,
         reconciliationInterval,
-        confirmationRequestsMaxRate,
         maxRequestSize,
         sequencerAggregateSubmissionTimeout,
         trafficControlConfig,
         onboardingRestriction,
         acsCommitmentsCatchupConfig,
+        participantDomainLimits,
+        submissionTimeRecordTimeTolerance,
       )(representativePV)
 
     } yield dynamicDomainParameters
@@ -227,6 +235,16 @@ final class GeneratorsProtocol(
     )
   )
 
+  implicit val stakeholdersArb: Arbitrary[Stakeholders] = Arbitrary(
+    for {
+      signatories <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      observers <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+    } yield Stakeholders.withSignatoriesAndObservers(
+      signatories = signatories,
+      observers = observers,
+    )
+  )
+
   implicit val requestIdArb: Arbitrary[RequestId] = genArbitrary
 
   implicit val rollbackContextArb: Arbitrary[RollbackContext] =
@@ -244,5 +262,11 @@ final class GeneratorsProtocol(
         rolledBack,
       )
       .value
+  )
+
+  implicit val externalAuthorizationArb: Arbitrary[ExternalAuthorization] = Arbitrary(
+    for {
+      signatures <- Arbitrary.arbitrary[Map[PartyId, Seq[Signature]]]
+    } yield ExternalAuthorization.create(signatures, protocolVersion)
   )
 }

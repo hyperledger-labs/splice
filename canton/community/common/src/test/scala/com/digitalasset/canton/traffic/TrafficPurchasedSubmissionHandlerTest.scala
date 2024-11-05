@@ -4,10 +4,13 @@
 package com.digitalasset.canton.traffic
 
 import cats.data.EitherT
+import cats.syntax.either.*
+import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.UnlessShutdown
+import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.protocol.messages.{
   DefaultOpenEnvelope,
   SetTrafficPurchasedMessage,
@@ -41,6 +44,7 @@ import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.clearInvocations
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpec
+import org.slf4j.event.Level
 
 import java.time.{LocalDateTime, ZoneOffset}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -95,7 +99,7 @@ class TrafficPurchasedSubmissionHandlerTest
         aggregationRuleCapture.capture(),
         callbackCapture.capture(),
         any[Boolean],
-      )(any[TraceContext])
+      )(any[TraceContext], any[MetricsContext])
     ).thenReturn(EitherT.pure(()))
 
     val resultF = handler
@@ -121,9 +125,7 @@ class TrafficPurchasedSubmissionHandlerTest
       trafficParams.setBalanceRequestSubmissionWindowSize.duration.toSeconds
     )
 
-    resultF.failOnShutdown.futureValue shouldBe Right(
-      clock.now.plusSeconds(trafficParams.setBalanceRequestSubmissionWindowSize.duration.toSeconds)
-    )
+    resultF.failOnShutdown.futureValue shouldBe Either.unit
 
     val batch = batchCapture.getValue
     batch.envelopes.head.recipients shouldBe Recipients(
@@ -179,7 +181,7 @@ class TrafficPurchasedSubmissionHandlerTest
         any[Option[AggregationRule]],
         callbackCapture.capture(),
         any[Boolean],
-      )(any[TraceContext])
+      )(any[TraceContext], any[MetricsContext])
     ).thenReturn(EitherT.pure(()))
 
     val resultF = handler
@@ -221,7 +223,7 @@ class TrafficPurchasedSubmissionHandlerTest
       ),
     )
 
-    resultF.failOnShutdown.futureValue shouldBe Right(mkTimeBucketUpperBound(36))
+    resultF.failOnShutdown.futureValue shouldBe Either.unit
   }
 
   "catch sequencer client failures" in {
@@ -234,7 +236,7 @@ class TrafficPurchasedSubmissionHandlerTest
         any[Option[AggregationRule]],
         any[SendCallback],
         any[Boolean],
-      )(any[TraceContext])
+      )(any[TraceContext], any[MetricsContext])
     )
       .thenReturn(EitherT.leftT(SendAsyncClientError.RequestFailed("failed")))
 
@@ -258,7 +260,7 @@ class TrafficPurchasedSubmissionHandlerTest
     )
   }
 
-  "catch sequencing failures" in {
+  "log sequencing failures" in {
     val callbackCapture: ArgumentCaptor[SendCallback] =
       ArgumentCaptor.forClass(classOf[SendCallback])
     when(
@@ -270,26 +272,10 @@ class TrafficPurchasedSubmissionHandlerTest
         any[Option[AggregationRule]],
         callbackCapture.capture(),
         any[Boolean],
-      )(any[TraceContext])
+      )(any[TraceContext], any[MetricsContext])
     )
       .thenReturn(EitherT.pure(()))
 
-    val resultF = handler
-      .sendTrafficPurchasedRequest(
-        recipient1,
-        domainId,
-        testedProtocolVersion,
-        PositiveInt.tryCreate(5),
-        NonNegativeLong.tryCreate(1000),
-        sequencerClient,
-        domainTimeTracker,
-        crypto,
-      )
-      .value
-
-    eventually() {
-      Try(callbackCapture.getValue).isSuccess shouldBe true
-    }
     val messageId = MessageId.randomMessageId()
     val deliverError = DeliverError.create(
       SequencerCounter.Genesis,
@@ -300,18 +286,44 @@ class TrafficPurchasedSubmissionHandlerTest
       testedProtocolVersion,
       Option.empty[TrafficReceipt],
     )
-    callbackCapture.getValue.asInstanceOf[SendCallback.CallbackFuture](
-      UnlessShutdown.Outcome(SendResult.Error(deliverError))
-    )
 
-    resultF.failOnShutdown.futureValue shouldBe Left(
-      TrafficControlErrors.TrafficPurchasedRequestAsyncSendFailed.Error(
-        s"DeliverError(counter = 0, timestamp = 1970-01-01T00:00:00Z, domain id = da::default, message id = $messageId, reason = Status(OK, BOOM))"
-      )
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
+      {
+        val resultF = handler.sendTrafficPurchasedRequest(
+          recipient1,
+          domainId,
+          testedProtocolVersion,
+          PositiveInt.tryCreate(5),
+          NonNegativeLong.tryCreate(1000),
+          sequencerClient,
+          domainTimeTracker,
+          crypto,
+        )
+
+        eventually() {
+          Try(callbackCapture.getValue).isSuccess shouldBe true
+        }
+        callbackCapture.getValue.asInstanceOf[SendCallback.CallbackFuture](
+          UnlessShutdown.Outcome(SendResult.Error(deliverError))
+        )
+
+        resultF.failOnShutdown.value.futureValue shouldBe Either.unit
+      },
+      LogEntry.assertLogSeq(
+        Seq(
+          (
+            _.message should include(
+              s"The traffic balance request submission failed: DeliverError(counter = 0, timestamp = 1970-01-01T00:00:00Z, domain id = da::default, message id = $messageId, reason = Status(OK, BOOM))"
+            ),
+            "sequencing failure",
+          )
+        ),
+        Seq(_ => succeed),
+      ),
     )
   }
 
-  "catch sequencing timeouts" in {
+  "log sequencing timeouts" in {
     val callbackCapture: ArgumentCaptor[SendCallback] =
       ArgumentCaptor.forClass(classOf[SendCallback])
     when(
@@ -323,35 +335,44 @@ class TrafficPurchasedSubmissionHandlerTest
         any[Option[AggregationRule]],
         callbackCapture.capture(),
         any[Boolean],
-      )(any[TraceContext])
+      )(any[TraceContext], any[MetricsContext])
     )
       .thenReturn(EitherT.pure(()))
     clearInvocations(domainTimeTracker)
 
-    val resultF = handler
-      .sendTrafficPurchasedRequest(
-        recipient1,
-        domainId,
-        testedProtocolVersion,
-        PositiveInt.tryCreate(5),
-        NonNegativeLong.tryCreate(1000),
-        sequencerClient,
-        domainTimeTracker,
-        crypto,
-      )
-      .value
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
+      {
+        val resultF = handler.sendTrafficPurchasedRequest(
+          recipient1,
+          domainId,
+          testedProtocolVersion,
+          PositiveInt.tryCreate(5),
+          NonNegativeLong.tryCreate(1000),
+          sequencerClient,
+          domainTimeTracker,
+          crypto,
+        )
 
-    eventually() {
-      Try(callbackCapture.getValue).isSuccess shouldBe true
-    }
-    callbackCapture.getValue.asInstanceOf[SendCallback.CallbackFuture](
-      UnlessShutdown.Outcome(SendResult.Timeout(CantonTimestamp.Epoch))
-    )
+        eventually() {
+          Try(callbackCapture.getValue).isSuccess shouldBe true
+        }
+        callbackCapture.getValue.asInstanceOf[SendCallback.CallbackFuture](
+          UnlessShutdown.Outcome(SendResult.Timeout(CantonTimestamp.Epoch))
+        )
 
-    resultF.failOnShutdown.futureValue shouldBe Left(
-      TrafficControlErrors.TrafficPurchasedRequestAsyncSendFailed.Error(
-        s"Submission timed out after sequencing time ${CantonTimestamp.Epoch} has elapsed"
-      )
+        resultF.value.failOnShutdown.futureValue shouldBe Either.unit
+      },
+      LogEntry.assertLogSeq(
+        Seq(
+          (
+            _.warningMessage should include(
+              s"The traffic balance request submission timed out after sequencing time 1970-01-01T00:00:00Z has elapsed"
+            ),
+            "timeout",
+          )
+        ),
+        Seq.empty,
+      ),
     )
 
     // Check that a tick was requested so that the sequencer will actually observe the timeout

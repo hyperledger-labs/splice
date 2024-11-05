@@ -3,8 +3,10 @@
 
 package com.digitalasset.canton.data
 
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.daml.lf.data.{Bytes, Ref, Time}
-import com.digitalasset.daml.lf.transaction.{GlobalKeyWithMaintainers, Node, TransactionVersion}
+import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.transaction.{GlobalKeyWithMaintainers, Node}
 import com.digitalasset.daml.lf.value.Value
 
 /** An explicitly-disclosed contract that has been used during command interpretation
@@ -13,11 +15,14 @@ import com.digitalasset.daml.lf.value.Value
   * @param create the create event of the contract
   * @param createdAt ledger effective time of the transaction that created the contract
   * @param driverMetadata opaque bytestring used by the underlying ledger implementation
+  * @param domainIdO if defined, the ID of the domain where the contract is assigned
   */
 final case class ProcessedDisclosedContract(
     create: Node.Create,
     createdAt: Time.Timestamp,
     driverMetadata: Bytes,
+    // TODO(#21612): Make non-optional
+    domainIdO: Option[DomainId],
 ) {
   def contractId: Value.ContractId = create.coid
   def templateId: Ref.TypeConName = create.templateId
@@ -36,7 +41,8 @@ object ProcessedDisclosedContract {
       signatories: Set[Ref.Party],
       stakeholders: Set[Ref.Party],
       keyOpt: Option[GlobalKeyWithMaintainers],
-      version: TransactionVersion,
+      version: LanguageVersion,
+      domainIdO: Option[DomainId],
   ): ProcessedDisclosedContract =
     ProcessedDisclosedContract(
       create = Node.Create(
@@ -52,5 +58,6 @@ object ProcessedDisclosedContract {
       ),
       createdAt = createdAt,
       driverMetadata = driverMetadata,
+      domainIdO = domainIdO,
     )
 }

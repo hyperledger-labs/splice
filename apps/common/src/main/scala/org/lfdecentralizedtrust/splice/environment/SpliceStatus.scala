@@ -7,9 +7,8 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions as jsonV0
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
+import com.digitalasset.canton.admin.api.client.data.{ComponentStatus, NodeStatus}
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.health.ComponentStatus
-import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.topology.UniqueIdentifier
 
@@ -50,9 +49,6 @@ case class SpliceStatus(
       None,
       active,
     )
-
-  // Required by Status trait but unused by us.
-  override def toProtoV30 = ???
 }
 
 object SpliceStatus {
@@ -108,6 +104,8 @@ object SpliceStatus {
     )
   }
 
-  def fromNodeStatus(status: NodeStatus.Status): SpliceStatus =
+  def fromNodeStatus(
+      status: com.digitalasset.canton.health.admin.data.NodeStatus.Status
+  ): SpliceStatus =
     SpliceStatus(status.uid, status.uptime, status.ports, status.active)
 }

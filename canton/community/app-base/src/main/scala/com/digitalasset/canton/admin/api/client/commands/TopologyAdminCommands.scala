@@ -12,18 +12,18 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
 import com.digitalasset.canton.admin.api.client.data.*
 import com.digitalasset.canton.admin.api.client.data.topology.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.crypto.{Fingerprint, Hash}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.BaseQuery
 import com.digitalasset.canton.topology.admin.grpc.TopologyStore.Domain
 import com.digitalasset.canton.topology.admin.v30
+import com.digitalasset.canton.topology.admin.v30.*
 import com.digitalasset.canton.topology.admin.v30.AuthorizeRequest.Type.{Proposal, TransactionHash}
 import com.digitalasset.canton.topology.admin.v30.IdentityInitializationServiceGrpc.IdentityInitializationServiceStub
 import com.digitalasset.canton.topology.admin.v30.TopologyAggregationServiceGrpc.TopologyAggregationServiceStub
 import com.digitalasset.canton.topology.admin.v30.TopologyManagerReadServiceGrpc.TopologyManagerReadServiceStub
 import com.digitalasset.canton.topology.admin.v30.TopologyManagerWriteServiceGrpc.TopologyManagerWriteServiceStub
-import com.digitalasset.canton.topology.admin.v30.*
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -31,6 +31,7 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
   TopologyChangeOp,
   TopologyMapping,
+  TopologyTransaction,
 }
 import com.digitalasset.canton.version.ProtocolVersionValidation
 import com.google.protobuf.ByteString
@@ -67,7 +68,7 @@ object TopologyAdminCommands {
           Seq[ListNamespaceDelegationResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListNamespaceDelegationRequest] =
+      override protected def createRequest(): Either[String, v30.ListNamespaceDelegationRequest] =
         Right(
           new v30.ListNamespaceDelegationRequest(
             baseQuery = Some(query.toProtoV1),
@@ -76,13 +77,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListNamespaceDelegationRequest,
       ): Future[v30.ListNamespaceDelegationResponse] =
         service.listNamespaceDelegation(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListNamespaceDelegationResponse
       ): Either[String, Seq[ListNamespaceDelegationResult]] =
         response.results.traverse(ListNamespaceDelegationResult.fromProtoV30).leftMap(_.toString)
@@ -97,7 +98,7 @@ object TopologyAdminCommands {
           Seq[ListDecentralizedNamespaceDefinitionResult],
         ] {
 
-      override def createRequest()
+      override protected def createRequest()
           : Either[String, v30.ListDecentralizedNamespaceDefinitionRequest] =
         Right(
           new v30.ListDecentralizedNamespaceDefinitionRequest(
@@ -106,13 +107,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListDecentralizedNamespaceDefinitionRequest,
       ): Future[v30.ListDecentralizedNamespaceDefinitionResponse] =
         service.listDecentralizedNamespaceDefinition(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListDecentralizedNamespaceDefinitionResponse
       ): Either[String, Seq[ListDecentralizedNamespaceDefinitionResult]] =
         response.results
@@ -130,7 +131,7 @@ object TopologyAdminCommands {
           Seq[ListIdentifierDelegationResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListIdentifierDelegationRequest] =
+      override protected def createRequest(): Either[String, v30.ListIdentifierDelegationRequest] =
         Right(
           new v30.ListIdentifierDelegationRequest(
             baseQuery = Some(query.toProtoV1),
@@ -139,13 +140,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListIdentifierDelegationRequest,
       ): Future[v30.ListIdentifierDelegationResponse] =
         service.listIdentifierDelegation(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListIdentifierDelegationResponse
       ): Either[String, Seq[ListIdentifierDelegationResult]] =
         response.results.traverse(ListIdentifierDelegationResult.fromProtoV30).leftMap(_.toString)
@@ -159,7 +160,7 @@ object TopologyAdminCommands {
           ListOwnerToKeyMappingResult
         ]] {
 
-      override def createRequest(): Either[String, v30.ListOwnerToKeyMappingRequest] =
+      override protected def createRequest(): Either[String, v30.ListOwnerToKeyMappingRequest] =
         Right(
           new v30.ListOwnerToKeyMappingRequest(
             baseQuery = Some(query.toProtoV1),
@@ -168,16 +169,43 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListOwnerToKeyMappingRequest,
       ): Future[v30.ListOwnerToKeyMappingResponse] =
         service.listOwnerToKeyMapping(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListOwnerToKeyMappingResponse
       ): Either[String, Seq[ListOwnerToKeyMappingResult]] =
         response.results.traverse(ListOwnerToKeyMappingResult.fromProtoV30).leftMap(_.toString)
+    }
+
+    final case class ListPartyToKeyMapping(
+        query: BaseQuery,
+        filterParty: String,
+    ) extends BaseCommand[v30.ListPartyToKeyMappingRequest, v30.ListPartyToKeyMappingResponse, Seq[
+          ListPartyToKeyMappingResult
+        ]] {
+
+      override protected def createRequest(): Either[String, v30.ListPartyToKeyMappingRequest] =
+        Right(
+          new v30.ListPartyToKeyMappingRequest(
+            baseQuery = Some(query.toProtoV1),
+            filterParty = filterParty,
+          )
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.ListPartyToKeyMappingRequest,
+      ): Future[v30.ListPartyToKeyMappingResponse] =
+        service.listPartyToKeyMapping(request)
+
+      override protected def handleResponse(
+          response: v30.ListPartyToKeyMappingResponse
+      ): Either[String, Seq[ListPartyToKeyMappingResult]] =
+        response.results.traverse(ListPartyToKeyMappingResult.fromProtoV30).leftMap(_.toString)
     }
 
     final case class ListDomainTrustCertificate(
@@ -189,7 +217,8 @@ object TopologyAdminCommands {
           Seq[ListDomainTrustCertificateResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListDomainTrustCertificateRequest] =
+      override protected def createRequest()
+          : Either[String, v30.ListDomainTrustCertificateRequest] =
         Right(
           new v30.ListDomainTrustCertificateRequest(
             baseQuery = Some(query.toProtoV1),
@@ -197,13 +226,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListDomainTrustCertificateRequest,
       ): Future[v30.ListDomainTrustCertificateResponse] =
         service.listDomainTrustCertificate(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListDomainTrustCertificateResponse
       ): Either[String, Seq[ListDomainTrustCertificateResult]] =
         response.results.traverse(ListDomainTrustCertificateResult.fromProtoV30).leftMap(_.toString)
@@ -218,7 +247,8 @@ object TopologyAdminCommands {
           Seq[ListParticipantDomainPermissionResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListParticipantDomainPermissionRequest] =
+      override protected def createRequest()
+          : Either[String, v30.ListParticipantDomainPermissionRequest] =
         Right(
           new v30.ListParticipantDomainPermissionRequest(
             baseQuery = Some(query.toProtoV1),
@@ -226,13 +256,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListParticipantDomainPermissionRequest,
       ): Future[v30.ListParticipantDomainPermissionResponse] =
         service.listParticipantDomainPermission(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListParticipantDomainPermissionResponse
       ): Either[String, Seq[ListParticipantDomainPermissionResult]] =
         response.results
@@ -249,7 +279,7 @@ object TopologyAdminCommands {
           Seq[ListPartyHostingLimitsResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListPartyHostingLimitsRequest] =
+      override protected def createRequest(): Either[String, v30.ListPartyHostingLimitsRequest] =
         Right(
           new v30.ListPartyHostingLimitsRequest(
             baseQuery = Some(query.toProtoV1),
@@ -257,13 +287,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListPartyHostingLimitsRequest,
       ): Future[v30.ListPartyHostingLimitsResponse] =
         service.listPartyHostingLimits(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListPartyHostingLimitsResponse
       ): Either[String, Seq[ListPartyHostingLimitsResult]] =
         response.results
@@ -280,7 +310,7 @@ object TopologyAdminCommands {
           Seq[ListVettedPackagesResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListVettedPackagesRequest] =
+      override protected def createRequest(): Either[String, v30.ListVettedPackagesRequest] =
         Right(
           new v30.ListVettedPackagesRequest(
             baseQuery = Some(query.toProtoV1),
@@ -288,13 +318,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListVettedPackagesRequest,
       ): Future[v30.ListVettedPackagesResponse] =
         service.listVettedPackages(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListVettedPackagesResponse
       ): Either[String, Seq[ListVettedPackagesResult]] =
         response.results
@@ -312,7 +342,7 @@ object TopologyAdminCommands {
           Seq[ListPartyToParticipantResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListPartyToParticipantRequest] =
+      override protected def createRequest(): Either[String, v30.ListPartyToParticipantRequest] =
         Right(
           new v30.ListPartyToParticipantRequest(
             baseQuery = Some(query.toProtoV1),
@@ -321,48 +351,17 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListPartyToParticipantRequest,
       ): Future[v30.ListPartyToParticipantResponse] =
         service.listPartyToParticipant(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListPartyToParticipantResponse
       ): Either[String, Seq[ListPartyToParticipantResult]] =
         response.results
           .traverse(ListPartyToParticipantResult.fromProtoV30)
-          .leftMap(_.toString)
-    }
-
-    final case class ListAuthorityOf(
-        query: BaseQuery,
-        filterParty: String,
-    ) extends BaseCommand[
-          v30.ListAuthorityOfRequest,
-          v30.ListAuthorityOfResponse,
-          Seq[ListAuthorityOfResult],
-        ] {
-
-      override def createRequest(): Either[String, v30.ListAuthorityOfRequest] =
-        Right(
-          new v30.ListAuthorityOfRequest(
-            baseQuery = Some(query.toProtoV1),
-            filterParty = filterParty,
-          )
-        )
-
-      override def submitRequest(
-          service: TopologyManagerReadServiceStub,
-          request: v30.ListAuthorityOfRequest,
-      ): Future[v30.ListAuthorityOfResponse] =
-        service.listAuthorityOf(request)
-
-      override def handleResponse(
-          response: v30.ListAuthorityOfResponse
-      ): Either[String, Seq[ListAuthorityOfResult]] =
-        response.results
-          .traverse(ListAuthorityOfResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
@@ -375,7 +374,7 @@ object TopologyAdminCommands {
           Seq[ListDomainParametersStateResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListDomainParametersStateRequest] =
+      override protected def createRequest(): Either[String, v30.ListDomainParametersStateRequest] =
         Right(
           new v30.ListDomainParametersStateRequest(
             baseQuery = Some(query.toProtoV1),
@@ -383,13 +382,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListDomainParametersStateRequest,
       ): Future[v30.ListDomainParametersStateResponse] =
         service.listDomainParametersState(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListDomainParametersStateResponse
       ): Either[String, Seq[ListDomainParametersStateResult]] =
         response.results
@@ -406,7 +405,7 @@ object TopologyAdminCommands {
           Seq[ListMediatorDomainStateResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListMediatorDomainStateRequest] =
+      override protected def createRequest(): Either[String, v30.ListMediatorDomainStateRequest] =
         Right(
           v30.ListMediatorDomainStateRequest(
             baseQuery = Some(query.toProtoV1),
@@ -414,13 +413,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListMediatorDomainStateRequest,
       ): Future[v30.ListMediatorDomainStateResponse] =
         service.listMediatorDomainState(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListMediatorDomainStateResponse
       ): Either[String, Seq[ListMediatorDomainStateResult]] =
         response.results
@@ -437,7 +436,7 @@ object TopologyAdminCommands {
           Seq[ListSequencerDomainStateResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListSequencerDomainStateRequest] =
+      override protected def createRequest(): Either[String, v30.ListSequencerDomainStateRequest] =
         Right(
           new v30.ListSequencerDomainStateRequest(
             baseQuery = Some(query.toProtoV1),
@@ -445,13 +444,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListSequencerDomainStateRequest,
       ): Future[v30.ListSequencerDomainStateResponse] =
         service.listSequencerDomainState(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListSequencerDomainStateResponse
       ): Either[String, Seq[ListSequencerDomainStateResult]] =
         response.results
@@ -468,7 +467,8 @@ object TopologyAdminCommands {
           Seq[ListPurgeTopologyTransactionResult],
         ] {
 
-      override def createRequest(): Either[String, v30.ListPurgeTopologyTransactionRequest] =
+      override protected def createRequest()
+          : Either[String, v30.ListPurgeTopologyTransactionRequest] =
         Right(
           new v30.ListPurgeTopologyTransactionRequest(
             baseQuery = Some(query.toProtoV1),
@@ -476,13 +476,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListPurgeTopologyTransactionRequest,
       ): Future[v30.ListPurgeTopologyTransactionResponse] =
         service.listPurgeTopologyTransaction(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListPurgeTopologyTransactionResponse
       ): Either[String, Seq[ListPurgeTopologyTransactionResult]] =
         response.results
@@ -495,16 +495,16 @@ object TopologyAdminCommands {
           String
         ]] {
 
-      override def createRequest(): Either[String, v30.ListAvailableStoresRequest] =
+      override protected def createRequest(): Either[String, v30.ListAvailableStoresRequest] =
         Right(v30.ListAvailableStoresRequest())
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListAvailableStoresRequest,
       ): Future[v30.ListAvailableStoresResponse] =
         service.listAvailableStores(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListAvailableStoresResponse
       ): Either[String, Seq[String]] =
         Right(response.storeIds)
@@ -519,7 +519,7 @@ object TopologyAdminCommands {
           v30.ListAllResponse,
           GenericStoredTopologyTransactions,
         ] {
-      override def createRequest(): Either[String, v30.ListAllRequest] =
+      override protected def createRequest(): Either[String, v30.ListAllRequest] =
         Right(
           new v30.ListAllRequest(
             baseQuery = Some(query.toProtoV1),
@@ -528,12 +528,12 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ListAllRequest,
       ): Future[v30.ListAllResponse] = service.listAll(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListAllResponse
       ): Either[String, GenericStoredTopologyTransactions] =
         response.result
@@ -552,7 +552,7 @@ object TopologyAdminCommands {
           v30.ExportTopologySnapshotResponse,
           ByteString,
         ] {
-      override def createRequest(): Either[String, v30.ExportTopologySnapshotRequest] =
+      override protected def createRequest(): Either[String, v30.ExportTopologySnapshotRequest] =
         Right(
           new v30.ExportTopologySnapshotRequest(
             baseQuery = Some(query.toProtoV1),
@@ -561,12 +561,12 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.ExportTopologySnapshotRequest,
       ): Future[v30.ExportTopologySnapshotResponse] = service.exportTopologySnapshot(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ExportTopologySnapshotResponse
       ): Either[String, ByteString] =
         Right(response.result)
@@ -581,19 +581,19 @@ object TopologyAdminCommands {
           CancellableContext,
           CancellableContext,
         ] {
-      override def createRequest(): Either[String, v30.GenesisStateRequest] = {
+      override protected def createRequest(): Either[String, v30.GenesisStateRequest] = {
         val domainStore = filterDomainStore.traverse(DomainId.fromString)
         domainStore.flatMap(domainId =>
           Right(
             v30.GenesisStateRequest(
-              domainId.map(Domain).map(_.toProto),
+              domainId.map(Domain.apply).map(_.toProto),
               timestamp.map(_.toProtoTimestamp),
             )
           )
         )
       }
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
           request: v30.GenesisStateRequest,
       ): Future[CancellableContext] = {
@@ -602,7 +602,7 @@ object TopologyAdminCommands {
         Future.successful(context)
       }
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: CancellableContext
       ): Either[String, CancellableContext] =
         Right(response)
@@ -630,7 +630,7 @@ object TopologyAdminCommands {
           ListPartiesResult
         ]] {
 
-      override def createRequest(): Either[String, v30.ListPartiesRequest] =
+      override protected def createRequest(): Either[String, v30.ListPartiesRequest] =
         Right(
           v30.ListPartiesRequest(
             filterDomain = filterDomain,
@@ -641,13 +641,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyAggregationServiceStub,
           request: v30.ListPartiesRequest,
       ): Future[v30.ListPartiesResponse] =
         service.listParties(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListPartiesResponse
       ): Either[String, Seq[ListPartiesResult]] =
         response.results.traverse(ListPartiesResult.fromProtoV30).leftMap(_.toString)
@@ -667,7 +667,7 @@ object TopologyAdminCommands {
           ListKeyOwnersResult
         ]] {
 
-      override def createRequest(): Either[String, v30.ListKeyOwnersRequest] =
+      override protected def createRequest(): Either[String, v30.ListKeyOwnersRequest] =
         Right(
           v30.ListKeyOwnersRequest(
             filterDomain = filterDomain,
@@ -678,13 +678,13 @@ object TopologyAdminCommands {
           )
         )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyAggregationServiceStub,
           request: v30.ListKeyOwnersRequest,
       ): Future[v30.ListKeyOwnersResponse] =
         service.listKeyOwners(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.ListKeyOwnersResponse
       ): Either[String, Seq[ListKeyOwnersResult]] =
         response.results.traverse(ListKeyOwnersResult.fromProtoV30).leftMap(_.toString)
@@ -711,7 +711,7 @@ object TopologyAdminCommands {
         store: String,
         forceChanges: ForceFlags,
     ) extends BaseWriteCommand[AddTransactionsRequest, AddTransactionsResponse, Unit] {
-      override def createRequest(): Either[String, AddTransactionsRequest] = {
+      override protected def createRequest(): Either[String, AddTransactionsRequest] =
         Right(
           AddTransactionsRequest(
             transactions.map(_.toProtoV30),
@@ -719,13 +719,14 @@ object TopologyAdminCommands {
             store,
           )
         )
-      }
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerWriteServiceStub,
           request: AddTransactionsRequest,
       ): Future[AddTransactionsResponse] = service.addTransactions(request)
-      override def handleResponse(response: AddTransactionsResponse): Either[String, Unit] =
-        Right(())
+      override protected def handleResponse(
+          response: AddTransactionsResponse
+      ): Either[String, Unit] =
+        Either.unit
     }
     final case class ImportTopologySnapshot(
         topologySnapshot: ByteString,
@@ -735,41 +736,46 @@ object TopologyAdminCommands {
           ImportTopologySnapshotResponse,
           Unit,
         ] {
-      override def createRequest(): Either[String, ImportTopologySnapshotRequest] = {
+      override protected def createRequest(): Either[String, ImportTopologySnapshotRequest] =
         Right(
           ImportTopologySnapshotRequest(
             topologySnapshot,
             store,
           )
         )
-      }
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerWriteServiceStub,
           request: ImportTopologySnapshotRequest,
       ): Future[ImportTopologySnapshotResponse] = service.importTopologySnapshot(request)
-      override def handleResponse(
+      override protected def handleResponse(
           response: ImportTopologySnapshotResponse
-      ): Either[String, Unit] = Right(())
+      ): Either[String, Unit] = Either.unit
     }
 
     final case class SignTransactions(
         transactions: Seq[GenericSignedTopologyTransaction],
+        store: String,
         signedBy: Seq[Fingerprint],
+        forceFlags: ForceFlags,
     ) extends BaseWriteCommand[SignTransactionsRequest, SignTransactionsResponse, Seq[
           GenericSignedTopologyTransaction
         ]] {
-      override def createRequest(): Either[String, SignTransactionsRequest] = {
+      override protected def createRequest(): Either[String, SignTransactionsRequest] =
         Right(
-          SignTransactionsRequest(transactions.map(_.toProtoV30), signedBy.map(_.toProtoPrimitive))
+          SignTransactionsRequest(
+            transactions.map(_.toProtoV30),
+            signedBy.map(_.toProtoPrimitive),
+            store,
+            forceFlags.toProtoV30,
+          )
         )
-      }
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerWriteServiceStub,
           request: SignTransactionsRequest,
       ): Future[SignTransactionsResponse] = service.signTransactions(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: SignTransactionsResponse
       ): Either[String, Seq[GenericSignedTopologyTransaction]] =
         response.transactions
@@ -777,6 +783,62 @@ object TopologyAdminCommands {
             SignedTopologyTransaction.fromProtoV30(ProtocolVersionValidation.NoValidation, tx)
           )
           .leftMap(_.message)
+    }
+
+    final case class GenerateTransactions(
+        proposals: Seq[GenerateTransactions.Proposal]
+    ) extends BaseWriteCommand[
+          GenerateTransactionsRequest,
+          GenerateTransactionsResponse,
+          Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]],
+        ] {
+
+      override protected def createRequest(): Either[String, GenerateTransactionsRequest] =
+        Right(GenerateTransactionsRequest(proposals.map(_.toGenerateTransactionProposal)))
+      override protected def submitRequest(
+          service: TopologyManagerWriteServiceStub,
+          request: GenerateTransactionsRequest,
+      ): Future[GenerateTransactionsResponse] = service.generateTransactions(request)
+
+      override protected def handleResponse(
+          response: GenerateTransactionsResponse
+      ): Either[String, Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]]] =
+        response.generatedTransactions
+          .traverse { generatedTransaction =>
+            val serializedTransaction = generatedTransaction.serializedTransaction
+            val serializedHash = generatedTransaction.transactionHash
+            for {
+              parsedTopologyTransaction <-
+                TopologyTransaction
+                  .fromByteString(ProtocolVersionValidation.NoValidation)(serializedTransaction)
+                  .leftMap(_.message)
+              // We don't really need the hash from the response here because we can re-build it from the deserialized
+              // topology transaction. But users of the API without access to this code wouldn't be able to do that,
+              // which is why the hash is returned by the API. Let's still verify that they match here.
+              parsedHash <- Hash.fromByteString(serializedHash).leftMap(_.message)
+              _ = Either.cond(
+                parsedTopologyTransaction.hash.hash.compare(parsedHash) == 0,
+                (),
+                s"Response hash did not match transaction hash",
+              )
+            } yield parsedTopologyTransaction
+          }
+    }
+    object GenerateTransactions {
+      final case class Proposal(
+          mapping: TopologyMapping,
+          store: String,
+          change: TopologyChangeOp = TopologyChangeOp.Replace,
+          serial: Option[PositiveInt] = None,
+      ) {
+        def toGenerateTransactionProposal: GenerateTransactionsRequest.Proposal =
+          GenerateTransactionsRequest.Proposal(
+            change.toProto,
+            serial.map(_.value).getOrElse(0),
+            Some(mapping.toProtoV30),
+            store,
+          )
+      }
     }
 
     final case class Propose[M <: TopologyMapping: ClassTag](
@@ -793,7 +855,7 @@ object TopologyAdminCommands {
           SignedTopologyTransaction[TopologyChangeOp, M],
         ] {
 
-      override def createRequest(): Either[String, AuthorizeRequest] = mapping.map(m =>
+      override protected def createRequest(): Either[String, AuthorizeRequest] = mapping.map(m =>
         AuthorizeRequest(
           Proposal(
             AuthorizeRequest.Proposal(
@@ -808,12 +870,12 @@ object TopologyAdminCommands {
           store,
         )
       )
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerWriteServiceStub,
           request: AuthorizeRequest,
       ): Future[AuthorizeResponse] = service.authorize(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: AuthorizeResponse
       ): Either[String, SignedTopologyTransaction[TopologyChangeOp, M]] = response.transaction
         .toRight("no transaction in response")
@@ -854,7 +916,7 @@ object TopologyAdminCommands {
           SignedTopologyTransaction[TopologyChangeOp, M],
         ] {
 
-      override def createRequest(): Either[String, AuthorizeRequest] = Right(
+      override protected def createRequest(): Either[String, AuthorizeRequest] = Right(
         AuthorizeRequest(
           TransactionHash(transactionHash),
           mustFullyAuthorize = mustFullyAuthorize,
@@ -864,12 +926,12 @@ object TopologyAdminCommands {
         )
       )
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: TopologyManagerWriteServiceStub,
           request: AuthorizeRequest,
       ): Future[AuthorizeResponse] = service.authorize(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: AuthorizeResponse
       ): Either[String, SignedTopologyTransaction[TopologyChangeOp, M]] = response.transaction
         .toRight("no transaction in response")
@@ -899,33 +961,33 @@ object TopologyAdminCommands {
     final case class InitId(identifier: String)
         extends BaseInitializationService[v30.InitIdRequest, v30.InitIdResponse, Unit] {
 
-      override def createRequest(): Either[String, v30.InitIdRequest] =
+      override protected def createRequest(): Either[String, v30.InitIdRequest] =
         Right(v30.InitIdRequest(identifier))
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: IdentityInitializationServiceStub,
           request: v30.InitIdRequest,
       ): Future[v30.InitIdResponse] =
         service.initId(request)
 
-      override def handleResponse(response: v30.InitIdResponse): Either[String, Unit] =
-        Right(())
+      override protected def handleResponse(response: v30.InitIdResponse): Either[String, Unit] =
+        Either.unit
     }
 
     final case class GetId()
         extends BaseInitializationService[v30.GetIdRequest, v30.GetIdResponse, GetIdResult] {
-      override def createRequest(): Either[String, v30.GetIdRequest] =
+      override protected def createRequest(): Either[String, v30.GetIdRequest] =
         Right(v30.GetIdRequest())
 
-      override def submitRequest(
+      override protected def submitRequest(
           service: IdentityInitializationServiceStub,
           request: v30.GetIdRequest,
       ): Future[v30.GetIdResponse] =
         service.getId(request)
 
-      override def handleResponse(
+      override protected def handleResponse(
           response: v30.GetIdResponse
-      ): Either[String, GetIdResult] = {
+      ): Either[String, GetIdResult] =
         if (response.uniqueIdentifier.nonEmpty)
           UniqueIdentifier
             .fromProtoPrimitive_(response.uniqueIdentifier)
@@ -933,7 +995,6 @@ object TopologyAdminCommands {
             .map(id => GetIdResult(response.initialized, Some(id)))
         else
           Right(GetIdResult(response.initialized, None))
-      }
     }
 
     final case class GetIdResult(

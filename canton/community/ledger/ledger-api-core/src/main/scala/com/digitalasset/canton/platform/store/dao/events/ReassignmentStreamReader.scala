@@ -12,6 +12,7 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
+  Entry,
   RawAssignEvent,
   RawUnassignEvent,
 }
@@ -78,7 +79,7 @@ class ReassignmentStreamReader(
         maxOutputBatchCount: Int,
         metric: DatabaseMetrics,
         idDbQuery: IdDbQuery,
-    ): Source[Iterable[Long], NotUsed] = {
+    ): Source[Iterable[Long], NotUsed] =
       decomposedFilters
         .map { filter =>
           paginatingAsyncStream.streamIdsFromSeekPagination(
@@ -108,7 +109,6 @@ class ReassignmentStreamReader(
           maxBatchSize = maxPayloadsPerPayloadsPage,
           maxBatchCount = maxOutputBatchCount,
         )
-    }
 
     def fetchPayloads[T](
         ids: Source[Iterable[Long], NotUsed],
@@ -129,9 +129,9 @@ class ReassignmentStreamReader(
                   minOffsetExclusive = queryRange.startExclusiveOffset,
                   maxOffsetInclusive = queryRange.endInclusiveOffset,
                   errorPruning = (prunedOffset: Offset) =>
-                    s"Reassignment request from ${queryRange.startExclusiveOffset.toHexString} to ${queryRange.endInclusiveOffset.toHexString} precedes pruned offset ${prunedOffset.toHexString}",
+                    s"Reassignment request from ${queryRange.startExclusiveOffset.toLong} to ${queryRange.endInclusiveOffset.toLong} precedes pruned offset ${prunedOffset.toLong}",
                   errorLedgerEnd = (ledgerEndOffset: Offset) =>
-                    s"Reassignment request from ${queryRange.startExclusiveOffset.toHexString} to ${queryRange.endInclusiveOffset.toHexString} is beyond ledger end offset ${ledgerEndOffset.toHexString}",
+                    s"Reassignment request from ${queryRange.startExclusiveOffset.toLong} to ${queryRange.endInclusiveOffset.toLong} is beyond ledger end offset ${ledgerEndOffset.toLong}",
                 ) {
                   payloadDbQuery.fetchPayloads(
                     eventSequentialIds = ids,
@@ -183,55 +183,53 @@ class ReassignmentStreamReader(
 
     payloadsAssign
       .mergeSorted(payloadsUnassign)(Ordering.by(_.offset))
-      .map(response => ApiOffset.assertFromString(response.offset) -> response)
+      .map(response => Offset.fromLong(response.offset) -> response)
   }
 
-  private def toApiUnassigned(rawUnassignEvent: RawUnassignEvent): Future[Reassignment] = {
+  private def toApiUnassigned(rawUnassignEntry: Entry[RawUnassignEvent]): Future[Reassignment] =
     Timed.future(
       future = Future {
         Reassignment(
-          updateId = rawUnassignEvent.updateId,
-          commandId = rawUnassignEvent.commandId.getOrElse(""),
-          workflowId = rawUnassignEvent.workflowId.getOrElse(""),
-          offset = rawUnassignEvent.offset,
+          updateId = rawUnassignEntry.updateId,
+          commandId = rawUnassignEntry.commandId.getOrElse(""),
+          workflowId = rawUnassignEntry.workflowId.getOrElse(""),
+          offset = ApiOffset.assertFromStringToLong(rawUnassignEntry.offset),
           event = Reassignment.Event.UnassignedEvent(
-            TransactionsReader.toUnassignedEvent(rawUnassignEvent)
+            TransactionsReader.toUnassignedEvent(rawUnassignEntry.event)
           ),
-          recordTime = Some(TimestampConversion.fromLf(rawUnassignEvent.recordTime)),
+          recordTime = Some(TimestampConversion.fromLf(rawUnassignEntry.recordTime)),
         )
       },
       timer = dbMetrics.reassignmentStream.translationTimer,
     )
-  }
 
   private def toApiAssigned(eventProjectionProperties: EventProjectionProperties)(
-      rawAssignEvent: RawAssignEvent
-  )(implicit lc: LoggingContextWithTrace): Future[Reassignment] = {
+      rawAssignEntry: Entry[RawAssignEvent]
+  )(implicit lc: LoggingContextWithTrace): Future[Reassignment] =
     Timed.future(
       future = Future.delegate(
-        TransactionsReader
-          .deserializeRawCreatedEvent(lfValueTranslation, eventProjectionProperties)(
-            rawAssignEvent.rawCreatedEvent
+        lfValueTranslation
+          .deserializeRaw(eventProjectionProperties)(
+            rawAssignEntry.event.rawCreatedEvent
           )
           .map(createdEvent =>
             Reassignment(
-              updateId = rawAssignEvent.rawCreatedEvent.updateId,
-              commandId = rawAssignEvent.commandId.getOrElse(""),
-              workflowId = rawAssignEvent.workflowId.getOrElse(""),
-              offset = rawAssignEvent.offset,
+              updateId = rawAssignEntry.updateId,
+              commandId = rawAssignEntry.commandId.getOrElse(""),
+              workflowId = rawAssignEntry.workflowId.getOrElse(""),
+              offset = ApiOffset.assertFromStringToLong(rawAssignEntry.offset),
               event = Reassignment.Event.AssignedEvent(
                 TransactionsReader.toAssignedEvent(
-                  rawAssignEvent,
+                  rawAssignEntry.event,
                   createdEvent,
                 )
               ),
-              recordTime = Some(TimestampConversion.fromLf(rawAssignEvent.recordTime)),
+              recordTime = Some(TimestampConversion.fromLf(rawAssignEntry.recordTime)),
             )
           )
       ),
       timer = dbMetrics.reassignmentStream.translationTimer,
     )
-  }
 
 }
 

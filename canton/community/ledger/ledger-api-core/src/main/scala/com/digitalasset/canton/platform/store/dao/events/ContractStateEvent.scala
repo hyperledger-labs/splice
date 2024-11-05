@@ -9,7 +9,6 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 
 sealed trait ContractStateEvent extends Product with Serializable {
   def eventOffset: Offset
-  def eventSequentialId: Long
 }
 
 object ContractStateEvent {
@@ -20,16 +19,14 @@ object ContractStateEvent {
       ledgerEffectiveTime: Timestamp,
       stakeholders: Set[Party],
       eventOffset: Offset,
-      eventSequentialId: Long,
       signatories: Set[Party],
       keyMaintainers: Option[Set[Party]],
-      driverMetadata: Option[Array[Byte]],
+      driverMetadata: Array[Byte],
   ) extends ContractStateEvent
   final case class Archived(
       contractId: ContractId,
       globalKey: Option[Key],
       stakeholders: Set[Party],
       eventOffset: Offset,
-      eventSequentialId: Long,
   ) extends ContractStateEvent
 }

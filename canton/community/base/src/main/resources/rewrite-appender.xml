@@ -1,5 +1,5 @@
 <!--
-  ~ Copyright 2020 Digital Asset (Switzerland) GmbH and/or its affiliates
+  ~ Copyright 2024 Digital Asset (Switzerland) GmbH and/or its affiliates
   ~
   ~ SPDX-License-Identifier: Apache-2.0
   -->
@@ -107,23 +107,8 @@
             <testing>true</testing>
         </rewrite>
 
-        <!-- # TODO(#13519): Suppress error in JSON API integration tests and remove these two exceptions -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.digitalasset.canton.http.StaticContentRouter</logger>
-            <maxLevel>INFO</maxLevel>
-            <contains>StaticContentRouter configured: StaticContentConfig</contains>
-            <testing>true</testing>
-        </rewrite>
-        <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.digitalasset.canton.http.StaticContentRouter</logger>
-            <maxLevel>INFO</maxLevel>
-            <contains>DO NOT USE StaticContentRouter IN PRODUCTION, CONSIDER SETTING UP REVERSE PROXY!!!</contains>
-            <testing>true</testing>
-        </rewrite>
-
-        <!-- # TODO(#13519): Suppress error in JSON API integration tests and remove this exception -->
-        <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.digitalasset.canton.ledger.api.auth.interceptor.AuthorizationInterceptor</logger>
+            <logger>com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedAuthorizationInterceptor</logger>
             <maxLevel>INFO</maxLevel>
             <contains>Could not resolve is_deactivated status for user </contains>
             <testing>true</testing>
@@ -134,14 +119,6 @@
             <logger>software.amazon.awssdk.http.nio.netty.internal.SslContextProvider</logger>
             <maxLevel>INFO</maxLevel>
             <contains>SSL Certificate verification is disabled</contains>
-            <testing>true</testing>
-        </rewrite>
-
-        <!-- Emitted when trying to connect to the database and Oracle is not ready yet -->
-        <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.zaxxer.hikari.pool.HikariPool</logger>
-            <maxLevel>INFO</maxLevel>
-            <contains>Exception during pool initialization</contains>
             <testing>true</testing>
         </rewrite>
 
@@ -182,27 +159,6 @@
             <testing>true</testing>
         </rewrite>
 
-        <!-- Parallel indexer on Oracle-based conformance tests runs into Oracle-upsert race.
-             The problem should only occur when storing packages.
-             However, we can't restrict the rule to the packages table, because the error message does not mention the affected table.
-
-             Since the rules are rather broad, it is applied during testing only.
-
-             The rules should be removed once https://digitalasset.atlassian.net/browse/DPP-562 is done.
-        -->
-        <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.digitalasset.canton.platform.indexer.RecoveringIndexer</logger>
-            <contains>Error while running indexer, restart scheduled</contains>
-            <maxLevel>INFO</maxLevel>
-            <testing>true</testing>
-        </rewrite>
-        <rewrite class="com.digitalasset.canton.logging.Rewrite"> <!-- version for Oracle -->
-            <logger>com.digitalasset.canton.platform.store.appendonlydao.DbDispatcher</logger>
-            <contains>Processing the request failed due to a non-transient database error: ORA-00001: unique constraint</contains>
-            <exceptionMessage>ORA-00001: unique constraint</exceptionMessage>
-            <maxLevel>INFO</maxLevel>
-            <testing>true</testing>
-        </rewrite>
         <rewrite class="com.digitalasset.canton.logging.Rewrite"> <!-- version for H2 -->
             <logger>com.digitalasset.canton.platform.store.appendonlydao.DbDispatcher</logger>
             <contains>Processing the request failed due to a non-transient database error: Unique index or primary key violation</contains>
@@ -222,7 +178,7 @@
              SecuredApisIntegrationTest: PERMISSION_DENIED(7,0): Claims do not authorize to act as party
         -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.digitalasset.canton.ledger.api.auth.Authorizer</logger>
+            <logger>com.digitalasset.canton.auth.Authorizer</logger>
             <maxLevel>INFO</maxLevel>
             <testing>true</testing>
         </rewrite>
@@ -231,7 +187,7 @@
              PERMISSION_DENIED(7,0): Claims were valid until 2023-04-27T11:47:43Z, current time is 2023-04-27T11:47:44.532146Z
         -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.digitalasset.canton.ledger.api.auth.OngoingAuthorizationObserver</logger>
+            <logger>com.digitalasset.canton.ledger.api.auth.UserBasedOngoingAuthorization</logger>
             <maxLevel>INFO</maxLevel>
             <testing>true</testing>
         </rewrite>
@@ -243,14 +199,6 @@
             <logger>daml.warnings</logger>
             <contains>Use of divulged contracts is deprecated and incompatible with pruning.</contains>
             <maxLevel>INFO</maxLevel>
-            <testing>true</testing>
-        </rewrite>
-
-        <!-- TODO(i10394) upstream sequencing actor does throw on shutdown -->
-        <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.daml.grpc.adapter.RunnableSequencingActor</logger>
-            <maxLevel>INFO</maxLevel>
-            <contains>Unexpected exception while executing</contains>
             <testing>true</testing>
         </rewrite>
 
@@ -346,6 +294,8 @@
             <testing>true</testing>
         </rewrite>
         <!-- Suppress ACS commitment processor catch-up degradation warnings in ledger API tests that might throw -->
+        <!-- Note: this does not immediately point to an issue: when a participant falls behind, the ACS commitment
+        processor is catching up with commitments and emits a warning. Participants might fall behind in long-running tests. -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
             <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:LedgerApiParticipantPruningConformanceTestPostgres</logger>
             <contains>ACS_COMMITMENT_DEGRADATION</contains>
@@ -454,6 +404,111 @@
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
             <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:LedgerApiExperimentalConformanceTest_Postgres</logger>
             <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:LatestProtocolContinuityShard0ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:LatestProtocolContinuityShard1ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:LatestProtocolContinuityShard2ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:LatestProtocolContinuityShard3ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:LatestProtocolContinuityShard4ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:LatestProtocolContinuityShard5ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:ProtocolContinuityShard0ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:ProtocolContinuityShard1ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:ProtocolContinuityShard2ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:ProtocolContinuityShard3ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:ProtocolContinuityShard4ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:ProtocolContinuityShard5ConformanceTestDomain</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress ACS commitment processor catch-up degradation warnings in tests that might throw -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:MajorUpgradeIntegrationTest</logger>
+            <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- At shutdown of the HikariPool warnings are going to be logged when ThreadPoolExecutor#awaitTermination
+         time out or get interrupted.
+
+         This library behavior has been changed in:
+         https://github.com/brettwooldridge/HikariCP/commit/1991355e6b20be04be2b2d9ff816c32c38937fd2#diff-980e81eb213376eb8e36ab6b3e3e1ff2f04c963b9b79264130f5f5dbbf03be83L233-R219
+
+         `Timed-out waiting for add connection executor to shutdown` gets logged by `HikariJdbcConnectionProviderSpec`.
+        -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.zaxxer.hikari.pool.HikariPool</logger>
+            <contains>Timed-out waiting for add connection executor to shutdown</contains>
             <maxLevel>INFO</maxLevel>
             <testing>true</testing>
         </rewrite>

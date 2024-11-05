@@ -3,13 +3,13 @@
 
 package com.digitalasset.canton.ledger.api.validation
 
-import com.daml.error.{ContextualizedErrorLogger, NoLogging}
-import com.daml.ledger.api.v2.value.Value.Sum
+import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.value as api
+import com.daml.ledger.api.v2.value.Value.Sum
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.daml.lf.data.*
-import com.digitalasset.daml.lf.value.Value.{ContractId, ValueUnit}
 import com.digitalasset.daml.lf.value.Value as Lf
+import com.digitalasset.daml.lf.value.Value.{ContractId, ValueUnit}
 import io.grpc.StatusRuntimeException
 import scalaz.std.either.*
 import scalaz.syntax.bifunctor.*
@@ -28,14 +28,14 @@ abstract class ValueValidator {
     recordFields
       .foldLeft[Either[StatusRuntimeException, BackStack[(Option[Ref.Name], domain.Value)]]](
         Right(BackStack.empty)
-      )((acc, rf) => {
+      ) { (acc, rf) =>
         for {
           fields <- acc
           v <- requirePresence(rf.value, "value")
           value <- validateValue(v)
           label <- if (rf.label.isEmpty) Right(None) else requireIdentifier(rf.label).map(Some(_))
         } yield fields :+ label -> value
-      })
+      }
       .map(_.toImmArray)
 
   def validateRecord(rec: api.Record)(implicit
@@ -65,20 +65,20 @@ abstract class ValueValidator {
         .fromString(party)
         .left
         .map(invalidArgument)
-        .map(Lf.ValueParty)
+        .map(Lf.ValueParty.apply)
     case Sum.Bool(b) => Right(Lf.ValueBool(b))
     case Sum.Timestamp(micros) =>
       Time.Timestamp
         .fromLong(micros)
         .left
         .map(invalidArgument)
-        .map(Lf.ValueTimestamp)
+        .map(Lf.ValueTimestamp.apply)
     case Sum.Date(days) =>
       Time.Date
         .fromDaysSinceEpoch(days)
         .left
         .map(invalidArgument)
-        .map(Lf.ValueDate)
+        .map(Lf.ValueDate.apply)
     case Sum.Text(text) => Right(Lf.ValueText(text))
     case Sum.Int64(value) => Right(Lf.ValueInt64(value))
     case Sum.Record(rec) =>
@@ -238,14 +238,4 @@ object ValueValidator extends ValueValidator {
 object StricterValueValidator extends ValueValidator {
   protected override def validateNumeric(s: String): Option[Numeric] =
     Numeric.fromString(s).toOption
-}
-
-object NoLoggingValueValidator {
-
-  def validateRecord(rec: api.Record): Either[StatusRuntimeException, Lf.ValueRecord] =
-    ValueValidator.validateRecord(rec)(NoLogging)
-
-  def validateValue(v0: api.Value): Either[StatusRuntimeException, Lf] =
-    ValueValidator.validateValue(v0)(NoLogging)
-
 }

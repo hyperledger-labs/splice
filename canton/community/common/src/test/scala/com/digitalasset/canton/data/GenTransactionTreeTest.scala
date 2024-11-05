@@ -3,20 +3,19 @@
 
 package com.digitalasset.canton.data
 
+import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.crypto.HashPurpose
+import com.digitalasset.canton.crypto.{CryptoPureApi, HashPurpose}
+import com.digitalasset.canton.data.GenTransactionTree.ViewWithWitnessesAndRecipients
 import com.digitalasset.canton.data.LightTransactionViewTree.InvalidLightTransactionViewTree
 import com.digitalasset.canton.data.MerkleTree.{BlindSubtree, RevealIfNeedBe, RevealSubtree}
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.sequencing.protocol.{
-  MemberRecipient,
-  ParticipantsOfParty,
-  Recipients,
-  RecipientsTree,
-}
+import com.digitalasset.canton.protocol.messages.EncryptedViewMessage
+import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
+import com.digitalasset.canton.sequencing.protocol.{MemberRecipient, Recipients, RecipientsTree}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.{
   BaseTestWordSpec,
   HasExecutionContext,
@@ -35,6 +34,40 @@ class GenTransactionTreeTest
     with ProtocolVersionChecksAnyWordSpec {
 
   val factory: ExampleTransactionFactory = new ExampleTransactionFactory()()
+
+  private def generateRandomKeysForSubviewHashes(
+      subviewHashes: Seq[ViewHash],
+      pureCrypto: CryptoPureApi,
+  ): Seq[ViewHashAndKey] =
+    subviewHashes.map(subviewHash =>
+      ViewHashAndKey(
+        subviewHash,
+        pureCrypto.generateSecureRandomness(
+          EncryptedViewMessage.computeRandomnessLength(pureCrypto)
+        ),
+      )
+    )
+
+  private def lightTransactionViewTreeWithRandomKeys(
+      tvt: FullTransactionViewTree,
+      pureCrypto: CryptoPureApi,
+  ): Either[String, LightTransactionViewTree] =
+    LightTransactionViewTree.fromTransactionViewTree(
+      tvt,
+      // we are not interested in the correctness of the subtree keys
+      generateRandomKeysForSubviewHashes(tvt.subviewHashes, pureCrypto)
+        .map(_.viewEncryptionKeyRandomness),
+      testedProtocolVersion,
+    )
+
+  private def allLightTransactionViewTreesWithRandomKeys(
+      allTransactionViewTrees: Seq[FullTransactionViewTree]
+  ): Seq[LightTransactionViewTree] = {
+    val pureCrypto = ExampleTransactionFactory.pureCrypto
+    allTransactionViewTrees
+      .traverse(lightTransactionViewTreeWithRandomKeys(_, pureCrypto))
+      .valueOrFail("fail to create light view tree")
+  }
 
   forEvery(factory.standardHappyCases) { example =>
     s"$example" can {
@@ -86,9 +119,14 @@ class GenTransactionTreeTest
           fullInformeeTree.toByteString
         ) shouldEqual Right(fullInformeeTree)
 
-        forAll(example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)) { lt =>
+        val randomnessLength = computeRandomnessLength(ExampleTransactionFactory.pureCrypto)
+        forAll(
+          allLightTransactionViewTreesWithRandomKeys(
+            example.transactionTree.allTransactionViewTrees
+          )
+        ) { lt =>
           LightTransactionViewTree.fromTrustedByteString(
-            (example.cryptoOps, testedProtocolVersion)
+            ((example.cryptoOps, randomnessLength), testedProtocolVersion)
           )(
             lt.toByteString
           ) shouldBe Right(lt)
@@ -97,7 +135,9 @@ class GenTransactionTreeTest
 
       "correctly reconstruct the full transaction view trees from the lightweight ones" in {
         val allLightTrees =
-          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+          allLightTransactionViewTreesWithRandomKeys(
+            example.transactionTree.allTransactionViewTrees
+          )
         val allTrees = example.transactionTree.allTransactionViewTrees
         LightTransactionViewTree
           .toFullViewTrees(PIso.id, testedProtocolVersion, factory.cryptoOps, topLevelOnly = false)(
@@ -107,7 +147,9 @@ class GenTransactionTreeTest
 
       "correctly reconstruct the top-level transaction view trees from the lightweight ones" in {
         val allLightTrees =
-          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+          allLightTransactionViewTreesWithRandomKeys(
+            example.transactionTree.allTransactionViewTrees
+          )
         val allTrees = example.transactionTree.allTransactionViewTrees.filter(_.isTopLevel)
 
         LightTransactionViewTree
@@ -117,17 +159,17 @@ class GenTransactionTreeTest
       }
 
       "correctly reconstruct the top-level transaction view trees from the lightweight ones for each informee" in {
-        val seedLength = example.cryptoOps.defaultHashAlgorithm.length
-        val seed = example.cryptoOps.generateSecureRandomness(seedLength.toInt)
-        val hkdfOps = ExampleTransactionFactory.hkdfOps
+        val topology = ExampleTransactionFactory.defaultTopologySnapshot
+        val pureCrypto = ExampleTransactionFactory.pureCrypto
 
         val allLightTrees = example.transactionTree
-          .allLightTransactionViewTreesWithWitnessesAndSeeds(
-            seed,
-            hkdfOps,
-            testedProtocolVersion,
-          )
-          .valueOrFail("Cant get the light transaction trees")
+          .allTransactionViewTreesWithRecipients(topology)
+          .valueOrFail("fail set up recipients for transaction view tree")
+          .futureValueUS
+          .map { case ViewWithWitnessesAndRecipients(tvt, witnesses, _, _) =>
+            lightTransactionViewTreeWithRandomKeys(tvt, pureCrypto)
+              .valueOrFail("fail to create light transaction trees") -> witnesses
+          }
         val allTrees = example.transactionTree.allTransactionViewTrees.toList
         val allInformees = allLightTrees.map(_._1.informees).fold(Set.empty)(_.union(_))
 
@@ -157,7 +199,9 @@ class GenTransactionTreeTest
 
       "correctly report missing subviews" in {
         val allLightTrees =
-          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+          allLightTransactionViewTreesWithRandomKeys(
+            example.transactionTree.allTransactionViewTrees
+          )
         val removedLightTreeO = allLightTrees.find(_.viewPosition.position.sizeIs > 1)
         val inputLightTrees = allLightTrees.filterNot(removedLightTreeO.contains)
         val badLightTrees = inputLightTrees.filter(tree =>
@@ -182,8 +226,9 @@ class GenTransactionTreeTest
       }
 
       "correctly process duplicate views" in {
-        val allLightTrees =
-          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+        val allLightTrees = allLightTransactionViewTreesWithRandomKeys(
+          example.transactionTree.allTransactionViewTrees
+        )
         val allFullTrees = example.transactionTree.allTransactionViewTrees
 
         val inputLightTrees1 = allLightTrees.flatMap(tree => Seq(tree, tree))
@@ -200,8 +245,9 @@ class GenTransactionTreeTest
       }
 
       "correctly process views in an unusual order" in {
-        val allLightTrees =
-          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+        val allLightTrees = allLightTransactionViewTreesWithRandomKeys(
+          example.transactionTree.allTransactionViewTrees
+        )
         val inputLightTrees = allLightTrees.sortBy(_.viewPosition.position.size)
         val allFullTrees = example.transactionTree.allTransactionViewTrees
         LightTransactionViewTree
@@ -248,9 +294,9 @@ class GenTransactionTreeTest
       "prevent creation" in {
         val childViewCommonData =
           singleCreateView.viewCommonData.tryUnwrap.copy(salt = factory.commonDataSalt(1))
-        val childView = singleCreateView.copy(viewCommonData = childViewCommonData)
+        val childView = singleCreateView.tryCopy(viewCommonData = childViewCommonData)
         val subviews = TransactionSubviews(Seq(childView))(testedProtocolVersion, factory.cryptoOps)
-        val parentView = singleCreateView.copy(subviews = subviews)
+        val parentView = singleCreateView.tryCopy(subviews = subviews)
 
         GenTransactionTree.create(factory.cryptoOps)(
           factory.submitterMetadata,
@@ -385,7 +431,7 @@ class GenTransactionTreeTest
     val example = factory.ViewInterleavings
 
     forEvery(example.transactionViewTrees.zipWithIndex) { case (tvt, index) =>
-      val viewWithBlindedSubviews = tvt.view.copy(subviews = tvt.view.subviews.blindFully)
+      val viewWithBlindedSubviews = tvt.view.tryCopy(subviews = tvt.view.subviews.blindFully)
       val genTransactionTree =
         tvt.tree.mapUnblindedRootViews(_.replace(tvt.viewHash, viewWithBlindedSubviews))
 
@@ -398,15 +444,25 @@ class GenTransactionTreeTest
 
       "given consistent subview hashes" must {
         s"pass sanity tests at creation (for the $index-th transaction view tree)" in {
+          val pureCrypto = ExampleTransactionFactory.pureCrypto
           noException should be thrownBy LightTransactionViewTree
-            .tryCreate(genTransactionTree, tvt.subviewHashes, testedProtocolVersion)
+            .tryCreate(
+              genTransactionTree,
+              generateRandomKeysForSubviewHashes(tvt.subviewHashes, pureCrypto),
+              testedProtocolVersion,
+            )
         }
       }
 
       "given inconsistent subview hashes" must {
         s"reject creation (for the $index-th transaction view tree)" in {
+          val pureCrypto = ExampleTransactionFactory.pureCrypto
           an[InvalidLightTransactionViewTree] should be thrownBy LightTransactionViewTree
-            .tryCreate(genTransactionTree, mangledSubviewHashes, testedProtocolVersion)
+            .tryCreate(
+              genTransactionTree,
+              generateRandomKeysForSubviewHashes(mangledSubviewHashes, pureCrypto),
+              testedProtocolVersion,
+            )
 
           if (tvt.subviewHashes.nonEmpty)
             an[InvalidLightTransactionViewTree] should be thrownBy LightTransactionViewTree
@@ -458,7 +514,7 @@ class GenTransactionTreeTest
         val Seq(_, view1) = informeeTree.rootViews.unblindedElements
 
         val view1WithParticipantDataUnblinded =
-          view1.copy(viewParticipantData = view1Unblinded.viewParticipantData)
+          view1.tryCopy(viewParticipantData = view1Unblinded.viewParticipantData)
         val rootViews = MerkleSeq.fromSeq(factory.cryptoOps, testedProtocolVersion)(
           Seq(view1WithParticipantDataUnblinded)
         )
@@ -488,17 +544,15 @@ class GenTransactionTreeTest
 
         val partiallyBlindedTree =
           example.fullInformeeTree.tree.blind {
-            {
-              case _: GenTransactionTree => RevealIfNeedBe
-              case _: CommonMetadata => RevealSubtree
-              case _: SubmitterMetadata => RevealSubtree
+            case _: GenTransactionTree => RevealIfNeedBe
+            case _: CommonMetadata => RevealSubtree
+            case _: SubmitterMetadata => RevealSubtree
 
-              case v: TransactionView =>
-                if (hashesOfUnblindedViews.contains(v.viewHash))
-                  RevealIfNeedBe // Necessary to reveal view0 and view1
-                else BlindSubtree // This will blind every other view
-              case _: ViewCommonData => RevealSubtree // Necessary to reveal view0 and view1
-            }
+            case v: TransactionView =>
+              if (hashesOfUnblindedViews.contains(v.viewHash))
+                RevealIfNeedBe // Necessary to reveal view0 and view1
+              else BlindSubtree // This will blind every other view
+            case _: ViewCommonData => RevealSubtree // Necessary to reveal view0 and view1
           }.tryUnwrap
 
         FullInformeeTree
@@ -515,7 +569,7 @@ class GenTransactionTreeTest
 
         val rootViewsWithCommonDataBlinded =
           rootViews.map(view =>
-            view.copy(viewCommonData = ExampleTransactionFactory.blinded(view.viewCommonData))
+            view.tryCopy(viewCommonData = ExampleTransactionFactory.blinded(view.viewCommonData))
           )
 
         val viewCommonDataBlinded =
@@ -562,9 +616,6 @@ class GenTransactionTreeTest
             case (party, map) if parties.contains(party) => (party, map.keySet)
           })
         }
-      when(topology.partiesWithGroupAddressing(any[Seq[LfPartyId]])(anyTraceContext))
-        // parties 3 and 6 will use group addressing
-        .thenReturn(Future.successful(Set(party(3), party(6))))
 
       val witnesses = mkWitnesses(
         NonEmpty(Seq, Set(1, 2), Set(1, 3), Set(2, 4), Set(1, 2, 5), Set(6))
@@ -577,7 +628,7 @@ class GenTransactionTreeTest
         NonEmpty(
           Seq,
           RecipientsTree.ofRecipients(
-            NonEmpty.mk(Set, ParticipantsOfParty(PartyId.tryFromLfParty(party(6)))),
+            NonEmpty.mk(Set, MemberRecipient(participant(16))),
             Seq(
               RecipientsTree.ofMembers(
                 NonEmpty(Set, 11, 12, 13, 15).map(participant),
@@ -589,7 +640,7 @@ class GenTransactionTreeTest
                         NonEmpty.mk(
                           Set,
                           MemberRecipient(participant(11)),
-                          ParticipantsOfParty(PartyId.tryFromLfParty(party(3))),
+                          MemberRecipient(participant(13)),
                         ),
                         Seq(
                           RecipientsTree.leaf(NonEmpty.mk(Set, participant(11), participant(12)))

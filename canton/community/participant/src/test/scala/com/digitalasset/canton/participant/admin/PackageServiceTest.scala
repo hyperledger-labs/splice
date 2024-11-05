@@ -51,15 +51,18 @@ object PackageServiceTest {
       .readArchiveFromFile(new File(BaseTest.CantonExamplesPath))
       .getOrElse(throw new IllegalArgumentException("Failed to read dar"))
 
-  def readCantonExamples(): List[DamlLf.Archive] = {
+  def readCantonExamples(): List[DamlLf.Archive] =
     loadExampleDar().all
-  }
 
   def readCantonExamplesBytes(): Array[Byte] =
     Files.readAllBytes(Paths.get(BaseTest.CantonExamplesPath))
 
   def badDarPath: String =
     ("community" / "participant" / "src" / "test" / "resources" / "daml" / "illformed.dar").toString
+
+  def lf1xDarPath: String =
+    ("community" / "participant" / "src" / "test" / "resources" / "daml" / "dummy-1.15.dar").toString
+
 }
 
 class PackageServiceTest

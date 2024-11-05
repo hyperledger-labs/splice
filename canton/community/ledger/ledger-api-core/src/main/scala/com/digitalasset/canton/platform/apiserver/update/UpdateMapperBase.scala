@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.platform.apiserver.update
 
+import cats.syntax.either.*
 import com.digitalasset.canton.platform.apiserver.update.UpdatePathsTrie.MatchResult
 import com.google.protobuf.field_mask.FieldMask
 
@@ -29,36 +30,35 @@ trait UpdateMapperBase {
   final def toUpdate(
       domainObject: Resource,
       updateMask: FieldMask,
-  ): Result[Update] = {
+  ): Result[Update] =
     for {
       updateTrie <- makeUpdateTrie(updateMask)
       updateObject <- makeUpdateObject(domainObject, updateTrie)
     } yield {
       updateObject
     }
-  }
 
-  private def makeUpdateTrie(updateMask: FieldMask): Result[UpdatePathsTrie] = {
+  private def makeUpdateTrie(updateMask: FieldMask): Result[UpdatePathsTrie] =
     for {
-      _ <- if (updateMask.paths.isEmpty) Left(UpdatePathError.EmptyUpdateMask) else Right(())
+      _ <- Either.cond(updateMask.paths.nonEmpty, (), UpdatePathError.EmptyUpdateMask)
       parsedPaths <- UpdatePath.parseAll(updateMask.paths)
       _ <- validatePathsMatchValidFields(parsedPaths)
       updateTrie <- UpdatePathsTrie.fromPaths(parsedPaths)
     } yield updateTrie
-  }
 
   protected[update] final def noUpdate[A]: Result[Option[A]] = Right(None)
 
   protected[update] final def validatePathsMatchValidFields(
       paths: Seq[UpdatePath]
   ): Result[Unit] =
-    paths.foldLeft[Result[Unit]](Right(())) { (ax, parsedPath) =>
+    paths.foldLeft(Either.unit[UpdatePathError]) { (ax, parsedPath) =>
       for {
         _ <- ax
-        _ <-
-          if (!fullResourceTrie.containsPrefix(parsedPath.fieldPath)) {
-            Left(UpdatePathError.UnknownFieldPath(parsedPath.toRawString))
-          } else Right(())
+        _ <- Either.cond(
+          fullResourceTrie.containsPrefix(parsedPath.fieldPath),
+          (),
+          UpdatePathError.UnknownFieldPath(parsedPath.toRawString),
+        )
       } yield ()
     }
 

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.participant.store.memory
 
 import cats.data.EitherT
+import cats.syntax.either.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -40,7 +41,7 @@ class InMemoryDomainConnectionConfigStore(protected override val loggerFactory: 
           config.domain,
           StoredDomainConnectionConfig(config, status),
         )
-        .fold[Either[AlreadyAddedForAlias, Unit]](Right(()))(existingConfig =>
+        .fold(Either.unit[AlreadyAddedForAlias])(existingConfig =>
           Either.cond(config == existingConfig.config, (), AlreadyAddedForAlias(config.domain))
         )
     )
@@ -53,16 +54,14 @@ class InMemoryDomainConnectionConfigStore(protected override val loggerFactory: 
   private def replaceInternal(
       alias: DomainAlias,
       modifier: StoredDomainConnectionConfig => StoredDomainConnectionConfig,
-  ): EitherT[Future, MissingConfigForAlias, Unit] = {
+  ): EitherT[Future, MissingConfigForAlias, Unit] =
     EitherT.fromEither[Future](
-      configuredDomainMap.updateWith(alias)(_.map(modifier)) match {
-        case Some(_) =>
-          Right(())
-        case None =>
-          Left(MissingConfigForAlias(alias))
-      }
+      Either.cond(
+        configuredDomainMap.updateWith(alias)(_.map(modifier)).isDefined,
+        (),
+        MissingConfigForAlias(alias),
+      )
     )
-  }
 
   override def get(
       alias: DomainAlias

@@ -4,7 +4,6 @@
 package com.digitalasset.canton.ledger.client
 
 import com.daml.error.utils.DecodedCantonError
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse.Update
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -15,7 +14,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{NoTracing, Spanning}
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.util.TryUtil.ForFailedOps
-import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
+import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
 import com.digitalasset.canton.util.{FutureUtil, retry}
 import io.grpc.StatusRuntimeException
 import org.apache.pekko.NotUsed
@@ -36,11 +35,11 @@ import scala.util.{Failure, Success, Try}
   * (i.e. allow re-processing the same transaction twice).
   */
 class ResilientLedgerSubscription[S, T](
-    makeSource: ParticipantOffset => Source[S, NotUsed],
+    makeSource: Long => Source[S, NotUsed],
     consumingFlow: Flow[S, T, ?],
     subscriptionName: String,
-    startOffset: ParticipantOffset,
-    extractOffset: S => Option[ParticipantOffset],
+    startOffset: Long,
+    extractOffset: S => Option[Long],
     val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
     resubscribeIfPruned: Boolean = false,
@@ -51,7 +50,7 @@ class ResilientLedgerSubscription[S, T](
     with NamedLogging
     with Spanning
     with NoTracing {
-  private val offsetRef = new AtomicReference[ParticipantOffset](startOffset)
+  private val offsetRef = new AtomicReference[Long](startOffset)
   private implicit val policyRetry: retry.Success[Any] = retry.Success.always
   private val ledgerSubscriptionRef = new AtomicReference[Option[LedgerSubscription]](None)
   private[client] val subscriptionF = retry
@@ -63,15 +62,14 @@ class ResilientLedgerSubscription[S, T](
       maxDelay = 5.seconds,
       operationName = s"restartable-$subscriptionName",
     )
-    .apply(resilientSubscription(), AllExnRetryable)
+    .apply(resilientSubscription(), AllExceptionRetryPolicy)
 
   runOnShutdown_(new RunOnShutdown {
     override def name: String = s"$subscriptionName-shutdown"
 
-    override def done: Boolean = {
+    override def done: Boolean =
       // Use isClosing to avoid task eviction at the beginning (see runOnShutdown)
       isClosing && ledgerSubscriptionRef.get().forall(_.completed.isCompleted)
-    }
 
     override def run(): Unit =
       ledgerSubscriptionRef.getAndSet(None).foreach(Lifecycle.close(_)(logger))
@@ -164,7 +162,7 @@ class ResilientLedgerSubscription[S, T](
             logger.warn(
               s"Setting the ${subject(capitalized = false)} offset to a later offset [$earliestOffset] due to pruning. Some commands might timeout or events might become stale."
             )
-            offsetRef.set(ParticipantOffset(ParticipantOffset.Value.Absolute(earliestOffset)))
+            offsetRef.set(earliestOffset.toLong)
           } else {
             logger.error(
               s"Connection ${subject(capitalized = false)} failed to resubscribe from  ${offsetRef
@@ -180,14 +178,15 @@ class ResilientLedgerSubscription[S, T](
 }
 
 object ResilientLedgerSubscription {
-  def extractOffsetFromGetUpdateResponse(response: GetUpdatesResponse): Option[ParticipantOffset] =
-    (response.update match {
+  def extractOffsetFromGetUpdateResponse(response: GetUpdatesResponse): Option[Long] =
+    response.update match {
       case Update.Transaction(value) =>
         Some(value.offset)
       case Update.Reassignment(value) =>
         Some(value.offset)
-      case Update.OffsetCheckpoint(_) => None
+      case Update.OffsetCheckpoint(value) =>
+        Some(value.offset)
       case Update.Empty => None
-    }).map(off => ParticipantOffset(ParticipantOffset.Value.Absolute(off)))
+    }
 
 }

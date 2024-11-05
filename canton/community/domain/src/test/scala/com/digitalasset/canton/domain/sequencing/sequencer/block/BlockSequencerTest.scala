@@ -13,39 +13,37 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.domain.block.*
 import com.digitalasset.canton.domain.block.BlockSequencerStateManager.ChunkState
 import com.digitalasset.canton.domain.block.data.memory.InMemorySequencerBlockStore
-import com.digitalasset.canton.domain.block.data.{BlockEphemeralState, BlockInfo, EphemeralState}
+import com.digitalasset.canton.domain.block.data.{BlockEphemeralState, BlockInfo}
 import com.digitalasset.canton.domain.block.update.{
   BlockUpdate,
   BlockUpdateGenerator,
   OrderedBlockUpdate,
-  SignedChunkEvents,
-}
-import com.digitalasset.canton.domain.block.{
-  BlockEvents,
-  BlockSequencerStateManager,
-  BlockSequencerStateManagerBase,
-  RawLedgerBlock,
-  SequencerDriverHealthStatus,
 }
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer.SignedOrderingRequest
-import com.digitalasset.canton.domain.sequencing.sequencer.SequencerIntegration
 import com.digitalasset.canton.domain.sequencing.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
+import com.digitalasset.canton.domain.sequencing.sequencer.errors.SequencerError
+import com.digitalasset.canton.domain.sequencing.sequencer.store.InMemorySequencerStore
+import com.digitalasset.canton.domain.sequencing.sequencer.{
+  BlockSequencerConfig,
+  SequencerIntegration,
+}
 import com.digitalasset.canton.domain.sequencing.traffic.RateLimitManagerTesting
 import com.digitalasset.canton.domain.sequencing.traffic.store.memory.InMemoryTrafficPurchasedStore
-import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FutureUnlessShutdown}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
 import com.digitalasset.canton.resource.MemoryStorage
+import com.digitalasset.canton.sequencer.admin.v30
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
   SendAsyncError,
   SignedContent,
 }
 import com.digitalasset.canton.time.{Clock, SimClock}
-import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.topology.client.StoreBasedDomainTopologyClient
 import com.digitalasset.canton.topology.processing.{
   ApproximateTime,
@@ -57,7 +55,7 @@ import com.digitalasset.canton.topology.store.TopologyStoreId.DomainStore
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.{BaseTest, HasExecutionContext, SequencerCounter}
+import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Source}
@@ -126,6 +124,7 @@ class BlockSequencerTest
       loggerFactory,
     )
     topologyClient.updateHead(
+      SequencedTime(CantonTimestamp.Epoch),
       EffectiveTime(CantonTimestamp.Epoch),
       ApproximateTime(CantonTimestamp.Epoch),
       potentialTopologyChange = true,
@@ -143,40 +142,55 @@ class BlockSequencerTest
       loggerFactory,
     )
 
-    private val store =
-      new InMemorySequencerBlockStore(None, loggerFactory)
-
     private val balanceStore = new InMemoryTrafficPurchasedStore(loggerFactory)
 
     val fakeBlockOrderer = new FakeBlockOrderer(N)
     private val fakeBlockSequencerStateManager = new FakeBlockSequencerStateManager
+    private val fakeDbSequencerStore = new InMemorySequencerStore(
+      testedProtocolVersion,
+      sequencer1,
+      blockSequencerMode = true,
+      loggerFactory,
+    )
     private val storage = new MemoryStorage(loggerFactory, timeouts)
+    private val store =
+      new InMemorySequencerBlockStore(
+        new InMemorySequencerStore(
+          testedProtocolVersion,
+          sequencer1,
+          blockSequencerMode = true,
+          loggerFactory,
+        ),
+        loggerFactory,
+      )
     private val blockSequencer =
       new BlockSequencer(
-        fakeBlockOrderer,
+        blockOrderer = fakeBlockOrderer,
         name = "test",
-        domainId,
-        cryptoApi,
+        domainId = domainId,
+        cryptoApi = cryptoApi,
         sequencerId = sequencer1,
         fakeBlockSequencerStateManager,
         store,
+        dbSequencerStore = fakeDbSequencerStore,
+        BlockSequencerConfig(),
         balanceStore,
         storage,
         FutureSupervisor.Noop,
         health = None,
-        new SimClock(loggerFactory = loggerFactory),
-        testedProtocolVersion,
+        clock = new SimClock(loggerFactory = loggerFactory),
+        protocolVersion = testedProtocolVersion,
         blockRateLimitManager = defaultRateLimiter,
-        OrderingTimeFixMode.MakeStrictlyIncreasing,
+        orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
+        cachingConfigs = CachingConfigs(),
         processingTimeouts = BlockSequencerTest.this.timeouts,
         logEventDetails = true,
         prettyPrinter = new CantonPrettyPrinter(
           ApiLoggingConfig.defaultMaxStringLength,
           ApiLoggingConfig.defaultMaxMessageLines,
         ),
-        SequencerMetrics.noop(this.getClass.getName),
-        loggerFactory,
-        unifiedSequencer = testedUseUnifiedSequencer,
+        metrics = SequencerMetrics.noop(this.getClass.getName),
+        loggerFactory = loggerFactory,
         exitOnFatalFailures = true,
         runtimeReady = FutureUnlessShutdown.unit,
       )
@@ -227,51 +241,38 @@ class BlockSequencerTest
     override def firstBlockHeight: Long = ???
 
     override def orderingTimeFixMode: OrderingTimeFixMode = ???
+
+    override def sequencerSnapshotAdditionalInfo(
+        timestamp: CantonTimestamp
+    ): EitherT[Future, SequencerError, Option[v30.BftSequencerSnapshotAdditionalInfo]] = ???
   }
 
   class FakeBlockSequencerStateManager extends BlockSequencerStateManagerBase {
-
-    override val maybeLowerTopologyTimestampBound: Option[CantonTimestamp] = None
-
     override def processBlock(
         bug: BlockUpdateGenerator
-    ): Flow[BlockEvents, Traced[OrderedBlockUpdate[SignedChunkEvents]], NotUsed] =
+    ): Flow[BlockEvents, Traced[OrderedBlockUpdate], NotUsed] =
       Flow[BlockEvents].mapConcat(_ => Seq.empty)
 
     override def applyBlockUpdate(
         dbSequencerIntegration: SequencerIntegration
-    ): Flow[Traced[BlockUpdate[SignedChunkEvents]], Traced[CantonTimestamp], NotUsed] =
-      Flow[Traced[BlockUpdate[SignedChunkEvents]]].map(_.map(_ => CantonTimestamp.MinValue))
+    ): Flow[Traced[BlockUpdate], Traced[CantonTimestamp], NotUsed] =
+      Flow[Traced[BlockUpdate]].map(_.map(_ => CantonTimestamp.MinValue))
 
     override def getHeadState: BlockSequencerStateManager.HeadState =
       BlockSequencerStateManager.HeadState(
         BlockInfo.initial,
-        ChunkState.initial(BlockEphemeralState(BlockInfo.initial, EphemeralState.empty)),
+        ChunkState.initial(BlockEphemeralState.empty),
       )
 
-    override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq()
     override protected def timeouts: ProcessingTimeout = BlockSequencerTest.this.timeouts
     override protected def logger: TracedLogger = BlockSequencerTest.this.logger
 
     // No need to implement these methods for the test
-    override def isMemberRegistered(member: Member): Boolean = ???
-    override def readEventsForMember(member: Member, startingAt: SequencerCounter)(implicit
-        traceContext: TraceContext
-    ): CreateSubscription = ???
-    override private[domain] def firstSequencerCounterServableForSequencer
-        : com.digitalasset.canton.SequencerCounter = ???
-    override def isMemberEnabled(member: com.digitalasset.canton.topology.Member): Boolean = ???
     override def waitForAcknowledgementToComplete(
         member: com.digitalasset.canton.topology.Member,
         timestamp: com.digitalasset.canton.data.CantonTimestamp,
     )(implicit
         traceContext: com.digitalasset.canton.tracing.TraceContext
     ): scala.concurrent.Future[Unit] = ???
-    override def waitForMemberToBeDisabled(
-        member: com.digitalasset.canton.topology.Member
-    ): scala.concurrent.Future[Unit] = ???
-    override def waitForPruningToComplete(
-        timestamp: com.digitalasset.canton.data.CantonTimestamp
-    ): (Boolean, Future[Unit]) = ???
   }
 }

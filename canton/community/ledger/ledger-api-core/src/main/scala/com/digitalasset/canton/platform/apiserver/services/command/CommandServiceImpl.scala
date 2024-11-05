@@ -34,7 +34,6 @@ import com.digitalasset.canton.platform.apiserver.services.tracking.{
 }
 import com.digitalasset.canton.platform.apiserver.services.{ApiCommandService, logging}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.google.protobuf.empty.Empty
 import io.grpc.{Context, Deadline}
 
 import java.time.Instant
@@ -66,21 +65,12 @@ private[apiserver] final class CommandServiceImpl private[services] (
 
   def submitAndWait(
       request: SubmitAndWaitRequest
-  )(loggingContext: LoggingContextWithTrace): Future[Empty] =
-    withCommandsLoggingContext(request.getCommands, loggingContext) { (errorLogger, traceContext) =>
-      submitAndWaitInternal(request)(errorLogger, traceContext).map { _ =>
-        Empty.defaultInstance
-      }
-    }
-
-  def submitAndWaitForUpdateId(
-      request: SubmitAndWaitRequest
-  )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForUpdateIdResponse] =
+  )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitResponse] =
     withCommandsLoggingContext(request.getCommands, loggingContext) { (errorLogger, traceContext) =>
       submitAndWaitInternal(request)(errorLogger, traceContext).map { response =>
-        SubmitAndWaitForUpdateIdResponse.of(
+        SubmitAndWaitResponse.of(
           updateId = response.completion.updateId,
-          completionOffset = response.checkpoint.map(_.offset).getOrElse(""),
+          completionOffset = response.completion.offset,
         )
       }
     }
@@ -100,8 +90,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
           .map(transactionResponse =>
             SubmitAndWaitForTransactionResponse
               .of(
-                transactionResponse.transaction,
-                transactionResponse.transaction.map(_.offset).getOrElse(""),
+                transactionResponse.transaction
               )
           )
       }
@@ -119,10 +108,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
         )
         transactionServices
           .getTransactionTreeById(txRequest)
-          .map(resp =>
-            SubmitAndWaitForTransactionTreeResponse
-              .of(resp.transaction, resp.transaction.map(_.offset).getOrElse(""))
-          )
+          .map(resp => SubmitAndWaitForTransactionTreeResponse.of(resp.transaction))
       }
     }
 
@@ -183,7 +169,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
       loggingContextWithTrace: LoggingContextWithTrace,
   )(
       submitWithContext: (ContextualizedErrorLogger, TraceContext) => Future[T]
-  ): Future[T] = {
+  ): Future[T] =
     LoggingContextWithTrace.withEnrichedLoggingContext(
       logging.submissionId(commands.submissionId),
       logging.commandId(commands.commandId),
@@ -200,7 +186,6 @@ private[apiserver] final class CommandServiceImpl private[services] (
         loggingContext.traceContext,
       )
     }(loggingContextWithTrace)
-  }
 }
 
 private[apiserver] object CommandServiceImpl {

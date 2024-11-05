@@ -6,9 +6,9 @@ package com.digitalasset.canton.platform.apiserver
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.tracing.Telemetry
+import com.digitalasset.canton.auth.Authorizer
 import com.digitalasset.canton.config
 import com.digitalasset.canton.ledger.api.SubmissionIdGenerator
-import com.digitalasset.canton.ledger.api.auth.Authorizer
 import com.digitalasset.canton.ledger.api.auth.services.*
 import com.digitalasset.canton.ledger.api.grpc.GrpcHealthService
 import com.digitalasset.canton.ledger.api.health.HealthChecks
@@ -27,11 +27,12 @@ import com.digitalasset.canton.platform.apiserver.configuration.{
   EngineLoggingConfig,
   LedgerEndObserverFromIndex,
 }
-import com.digitalasset.canton.platform.apiserver.execution.StoreBackedCommandExecutor.AuthenticateContract
 import com.digitalasset.canton.platform.apiserver.execution.*
+import com.digitalasset.canton.platform.apiserver.execution.StoreBackedCommandExecutor.AuthenticateContract
 import com.digitalasset.canton.platform.apiserver.meteringreport.MeteringReportKey
 import com.digitalasset.canton.platform.apiserver.services.*
 import com.digitalasset.canton.platform.apiserver.services.admin.*
+import com.digitalasset.canton.platform.apiserver.services.command.interactive.InteractiveSubmissionServiceImpl
 import com.digitalasset.canton.platform.apiserver.services.command.{
   CommandInspectionServiceImpl,
   CommandServiceImpl,
@@ -40,9 +41,11 @@ import com.digitalasset.canton.platform.apiserver.services.command.{
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
+  InteractiveSubmissionServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
+import com.digitalasset.canton.platform.store.dao.events.LfValueTranslation
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.*
@@ -81,7 +84,6 @@ object ApiServices {
       partyRecordStore: PartyRecordStore,
       authorizer: Authorizer,
       engine: Engine,
-      authorityResolver: AuthorityResolver,
       timeProvider: TimeProvider,
       timeProviderType: TimeProviderType,
       submissionTracker: SubmissionTracker,
@@ -105,6 +107,8 @@ object ApiServices {
       telemetry: Telemetry,
       val loggerFactory: NamedLoggerFactory,
       dynParamGetter: DynamicDomainParameterGetter,
+      interactiveSubmissionServiceConfig: InteractiveSubmissionServiceConfig,
+      lfValueTranslation: LfValueTranslation,
   )(implicit
       materializer: Materializer,
       esf: ExecutionSequencerFactory,
@@ -312,7 +316,6 @@ object ApiServices {
             participantId,
             writeService,
             contractStore,
-            authorityResolver,
             authenticateContract,
             metrics,
             engineLoggingConfig,
@@ -338,14 +341,12 @@ object ApiServices {
       val commandSubmissionService =
         CommandSubmissionServiceImpl.createApiService(
           writeService,
-          commandsValidator,
           timeProvider,
           timeProviderType,
           seedService,
           commandExecutor,
           checkOverloaded,
           metrics,
-          telemetry,
           loggerFactory,
         )
 
@@ -406,9 +407,40 @@ object ApiServices {
           loggerFactory = loggerFactory,
         )
 
+        val apiInteractiveSubmissionService =
+          Option.when(interactiveSubmissionServiceConfig.enabled) {
+            val interactiveSubmissionService =
+              InteractiveSubmissionServiceImpl.createApiService(
+                writeService,
+                timeProvider,
+                timeProviderType,
+                seedService,
+                commandExecutor,
+                metrics,
+                checkOverloaded,
+                interactiveSubmissionServiceConfig,
+                lfValueTranslation,
+                loggerFactory,
+              )
+
+            new ApiInteractiveSubmissionService(
+              commandsValidator = commandsValidator,
+              interactiveSubmissionService = interactiveSubmissionService,
+              currentLedgerTime = () => timeProvider.getCurrentTime,
+              currentUtcTime = () => Instant.now,
+              maxDeduplicationDuration = maxDeduplicationDuration.asJava,
+              submissionIdGenerator = SubmissionIdGenerator.Random,
+              metrics = metrics,
+              telemetry = telemetry,
+              loggerFactory = loggerFactory,
+            )
+          }
+
         List(
           new CommandSubmissionServiceAuthorization(apiSubmissionService, authorizer),
           new CommandServiceAuthorization(apiCommandService, authorizer),
+        ) ++ apiInteractiveSubmissionService.toList.map(
+          new InteractiveSubmissionServiceAuthorization(_, authorizer)
         )
       }
 

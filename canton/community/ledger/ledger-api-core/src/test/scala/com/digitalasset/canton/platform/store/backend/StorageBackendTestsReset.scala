@@ -52,6 +52,8 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
       // 5: unassign event
       dtoUnassign(offset(5), 5L, hashCid("#5")),
       DbDto.IdFilterUnassignStakeholder(5L, someTemplateId.toString, someParty.toString),
+      // 6: topology transaction
+      dtoPartyToParticipant(offset(6), 6L),
       // String interning
       DbDto.StringInterningDto(10, "d|x:abc"),
     )
@@ -66,7 +68,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
 
     def end = executeSql(backend.parameter.ledgerEnd)
 
-    def events = {
+    def events =
       executeSql(
         backend.event.transactionStreamingQueries.fetchEventPayloadsTree(
           EventPayloadSourceForTreeTx.Create
@@ -77,7 +79,6 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
             EventPayloadSourceForTreeTx.Consuming
           )(List(2L), Some(Set.empty))
         )
-    }
 
     def parties = executeSql(backend.party.knownParties(None, 10))
 

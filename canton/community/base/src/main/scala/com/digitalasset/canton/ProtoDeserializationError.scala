@@ -31,7 +31,10 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
   final case class TransactionDeserialization(message: String) extends ProtoDeserializationError
   final case class ValueDeserializationError(field: String, message: String)
       extends ProtoDeserializationError
-  final case class StringConversionError(message: String) extends ProtoDeserializationError
+  final case class StringConversionError(error: String, field: Option[String] = None)
+      extends ProtoDeserializationError {
+    val message = field.fold(error)(field => s"Unable to parse string in $field: $error")
+  }
   final case class UnrecognizedField(message: String) extends ProtoDeserializationError
   final case class UnrecognizedEnum(field: String, value: String, validValues: Seq[String])
       extends ProtoDeserializationError {
@@ -72,7 +75,7 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
   final case class UnknownProtoVersion(version: ProtoVersion, protoMessage: String)
       extends ProtoDeserializationError {
     override def message =
-      s"Message ${protoMessage} has no versioning information corresponding to protobuf $version"
+      s"Message $protoMessage has no versioning information corresponding to protobuf $version"
   }
 
   /** Common Deserialization error code
