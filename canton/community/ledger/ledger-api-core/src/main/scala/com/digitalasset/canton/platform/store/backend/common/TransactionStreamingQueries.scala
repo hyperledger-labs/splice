@@ -4,10 +4,13 @@
 package com.digitalasset.canton.platform.store.backend.common
 
 import anorm.SqlParser.long
-import com.digitalasset.canton.platform.store.backend.EventStorageBackend
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
+  Entry,
+  RawFlatEvent,
+  RawTreeEvent,
+}
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.backend.common.SimpleSqlExtensions.*
-import com.digitalasset.canton.platform.store.dao.events.Raw
 import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.canton.platform.{Identifier, Party}
 import com.digitalasset.daml.lf.data.Ref
@@ -119,7 +122,7 @@ class TransactionStreamingQueries(
   def fetchEventPayloadsFlat(target: EventPayloadSourceForFlatTx)(
       eventSequentialIds: Iterable[Long],
       allFilterParties: Option[Set[Ref.Party]],
-  )(connection: Connection): Vector[EventStorageBackend.Entry[Raw.FlatEvent]] = {
+  )(connection: Connection): Vector[Entry[RawFlatEvent]] =
     target match {
       case EventPayloadSourceForFlatTx.Consuming =>
         fetchFlatEvents(
@@ -136,18 +139,17 @@ class TransactionStreamingQueries(
           allFilterParties = allFilterParties,
         )(connection)
     }
-  }
 
   def fetchEventPayloadsTree(target: EventPayloadSourceForTreeTx)(
       eventSequentialIds: Iterable[Long],
       allFilterParties: Option[Set[Ref.Party]],
-  )(connection: Connection): Vector[EventStorageBackend.Entry[Raw.TreeEvent]] = {
+  )(connection: Connection): Vector[Entry[RawTreeEvent]] =
     target match {
       case EventPayloadSourceForTreeTx.Consuming =>
         fetchTreeEvents(
           tableName = "lapi_events_consuming_exercise",
           selectColumns =
-            s"$selectColumnsForTransactionTreeExercise, ${queryStrategy.constBooleanSelect(true)} as exercise_consuming",
+            s"$selectColumnsForTransactionTreeExercise, ${QueryStrategy.constBooleanSelect(true)} as exercise_consuming",
           eventSequentialIds = eventSequentialIds,
           allFilterParties = allFilterParties,
         )(connection)
@@ -155,7 +157,7 @@ class TransactionStreamingQueries(
         fetchTreeEvents(
           tableName = "lapi_events_create",
           selectColumns =
-            s"$selectColumnsForTransactionTreeCreate, ${queryStrategy.constBooleanSelect(false)} as exercise_consuming",
+            s"$selectColumnsForTransactionTreeCreate, ${QueryStrategy.constBooleanSelect(false)} as exercise_consuming",
           eventSequentialIds = eventSequentialIds,
           allFilterParties = allFilterParties,
         )(connection)
@@ -163,12 +165,11 @@ class TransactionStreamingQueries(
         fetchTreeEvents(
           tableName = "lapi_events_non_consuming_exercise",
           selectColumns =
-            s"$selectColumnsForTransactionTreeExercise, ${queryStrategy.constBooleanSelect(false)} as exercise_consuming",
+            s"$selectColumnsForTransactionTreeExercise, ${QueryStrategy.constBooleanSelect(false)} as exercise_consuming",
           eventSequentialIds = eventSequentialIds,
           allFilterParties = allFilterParties,
         )(connection)
     }
-  }
 
   def fetchIdsOfCreateEventsForStakeholder(
       stakeholderO: Option[Ref.Party],
@@ -176,7 +177,7 @@ class TransactionStreamingQueries(
       startExclusive: Long,
       endInclusive: Long,
       limit: Int,
-  )(connection: Connection): Vector[Long] = {
+  )(connection: Connection): Vector[Long] =
     TransactionStreamingQueries.fetchEventIds(
       tableName = "lapi_pe_create_id_filter_stakeholder",
       witnessO = stakeholderO,
@@ -186,7 +187,6 @@ class TransactionStreamingQueries(
       limit = limit,
       stringInterning = stringInterning,
     )(connection)
-  }
 
   private def fetchIdsOfConsumingEventsForStakeholder(
       stakeholder: Option[Ref.Party],
@@ -194,7 +194,7 @@ class TransactionStreamingQueries(
       startExclusive: Long,
       endInclusive: Long,
       limit: Int,
-  )(connection: Connection): Vector[Long] = {
+  )(connection: Connection): Vector[Long] =
     TransactionStreamingQueries.fetchEventIds(
       tableName = "lapi_pe_consuming_id_filter_stakeholder",
       witnessO = stakeholder,
@@ -204,14 +204,13 @@ class TransactionStreamingQueries(
       limit = limit,
       stringInterning = stringInterning,
     )(connection)
-  }
 
   private def fetchFlatEvents(
       tableName: String,
       selectColumns: String,
       eventSequentialIds: Iterable[Long],
       allFilterParties: Option[Set[Ref.Party]],
-  )(connection: Connection): Vector[EventStorageBackend.Entry[Raw.FlatEvent]] = {
+  )(connection: Connection): Vector[Entry[RawFlatEvent]] = {
     val internedAllParties: Option[Set[Int]] = allFilterParties
       .map(
         _.iterator
@@ -240,7 +239,7 @@ class TransactionStreamingQueries(
       selectColumns: String,
       eventSequentialIds: Iterable[Long],
       allFilterParties: Option[Set[Ref.Party]],
-  )(connection: Connection): Vector[EventStorageBackend.Entry[Raw.TreeEvent]] = {
+  )(connection: Connection): Vector[Entry[RawTreeEvent]] = {
     val internedAllParties: Option[Set[Int]] = allFilterParties
       .map(
         _.iterator

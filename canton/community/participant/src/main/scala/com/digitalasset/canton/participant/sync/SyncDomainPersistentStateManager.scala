@@ -3,11 +3,11 @@
 
 package com.digitalasset.canton.participant.sync
 
+import cats.Eval
 import cats.data.EitherT
 import cats.syntax.parallel.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.TopologyConfig
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -18,7 +18,9 @@ import com.digitalasset.canton.environment.{
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
+import com.digitalasset.canton.participant.admin.PackageDependencyResolver
 import com.digitalasset.canton.participant.domain.{DomainAliasResolution, DomainRegistryError}
+import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.topology.TopologyComponentFactory
 import com.digitalasset.canton.protocol.StaticDomainParameters
@@ -50,9 +52,10 @@ class SyncDomainPersistentStateManager(
     storage: Storage,
     val indexedStringStore: IndexedStringStore,
     parameters: ParticipantNodeParameters,
-    topologyConfig: TopologyConfig,
     crypto: Crypto,
     clock: Clock,
+    packageDependencyResolver: PackageDependencyResolver,
+    ledgerApiStore: Eval[LedgerApiStore],
     futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -66,9 +69,9 @@ class SyncDomainPersistentStateManager(
     * Must not be called concurrently with itself or other methods of this class.
     */
   def initializePersistentStates()(implicit traceContext: TraceContext): Future[Unit] = {
-    def getProtocolVersion(domainId: DomainId)(implicit
+    def getStaticDomainParameters(domainId: DomainId)(implicit
         traceContext: TraceContext
-    ): EitherT[Future, String, ProtocolVersion] =
+    ): EitherT[Future, String, StaticDomainParameters] =
       EitherT
         .fromOptionF(
           DomainParameterStore(
@@ -79,7 +82,6 @@ class SyncDomainPersistentStateManager(
           ).lastParameters,
           "No domain parameters in store",
         )
-        .map(_.protocolVersion)
 
     aliasResolution.aliases.toList.parTraverse_ { alias =>
       val resultE = for {
@@ -87,8 +89,8 @@ class SyncDomainPersistentStateManager(
           aliasResolution.domainIdForAlias(alias).toRight("Unknown domain-id")
         )
         domainIdIndexed <- EitherT.right(IndexedDomain.indexed(indexedStringStore)(domainId))
-        protocolVersion <- getProtocolVersion(domainId)
-        persistentState = createPersistentState(domainIdIndexed, protocolVersion)
+        staticDomainParameters <- getStaticDomainParameters(domainId)
+        persistentState = createPersistentState(domainIdIndexed, staticDomainParameters)
         _lastProcessedPresent <- persistentState.sequencedEventStore
           .find(SequencedEventStore.LatestUpto(CantonTimestamp.MaxValue))
           .leftMap(_ => "No persistent event")
@@ -99,9 +101,8 @@ class SyncDomainPersistentStateManager(
     }
   }
 
-  def indexedDomainId(domainId: DomainId): Future[IndexedDomain] = {
+  def indexedDomainId(domainId: DomainId): Future[IndexedDomain] =
     IndexedDomain.indexed(this.indexedStringStore)(domainId)
-  }
 
   /** Retrieves the [[com.digitalasset.canton.participant.store.SyncDomainPersistentState]] from the [[com.digitalasset.canton.participant.sync.SyncDomainPersistentStateManager]]
     * for the given domain if there is one. Otherwise creates a new [[com.digitalasset.canton.participant.store.SyncDomainPersistentState]] for the domain
@@ -119,7 +120,7 @@ class SyncDomainPersistentStateManager(
       traceContext: TraceContext
   ): EitherT[Future, DomainRegistryError, SyncDomainPersistentState] = {
     // TODO(#14048) does this method need to be synchronized?
-    val persistentState = createPersistentState(domainId, domainParameters.protocolVersion)
+    val persistentState = createPersistentState(domainId, domainParameters)
     for {
       _ <- checkAndUpdateDomainParameters(
         domainAlias,
@@ -134,17 +135,17 @@ class SyncDomainPersistentStateManager(
   }
 
   private def createPersistentState(
-      domainId: IndexedDomain,
-      protocolVersion: ProtocolVersion,
+      indexedDomain: IndexedDomain,
+      staticDomainParameters: StaticDomainParameters,
   ): SyncDomainPersistentState =
-    get(domainId.item)
-      .getOrElse(mkPersistentState(domainId, protocolVersion))
+    get(indexedDomain.domainId)
+      .getOrElse(mkPersistentState(indexedDomain, staticDomainParameters))
 
   private def checkAndUpdateDomainParameters(
       alias: DomainAlias,
       parameterStore: DomainParameterStore,
       newParameters: StaticDomainParameters,
-  )(implicit traceContext: TraceContext): EitherT[Future, DomainRegistryError, Unit] = {
+  )(implicit traceContext: TraceContext): EitherT[Future, DomainRegistryError, Unit] =
     for {
       oldParametersO <- EitherT.right(parameterStore.lastParameters)
       _ <- oldParametersO match {
@@ -161,23 +162,25 @@ class SyncDomainPersistentStateManager(
           )
       }
     } yield ()
-  }
+
+  def staticDomainParameters(domainId: DomainId): Option[StaticDomainParameters] =
+    get(domainId).map(_.staticDomainParameters)
 
   def protocolVersionFor(domainId: DomainId): Option[ProtocolVersion] =
-    get(domainId).map(_.protocolVersion)
+    staticDomainParameters(domainId).map(_.protocolVersion)
 
   private val domainStates: concurrent.Map[DomainId, SyncDomainPersistentState] =
     TrieMap[DomainId, SyncDomainPersistentState]()
 
   private def put(state: SyncDomainPersistentState): Unit = {
-    val domainId = state.domainId
-    val previous = domainStates.putIfAbsent(domainId.item, state)
+    val domainId = state.indexedDomain.domainId
+    val previous = domainStates.putIfAbsent(domainId, state)
     if (previous.isDefined)
       throw new IllegalArgumentException(s"domain state already exists for $domainId")
   }
 
   private def putIfAbsent(state: SyncDomainPersistentState): Unit =
-    domainStates.putIfAbsent(state.domainId.item, state).discard
+    domainStates.putIfAbsent(state.indexedDomain.domainId, state).discard
 
   def get(domainId: DomainId): Option[SyncDomainPersistentState] =
     domainStates.get(domainId)
@@ -197,22 +200,24 @@ class SyncDomainPersistentStateManager(
 
   private def mkPersistentState(
       domainId: IndexedDomain,
-      protocolVersion: ProtocolVersion,
+      staticDomainParameters: StaticDomainParameters,
   ): SyncDomainPersistentState = SyncDomainPersistentState
     .create(
       participantId,
       storage,
       domainId,
-      protocolVersion,
+      staticDomainParameters,
       clock,
       crypto,
       parameters,
       indexedStringStore,
+      packageDependencyResolver,
+      ledgerApiStore,
       loggerFactory,
       futureSupervisor,
     )
 
-  def topologyFactoryFor(domainId: DomainId): Option[TopologyComponentFactory] = {
+  def topologyFactoryFor(domainId: DomainId): Option[TopologyComponentFactory] =
     get(domainId).map(state =>
       new TopologyComponentFactory(
         domainId,
@@ -227,14 +232,13 @@ class SyncDomainPersistentStateManager(
         loggerFactory.append("domainId", domainId.toString),
       )
     )
-  }
 
   def domainTopologyStateInitFor(
       domainId: DomainId,
       participantId: ParticipantId,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, DomainRegistryError, Option[DomainTopologyInitializationCallback]] = {
+  ): EitherT[Future, DomainRegistryError, Option[DomainTopologyInitializationCallback]] =
     get(domainId) match {
       case None =>
         EitherT.leftT[Future, Option[DomainTopologyInitializationCallback]](
@@ -260,7 +264,6 @@ class SyncDomainPersistentStateManager(
         )
 
     }
-  }
 
   override def close(): Unit =
     Lifecycle.close(domainStates.values.toSeq :+ aliasResolution: _*)(logger)

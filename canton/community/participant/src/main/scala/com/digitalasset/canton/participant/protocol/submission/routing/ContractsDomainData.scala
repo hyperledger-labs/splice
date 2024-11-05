@@ -5,11 +5,9 @@ package com.digitalasset.canton.participant.protocol.submission.routing
 
 import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.protocol.{LfContractId, Stakeholders}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.daml.lf.data.Ref.Party
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -27,22 +25,22 @@ private[routing] object ContractsDomainData {
    */
   def create(
       domainStateProvider: DomainStateProvider,
-      contractRoutingParties: Map[LfContractId, Set[Party]],
+      contractsStakeholders: Map[LfContractId, Stakeholders],
       disclosedContracts: Seq[LfContractId],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): EitherT[Future, NonEmpty[Seq[LfContractId]], ContractsDomainData] = {
     val result = domainStateProvider
-      .getDomainsOfContracts(contractRoutingParties.keySet.toSeq)
+      .getDomainsOfContracts(contractsStakeholders.keySet.toSeq)
       .map { domainMap =>
         // Collect domains of input contracts, ignoring contracts that cannot be found in the ACS.
         // Such contracts need to be ignored, because they could be divulged contracts.
-        val (bad, good) = contractRoutingParties.toSeq
-          .partitionMap { case (coid, routingParties) =>
+        val (bad, good) = contractsStakeholders.toSeq
+          .partitionMap { case (coid, stakeholders) =>
             domainMap.get(coid) match {
               case Some(domainId) =>
-                Right(ContractData(coid, domainId, routingParties))
+                Right(ContractData(coid, domainId, stakeholders))
               case None => Left(coid)
             }
           }
@@ -58,5 +56,5 @@ private[routing] object ContractsDomainData {
 private[routing] final case class ContractData(
     id: LfContractId,
     domain: DomainId,
-    stakeholders: Set[LfPartyId],
+    stakeholders: Stakeholders,
 )

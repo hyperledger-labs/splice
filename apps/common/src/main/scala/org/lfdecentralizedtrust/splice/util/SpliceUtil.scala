@@ -247,6 +247,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
+      transferPreapprovalFee: Option[BigDecimal] = None,
   ) = new splice.schedule.Schedule[Instant, splice.amuletconfig.AmuletConfig[
     splice.amuletconfig.USD
   ]](
@@ -261,9 +262,15 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor,
       initialPackageConfig,
       holdingFee,
+      transferPreapprovalFee,
     ),
     List.empty[Tuple2[Instant, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]]].asJava,
   )
+
+  // Fee for keeping a transfer-preapproval around.
+  // Similar to holding fees, it compensates the SVs for the storage cost of the contract.
+  // Roughly equal to $1/year expressed as a daily rate.
+  lazy val defaultTransferPreapprovalFee = damlDecimal(0.00274)
 
   def defaultAmuletConfig(
       initialTickDuration: NonNegativeFiniteDuration,
@@ -276,6 +283,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
+      transferPreapprovalFee: Option[BigDecimal] = None,
       nextDomainId: Option[DomainId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
@@ -299,6 +307,7 @@ object SpliceUtil {
       // tick duration
       new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
       initialPackageConfig,
+      transferPreapprovalFee.map(_.bigDecimal).toJava,
     )
 
   def defaultAnsConfig(
@@ -489,8 +498,29 @@ object SpliceUtil {
       bytesInMB <- Numeric.fromLong(decimalScale, 1_000_000L)
       topupAmountMB <- Numeric.divide(decimalScale, topupAmountN, bytesInMB)
       trafficCostUsd <- Numeric.multiply(decimalScale, extraTrafficPriceN, topupAmountMB)
-      trafficCostCc <- Numeric.divide(decimalScale, trafficCostUsd, amuletPriceN)
-    } yield (BigDecimal(trafficCostUsd), BigDecimal(trafficCostCc))
+      trafficCostAmulet <- Numeric.divide(decimalScale, trafficCostUsd, amuletPriceN)
+    } yield (BigDecimal(trafficCostUsd), BigDecimal(trafficCostAmulet))
+
+    com.digitalasset.daml.lf.data.assertRight(tryCompute())
+  }
+
+  def transferPreapprovalFees(
+      duration: NonNegativeFiniteDuration,
+      preapprovalFeeRate: Option[BigDecimal],
+      amuletPrice: BigDecimal,
+  ): (BigDecimal, BigDecimal) = {
+
+    def tryCompute() = for {
+      preapprovalFeeN <- Numeric.fromBigDecimal(
+        decimalScale,
+        preapprovalFeeRate.getOrElse(BigDecimal(defaultTransferPreapprovalFee)),
+      )
+      amuletPriceN <- Numeric.fromBigDecimal(decimalScale, amuletPrice)
+      durationDays = BigDecimal(duration.duration.toSeconds) / (3600 * 24)
+      durationDaysN <- Numeric.fromBigDecimal(decimalScale, durationDays)
+      feeUsd <- Numeric.multiply(decimalScale, preapprovalFeeN, durationDaysN)
+      feeAmulet <- Numeric.divide(decimalScale, feeUsd, amuletPriceN)
+    } yield (BigDecimal(feeUsd), BigDecimal(feeAmulet))
 
     com.digitalasset.daml.lf.data.assertRight(tryCompute())
   }

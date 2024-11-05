@@ -16,6 +16,7 @@ import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
 import com.digitalasset.canton.participant.domain.{
   DomainAliasManager,
   DomainConnectionConfig,
@@ -31,6 +32,7 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -80,27 +82,25 @@ class GrpcDomainConnectivityService(
   private def parseDomainAlias(
       domainAliasProto: String
   ): EitherT[FutureUnlessShutdown, BaseCantonError, DomainAlias] =
-    EitherT
-      .fromEither[FutureUnlessShutdown](DomainAlias.create(domainAliasProto))
-      .leftMap(err => ProtoDeserializationFailure.WrapNoLoggingStr(err))
+    EitherT.fromEither[FutureUnlessShutdown](
+      DomainAlias
+        .create(domainAliasProto)
+        .leftMap(err => ProtoDeserializationFailure.WrapNoLoggingStr(err))
+    )
 
   private def parseDomainConnectionConfig(
       proto: Option[v30.DomainConnectionConfig],
       name: String,
-  ) =
-    EitherT
-      .fromEither[FutureUnlessShutdown](
-        ProtoConverter.parseRequired(DomainConnectionConfig.fromProtoV30, name, proto)
-      )
+  ): Either[BaseCantonError, DomainConnectionConfig] =
+    ProtoConverter
+      .parseRequired(DomainConnectionConfig.fromProtoV30, name, proto)
       .leftMap(err => ProtoDeserializationFailure.WrapNoLogging(err))
 
   private def parseSequencerConnectionValidation(
       proto: domainV30.SequencerConnectionValidation
-  ) =
-    EitherT
-      .fromEither[FutureUnlessShutdown](
-        SequencerConnectionValidation.fromProtoV30(proto)
-      )
+  ): Either[BaseCantonError, SequencerConnectionValidation] =
+    SequencerConnectionValidation
+      .fromProtoV30(proto)
       .leftMap(err => ProtoDeserializationFailure.WrapNoLogging(err))
 
   override def connectDomain(
@@ -128,6 +128,27 @@ class GrpcDomainConnectivityService(
     CantonGrpcUtil.mapErrNewEUS(ret)
   }
 
+  override def logout(request: v30.LogoutRequest): Future[v30.LogoutResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    val v30.LogoutRequest(domainAliasP) = request
+
+    val ret = for {
+      domainAlias <- EitherT
+        .fromEither[Future](DomainAlias.create(domainAliasP))
+        .leftMap(err =>
+          Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to parse domain alias: $err")
+            .asRuntimeException()
+        )
+      _ <- sync
+        .logout(domainAlias)
+        .leftMap(err => err.asRuntimeException())
+        .onShutdown(Left(AbortedDueToShutdown.Error().asGrpcError))
+    } yield v30.LogoutResponse()
+
+    EitherTUtil.toFuture(ret)
+  }
+
   override def listConnectedDomains(
       request: v30.ListConnectedDomainsRequest
   ): Future[v30.ListConnectedDomainsResponse] =
@@ -136,7 +157,7 @@ class GrpcDomainConnectivityService(
         new v30.ListConnectedDomainsResponse.Result(
           domainAlias = alias.unwrap,
           domainId = domainId.toProtoPrimitive,
-          healthy = healthy,
+          healthy = healthy.unwrap,
         )
     }.toSeq))
 
@@ -167,15 +188,17 @@ class GrpcDomainConnectivityService(
     val v30.RegisterDomainRequest(addPO, handshakeOnly, sequencerConnectionValidationPO) = request
     val connectDomain = if (handshakeOnly) ConnectDomain.HandshakeOnly else ConnectDomain.Register
     val ret: EitherT[FutureUnlessShutdown, BaseCantonError, v30.RegisterDomainResponse] = for {
-      config <- parseDomainConnectionConfig(addPO, "add")
-      validation <- parseSequencerConnectionValidation(sequencerConnectionValidationPO)
+      config <- EitherT.fromEither[FutureUnlessShutdown](parseDomainConnectionConfig(addPO, "add"))
+      validation <- EitherT.fromEither[FutureUnlessShutdown](
+        parseSequencerConnectionValidation(sequencerConnectionValidationPO)
+      )
       _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
         !(config.manualConnect && handshakeOnly),
         SyncServiceError.InvalidArgument
           .Error("For handshakeOnly to be useful, manualConnect should be set to false"),
       )
       _ = logger.info(show"Registering new domain $config")
-      _ <- sync.addDomain(config, validation).mapK(FutureUnlessShutdown.outcomeK)
+      _ <- sync.addDomain(config, validation)
       _ <-
         if (!config.manualConnect) for {
           success <-
@@ -197,12 +220,13 @@ class GrpcDomainConnectivityService(
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val v30.ModifyDomainRequest(config, sequencerConnectionValidationPO) = request
     val ret = for {
-      config <- parseDomainConnectionConfig(config, "modify")
-      validation <- parseSequencerConnectionValidation(sequencerConnectionValidationPO)
-      _ <- sync
-        .modifyDomain(config, validation)
-        .mapK(FutureUnlessShutdown.outcomeK)
-        .leftWiden[BaseCantonError]
+      config <- EitherT.fromEither[FutureUnlessShutdown](
+        parseDomainConnectionConfig(config, "modify")
+      )
+      validation <- EitherT.fromEither[FutureUnlessShutdown](
+        parseSequencerConnectionValidation(sequencerConnectionValidationPO)
+      )
+      _ <- sync.modifyDomain(config, validation).leftWiden[BaseCantonError]
     } yield v30.ModifyDomainResponse()
     mapErrNewEUS(ret)
   }
@@ -246,9 +270,7 @@ class GrpcDomainConnectivityService(
             traceContext,
             CloseContext(sync),
           )
-          .leftMap(err => DomainRegistryError.fromSequencerInfoLoaderError(err))
-          .mapK(FutureUnlessShutdown.outcomeK)
-          .leftWiden[BaseCantonError]
+          .leftMap[BaseCantonError](err => DomainRegistryError.fromSequencerInfoLoaderError(err))
       _ <- aliasManager
         .processHandshake(connectionConfig.domain, result.domainId)
         .leftMap(DomainRegistryHelpers.fromDomainAliasManagerError)

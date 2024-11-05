@@ -8,6 +8,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{RootHash, ViewHash}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 
 /** Common supertype of all view trees that are sent as [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]]s */
 trait ViewTree extends PrettyPrinting {
@@ -36,16 +37,25 @@ trait ViewTree extends PrettyPrinting {
   /** The mediator group that is responsible for coordinating this request */
   def mediator: MediatorGroupRecipient
 
-  override def pretty: Pretty[this.type]
+  override protected def pretty: Pretty[this.type]
 }
 
-/** Supertype of [[FullTransferOutTree]] and [[FullTransferInTree]]
+/** Supertype of [[FullUnassignmentTree]] and [[FullAssignmentTree]]
   */
-trait TransferViewTree extends ViewTree {
-  def submitterMetadata: TransferSubmitterMetadata
+trait ReassignmentViewTree extends ViewTree {
+  def submitterMetadata: ReassignmentSubmitterMetadata
 
-  def isTransferringParticipant(participantId: ParticipantId): Boolean
+  def reassigningParticipants: ReassigningParticipants
+
+  def isConfirmingReassigningParticipant(participantId: ParticipantId): Boolean =
+    reassigningParticipants.confirming.contains(participantId)
+
+  def isObservingReassigningParticipant(participantId: ParticipantId): Boolean =
+    reassigningParticipants.observing.contains(participantId)
 
   val viewPosition: ViewPosition =
     ViewPosition.root // Use a dummy value, as there is only one view.
+
+  def sourceDomain: Source[DomainId]
+  def targetDomain: Target[DomainId]
 }

@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol.submission
 
+import cats.syntax.either.*
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.{FutureSupervisor, SupervisedPromise}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -14,7 +15,7 @@ import com.digitalasset.canton.util.{ErrorUtil, Thereafter}
 import com.google.common.annotations.VisibleForTesting
 
 import java.util
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{Future, Promise, blocking}
 
 trait WatermarkLookup[Mark] {
 
@@ -44,7 +45,7 @@ class WatermarkTracker[Mark: Pretty](
     initialWatermark: Mark,
     protected override val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
-)(implicit private val ordering: Ordering[Mark], ec: ExecutionContext)
+)(implicit private val ordering: Ordering[Mark])
     extends WatermarkLookup[Mark]
     with NamedLogging {
   import WatermarkTracker.*
@@ -79,9 +80,9 @@ class WatermarkTracker[Mark: Pretty](
   // This data structure could probably be implemented without locks,
   // but it doesn't seem worth the effort for now.
   private val lock: AnyRef = new Object
-  private def withLock[A](body: => A): A = blocking { lock.synchronized(body) }
+  private def withLock[A](body: => A): A = blocking(lock.synchronized(body))
 
-  override def highWatermark: Mark = withLock { highWatermarkV }
+  override def highWatermark: Mark = withLock(highWatermarkV)
 
   /** Run a task `task` if `mark` > [[highWatermark]].
     *
@@ -122,7 +123,7 @@ class WatermarkTracker[Mark: Pretty](
             )
             runningTasks.put(mark, count + 1)
         }
-        Right(())
+        Either.unit
       }
     }
 
@@ -186,7 +187,7 @@ object WatermarkTracker {
 
   /** The task's mark is lower than or equal to the high watermark */
   final case class MarkTooLow[A: Pretty](highWatermark: A) extends PrettyPrinting {
-    override def pretty: Pretty[MarkTooLow.this.type] = prettyOfClass(
+    override protected def pretty: Pretty[MarkTooLow.this.type] = prettyOfClass(
       param("high watermark", _.highWatermark)
     )
   }

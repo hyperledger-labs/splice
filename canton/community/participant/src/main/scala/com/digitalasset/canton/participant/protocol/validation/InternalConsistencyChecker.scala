@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol.validation
 
+import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.FullTransactionViewTree
@@ -48,12 +49,11 @@ class InternalConsistencyChecker(
       hostedParty: LfPartyId => Boolean,
   )(implicit
       traceContext: TraceContext
-  ): Either[ErrorWithInternalConsistencyCheck, Unit] = {
+  ): Either[ErrorWithInternalConsistencyCheck, Unit] =
     for {
       _ <- checkRollbackScopes(rootViewTrees)
       _ <- checkContractState(rootViewTrees)
     } yield ()
-  }
 
   private def checkRollbackScopes(
       rootViewTrees: NonEmpty[Seq[FullTransactionViewTree]]
@@ -66,14 +66,12 @@ class InternalConsistencyChecker(
 
   private def checkContractState(
       rootViewTrees: NonEmpty[Seq[FullTransactionViewTree]]
-  )(implicit traceContext: TraceContext): Result[Unit] = {
-
+  )(implicit traceContext: TraceContext): Result[Unit] =
     MonadUtil
       .foldLeftM[Result, ContractState, FullTransactionViewTree](
         ContractState.empty,
         rootViewTrees,
-      )((previous, rootViewTree) => {
-
+      ) { (previous, rootViewTree) =>
         val state = adjustRollbackScope[ContractState, Set[LfContractId]](
           previous,
           rootViewTree.viewParticipantData.tryUnwrap.rollbackContext.rollbackScope,
@@ -90,40 +88,36 @@ class InternalConsistencyChecker(
           _ <- checkNotUsedAfterArchive(state.consumed, referenced)
         } yield state.update(referenced = referenced, consumed = consumed)
 
-      })
+      }
       .map(_.discard)
-  }
 
   private def checkNotUsedBeforeCreation(
       previouslyReferenced: Set[LfContractId],
       newlyCreated: Set[LfContractId],
-  ): Result[Unit] = {
+  ): Result[Unit] =
     NonEmpty.from(newlyCreated.intersect(previouslyReferenced)) match {
       case Some(ne) => Left(ErrorWithInternalConsistencyCheck(UsedBeforeCreation(ne)))
-      case None => Right(())
+      case None => Either.unit
     }
-  }
 
   private def checkNotUsedAfterArchive(
       previouslyConsumed: Set[LfContractId],
       newlyReferenced: Set[LfContractId],
-  ): Result[Unit] = {
+  ): Result[Unit] =
     NonEmpty.from(previouslyConsumed.intersect(newlyReferenced)) match {
       case Some(ne) => Left(ErrorWithInternalConsistencyCheck(UsedAfterArchive(ne)))
-      case None => Right(())
+      case None => Either.unit
     }
-  }
 
   /** @param inconsistent - the set of inconsistent keys or the empty set if no inconsistencies have been found,
     *                     see [[KeyState.inconsistentKeys]] to see how inconsistency is detected.
     * @return - returns a failed result if there are inconsistent keys
     */
-  private def checkConsistentKeyUse(inconsistent: Set[LfGlobalKey]): Result[Unit] = {
+  private def checkConsistentKeyUse(inconsistent: Set[LfGlobalKey]): Result[Unit] =
     NonEmpty.from(inconsistent) match {
       case Some(ne) => Left(ErrorWithInternalConsistencyCheck(InconsistentKeyUse(ne)))
-      case None => Right(())
+      case None => Either.unit
     }
-  }
 }
 
 object InternalConsistencyChecker {
@@ -177,13 +171,12 @@ object InternalConsistencyChecker {
       starting: M,
       targetScope: RollbackScope,
   ): M = {
-    @tailrec def loop(current: M): M = {
+    @tailrec def loop(current: M): M =
       RollbackScope.popsAndPushes(current.rollbackScope, targetScope) match {
         case (0, 0) => current
         case (0, _) => current.pushRollbackScope(targetScope)
         case _ => loop(current.popRollbackScope())
       }
-    }
 
     loop(starting)
   }
@@ -210,9 +203,8 @@ object InternalConsistencyChecker {
         stack: List[WithRollbackScope[Set[LfContractId]]],
     ): ContractState = copy(rollbackScope = rollbackScope, consumed = activeState, stack = stack)
 
-    def update(referenced: Set[LfContractId], consumed: Set[LfContractId]): ContractState = {
+    def update(referenced: Set[LfContractId], consumed: Set[LfContractId]): ContractState =
       copy(referenced = this.referenced ++ referenced, consumed = this.consumed ++ consumed)
-    }
 
   }
 
@@ -248,20 +240,18 @@ object InternalConsistencyChecker {
 
     def inconsistentKeys(
         viewKeyMappings: Map[LfGlobalKey, KeyResolution]
-    ): Set[LfGlobalKey] = {
+    ): Set[LfGlobalKey] =
       (for {
         (key, previousResolution) <- preResolutions ++ activeRollbackState
         currentResolution <- viewKeyMappings.get(key)
         if previousResolution != currentResolution
       } yield key).toSet
-    }
 
-    def update(viewGlobal: KeyMapping, updates: KeyMapping): KeyState = {
+    def update(viewGlobal: KeyMapping, updates: KeyMapping): KeyState =
       copy(
         preResolutions = preResolutions ++ (viewGlobal -- preResolutions.keySet),
         activeResolutions = activeResolutions ++ updates,
       )
-    }
 
   }
 
@@ -270,34 +260,34 @@ object InternalConsistencyChecker {
   }
 
   final case class ErrorWithInternalConsistencyCheck(error: Error) extends PrettyPrinting {
-    override def pretty: Pretty[ErrorWithInternalConsistencyCheck] =
+    override protected def pretty: Pretty[ErrorWithInternalConsistencyCheck] =
       prettyOfClass(
         unnamedParam(_.error)
       )
   }
 
   final case class IncorrectRollbackScopeOrder(error: String) extends Error {
-    override def pretty: Pretty[IncorrectRollbackScopeOrder] = prettyOfClass(
+    override protected def pretty: Pretty[IncorrectRollbackScopeOrder] = prettyOfClass(
       param("cause", _ => error.unquoted)
     )
   }
 
   final case class UsedBeforeCreation(contractIds: NonEmpty[Set[LfContractId]]) extends Error {
-    override def pretty: Pretty[UsedBeforeCreation] = prettyOfClass(
+    override protected def pretty: Pretty[UsedBeforeCreation] = prettyOfClass(
       param("cause", _ => "Contract id used before creation".unquoted),
       param("contractIds", _.contractIds),
     )
   }
 
   final case class UsedAfterArchive(keys: NonEmpty[Set[LfContractId]]) extends Error {
-    override def pretty: Pretty[UsedAfterArchive] = prettyOfClass(
+    override protected def pretty: Pretty[UsedAfterArchive] = prettyOfClass(
       param("cause", _ => "Contract id used after archive".unquoted),
       param("contractIds", _.keys),
     )
   }
 
   final case class InconsistentKeyUse(keys: NonEmpty[Set[LfGlobalKey]]) extends Error {
-    override def pretty: Pretty[InconsistentKeyUse] = prettyOfClass(
+    override protected def pretty: Pretty[InconsistentKeyUse] = prettyOfClass(
       param("cause", _ => "Inconsistent global key assumptions".unquoted),
       param("contractIds", _.keys),
     )
@@ -337,12 +327,11 @@ object InternalConsistencyChecker {
 
   private[validation] def checkRollbackScopeOrder(
       presented: Seq[RollbackContext]
-  ): Either[String, Unit] = {
+  ): Either[String, Unit] =
     Either.cond(
       presented == presented.sorted,
       (),
       s"Detected out of order rollback scopes in: $presented",
     )
-  }
 
 }

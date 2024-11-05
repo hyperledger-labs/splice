@@ -118,6 +118,8 @@ object TraceContext {
     result
   }
 
+  def createNew(): TraceContext = withNewTraceContext(identity)
+
   def wrapWithNewTraceContext[A](item: A): Traced[A] =
     withNewTraceContext(implicit traceContext => Traced(item))
 
@@ -128,6 +130,9 @@ object TraceContext {
   def fromW3CTraceParent(traceParent: String): TraceContext = W3CTraceContext(
     traceParent
   ).toTraceContext
+
+  def withOpenTelemetryContext[A](context: OpenTelemetryContext)(fn: TraceContext => A): A =
+    fn(TraceContext(context))
 
   /** Where we use batching operations create a separate trace-context but mention this in a debug log statement
     * linking it to the trace ids of the contained items. This will allow manual tracing via logs if ever needed.

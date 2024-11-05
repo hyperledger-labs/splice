@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.admin
 
-import cats.Eval
 import cats.data.EitherT
 import cats.implicits.toBifunctorOps
 import cats.syntax.functor.*
@@ -34,6 +33,7 @@ import com.digitalasset.canton.participant.store.memory.{
   MutablePackageMetadataViewImpl,
   PackageMetadataView,
 }
+import com.digitalasset.canton.participant.topology.PackageOps
 import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
 import com.digitalasset.canton.protocol.{PackageDescription, PackageInfoService}
 import com.digitalasset.canton.time.Clock
@@ -129,7 +129,7 @@ class PackageService(
 
       val checkNotVetted =
         packageOps
-          .isPackageVetted(packageId)
+          .hasVettedPackageEntry(packageId)
           .flatMap[CantonError, Unit] {
             case true => EitherT.leftT(new PackageVetted(packageId))
             case false => EitherT.rightT(())
@@ -281,7 +281,7 @@ class PackageService(
       tc: TraceContext
   ): EitherT[FutureUnlessShutdown, CantonError, Unit] =
     packageOps
-      .isPackageVetted(mainPkg)
+      .hasVettedPackageEntry(mainPkg)
       .flatMap { isVetted =>
         if (!isVetted)
           EitherT.pure[FutureUnlessShutdown, CantonError](
@@ -335,9 +335,8 @@ class PackageService(
 
   override def getDar(hash: Hash)(implicit
       traceContext: TraceContext
-  ): Future[Option[PackageService.Dar]] = {
+  ): Future[Option[PackageService.Dar]] =
     packagesDarsStore.getDar(hash)
-  }
 
   override def listDars(limit: Option[Int])(implicit
       traceContext: TraceContext
@@ -349,7 +348,7 @@ class PackageService(
     EitherT(
       packagesDarsStore
         .getDar(darId)
-        .map(_.toRight(s"No such dar ${darId}").flatMap(PackageService.darToLf))
+        .map(_.toRight(s"No such dar $darId").flatMap(PackageService.darToLf))
     )
 
   def vetPackages(
@@ -454,9 +453,7 @@ object PackageService {
     DarParser
       .readArchive(dar.descriptor.name.str, stream)
       .fold(
-        { _ =>
-          Left(s"Cannot parse stored dar $dar")
-        },
+        _ => Left(s"Cannot parse stored dar $dar"),
         x => Right(dar.descriptor -> x),
       )
   }
@@ -484,22 +481,4 @@ object PackageService {
       case Left(e) =>
         Left(PackageServiceErrors.InternalError.Unhandled(e))
     })
-}
-
-trait PackageServiceFactory {
-  def create(
-      createAndInitialize: () => FutureUnlessShutdown[PackageService]
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): FutureUnlessShutdown[Eval[PackageService]]
-}
-
-object PackageServiceFactory extends PackageServiceFactory {
-  override def create(
-      createAndInitialize: () => FutureUnlessShutdown[PackageService]
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): FutureUnlessShutdown[Eval[PackageService]] = createAndInitialize().map(Eval.now)
 }

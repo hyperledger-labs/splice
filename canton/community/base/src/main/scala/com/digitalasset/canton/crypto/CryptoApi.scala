@@ -39,13 +39,14 @@ class Crypto(
 
   /** Helper method to generate a new signing key pair and store the public key in the public store as well. */
   def generateSigningKey(
-      scheme: SigningKeyScheme = privateCrypto.defaultSigningKeyScheme,
+      keySpec: SigningKeySpec = privateCrypto.defaultSigningKeySpec,
+      usage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
       name: Option[KeyName] = None,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SigningKeyGenerationError, SigningPublicKey] =
     for {
-      publicKey <- privateCrypto.generateSigningKey(scheme, name)
+      publicKey <- privateCrypto.generateSigningKey(keySpec, usage, name)
       _ <- EitherT.right(cryptoPublicStore.storeSigningKey(publicKey, name))
     } yield publicKey
 
@@ -69,7 +70,6 @@ trait CryptoPureApi
     extends EncryptionOps
     with SigningOps
     with HmacOps
-    with HkdfOps
     with HashOps
     with RandomOps
     with PasswordBasedEncryptionOps
@@ -77,7 +77,7 @@ trait CryptoPureApi
 sealed trait CryptoPureApiError extends Product with Serializable with PrettyPrinting
 object CryptoPureApiError {
   final case class KeyParseAndValidateError(error: String) extends CryptoPureApiError {
-    override def pretty: Pretty[KeyParseAndValidateError] = prettyOfClass(
+    override protected def pretty: Pretty[KeyParseAndValidateError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
@@ -99,7 +99,7 @@ object SyncCryptoError {
       timestamp: CantonTimestamp,
       candidates: Seq[Fingerprint],
   ) extends SyncCryptoError {
-    override def pretty: Pretty[KeyNotAvailable] = prettyOfClass(
+    override protected def pretty: Pretty[KeyNotAvailable] = prettyOfClass(
       param("owner", _.owner),
       param("key purpose", _.keyPurpose),
       param("timestamp", _.timestamp),
@@ -108,19 +108,19 @@ object SyncCryptoError {
   }
 
   final case class SyncCryptoSigningError(error: SigningError) extends SyncCryptoError {
-    override def pretty: Pretty[SyncCryptoSigningError] = prettyOfParam(_.error)
+    override protected def pretty: Pretty[SyncCryptoSigningError] = prettyOfParam(_.error)
   }
 
   final case class SyncCryptoDecryptionError(error: DecryptionError) extends SyncCryptoError {
-    override def pretty: Pretty[SyncCryptoDecryptionError] = prettyOfParam(_.error)
+    override protected def pretty: Pretty[SyncCryptoDecryptionError] = prettyOfParam(_.error)
   }
 
   final case class SyncCryptoEncryptionError(error: EncryptionError) extends SyncCryptoError {
-    override def pretty: Pretty[SyncCryptoEncryptionError] = prettyOfParam(_.error)
+    override protected def pretty: Pretty[SyncCryptoEncryptionError] = prettyOfParam(_.error)
   }
 
   final case class StoreError(error: CryptoPrivateStoreError) extends SyncCryptoError {
-    override def pretty: Pretty[StoreError] =
+    override protected def pretty: Pretty[StoreError] =
       prettyOfClass(unnamedParam(_.error))
   }
 }
@@ -176,6 +176,18 @@ trait SyncCryptoApi {
   )(implicit traceContext: TraceContext): EitherT[Future, SignatureCheckError, Unit]
 
   def verifySequencerSignatures(
+      hash: Hash,
+      signatures: NonEmpty[Seq[Signature]],
+  )(implicit traceContext: TraceContext): EitherT[Future, SignatureCheckError, Unit]
+
+  /** This verifies that at least one of the signature is a valid sequencer signature.
+    * In particular, it does not respect the participant trust threshold.
+    * This should be used only in the context of reassignment where the concept of cross-domain
+    * proof of sequencing is not fully fleshed out.
+    *
+    * TODO(#12410) Remove this method and respect trust threshold
+    */
+  def unsafePartialVerifySequencerSignatures(
       hash: Hash,
       signatures: NonEmpty[Seq[Signature]],
   )(implicit traceContext: TraceContext): EitherT[Future, SignatureCheckError, Unit]

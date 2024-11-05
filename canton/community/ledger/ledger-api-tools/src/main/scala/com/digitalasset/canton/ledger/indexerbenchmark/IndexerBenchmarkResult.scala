@@ -25,7 +25,7 @@ class IndexerBenchmarkResult(
 
   private val duration: Double =
     (stopTimeInNano - startTimeInNano).toDouble.nanos.toUnit(TimeUnit.SECONDS)
-  private val updates: Long = counterState(metrics.parallelIndexer.updates)
+  private val updates: Long = counterState(metrics.indexer.updates)
   private val updateRate: Double = updates / duration
 
   val (failure, minimumUpdateRateFailureInfo): (Boolean, String) =
@@ -65,25 +65,25 @@ class IndexerBenchmarkResult(
        |
        |Other metrics:
        |  inputMapping.batchSize:     ${histogramToString(
-        metrics.parallelIndexer.inputMapping.batchSize
+        metrics.indexer.inputMapping.batchSize
       )}
        |  seqMapping.duration: ${timerToString(
-        metrics.parallelIndexer.seqMapping.duration
+        metrics.indexer.seqMapping.duration
       )}|
        |  seqMapping.duration.rate: ${timerMeanRate(
-        metrics.parallelIndexer.seqMapping.duration
+        metrics.indexer.seqMapping.duration
       )}|
        |  ingestion.duration:         ${timerToString(
-        metrics.parallelIndexer.ingestion.executionTimer
+        metrics.indexer.ingestion.executionTimer
       )}
        |  ingestion.duration.rate:    ${timerMeanRate(
-        metrics.parallelIndexer.ingestion.executionTimer
+        metrics.indexer.ingestion.executionTimer
       )}
        |  tailIngestion.duration:         ${timerToString(
-        metrics.parallelIndexer.tailIngestion.executionTimer
+        metrics.indexer.tailIngestion.executionTimer
       )}
        |  tailIngestion.duration.rate:    ${timerMeanRate(
-        metrics.parallelIndexer.tailIngestion.executionTimer
+        metrics.indexer.tailIngestion.executionTimer
       )}
        |
        |Notes:
@@ -94,7 +94,7 @@ class IndexerBenchmarkResult(
        |--------------------------------------------------------------------------------
        |""".stripMargin
 
-  private[this] def histogramToString(histogram: Histogram): String = {
+  private[this] def histogramToString(histogram: Histogram): String =
     histogram match {
 
       case _: InMemoryHistogram =>
@@ -102,9 +102,8 @@ class IndexerBenchmarkResult(
 
       case other => throw new IllegalArgumentException(s"Metric $other not supported")
     }
-  }
 
-  private[this] def timerToString(timer: Timer): String = {
+  private[this] def timerToString(timer: Timer): String =
     timer match {
       case NoOpTimer(_) => ""
       case _: InMemoryTimer =>
@@ -112,29 +111,25 @@ class IndexerBenchmarkResult(
 
       case other => throw new IllegalArgumentException(s"Metric $other not supported")
     }
-  }
 
-  private[this] def timerMeanRate(timer: Timer): Double = {
+  private[this] def timerMeanRate(timer: Timer): Double =
     timer match {
       case NoOpTimer(_) => 0
       case timer: InMemoryTimer =>
         timer.data.values.size.toDouble / duration
       case other => throw new IllegalArgumentException(s"Metric $other not supported")
     }
-  }
 
-  private[this] def counterState(counter: Counter): Long = {
+  private[this] def counterState(counter: Counter): Long =
     counter match {
       case NoOpCounter(_) => 0
       case InMemoryCounter(_, _) => counter.value
 
       case other => throw new IllegalArgumentException(s"Metric $other not supported")
     }
-  }
 
-  private def recordedHistogramValuesToString(data: Seq[Long]) = {
+  private def recordedHistogramValuesToString(data: Seq[Long]) =
     s"[min: ${data.foldLeft(0L)(_.min(_))}, median: ${median(data)}, max: ${data.foldLeft(0L)(_.max(_))}"
-  }
 
   private def median(data: Seq[Long]) = {
     val sorted = data.sorted

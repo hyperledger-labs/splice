@@ -64,7 +64,7 @@ class DiscardedFutureTest extends AnyWordSpec with Matchers with org.mockito.Moc
 
     "detects discarded futures wrapped in an EitherT" in {
       val result = WartTestTraverser(DiscardedFuture) {
-        EitherT(Future.successful(Either.right(())))
+        EitherT(Future.successful(Either.unit))
         ()
       }
       assertErrors(result, 1)
@@ -175,7 +175,7 @@ object DiscardedFutureTest {
   def assertErrors(result: WartTestTraverser.Result, expectedErrors: Int): Assertion = {
     import Matchers.*
     result.errors.length shouldBe expectedErrors
-    result.errors.foreach { _ should include(DiscardedFuture.message) }
+    result.errors.foreach(_ should include(DiscardedFuture.message))
     succeed
   }
 }

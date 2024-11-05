@@ -4,6 +4,7 @@
 package com.digitalasset.canton.concurrent
 
 import cats.Monad
+import cats.syntax.either.*
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.{BaseTest, BaseTestWordSpec}
 import org.scalatest.wordspec.AnyWordSpec
@@ -27,7 +28,7 @@ trait IdlenessExecutorServiceTest extends BaseTest { this: AnyWordSpec =>
       val promise = Promise[Unit]()
       val future = for {
         _ <- promise.future
-        _ <- Future { busyWait(waitMillis) }
+        _ <- Future(busyWait(waitMillis))
       } yield ()
       promise.completeWith(Future {
         busyWait(waitMillis)
@@ -65,9 +66,9 @@ trait IdlenessExecutorServiceTest extends BaseTest { this: AnyWordSpec =>
           busyWait(waitMillis)
           if (Thread.interrupted) {
             Thread.currentThread.interrupt()
-            Right(())
+            Either.unit
           } else if (!running.get()) {
-            Right(())
+            Either.unit
           } else {
             Left(())
           }

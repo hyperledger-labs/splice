@@ -4,8 +4,9 @@
 package com.digitalasset.canton.admin.api.client
 
 import cats.data.EitherT
+import com.daml.grpc.AuthCallCredentials
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.ledger.client.LedgerCallCredentials
+import com.digitalasset.canton.lifecycle.OnShutdownRunner
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
@@ -21,6 +22,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcCtlRunner(
     maxRequestDebugLines: Int,
     maxRequestDebugStringLength: Int,
+    onShutdownRunner: OnShutdownRunner,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
@@ -37,15 +39,15 @@ class GrpcCtlRunner(
   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Result] = {
 
     val baseService: command.Svc = command
-      .createService(channel)
+      .createServiceInternal(channel)
       .withInterceptors(TraceContextGrpc.clientInterceptor)
 
-    val service = token.fold(baseService)(LedgerCallCredentials.authenticatingStub(baseService, _))
+    val service = token.fold(baseService)(AuthCallCredentials.authorizingStub(baseService, _))
 
     for {
-      request <- EitherT.fromEither[Future](command.createRequest())
+      request <- EitherT.fromEither[Future](command.createRequestInternal())
       response <- submitRequest(command)(instanceName, service, request, timeout, retryPolicy)
-      result <- EitherT.fromEither[Future](command.handleResponse(response))
+      result <- EitherT.fromEither[Future](command.handleResponseInternal(response))
     } yield result
   }
 
@@ -60,17 +62,19 @@ class GrpcCtlRunner(
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): EitherT[Future, String, Res] =
+  ): EitherT[Future, String, Res] = CantonGrpcUtil.shutdownAsGrpcErrorE(
     CantonGrpcUtil
       .sendGrpcRequest(service, instanceName)(
-        command.submitRequest(_, request),
+        command.submitRequestInternal(_, request),
         LoggerUtil.truncateString(maxRequestDebugLines, maxRequestDebugStringLength)(
           command.toString
         ),
         timeout,
         logger,
+        onShutdownRunner,
         CantonGrpcUtil.silentLogPolicy, // silent log policy, as the ConsoleEnvironment will log the result
         retryPolicy,
       )
       .leftMap(_.toString)
+  )
 }

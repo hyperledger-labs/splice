@@ -27,8 +27,10 @@ import org.lfdecentralizedtrust.splice.validator.store.{AppManagerStore, Validat
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.automation.{
   OffboardUserPartyTrigger,
+  ValidatorRightTrigger,
   WalletAppInstallTrigger,
 }
+import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -47,6 +49,7 @@ class ValidatorAutomationService(
     validatorTopupConfig: ValidatorTopupConfig,
     grpcDeadline: Option[NonNegativeFiniteDuration],
     appManagerConfig: Option[AppManagerConfig],
+    transferPreapprovalConfig: TransferPreapprovalConfig,
     sequencerConnectionFromScan: Boolean,
     prevetDuration: NonNegativeFiniteDuration,
     isSvValidator: Boolean,
@@ -104,8 +107,35 @@ class ValidatorAutomationService(
 
   walletManagerOpt.foreach { walletManager =>
     registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
+    registerTrigger(
+      new ValidatorRightTrigger(
+        triggerContext,
+        walletManager.externalPartyWalletManager,
+        connection,
+        participantAdminConnection,
+      )
+    )
 
     registerTrigger(new OffboardUserPartyTrigger(triggerContext, walletManager, connection))
+
+    registerTrigger(
+      new AcceptTransferPreapprovalProposalTrigger(
+        triggerContext,
+        store,
+        walletManager,
+        transferPreapprovalConfig,
+        clock,
+      )
+    )
+
+    registerTrigger(
+      new RenewTransferPreapprovalTrigger(
+        triggerContext,
+        store,
+        walletManager,
+        transferPreapprovalConfig,
+      )
+    )
 
     if (automationConfig.enableAutomaticRewardsCollectionAndAmuletMerging) {
       registerTrigger(
@@ -146,6 +176,16 @@ class ValidatorAutomationService(
           domainMigrationId,
         )
       )
+
+    registerTrigger(
+      new TransferCommandSendTrigger(
+        triggerContext,
+        scanConnection,
+        store,
+        walletManager.externalPartyWalletManager,
+        connection,
+      )
+    )
   }
 
   backupDumpConfig.foreach(config =>

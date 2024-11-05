@@ -18,10 +18,7 @@ import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.config.PartyNotificationConfig
 import com.digitalasset.canton.participant.store.ParticipantNodeEphemeralState
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerError.IdentityManagerParentError
-import com.digitalasset.canton.participant.topology.{
-  LedgerServerPartyNotifier,
-  ParticipantTopologyManagerOps,
-}
+import com.digitalasset.canton.participant.topology.{LedgerServerPartyNotifier, PartyOps}
 import com.digitalasset.canton.topology.TopologyManagerError.MappingAlreadyExists
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -39,7 +36,7 @@ import scala.util.chaining.*
 private[sync] class PartyAllocation(
     participantId: ParticipantId,
     participantNodeEphemeralState: ParticipantNodeEphemeralState,
-    topologyManagerOps: ParticipantTopologyManagerOps,
+    partyOps: PartyOps,
     partyNotifier: LedgerServerPartyNotifier,
     parameters: ParticipantNodeParameters,
     isActive: () => Boolean,
@@ -53,13 +50,12 @@ private[sync] class PartyAllocation(
       hint: Option[LfPartyId],
       displayName: Option[String],
       rawSubmissionId: LedgerSubmissionId,
-  )(implicit traceContext: TraceContext): CompletionStage[SubmissionResult] = {
+  )(implicit traceContext: TraceContext): CompletionStage[SubmissionResult] =
     withSpan("CantonSyncService.allocateParty") { implicit traceContext => span =>
       span.setAttribute("submission_id", rawSubmissionId)
 
       allocateInternal(hint, displayName, rawSubmissionId)
     }.asJava
-  }
 
   private def allocateInternal(
       hint: Option[LfPartyId],
@@ -67,7 +63,7 @@ private[sync] class PartyAllocation(
       rawSubmissionId: LedgerSubmissionId,
   )(implicit traceContext: TraceContext): Future[SubmissionResult] = {
     def reject(reason: String, result: SubmissionResult): SubmissionResult = {
-      publishReject(reason, rawSubmissionId, displayName, result)
+      publishReject(reason, rawSubmissionId, displayName)
       result
     }
 
@@ -114,8 +110,8 @@ private[sync] class PartyAllocation(
             reject(err, SubmissionResult.Acknowledged)
           }
           .toEitherT[Future]
-        _ <- topologyManagerOps
-          .allocateParty(validatedSubmissionId, partyId, participantId, protocolVersion)
+        _ <- partyOps
+          .allocateParty(partyId, participantId, protocolVersion)
           .leftMap[SubmissionResult] {
             case IdentityManagerParentError(e) if e.code == MappingAlreadyExists =>
               reject(
@@ -135,14 +131,14 @@ private[sync] class PartyAllocation(
           }
           .onShutdown(Left(SyncServiceError.Synchronous.shutdownError))
 
-        // TODO(#15087) remove this waiting logic once topology events are published on the ledger api
+        // TODO(i21341) remove this waiting logic once topology events are published on the ledger api
         // wait for parties to be available on the currently connected domains
         waitingSuccessful <- EitherT
           .right[SubmissionResult](
             connectedDomainsLookup.snapshot.toSeq.parTraverse { case (domainId, syncDomain) =>
               syncDomain.topologyClient
                 .await(
-                  _.inspectKnownParties(partyId.filterString, participantId.filterString, 1)
+                  _.inspectKnownParties(partyId.filterString, participantId.filterString)
                     .map(_.nonEmpty),
                   timeouts.network.duration,
                 )
@@ -173,14 +169,13 @@ private[sync] class PartyAllocation(
       reason: String,
       rawSubmissionId: LedgerSubmissionId,
       displayName: Option[String],
-      result: SubmissionResult,
   )(implicit
       traceContext: TraceContext
-  ): Unit = {
+  ): Unit =
     FutureUtil.doNotAwait(
       participantNodeEphemeralState.participantEventPublisher
-        .publish(
-          LedgerSyncEvent.PartyAllocationRejected(
+        .publishEventDelayableByRepairOperation(
+          Update.PartyAllocationRejected(
             rawSubmissionId,
             participantId.toLf,
             recordTime =
@@ -193,6 +188,5 @@ private[sync] class PartyAllocation(
         ),
       s"Failed to publish allocation rejection for party $displayName",
     )
-  }
 
 }

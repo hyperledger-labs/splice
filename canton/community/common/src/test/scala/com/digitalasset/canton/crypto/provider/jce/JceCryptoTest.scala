@@ -5,8 +5,8 @@ package com.digitalasset.canton.crypto.provider.jce
 
 import com.digitalasset.canton.config.CommunityCryptoConfig
 import com.digitalasset.canton.config.CommunityCryptoProvider.Jce
-import com.digitalasset.canton.crypto.CryptoTestHelper.TestMessage
 import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.crypto.CryptoTestHelper.TestMessage
 import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CommunityCryptoPrivateStoreFactory
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.MemoryStorage
@@ -19,7 +19,6 @@ class JceCryptoTest
     with SigningTest
     with EncryptionTest
     with PrivateKeySerializationTest
-    with HkdfTest
     with PasswordBasedEncryptionTest
     with RandomTest
     with PublicKeyValidationTest {
@@ -39,14 +38,14 @@ class JceCryptoTest
         )
         .valueOrFail("failed to create crypto")
 
-    behave like signingProvider(Jce.signing.supported, jceCrypto())
+    behave like signingProvider(Jce.signingAlgorithms.supported, jceCrypto())
     behave like encryptionProvider(
       Jce.encryptionAlgorithms.supported,
       Jce.symmetric.supported,
       jceCrypto(),
     )
     behave like privateKeySerializerProvider(
-      Jce.signing.supported,
+      Jce.signingKeys.supported,
       Jce.encryptionKeys.supported,
       jceCrypto(),
     )
@@ -103,7 +102,6 @@ class JceCryptoTest
       }
     }
 
-    behave like hkdfProvider(jceCrypto().map(_.pureCrypto))
     behave like randomnessProvider(jceCrypto().map(_.pureCrypto))
 
     behave like pbeProvider(
@@ -113,7 +111,7 @@ class JceCryptoTest
     )
 
     behave like publicKeyValidationProvider(
-      Jce.signing.supported,
+      Jce.signingKeys.supported,
       Jce.encryptionKeys.supported,
       Jce.supportedCryptoKeyFormats,
       jceCrypto().failOnShutdown,

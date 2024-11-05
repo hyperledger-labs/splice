@@ -49,8 +49,7 @@ private[mediator] class MediatorEventsProcessor(
 
     val envelopesByEvent = envelopesGroupedByEvent(events)
     for {
-      deduplicatorResult <-
-        deduplicator.rejectDuplicates(envelopesByEvent)
+      deduplicatorResult <- deduplicator.rejectDuplicates(envelopesByEvent)
       (uniqueEnvelopesByEvent, storeF) = deduplicatorResult
       lastEvent = events.last1
 
@@ -123,7 +122,10 @@ private[mediator] class MediatorEventsProcessor(
     val responses =
       envelopes.mapFilter(ProtocolMessage.select[SignedProtocolMessage[ConfirmationResponse]])
 
-    val containsTopologyTransactions = DefaultOpenEnvelopesFilter.containsTopology(envelopes)
+    val containsTopologyTransactions = DefaultOpenEnvelopesFilter.containsTopology(
+      envelopes = envelopes,
+      withExplicitTopologyTimestamp = false, // we do not care about this for mediator
+    )
 
     if (requests.nonEmpty && responses.nonEmpty) {
       logger.error("Received both mediator confirmation requests and confirmation responses.")
@@ -139,7 +141,7 @@ private[mediator] class MediatorEventsProcessor(
             MediatorEvent.Request(
               counter,
               timestamp,
-              request.protocolMessage,
+              request,
               rootHashMessages.toList,
               batchAlsoContainsTopologyTransaction = containsTopologyTransactions,
             )
@@ -170,7 +172,7 @@ private[mediator] object MediatorEventsProcessor {
       mediatorEventDeduplicator: MediatorEventDeduplicator,
       metrics: MediatorMetrics,
       loggerFactory: NamedLoggerFactory,
-  )(implicit executionContext: ExecutionContext): MediatorEventsProcessor = {
+  )(implicit executionContext: ExecutionContext): MediatorEventsProcessor =
     new MediatorEventsProcessor(
       identityClientEventHandler,
       processor.handleRequestEvents,
@@ -178,5 +180,4 @@ private[mediator] object MediatorEventsProcessor {
       metrics,
       loggerFactory,
     )
-  }
 }

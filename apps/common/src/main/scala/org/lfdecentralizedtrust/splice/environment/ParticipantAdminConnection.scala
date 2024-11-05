@@ -11,13 +11,16 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.{
 }
 import org.lfdecentralizedtrust.splice.util.UploadablePackage
 import com.digitalasset.canton.admin.api.client.commands.{
+  GrpcAdminCommand,
   ParticipantAdminCommands,
-  StatusAdminCommands,
 }
-import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
+import com.digitalasset.canton.admin.api.client.data.{
+  ParticipantStatus,
+  NodeStatus,
+  ListConnectedDomainsResult,
+}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
@@ -62,8 +65,8 @@ class ParticipantAdminConnection(
 
   override protected type Status = ParticipantStatus
 
-  override protected def getStatusRequest: StatusAdminCommands.GetStatus[ParticipantStatus] =
-    new StatusAdminCommands.GetStatus(ParticipantStatus.fromProtoV30)
+  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
+    ParticipantAdminCommands.Health.ParticipantStatusCommand()
 
   private val hashOps = new HashOps {
     override def defaultHashAlgorithm = HashAlgorithm.Sha256
@@ -75,11 +78,8 @@ class ParticipantAdminConnection(
     runCmd(ParticipantAdminCommands.DomainConnectivity.ListConnectedDomains())
   }
 
-  private val participantStatusCommand =
-    new StatusAdminCommands.GetStatus(ParticipantStatus.fromProtoV30)
-
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean] =
-    runCmd(participantStatusCommand).map {
+    runCmd(getStatusRequest).map {
       case NodeStatus.Failure(_) => false
       case NodeStatus.NotInitialized(_, _) => false
       case NodeStatus.Success(_) => true
@@ -524,14 +524,6 @@ class ParticipantAdminConnection(
           logger,
         )
     } yield ()
-  }
-
-  def unVetDar(darHash: String)(implicit traceContext: TraceContext): Future[Unit] = {
-    runCmd(ParticipantAdminCommands.Package.UnvetDar(darHash))
-  }
-
-  def vetDar(darHash: String)(implicit traceContext: TraceContext): Future[Unit] = {
-    runCmd(ParticipantAdminCommands.Package.VetDar(darHash, false))
   }
 
   def ensureInitialPartyToParticipant(

@@ -18,7 +18,7 @@ import com.digitalasset.canton.topology.DomainId
 final case class IngestionSummary(
     updateId: Option[String],
     synchronizerId: Option[DomainId],
-    offset: Option[String],
+    offset: Option[Long],
     recordTime: Option[CantonTimestamp],
     newAcsSize: Int,
     ingestedCreatedEvents: Vector[CreatedEvent],
@@ -71,7 +71,7 @@ private[store] object IngestionSummary {
       "", // intentionally left empty, as that worked better in the log messages above
       paramIfDefined("updateId", _.updateId.map(_.unquoted)),
       paramIfDefined("synchronizerId", _.synchronizerId),
-      paramIfDefined("offset", _.offset.map(_.unquoted)),
+      paramIfDefined("offset", _.offset),
       paramIfDefined("recordTime", _.recordTime.map(_.toString.unquoted)),
       param("newAcsSize", _.newAcsSize),
       paramIfNonEmpty("ingestedCreatedEvents", _.ingestedCreatedEvents),

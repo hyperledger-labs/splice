@@ -10,6 +10,7 @@ import com.digitalasset.canton.ledger.localstore.{
   PersistentIdentityProviderConfigStore,
   PersistentUserManagementStore,
 }
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.store.backend.StorageBackendProvider
 import org.scalatest.freespec.AsyncFreeSpec
@@ -26,9 +27,10 @@ trait PersistentUserStoreTests extends PersistentStoreSpecBase with UserStoreTes
       timeProvider = TimeProvider.UTC,
       maxRightsPerUser = 100,
       loggerFactory = loggerFactory,
+      FlagCloseable(logger, timeouts),
     )
 
-  def createIdentityProviderConfig(identityProviderConfig: IdentityProviderConfig): Future[Unit] = {
+  def createIdentityProviderConfig(identityProviderConfig: IdentityProviderConfig): Future[Unit] =
     new PersistentIdentityProviderConfigStore(
       dbSupport,
       LedgerApiServerMetrics.ForTesting,
@@ -40,5 +42,4 @@ trait PersistentUserStoreTests extends PersistentStoreSpecBase with UserStoreTes
         case Left(error) => Future.failed(new Exception(error.toString))
         case Right(_) => Future.unit
       }
-  }
 }

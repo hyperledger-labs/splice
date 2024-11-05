@@ -5,6 +5,7 @@ package com.digitalasset.canton.util
 
 import cats.data.Nested
 import cats.{Applicative, Eval, Id, Traverse}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import org.apache.pekko.stream.scaladsl.Keep
 
 /** [[cats.Traverse]] for containers with at most one element.
@@ -87,11 +88,10 @@ object SingletonTraverse {
 
     override def traverseSingleton[H[_], A, B](fga: F[G[A]])(f: (Context, A) => H[B])(implicit
         H: Applicative[H]
-    ): H[F[G[B]]] = {
+    ): H[F[G[B]]] =
       F.traverseSingleton(fga) { (contextF, ga) =>
-        G.traverseSingleton(ga) { (contextG, x) => f(combineContext(contextF, contextG), x) }
+        G.traverseSingleton(ga)((contextG, x) => f(combineContext(contextF, contextG), x))
       }
-    }
 
     override def map[A, B](fga: F[G[A]])(f: A => B): F[G[B]] =
       F.map(fga)(ga => G.map(ga)(f))
@@ -145,6 +145,22 @@ object SingletonTraverse {
         val (a, _) = x
         traverse(x)(f(a, _))
       }
+    }
+
+  implicit val singletonTraverseSourceTag: SingletonTraverse.Aux[Source, Unit] =
+    new FromTraverse[Source](ReassignmentTag.Source.sourceMonadInstance) {
+      override type Context = Unit
+      override def traverseSingleton[G[_], A, B](x: Source[A])(f: (Unit, A) => G[B])(implicit
+          G: Applicative[G]
+      ): G[Source[B]] = traverse(x)(f((), _))
+    }
+
+  implicit val singletonTraverseTargetTag: SingletonTraverse.Aux[Target, Unit] =
+    new FromTraverse[Target](ReassignmentTag.Target.targetMonadInstance) {
+      override type Context = Unit
+      override def traverseSingleton[G[_], A, B](x: Target[A])(f: (Unit, A) => G[B])(implicit
+          G: Applicative[G]
+      ): G[Target[B]] = traverse(x)(f((), _))
     }
 
   implicit val singletonTraverseOption: SingletonTraverse.Aux[Option, Unit] =

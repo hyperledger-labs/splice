@@ -35,6 +35,7 @@ import org.lfdecentralizedtrust.splice.util.Codec
 import org.lfdecentralizedtrust.splice.validator.config.*
 import org.lfdecentralizedtrust.splice.wallet.config.{
   AutoAcceptTransfersConfig,
+  TransferPreapprovalConfig,
   TreasuryConfig,
   WalletAppClientConfig,
   WalletSweepConfig,
@@ -455,18 +456,24 @@ object SpliceConfig {
     implicit val approvedSvIdentityConfigReader: ConfigReader[ApprovedSvIdentityConfig] =
       deriveReader[ApprovedSvIdentityConfig]
     implicit val cometBftConfigReader: ConfigReader[CometBftConfig] = deriveReader
-    implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] =
-      deriveReader[SvSequencerConfig].emap { sequencerConfig =>
-        UrlValidator
-          .isValid(sequencerConfig.externalPublicApiUrl)
-          .bimap(
-            invalidUrl =>
-              ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl"),
-            _ => sequencerConfig,
-          )
-      }
     implicit val sequencerPruningConfig: ConfigReader[SequencerPruningConfig] =
       deriveReader[SequencerPruningConfig]
+    implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] = {
+      // Somehow the implicit search seems to have trouble finding the sequencer pruning config implicit.
+      // Redefining it here works though.
+      @nowarn("cat=unused")
+      implicit val sequencerPruningConfig2 = sequencerPruningConfig
+      deriveReader[SvSequencerConfig]
+        .emap { sequencerConfig =>
+          UrlValidator
+            .isValid(sequencerConfig.externalPublicApiUrl)
+            .bimap(
+              invalidUrl =>
+                ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl"),
+              _ => sequencerConfig,
+            )
+        }
+    }
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =
       deriveReader[SvMediatorConfig]
     implicit val svScanConfig: ConfigReader[SvScanConfig] =
@@ -600,6 +607,16 @@ object SpliceConfig {
       deriveReader[InitialInstalledApp]
     implicit val appManagerConfigReader: ConfigReader[AppManagerConfig] =
       deriveReader[AppManagerConfig]
+    implicit val transferPreapprovalConfigReader: ConfigReader[TransferPreapprovalConfig] =
+      deriveReader[TransferPreapprovalConfig].emap { conf =>
+        Either.cond(
+          conf.renewalDuration.duration.toSeconds < conf.preapprovalLifetime.duration.toSeconds,
+          conf,
+          ConfigValidationFailed(
+            "renewalDuration must be smaller than preapprovalLifetime for TransferPreapprovals"
+          ),
+        )
+      }
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
@@ -855,6 +872,8 @@ object SpliceConfig {
       deriveWriter[InitialInstalledApp]
     implicit val appManagerConfigWriter: ConfigWriter[AppManagerConfig] =
       deriveWriter[AppManagerConfig]
+    implicit val transferPreapprovalConfigWriter: ConfigWriter[TransferPreapprovalConfig] =
+      deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
       deriveWriter[MigrateValidatorPartyConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =

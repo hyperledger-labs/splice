@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
 import org.lfdecentralizedtrust.splice.sv.store.{ErrorTxLogEntry, TxLogEntry, VoteRequestTxLogEntry}
 import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{Member, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import io.circe.Json
 
 object DsoTables extends AcsTables with NamedLogging {
@@ -51,6 +51,7 @@ object DsoTables extends AcsTables with NamedLogging {
       electionRequestEpoch: Option[Long] = None,
       importCrateReceiver: Option[PartyId] = None,
       memberTrafficMember: Option[Member] = None,
+      memberTrafficDomain: Option[DomainId] = None,
       ansEntryName: Option[String] = None,
       actionAnsEntryContextCid: Option[splice.ans.AnsEntryContext.ContractId] = None,
       actionAnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,
@@ -60,6 +61,7 @@ object DsoTables extends AcsTables with NamedLogging {
       featuredAppRightProvider: Option[PartyId] = None,
       svParty: Option[PartyId] = None,
       svName: Option[String] = None,
+      walletParty: Option[PartyId] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "amulet_round_of_expiry" -> amuletRoundOfExpiry,
@@ -83,6 +85,7 @@ object DsoTables extends AcsTables with NamedLogging {
       "election_request_epoch" -> electionRequestEpoch,
       "import_crate_receiver" -> importCrateReceiver,
       "member_traffic_member" -> memberTrafficMember,
+      "member_traffic_domain" -> memberTrafficDomain,
       "ans_entry_name" -> ansEntryName.map(lengthLimited),
       "action_ans_entry_context_cid" -> actionAnsEntryContextCid,
       "action_ans_entry_context_payment_id" -> actionAnsEntryContextPaymentId,
@@ -92,6 +95,7 @@ object DsoTables extends AcsTables with NamedLogging {
       "featured_app_right_provider" -> featuredAppRightProvider,
       "sv_party" -> svParty,
       "sv_name" -> svName.map(lengthLimited),
+      "wallet_party" -> walletParty,
     )
   }
 

@@ -8,6 +8,9 @@ import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.google.common.annotations.VisibleForTesting
+import monocle.Lens
+import monocle.macros.GenLens
 
 /** @param consumedInCore Whether the contract is consumed in the core of the view.
   *   [[com.digitalasset.canton.protocol.WellFormedTransaction]] checks that a created contract
@@ -31,11 +34,12 @@ final case class CreatedContract private (
       rolledBack = rolledBack,
     )
 
-  override def pretty: Pretty[CreatedContract] = prettyOfClass(
+  override protected def pretty: Pretty[CreatedContract] = prettyOfClass(
     unnamedParam(_.contract),
     paramIfTrue("consumed in core", _.consumedInCore),
     paramIfTrue("rolled back", _.rolledBack),
   )
+
 }
 
 object CreatedContract {
@@ -81,9 +85,13 @@ object CreatedContract {
         contract = contract,
         consumedInCore = consumedInCore,
         rolledBack = rolledBack,
-      ).leftMap(OtherError)
+      ).leftMap(OtherError.apply)
     } yield createdContract
   }
+
+  @VisibleForTesting
+  val contractUnsafe: Lens[CreatedContract, SerializableContract] =
+    GenLens[CreatedContract](_.contract)
 }
 
 /** @param consumedInView Whether the contract is consumed in the view.

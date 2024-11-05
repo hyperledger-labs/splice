@@ -14,12 +14,13 @@ import com.digitalasset.canton.protocol.{
   TransactionId,
   WithTransactionId,
 }
+import com.digitalasset.canton.store.Purgeable
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
 
-trait ContractStore extends ContractLookup {
+trait ContractStore extends ContractLookup with Purgeable {
 
   /** Stores contracts created by a request.
     * Assumes the contract data has been authenticated against the contract id using
@@ -118,7 +119,7 @@ final case class StoredContract(
 ) extends PrettyPrinting {
   def contractId: LfContractId = contract.contractId
 
-  def mergeWith(other: StoredContract): StoredContract = {
+  def mergeWith(other: StoredContract): StoredContract =
     if (this eq other) this
     else {
       require(
@@ -135,9 +136,8 @@ final case class StoredContract(
         )
       } else this
     }
-  }
 
-  override def pretty: Pretty[StoredContract] = prettyOfClass(
+  override protected def pretty: Pretty[StoredContract] = prettyOfClass(
     param("contract", _.contract),
     param("request counter", _.requestCounter),
     paramIfDefined("creating transaction id", _.creatingTransactionIdO),
@@ -164,8 +164,10 @@ sealed trait ContractStoreError extends Product with Serializable with PrettyPri
 sealed trait ContractLookupError extends ContractStoreError
 
 final case class UnknownContract(contractId: LfContractId) extends ContractLookupError {
-  override def pretty: Pretty[UnknownContract] = prettyOfClass(unnamedParam(_.contractId))
+  override protected def pretty: Pretty[UnknownContract] = prettyOfClass(unnamedParam(_.contractId))
 }
 final case class UnknownContracts(contractIds: Set[LfContractId]) extends ContractLookupError {
-  override def pretty: Pretty[UnknownContracts] = prettyOfClass(unnamedParam(_.contractIds))
+  override protected def pretty: Pretty[UnknownContracts] = prettyOfClass(
+    unnamedParam(_.contractIds)
+  )
 }

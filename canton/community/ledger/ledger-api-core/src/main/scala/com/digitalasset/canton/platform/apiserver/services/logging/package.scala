@@ -6,14 +6,14 @@ package com.digitalasset.canton.platform.apiserver.services
 import com.daml.logging.entries.LoggingValue.OfString
 import com.daml.logging.entries.ToLoggingKey.*
 import com.daml.logging.entries.{LoggingEntries, LoggingEntry, LoggingKey, LoggingValue}
+import com.digitalasset.canton.ledger.api.domain.types.ParticipantOffset
 import com.digitalasset.canton.ledger.api.domain.{
   Commands,
   CumulativeFilter,
   EventId,
-  ParticipantOffset,
   TemplateWildcardFilter,
   TransactionFilter,
-  TransactionId,
+  UpdateId,
 }
 import com.digitalasset.daml.lf.data.Ref.{Identifier, Party}
 import com.digitalasset.daml.lf.data.logging.*
@@ -62,11 +62,11 @@ package object logging {
   private[services] def offset(offset: String): LoggingEntry =
     "offset" -> offset
 
+  private[services] def offset(offset: Long): LoggingEntry =
+    "offset" -> offset.toString
+
   private[services] def commandId(id: String): LoggingEntry =
     "commandId" -> id
-
-  private[services] def eventSequentialId(seqId: Option[Long]): LoggingEntry =
-    "eventSequentialId" -> OfString(seqId.map(_.toString).getOrElse("<empty-sequential-id>"))
 
   private[services] def eventId(id: EventId): LoggingEntry =
     "eventId" -> OfString(id.unwrap)
@@ -93,7 +93,7 @@ package object logging {
             filter.templateFilters.map(_.templateTypeRef)
           ),
           "interfaces" -> LoggingValue.from(
-            filter.interfaceFilters.map(_.interfaceId)
+            filter.interfaceFilters.map(_.interfaceTypeRef)
           ),
         )
           ++ (filter.templateWildcardFilter match {
@@ -111,11 +111,11 @@ package object logging {
   private[services] def submissionId(id: String): LoggingEntry =
     "submissionId" -> id
 
-  private[services] def transactionId(id: String): LoggingEntry =
-    "transactionId" -> id
+  private[services] def updateId(id: String): LoggingEntry =
+    "updateId" -> id
 
-  private[services] def transactionId(id: TransactionId): LoggingEntry =
-    "transactionId" -> id.unwrap
+  private[services] def updateId(id: UpdateId): LoggingEntry =
+    "updateId" -> id.unwrap
 
   private[services] def workflowId(id: String): LoggingEntry =
     "workflowId" -> id

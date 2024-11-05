@@ -524,6 +524,46 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/transfer-preapproval:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "createTransferPreapproval"
+      responses:
+        "200":
+          description: Transfer preapproval was created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferPreapprovalResponse"
+        "409":
+          description: Transfer preapproval already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferPreapprovalResponse"
+        "429":
+          description:
+            Request to create transfer pre-approval is currently being processed, which
+            may or may not succeed. Retry submitting the request with exponential backoff.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+  /v0/wallet/transfer-preapproval/send:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "transferPreapprovalSend"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TransferPreapprovalSendRequest"
+      responses:
+        "200":
+          description: ok
 components:
   schemas:
     UserStatusResponse:
@@ -942,3 +982,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListTransactionsResponseItem"
+
+    CreateTransferPreapprovalResponse:
+      type: object
+      required:
+        - transfer_preapproval_contract_id
+      properties:
+        transfer_preapproval_contract_id:
+          type: string
+
+    TransferPreapprovalSendRequest:
+      type: object
+      required:
+        - receiver_party_id
+        - amount
+      properties:
+        receiver_party_id:
+          type: string
+        amount:
+          type: string

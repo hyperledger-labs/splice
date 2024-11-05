@@ -123,6 +123,22 @@ class DbMultiDomainAcsStoreTest
         actual.map(_.numericValue.bigDecimal) should contain theSameElementsInOrderAs values
       }
     }
+
+    "re-initialize at offset 0" in {
+      val store = mkStore(id = 0)
+      for {
+        r <- store.testIngestionSink.initialize()
+        _ = r shouldBe None
+        _ <- store.testIngestionSink.ingestAcs(
+          0L,
+          Seq.empty,
+          Seq.empty,
+          Seq.empty,
+        )
+        r <- store.testIngestionSink.initialize()
+        _ = r shouldBe Some(0L)
+      } yield succeed
+    }
   }
 
   private def storeDescriptor(id: Int, participantId: ParticipantId) =

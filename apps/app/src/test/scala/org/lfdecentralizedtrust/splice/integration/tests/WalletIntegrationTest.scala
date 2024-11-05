@@ -4,15 +4,19 @@ import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TapRequest
 import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletClient
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
   WalletTestUtil,
   JavaDecodeUtil as DecodeUtil,
 }
+import org.lfdecentralizedtrust.splice.validator.automation.AcceptTransferPreapprovalProposalTrigger
+import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
@@ -29,6 +33,8 @@ import java.time.Duration
 import java.util.UUID
 import scala.concurrent.Future
 import scala.util.Try
+import cats.syntax.parallel.*
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
 class WalletIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -93,7 +99,7 @@ class WalletIntegrationTest
       aliceWalletClient.tap(50.0, Some("dedup-test"))
       assertThrowsAndLogsCommandFailures(
         aliceWalletClient.tap(50.0, Some("dedup-test")),
-        _.errorMessage should include("DUPLICATE_COMMAND"),
+        _.errorMessage should include("409 Conflict"),
       )
     }
 
@@ -535,5 +541,123 @@ class WalletIntegrationTest
         p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10)
       }
     }
+
+    "TransferPreapprovals can be created, looked up and amulet can be sent through them" in {
+      implicit env =>
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        aliceValidatorWalletClient.tap(10.0)
+        onboardWalletUser(bobWalletClient, bobValidatorBackend)
+
+        aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
+        sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
+        val (_, cid) = actAndCheck(
+          "Create TransferPreapproval",
+          aliceWalletClient.createTransferPreapproval(),
+        )(
+          "Scan lookup returns TransferPreapproval",
+          inside(_) {
+            case CreateTransferPreapprovalResponse.Created(c) => {
+              val contractFromScan =
+                sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+              contractFromScan.contractId shouldBe c
+
+              val contractFromValidatorBackend =
+                aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+              contractFromValidatorBackend.contractId shouldBe c
+              contractFromValidatorBackend.contractId
+            }
+          },
+        )
+        aliceWalletClient.createTransferPreapproval() shouldBe CreateTransferPreapprovalResponse
+          .AlreadyExists(cid)
+        bobWalletClient.tap(walletAmuletToUsd(50.0))
+        bobWalletClient.balance().unlockedQty should beAround(50.0)
+        aliceWalletClient.balance().unlockedQty should beAround(0.0)
+        actAndCheck(
+          "Bob sends Alice 40.0 amulet",
+          bobWalletClient.transferPreapprovalSend(aliceUserParty, 40.0),
+        )(
+          "Alice and Bob's balance are updated",
+          _ => {
+            // Fees eat up the remainder which is why we allow bob’s balance to drop to close to 0
+            bobWalletClient.balance().unlockedQty should beWithin(0.0, 10.0)
+            aliceWalletClient.balance().unlockedQty should beAround(40.0)
+          },
+        )
+    }
+
+    "Failure to complete TransferPreapproval creation should be handled correctly" in {
+      implicit env =>
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+
+        def acceptTransferPreapprovalProposalTrigger = aliceValidatorBackend.validatorAutomation
+          .trigger[AcceptTransferPreapprovalProposalTrigger]
+
+        def aliceTransferPreapprovalProposals =
+          aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+            .filterJava(TransferPreapprovalProposal.COMPANION)(aliceUserParty)
+
+        aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
+        aliceTransferPreapprovalProposals should be(empty)
+
+        // Disable validator automation to create the TransferPreapproval.
+        // This implies the request from alice will not succeed and time out.
+        bracket(
+          acceptTransferPreapprovalProposalTrigger.pause().futureValue,
+          acceptTransferPreapprovalProposalTrigger.resume(),
+        ) {
+          val proposalCid =
+            clue("createTransferPreapproval fails with HTTP 429 if validator automation fails") {
+              assertThrowsAndLogsCommandFailures(
+                aliceWalletClient.createTransferPreapproval(),
+                _.errorMessage should include("429 Too Many Requests"),
+              )
+              aliceTransferPreapprovalProposals should have length 1
+              aliceTransferPreapprovalProposals.head.id
+            }
+          clue("TransferPreapprovalProposals created via the wallet API are deduplicated") {
+            assertThrowsAndLogsCommandFailures(
+              aliceWalletClient.createTransferPreapproval(),
+              _.errorMessage should include("429 Too Many Requests"),
+            )
+            aliceTransferPreapprovalProposals should have length 1
+            aliceTransferPreapprovalProposals.head.id shouldBe proposalCid
+          }
+        }
+    }
+
+    "Validator automation de-duplicates TransferPreapprovals per receiver" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+      aliceValidatorWalletClient.tap(10.0)
+
+      def createTransferPreapprovalProposal =
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+          .submitWithResult(
+            userId = aliceValidatorBackend.config.ledgerApiUser,
+            actAs = Seq(aliceUserParty),
+            readAs = Seq(aliceUserParty),
+            update = TransferPreapprovalProposal
+              .create(aliceUserParty.toProtoPrimitive, aliceValidatorParty.toProtoPrimitive),
+          )
+          .contractId
+
+      actAndCheck(
+        "Create duplicate TransferPreapprovalProposals directly via the ledger API", {
+          val proposalCids =
+            (1 to 5).toList.parTraverse(_ => Future(createTransferPreapprovalProposal)).futureValue
+          proposalCids.toSet.size shouldBe proposalCids.size
+        },
+      )(
+        "Automation converts exactly 1 proposal into a TransferPreapproval",
+        _ => {
+          val preapprovals = aliceValidatorBackend
+            .listTransferPreapprovals()
+            .filter(_.payload.receiver == aliceUserParty.toProtoPrimitive)
+          preapprovals should have length 1
+        },
+      )
+    }
+
   }
 }

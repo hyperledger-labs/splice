@@ -8,6 +8,7 @@ import com.digitalasset.daml.lf.data.Ref
 
 package index {
 
+  import com.digitalasset.canton.ledger.api.domain.types.ParticipantOffset
   import com.digitalasset.daml.lf.data.Time.Timestamp
 
   /** Information provided by the submitter of changes submitted to the ledger.
@@ -34,7 +35,7 @@ package index {
   /** Meta-data of a transaction visible to all parties that can see a part of
     * the transaction.
     *
-    * @param transactionId: identifier of the transaction for looking it up
+    * @param updateId: identifier of the transaction for looking it up
     *   over the Daml Ledger API.
     *
     *   Implementors are free to make it equal to the 'offset' of this event.
@@ -56,8 +57,8 @@ package index {
     *   fashion by all parties participating in the workflow.
     */
   final case class TransactionMeta(
-      transactionId: TransactionId,
-      offset: ParticipantOffset.Absolute,
+      updateId: UpdateId,
+      offset: ParticipantOffset,
       ledgerEffectiveTime: Timestamp,
       recordTime: Timestamp,
       workflowId: WorkflowId,

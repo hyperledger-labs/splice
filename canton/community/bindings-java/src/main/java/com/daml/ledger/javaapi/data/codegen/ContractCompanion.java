@@ -6,6 +6,7 @@ package com.daml.ledger.javaapi.data.codegen;
 import com.daml.ledger.javaapi.data.CreatedEvent;
 import com.daml.ledger.javaapi.data.DamlRecord;
 import com.daml.ledger.javaapi.data.Identifier;
+import com.daml.ledger.javaapi.data.PackageVersion;
 import com.daml.ledger.javaapi.data.Value;
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfDecoder;
 import java.util.List;
@@ -78,13 +79,14 @@ public abstract class ContractCompanion<Ct, Id, Data>
    * @hidden
    */
   protected ContractCompanion(
+      ContractTypeCompanion.Package packageInfo,
       String templateClassName,
       Identifier templateId,
       Function<String, Id> newContractId,
       Function<DamlRecord, Data> fromValue,
       FromJson<Data> fromJson,
       List<Choice<Data, ?, ?>> choices) {
-    super(templateId, templateClassName, newContractId, choices);
+    super(packageInfo, templateId, templateClassName, newContractId, choices);
     this.fromValue = fromValue;
     this.fromJson = fromJson;
   }
@@ -106,6 +108,7 @@ public abstract class ContractCompanion<Ct, Id, Data>
      * @hidden
      */
     public WithoutKey(
+        ContractTypeCompanion.Package packageInfo,
         String templateClassName,
         Identifier templateId,
         Function<String, Id> newContractId,
@@ -113,7 +116,8 @@ public abstract class ContractCompanion<Ct, Id, Data>
         FromJson<Data> fromJson,
         NewContract<Ct, Id, Data> newContract,
         List<Choice<Data, ?, ?>> choices) {
-      super(templateClassName, templateId, newContractId, fromValue, fromJson, choices);
+      super(
+          packageInfo, templateClassName, templateId, newContractId, fromValue, fromJson, choices);
       this.newContract = newContract;
     }
 
@@ -154,6 +158,7 @@ public abstract class ContractCompanion<Ct, Id, Data>
      * @hidden
      */
     public WithKey(
+        ContractTypeCompanion.Package packageInfo,
         String templateClassName,
         Identifier templateId,
         Function<String, Id> newContractId,
@@ -162,7 +167,8 @@ public abstract class ContractCompanion<Ct, Id, Data>
         NewContract<Ct, Id, Data, Key> newContract,
         List<Choice<Data, ?, ?>> choices,
         Function<Value, Key> keyFromValue) {
-      super(templateClassName, templateId, newContractId, fromValue, fromJson, choices);
+      super(
+          packageInfo, templateClassName, templateId, newContractId, fromValue, fromJson, choices);
       this.newContract = newContract;
       this.keyFromValue = keyFromValue;
     }

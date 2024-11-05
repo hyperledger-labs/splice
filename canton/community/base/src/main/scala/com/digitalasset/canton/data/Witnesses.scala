@@ -10,11 +10,10 @@ import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.sequencing.protocol.{
   MemberRecipient,
-  ParticipantsOfParty,
+  Recipient,
   Recipients,
   RecipientsTree,
 }
-import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -43,16 +42,12 @@ final case class Witnesses(unwrap: NonEmpty[Seq[Set[LfPartyId]]]) {
           val parties = informees.toList
           for {
             informeeParticipants <- EitherT
-              .right[InvalidWitnesses](
-                topology
-                  .activeParticipantsOfParties(parties)
-              )
+              .right[InvalidWitnesses](topology.activeParticipantsOfParties(parties))
             _ <- {
               val informeesWithNoActiveParticipants =
-                informeeParticipants
-                  .collect {
-                    case (party, participants) if participants.isEmpty => party
-                  }
+                informeeParticipants.collect {
+                  case (party, participants) if participants.isEmpty => party
+                }
               EitherT.cond[Future](
                 informeesWithNoActiveParticipants.isEmpty,
                 (),
@@ -61,14 +56,8 @@ final case class Witnesses(unwrap: NonEmpty[Seq[Set[LfPartyId]]]) {
                 ),
               )
             }
-            partiesWithGroupAddressing <- EitherT.right(
-              topology.partiesWithGroupAddressing(parties)
-            )
-            recipients = informeeParticipants.toList.flatMap { case (party, participants) =>
-              if (partiesWithGroupAddressing.contains(party))
-                Seq(ParticipantsOfParty(PartyId.tryFromLfParty(party)))
-              else
-                participants.map(MemberRecipient)
+            recipients = informeeParticipants.toList.flatMap { case (_, participants) =>
+              participants.map[Recipient](MemberRecipient.apply)
             }.toSet
 
             informeeRecipientSet <- EitherT.fromOption[Future](
@@ -89,6 +78,8 @@ final case class Witnesses(unwrap: NonEmpty[Seq[Set[LfPartyId]]]) {
 
 case object Witnesses {
   final case class InvalidWitnesses(message: String) extends PrettyPrinting {
-    override def pretty: Pretty[InvalidWitnesses] = prettyOfClass(unnamedParam(_.message.unquoted))
+    override protected def pretty: Pretty[InvalidWitnesses] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
   }
 }

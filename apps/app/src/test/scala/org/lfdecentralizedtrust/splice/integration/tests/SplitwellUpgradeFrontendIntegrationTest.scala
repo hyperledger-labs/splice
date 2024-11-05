@@ -130,6 +130,12 @@ class SplitwellUpgradeFrontendIntegrationTest
             groupsBefore
           }
 
+          clue("Alice sees bob’s accepted invite") {
+            eventually() {
+              findAll(className("add-user-link")).toSeq should have size 1
+            }
+          }
+
           actAndCheck(
             "Alice accepts bob's request",
             click on className("add-user-link") withClue "alice accepts bob's request",

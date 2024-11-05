@@ -3,14 +3,21 @@
 
 package com.digitalasset.canton.domain.sequencing.traffic
 
+import cats.syntax.either.*
+import cats.syntax.parallel.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerRateLimitError.AboveTrafficLimit
+import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerRateLimitError.{
+  AboveTrafficLimit,
+  IncorrectEventCost,
+  OutdatedEventCost,
+}
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
   SequencerRateLimitError,
   SequencerRateLimitManager,
 }
+import com.digitalasset.canton.domain.sequencing.traffic.store.TrafficConsumedStore
 import com.digitalasset.canton.domain.sequencing.traffic.store.memory.{
   InMemoryTrafficConsumedStore,
   InMemoryTrafficPurchasedStore,
@@ -24,10 +31,11 @@ import com.digitalasset.canton.sequencing.traffic.{
   TrafficPurchased,
   TrafficReceipt,
 }
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.PositiveFiniteDuration
 import com.digitalasset.canton.topology.DefaultTestIdentities.*
 import com.digitalasset.canton.topology.{DefaultTestIdentities, Member, TestingTopology}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.version.{HasTestCloseContext, ProtocolVersion}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.google.protobuf.ByteString
@@ -35,6 +43,7 @@ import org.scalatest.FutureOutcome
 import org.scalatest.wordspec.FixtureAsyncWordSpec
 
 import java.util.UUID
+import scala.concurrent.Future
 
 class EnterpriseSequencerRateLimitManagerTest
     extends FixtureAsyncWordSpec
@@ -46,7 +55,7 @@ class EnterpriseSequencerRateLimitManagerTest
   private val maxBaseTrafficRemainder = NonNegativeLong.tryCreate(5)
   private val trafficConfig: TrafficControlParameters = TrafficControlParameters(
     maxBaseTrafficAmount = maxBaseTrafficRemainder,
-    maxBaseTrafficAccumulationDuration = NonNegativeFiniteDuration.tryOfSeconds(1),
+    maxBaseTrafficAccumulationDuration = PositiveFiniteDuration.tryOfSeconds(1),
   )
 
   private val senderTs = CantonTimestamp.Epoch
@@ -126,6 +135,7 @@ class EnterpriseSequencerRateLimitManagerTest
       eventCostCalculator: EventCostCalculator,
       rlm: SequencerRateLimitManager,
       balanceManager: TrafficPurchasedManager,
+      trafficConsumedStore: TrafficConsumedStore,
   )
 
   override type FixtureParam = Env
@@ -182,7 +192,7 @@ class EnterpriseSequencerRateLimitManagerTest
       ),
       submissionTimestamp: Option[CantonTimestamp] = Some(senderTs),
       lastKnownSequencedEvent: CantonTimestamp = sequencerTs,
-  )(implicit f: Env) = {
+  )(implicit f: Env) =
     f.rlm
       .validateRequestAtSubmissionTime(
         defaultSubmissionRequest.copy(submissionCost = cost),
@@ -192,16 +202,14 @@ class EnterpriseSequencerRateLimitManagerTest
       )
       .value
       .failOnShutdown
-  }
 
-  private def mkEnvelope(content: String): ClosedEnvelope = {
+  private def mkEnvelope(content: String): ClosedEnvelope =
     ClosedEnvelope.create(
       ByteString.copyFromUtf8(content),
       Recipients.cc(DefaultTestIdentities.participant1),
       Seq.empty,
       testedProtocolVersion,
     )
-  }
 
   private def mkBatch(content: String) = Batch(List(mkEnvelope(content)), testedProtocolVersion)
 
@@ -242,10 +250,35 @@ class EnterpriseSequencerRateLimitManagerTest
         sequencerSignature = Signature.noSignature,
       )
       .value
+      .map { errorOrReceiptO =>
+        // simulate storing the consumed traffic, which has now moved
+        // into the BlockSequencerStateManager from the EnterpriseSequencerRateLimitManager
+        def storeTrafficConsumed(trafficReceiptO: Option[TrafficReceipt]) =
+          trafficReceiptO.toList.parTraverse_ { trafficReceipt =>
+            f.trafficConsumedStore.store(
+              Seq(trafficReceipt.toTrafficConsumed(sender, sequencingTimestamp))
+            )
+          }
+
+        val storeF = errorOrReceiptO match {
+          case Right(Some(trafficReceipt)) =>
+            storeTrafficConsumed(Some(trafficReceipt))
+          case Left(err: IncorrectEventCost.Error) =>
+            storeTrafficConsumed(err.trafficReceipt)
+          case Left(err: AboveTrafficLimit) =>
+            storeTrafficConsumed(Some(err.trafficState.toTrafficReceipt))
+          case Left(err: OutdatedEventCost) =>
+            storeTrafficConsumed(err.trafficReceipt)
+          case _ => Future.unit
+        }
+        storeF.futureValue
+
+        errorOrReceiptO
+      }
       .failOnShutdown
   }
 
-  private def purchaseTraffic(implicit f: Env) = {
+  private def purchaseTraffic(implicit f: Env) =
     f.balanceManager.addTrafficPurchased(
       TrafficPurchased(
         sender,
@@ -254,7 +287,6 @@ class EnterpriseSequencerRateLimitManagerTest
         sequencerTs.immediatePredecessor,
       )
     )
-  }
 
   private def returnIncorrectCostFromSender(
       cost: NonNegativeLong = incorrectSubmissionCostNN
@@ -302,7 +334,7 @@ class EnterpriseSequencerRateLimitManagerTest
         _ <- purchaseTraffic
         res <- validate()
       } yield {
-        res shouldBe Right(())
+        res shouldBe Either.unit
       }
     }
 
@@ -337,7 +369,7 @@ class EnterpriseSequencerRateLimitManagerTest
             Some(SequencingSubmissionCost(incorrectSubmissionCostNN, testedProtocolVersion))
           )
         } yield {
-          res shouldBe Right(())
+          res shouldBe Either.unit
         }
     }
 
@@ -355,7 +387,7 @@ class EnterpriseSequencerRateLimitManagerTest
           submissionTimestamp = Some(submissionTimestamp),
         )
       } yield {
-        res shouldBe Right(())
+        res shouldBe Either.unit
       }
     }
 
@@ -889,6 +921,7 @@ class EnterpriseSequencerRateLimitManagerTest
       eventCostCalculator,
       rateLimiter,
       manager,
+      consumedStore,
     )
 
     withFixture(test.toNoArgAsyncTest(env))

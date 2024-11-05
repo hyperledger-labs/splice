@@ -27,7 +27,7 @@ sealed trait TopologyChangeOp extends Product with Serializable with PrettyPrint
       O: ClassTag[TargetOp]
   ): Option[TargetOp] = O.unapply(this)
 
-  override def pretty: Pretty[TopologyChangeOp.this.type] = adHocPrettyInstance
+  override protected def pretty: Pretty[TopologyChangeOp.this.type] = adHocPrettyInstance
 }
 
 object TopologyChangeOp {
@@ -136,8 +136,12 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
   def selectOp[TargetOp <: TopologyChangeOp: ClassTag]: Option[TopologyTransaction[TargetOp, M]] =
     operation.select[TargetOp].map(_ => this.asInstanceOf[TopologyTransaction[TargetOp, M]])
 
+  def select[TargetOp <: TopologyChangeOp: ClassTag, TargetMapping <: TopologyMapping: ClassTag]
+      : Option[TopologyTransaction[TargetOp, TargetMapping]] =
+    selectOp[TargetOp].flatMap(_.selectMapping[TargetMapping])
+
   /** returns hash of the given transaction */
-  lazy val hash: TxHash = {
+  lazy val hash: TxHash =
     TxHash(
       Hash.digest(
         HashPurpose.TopologyTransactionSignature,
@@ -146,7 +150,6 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
         HashAlgorithm.Sha256,
       )
     )
-  }
 
   override def toByteStringUnmemoized: ByteString = super[HasProtocolVersionedWrapper].toByteString
 
@@ -158,16 +161,15 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
 
   def asVersion(
       protocolVersion: ProtocolVersion
-  ): TopologyTransaction[Op, M] = {
+  ): TopologyTransaction[Op, M] =
     TopologyTransaction[Op, M](operation, serial, mapping)(
       TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
     )
-  }
 
   /** Indicates how to pretty print this instance.
     * See `PrettyPrintingTest` for examples on how to implement this method.
     */
-  override def pretty: Pretty[TopologyTransaction.this.type] =
+  override protected def pretty: Pretty[TopologyTransaction.this.type] =
     prettyOfClass(
       unnamedParam(_.mapping),
       param("serial", _.serial),
@@ -191,7 +193,7 @@ object TopologyTransaction
 
   val supportedProtoVersions: transaction.TopologyTransaction.SupportedProtoVersions =
     SupportedProtoVersions(
-      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.TopologyTransaction)(
+      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.TopologyTransaction)(
         supportedProtoVersionMemoized(_)(fromProtoV30),
         _.toProtoV30.toByteString,
       )

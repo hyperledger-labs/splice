@@ -6,13 +6,11 @@ package com.digitalasset.canton.domain.block.data
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.block.UninitializedBlockHeight
 import com.digitalasset.canton.domain.sequencing.sequencer.{
+  InFlightAggregations,
   SequencerInitialState,
-  SequencerSnapshot,
 }
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
-import com.digitalasset.canton.sequencing.traffic.{TrafficConsumed, TrafficPurchased}
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.version.ProtocolVersion
 import slick.jdbc.GetResult
 
 /** Persisted information about a block as a whole once it has been fully processed.
@@ -35,7 +33,7 @@ final case class BlockInfo(
 ) {
   require(
     latestSequencerEventTimestamp.forall(lastTs >= _),
-    s"The latest sequencer event timestamp $latestSequencerEventTimestamp must not be after the last known event at ${lastTs}",
+    s"The latest sequencer event timestamp $latestSequencerEventTimestamp must not be after the last known event at $lastTs",
   )
 }
 
@@ -49,6 +47,12 @@ object BlockInfo {
     val latestSequencerEventTs = r.<<[Option[CantonTimestamp]]
     BlockInfo(height, lastTs, latestSequencerEventTs)
   }
+
+  def fromSequencerInitialState(initial: SequencerInitialState): BlockInfo = BlockInfo(
+    initial.snapshot.latestBlockHeight,
+    initial.snapshot.lastTs,
+    initial.latestSequencerEventTimestamp,
+  )
 }
 
 /** Our typical sequencer state with an associated block height.
@@ -57,21 +61,8 @@ object BlockInfo {
   */
 final case class BlockEphemeralState(
     latestBlock: BlockInfo,
-    state: EphemeralState,
+    inFlightAggregations: InFlightAggregations,
 ) extends HasLoggerName {
-  def toSequencerSnapshot(
-      protocolVersion: ProtocolVersion,
-      trafficPurchased: Seq[TrafficPurchased],
-      trafficConsumed: Seq[TrafficConsumed],
-  ): SequencerSnapshot =
-    state.toSequencerSnapshot(
-      latestBlock.lastTs,
-      latestBlock.height,
-      None,
-      protocolVersion,
-      trafficPurchased,
-      trafficConsumed,
-    )
 
   /** Checks that the class invariant holds:
     * - Expired in-flight aggregations have been evicted
@@ -82,22 +73,23 @@ final case class BlockEphemeralState(
   def checkInvariant()(implicit loggingContext: NamedLoggingContext): Unit = {
     // All expired in-flight aggregations have been evicted
     val lastTs = latestBlock.lastTs
-    val expired = state.inFlightAggregations.collect {
+    val expired = inFlightAggregations.collect {
       case (aggregationId, inFlightAggregation) if inFlightAggregation.expired(lastTs) =>
         aggregationId
     }
     ErrorUtil.requireState(
       expired.isEmpty,
-      s"Expired in-flight aggregations have not been evicted by ${lastTs}: ${expired.toSeq}",
+      s"Expired in-flight aggregations have not been evicted by $lastTs: ${expired.toSeq}",
     )
 
     // All in-flight aggregations satisfy their invariant
-    state.inFlightAggregations.values.foreach(_.checkInvariant())
+    inFlightAggregations.values.foreach(_.checkInvariant())
   }
 }
 
 object BlockEphemeralState {
-  val empty: BlockEphemeralState = BlockEphemeralState(BlockInfo.initial, EphemeralState.empty)
+  val empty: BlockEphemeralState =
+    BlockEphemeralState(BlockInfo.initial, Map.empty)
 
   def fromSequencerInitialState(
       initialState: SequencerInitialState
@@ -109,11 +101,7 @@ object BlockEphemeralState {
     )
     BlockEphemeralState(
       block,
-      EphemeralState.fromHeads(
-        initialState.snapshot.heads,
-        inFlightAggregations = initialState.snapshot.inFlightAggregations,
-        initialState.snapshot.status.toInternal,
-      ),
+      initialState.snapshot.inFlightAggregations,
     )
   }
 }

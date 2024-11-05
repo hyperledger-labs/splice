@@ -114,6 +114,15 @@
     "isFirstSv": {
       "type": "boolean"
     },
+    "updateHistoryBackfilling": {
+      "type": "object",
+      "enabled": {
+        "type": "boolean"
+      },
+      "batchSize": {
+        "type": "integer"
+      }
+    },
     "participantAddress": {
       "type": "string"
     },

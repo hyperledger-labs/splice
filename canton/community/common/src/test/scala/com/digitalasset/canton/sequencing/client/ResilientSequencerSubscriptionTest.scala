@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.sequencing.client
 
+import cats.syntax.either.*
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -37,7 +38,7 @@ sealed trait TestSubscriptionError
     with Product
     with Serializable
     with PrettyPrinting {
-  override def pretty: Pretty[this.type] = prettyOfObject[this.type]
+  override protected def pretty: Pretty[this.type] = prettyOfObject[this.type]
 }
 object TestSubscriptionError {
   case object RetryableError extends TestSubscriptionError
@@ -228,7 +229,7 @@ class ResilientSequencerSubscriptionTest
           ] = {
             // Close the resilient sequencer subscription while it is creating the subscription
             // close will block waiting for the subscription request, so start in a future but defer waiting for its completion until after its resolved
-            closePromise.completeWith(Future { resilientSequencerSubscriptionRef.get().close() })
+            closePromise.completeWith(Future(resilientSequencerSubscriptionRef.get().close()))
             eventually() {
               resilientSequencerSubscriptionRef.get().isClosing shouldBe true
             }
@@ -239,7 +240,7 @@ class ResilientSequencerSubscriptionTest
       val resilientSequencerSubscription = new ResilientSequencerSubscription[TestHandlerError](
         SequencerId(domainId.uid),
         SequencerCounter(0),
-        _ => Future.successful[Either[TestHandlerError, Unit]](Right(())),
+        _ => Future.successful(Either.unit[TestHandlerError]),
         subscriptionFactory,
         retryDelay(),
         timeouts,
@@ -270,7 +271,7 @@ class ResilientSequencerSubscriptionTest
       val resilientSequencerSubscription = new ResilientSequencerSubscription[TestHandlerError](
         SequencerId(domainId.uid),
         SequencerCounter(0),
-        _ => Future.successful[Either[TestHandlerError, Unit]](Right(())),
+        _ => Future.successful(Either.unit[TestHandlerError]),
         subscriptionFactory,
         retryDelay(),
         timeouts,
@@ -353,7 +354,7 @@ trait ResilientSequencerSubscriptionTestUtils {
     val subscription = new ResilientSequencerSubscription(
       SequencerId(domainId.uid), // only used for logging
       SequencerCounter(0),
-      _ => Future.successful[Either[TestHandlerError, Unit]](Right(())),
+      _ => Future.successful(Either.unit[TestHandlerError]),
       subscriptionTestFactory,
       retryDelayRule,
       DefaultProcessingTimeouts.testing,
@@ -489,9 +490,8 @@ trait ResilientSequencerSubscriptionTestUtils {
       mockResponse.subscribed.map(_ => mockResponse)
     }
 
-    def addClosed(reason: SubscriptionCloseReason[TestHandlerError]): MockedSubscriptions = {
+    def addClosed(reason: SubscriptionCloseReason[TestHandlerError]): MockedSubscriptions =
       add(new MockSubscriptionResponse(Some(reason)))
-    }
 
     def add(mockSubscriptionResponse: MockSubscriptionResponse): MockedSubscriptions = {
       subscriptions += mockSubscriptionResponse
