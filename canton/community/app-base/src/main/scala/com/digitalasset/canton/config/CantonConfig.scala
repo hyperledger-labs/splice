@@ -406,6 +406,7 @@ trait CantonConfig {
           participantParameters.unsafeEnableOnlinePartyReplication,
         // TODO(i21341) Remove the flag before going to production
         experimentalEnableTopologyEvents = participantParameters.experimentalEnableTopologyEvents,
+        enableExternalAuthorization = participantParameters.enableExternalAuthorization,
       )
     }
 

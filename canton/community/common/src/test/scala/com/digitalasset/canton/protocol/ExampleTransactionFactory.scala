@@ -798,6 +798,7 @@ class ExampleTransactionFactory(
       DefaultDamlValues.submissionId().some,
       DeduplicationDuration(JDuration.ofSeconds(100)),
       ledgerTime.plusSeconds(100),
+      None,
       cryptoOps,
       protocolVersion,
     )

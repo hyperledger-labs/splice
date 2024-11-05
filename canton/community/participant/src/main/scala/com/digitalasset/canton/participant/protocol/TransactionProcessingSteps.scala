@@ -318,7 +318,10 @@ class TransactionProcessingSteps(
       val submitterInfoWithDedupPeriod =
         submitterInfo.copy(deduplicationPeriod = actualDeduplicationOffset)
 
-      def causeWithTemplate(message: String, reason: TransactionConfirmationRequestCreationError) =
+      def causeWithTemplate(
+          message: String,
+          reason: TransactionConfirmationRequestCreationError,
+      ): TransactionSubmissionTrackingData.CauseWithTemplate =
         TransactionSubmissionTrackingData.CauseWithTemplate(
           SubmissionErrors.MalformedRequest.Error(message, reason)
         )

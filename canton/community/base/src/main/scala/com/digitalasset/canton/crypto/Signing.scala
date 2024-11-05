@@ -208,6 +208,15 @@ object Signature
         signatureP.signingAlgorithmSpec,
       )
     } yield new Signature(format, signature, signedBy, signingAlgorithmSpecO)
+
+  def fromExternalSigning(
+      format: SignatureFormat,
+      signature: ByteString,
+      signedBy: Fingerprint,
+      signingAlgorithmSpec: SigningAlgorithmSpec,
+  ): Signature =
+    new Signature(format, signature, signedBy, Some(signingAlgorithmSpec))
+
 }
 
 sealed trait SignatureFormat extends Product with Serializable {

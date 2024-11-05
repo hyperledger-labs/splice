@@ -307,7 +307,7 @@ private[environment] class LedgerClient(
       result <- stub.executeSubmission(
         lapi.interactive_submission_service.ExecuteSubmissionRequest(
           preparedTransaction = Some(preparedTransaction),
-          partiesSignatures =
+          partySignatures =
             Some(lapi.interactive_submission_service.PartySignatures(partySignatures.toList.map {
               case (party, signature) =>
                 lapi.interactive_submission_service.SinglePartySignatures(
@@ -317,6 +317,7 @@ private[environment] class LedgerClient(
                       lapi.interactive_submission_service.SignatureFormat.SIGNATURE_FORMAT_RAW,
                       signature.signature,
                       signature.signedBy.toProtoPrimitive,
+                      lapi.interactive_submission_service.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519,
                     )
                   ),
                 )
