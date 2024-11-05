@@ -209,7 +209,20 @@ const SendTransfer: React.FC = () => {
           )}
 
           <DisableConditionally
-            conditions={[{ disabled: createTransferOfferMutation.isLoading, reason: 'Loading...' }]}
+            conditions={[
+              {
+                disabled: createTransferOfferMutation.isLoading,
+                reason: 'Creating transfer offer...',
+              },
+              {
+                disabled: transferPreapprovalSendMutation.isLoading,
+                reason: 'Executing preapproved transfer...',
+              },
+              {
+                disabled: preapprovalResult.isLoading,
+                reason: 'Loading preapproval data...',
+              },
+            ]}
           >
             <Button
               id="create-offer-submit-button"
@@ -221,7 +234,6 @@ const SendTransfer: React.FC = () => {
                   ? transferPreapprovalSendMutation.mutate()
                   : createTransferOfferMutation.mutate()
               }
-              disabled={preapprovalResult.data === undefined}
             >
               Send
             </Button>
