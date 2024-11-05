@@ -330,7 +330,7 @@ class HttpValidatorAdminHandler(
     withSpan(s"$workflowId.submitExternalPartyTopology") { _ => _ =>
       requireWalletEnabled { _ =>
         val publicKey = ValidatorUtil.signingPublicKeyFromHexEd25119(body.publicKey)
-        val partyId = body.signedTopologyTxs
+        val partyToParticipant = body.signedTopologyTxs
           .map(decodeSignedTopologyTx(publicKey, _))
           .flatMap(_.selectMapping[PartyToParticipant])
           .headOption
@@ -343,7 +343,7 @@ class HttpValidatorAdminHandler(
           )
           .transaction
           .mapping
-          .partyId
+        val partyId = partyToParticipant.partyId
         for {
           _ <- body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)).traverse_ { tx =>
             participantAdminConnection.addTopologyTransactions(
@@ -370,19 +370,7 @@ class HttpValidatorAdminHandler(
           participantId <- participantAdminConnection.getParticipantId()
           _ <- participantAdminConnection.proposeMapping(
             AuthorizedStore,
-            PartyToParticipant
-              .create(
-                partyId = partyId,
-                threshold = PositiveInt.one,
-                participants = Seq(
-                  HostingParticipant(participantId, ParticipantPermission.Submission)
-                ),
-              )
-              .valueOr(error =>
-                throw Status.INVALID_ARGUMENT
-                  .withDescription(s"failed to construct party to participant mapping: $error")
-                  .asRuntimeException()
-              ),
+            partyToParticipant,
             signedBy = participantId.fingerprint,
             serial = PositiveInt.one,
             isProposal = true,

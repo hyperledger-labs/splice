@@ -187,13 +187,12 @@ private[validator] object ValidatorUtil {
             .asRuntimeException()
         )
 
-      // TODO(#14568): change to Confirmation
       partyToParticipantMapping = PartyToParticipant
         .create(
           partyId = partyId,
           threshold = PositiveInt.one,
           participants = Seq(
-            HostingParticipant(participantId, ParticipantPermission.Submission)
+            HostingParticipant(participantId, ParticipantPermission.Confirmation)
           ),
         )
         .valueOr(error =>
