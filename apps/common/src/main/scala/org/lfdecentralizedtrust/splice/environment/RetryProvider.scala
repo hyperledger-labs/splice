@@ -23,7 +23,7 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.retry.{Backoff, ExceptionRetryPolicy, ErrorKind, Success}
+import com.digitalasset.canton.util.retry.{Backoff, ErrorKind, ExceptionRetryPolicy, Success}
 import ErrorKind.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.time.Clock
@@ -33,6 +33,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.Done
 import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import org.apache.pekko.stream.StreamTcpException
+import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 
 import java.io.IOException
 import java.net.ConnectException
@@ -692,6 +693,18 @@ object RetryProvider {
             TransientErrorKind()
           case ex @ HttpCommandException(_, status, _) =>
             if (retryableHttpStatusCodes.contains(status)) {
+              logger.info(
+                s"The operation ${operationName.singleQuoted} failed with a $transientDescription HTTP error: $ex"
+              )
+              TransientErrorKind()
+            } else {
+              logger.warn(
+                s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription HTTP error, $fatalBehavior: $ex"
+              )
+              FatalErrorKind
+            }
+          case ex @ HttpErrorWithHttpCode(code, _) =>
+            if (retryableHttpStatusCodes.contains(code)) {
               logger.info(
                 s"The operation ${operationName.singleQuoted} failed with a $transientDescription HTTP error: $ex"
               )
