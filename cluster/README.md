@@ -328,12 +328,21 @@ To upgrade a cluster controlled by the operator, you need to go
 through the following steps:
 
 1. Run the `publish-public-artifacts` job on CI.
-2. Make a PR to set `CHARTS_VERSION` in the `.envrc.vars` file of the corresponding cluster.
-   For CILR this PR should be made against `main`.
-   For production clusters (DevNet, TestNet, MainNet) this PR should be made against the respective deployment branch.
-   Note that for production clusters, the current process is to rebase the deployment branch to the release branch of the target version via force pushing (i.e., not a PR).
-3. If the active migration configured in the `cluster.yaml` under the key `synchronizerMigration.active.releaseReference` of the corresponding cluster is a Git tag,
-   e.g., `cilr` for CILR, then tag the merged commit with that tag.
+2. Make a PR where you:
+
+   1. Set `CHARTS_VERSION` and `OVERRIDE_VERSION` in the `.envrc.vars` file of the corresponding cluster.
+   2. If the active migration configured in the `cluster.yaml` under the key `synchronizerMigration.active.releaseReference`
+      of the corresponding cluster is a release line branch (this should be true for DevNet/TestNet/MainNet, usually not for CILR),
+      then update it to the release line of the new version.
+   3. Update any circleci periodic triggers for the cluster that run on the release line branch to the new release.
+
+   This PR should be made against `main` and against the release line of the new release.
+
+3. If the active migration configured in the `cluster.yaml` under the key `synchronizerMigration.active.releaseReference` of
+   the corresponding cluster is a Git tag, e.g., `cilr` for CILR, then tag the merged commit on `main` with that tag.
+
+4. In order for the operator to start tracking the new version, and thus apply the upgrade, trigger a CircleCI pipeline on
+   the release branch with `run-job: update-deployment` and `cluster: devnet` (or whatever cluster you are upgrading).
 
 #### The operator
 
