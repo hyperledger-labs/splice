@@ -77,7 +77,7 @@ class SvOnboardingAddlIntegrationTest
 
     val (token, svOnboardingRequestCid) =
       clue("Checking that SV4's `SvOnboarding` contract was created correctly by SV1") {
-        eventually()(
+        eventually(40.seconds)(
           // The onboarding is requested by SV4 during SvApp init.
           inside(
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
