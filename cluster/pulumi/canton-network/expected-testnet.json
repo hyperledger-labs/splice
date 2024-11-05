@@ -1417,11 +1417,6 @@
             "rewardWeightBps": 430000
           },
           {
-            "name": "Orb-1-LP",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJjVrU8AbQM12OyHwsoI1uHNQrtOYO5IFbB7w46F+ivPWSIo+7nqh5nKYFkFoMNPEYGUwrO57N12rj8Dyb0ldDg==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEOxCYWSBB4hDz7O1XxJ3xswKXxJcQqsgyzBTbWjkwa+ILYXy8T2vtVMoZ+tC/Ykdp3MyFwcMIP1kzcDKCSp0qow==",
             "rewardWeightBps": 10000
@@ -1430,6 +1425,11 @@
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEM/I3om2cE1ccDhYdy3wwKys3afBskv/OsRe8Jr52RywZOke+TfNbqQYcltATswgDi3HPdJUG3IEgo4Fh2vfl+g==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "Tradeweb-Markets-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEO3NIzHIIxatGCFHLdONUYNJ3SePvA4lq3EbtMgvpe1CoALZZ+CRNZrHNsj49jdeJNQgcJBPsOcW7XP6VF7Q1YA==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {

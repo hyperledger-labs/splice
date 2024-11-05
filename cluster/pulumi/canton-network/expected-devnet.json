@@ -2313,11 +2313,6 @@
             "rewardWeightBps": 120000
           },
           {
-            "name": "Orb-1-LP",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1LDIm4cEZ/fVP9Y3ReyP93osmeZ+9saRSHRDRb+gmLxtAEOL3GTYCRZClItc4gS8Y8FCNBBYkcSpfjvtBSTfGw==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Digital-Asset-Eng-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 140000
@@ -3185,11 +3180,6 @@
             "rewardWeightBps": 120000
           },
           {
-            "name": "Orb-1-LP",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1LDIm4cEZ/fVP9Y3ReyP93osmeZ+9saRSHRDRb+gmLxtAEOL3GTYCRZClItc4gS8Y8FCNBBYkcSpfjvtBSTfGw==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Digital-Asset-Eng-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 140000
@@ -4023,11 +4013,6 @@
             "rewardWeightBps": 120000
           },
           {
-            "name": "Orb-1-LP",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1LDIm4cEZ/fVP9Y3ReyP93osmeZ+9saRSHRDRb+gmLxtAEOL3GTYCRZClItc4gS8Y8FCNBBYkcSpfjvtBSTfGw==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Digital-Asset-Eng-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 140000
@@ -4859,11 +4844,6 @@
             "name": "Cumberland-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9/PUF/FFmdhbJNtxt+fR67LEW9vM/NluHSKTecvaqx7EYymDRsJf0GShphXwJAgrFzEOQ0Vsmbu6dmO6N1x8/g==",
             "rewardWeightBps": 120000
-          },
-          {
-            "name": "Orb-1-LP",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1LDIm4cEZ/fVP9Y3ReyP93osmeZ+9saRSHRDRb+gmLxtAEOL3GTYCRZClItc4gS8Y8FCNBBYkcSpfjvtBSTfGw==",
-            "rewardWeightBps": 0
           },
           {
             "name": "Digital-Asset-Eng-2",
