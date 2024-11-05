@@ -21,7 +21,7 @@ spec:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
         app: {{ .Release.Name }}-mediator
-        cn-component: mediator
+        splice-component: mediator
         {{- with $.Values.metrics.migration }}
         active_migration: {{ .active | quote }}
         migration_id: {{ .id | quote }}
