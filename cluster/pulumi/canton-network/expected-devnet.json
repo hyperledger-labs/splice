@@ -1921,8 +1921,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3",
-              "2"
+              "3"
             ]
           }
         },
@@ -2437,7 +2436,6 @@
         },
         "migration": {
           "id": 3,
-          "legacyId": 2,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -2788,8 +2786,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3",
-              "2"
+              "3"
             ]
           }
         },
@@ -3279,7 +3276,6 @@
         },
         "migration": {
           "id": 3,
-          "legacyId": 2,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-2",
@@ -3621,8 +3617,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3",
-              "2"
+              "3"
             ]
           }
         },
@@ -4112,7 +4107,6 @@
         },
         "migration": {
           "id": 3,
-          "legacyId": 2,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-3",
@@ -4454,8 +4448,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3",
-              "2"
+              "3"
             ]
           }
         },
@@ -4945,7 +4938,6 @@
         },
         "migration": {
           "id": 3,
-          "legacyId": 2,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-Eng-4",
