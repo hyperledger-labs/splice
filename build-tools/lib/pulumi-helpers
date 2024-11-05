@@ -185,6 +185,14 @@ function _pulumi_automation_run_refresh() {
   _killable_pulumi_automation_run --prefix "${REPO_ROOT}/cluster/pulumi" run refresh
 }
 
+function _pulumi_automation_run_cancel() {
+    if [ $# -eq 1 ]; then
+        _killable_pulumi_automation_run --prefix "${REPO_ROOT}/cluster/pulumi/$1" run cancel
+    else
+        _killable_pulumi_automation_run --prefix "${REPO_ROOT}/cluster/pulumi" run cancel
+    fi
+}
+
 # If we run npm [...] pulumi in the same process group as us, then when we ctrl-c,
 # it will signal pulumi at least twice, sometimes even three: once through the ctrl-c
 # signalling the whole process group, and once through pulumiXX.ts catching the signal

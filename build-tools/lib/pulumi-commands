@@ -192,6 +192,18 @@ function subcmd_pdown() {
 
 ###
 
+subcommand_whitelist[pcancel]="Cancel a running pulumi operation on the cluster (usually relevant when an operation was interrupted and left the lock unreleased)"
+
+function subcmd_pcancel() {
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _pulumi_automation_run_cancel
+}
+
+###
+
 subcommand_whitelist[prefresh]="Refresh the Pulumi resources in the stack"
 
 function subcmd_prefresh() {
@@ -540,4 +552,12 @@ subcommand_whitelist[pulumi_up_canton]="Up the sv-canton migrations"
 function subcmd_pulumi_up_canton() {
   _info "Updating sv-canton stacks"
   _pulumi_automation_run_up "sv-canton"
+}
+
+###
+subcommand_whitelist[pulumi_cancel_canton]="Cancel the pulumi operations on sv-canton migrations"
+
+function subcmd_pulumi_cancel_canton() {
+  _info "Canceling sv-canton stacks"
+  _pulumi_automation_run_cancel "sv-canton"
 }
