@@ -241,6 +241,13 @@ abstract class ValidatorAppReference(
     }
   }
 
+  @Help.Summary("Cancel TransferPreapproval for a given party")
+  def cancelTransferPreapprovalByParty(userPartyId: PartyId): Unit = {
+    consoleEnvironment.run {
+      httpCommand(HttpValidatorAdminAppClient.CancelTransferPreapprovalByParty(userPartyId))
+    }
+  }
+
   @Help.Summary("Prepare TransferPreapproval send")
   def prepareTransferPreapprovalSend(
       senderPartyId: PartyId,

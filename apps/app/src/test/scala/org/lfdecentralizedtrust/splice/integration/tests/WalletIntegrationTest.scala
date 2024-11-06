@@ -542,7 +542,7 @@ class WalletIntegrationTest
       }
     }
 
-    "TransferPreapprovals can be created, looked up and amulet can be sent through them" in {
+    "TransferPreapprovals can be created, looked up, cancelled and amulet can be sent through them" in {
       implicit env =>
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         aliceValidatorWalletClient.tap(10.0)
@@ -588,6 +588,17 @@ class WalletIntegrationTest
         assertThrowsAndLogsCommandFailures(
           bobWalletClient.transferPreapprovalSend(aliceUserParty, 40.0, deduplicationId),
           _.errorMessage should include("409 Conflict"),
+        )
+
+        actAndCheck(
+          "Alice validator cancels TransferPreapproval",
+          aliceValidatorBackend.cancelTransferPreapprovalByParty(aliceUserParty),
+        )(
+          "See that TransferPreapproval has been cancelled",
+          _ => {
+            aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
+            sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
+          },
         )
     }
 

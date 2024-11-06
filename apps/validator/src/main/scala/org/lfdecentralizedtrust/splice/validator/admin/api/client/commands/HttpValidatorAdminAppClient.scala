@@ -384,6 +384,26 @@ object HttpValidatorAdminAppClient {
     }
   }
 
+  case class CancelTransferPreapprovalByParty(
+      userPartyId: PartyId
+  ) extends BaseCommand[http.CancelTransferPreapprovalByPartyResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) =
+      client.cancelTransferPreapprovalByParty(userPartyId.toProtoPrimitive, headers = headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.CancelTransferPreapprovalByPartyResponse.OK =>
+        Right(())
+      case http.CancelTransferPreapprovalByPartyResponse.NotFound(response) =>
+        Left(response.error)
+    }
+  }
+
   case class ListTransferPreapprovals()
       extends BaseCommand[
         http.ListTransferPreapprovalsResponse,

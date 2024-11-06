@@ -663,6 +663,42 @@ class HttpValidatorAdminHandler(
     }
   }
 
+  override def cancelTransferPreapprovalByParty(
+      respond: v0.ValidatorAdminResource.CancelTransferPreapprovalByPartyResponse.type
+  )(
+      receiverParty: String
+  )(
+      tuser: TracedUser
+  ): Future[v0.ValidatorAdminResource.CancelTransferPreapprovalByPartyResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    val receiverPartyId = PartyId.tryFromProtoPrimitive(receiverParty)
+    val validatorParty = store.key.validatorParty
+    store.lookupTransferPreapprovalByReceiverPartyWithOffset(receiverPartyId).flatMap {
+      case QueryResult(_, None) =>
+        Future.successful(
+          v0.ValidatorAdminResource.CancelTransferPreapprovalByPartyResponse.NotFound(
+            definitions.ErrorResponse(s"No TransferPreapproval found for party: $receiverPartyId")
+          )
+        )
+      case QueryResult(_, Some(preapproval)) =>
+        storeWithIngestion.connection
+          .submit(
+            Seq(validatorParty),
+            Seq(validatorParty),
+            preapproval.toAssignedContract
+              .getOrElse(
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(s"TransferPreapproval contract is not assigned to a domain.")
+                  .asRuntimeException
+              )
+              .exercise(_.exerciseTransferPreapproval_Cancel(validatorParty.toProtoPrimitive)),
+          )
+          .noDedup
+          .yieldResult()
+          .map(_ => v0.ValidatorAdminResource.CancelTransferPreapprovalByPartyResponse.OK)
+    }
+  }
+
   override def listTransferPreapprovals(
       respond: v0.ValidatorAdminResource.ListTransferPreapprovalsResponse.type
   )()(tuser: TracedUser): Future[v0.ValidatorAdminResource.ListTransferPreapprovalsResponse] = {

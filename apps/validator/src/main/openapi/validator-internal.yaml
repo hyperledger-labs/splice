@@ -167,6 +167,21 @@ paths:
                 "$ref": "#/components/schemas/LookupTransferPreapprovalByPartyResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+    delete:
+      tags: [validator]
+      x-jvm-package: validator_admin
+      operationId: "cancelTransferPreapprovalByParty"
+      parameters:
+        - in: path
+          name: receiver-party
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
   /v0/admin/transfer-preapprovals:
     get:
@@ -253,7 +268,7 @@ paths:
             type: string
       responses:
         200:
-          description: ok"
+          description: ok
         404:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 

@@ -3509,6 +3509,8 @@ class State:
                 return self.handle_renew_transfer_preapproval(transaction, event)
             case "TransferPreapproval_Send":
                 return self.handle_transfer_preapproval_send(transaction, event)
+            case "TransferPreapproval_Cancel":
+                return HandleTransactionResult.empty()
             case "TransferCommand_Send":
                 return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":
