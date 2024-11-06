@@ -1,7 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { useMutation } from '@tanstack/react-query';
 import { DisableConditionally, Loading, useUserState } from 'common-frontend';
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { Button, Grid, Typography } from '@mui/material';
 
@@ -10,19 +11,27 @@ import { useWalletConfig } from '../utils/config';
 
 const Onboarding: React.FC = () => {
   const config = useWalletConfig();
-  const validatorService = useValidatorClient();
+  const { registerUser } = useValidatorClient();
   const { userId } = useUserState();
+  const navigate = useNavigate();
 
-  const [onboardClicked, setOnboardClicked] = useState<boolean>(false);
+  const onboardUserMutation = useMutation({
+    mutationFn: async () => {
+      return await registerUser();
+    },
+    onSuccess: () => {
+      navigate('/transactions');
+    },
+    onError: error => {
+      // TODO (#5491): show an error to the user.
+      console.error(`Failed to onboard user`, error);
+    },
+    retry: 3,
+  });
 
   if (!userId) {
     return <Loading />;
   }
-
-  const onOnboardUser = async () => {
-    setOnboardClicked(true);
-    await validatorService.registerUser();
-  };
 
   return (
     <Grid
@@ -44,13 +53,15 @@ const Onboarding: React.FC = () => {
         the button below to start using the wallet.
       </Typography>
 
-      <DisableConditionally conditions={[{ disabled: onboardClicked, reason: 'Loading...' }]}>
+      <DisableConditionally
+        conditions={[{ disabled: onboardUserMutation.isLoading, reason: 'Loading...' }]}
+      >
         <Button
           variant="pill"
           sx={{ margin: '15px' }}
           onClick={e => {
             e.preventDefault();
-            onOnboardUser();
+            onboardUserMutation.mutate();
           }}
           id="onboard-button"
         >
