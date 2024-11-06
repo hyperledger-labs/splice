@@ -5067,7 +5067,7 @@ workflows:
             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
           with_docker_images: true
-          resource_class: "xlarge"
+          resource_class: "2xlarge"
           parallelism: 2
       - ui_test:
           <<: *notify-fail
