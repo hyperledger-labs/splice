@@ -1503,14 +1503,14 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
    It's probably easiest to check this via the [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Ingested%20transaction%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:41:04.651869226Z;duration=PT30M?project=da-cn-devnet).
    Once you have verified this, move onto the next step quickly (no need to wait for the go-ahead from the person leading the call).
-1. Backup our SVs and validators:
+1. Backup our SVs and validators (see [Backup](#backup)):
    ```
-   cncluster backup_nodes <old_migration_id> sv-1
-   cncluster backup_nodes <old_migration_id> sv-2
-   cncluster backup_nodes <old_migration_id> sv-3
-   cncluster backup_nodes <old_migration_id> sv-4
-   cncluster backup_nodes <old_migration_id> validator1
-   cncluster backup_nodes <old_migration_id> splitwell
+   cncluster backup_nodes <old_migration_id> true|false sv-1
+   cncluster backup_nodes <old_migration_id> true|false sv-2
+   cncluster backup_nodes <old_migration_id> true|false sv-3
+   cncluster backup_nodes <old_migration_id> true|false sv-4
+   cncluster backup_nodes <old_migration_id> true|false validator1
+   cncluster backup_nodes <old_migration_id> true|false splitwell
    ```
    Our backups are slow, specifically the SV backups can take upto 10 mins. So you want to get started early and launch the commands in parallel.
    Note that our tooling currently doesn't support backing up our runbook nodes.
@@ -1948,7 +1948,9 @@ node (where a "node" in this context is a single SV or a single validator). It p
 of backups of all relevant persistent storage, identified by a RUN_ID. These backups are
 guaranteed to be consistent in terms of ordering requirements.
 
-This script can also be invoked from `cncluster` through `cncluster backup_nodes <migration_id> <node...>`, where node can be one (or more) of {sv-1, sv-2, sv-3, sv-4, validator1, splitwell}.
+This script can also be invoked from `cncluster` through `cncluster backup_nodes <migration_id> <internal_stack> <node...>`,
+where `internal_stack` is true if the nodes are deployed through the internal stack (canton-network), and false otherwise, and
+where `node` can be one (or more) of {sv-1, sv-2, sv-3, sv-4, validator1, splitwell}.
 
 For every node, at the end of the backup process, the script will report something like:
 ```
@@ -1964,8 +1966,9 @@ cidaily, cilr and the prod clusters are backed up periodically through CircleCI,
 Backups created through `node-backup.sh` (or the corresponding `cncluster backup_nodes`
 command) can be used for recovery using the `node-restore.sh` command.
 
-To do that, run: `node-restore.sh <node> <run_id> <component...>`, where `component` can be one
-or more out of {validator, participant} for a validator and one or more out of
+To do that, run: `node-restore.sh <namespace> <migration_id> <run_id> <internal_stack> <component...>`,
+where `internal_stack` is true if the nodes are deployed through the internal stack (canton-network), and false otherwise, and
+where `component` can be one or more out of {validator, participant} for a validator and one or more out of
 {validator, scan, sv-app, participant-<migration_id>, mediator, sequencer, cometbft-<migration_id>} for an SV.
 
 Most components can, in general, be restored independently of others.

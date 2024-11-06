@@ -1559,7 +1559,7 @@ function subcmd_backup_nodes() {
         _error "<migration_id> must be a positive integer"
     fi
 
-    if [[ "$1" == "true" || "$1" == "false" ]]; then
+    if [[ "$2" != "true" && "$2" != "false" ]]; then
         echo "Usage: $0 <internal_stack> [node...]"
         _error "<internal_stack> must be either \"true\" or \"false\""
     fi
