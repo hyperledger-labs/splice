@@ -318,6 +318,7 @@ jobs:
             cncluster activate
             mkdir -p workspace
             cncluster dump_identities > workspace/identities-before.json
+          cmd_retry_count: 3
       - persist_to_workspace:
           root: workspace
           paths:
