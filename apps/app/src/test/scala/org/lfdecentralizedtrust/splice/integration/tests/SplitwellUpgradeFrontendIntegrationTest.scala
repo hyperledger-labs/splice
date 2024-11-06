@@ -262,7 +262,7 @@ class SplitwellUpgradeFrontendIntegrationTest
               loginOnCurrentPage(bobWalletUIPort, bobDamlUser)
               actAndCheck(
                 "Bob completes payment after migration",
-                click on className("payment-accept"),
+                eventuallyClickOn(className("payment-accept")),
               )(
                 "Bob returns to splitwell and balance update gets transferred to splitwellUpgrade",
                 _ => {

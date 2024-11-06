@@ -466,7 +466,7 @@ class WalletPaymentFrontendIntegrationTest
   ): ContractWithState[AcceptedAppPayment.ContractId, AcceptedAppPayment] = {
     actAndCheck(
       "Alice clicks on the button to confirm the payment", {
-        click on className("payment-accept")
+        eventuallyClickOn(className("payment-accept"))
         go to s"http://localhost:3000"
       },
     )(

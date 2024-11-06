@@ -25,7 +25,7 @@ import org.openqa.selenium.{
 }
 import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
-import org.openqa.selenium.support.ui.{ExpectedCondition, WebDriverWait}
+import org.openqa.selenium.support.ui.{ExpectedCondition, ExpectedConditions, WebDriverWait}
 import org.scalatest.ParallelTestExecution
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
@@ -657,6 +657,15 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     eventually() {
       textField.attribute("data-resolved-party-id") shouldBe Some(expectedPartyId)
     }
+  }
+
+  protected def eventuallyClickOn(query: Query)(implicit driver: WebDriverType) = {
+    clue(s"Waiting for $query to be clickable") {
+      waitForCondition(query) {
+        ExpectedConditions.elementToBeClickable(_)
+      }
+    }
+    clickOn(query)
   }
 }
 
