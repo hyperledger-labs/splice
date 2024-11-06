@@ -7,6 +7,9 @@ ARG pulumi_version
 
 FROM pulumi/pulumi:${pulumi_version}
 
+# TODO(tech-debt) Clean up workaround for broken k8s apt repo (`EXPKEYSIG 234654DA9A296436` error)
+RUN rm /etc/apt/sources.list.d/kubernetes.list
+
 RUN apt-get update \
     && apt-get install tini \
     && apt-get clean
