@@ -49,26 +49,24 @@ def bootstrapOtherDomain(
   val domainId = sequencer.domain_id
   // Align the reconciliation interval and catchup config with what our triggers set.
   // This doesn't really matter for splitwell but it matters for the soft synchronizer upgrade test.
-  Seq(sequencer, mediator).foreach { node =>
-    node.topology.domain_parameters.propose_update(
-      domainId,
-      parameters =>
-        parameters.update(
-          reconciliationInterval = PositiveDurationSeconds.ofMinutes(30),
-          acsCommitmentsCatchUpConfig = Some(
-            AcsCommitmentsCatchUpConfig(
-              catchUpIntervalSkip = PositiveInt.tryCreate(24),
-              nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
-            )
-          ),
-          submissionTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofHours(24),
-          mediatorDeduplicationTimeout = NonNegativeFiniteDuration.ofHours(48),
+  sequencer.topology.domain_parameters.propose_update(
+    domainId,
+    parameters =>
+      parameters.update(
+        reconciliationInterval = PositiveDurationSeconds.ofMinutes(30),
+        acsCommitmentsCatchUpConfig = Some(
+          AcsCommitmentsCatchUpConfig(
+            catchUpIntervalSkip = PositiveInt.tryCreate(24),
+            nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
+          )
         ),
-      signedBy = Some(node.id.uid.namespace.fingerprint),
-      // This is test code so just force the change.
-      force = ForceFlags(ForceFlag.SubmissionTimeRecordTimeToleranceIncrease),
-    )
-  }
+        submissionTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofHours(24),
+        mediatorDeduplicationTimeout = NonNegativeFiniteDuration.ofHours(48),
+      ),
+    signedBy = Some(sequencer.id.uid.namespace.fingerprint),
+    // This is test code so just force the change.
+    force = ForceFlags(ForceFlag.SubmissionTimeRecordTimeToleranceIncrease),
+  )
 }
 
 Seq(
