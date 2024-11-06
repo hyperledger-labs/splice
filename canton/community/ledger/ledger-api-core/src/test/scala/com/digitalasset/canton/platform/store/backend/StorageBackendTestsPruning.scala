@@ -980,7 +980,7 @@ private[backend] trait StorageBackendTestsPruning
     val someParty = Ref.Party.assertFromString("party")
     val completion = dtoCompletion(
       offset = offset(1),
-      submitters = Set(someParty),
+      submitter = someParty,
     )
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     // Ingest a completion
@@ -990,8 +990,6 @@ private[backend] trait StorageBackendTestsPruning
     executeSql(backend.completion.pruneCompletions(offset(1))(_, TraceContext.empty))
     assertIndexDbDataSql(completion = Seq.empty)
   }
-
-  // TODO(i21351) Implement pruning tests for topology events
 
   /** Asserts the content of the tables subject to pruning.
     * Be default asserts the tables are empty.

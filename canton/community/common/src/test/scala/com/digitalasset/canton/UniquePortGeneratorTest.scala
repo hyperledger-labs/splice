@@ -36,11 +36,12 @@ class UniquePortGeneratorTest extends AnyFlatSpec with BaseTest with HasExecutio
     }
   }
 
-  override def afterAll(): Unit =
+  override def afterAll(): Unit = {
     lock.foreach { l =>
       if (l.isValid) {
         l.release()
       }
     }
+  }
 
 }

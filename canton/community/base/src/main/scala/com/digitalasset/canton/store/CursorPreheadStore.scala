@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.store
 
-import com.digitalasset.canton.SequencerCounterDiscriminator
 import com.digitalasset.canton.data.{CantonTimestamp, Counter}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.TransactionalStoreUpdate
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.{RequestCounterDiscriminator, SequencerCounterDiscriminator}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -55,7 +55,7 @@ trait CursorPreheadStore[Discr] extends AutoCloseable {
 final case class CursorPrehead[Discr](counter: Counter[Discr], timestamp: CantonTimestamp)
     extends PrettyPrinting {
 
-  override protected def pretty: Pretty[CursorPrehead.this.type] = prettyOfClass(
+  override def pretty: Pretty[CursorPrehead.this.type] = prettyOfClass(
     param("counter", _.counter),
     param("timestamp", _.timestamp),
   )
@@ -63,4 +63,5 @@ final case class CursorPrehead[Discr](counter: Counter[Discr], timestamp: Canton
 
 object CursorPrehead {
   type SequencerCounterCursorPrehead = CursorPrehead[SequencerCounterDiscriminator]
+  type RequestCounterCursorPrehead = CursorPrehead[RequestCounterDiscriminator]
 }

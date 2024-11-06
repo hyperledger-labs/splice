@@ -7,8 +7,8 @@ import com.daml.ledger.api.v2.command_service.CommandServiceGrpc.CommandServiceS
 import com.daml.ledger.api.v2.command_service.{
   SubmitAndWaitForTransactionResponse,
   SubmitAndWaitForTransactionTreeResponse,
+  SubmitAndWaitForUpdateIdResponse,
   SubmitAndWaitRequest,
-  SubmitAndWaitResponse,
 }
 import com.daml.ledger.api.v2.commands.Commands
 import com.digitalasset.canton.ledger.client.LedgerClient
@@ -26,17 +26,28 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
     executionContext: ExecutionContext
 ) {
 
-  private def handleException[R](exception: Throwable): Future[Either[Status, R]] =
+  private def handleException[R](exception: Throwable): Future[Either[Status, R]] = {
     statusFromThrowable(exception) match {
       case Some(value) => Future.successful(Left(value))
       case None => Future.failed(exception)
     }
+  }
 
   /** Submits and waits, optionally with a custom timeout
     *
     * Note that the [[com.daml.ledger.api.v2.commands.Commands]] argument is scala protobuf. If you use java codegen,
     * you need to convert the List[Command] using the codegenToScalaProto method
     */
+  def submitAndWait(
+      commands: Commands,
+      timeout: Option[Duration] = None,
+      token: Option[String] = None,
+  )(implicit traceContext: TraceContext): Future[Either[Status, Unit]] =
+    submitAndHandle(
+      timeout,
+      token,
+      _.submitAndWait(SubmitAndWaitRequest(commands = Some(commands))).map(_ => ()),
+    )
 
   def deprecatedSubmitAndWaitForTransactionForJsonApi(
       request: SubmitAndWaitRequest,
@@ -82,18 +93,19 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
       _.submitAndWaitForTransactionTree(SubmitAndWaitRequest(commands = Some(commands))),
     )
 
-  def submitAndWait(
+  def submitAndWaitForUpdateId(
       commands: Commands,
       timeout: Option[Duration] = None,
       token: Option[String] = None,
   )(implicit
       traceContext: TraceContext
-  ): Future[Either[Status, SubmitAndWaitResponse]] =
+  ): Future[Either[Status, SubmitAndWaitForUpdateIdResponse]] = {
     submitAndHandle(
       timeout,
       token,
-      _.submitAndWait(SubmitAndWaitRequest(commands = Some(commands))),
+      _.submitAndWaitForUpdateId(SubmitAndWaitRequest(commands = Some(commands))),
     )
+  }
 
   private def serviceWithTokenAndDeadline(
       timeout: Option[Duration],
@@ -113,12 +125,13 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
       timeout: Option[Duration],
       token: Option[String],
       request: CommandServiceStub => Future[R],
-  )(implicit traceContext: TraceContext): Future[Either[Status, R]] =
+  )(implicit traceContext: TraceContext): Future[Either[Status, R]] = {
     request(serviceWithTokenAndDeadline(timeout, token))
       .transformWith {
         case Success(value) => Future.successful(Right(value))
         case Failure(exception) => handleException(exception)
       }
+  }
 }
 
 object CommandServiceClient {

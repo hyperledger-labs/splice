@@ -4,19 +4,15 @@
 package org.lfdecentralizedtrust.splice.validator.store.db
 
 import cats.implicits.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store.AppConfiguration
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  ExternalPartySetupProposal,
-  TransferPreapproval,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
-  install as walletCodegen,
-  topupstate as topupCodegen,
-}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   validatorlicense as validatorLicenseCodegen,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store.AppConfiguration
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
+  install as walletCodegen,
+  topupstate as topupCodegen,
 }
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -101,7 +97,7 @@ class DbValidatorStore(
           storeId,
           domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
-              walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
+              walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
             )} and user_party = $endUserParty""",
           orderLimit = sql"limit 1",
         ).headOption,
@@ -122,7 +118,7 @@ class DbValidatorStore(
           storeId,
           domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
-              walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
+              walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
             )} and user_name = ${lengthLimited(endUserName)}""",
           orderLimit = sql"limit 1",
         ).headOption,
@@ -143,7 +139,7 @@ class DbValidatorStore(
           storeId,
           domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
-              amuletCodegen.FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
+              amuletCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID
             )} and provider_party = ${walletKey.validatorParty}""",
           orderLimit = sql"limit 1",
         ).headOption,
@@ -168,7 +164,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                walletCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
+                walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
               )}
               and user_name = ${lengthLimited(endUserName)}
             """,
@@ -181,76 +177,6 @@ class DbValidatorStore(
       resultWithOffset.offset,
       resultWithOffset.row.map(
         contractWithStateFromRow(walletCodegen.WalletAppInstall.COMPANION)(_)
-      ),
-    )
-  }
-
-  override def lookupExternalPartySetupProposalByUserPartyWithOffset(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[ContractWithState[ExternalPartySetupProposal.ContractId, ExternalPartySetupProposal]]
-    ]
-  ] = waitUntilAcsIngested {
-    for {
-      resultWithOffset <- storage
-        .querySingle(
-          selectFromAcsTableWithStateAndOffset(
-            ValidatorTables.acsTableName,
-            storeId,
-            domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                ExternalPartySetupProposal.COMPANION.TEMPLATE_ID
-              )}
-                and user_party = $partyId
-            """, // TODO(#14568): ensure this is indexed
-            orderLimit = sql"""
-                limit 1
-            """,
-          ).headOption,
-          "lookupExternalPartySetupProposalUser",
-        )
-        .getOrElse(throw offsetExpectedError())
-
-    } yield QueryResult(
-      resultWithOffset.offset,
-      resultWithOffset.row.map(
-        contractWithStateFromRow(ExternalPartySetupProposal.COMPANION)(_)
-      ),
-    )
-  }
-
-  override def lookupTransferPreapprovalByReceiverPartyWithOffset(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]]
-  ] = waitUntilAcsIngested {
-    for {
-      resultWithOffset <- storage
-        .querySingle(
-          selectFromAcsTableWithStateAndOffset(
-            ValidatorTables.acsTableName,
-            storeId,
-            domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                TransferPreapproval.COMPANION.TEMPLATE_ID
-              )}
-                and user_party = $partyId
-            """,
-            orderLimit = sql"""
-                limit 1
-            """,
-          ).headOption,
-          "lookupTransferPreapprovalReceiver",
-        )
-        .getOrElse(throw offsetExpectedError())
-
-    } yield QueryResult(
-      resultWithOffset.offset,
-      resultWithOffset.row.map(
-        contractWithStateFromRow(TransferPreapproval.COMPANION)(_)
       ),
     )
   }
@@ -270,7 +196,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
+                validatorLicenseCodegen.ValidatorLicense.COMPANION.TEMPLATE_ID
               )}
               and validator_party = ${key.validatorParty}
             """,
@@ -305,7 +231,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                amuletCodegen.ValidatorRight.TEMPLATE_ID_WITH_PACKAGE_ID
+                amuletCodegen.ValidatorRight.COMPANION.TEMPLATE_ID
               )}
               and user_party = $party
             """,
@@ -337,7 +263,7 @@ class DbValidatorStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.AppConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
+                appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID
               )}
               and provider_party = $provider
               """,
@@ -367,7 +293,7 @@ class DbValidatorStore(
               domainMigrationId,
               where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                  appManagerCodegen.AppConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
+                  appManagerCodegen.AppConfiguration.TEMPLATE_ID
                 )}
                 and app_configuration_name = ${lengthLimited(name)}
                 """,
@@ -400,7 +326,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.AppConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
+                appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID
               )}
               and provider_party = $provider
               and app_configuration_version = $version
@@ -432,7 +358,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.AppRelease.TEMPLATE_ID_WITH_PACKAGE_ID
+                appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID
               )}
               and provider_party = $provider
               and app_release_version = ${lengthLimited(version)}
@@ -465,7 +391,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.RegisteredApp.TEMPLATE_ID_WITH_PACKAGE_ID
+                appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID
               )}
               and provider_party = $provider
             """,
@@ -497,7 +423,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.InstalledApp.TEMPLATE_ID_WITH_PACKAGE_ID
+                appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID
               )}
               and provider_party = $provider
             """,
@@ -532,7 +458,7 @@ class DbValidatorStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
+                appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
               )}
               and provider_party = $provider""",
             orderLimit = sql"limit ${sqlLimit(limit)}",
@@ -565,7 +491,7 @@ class DbValidatorStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
+                appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
               )}
               and provider_party = $provider
               and json_hash = $jsonHash
@@ -598,7 +524,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                topupCodegen.ValidatorTopUpState.TEMPLATE_ID_WITH_PACKAGE_ID
+                topupCodegen.ValidatorTopUpState.COMPANION.TEMPLATE_ID
               )}
               and traffic_domain_id = $domainId
             """,

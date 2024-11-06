@@ -12,7 +12,6 @@ import com.digitalasset.canton.common.domain.SequencerConnectClient.{
 import com.digitalasset.canton.common.domain.grpc.GrpcSequencerConnectClient
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.domain.api.v30
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.client.SequencerClient
@@ -22,25 +21,25 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.Ge
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, SequencerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 trait SequencerConnectClient extends NamedLogging with AutoCloseable {
 
   def getDomainClientBootstrapInfo(domainAlias: DomainAlias)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, DomainClientBootstrapInfo]
+  ): EitherT[Future, Error, DomainClientBootstrapInfo]
 
   /** @param domainIdentifier Used for logging purpose
     */
   def getDomainParameters(domainIdentifier: String)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, StaticDomainParameters]
+  ): EitherT[Future, Error, StaticDomainParameters]
 
   /** @param domainIdentifier Used for logging purpose
     */
   def getDomainId(domainIdentifier: String)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, DomainId]
+  ): EitherT[Future, Error, DomainId]
 
   def handshake(
       domainAlias: DomainAlias,
@@ -48,11 +47,11 @@ trait SequencerConnectClient extends NamedLogging with AutoCloseable {
       dontWarnOnDeprecatedPV: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, HandshakeResponse]
+  ): EitherT[Future, Error, HandshakeResponse]
 
-  def isActive(participantId: ParticipantId, domainAlias: DomainAlias, waitForActive: Boolean)(
-      implicit traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, Boolean]
+  def isActive(participantId: ParticipantId, waitForActive: Boolean)(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, Error, Boolean]
 
   protected def handleVerifyActiveResponse(
       response: v30.SequencerConnect.VerifyActiveResponse
@@ -69,12 +68,13 @@ trait SequencerConnectClient extends NamedLogging with AutoCloseable {
       domainAlias: DomainAlias,
       member: Member,
       topologyTransactions: Seq[GenericSignedTopologyTransaction],
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Error, Unit]
+  )(implicit traceContext: TraceContext): EitherT[Future, Error, Unit]
 }
 
 object SequencerConnectClient {
 
-  type Builder = (DomainAlias, SequencerConnection) => SequencerConnectClient
+  type Builder =
+    SequencerConnection => EitherT[Future, Error, SequencerConnectClient]
 
   sealed trait Error {
     def message: String
@@ -89,28 +89,30 @@ object SequencerConnectClient {
   }
 
   def apply(
-      domainAlias: DomainAlias,
       sequencerConnection: SequencerConnection,
       timeouts: ProcessingTimeout,
       traceContextPropagation: TracingConfig.Propagation,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ec: ExecutionContextExecutor
-  ): SequencerConnectClient =
-    sequencerConnection match {
-      case connection: GrpcSequencerConnection =>
-        new GrpcSequencerConnectClient(
-          connection,
-          timeouts,
-          traceContextPropagation,
-          SequencerClient
-            .loggerFactoryWithSequencerAlias(
-              loggerFactory.append("domainAlias", domainAlias.toString),
-              connection.sequencerAlias,
+  ): EitherT[Future, Error, SequencerConnectClient] = {
+    for {
+      client <- sequencerConnection match {
+        case connection: GrpcSequencerConnection =>
+          EitherT.rightT[Future, Error](
+            new GrpcSequencerConnectClient(
+              connection,
+              timeouts,
+              traceContextPropagation,
+              SequencerClient.loggerFactoryWithSequencerConnection(
+                loggerFactory,
+                connection.sequencerAlias,
+              ),
             )
-            .append("sequencerConnection", connection.endpoints.map(_.toString).mkString(",")),
-        )
-    }
+          )
+      }
+    } yield client
+  }
 
   final case class DomainClientBootstrapInfo(domainId: DomainId, sequencerId: SequencerId)
 }

@@ -7,8 +7,9 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.sequencing.admin.data.SequencerHealthStatus.implicitPrettyString
+import com.digitalasset.canton.domain.block.UninitializedBlockHeight
 import com.digitalasset.canton.domain.sequencing.sequencer.InFlightAggregation.AggregationBySender
+import com.digitalasset.canton.health.admin.data.SequencerHealthStatus.implicitPrettyString
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.sequencer.admin.v30
 import com.digitalasset.canton.sequencing.protocol.{AggregationId, AggregationRule}
@@ -65,7 +66,7 @@ final case class SequencerSnapshot(
       headMemberCounters =
         // TODO(#12075) sortBy is a poor man's approach to achieving deterministic serialization here
         //  Figure out whether we need this for sequencer snapshots
-        heads.toSeq.sortBy { case (member, _) => member }.map { case (member, counter) =>
+        heads.toSeq.sortBy { case (member, _counter) => member }.map { case (member, counter) =>
           v30.SequencerSnapshot.MemberCounter(member.toProtoPrimitive, counter.toProtoPrimitive)
         },
       status = Some(status.toProtoV30),
@@ -80,9 +81,8 @@ final case class SequencerSnapshot(
   /** Indicates how to pretty print this instance.
     * See `PrettyPrintingTest` for examples on how to implement this method.
     */
-  override protected def pretty: Pretty[SequencerSnapshot.this.type] = prettyOfClass(
+  override def pretty: Pretty[SequencerSnapshot.this.type] = prettyOfClass(
     param("lastTs", _.lastTs),
-    param("latestBlockHeight", _.latestBlockHeight),
     param("heads", _.heads),
     param("status", _.status),
     param("inFlightAggregations", _.inFlightAggregations),
@@ -90,22 +90,11 @@ final case class SequencerSnapshot(
     param("trafficPurchased", _.trafficPurchased),
     param("trafficConsumed", _.trafficConsumed),
   )
-
-  // compares this snapshot with another one for contents equality
-  def hasSameContentsAs(otherSnapshot: SequencerSnapshot): Boolean =
-    lastTs == otherSnapshot.lastTs && latestBlockHeight == otherSnapshot.latestBlockHeight &&
-      // map comparison
-      heads.equals(otherSnapshot.heads) && status == otherSnapshot.status &&
-      // map comparison
-      inFlightAggregations.equals(otherSnapshot.inFlightAggregations) &&
-      additional == otherSnapshot.additional &&
-      trafficPurchased.toSet == otherSnapshot.trafficPurchased.toSet &&
-      trafficConsumed.toSet == otherSnapshot.trafficConsumed.toSet
 }
 
 object SequencerSnapshot extends HasProtocolVersionedCompanion[SequencerSnapshot] {
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.SequencerSnapshot)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.SequencerSnapshot)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -135,9 +124,20 @@ object SequencerSnapshot extends HasProtocolVersionedCompanion[SequencerSnapshot
       trafficConsumed,
     )(protocolVersionRepresentativeFor(protocolVersion))
 
+  def unimplemented(protocolVersion: ProtocolVersion): SequencerSnapshot = SequencerSnapshot(
+    CantonTimestamp.MinValue,
+    UninitializedBlockHeight,
+    Map.empty,
+    SequencerPruningStatus.Unimplemented,
+    Map.empty,
+    None,
+    Seq.empty,
+    Seq.empty,
+  )(protocolVersionRepresentativeFor(protocolVersion))
+
   final case class ImplementationSpecificInfo(implementationName: String, info: ByteString)
       extends PrettyPrinting {
-    override protected def pretty: Pretty[ImplementationSpecificInfo.this.type] = prettyOfClass(
+    override def pretty: Pretty[ImplementationSpecificInfo.this.type] = prettyOfClass(
       param("implementationName", _.implementationName),
       param("info", _.info),
     )

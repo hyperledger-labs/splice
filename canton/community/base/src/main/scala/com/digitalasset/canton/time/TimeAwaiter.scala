@@ -3,11 +3,14 @@
 
 package com.digitalasset.canton.time
 
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.lifecycle.{
+  FutureUnlessShutdown,
+  PerformUnlessClosing,
+  UnlessShutdown,
+}
+import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 
@@ -17,13 +20,12 @@ import scala.concurrent.{Future, Promise, blocking}
 import scala.jdk.CollectionConverters.*
 
 /** Utility to implement a time awaiter
+  *
+  * Note, you need to invoke expireOnShutdown onClosed
   */
-final class TimeAwaiter(
-    getCurrentKnownTime: () => CantonTimestamp,
-    override val timeouts: ProcessingTimeout,
-    override val loggerFactory: NamedLoggerFactory,
-) extends FlagCloseable
-    with NamedLogging {
+trait TimeAwaiter {
+
+  this: PerformUnlessClosing & NamedLogging =>
 
   private abstract class Awaiting[T] {
     val promise: Promise[T] = Promise[T]()
@@ -42,17 +44,20 @@ final class TimeAwaiter(
     override def success(): Unit = promise.trySuccess(UnlessShutdown.unit).discard
   }
 
-  override def onClosed(): Unit =
+  protected def expireTimeAwaiter(): Unit =
     blocking(awaitTimestampFuturesLock.synchronized {
       awaitTimestampFutures.iterator().asScala.foreach(_._2.shutdown().discard[Boolean])
     })
 
-  def awaitKnownTimestamp(
-      timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Option[Future[Unit]] =
-    awaitKnownTimestampGen(timestamp, new General()).map(_.promise.future)
+  protected def currentKnownTime: CantonTimestamp
 
-  def awaitKnownTimestampUS(
+  protected def awaitKnownTimestamp(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): Option[Future[Unit]] = {
+    awaitKnownTimestampGen(timestamp, new General()).map(_.promise.future)
+  }
+
+  protected def awaitKnownTimestampUS(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): Option[FutureUnlessShutdown[Unit]] =
     performUnlessClosing(s"await known timestamp at $timestamp") {
@@ -64,7 +69,7 @@ final class TimeAwaiter(
       timestamp: CantonTimestamp,
       create: => Awaiting[T],
   )(implicit traceContext: TraceContext): Option[Awaiting[T]] = {
-    val current = getCurrentKnownTime()
+    val current = currentKnownTime
     if (current >= timestamp) None
     else {
       logger.debug(
@@ -76,7 +81,7 @@ final class TimeAwaiter(
       })
       // If the timestamp has been advanced while we're inserting into the priority queue,
       // make sure that we're completing the future.
-      val newCurrent = getCurrentKnownTime()
+      val newCurrent = currentKnownTime
       if (newCurrent >= timestamp) notifyAwaitedFutures(newCurrent)
       Some(awaiter)
     }
@@ -91,7 +96,7 @@ final class TimeAwaiter(
     )
   private val awaitTimestampFuturesLock: AnyRef = new Object()
 
-  def notifyAwaitedFutures(
+  protected def notifyAwaitedFutures(
       upToInclusive: CantonTimestamp
   )(implicit traceContext: TraceContext): Unit = {
     @tailrec def go(): Unit = Option(awaitTimestampFutures.peek()) match {

@@ -9,10 +9,7 @@ import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AmuletCreateSummary
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  InvalidTransferReason,
-  TransferSummary,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.InvalidTransferReason
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtransferreason.{
   ITR_InsufficientFunds,
   ITR_InsufficientTopupAmount,
@@ -21,14 +18,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtr
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequestTrackingInfo
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.{
-  CO_AcceptTransferPreapprovalProposal,
   CO_AppPayment,
   CO_BuyMemberTraffic,
   CO_CompleteAcceptedTransfer,
   CO_CompleteBuyTrafficRequest,
-  CO_CreateExternalPartySetupProposal,
   CO_MergeTransferInputs,
-  CO_RenewTransferPreapproval,
   CO_SubscriptionAcceptAndMakeInitialPayment,
   CO_SubscriptionMakePayment,
   CO_Tap,
@@ -48,21 +42,18 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   transferoffer as transferCodegen,
 }
 import org.lfdecentralizedtrust.splice.history.{
+  AnsRules_CollectEntryRenewalPayment,
+  AnsRules_CollectInitialEntryPayment,
   AmuletArchive,
   AmuletCreate,
   AmuletExpire,
   AmuletRules_BuyMemberTraffic,
-  AmuletRules_CreateExternalPartySetupProposal,
-  AmuletRules_CreateTransferPreapproval,
-  AnsRules_CollectEntryRenewalPayment,
-  AnsRules_CollectInitialEntryPayment,
   LockedAmuletExpireAmulet,
   LockedAmuletOwnerExpireLock,
   LockedAmuletUnlock,
   Mint,
   Tap,
   Transfer,
-  TransferPreapproval_Renew,
 }
 import org.lfdecentralizedtrust.splice.store.TxLogStore
 import org.lfdecentralizedtrust.splice.util.{ExerciseNode, ExerciseNodeCompanion}
@@ -235,13 +226,9 @@ class UserWalletTxLogParser(
                       // The errors below should not produce notifications
                       case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
                           _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic |
-                          _: CO_CompleteBuyTrafficRequest | _: CO_CreateExternalPartySetupProposal |
-                          _: CO_AcceptTransferPreapprovalProposal | _: CO_RenewTransferPreapproval |
-                          _: CO_Tap | _: ExtAmuletOperation =>
+                          _: CO_CompleteBuyTrafficRequest | _: CO_Tap | _: ExtAmuletOperation =>
                         State.empty
-                      case _ => {
-                        throw new RuntimeException(s"Invalid operation $op")
-                      }
+                      case _ => throw new RuntimeException(s"Invalid operation $op")
                     }
                   } else {
                     State.empty
@@ -652,19 +639,6 @@ class UserWalletTxLogParser(
             )(_.amulet)
 
           // ------------------------------------------------------------------
-          // Transfer pre-approvals
-          // ------------------------------------------------------------------
-
-          case AmuletRules_CreateExternalPartySetupProposal(node) =>
-            now(State.fromCreateExternalPartySetupProposal(node, tree, exercised))
-
-          case AmuletRules_CreateTransferPreapproval(node) =>
-            now(State.fromCreateTransferPreapproval(node, tree, exercised))
-
-          case TransferPreapproval_Renew(node) =>
-            now(State.fromRenewTransferPreapproval(node, tree, exercised))
-
-          // ------------------------------------------------------------------
           // Other
           // ------------------------------------------------------------------
 
@@ -711,7 +685,7 @@ class UserWalletTxLogParser(
       .entries
   }
 
-  override def error(offset: Long, eventId: String, domainId: DomainId): Option[TxLogEntry] =
+  override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
     Some(UnknownTxLogEntry(eventId))
 
   private def fromAnsEntryPaymentCollection(
@@ -1104,85 +1078,6 @@ object UserWalletTxLogParser {
         amuletPrice = node.result.value.summary.amuletPrice,
         appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
         validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
-      )
-
-      State(
-        entries = immutable.Queue(newEntry)
-      )
-    }
-
-    def fromCreateExternalPartySetupProposal(
-        node: ExerciseNode[
-          AmuletRules_CreateExternalPartySetupProposal.Arg,
-          AmuletRules_CreateExternalPartySetupProposal.Res,
-        ],
-        tx: TransactionTree,
-        event: ExercisedEvent,
-    ): State = {
-      State.fromTransferPreapprovalPurchase(
-        tx,
-        event,
-        node.result.value.validator,
-        node.result.value.transferResult.summary,
-        TransferTransactionSubtype.TransferPreapprovalCreation,
-      )
-    }
-
-    def fromCreateTransferPreapproval(
-        node: ExerciseNode[
-          AmuletRules_CreateTransferPreapproval.Arg,
-          AmuletRules_CreateTransferPreapproval.Res,
-        ],
-        tx: TransactionTree,
-        event: ExercisedEvent,
-    ): State = {
-      State.fromTransferPreapprovalPurchase(
-        tx,
-        event,
-        node.argument.value.provider,
-        node.result.value.transferResult.summary,
-        TransferTransactionSubtype.TransferPreapprovalCreation,
-      )
-    }
-
-    def fromRenewTransferPreapproval(
-        node: ExerciseNode[
-          TransferPreapproval_Renew.Arg,
-          TransferPreapproval_Renew.Res,
-        ],
-        tx: TransactionTree,
-        event: ExercisedEvent,
-    ): State = {
-      State.fromTransferPreapprovalPurchase(
-        tx,
-        event,
-        node.result.value.provider,
-        node.result.value.transferResult.summary,
-        TransferTransactionSubtype.TransferPreapprovalRenewal,
-      )
-    }
-
-    private def fromTransferPreapprovalPurchase(
-        tx: TransactionTree,
-        event: ExercisedEvent,
-        provider: String,
-        summary: TransferSummary,
-        transferSubtype: TransferTransactionSubtype,
-    ) = {
-      val netSenderInput = summary.inputAmuletAmount - summary.holdingFees
-      val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
-
-      val newEntry = TransferTxLogEntry(
-        eventId = event.getEventId,
-        subtype = Some(transferSubtype.toProto),
-        date = Some(tx.getEffectiveAt),
-        provider = provider,
-        sender = Some(PartyAndAmount(provider, senderBalanceChange)),
-        receivers = Seq.empty,
-        senderHoldingFees = summary.holdingFees,
-        amuletPrice = summary.amuletPrice,
-        appRewardsUsed = BigDecimal(summary.inputAppRewardAmount),
-        validatorRewardsUsed = BigDecimal(summary.inputValidatorRewardAmount),
       )
 
       State(

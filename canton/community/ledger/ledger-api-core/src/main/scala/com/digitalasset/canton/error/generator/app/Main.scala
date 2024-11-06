@@ -32,11 +32,12 @@ object Main {
       )
     )
 
-  implicit val deprecatedEncode: Encoder[DeprecatedItem] =
+  implicit val deprecatedEncode: Encoder[DeprecatedItem] = {
     Encoder.forProduct2(
       "message",
       "since",
     )(i => (i.message, i.since))
+  }
 
   implicit val errorCodeEncode: Encoder[ErrorCodeDocItem] =
     Encoder.forProduct8(

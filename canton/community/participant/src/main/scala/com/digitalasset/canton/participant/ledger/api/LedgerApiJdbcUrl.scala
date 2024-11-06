@@ -28,6 +28,7 @@ object LedgerApiJdbcUrl {
   private val userKey = "user"
   private val passwordKey = "password"
   private val databaseNameKey = "databaseName"
+  private val currentSchema = "currentSchema"
 
   private val nonParametersProperties = Set(
     serverNameKey,
@@ -43,7 +44,7 @@ object LedgerApiJdbcUrl {
     case h2: H2DbConfig => reuseH2(h2.config)
     case postgres: PostgresDbConfig => reusePostgres(postgres.config)
     case _: DbConfig => Left("Unknown db-config type")
-  }).leftMap(FailedToConfigureLedgerApiStorage.apply)
+  }).leftMap(FailedToConfigureLedgerApiStorage)
 
   /** Extensions to [[com.typesafe.config.Config]] to make config extraction more concise for our purposes. */
   private implicit class ConfigExtensions(config: Config) {
@@ -109,13 +110,13 @@ object LedgerApiJdbcUrl {
         .map(
           _.entrySet().asScala
             .filterNot(e => nonParametersProperties.contains(e.getKey))
-            .foldLeft(Map.empty[String, String]) {
+            .foldLeft(Map.empty[String, String])({
               // All properties should be string anyways, but to avoid bad surprises, filter for them here
               case (parametersMap, configEntry)
                   if configEntry.getValue.valueType() == ConfigValueType.STRING =>
                 parametersMap.updated(configEntry.getKey, configEntry.getValue.unwrapped.toString)
               case (parametersMap, _) => parametersMap
-            }
+            })
         )
         .getOrElse(Map.empty[String, String])
 
@@ -173,7 +174,11 @@ object LedgerApiJdbcUrl {
     def isDefined(key: String): Boolean =
       options.keySet.find(_.equalsIgnoreCase(key)).fold(false)(_ => true)
 
-    def addIfMissing(key: String, defaultValue: => Option[String]): UrlBuilder =
+    def replace(key: String, value: String): UrlBuilder =
+      // remove any existing values with this key and add the provided
+      copy(options = options.filterNot(_._1.equalsIgnoreCase(key)) + (key -> value))
+
+    def addIfMissing(key: String, defaultValue: => Option[String]): UrlBuilder = {
       if (isDefined(key)) this
       else
         defaultValue
@@ -181,9 +186,11 @@ object LedgerApiJdbcUrl {
           // https://stackoverflow.com/questions/13984567/how-to-escape-special-characters-in-mysql-jdbc-connection-string
           .map(v => copy(options = options + (key -> URLEncoder.encode(v, "utf-8"))))
           .getOrElse(this)
+    }
 
-    def addAll(values: Map[String, String]): UrlBuilder =
+    def addAll(values: Map[String, String]): UrlBuilder = {
       copy(options = options ++ values.fmap(URLEncoder.encode(_, "utf-8")))
+    }
 
     def build: String = {
       val JdbcUrlFormat(queryStringSeparator, parameterSeparator) = format
@@ -223,16 +230,17 @@ object LedgerApiJdbcUrl {
     private def parseQueryString(
         queryString: String,
         format: JdbcUrlFormat,
-    ): Map[String, String] =
+    ): Map[String, String] = {
       queryString
         .split(format.parameterSeparator)
-        .map { param =>
+        .map(param => {
           val eqIndex = param.indexOf('=')
 
           if (eqIndex >= 0) param.substring(0, eqIndex) -> param.substring(eqIndex + 1)
           else param -> ""
-        }
+        })
         .toMap // if a key is duplicated the last one will win, this matches the behavior of the postgres driver
+    }
   }
 
   private object UrlBuilder {

@@ -54,7 +54,7 @@ trait DbMigrations { this: NamedLogging =>
   /** Database is migrated using Flyway, which looks at the migration files at
     * src/main/resources/db/migration/canton as explained at https://flywaydb.org/documentation/getstarted/firststeps/api
     */
-  protected def createFlyway(dataSource: DataSource): Flyway =
+  protected def createFlyway(dataSource: DataSource): Flyway = {
     Flyway.configure
       .locations(dbConfig.buildMigrationsPaths(alphaVersionSupport)*)
       .dataSource(dataSource)
@@ -63,10 +63,11 @@ trait DbMigrations { this: NamedLogging =>
       .baselineOnMigrate(dbConfig.parameters.unsafeBaselineOnMigrate)
       .lockRetryCount(60)
       .load()
+  }
 
   protected def withCreatedDb[A](retryConfig: DbStorage.RetryConfig)(
       fn: Database => EitherT[UnlessShutdown, DbMigrations.Error, A]
-  ): EitherT[UnlessShutdown, DbMigrations.Error, A] =
+  ): EitherT[UnlessShutdown, DbMigrations.Error, A] = {
     DbStorage
       .createDatabase(
         dbConfig,
@@ -75,8 +76,9 @@ trait DbMigrations { this: NamedLogging =>
         forMigration = true,
         retryConfig = retryConfig,
       )(loggerFactory)
-      .leftMap(DbMigrations.DatabaseError.apply)
+      .leftMap(DbMigrations.DatabaseError)
       .flatMap(db => ResourceUtil.withResource(db)(fn))
+  }
 
   /** Obtain access to the database to run the migration operation. */
   protected def withDb[A](
@@ -87,18 +89,19 @@ trait DbMigrations { this: NamedLogging =>
 
   protected def migrateDatabaseInternal(
       flyway: Flyway
-  )(implicit traceContext: TraceContext): EitherT[UnlessShutdown, DbMigrations.Error, Unit] =
+  )(implicit traceContext: TraceContext): EitherT[UnlessShutdown, DbMigrations.Error, Unit] = {
     // Retry the migration in case of failures, which may happen due to a race condition in concurrent migrations
     RetryEither.retry[DbMigrations.Error, Unit](10, 100, functionFullName, logger) {
       Either
         .catchOnly[FlywayException](flyway.migrate())
         .map(r => logger.info(s"Applied ${r.migrationsExecuted} migrations successfully"))
-        .leftMap(DbMigrations.FlywayError.apply)
+        .leftMap(DbMigrations.FlywayError)
     }
+  }
 
   protected def repairFlywayMigrationInternal(
       flyway: Flyway
-  )(implicit traceContext: TraceContext): EitherT[UnlessShutdown, DbMigrations.Error, Unit] =
+  )(implicit traceContext: TraceContext): EitherT[UnlessShutdown, DbMigrations.Error, Unit] = {
     Either
       .catchOnly[FlywayException](flyway.repair())
       .map(r =>
@@ -106,8 +109,9 @@ trait DbMigrations { this: NamedLogging =>
           s"The repair of the Flyway database migration succeeded. This is the Flyway repair report: $r"
         )
       )
-      .leftMap[DbMigrations.Error](DbMigrations.FlywayError.apply)
+      .leftMap[DbMigrations.Error](DbMigrations.FlywayError)
       .toEitherT[UnlessShutdown]
+  }
 
   protected def dbConfig: DbConfig
 
@@ -152,7 +156,7 @@ trait DbMigrations { this: NamedLogging =>
   private def connectionCheck(
       source: JdbcDataSource,
       processingTimeout: ProcessingTimeout,
-  ): EitherT[UnlessShutdown, DbMigrations.Error, Unit] =
+  ): EitherT[UnlessShutdown, DbMigrations.Error, Unit] = {
     ResourceUtil
       .withResourceEither(source.createConnection()) { conn =>
         val valid = blocking {
@@ -175,6 +179,7 @@ trait DbMigrations { this: NamedLogging =>
         Left(DbMigrations.DatabaseError(s"failed to create connection ${err.getMessage}"))
       }
       .toEitherT[UnlessShutdown]
+  }
 
   def checkAndMigrate(params: CantonNodeParameters, retryConfig: RetryConfig)(implicit
       tc: TraceContext
@@ -220,12 +225,13 @@ trait DbMigrations { this: NamedLogging =>
 
   private def migrateIfFreshInternal(flyway: Flyway)(implicit
       traceContext: TraceContext
-  ): EitherT[UnlessShutdown, DbMigrations.Error, Unit] =
+  ): EitherT[UnlessShutdown, DbMigrations.Error, Unit] = {
     if (flyway.info().applied().isEmpty) migrateDatabaseInternal(flyway)
     else {
       logger.debug("Skip flyway migration on non-empty database")
       EitherT.rightT(())
     }
+  }
 
   /** Combined method of migrateIfFresh and checkPendingMigration, avoids creating multiple pools */
   private def migrateIfFreshAndCheckPending(
@@ -250,14 +256,14 @@ trait DbMigrations { this: NamedLogging =>
 
   private def checkPendingMigrationInternal(
       flyway: Flyway
-  ): Either[DbMigrations.Error, Unit] =
+  ): Either[DbMigrations.Error, Unit] = {
     for {
       info <- Either
         .catchOnly[FlywayException](flyway.info())
-        .leftMap(DbMigrations.FlywayError.apply)
+        .leftMap(DbMigrations.FlywayError)
       pendingMigrations = info.pending()
       _ <-
-        if (pendingMigrations.isEmpty) Either.unit
+        if (pendingMigrations.isEmpty) Right(())
         else {
           val currentVersion = Option(info.current()).map(_.getVersion.getVersion)
           val lastVersion = pendingMigrations.last.getVersion.getVersion
@@ -270,6 +276,7 @@ trait DbMigrations { this: NamedLogging =>
           Left(DbMigrations.PendingMigrationError(msg))
         }
     } yield ()
+  }
 
 }
 
@@ -317,25 +324,21 @@ object DbMigrations {
 
   sealed trait Error extends PrettyPrinting
   final case class FlywayError(err: FlywayException) extends Error {
-    override protected def pretty: Pretty[FlywayError] = prettyOfClass(unnamedParam(_.err))
+    override def pretty: Pretty[FlywayError] = prettyOfClass(unnamedParam(_.err))
   }
   final case class PendingMigrationError(msg: String) extends Error {
-    override protected def pretty: Pretty[PendingMigrationError] = prettyOfClass(
-      unnamedParam(_.msg.unquoted)
-    )
+    override def pretty: Pretty[PendingMigrationError] = prettyOfClass(unnamedParam(_.msg.unquoted))
   }
   final case class DatabaseError(error: String) extends Error {
-    override protected def pretty: Pretty[DatabaseError] = prettyOfClass(
-      unnamedParam(_.error.unquoted)
-    )
+    override def pretty: Pretty[DatabaseError] = prettyOfClass(unnamedParam(_.error.unquoted))
   }
   final case class DatabaseVersionError(error: String) extends Error {
-    override protected def pretty: Pretty[DatabaseVersionError] = prettyOfClass(
+    override def pretty: Pretty[DatabaseVersionError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class DatabaseConfigError(error: String) extends Error {
-    override protected def pretty: Pretty[DatabaseConfigError] = prettyOfClass(
+    override def pretty: Pretty[DatabaseConfigError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }

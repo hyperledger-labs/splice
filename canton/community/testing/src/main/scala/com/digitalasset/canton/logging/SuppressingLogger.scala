@@ -163,7 +163,7 @@ class SuppressingLogger private[logging] (
   def assertInternalError[T <: Throwable](within: => Any, assertion: T => Assertion)(implicit
       c: ClassTag[T],
       pos: source.Position,
-  ): Assertion =
+  ): Assertion = {
     assertLogs(
       {
         val t = the[T] thrownBy within
@@ -171,6 +171,7 @@ class SuppressingLogger private[logging] (
       },
       checkLogsInternalError(assertion),
     )
+  }
 
   def checkLogsInternalError[T <: Throwable](
       assertion: T => Assertion
@@ -245,7 +246,9 @@ class SuppressingLogger private[logging] (
   ): A =
     suppress(rule) {
       runWithCleanup(
-        within,
+        {
+          within
+        },
         { () =>
           // check the log
 
@@ -291,15 +294,17 @@ class SuppressingLogger private[logging] (
   )(within: => A, assertion: Seq[LogEntry] => Assertion): A =
     suppress(rule) {
       runWithCleanup(
-        within,
-        () => checkLogsAssertion(assertion),
+        {
+          within
+        },
+        { () => checkLogsAssertion(assertion) },
         () => (),
       )
     }
 
   /** Asserts that the sequence of logged warnings/errors will eventually meet a given assertion.
     * Use this if the expected sequence of logged warnings/errors is non-deterministic and the log-message assertion might not immediately succeed when it is called (e.g. because the messages might be logged with a delay).
-    * The SuppressingLogger only starts suppressing and capturing logs when this method is called,
+    * The SupressingLogger only starts supresing and capturing logs when this method is called,
     * If some logs that we want to capture might fire before the start or after the end of the suppression. Please use method `assertEventuallyLogsSeq` instead to provide those action in `within` parameter.
     * On success, the method will delete all logged messages. So this method is not idempotent.
     *
@@ -338,8 +343,10 @@ class SuppressingLogger private[logging] (
   ): A =
     suppress(rule) {
       runWithCleanup(
-        within,
-        () => BaseTest.eventually(timeUntilSuccess, maxPollInterval)(checkLogsAssertion(assertion)),
+        { within },
+        { () =>
+          BaseTest.eventually(timeUntilSuccess, maxPollInterval)(checkLogsAssertion(assertion))
+        },
         () => (),
       )
     }
@@ -551,10 +558,10 @@ class SuppressingLogger private[logging] (
 
           // Cleanup after completion of the future.
           val asyncResultWithCleanup = asyncResult
-            .map { r =>
+            .map(r => {
               onSuccess(result)
               r
-            }
+            })
             .thereafter(_ => doFinally())
 
           // Switch off cleanup in finally block, as that would be performed too early
@@ -669,13 +676,14 @@ object SuppressingLogger {
 
   def assertThatLogDoesntContainUnexpected(
       expectedProblems: List[String]
-  )(logs: Seq[LogEntry]): Assertion =
+  )(logs: Seq[LogEntry]): Assertion = {
     forEvery(logs) { x =>
       assert(
         expectedProblems.exists(msg => x.toString.contains(msg)),
         s"line $x contained unexpected problem",
       )
     }
+  }
 
   /** Lists criteria for log entries that are skipped during suppression in all test cases */
   val skippedLogEntries: Seq[LogEntryCriterion] = Seq(

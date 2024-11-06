@@ -12,8 +12,6 @@ import "com/digitalasset/canton/admin/domain/v30/sequencer_connection.proto";
 service SequencerConnectionService {
   rpc GetConnection(GetConnectionRequest) returns (GetConnectionResponse);
   rpc SetConnection(SetConnectionRequest) returns (SetConnectionResponse);
-  // Revoke the authentication tokens for all the sequencers on the domain and disconnect the sequencer clients
-  rpc Logout(LogoutRequest) returns (LogoutResponse);
 }
 
 message GetConnectionRequest {}
@@ -28,7 +26,3 @@ message SetConnectionRequest {
 }
 
 message SetConnectionResponse {}
-
-message LogoutRequest {}
-
-message LogoutResponse {}

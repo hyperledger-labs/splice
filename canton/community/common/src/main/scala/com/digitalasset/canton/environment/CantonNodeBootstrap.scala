@@ -11,9 +11,6 @@ import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricName
 import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.nonempty.NonEmpty
-import com.daml.tracing.DefaultOpenTelemetry
-import com.digitalasset.canton.admin.health.v30.StatusServiceGrpc
-import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -44,6 +41,7 @@ import com.digitalasset.canton.health.admin.data.{
   WaitingForNodeTopology,
 }
 import com.digitalasset.canton.health.admin.grpc.GrpcStatusService
+import com.digitalasset.canton.health.admin.v30.StatusServiceGrpc
 import com.digitalasset.canton.health.{
   DependenciesHealthService,
   GrpcHealthReporter,
@@ -60,11 +58,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.DbStorageMetrics
-import com.digitalasset.canton.networking.grpc.{
-  CantonGrpcUtil,
-  CantonMutableHandlerRegistry,
-  CantonServerBuilder,
-}
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, CantonServerBuilder}
 import com.digitalasset.canton.resource.{Storage, StorageFactory}
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
@@ -80,7 +74,7 @@ import com.digitalasset.canton.topology.client.{
   DomainTopologyClient,
   IdentityProvidingServiceClient,
 }
-import com.digitalasset.canton.topology.store.TopologyStoreId.{AuthorizedStore, DomainStore}
+import com.digitalasset.canton.topology.store.TopologyStoreId.DomainStore
 import com.digitalasset.canton.topology.store.{InitializationStore, TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.{
   NamespaceDelegation,
@@ -93,7 +87,6 @@ import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.{FutureUtil, SimpleExecutionQueue}
 import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
 import com.digitalasset.canton.watchdog.WatchdogService
-import io.grpc.ServerServiceDefinition
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -188,22 +181,6 @@ abstract class CantonNodeBootstrapImpl[
   override def timeouts: ProcessingTimeout = arguments.parameterConfig.processingTimeouts
   override def loggerFactory: NamedLoggerFactory = arguments.loggerFactory
   protected def futureSupervisor: FutureSupervisor = arguments.futureSupervisor
-  protected def createAuthorizedTopologyManager(
-      nodeId: UniqueIdentifier,
-      crypto: Crypto,
-      authorizedStore: TopologyStore[AuthorizedStore],
-      storage: Storage,
-  ): AuthorizedTopologyManager =
-    new AuthorizedTopologyManager(
-      nodeId,
-      clock,
-      crypto,
-      authorizedStore,
-      exitOnFatalFailures = parameters.exitOnFatalFailures,
-      bootstrapStageCallback.timeouts,
-      futureSupervisor,
-      bootstrapStageCallback.loggerFactory,
-    )
 
   protected val cryptoConfig: CryptoConfig = config.crypto
   protected val initConfig: InitConfigBase = config.init
@@ -223,18 +200,17 @@ abstract class CantonNodeBootstrapImpl[
   protected val ips = new IdentityProvidingServiceClient()
 
   private val adminApiConfig = config.adminApi
-  protected def adminTokenConfig: Option[String]
 
-  def getAdminToken: Option[String] = startupStage.getAdminToken
-
-  protected def getNodeStatus: NodeStatus[T#Status] =
+  private def status: Future[NodeStatus[NodeStatus.Status]] = {
     getNode
-      .map(_.status)
-      .map(NodeStatus.Success(_))
-      .getOrElse(NodeStatus.NotInitialized(isActive, waitingFor))
+      .map(_.status.map(NodeStatus.Success(_)))
+      .getOrElse(
+        Future.successful(NodeStatus.NotInitialized(isActive, waitingFor))
+      )
+  }
 
   private def waitingFor: Option[WaitingForExternalInput] = {
-    def nextStage(stage: BootstrapStage[?, ?]): Option[BootstrapStage[?, ?]] =
+    def nextStage(stage: BootstrapStage[?, ?]): Option[BootstrapStage[?, ?]] = {
       stage.next match {
         case Some(s: BootstrapStage[_, _]) => nextStage(s)
         case Some(_: RunningNode[_]) => None
@@ -243,24 +219,63 @@ abstract class CantonNodeBootstrapImpl[
         case Some(_) => None
         case None => Some(stage)
       }
+    }
     nextStage(startupStage).flatMap(_.waitingFor)
   }
 
-  protected def registerHealthGauge(): Unit =
+  protected def registerHealthGauge(): Unit = {
     arguments.metrics.healthMetrics
       .registerHealthGauge(
         name.toProtoPrimitive,
-        () => getNode.exists(_.status.active),
+        () => getNode.map(_.status.map(_.active)).getOrElse(Future(false)),
       )
       .discard // we still want to report the health even if the node is closed
+  }
+
+  // The admin-API services
+  logger.info(s"Starting admin-api services on $adminApiConfig")
+  protected val (adminServer, adminServerRegistry) = {
+    val builder = CantonServerBuilder
+      .forConfig(
+        adminApiConfig,
+        arguments.metrics.prefix,
+        arguments.metrics.openTelemetryMetricsFactory,
+        executionContext,
+        loggerFactory,
+        parameterConfig.loggingConfig.api,
+        parameterConfig.tracing,
+        arguments.metrics.grpcMetrics,
+      )
+
+    val registry = builder.mutableHandlerRegistry()
+
+    val server = builder
+      .addService(
+        StatusServiceGrpc.bindService(
+          new GrpcStatusService(
+            status,
+            arguments.writeHealthDumpToFile,
+            parameterConfig.processingTimeouts,
+            loggerFactory,
+          ),
+          executionContext,
+        )
+      )
+      .addService(ProtoReflectionService.newInstance(), withLogging = false)
+      .addService(
+        ApiInfoServiceGrpc.bindService(
+          new GrpcApiInfoService(CantonGrpcUtil.ApiName.AdminApi),
+          executionContext,
+        )
+      )
+      .build
+      .start()
+    (Lifecycle.toCloseableServer(server, logger, "AdminServer"), registry)
+  }
 
   protected def mkNodeHealthService(
       storage: Storage
   ): (DependenciesHealthService, LivenessHealthService)
-
-  // Node specific status service need to be bound early
-  protected def bindNodeStatusService(): ServerServiceDefinition
-
   protected def mkHealthComponents(
       nodeHealthService: DependenciesHealthService,
       livenessService: LivenessHealthService,
@@ -304,8 +319,6 @@ abstract class CantonNodeBootstrapImpl[
   protected def customNodeStages(
       storage: Storage,
       crypto: Crypto,
-      adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
       nodeId: UniqueIdentifier,
       manager: AuthorizedTopologyManager,
       healthReporter: GrpcHealthReporter,
@@ -330,23 +343,20 @@ abstract class CantonNodeBootstrapImpl[
     * topology stores which are only available in a later startup stage (domain nodes) or
     * in the node runtime itself (participant sync domain)
     */
-  protected def sequencedTopologyStores: Seq[TopologyStore[DomainStore]]
+  // TODO(#14048) implement me!
+  protected def sequencedTopologyStores: Seq[TopologyStore[DomainStore]] = Seq()
 
-  protected def sequencedTopologyManagers: Seq[DomainTopologyManager]
+  protected def sequencedTopologyManagers: Seq[DomainTopologyManager] = Seq()
 
   protected val bootstrapStageCallback = new BootstrapStage.Callback {
     override def loggerFactory: NamedLoggerFactory = CantonNodeBootstrapImpl.this.loggerFactory
     override def timeouts: ProcessingTimeout = CantonNodeBootstrapImpl.this.timeouts
-    override def abortThisNodeOnStartupFailure(): Unit =
+    override def abortThisNodeOnStartupFailure(): Unit = {
       // TODO(#14048) bubble this up into env ensuring that the node is properly deregistered from env if we fail during
       //   async startup. (node should be removed from running nodes)
       //   we can't call node.close() here as this thing is executed within a performUnlessClosing, so we'd deadlock
-      if (parameters.exitOnFatalFailures) {
-        FatalError.exitOnFatalError(s"startup of node $name failed", logger)
-      } else {
-        logger.error(s"Startup of node $name failed")
-      }
-
+      FatalError.exitOnFatalError(s"startup of node $name failed", logger)
+    }
     override val queue: SimpleExecutionQueue = initQueue
     override def ec: ExecutionContext = CantonNodeBootstrapImpl.this.executionContext
   }
@@ -360,7 +370,7 @@ abstract class CantonNodeBootstrapImpl[
     ) {
       override protected def attempt()(implicit
           traceContext: TraceContext
-      ): EitherT[FutureUnlessShutdown, String, Option[SetupCrypto]] =
+      ): EitherT[FutureUnlessShutdown, String, Option[SetupCrypto]] = {
         EitherT(
           FutureUnlessShutdown.lift(
             arguments.storageFactory
@@ -381,11 +391,12 @@ abstract class CantonNodeBootstrapImpl[
           val (healthService, livenessService) = mkNodeHealthService(storage)
           addCloseable(healthService)
           addCloseable(livenessService)
-          val (healthReporter, grpcHealthServer, httpHealthServer) =
+          val (healthReporter, grpcHealthServer, httpHealthServer) = {
             mkHealthComponents(healthService, livenessService)
+          }
           arguments.parameterConfig.watchdog
             .filter(_.enabled)
-            .foreach { watchdogConfig =>
+            .foreach(watchdogConfig => {
               val watchdog = WatchdogService.SysExitOnNotServing(
                 watchdogConfig.checkInterval,
                 watchdogConfig.killDelay,
@@ -394,12 +405,13 @@ abstract class CantonNodeBootstrapImpl[
                 bootstrap.timeouts,
               )
               addCloseable(watchdog)
-            }
+            })
           grpcHealthServer.foreach(addCloseable)
           httpHealthServer.foreach(addCloseable)
           addCloseable(storage)
           Some(new SetupCrypto(storage, healthReporter, healthService))
         }
+      }
     }
 
   private class SetupCrypto(
@@ -412,36 +424,9 @@ abstract class CantonNodeBootstrapImpl[
       )
       with HasCloseContext {
 
-    private def createAdminServerRegistry(
-        adminToken: CantonAdminToken
-    ): CantonMutableHandlerRegistry = {
-      // The admin-API services
-      logger.info(s"Starting admin-api services on $adminApiConfig")
-      val openTelemetry = new DefaultOpenTelemetry(tracerProvider.openTelemetry)
-      val builder = CantonServerBuilder
-        .forConfig(
-          adminApiConfig,
-          Some(adminToken),
-          executionContext,
-          bootstrapStageCallback.loggerFactory,
-          parameterConfig.loggingConfig.api,
-          parameterConfig.tracing,
-          arguments.metrics.grpcMetrics,
-          openTelemetry,
-        )
-
-      val registry = builder.mutableHandlerRegistry()
-
-      val server = builder.build
-        .start()
-      addCloseable(Lifecycle.toCloseableServer(server, logger, "AdminServer"))
-      addCloseable(registry)
-      registry
-    }
-
     override protected def attempt()(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, String, Option[SetupNodeId]] =
+    ): EitherT[FutureUnlessShutdown, String, Option[SetupNodeId]] = {
       // crypto factory doesn't write to the db during startup, hence,
       // we won't have "isPassive" issues here
       performUnlessClosingEitherUSF("create-crypto")(
@@ -457,33 +442,6 @@ abstract class CantonNodeBootstrapImpl[
           )
           .map { crypto =>
             addCloseable(crypto)
-            // admin token is taken from the config or created per session
-            val adminToken: CantonAdminToken = adminTokenConfig
-              .fold(CantonAdminToken.create(crypto.pureCrypto))(token =>
-                CantonAdminToken(secret = token)
-              )
-            val adminServerRegistry = createAdminServerRegistry(adminToken)
-
-            adminServerRegistry.addServiceU(bindNodeStatusService())
-
-            adminServerRegistry.addServiceU(
-              StatusServiceGrpc.bindService(
-                new GrpcStatusService(
-                  arguments.writeHealthDumpToFile,
-                  parameterConfig.processingTimeouts,
-                  bootstrapStageCallback.loggerFactory,
-                ),
-                executionContext,
-              )
-            )
-            adminServerRegistry
-              .addServiceU(ProtoReflectionService.newInstance().bindService(), withLogging = false)
-            adminServerRegistry.addServiceU(
-              ApiInfoServiceGrpc.bindService(
-                new GrpcApiInfoService(CantonGrpcUtil.ApiName.AdminApi),
-                executionContext,
-              )
-            )
             adminServerRegistry.addServiceU(
               VaultServiceGrpc.bindService(
                 arguments.grpcVaultServiceFactory
@@ -496,25 +454,15 @@ abstract class CantonNodeBootstrapImpl[
                 executionContext,
               )
             )
-            Some(
-              new SetupNodeId(
-                storage,
-                crypto,
-                adminServerRegistry,
-                adminToken,
-                healthReporter,
-                healthService,
-              )
-            )
+            Some(new SetupNodeId(storage, crypto, healthReporter, healthService))
           }
       )
+    }
   }
 
   private class SetupNodeId(
       storage: Storage,
       val crypto: Crypto,
-      adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
       healthReporter: GrpcHealthReporter,
       healthService: DependenciesHealthService,
   ) extends BootstrapStageWithStorage[T, GenerateOrAwaitNodeTopologyTx, UniqueIdentifier](
@@ -525,7 +473,6 @@ abstract class CantonNodeBootstrapImpl[
       )
       with HasCloseContext
       with GrpcIdentityInitializationService.Callback {
-    override def getAdminToken: Option[String] = Some(adminToken.secret)
 
     private val initializationStore = InitializationStore(
       storage,
@@ -571,25 +518,20 @@ abstract class CantonNodeBootstrapImpl[
           authorizedStore,
           storage,
           crypto,
-          adminServerRegistry,
-          adminToken,
           healthReporter,
           healthService,
         )
       )
 
     override protected def autoCompleteStage()
-        : EitherT[FutureUnlessShutdown, String, Option[UniqueIdentifier]] =
+        : EitherT[FutureUnlessShutdown, String, Option[UniqueIdentifier]] = {
       for {
         // create namespace key
-        namespaceKey <- CantonNodeBootstrapImpl.getOrCreateSigningKey(crypto)(
-          s"$name-${SigningKeyUsage.Namespace.identifier}"
-        )
+        namespaceKey <- CantonNodeBootstrapImpl.getOrCreateSigningKey(crypto)(s"$name-namespace")
         // create id
-        identifierName =
-          arguments.config.init.identity
-            .flatMap(_.nodeIdentifier.identifierName)
-            .getOrElse(name.unwrap)
+        identifierName = arguments.config.init.identity
+          .flatMap(_.nodeIdentifier.identifierName)
+          .getOrElse(name.unwrap)
         uid <- EitherT
           .fromEither[FutureUnlessShutdown](
             UniqueIdentifier
@@ -600,6 +542,7 @@ abstract class CantonNodeBootstrapImpl[
           .right[String](initializationStore.setUid(uid))
           .mapK(FutureUnlessShutdown.outcomeK)
       } yield Option(uid)
+    }
 
     override def initializeWithProvidedId(uid: UniqueIdentifier)(implicit
         traceContext: TraceContext
@@ -617,8 +560,6 @@ abstract class CantonNodeBootstrapImpl[
       authorizedStore: TopologyStore[TopologyStoreId.AuthorizedStore],
       storage: Storage,
       crypto: Crypto,
-      adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
       healthReporter: GrpcHealthReporter,
       healthService: DependenciesHealthService,
   ) extends BootstrapStageWithStorage[T, BootstrapStageOrLeaf[T], Unit](
@@ -628,10 +569,17 @@ abstract class CantonNodeBootstrapImpl[
         config.init.autoInit,
       ) {
 
-    override def getAdminToken: Option[String] = Some(adminToken.secret)
-
     private val topologyManager: AuthorizedTopologyManager =
-      createAuthorizedTopologyManager(nodeId, crypto, authorizedStore, storage)
+      new AuthorizedTopologyManager(
+        nodeId,
+        clock,
+        crypto,
+        authorizedStore,
+        exitOnFatalFailures = parameters.exitOnFatalFailures,
+        bootstrapStageCallback.timeouts,
+        futureSupervisor,
+        bootstrapStageCallback.loggerFactory,
+      )
     addCloseable(topologyManager)
     adminServerRegistry
       .addServiceU(
@@ -721,7 +669,7 @@ abstract class CantonNodeBootstrapImpl[
             .filterNot(_.transaction.isProposal)
             .map(_.mapping)
             .exists {
-              case OwnerToKeyMapping(`myMember`, keys) =>
+              case OwnerToKeyMapping(`myMember`, None, keys) =>
                 // stage is clear if we have a general signing key and possibly also an encryption key
                 // this tx can not exist without appropriate certificates, so don't need to check for them
                 keys.exists(_.isSigning) && (myMember.code != ParticipantId.Code || keys
@@ -740,8 +688,6 @@ abstract class CantonNodeBootstrapImpl[
         customNodeStages(
           storage,
           crypto,
-          adminServerRegistry,
-          adminToken,
           nodeId,
           topologyManager,
           healthReporter,
@@ -751,7 +697,7 @@ abstract class CantonNodeBootstrapImpl[
     }
 
     override protected def autoCompleteStage()
-        : EitherT[FutureUnlessShutdown, String, Option[Unit]] =
+        : EitherT[FutureUnlessShutdown, String, Option[Unit]] = {
       for {
         namespaceKey <- crypto.cryptoPublicStore
           .signingKey(nodeId.fingerprint)
@@ -766,16 +712,10 @@ abstract class CantonNodeBootstrapImpl[
             isRootDelegation = true,
           )
         )
-        _ <- authorizeStateUpdate(
-          Seq(namespaceKey.fingerprint),
-          nsd,
-          ProtocolVersion.latest,
-        )
+        _ <- authorizeStateUpdate(Seq(namespaceKey.fingerprint), nsd, ProtocolVersion.latest)
         // all nodes need a signing key
         signingKey <- CantonNodeBootstrapImpl
-          .getOrCreateSigningKey(crypto)(
-            s"$name-${SigningKeyUsage.Protocol.identifier}"
-          )
+          .getOrCreateSigningKey(crypto)(s"$name-signing")
         // key owner id depends on the type of node
         ownerId = member(nodeId)
         // participants need also an encryption key
@@ -788,20 +728,16 @@ abstract class CantonNodeBootstrapImpl[
                 )
             } yield NonEmpty.mk(Seq, signingKey, encryptionKey)
           } else {
-            EitherT.rightT[FutureUnlessShutdown, String](
-              NonEmpty.mk(Seq, signingKey)
-            )
+            EitherT.rightT[FutureUnlessShutdown, String](NonEmpty.mk(Seq, signingKey))
           }
         // register the keys
         _ <- authorizeStateUpdate(
-          Seq(
-            namespaceKey.fingerprint,
-            signingKey.fingerprint,
-          ),
-          OwnerToKeyMapping(ownerId, keys),
+          Seq(namespaceKey.fingerprint, signingKey.fingerprint),
+          OwnerToKeyMapping(ownerId, None, keys),
           ProtocolVersion.latest,
         )
       } yield Some(())
+    }
 
     private def authorizeStateUpdate(
         keys: Seq[Fingerprint],
@@ -809,7 +745,7 @@ abstract class CantonNodeBootstrapImpl[
         protocolVersion: ProtocolVersion,
     )(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, String, Unit] =
+    ): EitherT[FutureUnlessShutdown, String, Unit] = {
       topologyManager
         .proposeAndAuthorize(
           TopologyChangeOp.Replace,
@@ -822,11 +758,12 @@ abstract class CantonNodeBootstrapImpl[
         // TODO(#14048) error handling
         .leftMap(_.toString)
         .map(_ => ())
+    }
 
   }
 
   override protected def onClosed(): Unit = {
-    Lifecycle.close(clock, initQueue, startupStage)(
+    Lifecycle.close(clock, initQueue, adminServerRegistry, adminServer, startupStage)(
       logger
     )
     super.onClosed()
@@ -837,8 +774,7 @@ abstract class CantonNodeBootstrapImpl[
 object CantonNodeBootstrapImpl {
 
   def getOrCreateSigningKey(crypto: Crypto)(
-      name: String,
-      usage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
+      name: String
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
@@ -848,15 +784,14 @@ object CantonNodeBootstrapImpl {
       crypto.cryptoPublicStore.findSigningKeyIdByName,
       name =>
         crypto
-          .generateSigningKey(usage = usage, name = name)
+          .generateSigningKey(name = name)
           .leftMap(_.toString),
       crypto.cryptoPrivateStore.existsSigningKey,
       name,
     )
 
   def getOrCreateSigningKeyByFingerprint(crypto: Crypto)(
-      fingerprint: Fingerprint,
-      usage: SigningKeyUsage,
+      fingerprint: Fingerprint
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
@@ -891,7 +826,7 @@ object CantonNodeBootstrapImpl {
         Boolean,
       ],
       fingerprint: Fingerprint,
-  )(implicit ec: ExecutionContext): EitherT[FutureUnlessShutdown, String, P] =
+  )(implicit ec: ExecutionContext): EitherT[FutureUnlessShutdown, String, P] = {
     findPubKeyIdByFingerprint(fingerprint)
       .toRight(s"$typ key with fingerprint $fingerprint does not exist")
       .flatMap { keyWithFingerprint =>
@@ -907,6 +842,7 @@ object CantonNodeBootstrapImpl {
             case Left(err) => Left(err)
           }
       }
+  }
 
   private def getOrCreateKey[P <: PublicKey](
       typ: String,

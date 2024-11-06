@@ -473,14 +473,14 @@ class CheckedTTest extends AnyWordSpec with BaseTestWordSpec {
   "foreach" should {
     "do nothing on an abort" in {
       val sut = CheckedT.abortT[Monad, String, Int]("failure")
-      assert(sut.foreach(failure) == Either.unit)
+      assert(sut.foreach(failure) == Right(()))
     }
 
     "run the function on the result" in {
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var run = false
       assert(
-        CheckedT.resultT[Monad, Int, String](5).foreach(x => if (x == 5) run = true) == Either.unit
+        CheckedT.resultT[Monad, Int, String](5).foreach(x => if (x == 5) run = true) == Right(())
       )
       assert(run)
     }

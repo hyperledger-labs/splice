@@ -7,7 +7,7 @@ import com.daml.ledger.api.v2.package_service.GetPackageResponse
 import com.digitalasset.daml.lf.archive
 import com.digitalasset.daml.lf.data.ImmArray.ImmArraySeq
 import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageId}
-import com.digitalasset.daml.lf.typesig.reader.{DamlLfArchiveReader, SignatureReader}
+import com.digitalasset.daml.lf.typesig.reader.SignatureReader
 import com.digitalasset.daml.lf.typesig.{DefDataType, PackageSignature}
 import com.daml.logging.LoggingContextOf
 import com.daml.scalautil.TraverseFMSyntax.*
@@ -15,8 +15,6 @@ import com.daml.timer.RetryStrategy
 import com.digitalasset.canton.ledger.client.services.pkg.PackageClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.daml.lf.archive.DamlLf
-import com.digitalasset.daml.lf.language.{Ast, Util}
 import scalaz.*
 import scalaz.Scalaz.*
 
@@ -67,7 +65,7 @@ final case class LedgerReader(loggerFactory: NamedLoggerFactory)
       token: Option[String],
   )(
       pkid: String
-  )(implicit ec: ExecutionContext, lc: LoggingContextOf[Any]): Future[Error \/ Signatures] = {
+  )(implicit ec: ExecutionContext, lc: LoggingContextOf[Any]): Future[Error \/ PackageSignature] = {
     import loadCache.cache
     retryLoop {
       cache
@@ -128,9 +126,8 @@ object LedgerReader {
 
   type Error = String
 
-  case class Signatures(typesig: PackageSignature, pack: Ast.PackageSignature)
   // PackageId -> PackageSignature
-  type PackageStore = Map[String, Signatures]
+  type PackageStore = Map[String, PackageSignature]
 
   val UpToDate: Future[Error \/ Option[PackageStore]] =
     Future.successful(\/-(None))
@@ -151,7 +148,7 @@ object LedgerReader {
     // request pattern, so there isn't anything you can really do about it on
     // the server configuration.  100% miss rate means no redundant work is
     // happening; it does not mean the server is being slower.
-    private[LedgerReader] val cache = CaffeineCache[String, Error \/ Signatures](
+    private[LedgerReader] val cache = CaffeineCache[String, Error \/ PackageSignature](
       Caffeine
         .newBuilder()
         .softValues()
@@ -167,29 +164,22 @@ object LedgerReader {
   }
 
   private def createPackageStoreFromArchives(
-      packageResponses: List[Error \/ Signatures]
+      packageResponses: List[Error \/ PackageSignature]
   ): Error \/ PackageStore = {
     packageResponses.sequence
-      .map(_.groupMapReduce(_.typesig.packageId: String)(identity)((_, sig) => sig))
+      .map(_.groupMapReduce(_.packageId: String)(identity)((_, sig) => sig))
   }
 
   private def decodeInterfaceFromPackageResponse(
       packageResponse: GetPackageResponse
-  ): Error \/ Signatures = {
+  ): Error \/ PackageSignature = {
     import packageResponse.*
     \/.attempt {
-      val payload: DamlLf.ArchivePayload =
-        archive.ArchivePayloadParser.assertFromByteString(archivePayload)
-      val pck = DamlLfArchiveReader.readPackage(PackageId.assertFromString(hash), payload)
-
+      val payload = archive.ArchivePayloadParser.assertFromByteString(archivePayload)
       val (errors, out) =
-        SignatureReader.readPackageSignature(() => pck)
-
+        SignatureReader.readPackageSignature(PackageId.assertFromString(hash), payload)
       (if (!errors.empty) -\/("Errors reading LF archive:\n" + errors.toString)
-       else
-         \/-(out).flatMap(x =>
-           pck.map(p => Signatures(x, Util.toSignature(p._2)))
-         )): Error \/ Signatures
+       else \/-(out)): Error \/ PackageSignature
     }(_.getLocalizedMessage).join
   }
 
@@ -199,13 +189,14 @@ object LedgerReader {
     val store = packageStore()
 
     store.get(id.packageId).flatMap { packageSignature =>
-      packageSignature.typesig.typeDecls.get(id.qualifiedName).map(_.`type`).orElse {
+      packageSignature.typeDecls.get(id.qualifiedName).map(_.`type`).orElse {
         for {
-          interface <- packageSignature.typesig.interfaces.get(id.qualifiedName)
+          interface <- packageSignature.interfaces.get(id.qualifiedName)
           viewTypeId <- interface.viewType
-          viewType <- PackageSignature.resolveInterfaceViewType(store.view.mapValues(_.typesig)).lift(viewTypeId)
+          viewType <- PackageSignature.resolveInterfaceViewType(store).lift(viewTypeId)
         } yield DefDataType(ImmArraySeq(), viewType)
       }
     }
   }
+
 }

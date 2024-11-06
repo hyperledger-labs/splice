@@ -21,8 +21,8 @@ package object domain {
   type CommandId = Ref.CommandId @@ CommandIdTag
   val CommandId: Tag.TagOf[CommandIdTag] = Tag.of[CommandIdTag]
 
-  type UpdateId = Ref.TransactionId @@ UpdateIdTag
-  val UpdateId: Tag.TagOf[UpdateIdTag] = Tag.of[UpdateIdTag]
+  type TransactionId = Ref.TransactionId @@ TransactionIdTag
+  val TransactionId: Tag.TagOf[TransactionIdTag] = Tag.of[TransactionIdTag]
 
   type EventId = Ref.LedgerString @@ EventIdTag
   val EventId: Tag.TagOf[EventIdTag] = Tag.of[EventIdTag]
@@ -39,7 +39,7 @@ package object domain {
 package domain {
   sealed trait WorkflowIdTag
   sealed trait CommandIdTag
-  sealed trait UpdateIdTag
+  sealed trait TransactionIdTag
   sealed trait EventIdTag
   sealed trait ParticipantIdTag
   sealed trait SubmissionIdTag
@@ -80,22 +80,24 @@ package domain {
     }
 
     object Id {
-      def fromString(id: String): Either[String, IdentityProviderId.Id] =
+      def fromString(id: String): Either[String, IdentityProviderId.Id] = {
         Ref.LedgerString.fromString(id).map(Id.apply)
+      }
 
-      def assertFromString(id: String): Id =
+      def assertFromString(id: String): Id = {
         Id(Ref.LedgerString.assertFromString(id))
+      }
     }
 
     def apply(identityProviderId: String): IdentityProviderId =
       Some(identityProviderId).filter(_.nonEmpty) match {
-        case Some(id) => Id.assertFromString(id)
+        case Some(id) => Id(Ref.LedgerString.assertFromString(id))
         case None => Default
       }
 
     def fromString(identityProviderId: String): Either[String, IdentityProviderId] =
       Some(identityProviderId).filter(_.nonEmpty) match {
-        case Some(id) => Id.fromString(id)
+        case Some(id) => Ref.LedgerString.fromString(id).map(Id.apply)
         case None => Right(Default)
       }
 
@@ -103,12 +105,6 @@ package domain {
       identityProviderId match {
         case None => IdentityProviderId.Default
         case Some(id) => id
-      }
-
-    def fromOptionalLedgerString(identityProviderId: Option[Ref.LedgerString]): IdentityProviderId =
-      identityProviderId match {
-        case None => IdentityProviderId.Default
-        case Some(id) => IdentityProviderId.Id(id)
       }
   }
 
@@ -142,7 +138,7 @@ package domain {
     // Note: this should be replaced by pretty printing once the ledger-api server packages move
     //  into their proper place
     override def toString: String =
-      s"User(id=$id, primaryParty=$primaryParty, isDeactivated=$isDeactivated, metadata=${metadata.toString
+      s"User(id=${id}, primaryParty=${primaryParty}, isDeactivated=$isDeactivated, metadata=${metadata.toString
           .take(512)}, identityProviderId=${identityProviderId.toRequestString})"
   }
 

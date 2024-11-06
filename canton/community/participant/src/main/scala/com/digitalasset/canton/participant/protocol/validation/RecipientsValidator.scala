@@ -16,9 +16,14 @@ import com.digitalasset.canton.participant.protocol.ProtocolProcessor.{
 }
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.RequestId
-import com.digitalasset.canton.sequencing.protocol.{MemberRecipient, Recipient, Recipients}
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.sequencing.protocol.{
+  MemberRecipient,
+  ParticipantsOfParty,
+  Recipient,
+  Recipients,
+}
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.{ErrorUtil, IterableUtil}
@@ -167,12 +172,20 @@ class RecipientsValidator[I](
       s"Views with different root hashes are not supported: $rootHashes",
     )
 
+    val allInformees = inputs
+      .flatMap { viewOfInput(_).informees }
+      .distinct
+      .toList
+
     for {
+      informeesWithGroupAddressing <- snapshot.partiesWithGroupAddressing(parties = allInformees)
+
       informeeParticipantsOfPositionAndParty <-
         computeInformeeParticipantsOfPositionAndParty(inputs, snapshot)
 
     } yield {
-      val context = Context(requestId, informeeParticipantsOfPositionAndParty)
+      val context =
+        Context(requestId, informeesWithGroupAddressing, informeeParticipantsOfPositionAndParty)
 
       // Check Condition 1, i.e., detect inputs where the view has an informee without an active participant
       val inactivePartyPositions = computeInactivePartyPositions(context)
@@ -249,7 +262,9 @@ class RecipientsValidator[I](
       .parTraverse { input =>
         val view = viewOfInput(input)
         snapshot
-          .activeParticipantsOfParties(view.informees.toList)
+          .activeParticipantsOfParties(
+            view.informees.toList
+          )
           .map(view.viewPosition.position -> _)
       }
       // It is ok to remove duplicates, as the informees of a view depend only on view.viewPosition.
@@ -259,7 +274,7 @@ class RecipientsValidator[I](
   /** Yields the positions of those views that have an informee without an active participant.
     */
   private def computeInactivePartyPositions(context: Context): Seq[BadViewPosition] = {
-    val Context(requestId, informeeParticipantsOfPositionAndParty) = context
+    val Context(requestId, _, informeeParticipantsOfPositionAndParty) = context
 
     informeeParticipantsOfPositionAndParty.toSeq.mapFilter {
       case (viewPositionSeq, informeeParticipantsOfParty) =>
@@ -344,7 +359,7 @@ class RecipientsValidator[I](
       recipientsPathViewToRoot: Seq[Set[Recipient]],
       errorBuilder: mutable.Builder[Error, Seq[Error]],
   )(implicit traceContext: TraceContext): Option[BadViewPosition] = {
-    val Context(requestId, informeeParticipantsOfPositionAndParty) =
+    val Context(requestId, informeesWithGroupAddressing, informeeParticipantsOfPositionAndParty) =
       context
 
     IterableUtil
@@ -405,11 +420,13 @@ class RecipientsValidator[I](
           val informeeParticipantsOfParty =
             informeeParticipantsOfPositionAndParty(viewPosition)
 
-          val informeeRecipients = informeeParticipantsOfParty.toList
-            .flatMap { case (_party, participants) =>
-              participants.map(MemberRecipient.apply)
-            }
-            .toSet[Recipient]
+          val informeeRecipients = informeeParticipantsOfParty.toList.flatMap {
+            case (party, participants) =>
+              if (informeesWithGroupAddressing.contains(party))
+                Seq(ParticipantsOfParty(PartyId.tryFromLfParty(party)))
+              else
+                participants.map(MemberRecipient)
+          }.toSet
 
           val extraRecipients = recipientGroup -- informeeRecipients
 
@@ -445,6 +462,7 @@ object RecipientsValidator {
 
   private final case class Context(
       requestId: RequestId,
+      informeesWithGroupAddressing: Set[LfPartyId],
       informeeParticipantsOfPositionAndParty: Map[
         List[MerklePathElement],
         Map[LfPartyId, Set[ParticipantId]],

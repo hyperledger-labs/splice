@@ -39,7 +39,7 @@ public final class CommandsSubmission {
   @NonNull private final String commandId;
   @NonNull private final List<@NonNull ? extends HasCommands> commands;
   @NonNull private final Optional<Duration> deduplicationDuration;
-  @NonNull private final Optional<Long> deduplicationOffset;
+  @NonNull private final Optional<String> deduplicationOffset;
   @NonNull private final Optional<Instant> minLedgerTimeAbs;
   @NonNull private final Optional<Duration> minLedgerTimeRel;
   @NonNull private final List<@NonNull String> actAs;
@@ -55,7 +55,7 @@ public final class CommandsSubmission {
       @NonNull String commandId,
       @NonNull List<@NonNull ? extends HasCommands> commands,
       @NonNull Optional<Duration> deduplicationDuration,
-      @NonNull Optional<Long> deduplicationOffset,
+      @NonNull Optional<String> deduplicationOffset,
       @NonNull Optional<Instant> minLedgerTimeAbs,
       @NonNull Optional<Duration> minLedgerTimeRel,
       @NonNull List<@NonNull String> actAs,
@@ -128,7 +128,7 @@ public final class CommandsSubmission {
   }
 
   @NonNull
-  public Optional<Long> getDeduplicationOffset() {
+  public Optional<String> getDeduplicationOffset() {
     return deduplicationOffset;
   }
 
@@ -303,7 +303,7 @@ public final class CommandsSubmission {
         accessToken);
   }
 
-  public CommandsSubmission withDeduplicationOffset(@NonNull Long deduplicationOffset)
+  public CommandsSubmission withDeduplicationOffset(@NonNull String deduplicationOffset)
       throws RedundantDeduplicationSpecification {
     deduplicationDuration.ifPresent(
         duration -> {
@@ -437,7 +437,7 @@ public final class CommandsSubmission {
         commands.hasDeduplicationDuration()
             ? Optional.of(Utils.durationFromProto(commands.getDeduplicationDuration()))
             : Optional.empty();
-    Optional<Long> deduplicationOffset =
+    Optional<String> deduplicationOffset =
         commands.hasDeduplicationOffset()
             ? Optional.of(commands.getDeduplicationOffset())
             : Optional.empty();
@@ -561,12 +561,12 @@ public final class CommandsSubmission {
 
   public static class RedundantDeduplicationSpecification extends RuntimeException {
     public RedundantDeduplicationSpecification(
-        Duration deduplicationDuration, Long deduplicationOffset) {
+        Duration deduplicationDuration, String deduplicationOffset) {
       super(
           "Both a deduplicationDuration: "
               + deduplicationDuration.toString()
               + " and a deduplicationOffset: "
-              + deduplicationOffset.toString()
+              + deduplicationOffset
               + " given");
     }
   }

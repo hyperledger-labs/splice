@@ -83,8 +83,9 @@ object MemoryCheck {
     * to the underlying system gc are limited.
     */
 
-  private def gc(memoryMxBean: GcThrottledMemoryBean): Unit =
+  private def gc(memoryMxBean: GcThrottledMemoryBean): Unit = {
     memoryMxBean.gc()
+  }
 
   private[ratelimiting] class GcThrottledMemoryBean(
       delegate: MemoryMXBean,
@@ -115,7 +116,7 @@ object MemoryCheck {
       config: RateLimitingConfig,
       memoryPoolMxBeans: List[MemoryPoolMXBean],
       logger: ContextualizedErrorLogger,
-  ): Option[MemoryPoolMXBean] =
+  ): Option[MemoryPoolMXBean] = {
     candidates(memoryPoolMxBeans).sortBy(_.getCollectionUsage.getMax).lastOption match {
       case None =>
         logger.error("Could not find tenured memory pool")
@@ -128,6 +129,7 @@ object MemoryCheck {
         pool.setCollectionUsageThreshold(threshold)
         Some(pool)
     }
+  }
 
   private def candidates(memoryPoolMxBeans: List[MemoryPoolMXBean]): List[MemoryPoolMXBean] =
     memoryPoolMxBeans.filter(p =>

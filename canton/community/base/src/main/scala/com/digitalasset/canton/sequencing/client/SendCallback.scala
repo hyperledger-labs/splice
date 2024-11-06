@@ -32,8 +32,9 @@ object SendCallback {
 
     private val promise = Promise[UnlessShutdown[SendResult]]()
 
-    val future: FutureUnlessShutdown[SendResult] =
+    val future: FutureUnlessShutdown[SendResult] = {
       FutureUnlessShutdown(promise.future)
+    }
 
     override def apply(result: UnlessShutdown[SendResult]): Unit =
       promise.trySuccess(result).discard

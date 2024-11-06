@@ -20,42 +20,6 @@ service TopologyManagerWriteService {
   rpc ImportTopologySnapshot(ImportTopologySnapshotRequest) returns (ImportTopologySnapshotResponse);
 
   rpc SignTransactions(SignTransactionsRequest) returns (SignTransactionsResponse);
-
-  // RPC to generate topology transactions that can be signed
-  rpc GenerateTransactions(GenerateTransactionsRequest) returns (GenerateTransactionsResponse);
-}
-
-message GenerateTransactionsRequest {
-  message Proposal {
-    /** Replace / Remove */
-    com.digitalasset.canton.protocol.v30.Enums.TopologyChangeOp operation = 1;
-
-    /** Optionally, the serial number of this request (auto-determined if omitted)
-     * NOTE: omitting the serial MAY end up overwriting previous mappings processed concurrently.
-     * To avoid such cases, First read the state using the TopologyManagerReadService and update the mappings
-     * accordingly, incrementing the serial by one and setting it here explicitly.
-     */
-    uint32 serial = 2;
-
-    /** The mapping to be authorized */
-    com.digitalasset.canton.protocol.v30.TopologyMapping mapping = 3;
-
-    // Target store
-    string store = 4;
-  }
-  // transaction proposals for which to generate topology transactions
-  repeated Proposal proposals = 1;
-}
-
-message GenerateTransactionsResponse {
-  message GeneratedTransaction {
-    // Serialized com.digitalasset.canton.protocol.v30.TopologyTransaction
-    bytes serialized_transaction = 1;
-    // Hash of the transaction - this should be signed by the submitter to authorize the transaction
-    bytes transaction_hash = 2;
-  }
-  // Generated transactions, in the same order as the mappings provided in the request
-  repeated GeneratedTransaction generated_transactions = 1;
 }
 
 message AuthorizeRequest {
@@ -98,7 +62,7 @@ message AuthorizeRequest {
    *
    * The signing key is used to identify a particular `NamespaceDelegation` or `IdentifierDelegation` certificate,
    * which is used to justify the given authorization.
-   * Optional, if empty, suitable signing keys available known to the node are automatically selected.
+   * Optional, if empty, the signing key be auto-determined.
    */
   repeated string signed_by = 5;
 
@@ -158,15 +122,9 @@ message SignTransactionsRequest {
    *
    * The signing key is used to identify a particular `NamespaceDelegation` or `IdentifierDelegation` certificate,
    * which is used to justify the given authorization.
-   * Optional, if empty, suitable signing keys available known to the node are automatically selected.
+   * Optional, if empty, the signing key be auto-determined.
    */
   repeated string signed_by = 2;
-
-  // Target store
-  string store = 3;
-
-  /** Force specific changes even if dangerous */
-  repeated ForceFlag force_flags = 4;
 }
 
 message SignTransactionsResponse {
@@ -178,23 +136,6 @@ enum ForceFlag {
   FORCE_FLAG_UNSPECIFIED = 0;
   /** Required when authorizing adding a topology transaction on behalf of another node. */
   FORCE_FLAG_ALIEN_MEMBER = 1;
-  /* Deprecated, increasing ledger time record time tolerance does not require a force flag for PV >= 32 */
+  /** Required when increasing the ledger time record time tolerance */
   FORCE_FLAG_LEDGER_TIME_RECORD_TIME_TOLERANCE_INCREASE = 2;
-  /** Required when revoking the vetting of a package */
-  FORCE_FLAG_ALLOW_UNVET_PACKAGE = 3;
-  /** Required when vetting unknown packages (not uploaded). */
-  FORCE_FLAG_ALLOW_UNKNOWN_PACKAGE = 4;
-  /** Required when vetting a package with unvetted dependencies */
-  FORCE_FLAG_ALLOW_UNVETTED_DEPENDENCIES = 5;
-  /** Required when disabling a party with active contracts */
-  FORCE_FLAG_DISABLE_PARTY_WITH_ACTIVE_CONTRACTS = 6;
-  /**
-   * Required when using a key that is not suitable to sign a topology transaction.
-   * Using this force flag likely causes the transaction to be rejected at a later stage of the processing.
-   */
-  FORCE_FLAG_ALLOW_UNVALIDATED_SIGNING_KEYS = 7;
-  /** Required when unvetting a package with active contracts */
-  FORCE_FLAG_ALLOW_UNVET_PACKAGE_WITH_ACTIVE_CONTRACTS = 8;
-  /** Required when increasing the submission time record time tolerance */
-  FORCE_FLAG_SUBMISSION_TIME_RECORD_TIME_TOLERANCE_INCREASE = 9;
 }

@@ -16,18 +16,13 @@ package object messages {
 
   type DefaultOpenEnvelope = OpenEnvelope[ProtocolMessage]
   object DefaultOpenEnvelopesFilter {
+    def containsTopology(envelopes: Seq[DefaultOpenEnvelope]): Boolean = envelopes.exists {
+      envelope =>
+        val broadcastO = ProtocolMessage.select[TopologyTransactionsBroadcast](envelope)
+        val envelopeIsValidBroadcast =
+          broadcastO.exists(_.recipients.allRecipients.contains(AllMembersOfDomain))
 
-    /** @param withExplicitTopologyTimestamp Whether the event contained a prescribed topology timestamp.
-      */
-    def containsTopology(
-        envelopes: Seq[DefaultOpenEnvelope],
-        withExplicitTopologyTimestamp: Boolean,
-    ): Boolean = !withExplicitTopologyTimestamp && envelopes.exists { envelope =>
-      val broadcastO = ProtocolMessage.select[TopologyTransactionsBroadcast](envelope)
-      val envelopeIsValidBroadcast =
-        broadcastO.exists(_.recipients.allRecipients.contains(AllMembersOfDomain))
-
-      envelopeIsValidBroadcast
+        envelopeIsValidBroadcast
     }
   }
 

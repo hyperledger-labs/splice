@@ -6,10 +6,8 @@ package com.digitalasset.canton.protocol
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
-import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.client.DomainTopologyClient
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
@@ -35,13 +33,11 @@ class DynamicDomainParametersLookup[P](
     */
   def get(validAt: CantonTimestamp, warnOnUsingDefaults: Boolean = true)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[P] = topologyClient
-    .awaitSnapshotUSSupervised(s"Querying for domain parameters valid at $validAt")(validAt)
-    .flatMap(snapshot =>
-      FutureUnlessShutdown.outcomeF(
-        snapshot.findDynamicDomainParametersOrDefault(protocolVersion, warnOnUsingDefaults)
-      )
-    )
+  ): Future[P] = futureSupervisor
+    .supervised(s"Querying for domain parameters valid at $validAt") {
+      topologyClient.awaitSnapshot(validAt)
+    }
+    .flatMap(_.findDynamicDomainParametersOrDefault(protocolVersion, warnOnUsingDefaults))
     .map(projector)
 
   /** Return the value of the topology snapshot approximation
@@ -61,6 +57,23 @@ class DynamicDomainParametersLookup[P](
       .findDynamicDomainParameters()
       .map(_.map(p => projector(p.parameters)).toOption)
 
+  /** Return a list of parameters, together with their validity interval,
+    *
+    * @param warnOnUsingDefaults Log a warning if dynamic domain parameters are not set
+    *                            and default value is used.
+    */
+  def getAll(validAt: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[DomainParameters.WithValidity[P]]] =
+    futureSupervisor
+      .supervised(s"Querying for list of domain parameters changes valid at $validAt") {
+        topologyClient.awaitSnapshot(validAt)
+      }
+      .flatMap(_.listDynamicDomainParametersChanges())
+      .map { domainParametersChanges =>
+        domainParametersChanges.map(_.map(projector))
+      }
+
   /** Return the approximate latest validity/freshness.
     * Returned value is the approximate timestamp of the `TopologyClient`.
     */
@@ -74,44 +87,22 @@ object DomainParametersLookup {
       topologyClient: DomainTopologyClient,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext): DynamicDomainParametersLookup[SequencerDomainParameters] =
+  )(implicit ec: ExecutionContext): DynamicDomainParametersLookup[SequencerDomainParameters] = {
     new DynamicDomainParametersLookup(
       params =>
         SequencerDomainParameters(
           params.confirmationRequestsMaxRate,
-          overrideMaxRequestSize.map(MaxRequestSize.apply).getOrElse(params.maxRequestSize),
+          overrideMaxRequestSize.map(MaxRequestSize).getOrElse(params.maxRequestSize),
         ),
       topologyClient,
       staticDomainParameters.protocolVersion,
       futureSupervisor,
       loggerFactory,
     )
-
-  def forAcsCommitmentDomainParameters(
-      pv: ProtocolVersion,
-      topologyClient: DomainTopologyClient,
-      futureSupervisor: FutureSupervisor,
-      loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext): DynamicDomainParametersLookup[AcsCommitmentDomainParameters] =
-    new DynamicDomainParametersLookup(
-      params =>
-        AcsCommitmentDomainParameters(
-          params.reconciliationInterval,
-          params.acsCommitmentsCatchUpConfig,
-        ),
-      topologyClient,
-      pv,
-      futureSupervisor,
-      loggerFactory,
-    )
+  }
 
   final case class SequencerDomainParameters(
       confirmationRequestsMaxRate: NonNegativeInt,
       maxRequestSize: MaxRequestSize,
-  )
-
-  final case class AcsCommitmentDomainParameters(
-      reconciliationInterval: PositiveSeconds,
-      acsCommitmentsCatchUpConfig: Option[AcsCommitmentsCatchUpConfig],
   )
 }

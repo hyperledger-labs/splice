@@ -49,8 +49,8 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigra
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForInitialization}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.DynamicDomainParameters

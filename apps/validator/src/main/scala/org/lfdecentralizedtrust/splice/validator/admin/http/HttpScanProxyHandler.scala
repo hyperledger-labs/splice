@@ -12,7 +12,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -165,84 +164,6 @@ class HttpScanProxyHandler(
         )
       } yield {
         respond.OK(definitions.GetAnsRulesResponse(ansRulesUpdate = maybeCachedContract))
-      }
-    }
-  }
-
-  override def lookupTransferPreapprovalByParty(
-      respond: ScanproxyResource.LookupTransferPreapprovalByPartyResponse.type
-  )(party: String)(
-      tUser: TracedUser
-  ): Future[ScanproxyResource.LookupTransferPreapprovalByPartyResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
-    withSpan(s"$workflowId.lookupTransferPreapprovalByParty") { implicit traceContext => _ =>
-      for {
-        transferPreapprovalOpt <- scanConnection.lookupTransferPreapprovalByParty(
-          PartyId.tryFromProtoPrimitive(party)
-        )
-      } yield {
-        transferPreapprovalOpt match {
-          case None =>
-            respond.NotFound(
-              definitions.ErrorResponse(s"No TransferPreapproval found for party: $party")
-            )
-          case Some(transferPreapproval) =>
-            respond.OK(
-              definitions.LookupTransferPreapprovalByPartyResponse(transferPreapproval.toHttp)
-            )
-        }
-      }
-    }
-  }
-
-  override def lookupTransferCommandCounterByParty(
-      respond: ScanproxyResource.LookupTransferCommandCounterByPartyResponse.type
-  )(party: String)(
-      tUser: TracedUser
-  ): Future[ScanproxyResource.LookupTransferCommandCounterByPartyResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
-    withSpan(s"$workflowId.lookupTransferCommandCounterByParty") { implicit traceContext => _ =>
-      for {
-        transferCommandCounterOpt <- scanConnection.lookupTransferCommandCounterByParty(
-          PartyId.tryFromProtoPrimitive(party)
-        )
-      } yield {
-        transferCommandCounterOpt match {
-          case None =>
-            respond.NotFound(
-              definitions.ErrorResponse(
-                s"No TransferCommandCounter found for party: $party, use 0 for the nonce"
-              )
-            )
-          case Some(transferCommandCounter) =>
-            respond.OK(
-              definitions.LookupTransferCommandCounterByPartyResponse(transferCommandCounter.toHttp)
-            )
-        }
-      }
-    }
-  }
-
-  override def lookupTransferCommandStatus(
-      respond: ScanproxyResource.LookupTransferCommandStatusResponse.type
-  )(sender: String, nonce: Long)(
-      tUser: TracedUser
-  ): Future[ScanproxyResource.LookupTransferCommandStatusResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
-    withSpan(s"$workflowId.lookupTransferCommandStatus") { implicit traceContext => _ =>
-      val senderParty = PartyId.tryFromProtoPrimitive(sender)
-      for {
-        statusResponseOpt <- scanConnection.lookupTransferCommandStatus(senderParty, nonce)
-      } yield {
-        statusResponseOpt match {
-          case None =>
-            respond.NotFound(
-              definitions.ErrorResponse(
-                s"Couldn't find transfer command for sender $senderParty with nonce $nonce created in the last 24h"
-              )
-            )
-          case Some(response) => respond.OK(response)
-        }
       }
     }
   }

@@ -28,15 +28,16 @@ object UniquePortGenerator {
   SharedPortNumFile.createFileIfNotExists(createParents = true)
   logger.debug(s"Initialized port file: ${SharedPortNumFile.path.toString}")
 
-  private def wrap(port: Int): Int =
+  private def wrap(port: Int): Int = {
     if (port > PortRangeEnd) {
       PortRangeStart
     } else {
       port
     }
+  }
 
   @annotation.tailrec
-  def retryLock[T](retries: Int, sleepMs: Long)(fct: => T): T =
+  def retryLock[T](retries: Int, sleepMs: Long)(fct: => T): T = {
     Try {
       fct
     } match {
@@ -47,7 +48,8 @@ object UniquePortGenerator {
         retryLock(retries - 1, sleepMs)(fct)
       case Failure(e) => throw e
     }
-  private def exclusiveReadAndWriteIncrement: Int =
+  }
+  private def exclusiveReadAndWriteIncrement: Int = {
     SharedPortNumFile.usingLock(File.RandomAccessMode.readWriteContentSynchronous) { channel =>
       val lock: FileLock = retryLock(100, 100) {
         blocking(synchronized(channel.lock()))
@@ -75,6 +77,7 @@ object UniquePortGenerator {
         }
       }
     }
+  }
 
   def next: Port = Port.tryCreate(exclusiveReadAndWriteIncrement)
 }

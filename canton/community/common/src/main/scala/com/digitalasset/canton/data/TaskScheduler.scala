@@ -11,15 +11,9 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.PeanoQueue.{BeforeHead, InsertedValue, NotInserted}
 import com.digitalasset.canton.data.TaskScheduler.Scheduled
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{
-  FlagCloseable,
-  FutureUnlessShutdown,
-  HasCloseContext,
-  Lifecycle,
-  PromiseUnlessShutdown,
-}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -31,7 +25,7 @@ import java.time.Duration as JDuration
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.math.Ordering.Implicits.infixOrderingOps
 import scala.util.control.NonFatal
 
@@ -60,8 +54,7 @@ class TaskScheduler[Task <: TaskScheduler.TimedTask](
     clock: Clock,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging
-    with FlagCloseable
-    with HasCloseContext {
+    with FlagCloseable {
 
   /** Stores the timestamp up to which all tasks are known and can be performed,
     * unless they cannot be completed right now.
@@ -139,7 +132,11 @@ class TaskScheduler[Task <: TaskScheduler.TimedTask](
 
   private def scheduleNextCheck(after: JDuration): Unit =
     FutureUtil.doNotAwaitUnlessShutdown(
-      clock.scheduleAfter(_ => checkIfBlocked(), after),
+      clock
+        .scheduleAfter(
+          _ => checkIfBlocked(),
+          after,
+        ),
       "The check for missing ticks has failed unexpectedly",
     )(errorLoggingContext(TraceContext.empty))
 
@@ -158,9 +155,7 @@ class TaskScheduler[Task <: TaskScheduler.TimedTask](
             queue: mutable.PriorityQueue[A]
         ): mutable.Iterable[String] =
           if (queue.headOption.exists(_.timestamp <= highWatermarkTs))
-            queue
-              .filter(_.timestamp <= highWatermarkTs)
-              .map(_.traceContext.traceId.getOrElse(""))
+            queue.filter(_.timestamp <= highWatermarkTs).map(_.traceContext.traceId.getOrElse(""))
           else {
             // If there is no blocked task, we do not need to traverse the entire queue.
             mutable.Iterable.empty
@@ -222,19 +217,15 @@ class TaskScheduler[Task <: TaskScheduler.TimedTask](
     * @return A future that completes when all sequencer counters up to the given timestamp have been signalled.
     *         [[scala.None$]] if all sequencer counters up to the given timestamp have already been signalled.
     */
-  def scheduleBarrierUS(
+  def scheduleBarrier(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Option[FutureUnlessShutdown[Unit]] = blocking {
+  )(implicit traceContext: TraceContext): Option[Future[Unit]] = blocking {
     lock.synchronized {
       if (latestPolledTimestamp.get >= timestamp) None
       else {
-        val barrier = TaskScheduler.TimeBarrier(
-          timestamp,
-          futureSupervisor,
-          mkPromise("task-scheduler-time-barrier", futureSupervisor),
-        )
+        val barrier = TaskScheduler.TimeBarrier(timestamp)
         barrierQueue.enqueue(barrier)
-        Some(barrier.completion.futureUS)
+        Some(barrier.completion.future)
       }
     }
   }
@@ -353,7 +344,7 @@ class TaskScheduler[Task <: TaskScheduler.TimedTask](
       traceContext: TraceContext
   ): Unit = {
     // drain the sequencerCounterQueue and record the latest observed timestamp
-    @tailrec def pollAll(): Unit =
+    @tailrec def pollAll(): Unit = {
       sequencerCounterQueue.poll() match {
         case None => ()
         case Some((sc, observedTime)) =>
@@ -369,6 +360,7 @@ class TaskScheduler[Task <: TaskScheduler.TimedTask](
           }
           pollAll()
       }
+    }
     pollAll()
 
     val _ = performUnlessClosing(functionFullName) {
@@ -415,18 +407,12 @@ class TaskScheduler[Task <: TaskScheduler.TimedTask](
     go()
   }
 
-  private[this] def completeBarriersUpTo(observedTime: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): Unit = {
+  private[this] def completeBarriersUpTo(observedTime: CantonTimestamp): Unit = {
     @tailrec def go(): Unit = barrierQueue.headOption match {
       case None => ()
       case Some(barrier) if barrier.timestamp > observedTime => ()
       case Some(barrier) =>
-        performUnlessClosing(functionFullName)(
-          barrier.completion.outcome(())
-        ).onShutdown(
-          barrier.completion.shutdown()
-        )
+        barrier.completion.success(())
         barrierQueue.dequeue().discard
         go()
     }
@@ -473,13 +459,10 @@ object TaskScheduler {
     def timestamp: CantonTimestamp
   }
 
-  private final case class TimeBarrier(
-      override val timestamp: CantonTimestamp,
-      futureSupervisor: FutureSupervisor,
-      private[TaskScheduler] val completion: PromiseUnlessShutdown[Unit],
-  )(implicit val errorLoggingContext: ErrorLoggingContext)
-      extends Scheduled {
-    override val traceContext: TraceContext = errorLoggingContext.traceContext
+  private final case class TimeBarrier(override val timestamp: CantonTimestamp)(implicit
+      override val traceContext: TraceContext
+  ) extends Scheduled {
+    private[TaskScheduler] val completion: Promise[Unit] = Promise[Unit]()
   }
 
   trait TimedTask extends Scheduled with PrettyPrinting with AutoCloseable {

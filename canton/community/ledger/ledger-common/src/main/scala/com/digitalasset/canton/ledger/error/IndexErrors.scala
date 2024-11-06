@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.ledger.error
 
-import com.daml.error.*
 import com.daml.error.ErrorCode.LoggedApiException
+import com.daml.error.*
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.IndexErrorGroup
 
 @Explanation("Errors raised by the Participant Index persistence layer.")
@@ -43,6 +43,22 @@ object IndexErrors extends IndexErrorGroup {
             cause =
               s"Processing the request failed due to a non-transient database error: ${throwable.getMessage}",
             throwableO = Some(throwable),
+          )
+    }
+
+    @Explanation(
+      "This error occurs if the result set returned by a query against the Index database is invalid."
+    )
+    @Resolution("Contact support.")
+    object ResultSetError
+        extends ErrorCode(
+          id = "INDEX_DB_INVALID_RESULT_SET",
+          ErrorCategory.SystemInternalAssumptionViolated,
+        ) {
+      final case class Reject(message: String)(implicit
+          val loggingContext: ContextualizedErrorLogger
+      ) extends DbError(
+            cause = message
           )
     }
   }

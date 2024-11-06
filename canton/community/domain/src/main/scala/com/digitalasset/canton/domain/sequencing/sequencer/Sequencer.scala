@@ -7,10 +7,6 @@ import cats.data.EitherT
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.sequencing.admin.data.{
-  SequencerAdminStatus,
-  SequencerHealthStatus,
-}
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
   CreateSubscriptionError,
@@ -25,6 +21,7 @@ import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
   SequencerRateLimitManager,
   SequencerTrafficStatus,
 }
+import com.digitalasset.canton.health.admin.data.{SequencerAdminStatus, SequencerHealthStatus}
 import com.digitalasset.canton.health.{AtomicHealthElement, CloseableHealthQuasiComponent}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLogging}
@@ -66,11 +63,6 @@ object PruningError {
   ) extends PruningError {
     override def message: String =
       s"Could not prune at [$requestedTimestamp] as the earliest safe pruning point is [$safeTimestamp]"
-  }
-
-  /* TODO(#15987): Block sequencer does not yet support scheduled pruning */
-  object ScheduledPruningNotSupported {
-    lazy val message: String = "This sequencer does not support scheduled pruning"
   }
 }
 
@@ -142,9 +134,7 @@ trait Sequencer
     * For a non-bootstrapped sequencer, this can be [[com.digitalasset.canton.GenesisSequencerCounter]].
     * This is sound as pruning ensures that we never
     */
-  private[sequencing] def firstSequencerCounterServeableForSequencer(implicit
-      traceContext: TraceContext
-  ): Future[SequencerCounter]
+  private[sequencing] def firstSequencerCounterServeableForSequencer: SequencerCounter
 
   /** Return the latest known status of the specified members, either at wall clock time of this sequencer or
     * latest known sequenced event, whichever is the most recent.
@@ -170,7 +160,7 @@ trait Sequencer
       domainTimeTracker: DomainTimeTracker,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TrafficControlError, Unit]
+  ): EitherT[FutureUnlessShutdown, TrafficControlError, CantonTimestamp]
 
   /** Return the traffic state of a member at a given timestamp.
     */

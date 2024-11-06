@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
-  TransferPreapproval,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
@@ -42,7 +41,6 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
 }
 import SpliceLedgerConnection.CommandId
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupConfig
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.PageLimit
@@ -183,15 +181,12 @@ class TreasuryService(
       operation: installCodegen.AmuletOperation,
       priority: CommandPriority = CommandPriority.Low,
       dedup: Option[AmuletOperationDedupConfig] = None,
-      extraDisclosedContracts: DisclosedContracts = DisclosedContracts.Empty,
   )(implicit tc: TraceContext): Future[installCodegen.AmuletOperationOutcome] = {
     val p = Promise[installCodegen.AmuletOperationOutcome]()
     logger.debug(
       show"Received operation (queue size before adding this: ${queue.size()}): $operation"
     )
-    queue.offer(
-      EnqueuedAmuletOperation(operation, p, tc, priority, dedup, extraDisclosedContracts)
-    ) match {
+    queue.offer(EnqueuedAmuletOperation(operation, p, tc, priority, dedup)) match {
       case Enqueued =>
         logger.debug(show"Operation $operation enqueued successfully")
         p.future
@@ -268,24 +263,6 @@ class TreasuryService(
             trafficRequestCodegen.BuyTrafficRequest.COMPANION
           )(op.trafficRequestCid)
         } yield ()
-
-      case _: amuletoperation.CO_CreateExternalPartySetupProposal => Future.unit
-
-      case op: amuletoperation.CO_AcceptTransferPreapprovalProposal =>
-        for {
-          _ <- userStore.multiDomainAcsStore.getContractById(TransferPreapprovalProposal.COMPANION)(
-            op.preapprovalProposalCid
-          )
-        } yield ()
-
-      case op: amuletoperation.CO_RenewTransferPreapproval =>
-        for {
-          _ <- userStore.multiDomainAcsStore.getContractById(TransferPreapproval.COMPANION)(
-            op.previousApprovalCid
-          )
-        } yield ()
-
-      case _: amuletoperation.CO_TransferPreapprovalSend => Future.unit
 
       case op => throw new NotImplementedError(show"Unexpected amulet operation: $op")
     }
@@ -439,7 +416,7 @@ class TreasuryService(
         priority = batch.priority,
         deadline = treasuryConfig.grpcDeadline,
       )
-      .withDisclosedContracts(disclosedContracts.merge(batch.extraDisclosedContracts))
+      .withDisclosedContracts(disclosedContracts)
     for {
       (offset, result) <- batch.dedup match {
         case None => baseSubmission.noDedup.yieldResultAndOffset()
@@ -455,7 +432,7 @@ class TreasuryService(
   }
 
   private def waitForIngestion(
-      offset: Long,
+      offset: String,
       outcomes: Exercised[WalletAppInstall_ExecuteBatchResult],
   )(implicit tc: TraceContext): Future[Unit] =
     if (outcomes.exerciseResult.outcomes.asScala.forall(isErrorOutcome)) {
@@ -464,7 +441,7 @@ class TreasuryService(
       // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
       Future.unit
     } else {
-      logger.debug(show"Waiting for store to ingest offset ${offset}")
+      logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
       userStore.signalWhenIngestedOrShutdown(offset)
     }
 
@@ -702,16 +679,16 @@ class TreasuryService(
     (BigDecimal, Set[PartyId], Seq[(Round, BigDecimal, InputValidatorRewardCoupon)])
   ] = {
     for {
-      validatorRewardCoupons <- walletManager
+      validatorRewardCouponsRaw <- walletManager
         .listValidatorRewardCouponsCollectableBy(
           userStore,
           limit = PageLimit.tryCreate(validatorRewardCouponsLimit),
           Some(issuingRoundsMap.keySet.map(_.number)),
         )
-      validatorRewardCouponUsers = validatorRewardCoupons
+      validatorRewardCouponUsers = validatorRewardCouponsRaw
         .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
         .toSet
-      validatorRewardsWithAmuletQuantity = validatorRewardCoupons.flatMap(rw => {
+      validatorRewardsWithAmuletQuantity = validatorRewardCouponsRaw.flatMap(rw => {
         val issuingO = issuingRoundsMap.get(rw.payload.round)
         issuingO
           .map(i => {
@@ -936,11 +913,6 @@ object TreasuryService {
           op.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
         )
     }
-
-    lazy val extraDisclosedContracts: DisclosedContracts =
-      operationsToRun.foldLeft[DisclosedContracts](DisclosedContracts.Empty) {
-        case (acc, operation) => acc.merge(operation.extraDisclosedContracts)
-      }
   }
 
   private object AmuletOperationBatch {
@@ -955,7 +927,6 @@ object TreasuryService {
       submittedFrom: TraceContext,
       priority: CommandPriority,
       dedup: Option[AmuletOperationDedupConfig],
-      extraDisclosedContracts: DisclosedContracts,
   ) extends PrettyPrinting {
     override def pretty: Pretty[EnqueuedAmuletOperation.this.type] =
       prettyNode(

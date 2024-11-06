@@ -4,19 +4,14 @@
 package com.digitalasset.canton.domain.sequencing.traffic
 
 import cats.syntax.parallel.*
-import com.daml.metrics.HealthMetrics
-import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.metrics.api.{HistogramInventory, MetricName}
-import com.daml.metrics.grpc.DamlGrpcServerMetrics
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.metrics.{SequencerHistograms, SequencerMetrics}
+import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.domain.sequencing.traffic.TrafficPurchasedManager.TrafficPurchasedAlreadyPruned
 import com.digitalasset.canton.domain.sequencing.traffic.store.memory.InMemoryTrafficPurchasedStore
 import com.digitalasset.canton.lifecycle.PromiseUnlessShutdown
-import com.digitalasset.canton.metrics.MetricsUtils
 import com.digitalasset.canton.sequencing.traffic.TrafficPurchased
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{DefaultTestIdentities, Member}
@@ -33,21 +28,12 @@ class TrafficPurchasedManagerTest
     extends AnyWordSpec
     with BaseTest
     with HasExecutionContext
-    with BeforeAndAfterEach
-    with MetricsUtils {
+    with BeforeAndAfterEach {
   private val store = new InMemoryTrafficPurchasedStore(loggerFactory)
   private val member = DefaultTestIdentities.participant1.member
 
   private val clock = new SimClock(loggerFactory = loggerFactory)
   private val timestamp = clock.now
-
-  val histogramInventory = new HistogramInventory
-  val sequencerMetrics = new SequencerMetrics(
-    new SequencerHistograms(MetricName.Daml)(histogramInventory),
-    metricsFactory(histogramInventory),
-    new DamlGrpcServerMetrics(NoOpMetricsFactory, "sequencer"),
-    new HealthMetrics(NoOpMetricsFactory),
-  )
 
   private def mkManager = new TrafficPurchasedManager(
     store,
@@ -57,7 +43,7 @@ class TrafficPurchasedManagerTest
       trafficPurchasedCacheSizePerMember = PositiveInt.one,
     ),
     futureSupervisor,
-    sequencerMetrics,
+    SequencerMetrics.noop("traffic-balance-manager"),
     protocolVersion = testedProtocolVersion,
     timeouts,
     loggerFactory,
@@ -73,24 +59,27 @@ class TrafficPurchasedManagerTest
       manager: TrafficPurchasedManager,
       timestamp: CantonTimestamp,
       balance: TrafficPurchased,
-  ) =
+  ) = {
     manager
       .getTrafficPurchasedAt(member, timestamp, warnIfApproximate = false)
       .value
       .futureValueUS shouldBe Right(
       Some(balance)
     )
+  }
 
   private def assertEmptyBalance(
       manager: TrafficPurchasedManager,
       timestamp: CantonTimestamp,
-  ) =
+  ) = {
     manager.getTrafficPurchasedAt(member, timestamp).value.futureValueUS shouldBe Right(None)
+  }
 
-  private def assertFailed(manager: TrafficPurchasedManager, timestamp: CantonTimestamp) =
+  private def assertFailed(manager: TrafficPurchasedManager, timestamp: CantonTimestamp) = {
     manager.getTrafficPurchasedAt(member, timestamp).value.futureValueUS shouldBe Left(
       TrafficPurchasedAlreadyPruned(member, timestamp)
     )
+  }
 
   private def mkBalance(serial: Int, balance: Long, timestamp: CantonTimestamp = timestamp) =
     TrafficPurchased(
@@ -111,16 +100,6 @@ class TrafficPurchasedManagerTest
       // Avoids a warning when getting the balance at timestamp.plusSeconds(1).immediateSuccessor
       assertBalance(manager, timestamp.immediateSuccessor, balance)
       assertBalance(manager, timestamp.plusSeconds(1).immediateSuccessor, balance2)
-
-      assertLongValue(
-        "daml.sequencer.traffic-control.extra-traffic-purchased",
-        balance2.extraTrafficPurchased.value,
-      )
-      assertInContext(
-        "daml.sequencer.traffic-control.extra-traffic-purchased",
-        "member",
-        "PAR::participant1::participant1...",
-      )
     }
 
     "not fail if requesting a balance before the first buy" in {

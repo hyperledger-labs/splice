@@ -58,7 +58,7 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       completionOffsetCallback,
     )
 
-  private def completionOffsetCallback(offset: Long): Future[Unit] =
+  private def completionOffsetCallback(offset: String): Future[Unit] =
     store.multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)(TraceContext.empty)
 
   registerService(

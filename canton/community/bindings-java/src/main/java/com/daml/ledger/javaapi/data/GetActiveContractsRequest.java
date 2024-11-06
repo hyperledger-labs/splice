@@ -14,10 +14,12 @@ public final class GetActiveContractsRequest {
 
   private final boolean verbose;
 
-  @NonNull private final Long activeAtOffset;
+  @NonNull private final String activeAtOffset;
 
   public GetActiveContractsRequest(
-      @NonNull TransactionFilter transactionFilter, boolean verbose, @NonNull Long activeAtOffset) {
+      @NonNull TransactionFilter transactionFilter,
+      boolean verbose,
+      @NonNull String activeAtOffset) {
     this.transactionFilter = transactionFilter;
     this.verbose = verbose;
     this.activeAtOffset = activeAtOffset;
@@ -27,7 +29,7 @@ public final class GetActiveContractsRequest {
       StateServiceOuterClass.GetActiveContractsRequest request) {
     TransactionFilter filters = TransactionFilter.fromProto(request.getFilter());
     boolean verbose = request.getVerbose();
-    Long activeAtOffset = request.getActiveAtOffset();
+    String activeAtOffset = request.getActiveAtOffset();
     return new GetActiveContractsRequest(filters, verbose, activeAtOffset);
   }
 
@@ -49,7 +51,7 @@ public final class GetActiveContractsRequest {
   }
 
   @NonNull
-  public Long getActiveAtOffset() {
+  public String getActiveAtOffset() {
     return activeAtOffset;
   }
 

@@ -20,11 +20,13 @@ import com.digitalasset.canton.protocol.messages.{
   SetTrafficPurchasedMessage,
   SignedProtocolMessage,
 }
+import com.digitalasset.canton.sequencing.SubscriptionStart
 import com.digitalasset.canton.sequencing.protocol.{
   Deliver,
   DeliverError,
   OpenEnvelope,
   Recipient,
+  SequencedEvent,
   SequencersOfDomain,
 }
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.{
@@ -32,16 +34,8 @@ import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.{
   TrafficControlError,
 }
 import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor.TrafficControlSubscriber
-import com.digitalasset.canton.sequencing.{
-  BoxedEnvelope,
-  HandlerResult,
-  SubscriptionStart,
-  UnsignedEnvelopeBox,
-  UnsignedProtocolEventHandler,
-}
-import com.digitalasset.canton.time.DomainTimeTracker
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.MonadUtil
 
@@ -55,18 +49,15 @@ class TrafficControlProcessor(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
-) extends UnsignedProtocolEventHandler
-    with NamedLogging {
-
-  override val name: String = s"traffic-control-processor-$domainId"
+) extends NamedLogging {
 
   private val listeners = new AtomicReference[List[TrafficControlSubscriber]](List.empty)
 
   def subscribe(subscriber: TrafficControlSubscriber): Unit =
     listeners.updateAndGet(subscriber :: _).discard
 
-  override def subscriptionStartsAt(start: SubscriptionStart, domainTimeTracker: DomainTimeTracker)(
-      implicit traceContext: TraceContext
+  def subscriptionStartsAt(start: SubscriptionStart)(implicit
+      traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = {
     import SubscriptionStart.*
 
@@ -90,10 +81,10 @@ class TrafficControlProcessor(
     FutureUnlessShutdown.unit
   }
 
-  override def apply(
-      tracedBatch: BoxedEnvelope[UnsignedEnvelopeBox, DefaultOpenEnvelope]
-  ): HandlerResult =
-    MonadUtil.sequentialTraverseMonoid(tracedBatch.value) { tracedEvent =>
+  def handle(
+      tracedEvents: NonEmpty[Seq[Traced[SequencedEvent[DefaultOpenEnvelope]]]]
+  ): FutureUnlessShutdown[Unit] = {
+    MonadUtil.sequentialTraverseMonoid(tracedEvents) { tracedEvent =>
       implicit val tracContext: TraceContext = tracedEvent.traceContext
 
       tracedEvent.value match {
@@ -111,21 +102,20 @@ class TrafficControlProcessor(
             },
           )
 
-          HandlerResult.synchronous(
-            processSetTrafficPurchasedEnvelopes(ts, topologyTimestampO, domainEnvelopes)
-          )
+          processSetTrafficPurchasedEnvelopes(ts, topologyTimestampO, domainEnvelopes)
 
         case DeliverError(_sc, ts, _domainId, _messageId, _status, _trafficReceipt) =>
           notifyListenersOfTimestamp(ts)
-          HandlerResult.done
+          FutureUnlessShutdown.unit
       }
     }
+  }
 
   private def notifyListenersOfTimestamp(ts: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Unit = {
     logger.debug(s"Notifying listeners that timestamp $ts was observed")
-    listeners.get().foreach(_.observedTimestamp(ts))
+    listeners.get().foreach { _.observedTimestamp(ts) }
   }
 
   private def notifyListenersOfBalanceUpdate(
@@ -135,7 +125,7 @@ class TrafficControlProcessor(
       traceContext: TraceContext
   ): Future[Unit] = {
     logger.debug(s"Notifying listeners that balance update $update was observed")
-    listeners.get().parTraverse_(_.trafficPurchasedUpdate(update, sequencingTimestamp))
+    listeners.get().parTraverse_ { _.trafficPurchasedUpdate(update, sequencingTimestamp) }
   }
 
   def processSetTrafficPurchasedEnvelopes(
@@ -166,7 +156,7 @@ class TrafficControlProcessor(
           for {
             // We use the topology snapshot at the time of event sequencing to check
             // the eligible members and signatures.
-            snapshot <- cryptoApi.awaitSnapshotUS(ts)
+            snapshot <- FutureUnlessShutdown.outcomeF(cryptoApi.awaitSnapshot(ts))
 
             listenersNotified <- MonadUtil.sequentialTraverseMonoid(trafficEnvelopesNE) { env =>
               processSetTrafficPurchased(env, snapshot, ts)

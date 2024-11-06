@@ -3,9 +3,7 @@
 
 package com.digitalasset.canton.platform
 
-import com.digitalasset.canton.ledger.participant.state.Update
-import com.digitalasset.canton.tracing.Traced
-import com.digitalasset.canton.util.PekkoUtil.{Commit, FutureQueueConsumer}
+import com.daml.ledger.resources.ResourceOwner
 
 import scala.concurrent.Future
 
@@ -13,5 +11,5 @@ package object indexer {
 
   /** Indexer is a factory for indexing. Future[Unit] is the completion Future, as it completes indexing is completed with results accordingly (Success/Failure)
     */
-  type Indexer = Boolean => Commit => Future[FutureQueueConsumer[Traced[Update]]]
+  type Indexer = ResourceOwner[Future[Unit]]
 }

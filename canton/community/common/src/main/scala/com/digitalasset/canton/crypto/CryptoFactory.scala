@@ -12,7 +12,6 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.crypto.CryptoFactory.{
   CryptoStoresAndSchemes,
   selectAllowedEncryptionAlgorithmSpecs,
-  selectAllowedSigningAlgorithmSpecs,
   selectSchemes,
 }
 import com.digitalasset.canton.crypto.provider.jce.{JcePrivateCrypto, JcePureCrypto}
@@ -50,13 +49,8 @@ trait CryptoFactory {
     for {
       symmetricKeyScheme <- selectSchemes(config.symmetric, config.provider.symmetric)
         .map(_.default)
-      signingAlgorithmSpec <- selectSchemes(
-        config.signing.algorithms,
-        config.provider.signingAlgorithms,
-      )
-      supportedSigningAlgorithmSpecs <- selectAllowedSigningAlgorithmSpecs(config)
       encryptionAlgorithmSpec <- selectSchemes(
-        config.encryption.algorithms,
+        config.encryptionAlgorithms,
         config.provider.encryptionAlgorithms,
       )
       supportedEncryptionAlgorithmSpecs <- selectAllowedEncryptionAlgorithmSpecs(config)
@@ -70,8 +64,6 @@ trait CryptoFactory {
             pbkdfScheme <- selectSchemes(config.pbkdf, pbkdfSchemes).map(_.default)
           } yield new JcePureCrypto(
             symmetricKeyScheme,
-            signingAlgorithmSpec.default,
-            supportedSigningAlgorithmSpecs,
             encryptionAlgorithmSpec.default,
             supportedEncryptionAlgorithmSpecs,
             hashAlgorithm,
@@ -108,35 +100,27 @@ trait CryptoFactory {
       hashAlgorithm <- selectSchemes(config.hash, config.provider.hash)
         .map(_.default)
         .toEitherT[FutureUnlessShutdown]
-      signingCryptoAlgorithmSpec <- selectSchemes(
-        config.signing.algorithms,
-        config.provider.signingAlgorithms,
-      )
+      signingKeyScheme <- selectSchemes(config.signing, config.provider.signing)
         .map(_.default)
-        .toEitherT[FutureUnlessShutdown]
-      signingKeySpec <- selectSchemes(config.signing.keys, config.provider.signingKeys)
-        .map(_.default)
-        .toEitherT[FutureUnlessShutdown]
-      supportedSigningAlgorithmSpecs <- selectAllowedSigningAlgorithmSpecs(config)
         .toEitherT[FutureUnlessShutdown]
       encryptionCryptoAlgorithmSpec <- selectSchemes(
-        config.encryption.algorithms,
+        config.encryptionAlgorithms,
         config.provider.encryptionAlgorithms,
       )
         .map(_.default)
         .toEitherT[FutureUnlessShutdown]
-      encryptionKeySpec <- selectSchemes(config.encryption.keys, config.provider.encryptionKeys)
+      encryptionKeySpec <- selectSchemes(config.encryptionKeys, config.provider.encryptionKeys)
         .map(_.default)
         .toEitherT[FutureUnlessShutdown]
+      // TODO(#18934): Ensure required/allowed schemes are enforced by private/pure crypto classes
+      // requiredSigningKeySchemes <- selectAllowedSigningKeyScheme(config).toEitherT[FutureUnlessShutdown]
       supportedEncryptionAlgorithmSpecs <- selectAllowedEncryptionAlgorithmSpecs(config)
         .toEitherT[FutureUnlessShutdown]
     } yield CryptoStoresAndSchemes(
       cryptoPublicStore,
       cryptoPrivateStore,
       symmetricKeyScheme,
-      supportedSigningAlgorithmSpecs,
-      signingCryptoAlgorithmSpec,
-      signingKeySpec,
+      signingKeyScheme,
       supportedEncryptionAlgorithmSpecs,
       encryptionCryptoAlgorithmSpec,
       encryptionKeySpec,
@@ -153,10 +137,7 @@ object CryptoFactory {
       cryptoPublicStore: CryptoPublicStore,
       cryptoPrivateStore: CryptoPrivateStore,
       symmetricKeyScheme: SymmetricKeyScheme,
-      // TODO(#18934): Ensure required/allowed schemes are enforced by private/pure crypto classes
-      supportedSigningAlgorithmSpecs: NonEmpty[Set[SigningAlgorithmSpec]],
-      signingAlgorithmSpec: SigningAlgorithmSpec,
-      signingKeySpec: SigningKeySpec,
+      signingKeyScheme: SigningKeyScheme,
       supportedEncryptionAlgorithmSpecs: NonEmpty[Set[EncryptionAlgorithmSpec]],
       encryptionAlgorithmSpec: EncryptionAlgorithmSpec,
       encryptionKeySpec: EncryptionKeySpec,
@@ -194,25 +175,20 @@ object CryptoFactory {
   ): Either[String, NonEmpty[Set[HashAlgorithm]]] =
     selectSchemes(config.hash, config.provider.hash).map(_.allowed)
 
-  def selectAllowedSigningAlgorithmSpecs(
+  def selectAllowedSigningKeyScheme(
       config: CryptoConfig
-  ): Either[String, NonEmpty[Set[SigningAlgorithmSpec]]] =
-    selectSchemes(config.signing.algorithms, config.provider.signingAlgorithms).map(_.allowed)
-
-  def selectAllowedSigningKeySpecs(
-      config: CryptoConfig
-  ): Either[String, NonEmpty[Set[SigningKeySpec]]] =
-    selectSchemes(config.signing.keys, config.provider.signingKeys).map(_.allowed)
+  ): Either[String, NonEmpty[Set[SigningKeyScheme]]] =
+    selectSchemes(config.signing, config.provider.signing).map(_.allowed)
 
   def selectAllowedEncryptionAlgorithmSpecs(
       config: CryptoConfig
   ): Either[String, NonEmpty[Set[EncryptionAlgorithmSpec]]] =
-    selectSchemes(config.encryption.algorithms, config.provider.encryptionAlgorithms).map(_.allowed)
+    selectSchemes(config.encryptionAlgorithms, config.provider.encryptionAlgorithms).map(_.allowed)
 
   def selectAllowedEncryptionKeySpecs(
       config: CryptoConfig
   ): Either[String, NonEmpty[Set[EncryptionKeySpec]]] =
-    selectSchemes(config.encryption.keys, config.provider.encryptionKeys).map(_.allowed)
+    selectSchemes(config.encryptionKeys, config.provider.encryptionKeys).map(_.allowed)
 
 }
 
@@ -275,8 +251,6 @@ object JceCrypto {
       pureCrypto =
         new JcePureCrypto(
           storesAndSchemes.symmetricKeyScheme,
-          storesAndSchemes.signingAlgorithmSpec,
-          storesAndSchemes.supportedSigningAlgorithmSpecs,
           storesAndSchemes.encryptionAlgorithmSpec,
           storesAndSchemes.supportedEncryptionAlgorithmSpecs,
           storesAndSchemes.hashAlgorithm,
@@ -286,8 +260,7 @@ object JceCrypto {
       privateCrypto =
         new JcePrivateCrypto(
           pureCrypto,
-          storesAndSchemes.signingAlgorithmSpec,
-          storesAndSchemes.signingKeySpec,
+          storesAndSchemes.signingKeyScheme,
           storesAndSchemes.encryptionKeySpec,
           cryptoPrivateStoreExtended,
         )

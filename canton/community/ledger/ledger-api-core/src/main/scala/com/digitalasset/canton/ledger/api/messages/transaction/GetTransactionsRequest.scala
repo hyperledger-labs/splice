@@ -3,8 +3,7 @@
 
 package com.digitalasset.canton.ledger.api.messages.transaction
 
-import com.digitalasset.canton.ledger.api.domain.TransactionFilter
-import com.digitalasset.canton.ledger.api.domain.types.ParticipantOffset
+import com.digitalasset.canton.ledger.api.domain.{ParticipantOffset, TransactionFilter}
 
 final case class GetTransactionsRequest(
     startExclusive: ParticipantOffset,

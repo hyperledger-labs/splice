@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.ledger.api.validation
 
-import cats.syntax.either.*
 import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator.*
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
@@ -41,7 +40,7 @@ class ResourceAnnotationValidationsSpec extends AnyFlatSpec with Matchers with E
     testedValidationAllowEmptyValues(Map("aA._-b" -> "")).value shouldBe ()
     testedValidationAllowEmptyValues(
       Map("abcdefghijklmnopqrstuvwxyz.-_ABCDEFGHIJKLMNOPQRSTUVWXYZ" -> "")
-    ) shouldBe Either.unit
+    ) shouldBe Right(())
     testedValidationAllowEmptyValues(Map("some-key.like_this" -> "")).value shouldBe ()
     // too long
     testedValidationAllowEmptyValues(Map("a" * 64 -> "")).left.value shouldBe a[

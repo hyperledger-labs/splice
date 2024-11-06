@@ -3,15 +3,11 @@
 
 package com.digitalasset.canton.participant.protocol.conflictdetection
 
-import cats.syntax.either.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
-import com.digitalasset.canton.participant.store.memory.{
-  InMemoryReassignmentStore,
-  ReassignmentCache,
-}
-import com.digitalasset.canton.participant.store.{ActiveContractStore, ReassignmentStoreTest}
+import com.digitalasset.canton.participant.store.memory.{InMemoryTransferStore, TransferCache}
+import com.digitalasset.canton.participant.store.{ActiveContractStore, TransferStoreTest}
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.{BaseTest, HasExecutorService, RequestCounter, SequencerCounter}
 import org.scalatest.wordspec.AsyncWordSpec
@@ -30,19 +26,16 @@ class NaiveRequestTrackerTest
       ts: CantonTimestamp,
       acs: ActiveContractStore,
   ): NaiveRequestTracker = {
-    val reassignmentCache =
-      new ReassignmentCache(
-        new InMemoryReassignmentStore(
-          ReassignmentStoreTest.targetDomainId,
-          loggerFactory,
-        ),
+    val transferCache =
+      new TransferCache(
+        new InMemoryTransferStore(TransferStoreTest.targetDomain, loggerFactory),
         loggerFactory,
       )
 
     val conflictDetector =
       new ConflictDetector(
         acs,
-        reassignmentCache,
+        transferCache,
         loggerFactory,
         checkedInvariant = true,
         parallelExecutionContext,
@@ -105,7 +98,7 @@ class NaiveRequestTrackerTest
         "Request present immediately after transaction result",
       )
       _ = enterTick(rt, SequencerCounter(3), CantonTimestamp.ofEpochMilli(3))
-      _ <- finalize0.map(result => assert(result == Either.unit))
+      _ <- finalize0.map(result => assert(result == Right(())))
       _ = assert(
         !rt.requestInFlight(RequestCounter(0)),
         "Request evicted immediately after finalization",

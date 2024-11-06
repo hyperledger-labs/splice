@@ -46,7 +46,7 @@ object JceJavaKeyConverter {
           .catchOnly[NoSuchAlgorithmException](
             KeyFactory.getInstance(keyInstance, JceSecurityProvider.bouncyCastleProvider)
           )
-          .leftMap(JceJavaKeyConversionError.GeneralError.apply)
+          .leftMap(JceJavaKeyConversionError.GeneralError)
         javaPublicKey <- Either
           .catchOnly[InvalidKeySpecException](keyFactory.generatePublic(x509KeySpec))
           .leftMap(err => JceJavaKeyConversionError.InvalidKey(show"$err"))
@@ -54,12 +54,12 @@ object JceJavaKeyConverter {
 
     (publicKey: @unchecked) match {
       case sigKey: SigningPublicKey =>
-        sigKey.keySpec match {
-          case SigningKeySpec.EcCurve25519 =>
+        sigKey.scheme match {
+          case SigningKeyScheme.Ed25519 =>
             val algoId = new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519)
             val x509PublicKey = new SubjectPublicKeyInfo(algoId, publicKey.key.toByteArray)
             convert(CryptoKeyFormat.Raw, x509PublicKey.getEncoded, "Ed25519")
-          case SigningKeySpec.EcP256 | SigningKeySpec.EcP384 =>
+          case SigningKeyScheme.EcDsaP256 | SigningKeyScheme.EcDsaP384 =>
             convert(CryptoKeyFormat.Der, publicKey.key.toByteArray, "EC")
         }
       case encKey: EncryptionPublicKey =>
@@ -84,7 +84,7 @@ object JceJavaKeyConverter {
       for {
         keyFactory <- Either
           .catchOnly[NoSuchAlgorithmException](KeyFactory.getInstance(keyInstance, "BC"))
-          .leftMap(JceJavaKeyConversionError.GeneralError.apply)
+          .leftMap(JceJavaKeyConversionError.GeneralError)
         javaPrivateKey <- Either
           .catchOnly[InvalidKeySpecException](keyFactory.generatePrivate(pkcs8KeySpec))
           .leftMap(err => JceJavaKeyConversionError.InvalidKey(show"$err"))
@@ -105,22 +105,22 @@ object JceJavaKeyConverter {
 
     (privateKey: @unchecked) match {
       case sigKey: SigningPrivateKey =>
-        sigKey.keySpec match {
-          case SigningKeySpec.EcCurve25519 if sigKey.format == CryptoKeyFormat.Raw =>
+        sigKey.scheme match {
+          case SigningKeyScheme.Ed25519 if sigKey.format == CryptoKeyFormat.Raw =>
             val privateKeyInfo = new PrivateKeyInfo(
               new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
               new DEROctetString(privateKey.key.toByteArray),
             )
             convertFromPkcs8(privateKeyInfo.getEncoded, "Ed25519")
-          case SigningKeySpec.EcP256 if sigKey.format == CryptoKeyFormat.Der =>
+          case SigningKeyScheme.EcDsaP256 if sigKey.format == CryptoKeyFormat.Der =>
             convertFromPkcs8(privateKey.key.toByteArray, "EC")
-          case SigningKeySpec.EcP384 if sigKey.format == CryptoKeyFormat.Der =>
+          case SigningKeyScheme.EcDsaP384 if sigKey.format == CryptoKeyFormat.Der =>
             convertFromPkcs8(privateKey.key.toByteArray, "EC")
           case _ =>
-            val expectedFormat = sigKey.keySpec match {
-              case SigningKeySpec.EcCurve25519 => CryptoKeyFormat.Raw
-              case SigningKeySpec.EcP256 => CryptoKeyFormat.Der
-              case SigningKeySpec.EcP384 => CryptoKeyFormat.Der
+            val expectedFormat = sigKey.scheme match {
+              case SigningKeyScheme.Ed25519 => CryptoKeyFormat.Raw
+              case SigningKeyScheme.EcDsaP256 => CryptoKeyFormat.Der
+              case SigningKeyScheme.EcDsaP384 => CryptoKeyFormat.Der
             }
             Either.left[JceJavaKeyConversionError, JPrivateKey](
               JceJavaKeyConversionError.UnsupportedKeyFormat(sigKey.format, expectedFormat)
@@ -148,18 +148,18 @@ sealed trait JceJavaKeyConversionError extends Product with Serializable with Pr
 object JceJavaKeyConversionError {
 
   final case class GeneralError(error: Exception) extends JceJavaKeyConversionError {
-    override protected def pretty: Pretty[GeneralError] =
+    override def pretty: Pretty[GeneralError] =
       prettyOfClass(unnamedParam(_.error))
   }
 
   final case class UnsupportedKeyFormat(format: CryptoKeyFormat, expectedFormat: CryptoKeyFormat)
       extends JceJavaKeyConversionError {
-    override protected def pretty: Pretty[UnsupportedKeyFormat] =
+    override def pretty: Pretty[UnsupportedKeyFormat] =
       prettyOfClass(param("format", _.format), param("expected format", _.expectedFormat))
   }
 
   final case class InvalidKey(error: String) extends JceJavaKeyConversionError {
-    override protected def pretty: Pretty[InvalidKey] =
+    override def pretty: Pretty[InvalidKey] =
       prettyOfClass(unnamedParam(_.error.unquoted))
   }
 

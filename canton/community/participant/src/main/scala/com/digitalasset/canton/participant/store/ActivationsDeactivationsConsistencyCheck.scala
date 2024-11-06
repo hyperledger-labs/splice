@@ -53,8 +53,9 @@ object ActivationsDeactivationsConsistencyCheck {
       else if (currentToc == toc) List(prevToc)
       else Nil
 
-    def doubleContractArchival(prevArchival: TimeOfChange, currentToc: TimeOfChange) =
+    def doubleContractArchival(prevArchival: TimeOfChange, currentToc: TimeOfChange) = {
       existingToc(prevArchival, currentToc).map(DoubleContractArchival(cid, _, toc))
+    }
 
     def doubleContractCreation(prevToc: TimeOfChange, currentToc: TimeOfChange) =
       existingToc(prevToc, currentToc).map(DoubleContractCreation(cid, _, toc))

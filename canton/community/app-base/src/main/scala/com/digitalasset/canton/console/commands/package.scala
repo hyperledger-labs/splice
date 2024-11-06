@@ -74,7 +74,7 @@ package object commands {
       request: String,
       serverName: String = "",
       cleanupOnError: () => Unit = () => (),
-  ): ConsoleCommandResult[T] =
+  ): ConsoleCommandResult[T] = {
     call.flatMap { call =>
       try {
         ResourceUtil.withResource(call) { _ =>
@@ -91,4 +91,5 @@ package object commands {
           CommandErrors.ConsoleTimeout.Error(timeout.asJavaApproximation)
       }
     }
+  }
 }

@@ -13,6 +13,7 @@ import com.daml.ledger.api.v2.update_service.{
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform
 import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReader.FetchFromPersistence
 import com.digitalasset.canton.platform.store.dao.events.TransactionLogUpdatesConversions.{
@@ -28,7 +29,7 @@ import com.digitalasset.canton.platform.store.dao.{
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
 import com.digitalasset.canton.platform.{Party, TemplatePartiesFilter}
 import com.digitalasset.canton.tracing.Traced
-import com.digitalasset.canton.{data, platform}
+import com.digitalasset.daml.lf.data.Ref.TransactionId
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -61,7 +62,7 @@ private[events] class BufferedTransactionsReader(
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Source[(Offset, GetUpdatesResponse), NotUsed] =
+  ): Source[(Offset, GetUpdatesResponse), NotUsed] = {
     bufferedFlatTransactionsReader
       .stream(
         startExclusive = startExclusive,
@@ -83,6 +84,7 @@ private[events] class BufferedTransactionsReader(
             executionContext,
           ),
       )
+  }
 
   override def getTransactionTrees(
       startExclusive: Offset,
@@ -110,16 +112,16 @@ private[events] class BufferedTransactionsReader(
       )
 
   override def lookupFlatTransactionById(
-      updateId: data.UpdateId,
+      transactionId: TransactionId,
       requestingParties: Set[Party],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]] =
-    bufferedFlatTransactionByIdReader.fetch(updateId, requestingParties)
+    bufferedFlatTransactionByIdReader.fetch(transactionId, requestingParties)
 
   override def lookupTransactionTreeById(
-      updateId: data.UpdateId,
+      transactionId: TransactionId,
       requestingParties: Set[Party],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionTreeResponse]] =
-    bufferedTransactionTreeByIdReader.fetch(updateId, requestingParties)
+    bufferedTransactionTreeByIdReader.fetch(transactionId, requestingParties)
 
   override def getActiveContracts(
       activeAt: Offset,
@@ -210,12 +212,12 @@ private[platform] object BufferedTransactionsReader {
       new BufferedTransactionByIdReader[GetTransactionResponse](
         inMemoryFanoutBuffer = transactionsBuffer,
         fetchFromPersistence = (
-            updateId: String,
+            transactionId: String,
             requestingParties: Set[Party],
             loggingContext: LoggingContextWithTrace,
         ) =>
           delegate.lookupFlatTransactionById(
-            platform.UpdateId.assertFromString(updateId),
+            platform.TransactionId.assertFromString(transactionId),
             requestingParties,
           )(loggingContext),
         toApiResponse = (
@@ -234,12 +236,12 @@ private[platform] object BufferedTransactionsReader {
       new BufferedTransactionByIdReader[GetTransactionTreeResponse](
         inMemoryFanoutBuffer = transactionsBuffer,
         fetchFromPersistence = (
-            updateId: String,
+            transactionId: String,
             requestingParties: Set[Party],
             loggingContext: LoggingContextWithTrace,
         ) =>
           delegate.lookupTransactionTreeById(
-            platform.UpdateId.assertFromString(updateId),
+            platform.TransactionId.assertFromString(transactionId),
             requestingParties,
           )(loggingContext),
         toApiResponse = (

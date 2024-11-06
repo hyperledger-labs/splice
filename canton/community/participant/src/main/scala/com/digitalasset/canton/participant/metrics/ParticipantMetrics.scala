@@ -109,7 +109,7 @@ class ParticipantMetrics(
 
   object pruning extends ParticipantPruningMetrics(inventory.pruning, openTelemetryMetricsFactory)
 
-  def domainMetrics(alias: DomainAlias): SyncDomainMetrics =
+  def domainMetrics(alias: DomainAlias): SyncDomainMetrics = {
     clients
       .getOrElseUpdate(
         alias,
@@ -124,6 +124,18 @@ class ParticipantMetrics(
         ),
       )
       .value
+  }
+
+  val updatesPublished: Meter = openTelemetryMetricsFactory.meter(
+    MetricInfo(
+      prefix :+ "updates-published",
+      summary = "Number of updates published through the read service to the indexer",
+      description =
+        """When an update is published through the read service, it has already been committed to the ledger.
+        |The indexer will subsequently store the update in a form that allows for querying the ledger efficiently.""",
+      qualification = MetricQualification.Traffic,
+    )
+  )
 
   val inflightValidationRequests: Gauge[Int] =
     openTelemetryMetricsFactory.gauge(
@@ -266,4 +278,51 @@ class SyncDomainMetrics(
     def taskQueue(size: () => Int): CloseableGauge =
       factory.gaugeWithSupplier(taskQueueForDoc.info, size)
   }
+
+  // TODO(i14580): add testing
+  object trafficControl {
+
+    private val prefix = histograms.prefix :+ "traffic-control"
+
+    val extraTrafficAvailable: Gauge[Long] =
+      factory.gauge(
+        MetricInfo(
+          prefix :+ "extra-traffic-credit-available",
+          summary = "Current amount of extra traffic remaining",
+          description = """Gets updated with every event received.""",
+          qualification = MetricQualification.Traffic,
+        ),
+        0L,
+      )
+
+    val topologyTransaction: Gauge[Long] =
+      factory.gauge(
+        MetricInfo(
+          prefix :+ "traffic-state-topology-transaction",
+          summary = "Records a new top up on the participant",
+          description = """Records top up events and the new extra traffic limit associated.""",
+          qualification = MetricQualification.Traffic,
+        ),
+        0L,
+      )
+
+    val eventAboveTrafficLimit: Meter = factory.meter(
+      MetricInfo(
+        prefix :+ "event-above-traffic-limit",
+        summary = "Event was not delivered because of traffic limit exceeded",
+        description = """An event was not delivered because of insufficient traffic credit.""",
+        qualification = MetricQualification.Traffic,
+      )
+    )
+
+    val eventDelivered: Meter = factory.meter(
+      MetricInfo(
+        prefix :+ "event-delivered",
+        summary = "Event was delivered",
+        description = """An event was not delivered.""",
+        qualification = MetricQualification.Traffic,
+      )
+    )
+  }
+
 }

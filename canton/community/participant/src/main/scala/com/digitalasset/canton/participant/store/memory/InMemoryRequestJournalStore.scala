@@ -5,7 +5,6 @@ package com.digitalasset.canton.participant.store.memory
 
 import cats.data.{EitherT, OptionT}
 import com.digitalasset.canton.concurrent.DirectExecutionContext
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.RequestJournal.{RequestData, RequestState}
@@ -95,18 +94,13 @@ class InMemoryRequestJournalStore(protected val loggerFactory: NamedLoggerFactor
 
   @VisibleForTesting
   private[store] override def pruneInternal(
-      beforeInclusive: CantonTimestamp
+      beforeAndIncluding: CantonTimestamp
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val before = requestTable.size
     val after = requestTable
-      .filterInPlace((_, result) => result.requestTimestamp.isAfter(beforeInclusive))
+      .filterInPlace((_, result) => result.requestTimestamp.isAfter(beforeAndIncluding))
       .size
     logger.info(s"Pruned ${before - after} contracts from the request journal")
-    Future.unit
-  }
-
-  override def purge()(implicit traceContext: TraceContext): Future[Unit] = {
-    requestTable.clear()
     Future.unit
   }
 
@@ -125,7 +119,7 @@ class InMemoryRequestJournalStore(protected val loggerFactory: NamedLoggerFactor
   override def deleteSince(fromInclusive: RequestCounter)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
-    Future.successful(requestTable.filterInPlace((rc, _) => rc < fromInclusive))
+    Future.successful { requestTable.filterInPlace((rc, _) => rc < fromInclusive) }
 
   override def repairRequests(
       fromInclusive: RequestCounter
@@ -136,22 +130,10 @@ class InMemoryRequestJournalStore(protected val loggerFactory: NamedLoggerFactor
       .sortBy(_.rc)
   }
 
-  override def lastRequestCounterWithRequestTimestampBeforeOrAt(requestTimestamp: CantonTimestamp)(
-      implicit traceContext: TraceContext
-  ): Future[Option[RequestCounter]] =
-    Future.successful {
-      requestTable.values.foldLeft(Option.empty[RequestCounter]) {
-        (maxSoFar, queryResult: RequestData) =>
-          if (queryResult.requestTimestamp > requestTimestamp) maxSoFar
-          else if (maxSoFar.forall(_ < queryResult.rc)) Some(queryResult.rc)
-          else maxSoFar
-      }
-    }
-
   private def withRc(rc: RequestCounter, msg: String): String = s"Request $rc: $msg"
 
-  override def totalDirtyRequests()(implicit traceContext: TraceContext): Future[NonNegativeInt] =
-    Future.successful(NonNegativeInt.tryCreate(requestTable.count { case (_, result) =>
+  override def totalDirtyRequests()(implicit traceContext: TraceContext): Future[Int] =
+    Future.successful(requestTable.count { case (_, result) =>
       result.commitTime.isEmpty
-    }))
+    })
 }

@@ -4,6 +4,8 @@
 package com.digitalasset.canton.platform.store.dao
 
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.transaction.{BlindingInfo, NodeId}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{LoneElement, OptionValues}
@@ -52,8 +54,13 @@ private[dao] trait JdbcLedgerDaoTransactionsWriterSpec extends LoneElement with 
   }
 
   it should "prefer stakeholder info" in {
+    val mismatchingBlindingInfo =
+      BlindingInfo(Map(NodeId(0) -> Set(Ref.Party.assertFromString("zoe"))), Map())
     for {
-      (offset, tx) <- store(offsetAndTx = singleCreate)
+      (offset, tx) <- store(
+        offsetAndTx = singleCreate,
+        blindingInfo = Some(mismatchingBlindingInfo),
+      )
       result <- ledgerDao.contractsReader.lookupContractState(
         nonTransient(tx).loneElement,
         offset,

@@ -6,7 +6,11 @@ package com.digitalasset.canton.participant.protocol.submission
 import cats.Functor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.participant.store.InFlightSubmissionStore.InFlightByMessageId
+import com.digitalasset.canton.participant.store.InFlightSubmissionStore.{
+  InFlightByMessageId,
+  InFlightBySequencingInfo,
+}
+import com.digitalasset.canton.participant.sync.TimestampedEvent.TimelyRejectionEventId
 import com.digitalasset.canton.protocol.RootHash
 import com.digitalasset.canton.sequencing.protocol.MessageId
 import com.digitalasset.canton.store.db.DbSerializationException
@@ -54,6 +58,11 @@ final case class InFlightSubmission[+SequencingInfo <: SubmissionSequencingInfo]
   /** Whether the submission's sequencing has been observed */
   def isSequenced: Boolean = sequencingInfo.isSequenced
 
+  def mapSequencingInfo[B <: SubmissionSequencingInfo](
+      f: SequencingInfo => B
+  ): InFlightSubmission[B] =
+    setSequencingInfo(f(sequencingInfo))
+
   def traverseSequencingInfo[F[_], B <: SubmissionSequencingInfo](f: SequencingInfo => F[B])(
       implicit F: Functor[F]
   ): F[InFlightSubmission[B]] =
@@ -62,9 +71,10 @@ final case class InFlightSubmission[+SequencingInfo <: SubmissionSequencingInfo]
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def setSequencingInfo[B <: SubmissionSequencingInfo](
       newSequencingInfo: B
-  ): InFlightSubmission[B] =
+  ): InFlightSubmission[B] = {
     if (sequencingInfo eq newSequencingInfo) this.asInstanceOf[InFlightSubmission[B]]
     else this.copy(sequencingInfo = newSequencingInfo)
+  }
 
   private[participant] def associatedTimestamp: CantonTimestamp =
     (sequencingInfo: @unchecked) match {
@@ -72,7 +82,7 @@ final case class InFlightSubmission[+SequencingInfo <: SubmissionSequencingInfo]
       case SequencedSubmission(_sequencerCounter, sequencingTime) => sequencingTime
     }
 
-  override protected def pretty: Pretty[InFlightSubmission.this.type] = prettyOfClass(
+  override def pretty: Pretty[InFlightSubmission.this.type] = prettyOfClass(
     param("change ID hash", _.changeIdHash),
     paramIfDefined("submissionid", _.submissionId),
     param("submission domain", _.submissionDomain),
@@ -82,9 +92,21 @@ final case class InFlightSubmission[+SequencingInfo <: SubmissionSequencingInfo]
     param("submission trace context", _.submissionTraceContext),
   )
 
-  def referenceByMessageId: InFlightByMessageId = InFlightByMessageId(submissionDomain, messageId)
-}
+  /** @param ev Enforces that this method is called only on unsequenced in-flight submissions
+    *           as there is no point in talking about timely rejections for sequenced submissions.
+    */
+  def timelyRejectionEventId(implicit
+      ev: SequencingInfo <:< UnsequencedSubmission
+  ): TimelyRejectionEventId =
+    TimelyRejectionEventId(submissionDomain, messageUuid)
 
+  def referenceByMessageId: InFlightByMessageId = InFlightByMessageId(submissionDomain, messageId)
+
+  def referenceBySequencingInfo(implicit
+      ev: SequencingInfo <:< SequencedSubmission
+  ): InFlightBySequencingInfo =
+    InFlightBySequencingInfo(submissionDomain, ev(sequencingInfo))
+}
 object InFlightSubmission {
   implicit def getResultInFlightSubmission[SequencingInfo <: SubmissionSequencingInfo: GetResult](
       implicit getResultTraceContext: GetResult[SerializableTraceContext]
@@ -158,7 +180,7 @@ final case class UnsequencedSubmission(
   override def asUnsequenced: Some[UnsequencedSubmission] = Some(this)
   override def asSequenced: None.type = None
 
-  override protected def pretty: Pretty[UnsequencedSubmission] = prettyOfClass(
+  override def pretty: Pretty[UnsequencedSubmission] = prettyOfClass(
     param("timeout", _.timeout),
     param("tracking data", _.trackingData),
   )
@@ -188,7 +210,7 @@ final case class SequencedSubmission(
   override def asUnsequenced: None.type = None
   override def asSequenced: Some[SequencedSubmission] = Some(this)
 
-  override protected def pretty: Pretty[SequencedSubmission] = prettyOfClass(
+  override def pretty: Pretty[SequencedSubmission] = prettyOfClass(
     param("sequencer counter", _.sequencerCounter),
     param("sequencing time", _.sequencingTime),
   )

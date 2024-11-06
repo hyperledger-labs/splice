@@ -9,8 +9,7 @@ import com.digitalasset.canton.crypto.{
   EncryptionKeySpec,
   HashAlgorithm,
   PbkdfScheme,
-  SigningAlgorithmSpec,
-  SigningKeySpec,
+  SigningKeyScheme,
   SymmetricKeyScheme,
 }
 
@@ -28,26 +27,6 @@ final case class CryptoSchemeConfig[S](
     allowed: Option[NonEmpty[Set[S]]] = None,
 )
 
-/** Stores the configuration of the signing scheme.
-  *
-  * @param algorithms the algorithm specifications
-  * @param keys the key specifications
-  */
-final case class SigningSchemeConfig(
-    algorithms: CryptoSchemeConfig[SigningAlgorithmSpec] = CryptoSchemeConfig(),
-    keys: CryptoSchemeConfig[SigningKeySpec] = CryptoSchemeConfig(),
-)
-
-/** Stores the configuration of the encryption scheme.
-  *
-  * @param algorithms the algorithm specifications
-  * @param keys the key specifications
-  */
-final case class EncryptionSchemeConfig(
-    algorithms: CryptoSchemeConfig[EncryptionAlgorithmSpec] = CryptoSchemeConfig(),
-    keys: CryptoSchemeConfig[EncryptionKeySpec] = CryptoSchemeConfig(),
-)
-
 /** Cryptography configuration. */
 trait CryptoConfig {
 
@@ -55,10 +34,13 @@ trait CryptoConfig {
   def provider: CryptoProvider
 
   /** the signing key scheme configuration */
-  def signing: SigningSchemeConfig
+  def signing: CryptoSchemeConfig[SigningKeyScheme]
 
-  /** the encryption scheme configuration */
-  def encryption: EncryptionSchemeConfig
+  /** the encryption algorithm configuration */
+  def encryptionAlgorithms: CryptoSchemeConfig[EncryptionAlgorithmSpec]
+
+  /** the encryption key configuration */
+  def encryptionKeys: CryptoSchemeConfig[EncryptionKeySpec]
 
   /** the symmetric key scheme configuration */
   def symmetric: CryptoSchemeConfig[SymmetricKeyScheme]
@@ -72,8 +54,9 @@ trait CryptoConfig {
 
 final case class CommunityCryptoConfig(
     provider: CommunityCryptoProvider = CommunityCryptoProvider.Jce,
-    signing: SigningSchemeConfig = SigningSchemeConfig(),
-    encryption: EncryptionSchemeConfig = EncryptionSchemeConfig(),
+    signing: CryptoSchemeConfig[SigningKeyScheme] = CryptoSchemeConfig(),
+    encryptionAlgorithms: CryptoSchemeConfig[EncryptionAlgorithmSpec] = CryptoSchemeConfig(),
+    encryptionKeys: CryptoSchemeConfig[EncryptionKeySpec] = CryptoSchemeConfig(),
     symmetric: CryptoSchemeConfig[SymmetricKeyScheme] = CryptoSchemeConfig(),
     hash: CryptoSchemeConfig[HashAlgorithm] = CryptoSchemeConfig(),
     pbkdf: CryptoSchemeConfig[PbkdfScheme] = CryptoSchemeConfig(),

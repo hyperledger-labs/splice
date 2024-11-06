@@ -6,8 +6,8 @@ package com.digitalasset.canton.participant.sync
 import com.daml.error.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.error.*
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.RoutingErrorGroup
+import com.digitalasset.canton.error.*
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.TransactionSubmissionError
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.DomainId
@@ -101,20 +101,40 @@ object TransactionRoutingError extends RoutingErrorGroup {
   object MalformedInputErrors extends ErrorGroup() {
 
     @Explanation(
-      """The party defined as a reader (actAs or readAs) can not be parsed into a valid Canton party."""
+      """The party defined as a submitter can not be parsed into a valid Canton party."""
     )
     @Resolution(
       """Check that you only use correctly setup party names in your application."""
     )
-    object InvalidReader
+    object InvalidSubmitter
         extends ErrorCode(
-          id = "INVALID_READER",
+          id = "INVALID_SUBMITTER",
           ErrorCategory.InvalidIndependentOfSystemState,
         ) {
 
       final case class Error(submitter: String)
           extends TransactionErrorImpl(
-            cause = "Unable to parse reader (actAs or readAs)."
+            cause = "Unable to parse submitter."
+          )
+          with TransactionRoutingError
+    }
+
+    // TODO(i17634): remove or adapt description
+    @Explanation(
+      """The WorkflowID defined in the transaction metadata contains an invalid domain id."""
+    )
+    @Resolution(
+      """Check that the workflow ID (if specified) corresponds to a valid domain ID after the ``domain-id:`` marker string."""
+    )
+    object InvalidDomainId
+        extends ErrorCode(
+          id = "INVALID_DOMAIN_ID",
+          ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+        ) {
+
+      final case class Error(invalidDomainId: String)
+          extends TransactionErrorImpl(
+            cause = "Unable to parse workflow ID."
           )
           with TransactionRoutingError
     }
@@ -312,7 +332,7 @@ object TransactionRoutingError extends RoutingErrorGroup {
     }
 
     @Explanation(
-      """This error indicates that the transaction requires contract reassignments for which the submitter must be a stakeholder."""
+      """This error indicates that the transaction requires contract transfers for which the submitter must be a stakeholder."""
     )
     @Resolution(
       "Check that your participant node is connected to all domains you expect and check that the parties are hosted on these domains as you expect them to be."
@@ -324,7 +344,7 @@ object TransactionRoutingError extends RoutingErrorGroup {
         ) {
       final case class Error(cids: Seq[LfContractId])
           extends TransactionErrorImpl(
-            cause = "The given contracts cannot be reassigned as no submitter is a stakeholder."
+            cause = "The given contracts can not be transferred as no submitter is a stakeholder."
           )
           with TransactionRoutingError
     }
@@ -372,7 +392,7 @@ object TransactionRoutingError extends RoutingErrorGroup {
       """This error indicates that the transaction is referring to contracts whose domain is not currently known."""
     )
     @Resolution(
-      "Ensure all reassignment operations on contracts used by the transaction have completed and check connectivity to domains."
+      "Ensure all transfer operations on contracts used by the transaction have completed and check connectivity to domains."
     )
     object UnknownContractDomains
         extends ErrorCode(
@@ -383,7 +403,7 @@ object TransactionRoutingError extends RoutingErrorGroup {
       final case class Error(contractIds: List[String])
           extends TransactionErrorImpl(
             cause =
-              s"The domains for the contracts $contractIds are currently unknown due to ongoing contract reassignments or disconnected domains"
+              s"The domains for the contracts $contractIds are currently unknown due to ongoing contract transfers or disconnected domains"
           )
           with TransactionRoutingError {
         override def resources: Seq[(ErrorResource, String)] = Seq(
@@ -394,20 +414,20 @@ object TransactionRoutingError extends RoutingErrorGroup {
   }
 
   @Explanation(
-    """This error indicates that the automated reassignment could not succeed, as the current topology does not
-      allow the reassignment to complete, mostly due to lack of confirmation permissions of the involved parties."""
+    """This error indicates that the automated transfer could not succeed, as the current topology does not
+      allow the transfer to complete, mostly due to lack of confirmation permissions of the involved parties."""
   )
   @Resolution(
     """Inspect the message and your topology and ensure appropriate permissions exist."""
   )
-  object AutomaticReassignmentForTransactionFailure
+  object AutomaticTransferForTransactionFailure
       extends ErrorCode(
-        id = "AUTOMATIC_REASSIGNMENT_FOR_TRANSACTION_FAILED",
+        id = "AUTOMATIC_TRANSFER_FOR_TRANSACTION_FAILED",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
     final case class Failed(reason: String)
         extends TransactionErrorImpl(
-          cause = "Automatically reassigning contracts to a common domain failed."
+          cause = "Automatically transferring contracts to a common domain failed."
         )
         with TransactionRoutingError
   }

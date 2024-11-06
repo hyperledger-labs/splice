@@ -9,9 +9,10 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.sync.SyncDomainPersistentStateManager
+import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.topology.client.StoreBasedDomainTopologyClient
-import com.digitalasset.canton.topology.processing.{ApproximateTime, EffectiveTime, SequencedTime}
+import com.digitalasset.canton.topology.processing.{ApproximateTime, EffectiveTime}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -22,8 +23,8 @@ class SortedReconciliationIntervalsProviderFactory(
     val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
-  def get(domainId: DomainId, subscriptionTs: CantonTimestamp)(implicit
-      traceContext: TraceContext
+  def get(domainId: DomainId, sequencerCounterCursorPrehead: Option[SequencerCounterCursorPrehead])(
+      implicit traceContext: TraceContext
   ): EitherT[Future, String, SortedReconciliationIntervalsProvider] =
     for {
       syncDomainPersistentState <- EitherT.fromEither[Future](
@@ -37,9 +38,11 @@ class SortedReconciliationIntervalsProviderFactory(
           _.toRight(s"Unable to fetch static domain parameters for domain $domainId")
         )
       )
+
+      subscriptionTs = sequencerCounterCursorPrehead.fold(CantonTimestamp.MinValue)(_.timestamp)
       topologyFactory <- syncDomainPersistentStateManager
         .topologyFactoryFor(domainId)
-        .toRight(s"Can not obtain topology factory for $domainId")
+        .toRight(s"Can not obtain topology factory for ${domainId}")
         .toEitherT[Future]
     } yield {
       val topologyClient = topologyFactory.createTopologyClient(
@@ -47,7 +50,6 @@ class SortedReconciliationIntervalsProviderFactory(
         StoreBasedDomainTopologyClient.NoPackageDependencies,
       )
       topologyClient.updateHead(
-        SequencedTime(subscriptionTs),
         EffectiveTime(subscriptionTs),
         ApproximateTime(subscriptionTs),
         potentialTopologyChange = true,

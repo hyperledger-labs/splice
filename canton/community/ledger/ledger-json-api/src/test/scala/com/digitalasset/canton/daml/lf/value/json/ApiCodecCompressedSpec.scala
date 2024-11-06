@@ -5,11 +5,7 @@ package com.digitalasset.canton.daml.lf.value.json
 
 import com.digitalasset.daml.lf.value.Value.ContractId
 import com.digitalasset.daml.lf.data.{ImmArray, Numeric, Ref, SortedLookupList, Time}
-import com.digitalasset.daml.lf.value.test.TypedValueGenerators.{
-  genAddend,
-  genTypeAndValue,
-  ValueAddend as VA,
-}
+import com.digitalasset.daml.lf.value.test.TypedValueGenerators.{genAddend, genTypeAndValue, ValueAddend as VA}
 import com.digitalasset.daml.lf.value.test.ValueGenerators.coidGen
 import ApiCodecCompressed.{apiValueToJsValue, jsValueToApiValue}
 import com.digitalasset.canton.daml.lf.value.json.NavigatorModelAliases as model
@@ -29,6 +25,7 @@ import scalaz.syntax.show.*
 import java.time.Instant
 import scala.annotation.nowarn
 import scala.util.{Success, Try}
+import scala.util.Random.shuffle
 
 abstract class ApiCodecCompressedSpec
     extends AnyWordSpec
@@ -118,7 +115,6 @@ abstract class ApiCodecCompressedSpec
           fRecord = simpleRecordT,
         ),
       )
-    @nowarn("msg=dubious usage of method asInstanceOf with unit value")
     val complexRecordV: complexRecordT.Inj =
       HRecord(
         fText = "foo",
@@ -204,6 +200,36 @@ class ApiCodecCompressedSpecStable extends ApiCodecCompressedSpec {
         implicit val arbInj: Arbitrary[va.Inj] = va.injarb
         forAll(minSuccessful(1000)) { (v: va.Inj) =>
           roundtrip(va)(v) should ===(Some(v))
+        }
+      }
+
+      "ignore order in maps" in forAll(genAddend, minSuccessful(20)) { kva =>
+        val mapVa = VA.genMap(kva, VA.int64)
+        import mapVa.{injarb, injshrink}
+        forAll(minSuccessful(50)) { (map: mapVa.Inj) =>
+          val canonical = mapVa.inj(map)
+          val jsEnc = inside(apiValueToJsValue(canonical)) { case JsArray(elements) =>
+            elements
+          }
+          jsValueToApiValue(JsArray(shuffle(jsEnc)), mapVa.t, typeLookup) should ===(canonical)
+        }
+      }
+
+      "fail on map duplicate keys" in forAll(genAddend, minSuccessful(20)) { kva =>
+        val mapVa = VA.genMap(kva, VA.int64)
+        import kva.{injarb, injshrink}, mapVa.{injarb as maparb, injshrink as mapshrink}
+        forAll(minSuccessful(50)) { (k: kva.Inj, v: VA.int64.Inj, map: mapVa.Inj) =>
+          val canonical = mapVa.inj(map.updated(k, v))
+          val jsEnc = inside(apiValueToJsValue(canonical)) { case JsArray(elements) =>
+            elements
+          }
+          val broken = JsArray(
+            shuffle(jsEnc :+ JsArray(Seq(kva.inj(k), VA.int64.inj(v)) map apiValueToJsValue: _*))
+          )
+          val err = the[DeserializationException] thrownBy {
+            jsValueToApiValue(broken, mapVa.t, typeLookup)
+          }
+          err.msg should startWith("duplicate key: ")
         }
       }
 
@@ -387,7 +413,7 @@ class ApiCodecCompressedSpecStable extends ApiCodecCompressedSpec {
       }
     }
 
-    import com.digitalasset.daml.lf.value.Value as LfValue
+    import com.digitalasset.daml.lf.value.{Value as LfValue}
     import ApiCodecCompressed.JsonImplicits.*
 
     val packageId: Ref.PackageId = mustBeOne(
@@ -508,11 +534,11 @@ class ApiCodecCompressedSpecStable extends ApiCodecCompressedSpec {
 class ApiCodecCompressedSpecDev extends ApiCodecCompressedSpec {
   override def darPath: String = "JsonEncodingTestDev.dar"
 
-  import com.digitalasset.daml.lf.value.Value as LfValue
+  import com.digitalasset.daml.lf.value.{Value as LfValue}
 
   "API compressed JSON codec" when {
     "dealing with Contract Key" should {
-      import com.digitalasset.daml.lf.typesig.PackageSignature.TypeDecl.Template as TDTemplate
+      import com.digitalasset.daml.lf.typesig.PackageSignature.TypeDecl.{Template as TDTemplate}
 
       "decode type Key = Party from JSON" in {
         val templateDef: TDTemplate = mustBeOne(

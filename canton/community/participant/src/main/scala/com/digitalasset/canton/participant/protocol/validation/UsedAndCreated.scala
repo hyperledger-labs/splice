@@ -17,7 +17,7 @@ final case class UsedAndCreated(
   def activenessSet: ActivenessSet =
     ActivenessSet(
       contracts = contracts.activenessCheck,
-      reassignmentIds = Set.empty,
+      transferIds = Set.empty,
     )
 }
 
@@ -25,10 +25,10 @@ final case class UsedAndCreatedContracts(
     witnessed: Map[LfContractId, SerializableContract],
     divulged: Map[LfContractId, SerializableContract],
     checkActivenessTxInputs: Set[LfContractId],
-    consumedInputsOfHostedStakeholders: Map[LfContractId, Set[LfPartyId]],
+    consumedInputsOfHostedStakeholders: Map[LfContractId, WithContractHash[Set[LfPartyId]]],
     used: Map[LfContractId, SerializableContract],
     maybeCreated: Map[LfContractId, Option[SerializableContract]],
-    transient: Map[LfContractId, Set[LfPartyId]],
+    transient: Map[LfContractId, WithContractHash[Set[LfPartyId]]],
 ) {
   def activenessCheck: ActivenessCheck[LfContractId] =
     ActivenessCheck.tryCreate(

@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.protocol.validation
 
-import cats.syntax.either.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.participant.protocol.TransactionProcessingSteps.CommonData
@@ -16,7 +15,6 @@ object TimeValidator {
       commonData: CommonData,
       sequencerTimestamp: CantonTimestamp,
       ledgerTimeRecordTimeTolerance: NonNegativeFiniteDuration,
-      submissionTimeRecordTimeTolerance: NonNegativeFiniteDuration,
       amSubmitter: Boolean,
       logger: TracedLogger,
   )(implicit tc: TraceContext): Either[TimeCheckFailure, Unit] = {
@@ -24,7 +22,7 @@ object TimeValidator {
     val CommonData(_transactionId, ledgerTime, submissionTime) = commonData
 
     def log(msg: String): Unit = {
-      lazy val logMsg = s"Time validation has failed: $msg"
+      lazy val logMsg = s"Time validation has failed: ${msg}"
       if (amSubmitter) logger.warn(logMsg)
       else logger.info(logMsg)
     }
@@ -48,22 +46,22 @@ object TimeValidator {
     }
     // check that the submission time is valid
     else if (
-      submissionTime < sequencerTimestamp - submissionTimeRecordTimeTolerance ||
-      submissionTime > sequencerTimestamp + submissionTimeRecordTimeTolerance
+      submissionTime < sequencerTimestamp - ledgerTimeRecordTimeTolerance ||
+      submissionTime > sequencerTimestamp + ledgerTimeRecordTimeTolerance
     ) {
       log(
         s"The delta of the submission time $submissionTime and the record time $sequencerTimestamp exceeds the max " +
-          s"of $submissionTimeRecordTimeTolerance"
+          s"of $ledgerTimeRecordTimeTolerance"
       )
       Left(
         SubmissionTimeRecordTimeDeltaTooLargeError(
           submissionTime,
           sequencerTimestamp,
-          submissionTimeRecordTimeTolerance,
+          ledgerTimeRecordTimeTolerance,
         )
       )
 
-    } else Either.unit
+    } else Right(())
 
   }
 

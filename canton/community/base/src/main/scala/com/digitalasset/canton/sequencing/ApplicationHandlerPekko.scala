@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.sequencing
 
-import cats.syntax.either.*
+import cats.syntax.foldable.*
 import com.daml.metrics.Timed
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
@@ -54,7 +54,7 @@ class ApplicationHandlerPekko[F[+_], Context](
     F[BoxedEnvelope[PossiblyIgnoredEnvelopeBox, ClosedEnvelope]],
     F[UnlessShutdown[Either[ApplicationHandlerError, Unit]]],
     NotUsed,
-  ] =
+  ] = {
     Flow[F[BoxedEnvelope[PossiblyIgnoredEnvelopeBox, ClosedEnvelope]]].contextualize
       .statefulMapAsyncContextualizedUS(KeepGoing: State)(processSynchronously)
       // do not use mapAsyncUS because the asynchronous futures have already been spawned
@@ -69,7 +69,7 @@ class ApplicationHandlerPekko[F[+_], Context](
               errorOrSyncResult match {
                 case Right(Some(syncResult)) =>
                   processAsyncResult(syncResult, killSwitchOfContext(context))
-                case Right(None) => FutureUnlessShutdown.pure(Either.unit)
+                case Right(None) => FutureUnlessShutdown.pure(Right(()))
                 case Left(error) => FutureUnlessShutdown.pure(Left(error))
               }
             case AbortedDueToShutdown => FutureUnlessShutdown.abortedDueToShutdown
@@ -77,6 +77,7 @@ class ApplicationHandlerPekko[F[+_], Context](
           asyncResult.unwrap
         }
       }
+  }
 
   private[this] def processSynchronously(
       state: State,
@@ -87,7 +88,8 @@ class ApplicationHandlerPekko[F[+_], Context](
         State,
         Either[ApplicationHandlerError, Option[EventBatchSynchronousResult]],
     )
-  ] =
+  ] = {
+
     state match {
       case KeepGoing =>
         tracedEventBatch.traverse(NonEmpty.from) match {
@@ -99,6 +101,7 @@ class ApplicationHandlerPekko[F[+_], Context](
       case Halt =>
         FutureUnlessShutdown.pure(Halt -> Right(None))
     }
+  }
 
   private def handleNextBatch(
       tracedBatch: Traced[NonEmpty[Seq[PossiblyIgnoredSequencedEvent[ClosedEnvelope]]]],

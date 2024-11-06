@@ -11,8 +11,6 @@ final case class ParticipantAttributes(
     loginAfter: Option[CantonTimestamp] = None,
 ) {
 
-  def canConfirm: Boolean = permission.canConfirm
-
   def merge(elem: ParticipantAttributes): ParticipantAttributes =
     ParticipantAttributes(
       permission = ParticipantPermission.lowerOf(permission, elem.permission),

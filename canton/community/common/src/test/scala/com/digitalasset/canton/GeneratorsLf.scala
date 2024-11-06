@@ -11,8 +11,8 @@ import com.digitalasset.canton.protocol.{
   LfContractId,
   LfGlobalKey,
   LfHash,
-  LfLanguageVersion,
   LfTemplateId,
+  LfTransactionVersion,
   Unicum,
 }
 import com.digitalasset.canton.topology.PartyId
@@ -68,7 +68,7 @@ object GeneratorsLf {
   private val lfVersionedGlobalKeyGen: Gen[Versioned[LfGlobalKey]] = for {
     templateId <- Arbitrary.arbitrary[LfTemplateId]
     // We consider only this specific value because the goal is not exhaustive testing of LF (de)serialization
-    value <- Gen.long.map(ValueInt64.apply)
+    value <- Gen.long.map(ValueInt64)
   } yield ExampleTransactionFactory.globalKey(templateId, value)
 
   implicit val lfGlobalKeyArb: Arbitrary[LfGlobalKey] = Arbitrary(
@@ -79,7 +79,7 @@ object GeneratorsLf {
     lfVersionedGlobalKeyGen
   )
 
-  implicit val LfLanguageVersionArb: Arbitrary[LfLanguageVersion] =
-    Arbitrary(Gen.oneOf(LfLanguageVersion.AllV2))
+  implicit val lfTransactionVersionArb: Arbitrary[LfTransactionVersion] =
+    Arbitrary(Gen.oneOf(LfTransactionVersion.All))
 
 }

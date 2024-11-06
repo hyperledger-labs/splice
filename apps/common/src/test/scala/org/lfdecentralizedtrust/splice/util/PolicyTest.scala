@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.util
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.util.DelayUtil
-import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
+import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import com.digitalasset.canton.util.retry.{Jitter, Success, Backoff}
 import com.digitalasset.canton.{BaseTest, HasExecutorService}
 import com.digitalasset.canton.integration.IntegrationTestMetrics
@@ -50,7 +50,7 @@ class PolicyTest
           "op",
           Some(resetRetriesAfter),
         )
-      policy(run(), AllExceptionRetryPolicy)
+      policy(run(), AllExnRetryable)
     }
 
     it("should reset the retry counter after executing for resetRetriesAfter") {

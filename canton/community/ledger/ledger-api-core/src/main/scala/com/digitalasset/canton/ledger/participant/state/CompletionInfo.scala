@@ -26,7 +26,7 @@ import java.util.UUID
   *                               depends on the particular implementation.
   *
   *                               This allows auditing the deduplication guarantee described in the
-  *                               [[Update]].
+  *                               [[ReadService.stateUpdates]].
   *
   *                               Optional as some implementations may not be able to provide this
   *                               deduplication information. If an implementation does not provide
@@ -49,7 +49,7 @@ final case class CompletionInfo(
 ) extends PrettyPrinting {
   def changeId: ChangeId = ChangeId(applicationId, commandId, actAs.toSet)
 
-  override protected def pretty: Pretty[CompletionInfo.this.type] = prettyOfClass(
+  override def pretty: Pretty[CompletionInfo.this.type] = prettyOfClass(
     param("actAs", _.actAs.mkShow()),
     param("commandId", _.commandId),
     param("applicationId", _.applicationId),

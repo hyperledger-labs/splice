@@ -18,7 +18,6 @@ import com.digitalasset.canton.platform.indexer.parallel.PostPublishData
 import com.digitalasset.canton.platform.store.EventSequentialId
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   DomainOffset,
-  Entry,
   RawActiveContract,
   RawAssignEvent,
   RawUnassignEvent,
@@ -182,8 +181,10 @@ object ParameterStorageBackend {
       lastEventSeqId: Long,
       lastStringInterningId: Int,
       lastPublicationTime: CantonTimestamp,
-  )
-
+  ) {
+    def lastOffsetOption: Option[Offset] =
+      if (lastOffset == Offset.beforeBegin) None else Some(lastOffset)
+  }
   object LedgerEnd {
     val beforeBegin: ParameterStorageBackend.LedgerEnd =
       ParameterStorageBackend.LedgerEnd(
@@ -263,7 +264,7 @@ object ContractStorageBackend {
       createKey: Option[Array[Byte]],
       createKeyCompression: Option[Int],
       keyMaintainers: Option[Set[Party]],
-      driverMetadata: Array[Byte],
+      driverMetadata: Option[Array[Byte]],
   ) extends RawContractState
 
   final case class RawArchivedContract(
@@ -319,12 +320,12 @@ trait EventStorageBackend {
   def assignEventBatch(
       eventSequentialIds: Iterable[Long],
       allFilterParties: Option[Set[Party]],
-  )(connection: Connection): Vector[Entry[RawAssignEvent]]
+  )(connection: Connection): Vector[RawAssignEvent]
 
   def unassignEventBatch(
       eventSequentialIds: Iterable[Long],
       allFilterParties: Option[Set[Party]],
-  )(connection: Connection): Vector[Entry[RawUnassignEvent]]
+  )(connection: Connection): Vector[RawUnassignEvent]
 
   def lookupAssignSequentialIdByOffset(
       offsets: Iterable[String]
@@ -362,7 +363,7 @@ trait EventStorageBackend {
       afterOrAtPublicationTimeInclusive: Timestamp
   )(connection: Connection): Option[DomainOffset]
 
-  def lastDomainOffsetBeforeOrAtPublicationTime(
+  def lastDomainOffsetBeforerOrAtPublicationTime(
       beforeOrAtPublicationTimeInclusive: Timestamp
   )(connection: Connection): Option[DomainOffset]
 
@@ -373,27 +374,21 @@ trait EventStorageBackend {
 
 object EventStorageBackend {
   final case class Entry[+E](
-      offset: String,
-      updateId: String,
+      eventOffset: Offset,
+      transactionId: String,
+      nodeIndex: Int,
       eventSequentialId: Long,
       ledgerEffectiveTime: Timestamp,
-      commandId: Option[String],
-      workflowId: Option[String],
+      commandId: String,
+      workflowId: String,
       domainId: String,
       traceContext: Option[Array[Byte]],
       recordTime: Timestamp,
       event: E,
   )
 
-  sealed trait RawEvent {
-    def witnessParties: Set[String]
-  }
-  sealed trait RawFlatEvent extends RawEvent
-  sealed trait RawTreeEvent extends RawEvent
-
   final case class RawCreatedEvent(
       updateId: String,
-      nodeIndex: Int,
       contractId: String,
       templateId: Identifier,
       packageName: PackageName,
@@ -409,34 +404,7 @@ object EventStorageBackend {
       ledgerEffectiveTime: Timestamp,
       createKeyHash: Option[Hash],
       driverMetadata: Array[Byte],
-  ) extends RawFlatEvent
-      with RawTreeEvent
-
-  final case class RawArchivedEvent(
-      updateId: String,
-      nodeIndex: Int,
-      contractId: String,
-      templateId: Identifier,
-      packageName: PackageName,
-      witnessParties: Set[String],
-  ) extends RawFlatEvent
-
-  final case class RawExercisedEvent(
-      updateId: String,
-      nodeIndex: Int,
-      contractId: String,
-      templateId: Identifier,
-      packageName: PackageName,
-      exerciseConsuming: Boolean,
-      exerciseChoice: String,
-      exerciseArgument: Array[Byte],
-      exerciseArgumentCompression: Option[Int],
-      exerciseResult: Option[Array[Byte]],
-      exerciseResultCompression: Option[Int],
-      exerciseActors: Seq[String],
-      exerciseChildEventIds: Seq[String],
-      witnessParties: Set[String],
-  ) extends RawTreeEvent
+  )
 
   final case class RawActiveContract(
       workflowId: Option[String],
@@ -447,6 +415,10 @@ object EventStorageBackend {
   )
 
   final case class RawUnassignEvent(
+      updateId: String,
+      commandId: Option[String],
+      workflowId: Option[String],
+      offset: String,
       sourceDomainId: String,
       targetDomainId: String,
       unassignId: String,
@@ -457,15 +429,22 @@ object EventStorageBackend {
       packageName: PackageName,
       witnessParties: Set[String],
       assignmentExclusivity: Option[Timestamp],
+      traceContext: Option[Array[Byte]],
+      recordTime: Timestamp,
   )
 
   final case class RawAssignEvent(
+      commandId: Option[String],
+      workflowId: Option[String],
+      offset: String,
       sourceDomainId: String,
       targetDomainId: String,
       unassignId: String,
       submitter: Option[String],
       reassignmentCounter: Long,
       rawCreatedEvent: RawCreatedEvent,
+      traceContext: Option[Array[Byte]],
+      recordTime: Timestamp,
   )
 
   final case class DomainOffset(

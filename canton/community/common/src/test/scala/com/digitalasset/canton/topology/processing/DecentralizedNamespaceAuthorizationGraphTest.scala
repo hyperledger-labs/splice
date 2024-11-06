@@ -53,15 +53,16 @@ class DecentralizedNamespaceAuthorizationGraphTest
     implicit class DecentralizedNamespaceAuthorizationGraphExtension(
         dns: DecentralizedNamespaceAuthorizationGraph
     ) {
-      def addAuth(authorizedNSD: AuthorizedNamespaceDelegation): Unit =
-        dns.ownerGraphs
-          .find(_.namespace == authorizedNSD.mapping.namespace)
-          .foreach(_.replace(authorizedNSD))
+      def addAuth(authorizedNSD: AuthorizedNamespaceDelegation) = {
+        val found = dns.ownerGraphs.find(_.namespace == authorizedNSD.mapping.namespace)
+        found.exists(_.add(authorizedNSD))
+      }
 
-      def removeAuth(authorizedNSD: AuthorizedNamespaceDelegation): Unit =
+      def removeAuth(authorizedNSD: AuthorizedNamespaceDelegation) =
         dns.ownerGraphs
           .find(_.namespace == authorizedNSD.mapping.namespace)
-          .foreach(_.remove(authorizedNSD))
+          .exists(_.remove(authorizedNSD))
+
     }
 
     def mkAdd(
@@ -106,10 +107,7 @@ class DecentralizedNamespaceAuthorizationGraphTest
         key: SigningPublicKey,
     ): AuthorizedTopologyTransaction[T] = {
       val signature = factory.cryptoApi.crypto.privateCrypto
-        .sign(
-          authTx.hash.hash,
-          key.fingerprint,
-        )
+        .sign(authTx.hash.hash, key.fingerprint)
         .value
         .futureValueUS
         .getOrElse(sys.error(s"Error when signing ${authTx}with $key"))
@@ -124,11 +122,12 @@ class DecentralizedNamespaceAuthorizationGraphTest
       graph: AuthorizationCheck,
       requireRoot: Boolean,
       valid: Boolean,
-  )(keys: SigningPublicKey*) =
+  )(keys: SigningPublicKey*) = {
     graph.existsAuthorizedKeyIn(
       keys.map(_.fingerprint).toSet,
       requireRoot = requireRoot,
     ) shouldBe valid
+  }
 
   "authorization graph for a decentralized namespace" when {
 
@@ -137,9 +136,9 @@ class DecentralizedNamespaceAuthorizationGraphTest
       import fixture.factory.SigningKeys.*
       "work for a simple quorum" in {
         val graph = mkGraph
-        graph.addAuth(ns1k1k1)
-        graph.addAuth(ns2k2k2)
-        graph.addAuth(ns3k3k3)
+        graph.addAuth(ns1k1k1) shouldBe true
+        graph.addAuth(ns2k2k2) shouldBe true
+        graph.addAuth(ns3k3k3) shouldBe true
 
         // Individual keys are not enough
         for {
@@ -246,7 +245,7 @@ class DecentralizedNamespaceAuthorizationGraphTest
         graph.addAuth(ns2k5k2)
         graph.addAuth(ns2k8k5)
 
-        val danglingKeys = List(key5, key8).map(_.fingerprint).sorted.mkString(", ")
+        val danglingKeys = List(key2, key5, key8).map(_.fingerprint).sorted.mkString(", ")
         loggerFactory.assertLogs(
           graph.removeAuth(ns2k2k2_remove),
           _.warningMessage should (include regex s"dangling.*$danglingKeys"),

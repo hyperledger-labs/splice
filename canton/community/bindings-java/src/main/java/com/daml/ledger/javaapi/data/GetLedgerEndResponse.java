@@ -7,28 +7,29 @@ import com.daml.ledger.api.v2.StateServiceOuterClass;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.Objects;
-import java.util.Optional;
 
 public final class GetLedgerEndResponse {
 
-  @NonNull private final Long offset;
+  @NonNull private final ParticipantOffset offset;
 
-  public GetLedgerEndResponse(@NonNull Long offset) {
+  public GetLedgerEndResponse(@NonNull ParticipantOffset offset) {
     this.offset = offset;
   }
 
   @NonNull
-  public Long getOffset() {
+  public ParticipantOffset getOffset() {
     return offset;
   }
 
   public static GetLedgerEndResponse fromProto(
       StateServiceOuterClass.GetLedgerEndResponse response) {
-    return new GetLedgerEndResponse(response.getOffset());
+    return new GetLedgerEndResponse(ParticipantOffset.fromProto(response.getOffset()));
   }
 
   public StateServiceOuterClass.GetLedgerEndResponse toProto() {
-    return StateServiceOuterClass.GetLedgerEndResponse.newBuilder().setOffset(this.offset).build();
+    return StateServiceOuterClass.GetLedgerEndResponse.newBuilder()
+        .setOffset(this.offset.toProto())
+        .build();
   }
 
   @Override

@@ -39,12 +39,13 @@ class TrafficControlSequencerAdministrationGroup(
   )
   def traffic_state_of_members(
       members: Seq[Member]
-  ): SequencerTrafficStatus =
+  ): SequencerTrafficStatus = {
     consoleEnvironment.run(
       runner.adminCommand(
         SequencerAdminCommands.GetTrafficControlState(members, TimestampSelector.LatestSafe)
       )
     )
+  }
 
   @Help.Summary("Return the traffic state of the given members at the latest approximate time")
   @Help.Description(
@@ -55,12 +56,13 @@ class TrafficControlSequencerAdministrationGroup(
   )
   def traffic_state_of_members_approximate(
       members: Seq[Member]
-  ): SequencerTrafficStatus =
+  ): SequencerTrafficStatus = {
     consoleEnvironment.run(
       runner.adminCommand(
         SequencerAdminCommands.GetTrafficControlState(members, TimestampSelector.LatestApproximate)
       )
     )
+  }
 
   @Help.Summary("Return the last traffic state update of the given members, per member")
   @Help.Description(
@@ -68,7 +70,7 @@ class TrafficControlSequencerAdministrationGroup(
   )
   def last_traffic_state_update_of_members(
       members: Seq[Member]
-  ): SequencerTrafficStatus =
+  ): SequencerTrafficStatus = {
     consoleEnvironment.run(
       runner.adminCommand(
         SequencerAdminCommands.GetTrafficControlState(
@@ -77,6 +79,7 @@ class TrafficControlSequencerAdministrationGroup(
         )
       )
     )
+  }
 
   @Help.Summary("Return the traffic state of the given members at a specific timestamp")
   @Help.Description(
@@ -85,7 +88,7 @@ class TrafficControlSequencerAdministrationGroup(
   def traffic_state_of_members_at_timestamp(
       members: Seq[Member],
       timestamp: CantonTimestamp,
-  ): SequencerTrafficStatus =
+  ): SequencerTrafficStatus = {
     consoleEnvironment.run(
       runner.adminCommand(
         SequencerAdminCommands.GetTrafficControlState(
@@ -94,6 +97,7 @@ class TrafficControlSequencerAdministrationGroup(
         )
       )
     )
+  }
 
   @Help.Summary("Return the traffic state of the all members.")
   @Help.Description(
@@ -105,7 +109,7 @@ class TrafficControlSequencerAdministrationGroup(
   )
   def traffic_state_of_all_members(
       latestApproximate: Boolean = false
-  ): SequencerTrafficStatus =
+  ): SequencerTrafficStatus = {
     check(FeatureFlag.Preview)(
       consoleEnvironment.run(
         runner.adminCommand(
@@ -117,6 +121,7 @@ class TrafficControlSequencerAdministrationGroup(
         )
       )
     )
+  }
   @Help.Summary("Set the traffic purchased entry of a member")
   @Help.Description(
     """Use this command to set the new traffic purchased entry of a member.
@@ -133,7 +138,7 @@ class TrafficControlSequencerAdministrationGroup(
       member: Member,
       serial: PositiveInt,
       newBalance: NonNegativeLong,
-  ): Unit =
+  ): Option[CantonTimestamp] = {
     check(FeatureFlag.Preview)(
       consoleEnvironment.run(
         runner.adminCommand(
@@ -141,4 +146,5 @@ class TrafficControlSequencerAdministrationGroup(
         )
       )
     )
+  }
 }

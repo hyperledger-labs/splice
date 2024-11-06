@@ -11,6 +11,7 @@ import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor, Threading}
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
+import com.digitalasset.canton.environment.DefaultNodeParameters
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
@@ -75,6 +76,7 @@ trait TestEssentials
     BaseTest.testedReleaseProtocolVersion
   protected lazy val defaultStaticDomainParameters: StaticDomainParameters =
     BaseTest.defaultStaticDomainParameters
+  protected lazy val testedUseUnifiedSequencer: Boolean = BaseTest.testedUseUnifiedSequencer
 
   // default to providing an empty trace context to all tests
   protected implicit def traceContext: TraceContext = TraceContext.empty
@@ -268,22 +270,25 @@ trait BaseTest
   /** Converts an OptionT into a Future, failing in case of a [[scala.Some$]]. */
   def noneOrFail[A](e: OptionT[Future, A])(
       clue: String
-  )(implicit ec: ExecutionContext, position: Position): Future[Assertion] =
+  )(implicit ec: ExecutionContext, position: Position): Future[Assertion] = {
     e.fold(succeed)(some => fail(s"$clue, value is $some"))
+  }
 
   /** Converts an OptionT into a FutureUnlessShutdown, failing in case of a [[scala.Some$]]. */
   def noneOrFailUS[A](e: OptionT[FutureUnlessShutdown, A])(
       clue: String
-  )(implicit ec: ExecutionContext, position: Position): FutureUnlessShutdown[Assertion] =
+  )(implicit ec: ExecutionContext, position: Position): FutureUnlessShutdown[Assertion] = {
     e.fold(succeed)(some => fail(s"$clue, value is $some"))
+  }
 
   /** Converts an Either into a B value, failing in case of a [[scala.Left$]]. */
   def valueOrFail[A, B](e: Either[A, B])(clue: String)(implicit position: Position): B =
     e.fold(x => fail(s"$clue: ${x.toString}"), Predef.identity)
 
   /** Converts an Option into a A value, failing in case of a [[scala.None$]]. */
-  def valueOrFail[A](o: Option[A])(clue: String)(implicit position: Position): A =
+  def valueOrFail[A](o: Option[A])(clue: String)(implicit position: Position): A = {
     o.getOrElse(fail(s"$clue"))
+  }
 
   /** Converts an EitherT into a Future, failing in a case of a [[scala.Right$]] */
   def leftOrFail[F[_], A, B](e: EitherT[F, A, B])(
@@ -303,7 +308,7 @@ trait BaseTest
 
   @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
   def withClueF[A](clue: String)(sut: => Future[A])(implicit ec: ExecutionContext): Future[A] =
-    withClue(clue)(sut.transform(outcome => Try(withClue(clue)(outcome.get))))
+    withClue(clue) { sut.transform(outcome => Try(withClue(clue)(outcome.get))) }
 
   // Syntax extensions for valueOrFail
   implicit class OptionTestSyntax[A](option: Option[A]) {
@@ -374,7 +379,6 @@ trait BaseTest
 
   lazy val CantonExamplesPath: String = BaseTest.CantonExamplesPath
   lazy val CantonTestsPath: String = BaseTest.CantonTestsPath
-  lazy val CantonTestsDevPath: String = BaseTest.CantonTestsDevPath
   lazy val PerformanceTestPath: String = BaseTest.PerformanceTestPath
   lazy val DamlTestFilesPath: String = BaseTest.DamlTestFilesPath
   lazy val DamlTestLfDevFilesPath: String = BaseTest.DamlTestLfDevFilesPath
@@ -464,7 +468,7 @@ object BaseTest {
       protocolVersion: ProtocolVersion = testedProtocolVersion,
       acsCommitmentsCatchUp: Option[AcsCommitmentsCatchUpConfig] = None,
   ): StaticDomainParameters = StaticDomainParameters(
-    requiredSigningSpecs = SymbolicCryptoProvider.supportedSigningSpecs,
+    requiredSigningKeySchemes = SymbolicCryptoProvider.supportedSigningKeySchemes,
     requiredEncryptionSpecs = SymbolicCryptoProvider.supportedEncryptionSpecs,
     requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,
     requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
@@ -475,9 +479,6 @@ object BaseTest {
   lazy val testedProtocolVersion: ProtocolVersion =
     tryGetProtocolVersionFromEnv.getOrElse(ProtocolVersion.latest)
 
-  lazy val testedStaticDomainParameters: StaticDomainParameters =
-    defaultStaticDomainParametersWith(testedProtocolVersion)
-
   lazy val testedProtocolVersionValidation: ProtocolVersionValidation =
     ProtocolVersionValidation(testedProtocolVersion)
 
@@ -485,15 +486,17 @@ object BaseTest {
     testedProtocolVersion
   )
 
+  lazy val testedUseUnifiedSequencer: Boolean = tryGetUseUnifiedSequencerFromEnv
+
   lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
-  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.2.0.dar")
-  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.2.0.dar")
-  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.2.0.dar")
-  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.2.0.dar")
+  lazy val CantonTestsPath: String = getResourcePath("CantonTests.dar")
+  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev.dar")
+  lazy val CantonLfDev: String = getResourcePath("CantonLfDev.dar")
+  lazy val CantonLfV21: String = getResourcePath("CantonLfV21.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")
-  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.2.0.dar")
-  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.2.0.dar")
-  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.2.0.dar")
+  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles.dar")
+  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles.dar")
+  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles.dar")
 
   def getResourcePath(name: String): String =
     Option(getClass.getClassLoader.getResource(name))
@@ -506,10 +509,16 @@ object BaseTest {
   protected def tryGetProtocolVersionFromEnv: Option[ProtocolVersion] = sys.env
     .get("CANTON_PROTOCOL_VERSION")
     .map(ProtocolVersion.tryCreate)
+
+  protected def tryGetUseUnifiedSequencerFromEnv: Boolean = sys.env
+    .get("CANTON_UNIFIED_SEQUENCER")
+    .map(_.toBoolean)
+    .getOrElse(DefaultNodeParameters.UseUnifiedSequencer)
+
 }
 
 trait BaseTestWordSpec extends BaseTest with AnyWordSpecLike {
-  def checkAllLaws(name: String, ruleSet: Laws#RuleSet)(implicit position: Position): Unit =
+  def checkAllLaws(name: String, ruleSet: Laws#RuleSet)(implicit position: Position): Unit = {
     for ((id, prop) <- ruleSet.all.properties) {
       (name + "." + id) in {
         CheckerAsserting.assertingNatureOfAssertion.check(
@@ -520,4 +529,5 @@ trait BaseTestWordSpec extends BaseTest with AnyWordSpecLike {
         )
       }
     }
+  }
 }

@@ -18,6 +18,7 @@ import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.transaction.Versioned
 
@@ -33,7 +34,8 @@ object ExtractUsedAndCreated {
   ) {
     def informees: Set[LfPartyId] = common.viewConfirmationParameters.informees
 
-    def transientContracts(): Seq[LfContractId] =
+    def transientContracts(): Seq[LfContractId] = {
+
       // Only track transient contracts outside of rollback scopes.
       if (!participant.rollbackContext.inRollback) {
         val transientCore =
@@ -48,6 +50,7 @@ object ExtractUsedAndCreated {
       } else {
         Seq.empty
       }
+    }
 
   }
 
@@ -72,11 +75,6 @@ object ExtractUsedAndCreated {
         parties ++= c.stakeholders
         parties ++= c.maintainers
       }
-      data.participant.createdCore.foreach { c =>
-        // The object invariants of metadata enforce that every maintainer is also a stakeholder.
-        // Therefore, we don't have to explicitly add maintainers.
-        parties ++= c.contract.metadata.stakeholders
-      }
       data.participant.resolvedKeys.values
         .collect { case Versioned(_, FreeKey(maintainers)) => maintainers }
         .foreach(parties ++=)
@@ -88,12 +86,13 @@ object ExtractUsedAndCreated {
       parties: Set[LfPartyId],
       participantId: ParticipantId,
       topologySnapshot: TopologySnapshot,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Map[LfPartyId, Boolean]] =
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Map[LfPartyId, Boolean]] = {
     topologySnapshot.hostedOn(parties, participantId).map { partyWithAttributes =>
       parties
         .map(partyId => partyId -> partyWithAttributes.contains(partyId))
         .toMap
     }
+  }
 
   def apply(
       participantId: ParticipantId,
@@ -124,7 +123,7 @@ object ExtractUsedAndCreated {
   private[validation] final case class InputContractPrep(
       used: Map[LfContractId, SerializableContract],
       divulged: Map[LfContractId, SerializableContract],
-      consumedOfHostedStakeholders: Map[LfContractId, Set[LfPartyId]],
+      consumedOfHostedStakeholders: Map[LfContractId, WithContractHash[Set[LfPartyId]]],
       contractIdsOfHostedInformeeStakeholder: Set[LfContractId],
   )
 
@@ -161,7 +160,7 @@ private[validation] class ExtractUsedAndCreated(
       Map.newBuilder[LfContractId, SerializableContract]
     val contractIdsOfHostedInformeeStakeholderB = Set.newBuilder[LfContractId]
     val consumedOfHostedStakeholdersB =
-      Map.newBuilder[LfContractId, Set[LfPartyId]]
+      Map.newBuilder[LfContractId, WithContractHash[Set[LfPartyId]]]
     val divulgedB =
       Map.newBuilder[LfContractId, SerializableContract]
 
@@ -176,19 +175,27 @@ private[validation] class ExtractUsedAndCreated(
 
       usedB += contract.contractId -> contract
 
-      if (hostsAny(stakeholders)) {
-        if (hostsAny(informeeStakeholders)) {
-          contractIdsOfHostedInformeeStakeholderB += contract.contractId
-        }
+      if (hostsAny(informeeStakeholders)) {
+        contractIdsOfHostedInformeeStakeholderB += contract.contractId
         // We do not need to include in consumedInputsOfHostedStakeholders the contracts created in the core
         // because they are not inputs even if they are consumed.
         if (inputContractWithMetadata.consumed) {
           // Input contracts consumed under rollback node are not necessarily consumed in the transaction.
           if (!viewData.participant.rollbackContext.inRollback) {
             consumedOfHostedStakeholdersB +=
-              contract.contractId -> stakeholders
+              contract.contractId -> WithContractHash.fromContract(contract, stakeholders)
           }
         }
+      } else if (hostsAny(stakeholders.diff(informees))) {
+        // TODO(i12901) report view participant data as malformed
+        ErrorUtil.requireArgument(
+          !inputContractWithMetadata.consumed,
+          s"Participant hosts non-informee stakeholder(s) of consumed ${contract.contractId}; stakeholders: $stakeholders, informees: $informees",
+        )
+        // If the participant hosts a non-informee stakeholder of a used contract,
+        // it shouldn't check activeness, so we don't add it to checkActivenessOrRelative
+        // If another view adds the contract nevertheless to it, it will not matter since the participant
+        // will not send a confirmation for this view.
       } else {
         divulgedB += (contract.contractId -> contract)
       }
@@ -269,10 +276,10 @@ private[validation] class ExtractUsedAndCreated(
     val allConsumed =
       inputContracts.consumedOfHostedStakeholders.keySet.union(transientContracts)
 
-    val transient: Map[LfContractId, Set[LfPartyId]] =
+    val transient: Map[LfContractId, WithContractHash[Set[LfPartyId]]] =
       maybeCreated.collect {
         case (cid, Some(contract)) if allConsumed.contains(cid) =>
-          cid -> contract.metadata.stakeholders
+          cid -> WithContractHash.fromContract(contract, contract.metadata.stakeholders)
       }
 
     val consumedInputsOfHostedStakeholders =
@@ -292,7 +299,7 @@ private[validation] class ExtractUsedAndCreated(
   private def hostsAny(
       parties: IterableOnce[LfPartyId]
   )(implicit loggingContext: ErrorLoggingContext): Boolean =
-    parties.iterator.exists { party =>
+    parties.iterator.exists(party => {
       hostedParties.getOrElse(
         party, {
           loggingContext.error(
@@ -301,6 +308,6 @@ private[validation] class ExtractUsedAndCreated(
           false
         },
       )
-    }
+    })
 
 }

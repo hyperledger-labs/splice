@@ -4,12 +4,11 @@
 package com.digitalasset.canton.store.memory
 
 import cats.data.EitherT
-import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.{OrdinarySerializedEvent, PossiblyIgnoredSerializedEvent}
 import com.digitalasset.canton.store.SequencedEventStore.*
@@ -84,7 +83,7 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
 
   override def findRange(criterion: RangeCriterion, limit: Option[Int])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencedEventRangeOverlapsWithPruning, Seq[
+  ): EitherT[Future, SequencedEventRangeOverlapsWithPruning, Seq[
     PossiblyIgnoredSerializedEvent
   ]] = {
     logger.debug(s"Looking to retrieve delivery event $criterion")
@@ -104,7 +103,7 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
           }
       }
     })
-    EitherT.fromEither[FutureUnlessShutdown](res)
+    EitherT.fromEither[Future](res)
   }
 
   override def sequencedEvents(
@@ -167,9 +166,9 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
       }
       eventByTimestamp.addAll(events)
 
-      Either.unit
+      Right(())
     } else if (from > to) {
-      Either.unit
+      Right(())
     } else {
       Left(ChangeWouldResultInGap(firstSc, from - 1))
     }
@@ -219,19 +218,20 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
           eventByTimestamp.remove(ts).discard
           timestampOfCounter.remove(sc).discard
         }
-        Either.unit
+        Right(())
+
       } else {
         Left(ChangeWouldResultInGap(fromEffective, to))
       }
     } else {
-      Either.unit
+      Right(())
     }
   }
 
   private[canton] override def delete(
-      fromInclusive: SequencerCounter
+      from: SequencerCounter
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    timestampOfCounter.rangeFrom(fromInclusive).foreach { case (sc, ts) =>
+    timestampOfCounter.rangeFrom(from).foreach { case (sc, ts) =>
       timestampOfCounter.remove(sc).discard
       eventByTimestamp.remove(ts).discard
     }

@@ -4,15 +4,17 @@
 package com.digitalasset.canton.platform.apiserver.configuration
 
 import com.daml.timer.RetryStrategy
-import com.digitalasset.canton.ledger.api.domain.ParticipantOffset
+import com.digitalasset.canton.ledger.api.domain.ParticipantOffset.Absolute
 import com.digitalasset.canton.ledger.participant.state.index.LedgerEndService
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.apiserver.configuration.LedgerEndObserverFromIndex.*
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
+import scala.math.Ordered.orderingToOrdered
 import scala.util.control.NoStackTrace
 
 /** Wait for ledger to have an offset that is not before the ledger begin.
@@ -42,7 +44,7 @@ private[apiserver] final class LedgerEndObserverFromIndex(
         indexService
           .currentLedgerEnd()
           .flatMap {
-            case offset if offset > ParticipantOffset.fromString("") =>
+            case offset if offset > Absolute(Ref.LedgerString.assertFromString("00")) =>
               logger.info(s"New offset ($offset) greater than ledger begin found.")
               Future.successful(())
             case offset =>

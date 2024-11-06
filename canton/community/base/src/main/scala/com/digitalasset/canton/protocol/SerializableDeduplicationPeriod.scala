@@ -32,7 +32,7 @@ object SerializableDeduplicationPeriod {
       case dedupP.Duration(duration) =>
         DurationConverter
           .fromProtoPrimitive(duration)
-          .map(DeduplicationPeriod.DeduplicationDuration.apply)
+          .map(DeduplicationPeriod.DeduplicationDuration)
       case dedupP.Offset(offset) =>
         Right(DeduplicationPeriod.DeduplicationOffset(Offset(LfBytes.fromByteString(offset))))
     }

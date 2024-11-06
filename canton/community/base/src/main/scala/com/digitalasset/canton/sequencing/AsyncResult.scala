@@ -15,8 +15,9 @@ import scala.util.Try
 final case class AsyncResult(unwrap: FutureUnlessShutdown[Unit]) {
   def andThenF(
       f: Unit => FutureUnlessShutdown[Unit]
-  )(implicit ec: ExecutionContext): AsyncResult =
+  )(implicit ec: ExecutionContext): AsyncResult = {
     AsyncResult(unwrap.flatMap(f))
+  }
 
   def transform(f: Try[UnlessShutdown[Unit]] => Try[UnlessShutdown[Unit]])(implicit
       ec: ExecutionContext
@@ -42,7 +43,8 @@ object AsyncResult {
   implicit def monoidAsyncResult(implicit ec: ExecutionContext): Monoid[AsyncResult] =
     new Monoid[AsyncResult] {
       override def empty: AsyncResult = immediate
-      override def combine(x: AsyncResult, y: AsyncResult): AsyncResult =
+      override def combine(x: AsyncResult, y: AsyncResult): AsyncResult = {
         AsyncResult(Monoid[FutureUnlessShutdown[Unit]].combine(x.unwrap, y.unwrap))
+      }
     }
 }

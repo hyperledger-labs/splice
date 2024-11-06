@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.protocol
 
-import com.digitalasset.canton.ReassignmentCounter
+import com.digitalasset.canton.TransferCounter
 
 trait HasSerializableContract {
 
   def contract: SerializableContract
 
-  def reassignmentCounter: ReassignmentCounter
+  def transferCounter: TransferCounter
 
 }

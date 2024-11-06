@@ -24,22 +24,23 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TimelyRejectNotifier(
     rejecter: TimelyRejectNotifier.TimelyRejecter,
-    initialUpperBound: CantonTimestamp,
+    initialUpperBound: Option[CantonTimestamp],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
   import TimelyRejectNotifier.*
 
-  /** A non-strict upper bound on the timestamps with which the `rejecter` has been notified.
+  /** A non-strict upper bound on the timestamps with which the in-flight submission tracker has been notified.
     * Also stores the internal state of the notification state machine so that they can be updated atomically.
     */
-  private val upperBoundOnNotification: AtomicReference[(CantonTimestamp, UnlessShutdown[State])] =
-    new AtomicReference[(CantonTimestamp, UnlessShutdown[State])](
+  private val upperBoundOnNotification
+      : AtomicReference[(Option[CantonTimestamp], UnlessShutdown[State])] =
+    new AtomicReference[(Option[CantonTimestamp], UnlessShutdown[State])](
       (initialUpperBound, Outcome(Idle))
     )
 
-  /** Notifies the `rejecter` that the clean sequencer counter prehead
+  /** Notifies the in-flight submission tracker that the clean sequencer counter prehead
     * has advanced to the given point. Does nothing if a notification with a higher timestamp has
     * already happened or is happening concurrently.
     *
@@ -53,9 +54,9 @@ class TimelyRejectNotifier(
         notifyLoop(observedTime, increaseBound = true).discard[Boolean]
     }
 
-  /** Notifies the `rejecter` again
+  /** Notifies the in-flight submission tracker again
     * if it may have already been notified for the given timestamp or later.
-    * Does nothing if the `rejecter` has not yet been notified of the given timestamp or any later timestamp.
+    * Does nothing if the in-flight submission tracker has not yet been notified of the given timestamp or any later timestamp.
     *
     * The method returns immediately after the notification has been scheduled.
     * The notification itself happens asynchronously in a spawned future.
@@ -81,23 +82,22 @@ class TimelyRejectNotifier(
   ): Boolean = {
     // First advance the upper bound, then notify, to make sure that the upper bound really is an upper bound.
     val (oldBound, oldState) = upperBoundOnNotification.getAndUpdate { case (oldBound, oldState) =>
-      val newBound = if (increaseBound) oldBound max bound else oldBound
-      val shouldNotify = (oldBound < bound) == increaseBound
+      val newBound = if (increaseBound) Some(oldBound.fold(bound)(_ max bound)) else oldBound
+      val shouldNotify = oldBound.forall(_ < bound) == increaseBound
       val newState = oldState.map {
         case Idle => if (shouldNotify) Running else Idle
         case Running => if (shouldNotify) Pending(traceContext) else Running
         case pending @ Pending(_) =>
           // Update the trace context only if we increase the bound
-          if (increaseBound && oldBound < bound) Pending(traceContext)
+          if (increaseBound && oldBound.forall(_ < bound)) Pending(traceContext)
           else pending
       }
       newBound -> newState
     }
-    val shouldNotify = (oldBound < bound) == increaseBound
+    val shouldNotify = oldBound.forall(_ < bound) == increaseBound
     oldState match {
       case Outcome(Idle) if shouldNotify =>
-        val notifiedF =
-          Monad[Future].tailRecM(LoopState(bound, increaseBound, traceContext))(doNotify)
+        val notifiedF = Monad[Future].tailRecM(LoopState(bound, traceContext))(doNotify)
         FutureUtil.doNotAwait(notifiedF, "Timely reject notification failed")
         true
       case Outcome(_) =>
@@ -115,16 +115,16 @@ class TimelyRejectNotifier(
     * Returns [[scala.Left$]] if another notification should be run immediately after.
     */
   private def doNotify(loopState: LoopState): Future[Either[LoopState, Unit]] = {
-    val theBound = loopState.newBound
+    val newBound = loopState.newBound
     implicit val traceContext: TraceContext = loopState.traceContext
 
-    val notifyF =
-      if (loopState.boundIncreased) rejecter.notify(theBound) else rejecter.notifyAgain(theBound)
-    notifyF.unwrap
+    rejecter
+      .notify(newBound)
+      .unwrap
+      // Merely log the exception and keep going as a later notification may still succeed.
       .recover { case ex =>
-        // Merely log the exception and keep going as a later notification may still succeed.
         logger.error(
-          s"Notifying the in-flight submission tracker for $theBound failed",
+          s"Notifying the in-flight submission tracker for $newBound failed",
           ex,
         )
         UnlessShutdown.unit
@@ -147,15 +147,11 @@ class TimelyRejectNotifier(
           (bound, newState)
         }
         oldState match {
-          case Outcome(Running) => Either.unit
+          case Outcome(Running) => Right(())
           case Outcome(Pending(newTraceContext)) =>
-            Either.cond(
-              !notificationOutcome.isOutcome,
-              (), {
-                val boundIncreased = bound > theBound
-                LoopState(bound, boundIncreased, newTraceContext)
-              },
-            )
+            if (notificationOutcome.isOutcome) {
+              bound.toLeft(()).leftMap(LoopState(_, newTraceContext))
+            } else Right(())
           case _ =>
             ErrorUtil.invalidState("getAndUpdate should already have thrown an exception")
         }
@@ -168,10 +164,10 @@ object TimelyRejectNotifier {
   def apply(
       participantNodeEphemeralState: ParticipantNodeEphemeralState,
       domainId: DomainId,
-      initialUpperBound: CantonTimestamp,
+      initialUpperBound: Option[CantonTimestamp],
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): TimelyRejectNotifier = {
-    class InFlightSubmissionTimelyRejecter extends TimelyRejecter {
+    val rejecter = new TimelyRejecter {
       override def notify(
           upToInclusive: CantonTimestamp
       )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
@@ -195,26 +191,12 @@ object TimelyRejectNotifier {
               )
           }
 
-      override def notifyAgain(upToInclusive: CantonTimestamp)(implicit
-          traceContext: TraceContext
-      ): FutureUnlessShutdown[Unit] =
-        participantNodeEphemeralState.inFlightSubmissionTracker.timelyRejectAgain(
-          domainId,
-          upToInclusive,
-          participantNodeEphemeralState.participantEventPublisher,
-        )
     }
-    val rejecter = new InFlightSubmissionTimelyRejecter
     new TimelyRejectNotifier(rejecter, initialUpperBound, loggerFactory)
   }
 
   trait TimelyRejecter {
     def notify(upToInclusive: CantonTimestamp)(implicit
-        traceContext: TraceContext
-    ): FutureUnlessShutdown[Unit]
-
-    /** May be called only if an earlier call to `notify` with the same or a later timestamp has already completed. */
-    def notifyAgain(upToInclusive: CantonTimestamp)(implicit
         traceContext: TraceContext
     ): FutureUnlessShutdown[Unit]
   }
@@ -235,7 +217,7 @@ object TimelyRejectNotifier {
     *   │  │ notifyInPast if ts>b      │     │ notifyInPast if ts>b
     *   │  │                           │     │
     *   │  │   notify if ts>b          │     │   notify if ts>b
-    * ┌─┴──▼─┐ notifyInPast if ts<=b ┌─┴─────▼─┐ notifyInPast if ts<=b ┌─────────┐
+    * ┌─┴──▼─┐ notifyInPast if ts<=b ┌─┴─────▼─┐ notifyInpast if ts<=b ┌─────────┐
     * │      ├───────────────────────►         ├───────────────────────►         ├───────┐
     * │ Idle │                       │ Running │                       │ Pending │       │ notify
     * │      │                       │         │                       │         │       │ notifyInPast
@@ -260,7 +242,6 @@ object TimelyRejectNotifier {
 
   private final case class LoopState(
       newBound: CantonTimestamp,
-      boundIncreased: Boolean,
       traceContext: TraceContext,
   )
 }

@@ -6,7 +6,7 @@ import {
   DsoRules_CloseVoteRequestResult,
   Vote,
   VoteRequest,
-} from '../../../daml.js/splice-dso-governance-0.1.9/lib/Splice/DsoRules';
+} from '../../../daml.js/splice-dso-governance-0.1.8/lib/Splice/DsoRules';
 import { Contract } from '../../../utils';
 import { SvVote } from '../../models';
 
@@ -171,7 +171,6 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                   wallet: '0.1.5',
                   walletPayments: '0.1.5',
                 },
-                transferPreapprovalFee: null,
               },
             },
           },

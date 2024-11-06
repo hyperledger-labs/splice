@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.store.memory
 import cats.implicits.catsSyntaxSemigroup
 import com.daml.error.ContextualizedErrorLogger
 import com.daml.timer.FutureCheck.*
+import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.config.{PackageMetadataViewConfig, ProcessingTimeout}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.error.{CommonErrors, PackageServiceErrors}
@@ -17,7 +18,6 @@ import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata.Implicits.packageMetadataSemigroup
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.{LfPackageId, LfPackageRef}
 import com.digitalasset.daml.lf.archive.{DamlLf, Decode}
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
@@ -129,9 +129,7 @@ class MutablePackageMetadataViewImpl(
       .flatMap {
         case Some(pkg) => Future.successful(pkg)
         case None =>
-          Future.failed(
-            PackageServiceErrors.InternalError.Error(Set(LfPackageRef.Id(packageId))).asGrpcError
-          )
+          Future.failed(PackageServiceErrors.InternalError.Error(Set(packageId)).asGrpcError)
       }
 }
 

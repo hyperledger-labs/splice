@@ -5,15 +5,14 @@ package com.digitalasset.canton.domain.config
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{CommunityCryptoConfig, CryptoConfig, ProtocolConfig}
-import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.CryptoFactory.{
   selectAllowedEncryptionAlgorithmSpecs,
   selectAllowedEncryptionKeySpecs,
   selectAllowedHashAlgorithms,
-  selectAllowedSigningAlgorithmSpecs,
-  selectAllowedSigningKeySpecs,
+  selectAllowedSigningKeyScheme,
   selectAllowedSymmetricKeySchemes,
 }
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.version.ProtocolVersion
@@ -24,8 +23,7 @@ import com.digitalasset.canton.version.ProtocolVersion
   * See <a href="https://docs.daml.com/canton/architecture/overview.html">the Canton architecture overview</a>
   * for further information.
   *
-  * @param requiredSigningAlgorithmSpecs         The optional required signing algorithm specifications that a member has to support. If none is specified, all the allowed specifications are required.
-  * @param requiredSigningKeySpecs      The optional required signing key specifications that a member has to support. If none is specified, all the allowed specifications are required.
+  * @param requiredSigningKeySchemes    The optional required signing key schemes that a member has to support. If none is specified, all the allowed schemes are required.
   * @param requiredEncryptionAlgorithmSpecs      The optional required encryption algorithm specifications that a member has to support. If none is specified, all the allowed specifications are required.
   * @param requiredEncryptionKeySpecs   The optional required encryption key specifications that a member has to support. If none is specified, all the allowed specifications are required.
   * @param requiredSymmetricKeySchemes  The optional required symmetric key schemes that a member has to support. If none is specified, all the allowed schemes are required.
@@ -34,23 +32,20 @@ import com.digitalasset.canton.version.ProtocolVersion
   * @param dontWarnOnDeprecatedPV       If true, then this domain will not emit a warning when configured to use a deprecated protocol version (such as 2.0.0).
   */
 final case class DomainParametersConfig(
-    requiredSigningAlgorithmSpecs: Option[NonEmpty[Set[SigningAlgorithmSpec]]] = None,
-    requiredSigningKeySpecs: Option[NonEmpty[Set[SigningKeySpec]]] = None,
+    requiredSigningKeySchemes: Option[NonEmpty[Set[SigningKeyScheme]]] = None,
     requiredEncryptionAlgorithmSpecs: Option[NonEmpty[Set[EncryptionAlgorithmSpec]]] = None,
     requiredEncryptionKeySpecs: Option[NonEmpty[Set[EncryptionKeySpec]]] = None,
     requiredSymmetricKeySchemes: Option[NonEmpty[Set[SymmetricKeyScheme]]] = None,
     requiredHashAlgorithms: Option[NonEmpty[Set[HashAlgorithm]]] = None,
     requiredCryptoKeyFormats: Option[NonEmpty[Set[CryptoKeyFormat]]] = None,
-    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
-    override val alphaVersionSupport: Boolean = true,
+    override val alphaVersionSupport: Boolean = false,
     override val betaVersionSupport: Boolean = false,
     override val dontWarnOnDeprecatedPV: Boolean = false,
 ) extends ProtocolConfig
     with PrettyPrinting {
 
-  override protected def pretty: Pretty[DomainParametersConfig] = prettyOfClass(
-    param("requiredSigningAlgorithmSpecs", _.requiredSigningAlgorithmSpecs),
-    param("requiredSigningKeySpecs", _.requiredSigningKeySpecs),
+  override def pretty: Pretty[DomainParametersConfig] = prettyOfClass(
+    param("requiredSigningKeySchemes", _.requiredSigningKeySchemes),
     param("requiredEncryptionAlgorithmSpecs", _.requiredEncryptionAlgorithmSpecs),
     param("requiredEncryptionKeySpecs", _.requiredEncryptionKeySpecs),
     param("requiredSymmetricKeySchemes", _.requiredSymmetricKeySchemes),
@@ -87,13 +82,9 @@ final case class DomainParametersConfig(
 
     // Set to allowed schemes if none required schemes are specified
     for {
-      newRequiredSigningAlgorithmSpecs <- selectSchemes(
-        requiredSigningAlgorithmSpecs,
-        selectAllowedSigningAlgorithmSpecs,
-      )
-      newRequiredSigningKeySpecs <- selectSchemes(
-        requiredSigningKeySpecs,
-        selectAllowedSigningKeySpecs,
+      newRequiredSigningKeySchemes <- selectSchemes(
+        requiredSigningKeySchemes,
+        selectAllowedSigningKeyScheme,
       )
       newRequiredEncryptionAlgorithmSpecs <- selectSchemes(
         requiredEncryptionAlgorithmSpecs,
@@ -116,10 +107,7 @@ final case class DomainParametersConfig(
       )
     } yield {
       StaticDomainParameters(
-        requiredSigningSpecs = RequiredSigningSpecs(
-          newRequiredSigningAlgorithmSpecs,
-          newRequiredSigningKeySpecs,
-        ),
+        requiredSigningKeySchemes = newRequiredSigningKeySchemes,
         requiredEncryptionSpecs = RequiredEncryptionSpecs(
           newRequiredEncryptionAlgorithmSpecs,
           newRequiredEncryptionKeySpecs,

@@ -3,6 +3,8 @@
 
 package com.digitalasset.canton.domain.mediator.store
 
+import cats.data.EitherT
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -20,13 +22,22 @@ final case class MediatorDomainConfiguration(
     sequencerConnections: SequencerConnections,
 )
 
+sealed trait MediatorDomainConfigurationStoreError
+
+object MediatorDomainConfigurationStoreError {
+  final case class DeserializationError(deserializationError: ProtoDeserializationError)
+      extends MediatorDomainConfigurationStoreError
+}
+
 trait MediatorDomainConfigurationStore extends AutoCloseable {
   def fetchConfiguration(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[MediatorDomainConfiguration]]
+  ): EitherT[FutureUnlessShutdown, MediatorDomainConfigurationStoreError, Option[
+    MediatorDomainConfiguration
+  ]]
   def saveConfiguration(configuration: MediatorDomainConfiguration)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit]
+  ): EitherT[FutureUnlessShutdown, MediatorDomainConfigurationStoreError, Unit]
 }
 
 object MediatorDomainConfigurationStore {

@@ -6,13 +6,14 @@ import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules/';
 import { SvNodeState } from '@daml.js/splice-dso-governance/lib/Splice/DSO/SvState';
 import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 
-import { Contract } from '../../../utils';
+import { Contract, PollingStrategy } from '../../../utils';
 import { DsoInfo } from '../../components';
 import { useScanClient } from './ScanClientContext';
 
 export const useDsoInfo = (): UseQueryResult<DsoInfo> => {
   const scanClient = useScanClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['getDsoInfo', DsoRules, AmuletRules],
     queryFn: async () => {
       const resp = await scanClient.getDsoInfo();

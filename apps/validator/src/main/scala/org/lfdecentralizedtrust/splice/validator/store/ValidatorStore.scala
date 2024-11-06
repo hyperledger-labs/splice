@@ -4,18 +4,15 @@
 package org.lfdecentralizedtrust.splice.validator.store
 
 import cats.syntax.traverseFilter.*
-import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{
+  amulet as amuletCodegen,
+  amuletrules as amuletrulesCodegen,
+  validatorlicense as validatorLicenseCodegen,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as walletCodegen,
   topupstate as topUpCodegen,
-  transferpreapproval as preapprovalCodegen,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.{
-  amulet as amuletCodegen,
-  amuletrules as amuletrulesCodegen,
-  externalpartyamuletrules as externalpartyamuletrulesCodegen,
-  validatorlicense as validatorLicenseCodegen,
 }
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.http.v0.definitions
@@ -25,14 +22,12 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
   QueryResult,
   TemplateFilter,
 }
-import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore, PageLimit}
+import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
 import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
 import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Hash
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -95,79 +90,6 @@ trait ValidatorStore extends WalletStore with AppStore {
       )
     } yield installs.map(i => i.payload.endUserName)
   }
-
-  def listExternalPartySetupProposals()(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[ContractWithState[
-      amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
-      amuletrulesCodegen.ExternalPartySetupProposal,
-    ]]
-  ] = {
-    for {
-      proposals <- multiDomainAcsStore.listContracts(
-        amuletrulesCodegen.ExternalPartySetupProposal.COMPANION
-      )
-    } yield proposals
-  }
-
-  def listTransferPreapprovals()(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[
-      ContractWithState[
-        amuletrulesCodegen.TransferPreapproval.ContractId,
-        amuletrulesCodegen.TransferPreapproval,
-      ]
-    ]
-  ] = {
-    for {
-      preapprovals <- multiDomainAcsStore.listContracts(
-        amuletrulesCodegen.TransferPreapproval.COMPANION
-      )
-    } yield preapprovals
-  }
-
-  def listExpiringTransferPreapprovals(
-      renewalDuration: NonNegativeFiniteDuration
-  ): ListExpiredContracts[
-    amuletrulesCodegen.TransferPreapproval.ContractId,
-    amuletrulesCodegen.TransferPreapproval,
-  ] = { (now: CantonTimestamp, limit: PageLimit) => implicit traceContext =>
-    {
-      def isReadyForRenewal(preapproval: amuletrulesCodegen.TransferPreapproval): Boolean =
-        now.toInstant.isAfter(preapproval.expiresAt.minus(renewalDuration.asJava))
-
-      // TODO(#14568): Move this filter and limit into the DB query
-      multiDomainAcsStore
-        .listAssignedContracts(
-          amuletrulesCodegen.TransferPreapproval.COMPANION
-        )
-        .map(_.filter(p => isReadyForRenewal(p.payload)).take(limit.limit))
-    }
-  }
-
-  def lookupExternalPartySetupProposalByUserPartyWithOffset(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[ContractWithState[
-        amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
-        amuletrulesCodegen.ExternalPartySetupProposal,
-      ]]
-    ]
-  ]
-
-  def lookupTransferPreapprovalByReceiverPartyWithOffset(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[
-      ContractWithState[
-        amuletrulesCodegen.TransferPreapproval.ContractId,
-        amuletrulesCodegen.TransferPreapproval,
-      ]
-    ]]
-  ]
 
   def lookupLatestAppConfiguration(
       provider: PartyId
@@ -358,7 +280,6 @@ object ValidatorStore {
     Seq[ConstrainedTemplate](
       walletCodegen.WalletAppInstall.COMPANION,
       amuletCodegen.ValidatorRight.COMPANION,
-      amuletrulesCodegen.ExternalPartySetupProposal.COMPANION,
     ) ++ (if (appManagerEnabled)
             Seq[ConstrainedTemplate](
               appManagerCodegen.AppConfiguration.COMPANION,
@@ -426,33 +347,6 @@ object ValidatorStore {
             trafficDomainId = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
           )
         },
-        mkFilter(amuletrulesCodegen.ExternalPartySetupProposal.COMPANION)(co =>
-          co.payload.validator == validator && co.payload.dso == dso
-        ) { contract =>
-          ValidatorAcsStoreRowData(
-            contract = contract,
-            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
-          )
-        },
-        mkFilter(preapprovalCodegen.TransferPreapprovalProposal.COMPANION)(co =>
-          co.payload.provider == validator
-        ) { contract =>
-          ValidatorAcsStoreRowData(
-            contract = contract,
-            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
-          )
-        },
-        mkFilter(amuletrulesCodegen.TransferPreapproval.COMPANION)(co =>
-          co.payload.provider == validator && co.payload.dso == dso
-        ) { contract =>
-          ValidatorAcsStoreRowData(
-            contract = contract,
-            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
-          )
-        },
-        mkFilter(externalpartyamuletrulesCodegen.TransferCommand.COMPANION)(co =>
-          co.payload.delegate == validator && co.payload.dso == dso
-        ) { ValidatorAcsStoreRowData(_) },
         mkFilter(amuletCodegen.Amulet.COMPANION)(co =>
           co.payload.dso == dso &&
             co.payload.owner == validator

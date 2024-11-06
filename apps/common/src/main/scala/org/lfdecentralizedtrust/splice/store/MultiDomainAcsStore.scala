@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.store
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
   TransactionFilter as LapiTransactionFilter,
@@ -14,6 +15,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
 import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -226,13 +228,13 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   /** Signal when the store has finished ingesting ledger data from the given offset
     * or a larger one or node-level shutdown was initiated
     */
-  def signalWhenIngestedOrShutdown(offset: Long)(implicit
+  def signalWhenIngestedOrShutdown(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit] = {
     metrics.signalWhenIngestedLatency.timeFuture(signalWhenIngestedOrShutdownImpl(offset))
   }
 
-  protected def signalWhenIngestedOrShutdownImpl(offset: Long)(implicit
+  protected def signalWhenIngestedOrShutdownImpl(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit]
 
@@ -348,7 +350,7 @@ object MultiDomainAcsStore {
     override def mightContain[TC, TCid, T](
         templateCompanion: JavaContractCompanion[TC, TCid, T]
     ): Boolean =
-      templateFilters.contains(PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId))
+      templateFilters.contains(PackageQualifiedName(templateCompanion.TEMPLATE_ID))
 
     override def mightContain(identifier: Identifier): Boolean = {
       templateFiltersWithoutPackageNames.contains(QualifiedName(identifier))
@@ -400,7 +402,7 @@ object MultiDomainAcsStore {
       TemplateFilter[TCid, T, R],
   ) =
     (
-      PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId),
+      PackageQualifiedName(templateCompanion.TEMPLATE_ID),
       TemplateFilter(
         ev => {
           val c = Contract.fromCreatedEvent(templateCompanion)(ev)
@@ -439,7 +441,7 @@ object MultiDomainAcsStore {
 
   /** A query result computed as-of a specific set of per-domain ledger API offset. */
   final case class QueryResult[+A](
-      offset: Long,
+      offset: String,
       value: A,
   ) {
     def map[B](f: A => B): QueryResult[B] = copy(value = f(value))
@@ -452,7 +454,7 @@ object MultiDomainAcsStore {
     implicit def prettyQueryResult[T <: PrettyPrinting]: Pretty[QueryResult[T]] = {
       import com.digitalasset.canton.logging.pretty.PrettyUtil.*
       prettyOfClass(
-        param("offset", _.offset),
+        param("offset", _.offset.unquoted),
         param("value", _.value),
       )
     }
@@ -513,7 +515,7 @@ object MultiDomainAcsStore {
       ): Boolean = filter.mightContain(companion)
 
       override def typeId(companion: Contract.Companion.Template[TCid, T]): Identifier =
-        companion.getTemplateIdWithPackageId
+        companion.TEMPLATE_ID
 
       override def toContractId(companion: Companion.Template[TCid, T], contractId: String): TCid =
         companion.toContractId(new ContractId[T](contractId))
@@ -586,10 +588,10 @@ object MultiDomainAcsStore {
     def ingestionFilter: IngestionFilter
 
     /** Must be the first method called. Returns the last ingested offset, if any. */
-    def initialize()(implicit traceContext: TraceContext): Future[Option[Long]]
+    def initialize()(implicit traceContext: TraceContext): Future[Option[String]]
 
     def ingestAcs(
-        offset: Long,
+        offset: String,
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
@@ -599,6 +601,25 @@ object MultiDomainAcsStore {
         traceContext: TraceContext
     ): Future[Unit]
   }
+
+  def fromParticipantOffset(offset: ParticipantOffset): String =
+    offset.value match {
+      case ParticipantOffset.Value.Boundary(
+            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
+          ) =>
+        BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
+      case ParticipantOffset.Value.Absolute(offset) => offset
+      case offset => throw new IllegalArgumentException(s"Cannot convert $offset to string")
+    }
+
+  def toParticipantOffset(offset: String): ParticipantOffset =
+    if (offset == BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET)
+      ParticipantOffset(
+        ParticipantOffset.Value.Boundary(
+          ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
+        )
+      )
+    else ParticipantOffset(ParticipantOffset.Value.Absolute(offset))
 
   // The state of a contract in the store. Note that, contrary to `ContractState`, this can
   // also include archived contracts.

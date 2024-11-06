@@ -40,7 +40,7 @@ trait PostgresAround {
       logger.info(s"Using PostgreSQL on $hostName:$port.")
     } else {
       // using own temporal resource
-      val container = new PostgreSQLContainer(s"${PostgreSQLContainer.IMAGE}:14")
+      val container = new PostgreSQLContainer(s"${PostgreSQLContainer.IMAGE}:12")
       ownedServerContainer.set(Some(container))
       logger.info(s"Starting PostgreSQL Container...")
       container.start()
@@ -61,12 +61,13 @@ trait PostgresAround {
 
   }
 
-  protected def disconnectFromPostgresqlServer(): Unit =
+  protected def disconnectFromPostgresqlServer(): Unit = {
     ownedServerContainer.get().foreach { container =>
       logger.info(s"Stopping PostgreSQL Container...")
       container.close()
       logger.info(s"PostgreSQL Container stopped.")
     }
+  }
 
   protected def createNewRandomDatabase(): PostgresDatabase = {
     val database = executeAdminStatement(server.get()) { statement =>

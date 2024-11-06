@@ -4,12 +4,15 @@
 package com.digitalasset.canton.participant.store
 
 import cats.data.{EitherT, OptionT}
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.participant.protocol.RequestJournal.{RequestData, RequestState}
+import com.digitalasset.canton.resource.TransactionalStoreUpdate
+import com.digitalasset.canton.store.CursorPrehead.RequestCounterCursorPrehead
 import com.digitalasset.canton.store.CursorPreheadStore
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.{RequestCounter, RequestCounterDiscriminator}
 import com.google.common.annotations.VisibleForTesting
 
@@ -35,11 +38,6 @@ trait RequestJournalStore { this: NamedLogging =>
       traceContext: TraceContext
   ): Future[Option[RequestData]]
 
-  /** Finds the highest request counter with request time before or equal to the given timestamp */
-  def lastRequestCounterWithRequestTimestampBeforeOrAt(requestTimestamp: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): Future[Option[RequestCounter]]
-
   /** Replaces the state of the request.
     * The operation will only succeed if the current state is equal to the given `oldState`
     * and the provided `requestTimestamp` matches the stored timestamp,
@@ -62,22 +60,42 @@ trait RequestJournalStore { this: NamedLogging =>
   /** Deletes all request counters at or before the given timestamp.
     * Calls to this method are idempotent, independent of the order.
     *
-    * @param beforeInclusive inclusive timestamp to prune up to
+    * @param beforeAndIncluding inclusive timestamp to prune up to
+    * @param bypassAllSanityChecks force if true, bypass all pre-condition sanity checks
+    *
+    * Pre-conditions for the call unless `bypassAllSanityChecks` is true:
+    *   1. there must be a timestamp `ts` associated with the clean head
+    *   2. beforeAndIncluding < `ts`
+    * @throws java.lang.IllegalArgumentException if the preconditions are violated.
     */
   def prune(
-      beforeInclusive: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    pruneInternal(beforeInclusive)
+      beforeAndIncluding: CantonTimestamp,
+      bypassAllSanityChecks: Boolean,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    def checkCleanHead(): Future[Unit] = for {
+      cleanHead <- OptionT(preheadClean)
+        .getOrElseF(
+          ErrorUtil.internalErrorAsync(
+            new IllegalArgumentException("Attempted to prune a journal with no clean timestamps")
+          )
+        )
+      _ = ErrorUtil.requireArgument(
+        cleanHead.timestamp > beforeAndIncluding,
+        s"Attempted to prune at timestamp $beforeAndIncluding which is not earlier than ${cleanHead.timestamp} associated with the clean head",
+      )
+    } yield ()
 
-  /** Purges all data from the request journal.
-    */
-  def purge()(implicit traceContext: TraceContext): Future[Unit]
+    for {
+      _ <- if (!bypassAllSanityChecks) checkCleanHead() else Future.unit
+      result <- pruneInternal(beforeAndIncluding)
+    } yield result
+  }
 
   /** Deletes all request counters at or before the given timestamp.
     * Calls to this method are idempotent, independent of the order.
     */
   @VisibleForTesting
-  private[store] def pruneInternal(beforeInclusive: CantonTimestamp)(implicit
+  private[store] def pruneInternal(beforeAndIncluding: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Future[Unit]
 
@@ -89,6 +107,35 @@ trait RequestJournalStore { this: NamedLogging =>
   def size(start: CantonTimestamp = CantonTimestamp.Epoch, end: Option[CantonTimestamp] = None)(
       implicit traceContext: TraceContext
   ): Future[Int]
+
+  /** Gets the prehead for the clean cursor. */
+  def preheadClean(implicit
+      traceContext: TraceContext
+  ): Future[Option[RequestCounterCursorPrehead]] =
+    cleanPreheadStore.prehead
+
+  /** Forces an update to the prehead for clean requests. Only use this for testing. */
+  @VisibleForTesting
+  private[participant] def overridePreheadCleanForTesting(
+      rc: Option[RequestCounterCursorPrehead]
+  )(implicit traceContext: TraceContext): Future[Unit] = cleanPreheadStore.overridePreheadUnsafe(rc)
+
+  /** Sets the prehead counter for clean requests to `rc` with timestamp `timestamp`
+    * unless it has previously been set to the same or a higher value.
+    */
+  def advancePreheadCleanTo(newPrehead: RequestCounterCursorPrehead)(implicit
+      traceContext: TraceContext,
+      callerCloseContext: CloseContext,
+  ): Future[Unit] =
+    cleanPreheadStore.advancePreheadTo(newPrehead)
+
+  /** [[advancePreheadCleanTo]] as a [[com.digitalasset.canton.resource.TransactionalStoreUpdate]] */
+  def advancePreheadCleanToTransactionalUpdate(
+      newPrehead: RequestCounterCursorPrehead
+  )(implicit
+      traceContext: TraceContext
+  ): TransactionalStoreUpdate =
+    cleanPreheadStore.advancePreheadToTransactionalStoreUpdate(newPrehead)
 
   /** Deletes all the requests with a request counter equal to or higher than the given request counter. */
   def deleteSince(fromInclusive: RequestCounter)(implicit traceContext: TraceContext): Future[Unit]
@@ -102,7 +149,7 @@ trait RequestJournalStore { this: NamedLogging =>
 
   /** Returns the number of dirty requests.
     */
-  def totalDirtyRequests()(implicit traceContext: TraceContext): Future[NonNegativeInt]
+  def totalDirtyRequests()(implicit traceContext: TraceContext): Future[Int]
 }
 
 sealed trait RequestJournalStoreError extends Product with Serializable

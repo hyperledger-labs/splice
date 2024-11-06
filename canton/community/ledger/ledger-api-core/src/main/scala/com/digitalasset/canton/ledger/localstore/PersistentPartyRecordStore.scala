@@ -62,7 +62,7 @@ class PersistentPartyRecordStore(
 
   override def createPartyRecord(partyRecord: PartyRecord)(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Result[PartyRecord]] =
+  ): Future[Result[PartyRecord]] = {
     inTransaction(_.createPartyRecord) { implicit connection: Connection =>
       for {
         _ <- withoutPartyRecord(id = partyRecord.party) {
@@ -72,9 +72,10 @@ class PersistentPartyRecordStore(
       } yield createdPartyRecord
     }.map(tapSuccess { _ =>
       logger.info(
-        s"Created new party record in participant local store: $partyRecord"
+        s"Created new party record in participant local store: ${partyRecord}"
       )
     })(directEc)
+  }
 
   override def updatePartyRecord(
       partyRecordUpdate: PartyRecordUpdate,
@@ -117,7 +118,7 @@ class PersistentPartyRecordStore(
             }
         }
       }.map(tapSuccess { updatePartyRecord =>
-        logger.info(s"Updated party record in participant local store: $updatePartyRecord")
+        logger.info(s"Updated party record in participant local store: ${updatePartyRecord}")
       })
     } yield updatedPartyRecord
   }
@@ -127,7 +128,7 @@ class PersistentPartyRecordStore(
       ledgerPartyIsLocal: Boolean,
       sourceIdp: IdentityProviderId,
       targetIdp: IdentityProviderId,
-  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[PartyRecord]] =
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[PartyRecord]] = {
     for {
       updatedPartyRecord <- inTransaction(_.updatePartyRecordIdp) { implicit connection =>
         backend.getPartyRecord(party = party)(connection) match {
@@ -169,36 +170,40 @@ class PersistentPartyRecordStore(
             }
         }
       }.map(tapSuccess { updatePartyRecord =>
-        logger.info(s"Updated party record in participant local store: $updatePartyRecord")
+        logger.info(s"Updated party record in participant local store: ${updatePartyRecord}")
       })
     } yield updatedPartyRecord
+  }
 
   override def getPartyRecordO(
       party: Party
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Result[Option[PartyRecord]]] =
+  ): Future[Result[Option[PartyRecord]]] = {
     inTransaction(_.getPartyRecord) { implicit connection =>
       doFetchDomainPartyRecordO(party)
     }
+  }
 
   private def doFetchDomainPartyRecord(
       party: Ref.Party
-  )(implicit connection: Connection): Result[PartyRecord] =
+  )(implicit connection: Connection): Result[PartyRecord] = {
     withPartyRecord(id = party) { dbPartyRecord =>
       val annotations = backend.getPartyAnnotations(dbPartyRecord.internalId)(connection)
       toDomainPartyRecord(dbPartyRecord.payload, annotations)
     }
+  }
 
   private def doFetchDomainPartyRecordO(
       party: Ref.Party
-  )(implicit connection: Connection): Result[Option[PartyRecord]] =
+  )(implicit connection: Connection): Result[Option[PartyRecord]] = {
     backend.getPartyRecord(party = party)(connection) match {
       case Some(dbPartyRecord) =>
         val annotations = backend.getPartyAnnotations(dbPartyRecord.internalId)(connection)
         Right(Some(toDomainPartyRecord(dbPartyRecord.payload, annotations)))
       case None => Right(None)
     }
+  }
 
   private def doCreatePartyRecord(
       partyRecord: PartyRecord
@@ -283,7 +288,7 @@ class PersistentPartyRecordStore(
   private def toDomainPartyRecord(
       payload: PartyRecordStorageBackend.DbPartyRecordPayload,
       annotations: Map[String, String],
-  ): PartyRecord =
+  ): PartyRecord = {
     PartyRecord(
       party = payload.party,
       identityProviderId = IdentityProviderId.fromDb(payload.identityProviderId),
@@ -292,31 +297,34 @@ class PersistentPartyRecordStore(
         annotations = annotations,
       ),
     )
+  }
 
   private def withPartyRecord[T](
       id: Ref.Party
   )(
       f: PartyRecordStorageBackend.DbPartyRecord => T
-  )(implicit connection: Connection): Result[T] =
+  )(implicit connection: Connection): Result[T] = {
     backend.getPartyRecord(party = id)(connection) match {
       case Some(partyRecord) => Right(f(partyRecord))
       case None => Left(PartyRecordStore.PartyRecordNotFoundFatal(party = id))
     }
+  }
 
   private def withoutPartyRecord[T](
       id: Ref.Party
-  )(t: => T)(implicit connection: Connection): Result[T] =
+  )(t: => T)(implicit connection: Connection): Result[T] = {
     backend.getPartyRecord(party = id)(connection) match {
       case Some(partyRecord) =>
         Left(PartyRecordStore.PartyRecordExistsFatal(party = partyRecord.payload.party))
       case None => Right(t)
     }
+  }
 
   private def inTransaction[T](
       dbMetric: metrics.partyRecordStore.type => DatabaseMetrics
   )(
       thunk: Connection => Result[T]
-  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[T]] =
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[T]] = {
     dbDispatcher
       .executeSql(dbMetric(metrics.partyRecordStore))(thunk)
       .recover[Result[T]] {
@@ -324,6 +332,7 @@ class PersistentPartyRecordStore(
           Left(ConcurrentPartyUpdate(userId))
         case MaxAnnotationsSizeExceededException(userId) => Left(MaxAnnotationsSizeExceeded(userId))
       }(directEc)
+  }
 
   private def tapSuccess[T](f: T => Unit)(r: Result[T]): Result[T] = {
     r.foreach(f)

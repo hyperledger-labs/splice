@@ -44,7 +44,7 @@ object SaltAlgorithm {
     override def toProtoOneOf: v30.Salt.Algorithm =
       v30.Salt.Algorithm.Hmac(hmacAlgorithm.toProtoEnum)
     override def length: Long = hmacAlgorithm.hashAlgorithm.length
-    override protected def pretty: Pretty[Hmac] = prettyOfClass(
+    override def pretty: Pretty[Hmac] = prettyOfClass(
       param("hmacAlgorithm", _.hmacAlgorithm.name.unquoted)
     )
   }
@@ -56,7 +56,7 @@ object SaltAlgorithm {
     saltAlgorithmP match {
       case v30.Salt.Algorithm.Empty => Left(ProtoDeserializationError.FieldNotSet(field))
       case v30.Salt.Algorithm.Hmac(hmacAlgorithmP) =>
-        HmacAlgorithm.fromProtoEnum("hmac", hmacAlgorithmP).map(Hmac.apply)
+        HmacAlgorithm.fromProtoEnum("hmac", hmacAlgorithmP).map(Hmac)
     }
 }
 
@@ -104,20 +104,22 @@ object Salt {
     for {
       pseudoSecret <- HmacSecret
         .create(seed)
-        .leftMap(SaltError.HmacGenerationError.apply)
+        .leftMap(SaltError.HmacGenerationError)
       saltAlgorithm = SaltAlgorithm.Hmac(hmacOps.defaultHmacAlgorithm)
       hmac <- hmacOps
         .hmacWithSecret(pseudoSecret, bytes, saltAlgorithm.hmacAlgorithm)
-        .leftMap(SaltError.HmacGenerationError.apply)
+        .leftMap(SaltError.HmacGenerationError)
       salt <- create(hmac.unwrap, saltAlgorithm)
     } yield salt
 
   /** Derives a salt from a `seed` salt and an `index`. */
-  def deriveSalt(seed: SaltSeed, index: Int, hmacOps: HmacOps): Either[SaltError, Salt] =
+  def deriveSalt(seed: SaltSeed, index: Int, hmacOps: HmacOps): Either[SaltError, Salt] = {
     deriveSalt(seed, DeterministicEncoding.encodeInt(index), hmacOps)
+  }
 
-  def tryDeriveSalt(seed: SaltSeed, index: Int, hmacOps: HmacOps): Salt =
+  def tryDeriveSalt(seed: SaltSeed, index: Int, hmacOps: HmacOps): Salt = {
     deriveSalt(seed, index, hmacOps).valueOr(err => throw new IllegalStateException(err.toString))
+  }
 
   /** Derives a salt from a `seed` salt and `bytes` using an HMAC as a pseudo-random function. */
   def deriveSalt(seed: SaltSeed, bytes: ByteString, hmacOps: HmacOps): Either[SaltError, Salt] =
@@ -187,7 +189,7 @@ sealed trait SaltError extends Product with Serializable with PrettyPrinting
 object SaltError {
   final case class InvalidSaltCreation(bytes: ByteString, algorithm: SaltAlgorithm)
       extends SaltError {
-    override protected def pretty: Pretty[InvalidSaltCreation] =
+    override def pretty: Pretty[InvalidSaltCreation] =
       prettyOfClass(
         param("bytes", _.bytes),
         param("algorithm", _.algorithm),
@@ -195,7 +197,7 @@ object SaltError {
   }
 
   final case class HmacGenerationError(error: HmacError) extends SaltError {
-    override protected def pretty: Pretty[HmacGenerationError] = prettyOfClass(
+    override def pretty: Pretty[HmacGenerationError] = prettyOfClass(
       param("error", _.error)
     )
   }

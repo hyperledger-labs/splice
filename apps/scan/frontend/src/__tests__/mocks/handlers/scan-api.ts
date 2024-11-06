@@ -230,7 +230,6 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                     wallet: '0.1.0',
                     walletPayments: '0.1.0',
                   },
-                  transferPreapprovalFee: null,
                 },
                 futureValues: [],
               },

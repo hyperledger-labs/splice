@@ -548,13 +548,13 @@ final class ScanAggregator(
               and
               (
                 template_id_qualified_name = ${QualifiedName(
-                OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
+                OpenMiningRound.COMPANION.TEMPLATE_ID
               )} or
                 template_id_qualified_name = ${QualifiedName(
-                IssuingMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
+                IssuingMiningRound.COMPANION.TEMPLATE_ID
               )} or
                 template_id_qualified_name = ${QualifiedName(
-                SummarizingMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
+                SummarizingMiningRound.COMPANION.TEMPLATE_ID
               )}
               )
             """.as[Long].headOption,
