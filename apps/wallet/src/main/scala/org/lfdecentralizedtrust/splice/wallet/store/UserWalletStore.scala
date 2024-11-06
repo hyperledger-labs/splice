@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
-import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, PageLimit}
+import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit, TransferInputStore}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore.*
 import org.lfdecentralizedtrust.splice.wallet.store.db.DbUserWalletStore
@@ -44,7 +44,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait UserWalletStore extends AppStore with NamedLogging {
+trait UserWalletStore extends TransferInputStore with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
@@ -175,37 +175,6 @@ trait UserWalletStore extends AppStore with NamedLogging {
     requests <- multiDomainAcsStore.listContracts(subsCodegen.SubscriptionRequest.COMPANION, limit)
   } yield requests map (_.contract)
 
-  /** List all non-expired amulets owned by a user in descending order according to their current amount in the given submitting round. */
-  def listSortedAmuletsAndQuantity(
-      submittingRound: Long,
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[(BigDecimal, amuletrulesCodegen.transferinput.InputAmulet)]] = for {
-    amulets <- multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
-  } yield amulets
-    .map(c =>
-      (
-        SpliceUtil
-          .currentAmount(c.payload, submittingRound),
-        c,
-      )
-    )
-    .filter { quantityAndAmulet => quantityAndAmulet._1.compareTo(BigDecimal.valueOf(0)) > 0 }
-    .sortBy(quantityAndAmulet =>
-      // negating because largest values should come first.
-      quantityAndAmulet._1.negate()
-    )
-    .take(limit.limit)
-    .map(quantityAndAmulet =>
-      (
-        quantityAndAmulet._1,
-        new amuletrulesCodegen.transferinput.InputAmulet(
-          quantityAndAmulet._2.contractId
-        ),
-      )
-    )
-
   def getAmuletBalanceWithHoldingFees(asOfRound: Long)(implicit
       tc: TraceContext
   ): Future[(BigDecimal, BigDecimal)] = for {
@@ -234,26 +203,6 @@ trait UserWalletStore extends AppStore with NamedLogging {
       .sum
     totalAmount
   }
-
-  /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
-    * and optionally filtered by a set of issuing rounds.
-    */
-  def listSortedValidatorRewards(
-      activeIssuingRoundsO: Option[Set[Long]],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[
-    Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]
-  ]]
-
-  /** Returns the app reward coupon sorted by their round in ascending order and their value in descending order.
-    * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
-    */
-  def listSortedAppRewards(
-      issuingRoundsMap: Map[splice.types.Round, roundCodegen.IssuingMiningRound],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[
-    (Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon], BigDecimal)
-  ]]
 
   /** Returns the validator faucet coupons sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.

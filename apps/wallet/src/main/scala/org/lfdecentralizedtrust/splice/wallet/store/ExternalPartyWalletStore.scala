@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.wallet.store
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
+  AppRewardCoupon,
   LockedAmulet,
   ValidatorRewardCoupon,
 }
@@ -12,7 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletru
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
-import org.lfdecentralizedtrust.splice.store.{AppStore, Limit}
+import org.lfdecentralizedtrust.splice.store.{Limit, TransferInputStore}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.db.DbExternalPartyWalletStore
 import org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.ExternalPartyWalletAcsStoreRowData
@@ -26,20 +27,10 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for an external party. */
-trait ExternalPartyWalletStore extends AppStore with NamedLogging {
+trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: ExternalPartyWalletStore.Key
-
-  /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
-    * and optionally filtered by a set of issuing rounds.
-    */
-  def listSortedValidatorRewards(
-      activeIssuingRoundsO: Option[Set[Long]],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[
-    Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]
-  ]]
 
   def listAmulets(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
@@ -107,29 +98,35 @@ object ExternalPartyWalletStore {
   def contractFilter(
       key: Key
   ): ContractFilter[ExternalPartyWalletAcsStoreRowData] = {
-    val endUser = key.externalParty.toProtoPrimitive
+    val externalParty = key.externalParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive
 
     SimpleContractFilter(
       key.externalParty,
       Map(
+        mkFilter(AppRewardCoupon.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.provider == externalParty
+        }(co =>
+          ExternalPartyWalletAcsStoreRowData(co, rewardCouponRound = Some(co.payload.round.number))
+        ),
         mkFilter(ValidatorRewardCoupon.COMPANION) { co =>
           co.payload.dso == dso &&
-          co.payload.user == endUser
+          co.payload.user == externalParty
         }(co =>
           ExternalPartyWalletAcsStoreRowData(co, rewardCouponRound = Some(co.payload.round.number))
         ),
         mkFilter(Amulet.COMPANION) { co =>
           co.payload.dso == dso &&
-          co.payload.owner == endUser
+          co.payload.owner == externalParty
         }(ExternalPartyWalletAcsStoreRowData(_)),
         mkFilter(LockedAmulet.COMPANION) { co =>
           co.payload.amulet.dso == dso &&
-          co.payload.amulet.owner == endUser
+          co.payload.amulet.owner == externalParty
         }(ExternalPartyWalletAcsStoreRowData(_)),
         mkFilter(TransferCommandCounter.COMPANION) { co =>
           co.payload.dso == dso &&
-          co.payload.sender == endUser
+          co.payload.sender == externalParty
         }(ExternalPartyWalletAcsStoreRowData(_)),
       ),
     )
