@@ -165,6 +165,12 @@ main-branch-never: &main-branch-never
       ignore:
         - main
 
+minor-release-branch-never: &minor-release-branch-never
+  filters:
+    branches:
+      ignore:
+        - /release-line-\d+\.\d+\.\d+/
+
 executors:
   self_hosted_large:
     resource_class: dach_ny/cn-runner-large
@@ -4927,12 +4933,14 @@ workflows:
             - slack-context
       # Daml
       - daml_test:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
       # Scala
       - scala_test:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -4945,6 +4953,7 @@ workflows:
           # TODO(#10912) Investigate why things got slower
           parallelism: 11
       - scala_test_self_hosted:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -4954,6 +4963,7 @@ workflows:
           start_canton_options: "-w"
           parallelism: 2
       - scala_test_self_hosted:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -4963,6 +4973,7 @@ workflows:
           start_canton_options: "-s"
           parallelism: 5
       - scala_test:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -4976,6 +4987,7 @@ workflows:
           resource_class: "2xlarge"
           parallelism: 4
       - scala_test:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -4989,6 +5001,7 @@ workflows:
           resource_class: "xlarge"
           parallelism: 1
       - scala_test:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -5002,6 +5015,7 @@ workflows:
           resource_class: "xlarge"
           parallelism: 1
       - scala_test_self_hosted:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -5011,6 +5025,7 @@ workflows:
           start_canton_options: "-w -g"
           parallelism: 1
       - scala_test_self_hosted:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -5020,6 +5035,7 @@ workflows:
           start_canton_options: "-w --soft-domain-migration"
           parallelism: 1
       - scala_test_self_hosted:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -5029,6 +5045,7 @@ workflows:
           start_canton_options: "-w"
           parallelism: 1
       - scala_test:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -5044,6 +5061,7 @@ workflows:
           skip_if_files_changed: "nix/canton-sources.json"
           with_shared_gcp: true
       - scala_test:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory
@@ -5061,6 +5079,7 @@ workflows:
           resource_class: "xlarge"
           parallelism: 2
       - ui_test:
+          <<: *minor-release-branch-never
           <<: *notify-fail
           context:
             - artifactory

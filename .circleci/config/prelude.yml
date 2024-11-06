@@ -160,6 +160,12 @@ main-branch-never: &main-branch-never
       ignore:
         - main
 
+minor-release-branch-never: &minor-release-branch-never
+  filters:
+    branches:
+      ignore:
+        - /release-line-\d+\.\d+\.\d+/
+
 executors:
   self_hosted_large:
     resource_class: dach_ny/cn-runner-large
