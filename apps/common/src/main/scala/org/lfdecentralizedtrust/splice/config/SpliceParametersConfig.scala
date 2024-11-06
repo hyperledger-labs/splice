@@ -18,6 +18,4 @@ final case class SpliceParametersConfig(
 
   override def watchdog: Option[WatchdogConfig] = None
 
-  override def useUnifiedSequencer: Boolean = false
-
 }

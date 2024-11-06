@@ -29,6 +29,10 @@ service SequencerService {
   // For every accepted request, the sequencer assigns a unique sequencing timestamp to the request.
   // All honest sequencers of the domain will deliver an event to the sender and
   // to those domain members that are intended to receive at least one envelope.
+  //
+  // Honest sequencers may deliver to all sequencers of the domain events that don't correspond to submitted requests.
+  // Sequencer implementations may leverage this mechanism for internal purposes.
+  //
   // An event for a domain member contains only those envelopes of the batch of the request
   // that the member is intended to receive and
   // the recipients of an envelope contains only those that the member is supposed to learn about.
@@ -202,7 +206,7 @@ message AcknowledgeSignedRequest {
 message AcknowledgeSignedResponse {}
 
 message DownloadTopologyStateForInitRequest {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   string member = 1;
 }
@@ -212,7 +216,7 @@ message DownloadTopologyStateForInitResponse {
 }
 
 message GetTrafficStateForMemberRequest {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   // Member for which to get the traffic state
   string member = 1;
@@ -221,7 +225,7 @@ message GetTrafficStateForMemberRequest {
 }
 
 message GetTrafficStateForMemberResponse {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.protocol.v30.TrafficState traffic_state = 1;
 }

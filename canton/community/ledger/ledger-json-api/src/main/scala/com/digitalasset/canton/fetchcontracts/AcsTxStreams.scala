@@ -36,8 +36,8 @@ object AcsTxStreams extends NoTracing {
     import lav2.event.Event
     import Event.Event.*
     txes foreach {
-      case Event(Created(c)) => discard { csb += c }
-      case Event(Archived(a)) => discard { asb += ((a.contractId, a)) }
+      case Event(Created(c)) => discard(csb += c)
+      case Event(Archived(a)) => discard(asb += ((a.contractId, a)))
       case Event(Empty) => () // nonsense
     }
     val as = asb.result()
@@ -49,13 +49,13 @@ object AcsTxStreams extends NoTracing {
     * or the ACS's last offset if there were no transactions.
     */
   def acsFollowingAndBoundary(
-      transactionsSince: lav2.participant_offset.ParticipantOffset => Source[Transaction, NotUsed],
+      transactionsSince: String => Source[Transaction, NotUsed],
       logger: TracedLogger,
   )(implicit
       ec: concurrent.ExecutionContext,
       lc: com.daml.logging.LoggingContextOf[Any],
   ): Graph[FanOutShape2[
-    lav2.state_service.GetActiveContractsResponse,
+    Either[Long, lav2.state_service.GetActiveContractsResponse],
     ContractStreamStep.LAV1,
     BeginBookmark[domain.Offset],
   ], NotUsed] =
@@ -71,11 +71,11 @@ object AcsTxStreams extends NoTracing {
       val txns = b add transactionsFollowingBoundary(transactionsSince, logger)
       val allSteps = b add Concat[ContractStreamStep.LAV1](3)
       // format: off
-      discard { dupOff <~ acs.out1 }
-      discard {           acs.out0.map(ces => Acs(ces.toVector)) ~> allSteps }
-      discard { dupOff       ~> liveStart                        ~> allSteps }
-      discard {                      txns.out0                   ~> allSteps }
-      discard { dupOff            ~> txns.in }
+      discard {dupOff <~ acs.out1}
+      discard {acs.out0.map(ces => Acs(ces.toVector)) ~> allSteps}
+      discard {dupOff       ~> liveStart                        ~> allSteps}
+      discard {txns.out0                   ~> allSteps}
+      discard {dupOff            ~> txns.in}
       // format: on
       new FanOutShape2(acs.in, allSteps.out, txns.out1)
     }
@@ -84,23 +84,25 @@ object AcsTxStreams extends NoTracing {
     * other with a single result, the last offset.
     */
   private[this] def acsAndBoundary
-      : Graph[FanOutShape2[lav2.state_service.GetActiveContractsResponse, Seq[
+      : Graph[FanOutShape2[Either[Long, lav2.state_service.GetActiveContractsResponse], Seq[
         lav2.event.CreatedEvent,
       ], BeginBookmark[domain.Offset]], NotUsed] =
     GraphDSL.create() { implicit b =>
       import GraphDSL.Implicits.*
       import lav2.state_service.GetActiveContractsResponse as GACR
-      val dup = b add Broadcast[GACR](2, eagerCancel = true)
-      val acs = b add (Flow fromFunction ((_: GACR).contractEntry.activeContract
-        .flatMap(_.createdEvent)
-        .toSeq))
-      val off = b add Flow[GACR]
-        .collect {
-          case gacr if gacr.offset.nonEmpty => AbsoluteBookmark(domain.Offset(gacr.offset))
+      val dup = b add Broadcast[Either[Long, GACR]](2, eagerCancel = true)
+      val acs = b add (Flow fromFunction ((_: Either[Long, GACR]).toSeq.flatMap(
+        _.contractEntry.activeContract
+          .flatMap(_.createdEvent)
+          .toSeq
+      )))
+      val off = b add Flow[Either[Long, GACR]]
+        .collect { case Left(offset) =>
+          AbsoluteBookmark(domain.Offset(offset))
         }
         .via(last(ParticipantBegin: BeginBookmark[domain.Offset]))
-      discard { dup ~> acs }
-      discard { dup ~> off }
+      discard(dup ~> acs)
+      discard(dup ~> off)
       new FanOutShape2(dup.in, acs.out, off.out)
     }
 
@@ -109,7 +111,7 @@ object AcsTxStreams extends NoTracing {
     * to `acsFollowingAndBoundary`.
     */
   def transactionsFollowingBoundary(
-      transactionsSince: lav2.participant_offset.ParticipantOffset => Source[Transaction, NotUsed],
+      transactionsSince: String => Source[Transaction, NotUsed],
       logger: TracedLogger,
   )(implicit
       ec: concurrent.ExecutionContext,
@@ -134,10 +136,10 @@ object AcsTxStreams extends NoTracing {
       val logTxnOut =
         b add logTermination[ContractStreamStep.Txn.LAV1](logger, "first branch of tx stream split")
       // format: off
-      discard { txnSplit.in <~ txns <~ dupOff }
-      discard {                        dupOff                                ~> mergeOff ~> maxOff }
-      discard { txnSplit.out1.map(off => AbsoluteBookmark(off)) ~> lastTxOff ~> mergeOff }
-      discard { txnSplit.out0 ~> logTxnOut }
+      discard {txnSplit.in <~ txns <~ dupOff}
+      discard {dupOff                                ~> mergeOff ~> maxOff}
+      discard {txnSplit.out1.map(off => AbsoluteBookmark(off)) ~> lastTxOff ~> mergeOff}
+      discard {txnSplit.out0 ~> logTxnOut}
       // format: on
       new FanOutShape2(dupOff.in, logTxnOut.out, maxOff.out)
     }
@@ -149,9 +151,9 @@ object AcsTxStreams extends NoTracing {
     (ContractStreamStep.Txn(partitionInsertsDeletes(tx.events), offset), offset)
   }
 
-  def transactionFilter(
+  def transactionFilter[Pkg](
       parties: domain.PartySet,
-      contractTypeIds: List[ContractTypeId.Resolved],
+      contractTypeIds: List[ContractTypeId.Definite[Pkg]],
   ): lav2.transaction_filter.TransactionFilter = {
     import lav2.transaction_filter.{Filters, InterfaceFilter}
 
@@ -162,7 +164,7 @@ object AcsTxStreams extends NoTracing {
           CumulativeFilter(
             IdentifierFilter.TemplateFilter(
               TemplateFilter(
-                templateId = Some(apiIdentifier(templateId)),
+                templateId = Some(apiIdentifier[Pkg](templateId)),
                 includeCreatedEventBlob = false,
               )
             )

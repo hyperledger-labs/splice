@@ -23,7 +23,7 @@ spec:
         {{- toYaml $.Values.pod.annotations | nindent 8 }}
       labels:
         app: {{ $.Values.node.identifier }}
-        cn-component: cometbft
+        splice-component: cometbft
         {{- with $.Values.metrics.migration }}
         active_migration: {{ .active | quote }}
         migration_id: {{ .id | quote }}
@@ -35,7 +35,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
                 matchExpressions:
-                  - key: cn-component
+                  - key: splice-component
                     operator: In
                     values:
                       - cometbft

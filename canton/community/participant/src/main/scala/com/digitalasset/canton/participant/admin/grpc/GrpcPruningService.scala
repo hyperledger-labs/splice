@@ -18,9 +18,11 @@ import com.digitalasset.canton.admin.pruning.v30.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.PruningServiceErrorGroup
-import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.NonHexOffset
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidArgument
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcETFUSExtended
 import com.digitalasset.canton.participant.scheduler.{
   ParticipantPruningSchedule,
   ParticipantPruningScheduler,
@@ -29,6 +31,7 @@ import com.digitalasset.canton.participant.sync.{CantonSyncService, UpstreamOffs
 import com.digitalasset.canton.participant.{GlobalOffset, Pruning}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import io.grpc.{Status, StatusRuntimeException}
@@ -37,7 +40,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcPruningService(
     sync: CantonSyncService,
-    scheduleAccessorBuilder: () => Option[ParticipantPruningScheduler],
+    pruningScheduler: ParticipantPruningScheduler,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     val ec: ExecutionContext
@@ -55,7 +58,9 @@ class GrpcPruningService(
               UpstreamOffsetConvert
                 .toLedgerSyncOffset(request.pruneUpTo)
                 .leftMap(err =>
-                  NonHexOffset.Error("prune_up_to", request.pruneUpTo, err).asGrpcError
+                  InvalidArgument
+                    .Reject(s"The prune_up_to field (${request.pruneUpTo}) is invalid: $err")
+                    .asGrpcError
                 )
             )
           _ <- CantonGrpcUtil.mapErrNewETUS(sync.pruneInternally(ledgerSyncOffset))
@@ -82,7 +87,7 @@ class GrpcPruningService(
       } yield (beforeOrAt, ledgerEndOffset)
 
       val res = for {
-        validatedRequest <- EitherT.fromEither[Future](
+        validatedRequest <- EitherT.fromEither[FutureUnlessShutdown](
           validatedRequestE.leftMap(err =>
             Status.INVALID_ARGUMENT
               .withDescription(s"Invalid GetSafePruningOffsetRequest: $err")
@@ -95,18 +100,14 @@ class GrpcPruningService(
         safeOffsetO <- sync.pruningProcessor
           .safeToPrune(beforeOrAt, ledgerEndOffset)
           .leftFlatMap[Option[GlobalOffset], StatusRuntimeException] {
-            case Pruning.LedgerPruningOnlySupportedInEnterpriseEdition =>
-              EitherT.leftT(
-                PruningServiceError.PruningNotSupportedInCommunityEdition.Error().asGrpcError
-              )
-            case e @ Pruning.LedgerPruningNothingToPrune(ts, offset) =>
+            case e @ Pruning.LedgerPruningNothingToPrune =>
               // Let the user know that no internal canton data exists prior to the specified
               // time and offset. Return this condition as an error instead of None, so that
               // the caller can distinguish this case from LedgerPruningOffsetUnsafeDomain.
               logger.info(e.message)
               EitherT.leftT(
                 PruningServiceError.NoInternalParticipantDataBefore
-                  .Error(ts, offset)
+                  .Error(beforeOrAt, ledgerEndOffset)
                   .asGrpcError
               )
             case e @ Pruning.LedgerPruningOffsetUnsafeDomain(_) =>
@@ -121,7 +122,7 @@ class GrpcPruningService(
 
       } yield toProtoResponse(safeOffsetO)
 
-      EitherTUtil.toFuture(res)
+      res.asGrpcResponse
   }
 
   override def setParticipantSchedule(
@@ -160,25 +161,16 @@ class GrpcPruningService(
           .NoSafePruningOffset(GetSafePruningOffsetResponse.NoSafePruningOffset())
       )(offset =>
         GetSafePruningOffsetResponse.Response
-          .SafePruningOffset(UpstreamOffsetConvert.fromGlobalOffset(offset).toHexString)
+          .SafePruningOffset(UpstreamOffsetConvert.fromGlobalOffset(offset).toLong)
       )
 
     GetSafePruningOffsetResponse(response)
   }
 
-  private lazy val maybeScheduleAccessor: Option[ParticipantPruningScheduler] =
-    scheduleAccessorBuilder()
-
   override protected def ensureScheduler(implicit
       traceContext: TraceContext
   ): Future[ParticipantPruningScheduler] =
-    maybeScheduleAccessor match {
-      case None =>
-        Future.failed(
-          PruningServiceError.PruningNotSupportedInCommunityEdition.Error().asGrpcError
-        )
-      case Some(scheduler) => Future.successful(scheduler)
-    }
+    Future.successful(pruningScheduler)
 
   /** TODO(#18453) R6
     * Enable or disable waiting for commitments from the given counter-participants
@@ -218,21 +210,6 @@ object PruningServiceError extends PruningServiceErrorGroup {
     final case class Error(reason: String)(implicit val loggingContext: ErrorLoggingContext)
         extends CantonError.Impl(
           cause = "Offset length does not match ledger standard of 9 bytes"
-        )
-        with PruningServiceError
-  }
-
-  @Explanation("""Pruning is not supported in the Community Edition.""")
-  @Resolution("Upgrade to the Enterprise Edition.")
-  object PruningNotSupportedInCommunityEdition
-      extends ErrorCode(
-        id = "PRUNING_NOT_SUPPORTED_IN_COMMUNITY_EDITION",
-        // TODO(#5990) According to the WriteParticipantPruningService, this should give the status code UNIMPLEMENTED. Introduce a new error category for that!
-        ErrorCategory.InvalidGivenCurrentSystemStateOther,
-      ) {
-    final case class Error()(implicit val loggingContext: ErrorLoggingContext)
-        extends CantonError.Impl(
-          cause = "Pruning is only supported in the Enterprise Edition"
         )
         with PruningServiceError
   }
@@ -277,7 +254,7 @@ object PruningServiceError extends PruningServiceErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = "No internal participant data to prune up to time " +
-            s"${beforeOrAt} and offset ${boundInclusive.unwrap.value}."
+            s"$beforeOrAt and offset ${boundInclusive.unwrap.value}."
         )
         with PruningServiceError
   }
@@ -314,4 +291,31 @@ object PruningServiceError extends PruningServiceErrorGroup {
         with PruningServiceError
   }
 
+  @Explanation("""Domain purging has been invoked on an unknown domain.""")
+  @Resolution("Ensure that the specified domain id exists.")
+  object PurgingUnknownDomain
+      extends ErrorCode(
+        id = "PURGE_UNKNOWN_DOMAIN_ERROR",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Error(domainId: DomainId)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(cause = s"Domain $domainId does not exist.")
+        with PruningServiceError
+  }
+
+  @Explanation("""Domain purging has been invoked on a domain that is not marked inactive.""")
+  @Resolution(
+    "Ensure that the domain to be purged is inactive to indicate that no domain data is needed anymore."
+  )
+  object PurgingOnlyAllowedOnInactiveDomain
+      extends ErrorCode(
+        id = "PURGE_ACTIVE_DOMAIN_ERROR",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Error(override val cause: String)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(cause)
+        with PruningServiceError
+  }
 }

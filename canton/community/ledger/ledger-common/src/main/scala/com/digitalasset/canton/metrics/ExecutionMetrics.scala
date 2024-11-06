@@ -95,15 +95,15 @@ class ExecutionHistograms(val prefix: MetricName)(implicit
 
   private[metrics] val registerKeyStateCacheUpdate: Item = Item(
     cachePrefix :+ "key_state" :+ "register_update",
-    summary = "The time spent to update the cache.",
-    description = """The total time spent in sequential update steps of the contract state caches
+    summary = "The time spent to update the key state cache.",
+    description = """The total time spent in sequential update steps of the key state caches
                 |updating logic. This metric is created with debugging purposes in mind.""",
     qualification = MetricQualification.Debug,
   )
 
   private[metrics] val registerContractStateCacheUpdate: Item = Item(
     cachePrefix :+ "contract_state" :+ "register_update",
-    summary = "The time spent to update the cache.",
+    summary = "The time spent to update the contract state cache.",
     description = """The total time spent in sequential update steps of the contract state caches
                 |updating logic. This metric is created with debugging purposes in mind.""",
     qualification = MetricQualification.Debug,
@@ -181,16 +181,7 @@ class ExecutionMetrics(
         new CacheMetrics(prefix :+ "key_state", openTelemetryMetricsFactory)
 
       val registerCacheUpdate: Timer =
-        openTelemetryMetricsFactory.timer(
-          MetricInfo(
-            prefix :+ "key_state" :+ "register_update",
-            summary = "The time spent to update the cache.",
-            description =
-              """The total time spent in sequential update steps of the contract state caches
-              |updating logic. This metric is created with debugging purposes in mind.""",
-            qualification = MetricQualification.Debug,
-          )
-        )
+        openTelemetryMetricsFactory.timer(inventory.registerKeyStateCacheUpdate.info)
     }
 
     object contractState {
@@ -198,16 +189,7 @@ class ExecutionMetrics(
         new CacheMetrics(prefix :+ "contract_state", openTelemetryMetricsFactory)
 
       val registerCacheUpdate: Timer =
-        openTelemetryMetricsFactory.timer(
-          MetricInfo(
-            prefix :+ "contract_state" :+ "register_update",
-            summary = "The time spent to update the cache.",
-            description =
-              """The total time spent in sequential update steps of the contract state caches
-              |updating logic. This metric is created with debugging purposes in mind.""",
-            qualification = MetricQualification.Debug,
-          )
-        )
+        openTelemetryMetricsFactory.timer(inventory.registerContractStateCacheUpdate.info)
     }
 
   }

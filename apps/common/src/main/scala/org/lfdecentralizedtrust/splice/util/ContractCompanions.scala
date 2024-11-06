@@ -75,6 +75,8 @@ object ContractCompanions {
     // Throw away all type safety
     result
       .map(_.asInstanceOf[GenericChoice])
-      .toRight(s"Could not find companion for choice $choice of ${companion.TEMPLATE_ID}")
+      .toRight(
+        s"Could not find companion for choice $choice of ${companion.getTemplateIdWithPackageId}"
+      )
   }
 }

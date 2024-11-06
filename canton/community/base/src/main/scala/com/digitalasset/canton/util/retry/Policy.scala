@@ -15,12 +15,6 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.retry.RetryUtil.{
-  AllExnRetryable,
-  ErrorKind,
-  ExceptionRetryable,
-  NoErrorKind,
-}
 import com.digitalasset.canton.util.retry.RetryWithDelay.{RetryOutcome, RetryTermination}
 import com.digitalasset.canton.util.{DelayUtil, LoggerUtil}
 import org.slf4j.event.Level
@@ -41,13 +35,13 @@ abstract class Policy(logger: TracedLogger) {
 
   protected val directExecutionContext: DirectExecutionContext = DirectExecutionContext(logger)
 
-  def apply[T](task: => Future[T], retryOk: ExceptionRetryable)(implicit
+  def apply[T](task: => Future[T], retryOk: ExceptionRetryPolicy)(implicit
       success: Success[T],
       executionContext: ExecutionContext,
       traceContext: TraceContext,
   ): Future[T]
 
-  def unlessShutdown[T](task: => FutureUnlessShutdown[T], retryOk: ExceptionRetryable)(implicit
+  def unlessShutdown[T](task: => FutureUnlessShutdown[T], retryOk: ExceptionRetryPolicy)(implicit
       success: Success[T],
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -94,7 +88,7 @@ object Policy {
       retryInterval,
       operationName = operationName,
       actionable = Some(actionable),
-    ).unlessShutdown(task, AllExnRetryable)(
+    ).unlessShutdown(task, AllExceptionRetryPolicy)(
       Success.always,
       executionContext,
       loggingContext.traceContext,
@@ -127,7 +121,7 @@ abstract class RetryWithDelay(
     */
   override def apply[T](
       task: => Future[T],
-      retryable: ExceptionRetryable,
+      retryable: ExceptionRetryPolicy,
   )(implicit
       success: Success[T],
       executionContext: ExecutionContext,
@@ -152,7 +146,7 @@ abstract class RetryWithDelay(
     */
   override def unlessShutdown[T](
       task: => FutureUnlessShutdown[T],
-      retryable: ExceptionRetryable,
+      retryable: ExceptionRetryPolicy,
   )(implicit
       success: Success[T],
       executionContext: ExecutionContext,
@@ -171,7 +165,7 @@ abstract class RetryWithDelay(
 
   private def retryWithDelay[T](
       task: => Future[T],
-      retryable: ExceptionRetryable,
+      retryable: ExceptionRetryPolicy,
       executionContext: ExecutionContext,
   )(implicit success: Success[T], traceContext: TraceContext): Future[RetryOutcome[T]] = {
     implicit val loggingContext: ErrorLoggingContext = ErrorLoggingContext.fromTracedLogger(logger)
@@ -186,7 +180,7 @@ abstract class RetryWithDelay(
     def run(
         previousResult: Future[T],
         totalRetries: Int,
-        lastErrorKind: ErrorKind,
+        lastErrorKind: Option[ErrorKind],
         retriesOfLastErrorKind: Int,
         delay: FiniteDuration,
     ): Future[RetryOutcome[T]] = logOnThrow {
@@ -204,7 +198,7 @@ abstract class RetryWithDelay(
             case outcome if performUnlessClosing.isClosing =>
               val str = outcome match {
                 case Failure(exception) => s"exception: ${exception.getMessage}"
-                case util.Success(value) => s"success with predicate=false: ${value}"
+                case util.Success(value) => s"success with predicate=false: $value"
               }
               logger.info(
                 s"Giving up on retrying the operation '$operationName' due to shutdown. Last attempt was $lastErrorKind with $str"
@@ -223,8 +217,9 @@ abstract class RetryWithDelay(
 
             case outcome =>
               // this will also log the exception in outcome
-              val errorKind = retryable.retryOK(outcome, logger, Some(lastErrorKind))
-              val retriesOfErrorKind = if (errorKind == lastErrorKind) retriesOfLastErrorKind else 0
+              val errorKind = retryable.logAndDetermineErrorKind(outcome, logger, lastErrorKind)
+              val retriesOfErrorKind =
+                if (lastErrorKind.contains(errorKind)) retriesOfLastErrorKind else 0
               if (
                 errorKind.maxRetries == Int.MaxValue || retriesOfErrorKind < errorKind.maxRetries
               ) {
@@ -236,7 +231,7 @@ abstract class RetryWithDelay(
                   DelayUtil
                     .delayIfNotClosing(operationName, suspendDuration, performUnlessClosing)
                     .onShutdown(())(directExecutionContext)
-                    .flatMap(_ => run(previousResult, 0, errorKind, 0, initialDelay))(
+                    .flatMap(_ => run(previousResult, 0, Some(errorKind), 0, initialDelay))(
                       directExecutionContext
                     )
                 } else {
@@ -246,7 +241,7 @@ abstract class RetryWithDelay(
                       retryable.retryLogLevel(outcome).getOrElse(Level.INFO)
                     } else Level.WARN
                   }
-                  val change = if (errorKind == lastErrorKind) {
+                  val change = if (lastErrorKind.contains(errorKind)) {
                     ""
                   } else {
                     s"New kind of error: $errorKind. "
@@ -303,7 +298,7 @@ abstract class RetryWithDelay(
                           run(
                             nextRunF,
                             nextTotalRetries,
-                            errorKind,
+                            Some(errorKind),
                             retriesOfErrorKind + 1,
                             nextDelayIs,
                           )
@@ -347,7 +342,13 @@ abstract class RetryWithDelay(
     // Run 1 onwards: Only run this if `flagCloseable` is not closing.
     //  (The check is performed at the recursive call.)
     //  Checking at the client would be very difficult, because the client would have to deal with a closed EC.
-    run(runTask(), 0, NoErrorKind, 0, initialDelay)
+    run(
+      runTask(),
+      totalRetries = 0,
+      lastErrorKind = None,
+      retriesOfLastErrorKind = 0,
+      delay = initialDelay,
+    )
   }
 
   private def messageOfOutcome(
@@ -376,10 +377,9 @@ object RetryWithDelay {
 
     /** @throws java.lang.Throwable Rethrows the exception if [[outcome]] is a [[scala.util.Failure]] */
     @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
-    def toUnlessShutdown: UnlessShutdown[A] = {
+    def toUnlessShutdown: UnlessShutdown[A] =
       if (termination == RetryTermination.Shutdown) AbortedDueToShutdown
       else Outcome(outcome.get)
-    }
   }
   private sealed trait RetryTermination extends Product with Serializable
   private[RetryWithDelay] object RetryTermination {
@@ -529,7 +529,7 @@ final case class When(
     depends: PartialFunction[Any, Policy],
 ) extends Policy(logger) {
 
-  override def apply[T](task: => Future[T], retryable: ExceptionRetryable)(implicit
+  override def apply[T](task: => Future[T], retryable: ExceptionRetryPolicy)(implicit
       success: Success[T],
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -541,13 +541,18 @@ final case class When(
         else depends(res)(task, retryable)
       }(directExecutionContext)
       .recoverWith { case NonFatal(e) =>
-        if (depends.isDefinedAt(e) && retryable.retryOK(Failure(e), logger, None).maxRetries > 0)
+        if (
+          depends
+            .isDefinedAt(e) && retryable
+            .logAndDetermineErrorKind(Failure(e), logger, None)
+            .maxRetries > 0
+        )
           depends(e)(task, retryable)
         else fut
       }(directExecutionContext)
   }
 
-  override def unlessShutdown[T](task: => FutureUnlessShutdown[T], retryOk: ExceptionRetryable)(
+  override def unlessShutdown[T](task: => FutureUnlessShutdown[T], retryOk: ExceptionRetryPolicy)(
       implicit
       success: Success[T],
       executionContext: ExecutionContext,

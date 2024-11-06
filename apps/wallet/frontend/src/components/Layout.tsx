@@ -11,6 +11,7 @@ import CurrentUser from './CurrentUser';
 import FeaturedAppRight from './FeaturedAppRight';
 import Hero from './Hero';
 import LogoutButton from './LogoutButton';
+import TransferPreapproval from './TransferPreapproval';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -33,6 +34,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
           <Stack direction="row" alignItems="center" spacing={1} paddingLeft={1}>
             <CurrentUser key="current-user" />
             <FeaturedAppRight key="featured-app-right" />
+            <TransferPreapproval key="transfer-preapproval" />
             <Divider key="divider" orientation="vertical" variant="middle" flexItem />
             <LogoutButton key="logout-button" />
           </Stack>

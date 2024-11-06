@@ -8,8 +8,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
 import io.opentelemetry.sdk.common.CompletableResultCode
 import io.opentelemetry.sdk.metrics.InstrumentType
-import io.opentelemetry.sdk.metrics.data.{AggregationTemporality, MetricData}
 import io.opentelemetry.sdk.metrics.`export`.MetricExporter
+import io.opentelemetry.sdk.metrics.data.{AggregationTemporality, MetricData}
 
 import java.io.{BufferedWriter, File, FileWriter}
 import java.util
@@ -65,32 +65,39 @@ class CsvReporter(config: MetricsReporterConfig.Csv, val loggerFactory: NamedLog
     CompletableResultCode.ofSuccess()
   }
 
-  private def tryOrStop(res: => Unit): Unit = {
+  private def tryOrStop(res: => Unit): Unit =
     Try(res) match {
       case Success(_) =>
       case Failure(exception) =>
         logger.warn("Failed to write metrics to csv file. Turning myself off", exception)
         running.set(false)
     }
-  }
 
   private def writeRow(ts: CantonTimestamp, value: MetricValue, data: MetricData): Unit = if (
     running.get()
   ) {
-    val knownKeys = config.contextKeys.filter(key => value.attributes.contains(key))
+    def stripNamespace(s: String): String = {
+      val parts = s.split("::")
+      if (parts.length > 1) parts.head else s
+    }
+    val knownKeys = config.contextKeys.filter(value.attributes.contains)
+    val unknownKeys = value.attributes.keys.filterNot(config.contextKeys.contains).toSeq.sorted
     val prefix = knownKeys
       .flatMap { key =>
-        value.attributes.get(key).toList
+        // remove namespaces from file names ...
+        value.attributes.get(key).toList.map(stripNamespace)
       }
       .mkString(".")
+
     val name =
       ((if (prefix.isEmpty) Seq.empty else Seq(prefix)) ++ Seq(data.getName, "csv")).mkString(".")
+
     tryOrStop {
       val (_, bufferedWriter) = files.getOrElseUpdate(
         name, {
           val file = new File(config.directory, name)
           logger.info(
-            s"Creating new csv file ${file} for metric using keys=${knownKeys} from attributes=${value.attributes.keys}"
+            s"Creating new csv file $file for metric using keys=$knownKeys from attributes=${value.attributes.keys}"
           )
           file.getParentFile.mkdirs()
           val writer = new FileWriter(file, true)
@@ -102,7 +109,7 @@ class CsvReporter(config: MetricsReporterConfig.Csv, val loggerFactory: NamedLog
           (writer, bufferedWriter)
         },
       )
-      bufferedWriter.append(value.toCsvRow(ts, data))
+      bufferedWriter.append(value.toCsvRow(ts, data, unknownKeys))
       bufferedWriter.newLine()
     }
   }

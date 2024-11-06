@@ -58,11 +58,11 @@ sealed trait SequencedEventValidationError[+E] extends Product with Serializable
 object SequencedEventValidationError {
   final case class UpstreamSubscriptionError[+E: Pretty](error: E)
       extends SequencedEventValidationError[E] {
-    override def pretty: Pretty[this.type] = prettyOfParam(_.error)
+    override protected def pretty: Pretty[this.type] = prettyOfParam(_.error)
   }
   final case class BadDomainId(expected: DomainId, received: DomainId)
       extends SequencedEventValidationError[Nothing] {
-    override def pretty: Pretty[BadDomainId] = prettyOfClass(
+    override protected def pretty: Pretty[BadDomainId] = prettyOfClass(
       param("expected", _.expected),
       param("received", _.received),
     )
@@ -71,14 +71,14 @@ object SequencedEventValidationError {
       newCounter: SequencerCounter,
       oldCounter: SequencerCounter,
   ) extends SequencedEventValidationError[Nothing] {
-    override def pretty: Pretty[DecreasingSequencerCounter] = prettyOfClass(
+    override protected def pretty: Pretty[DecreasingSequencerCounter] = prettyOfClass(
       param("new counter", _.newCounter),
       param("old counter", _.oldCounter),
     )
   }
   final case class GapInSequencerCounter(newCounter: SequencerCounter, oldCounter: SequencerCounter)
       extends SequencedEventValidationError[Nothing] {
-    override def pretty: Pretty[GapInSequencerCounter] = prettyOfClass(
+    override protected def pretty: Pretty[GapInSequencerCounter] = prettyOfClass(
       param("new counter", _.newCounter),
       param("old counter", _.oldCounter),
     )
@@ -89,7 +89,7 @@ object SequencedEventValidationError {
       oldTimestamp: CantonTimestamp,
       oldCounter: SequencerCounter,
   ) extends SequencedEventValidationError[Nothing] {
-    override def pretty: Pretty[NonIncreasingTimestamp] = prettyOfClass(
+    override protected def pretty: Pretty[NonIncreasingTimestamp] = prettyOfClass(
       param("new timestamp", _.newTimestamp),
       param("new counter", _.newCounter),
       param("old timestamp", _.oldTimestamp),
@@ -108,7 +108,7 @@ object SequencedEventValidationError {
       )(ResilientSequencerSubscription.ForkHappened)
       with SequencedEventValidationError[Nothing]
       with PrettyPrinting {
-    override def pretty: Pretty[ForkHappened] = prettyOfClass(
+    override protected def pretty: Pretty[ForkHappened] = prettyOfClass(
       param("counter", _.counter),
       param("supplied event", _.suppliedEvent),
       paramIfDefined("expected event", _.expectedEvent),
@@ -119,7 +119,7 @@ object SequencedEventValidationError {
       usedTimestamp: CantonTimestamp,
       error: SignatureCheckError,
   ) extends SequencedEventValidationError[Nothing] {
-    override def pretty: Pretty[SignatureInvalid] = prettyOfClass(
+    override protected def pretty: Pretty[SignatureInvalid] = prettyOfClass(
       unnamedParam(_.error),
       param("sequenced timestamp", _.sequencedTimestamp),
       param("used timestamp", _.usedTimestamp),
@@ -130,7 +130,7 @@ object SequencedEventValidationError {
       declaredTopologyTimestamp: CantonTimestamp,
       reason: SequencedEventValidator.TopologyTimestampVerificationError,
   ) extends SequencedEventValidationError[Nothing] {
-    override def pretty: Pretty[InvalidTopologyTimestamp] = prettyOfClass(
+    override protected def pretty: Pretty[InvalidTopologyTimestamp] = prettyOfClass(
       param("sequenced timestamp", _.sequencedTimestamp),
       param("declared topology timestamp", _.declaredTopologyTimestamp),
       param("reason", _.reason),
@@ -140,7 +140,7 @@ object SequencedEventValidationError {
       sequencedTimestamp: CantonTimestamp,
       declaredSigningKeyTimestamp: CantonTimestamp,
   ) extends SequencedEventValidationError[Nothing] {
-    override def pretty: Pretty[TimestampOfSigningKeyNotAllowed] = prettyOfClass(
+    override protected def pretty: Pretty[TimestampOfSigningKeyNotAllowed] = prettyOfClass(
       param("sequenced timestamp", _.sequencedTimestamp),
       param("decalred signing key timestamp", _.declaredSigningKeyTimestamp),
     )
@@ -201,7 +201,7 @@ object SequencedEventValidator extends HasLoggerName {
     )(implicit
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, SequencedEventValidationError[Nothing], Unit] =
-      EitherT(FutureUnlessShutdown.pure(Either.right(())))
+      EitherT(FutureUnlessShutdown.pure(Either.unit))
     override def validateOnReconnect(
         priorEvent: Option[PossiblyIgnoredSerializedEvent],
         reconnectEvent: OrdinarySerializedEvent,
@@ -271,8 +271,7 @@ object SequencedEventValidator extends HasLoggerName {
   )(implicit
       loggingContext: NamedLoggingContext,
       executionContext: ExecutionContext,
-  ): EitherT[Future, TopologyTimestampVerificationError, SyncCryptoApi] = {
-
+  ): EitherT[Future, TopologyTimestampVerificationError, SyncCryptoApi] =
     validateTopologyTimestampInternal(
       syncCryptoApi,
       topologyTimestamp,
@@ -285,7 +284,6 @@ object SequencedEventValidator extends HasLoggerName {
       SyncCryptoClient.getSnapshotForTimestamp _,
       (topology, traceContext) => topology.findDynamicDomainParameters()(traceContext),
     )
-  }
 
   def validateTopologyTimestampUS(
       syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
@@ -299,7 +297,7 @@ object SequencedEventValidator extends HasLoggerName {
       loggingContext: NamedLoggingContext,
       executionContext: ExecutionContext,
       closeContext: CloseContext,
-  ): EitherT[FutureUnlessShutdown, TopologyTimestampVerificationError, SyncCryptoApi] = {
+  ): EitherT[FutureUnlessShutdown, TopologyTimestampVerificationError, SyncCryptoApi] =
     validateTopologyTimestampInternal(
       syncCryptoApi,
       topologyTimestamp,
@@ -315,7 +313,6 @@ object SequencedEventValidator extends HasLoggerName {
           topology.findDynamicDomainParameters()(traceContext)
         )(executionContext, traceContext),
     )
-  }
 
   // Base version of validateSigningTimestamp abstracting over the effect type to allow for
   // a `Future` and `FutureUnlessShutdown` version. Once we migrate all usages to the US version, this abstraction
@@ -358,11 +355,13 @@ object SequencedEventValidator extends HasLoggerName {
 
     def validateWithSnapshot(
         snapshot: SyncCryptoApi
-    ): F[Either[TopologyTimestampVerificationError, SyncCryptoApi]] = {
+    ): F[Either[TopologyTimestampVerificationError, SyncCryptoApi]] =
       getDynamicDomainParameters(snapshot.ipsSnapshot, traceContext)
         .map { dynamicDomainParametersE =>
           for {
-            dynamicDomainParameters <- dynamicDomainParametersE.leftMap(NoDynamicDomainParameters)
+            dynamicDomainParameters <- dynamicDomainParametersE.leftMap(
+              NoDynamicDomainParameters.apply
+            )
             tolerance = getTolerance(dynamicDomainParameters)
             withinSigningTolerance = {
               import scala.Ordered.orderingToOrdered
@@ -371,7 +370,6 @@ object SequencedEventValidator extends HasLoggerName {
             _ <- Either.cond(withinSigningTolerance, (), TopologyTimestampTooOld(tolerance))
           } yield snapshot
         }
-    }
 
     if (topologyTimestamp > sequencingTimestamp) {
       EitherT.leftT[F, SyncCryptoApi](TopologyTimestampAfterSequencingTime)
@@ -389,21 +387,21 @@ object SequencedEventValidator extends HasLoggerName {
       with Serializable
       with PrettyPrinting
   case object TopologyTimestampAfterSequencingTime extends TopologyTimestampVerificationError {
-    override def pretty: Pretty[TopologyTimestampAfterSequencingTime] =
+    override protected def pretty: Pretty[TopologyTimestampAfterSequencingTime] =
       prettyOfObject[TopologyTimestampAfterSequencingTime]
   }
   type TopologyTimestampAfterSequencingTime = TopologyTimestampAfterSequencingTime.type
 
   final case class TopologyTimestampTooOld(tolerance: NonNegativeFiniteDuration)
       extends TopologyTimestampVerificationError {
-    override def pretty: Pretty[TopologyTimestampTooOld] = prettyOfClass(
+    override protected def pretty: Pretty[TopologyTimestampTooOld] = prettyOfClass(
       param("tolerance", _.tolerance)
     )
   }
 
   final case class NoDynamicDomainParameters(error: String)
       extends TopologyTimestampVerificationError {
-    override def pretty: Pretty[NoDynamicDomainParameters] = prettyOfClass(
+    override protected def pretty: Pretty[NoDynamicDomainParameters] = prettyOfClass(
       param("error", _.error.unquoted)
     )
   }
@@ -625,11 +623,10 @@ class SequencedEventValidatorImpl(
   /** The timestamp of signing key is always derived from the timestamps in the [[com.digitalasset.canton.sequencing.protocol.SequencedEvent]],
     * so it must never be set as [[com.digitalasset.canton.sequencing.protocol.SignedContent.timestampOfSigningKey]]
     */
-  private def checkNoTimestampOfSigningKey(event: OrdinarySerializedEvent): ValidationResult = {
+  private def checkNoTimestampOfSigningKey(event: OrdinarySerializedEvent): ValidationResult =
     event.signedEvent.timestampOfSigningKey
       .toLeft(())
       .leftMap(TimestampOfSigningKeyNotAllowed(event.timestamp, _))
-  }
 
   override def validatePekko[E: Pretty](
       subscription: SequencerSubscriptionPekko[E],

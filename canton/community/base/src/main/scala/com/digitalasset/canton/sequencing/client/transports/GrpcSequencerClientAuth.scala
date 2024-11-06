@@ -3,12 +3,14 @@
 
 package com.digitalasset.canton.sequencing.client.transports
 
+import cats.data.EitherT
+import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.domain.api.v30.SequencerAuthenticationServiceGrpc.SequencerAuthenticationServiceStub
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
-import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.authentication.grpc.SequencerClientTokenAuthentication
@@ -20,8 +22,8 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.version.ProtocolVersion
-import io.grpc.ManagedChannel
 import io.grpc.stub.AbstractStub
+import io.grpc.{ManagedChannel, Status}
 
 import scala.concurrent.ExecutionContext
 
@@ -36,7 +38,7 @@ class GrpcSequencerClientAuth(
     clock: Clock,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
-)(implicit executionContext: ExecutionContext, traceContext: TraceContext)
+)(implicit executionContext: ExecutionContext)
     extends FlagCloseable
     with NamedLogging {
 
@@ -51,13 +53,19 @@ class GrpcSequencerClientAuth(
       loggerFactory,
     )
 
+  def logout()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit] =
+    channelPerEndpoint.forgetNE.toSeq.parTraverse_ { case (_, channel) =>
+      val authenticationClient = new SequencerAuthenticationServiceStub(channel)
+      tokenProvider.logout(authenticationClient)
+    }
+
   /** Wrap a grpc client with components to appropriately perform authentication */
   def apply[S <: AbstractStub[S]](client: S): S = {
     val obtainTokenPerEndpoint = channelPerEndpoint.transform { case (_, channel) =>
       val authenticationClient = new SequencerAuthenticationServiceStub(channel)
       (tc: TraceContext) =>
         TraceContextGrpc.withGrpcContext(tc) {
-          tokenProvider.generateToken(authenticationClient)
+          tokenProvider.generateToken(authenticationClient)(tc)
         }
     }
     val clientAuthentication = SequencerClientTokenAuthentication(
@@ -72,12 +80,11 @@ class GrpcSequencerClientAuth(
     clientAuthentication(client)
   }
 
-  override protected def onClosed(): Unit = {
+  override protected def onClosed(): Unit =
     Lifecycle.close(
       tokenProvider +:
         channelPerEndpoint.toList.map { case (endpoint, channel) =>
           new CloseableChannel(channel, logger, s"grpc-client-auth-$endpoint")
         }: _*
     )(logger)
-  }
 }

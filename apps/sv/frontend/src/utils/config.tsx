@@ -7,7 +7,9 @@ import {
   spliceInstanceNamesSchema,
   ConfigProvider,
   useConfig,
+  pollIntervalSchema,
 } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 import React from 'react';
 import { z } from 'zod';
 
@@ -20,12 +22,14 @@ type SvConfig = {
   testAuth?: z.infer<typeof testAuthSchema>;
   spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
   services: SvServicesConfig;
+  pollInterval?: z.infer<typeof pollIntervalSchema>;
 };
 
 const configScheme = z.object({
   auth: authSchema,
   testAuth: testAuthSchema.optional(),
   spliceInstanceNames: spliceInstanceNamesSchema,
+  pollInterval: pollIntervalSchema,
   services: z.object({
     sv: serviceSchema,
   }),
@@ -44,3 +48,10 @@ export const SvConfigProvider: React.FC<{
 };
 
 export const useSvConfig: () => SvConfig = () => useConfig<SvConfig>(ConfigContext);
+
+export const useConfigPollInterval: () => number = () => {
+  const config = useSvConfig();
+
+  // Use default poll interval if not specified in config
+  return config.pollInterval ?? PollingStrategy.FIXED;
+};

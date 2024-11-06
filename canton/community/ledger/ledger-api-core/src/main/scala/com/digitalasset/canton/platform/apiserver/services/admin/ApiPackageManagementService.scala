@@ -4,8 +4,8 @@
 package com.digitalasset.canton.platform.apiserver.services.admin
 
 import com.daml.error.DamlError
-import com.daml.ledger.api.v2.admin.package_management_service.PackageManagementServiceGrpc.PackageManagementService
 import com.daml.ledger.api.v2.admin.package_management_service.*
+import com.daml.ledger.api.v2.admin.package_management_service.PackageManagementServiceGrpc.PackageManagementService
 import com.daml.logging.LoggingContext
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
@@ -65,7 +65,7 @@ private[apiserver] final class ApiPackageManagementService private (
       .andThen(logger.logErrorsOnCall[ListKnownPackagesResponse])
   }
 
-  override def validateDarFile(request: ValidateDarFileRequest): Future[ValidateDarFileResponse] = {
+  override def validateDarFile(request: ValidateDarFileRequest): Future[ValidateDarFileResponse] =
     LoggingContextWithTrace.withEnrichedLoggingContext(telemetry)(
       logging.submissionId(submissionIdGenerator(request.submissionId))
     ) { implicit loggingContext: LoggingContextWithTrace =>
@@ -77,7 +77,6 @@ private[apiserver] final class ApiPackageManagementService private (
           case err: SubmissionResult.SynchronousError => Future.failed(err.exception)
         }
     }
-  }
 
   override def uploadDarFile(request: UploadDarFileRequest): Future[UploadDarFileResponse] = {
     val submissionId = submissionIdGenerator(request.submissionId)

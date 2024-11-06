@@ -9,22 +9,27 @@ import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
+import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.SequencerError.{
   ExceededMaxSequencingTime,
   PayloadToEventTimeBoundExceeded,
 }
 import com.digitalasset.canton.domain.sequencing.sequencer.store.*
 import com.digitalasset.canton.error.BaseCantonError
+import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
   NamedLogging,
   TracedLogger,
 }
+import com.digitalasset.canton.resource.DbExceptionRetryPolicy
 import com.digitalasset.canton.sequencing.protocol.{
   Batch,
   ClosedEnvelope,
@@ -38,21 +43,24 @@ import com.digitalasset.canton.tracing.BatchTracing.withTracedBatch
 import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext, Traced}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.retry.RetryUtil.DbExceptionRetryable
+import com.digitalasset.canton.util.PekkoUtil.{CombinedKillSwitch, KillSwitchFlagCloseable}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
-import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.*
-import org.apache.pekko.stream.scaladsl.{Flow, GraphDSL, Keep, Merge, Source}
+import org.apache.pekko.stream.scaladsl.{Flow, GraphDSL, Keep, Merge, Sink, Source}
+import org.apache.pekko.{Done, NotUsed}
 
+import java.sql.SQLTransientConnectionException
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Failure
 
 /** A write we want to make to the db */
 sealed trait Write
 object Write {
-  final case class Event(event: Presequenced[StoreEvent[PayloadId]]) extends Write
+  final case class Event(event: Presequenced[StoreEvent[Payload]]) extends Write
   case object KeepAlive extends Write
 }
 
@@ -68,7 +76,7 @@ sealed trait SequencedWrite extends HasTraceContext {
 }
 
 object SequencedWrite {
-  final case class Event(event: Sequenced[PayloadId]) extends SequencedWrite {
+  final case class Event(event: Sequenced[Payload]) extends SequencedWrite {
     override lazy val timestamp: CantonTimestamp = event.timestamp
     override def traceContext: TraceContext = event.traceContext
   }
@@ -77,14 +85,19 @@ object SequencedWrite {
   }
 }
 
-final case class BatchWritten(notifies: WriteNotification, latestTimestamp: CantonTimestamp)
+final case class BatchWritten(
+    notifies: WriteNotification,
+    latestTimestamp: CantonTimestamp,
+    events: Seq[NonEmpty[Seq[Sequenced[Payload]]]],
+)
 object BatchWritten {
 
   /** Assumes events are ordered by timestamp */
-  def apply(events: NonEmpty[Seq[Sequenced[_]]]): BatchWritten =
+  def apply(events: NonEmpty[Seq[Sequenced[Payload]]]): BatchWritten =
     BatchWritten(
       notifies = WriteNotification(events),
       latestTimestamp = events.last1.timestamp,
+      events = Seq(events),
     )
 }
 
@@ -146,21 +159,20 @@ class SequencerWriterQueues private[sequencer] (
     */
   private def writeInternal(
       submissionOrOutcome: Either[SubmissionRequest, DeliverableSubmissionOutcome]
-  )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncError, Unit] = {
+  )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncError, Unit] =
     for {
       event <- eventGenerator.generate(submissionOrOutcome)
       enqueueResult = deliverEventQueue.offer(event)
       _ <- EitherT.fromEither[Future](enqueueResult match {
-        case QueueOfferResult.Enqueued => Right(())
+        case QueueOfferResult.Enqueued => Either.unit
         case QueueOfferResult.Dropped =>
           Left(SendAsyncError.Overloaded("Sequencer event buffer is full"): SendAsyncError)
         case QueueOfferResult.QueueClosed => Left(SendAsyncError.ShuttingDown())
         case other =>
           logger.warn(s"Unexpected result from payload queue offer: $other")
-          Right(())
+          Either.unit
       })
     } yield ()
-  }
 
   def complete(): Unit = {
     implicit val tc: TraceContext = TraceContext.empty
@@ -186,6 +198,9 @@ object SequencerWriterSource {
       eventSignaller: EventSignaller,
       loggerFactory: NamedLoggerFactory,
       protocolVersion: ProtocolVersion,
+      metrics: SequencerMetrics,
+      timeouts: ProcessingTimeout,
+      blockSequencerMode: Boolean,
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -218,7 +233,7 @@ object SequencerWriterSource {
     val deliverEventSource = Source
       .queue[Presequenced[StoreEvent[Payload]]](writerConfig.payloadQueueSize)
       .via(WritePayloadsFlow(writerConfig, store, instanceDiscriminator, loggerFactory))
-      .map(Write.Event)
+      .map(Write.Event.apply)
 
     // push keep alive writes at the specified interval, or never if not set
     val keepAliveSource = keepAliveInterval
@@ -265,12 +280,46 @@ object SequencerWriterSource {
             BatchWritten(
               left.notifies.union(right.notifies),
               left.latestTimestamp.max(right.latestTimestamp),
+              left.events ++ right.events,
             )
           )
         }
       }
       .via(UpdateWatermarkFlow(store, logger))
+      .via(RecordWatermarkDelayMetricFlow(clock, metrics))
+      .via(
+        // Buffer events in case of block sequencer single instance mode
+        if (blockSequencerMode) {
+          Flow[Traced[BatchWritten]].map { tracedBatchWritten =>
+            tracedBatchWritten.withTraceContext { _ => batchWritten =>
+              batchWritten.events.foreach { events =>
+                store.bufferEvents(events)
+              }
+            }
+            tracedBatchWritten
+          }
+        } else {
+          Flow[Traced[BatchWritten]]
+        }
+      )
       .via(NotifyEventSignallerFlow(eventSignaller))
+      .via(
+        if (blockSequencerMode) { // write side checkpoints are only activated in block sequencer mode
+          // TODO(#20910): Always enable periodic checkpoints.
+          //  we need to use a different source of time for periodic checkpoints. Here we use watermark,
+          //  since we know that in BlockSequencer we are the only party writing to the events table.
+          //  In Active-active db sequencer one has to consider watermark of all sequencers,
+          //  so we need to use e.g. "safe watermark" as the time source for periodic checkpointing.
+          PeriodicCheckpointsForAllMembers(
+            writerConfig.checkpointInterval.underlying,
+            store,
+            loggerFactory,
+            timeouts,
+          )
+        } else {
+          Flow[Traced[BatchWritten]]
+        }
+      )
   }
 }
 
@@ -310,7 +359,6 @@ class SendEventGenerator(
     ): Future[Validated[NonEmpty[Seq[Member]], Set[SequencerMemberId]]] =
       for {
         // TODO(#12363) Support group addresses in the DB Sequencer
-        // TODO(#18394) Implement batch db check for member registration and id retrieval
         validatedSeq <- recipients.toSeq
           .parTraverse(validateRecipient)
         validated = validatedSeq.traverse(_.leftMap(NonEmpty(Seq, _)))
@@ -430,7 +478,7 @@ object AssertMonotonicBlockSequencerTimestampsFlow {
                 if (lastTimestamp.exists(_ > blockSequencerTimestamp)) {
                   logger.warn(
                     s"Block sequencer timestamp is not monotonically increasing: " +
-                      s"lastTimestamp=${lastTimestamp}, blockSequencerTimestamp=$blockSequencerTimestamp"
+                      s"lastTimestamp=$lastTimestamp, blockSequencerTimestamp=$blockSequencerTimestamp"
                   )
                 }
                 lastTimestamp = Some(blockSequencerTimestamp)
@@ -459,7 +507,7 @@ object SequenceWritesFlow {
         // due to the groupedWithin we should likely always have items
         .fold(Future.successful[Traced[Option[BatchWritten]]](Traced.empty(None))) { writes =>
           withTracedBatch(logger, writes) { implicit traceContext => writes =>
-            val events: Option[NonEmpty[Seq[Sequenced[PayloadId]]]] =
+            val events: Option[NonEmpty[Seq[Sequenced[Payload]]]] =
               NonEmpty.from(writes.collect { case SequencedWrite.Event(event) =>
                 event
               })
@@ -467,8 +515,10 @@ object SequenceWritesFlow {
               events.fold[WriteNotification](WriteNotification.None)(WriteNotification(_))
             for {
               // if this write batch had any events then save them
-              _ <- events.fold(Future.unit)(store.saveEvents)
-            } yield Traced(BatchWritten(notifies, writes.last1.timestamp).some)
+              _ <- events.fold(Future.unit)(eventsWithPayload =>
+                store.saveEvents(eventsWithPayload.map(_.map(_.id)))
+              )
+            } yield Traced(BatchWritten(notifies, writes.last1.timestamp, events.toList).some)
           }
         }
 
@@ -486,7 +536,7 @@ object SequenceWritesFlow {
           }
 
           sequenceEvent(sequencingTimestamp, event)
-            .map(SequencedWrite.Event)
+            .map(SequencedWrite.Event.apply)
             .getOrElse[SequencedWrite](SequencedWrite.KeepAlive(sequencingTimestamp))
       }
     }
@@ -497,11 +547,11 @@ object SequenceWritesFlow {
      */
     def sequenceEvent(
         timestamp: CantonTimestamp,
-        presequencedEvent: Presequenced[StoreEvent[PayloadId]],
-    ): Option[Sequenced[PayloadId]] = {
+        presequencedEvent: Presequenced[StoreEvent[Payload]],
+    ): Option[Sequenced[Payload]] = {
       def checkMaxSequencingTime(
-          event: Presequenced[StoreEvent[PayloadId]]
-      ): Either[BaseCantonError, Presequenced[StoreEvent[PayloadId]]] =
+          event: Presequenced[StoreEvent[Payload]]
+      ): Either[BaseCantonError, Presequenced[StoreEvent[Payload]]] =
         event.maxSequencingTimeO
           .toLeft(event)
           .leftFlatMap { maxSequencingTime =>
@@ -513,8 +563,8 @@ object SequenceWritesFlow {
           }
 
       def checkTopologyTimestamp(
-          event: Presequenced[StoreEvent[PayloadId]]
-      ): Presequenced[StoreEvent[PayloadId]] =
+          event: Presequenced[StoreEvent[Payload]]
+      ): Presequenced[StoreEvent[Payload]] =
         event.map {
           // we only do this validation for deliver events that specify a signing timestamp
           case deliver @ DeliverStoreEvent(
@@ -552,13 +602,13 @@ object SequenceWritesFlow {
         }
 
       def checkPayloadToEventMargin(
-          presequencedEvent: Presequenced[StoreEvent[PayloadId]]
-      ): Either[BaseCantonError, Presequenced[StoreEvent[PayloadId]]] =
+          presequencedEvent: Presequenced[StoreEvent[Payload]]
+      ): Either[BaseCantonError, Presequenced[StoreEvent[Payload]]] =
         presequencedEvent match {
           // we only need to check deliver events for payloads
           // the only reason why
-          case presequencedDeliver @ Presequenced(deliver: DeliverStoreEvent[PayloadId], _, _) =>
-            val payloadTs = deliver.payload.unwrap
+          case presequencedDeliver @ Presequenced(deliver: DeliverStoreEvent[Payload], _, _) =>
+            val payloadTs = deliver.payload.id.unwrap
             val bound = writerConfig.payloadToEventMargin
             val maxAllowableEventTime = payloadTs.add(bound.asJava)
             Either
@@ -618,20 +668,17 @@ object WritePayloadsFlow {
       loggerFactory: NamedLoggerFactory,
   )(implicit
       executionContext: ExecutionContext
-  ): Flow[Presequenced[StoreEvent[Payload]], Presequenced[StoreEvent[PayloadId]], NotUsed] = {
+  ): Flow[Presequenced[StoreEvent[Payload]], Presequenced[StoreEvent[Payload]], NotUsed] = {
     val logger = TracedLogger(WritePayloadsFlow.getClass, loggerFactory)
 
     def writePayloads(
         events: Seq[Presequenced[StoreEvent[Payload]]]
-    ): Future[Seq[Presequenced[StoreEvent[PayloadId]]]] = {
-      if (events.isEmpty) Future.successful(Seq.empty[Presequenced[StoreEvent[PayloadId]]])
+    ): Future[Seq[Presequenced[StoreEvent[Payload]]]] =
+      if (events.isEmpty) Future.successful(Seq.empty[Presequenced[StoreEvent[Payload]]])
       else {
         implicit val traceContext: TraceContext = TraceContext.ofBatch(events)(logger)
         // extract the payloads themselves for storing
         val payloads = events.map(_.event).flatMap(extractPayload(_).toList)
-
-        // strip out the payloads and replace with their id as the content itself is not needed downstream
-        val eventsWithPayloadId = events.map(_.map(e => dropPayloadContent(e)))
         logger.debug(s"Writing ${payloads.size} payloads from batch of ${events.size}")
 
         // save the payloads if there are any
@@ -644,20 +691,13 @@ object WritePayloadsFlow {
                 new ConflictingPayloadIdException(id, conflictingInstance)
               case SavePayloadsError.PayloadMissing(id) => new PayloadMissingException(id)
             }
-            .map((_: Unit) => eventsWithPayloadId)
+            .map((_: Unit) => events)
         }
       }
-    }
 
     def extractPayload(event: StoreEvent[Payload]): Option[Payload] = event match {
       case DeliverStoreEvent(_, _, _, payload, _, _) => payload.some
       case _other => None
-    }
-
-    def dropPayloadContent(event: StoreEvent[Payload]): StoreEvent[PayloadId] = event match {
-      case deliver: DeliverStoreEvent[Payload] => deliver.map(_.id)
-      case error: DeliverErrorStoreEvent => error
-      case receipt: ReceiptStoreEvent => receipt
     }
 
     Flow[Presequenced[StoreEvent[Payload]]]
@@ -675,9 +715,17 @@ object WritePayloadsFlow {
 }
 
 object UpdateWatermarkFlow {
+
+  private def retryDbException(error: Throwable, logger: TracedLogger)(implicit
+      tc: TraceContext
+  ): Boolean =
+    DbExceptionRetryPolicy
+      .logAndDetermineErrorKind(Failure(error), logger, None)
+      .maxRetries == Int.MaxValue
+
   def apply(store: SequencerWriterStore, logger: TracedLogger)(implicit
       executionContext: ExecutionContext
-  ): Flow[Traced[BatchWritten], Traced[BatchWritten], NotUsed] = {
+  ): Flow[Traced[BatchWritten], Traced[BatchWritten], NotUsed] =
     Flow[Traced[BatchWritten]]
       .mapAsync(1)(_.withTraceContext { implicit traceContext => written =>
         for {
@@ -694,8 +742,8 @@ object UpdateWatermarkFlow {
             // This is a workaround to avoid failing during shutdown that can be removed once saveWatermark returns
             // a FutureUnlessShutdown
             .recover {
-              case exception if DbExceptionRetryable.retryOKForever(exception, logger) =>
-                // The exception itself is already being logged above by retryOKForever. Only logging here additional
+              case exception if retryDbException(exception, logger) =>
+                // The exception itself is already being logged above by retryDbException. Only logging here additional
                 // context
                 logger.info(
                   "Saving watermark failed with a retryable error. This can happen during shutdown." +
@@ -705,7 +753,6 @@ object UpdateWatermarkFlow {
         } yield Traced(written)
       })
       .named("updateWatermark")
-  }
 }
 
 object NotifyEventSignallerFlow {
@@ -718,4 +765,84 @@ object NotifyEventSignallerFlow {
           Traced(batchWritten)
         }
       })
+}
+
+object RecordWatermarkDelayMetricFlow {
+  def apply(
+      clock: Clock,
+      metrics: SequencerMetrics,
+  ): Flow[Traced[BatchWritten], Traced[BatchWritten], NotUsed] =
+    Flow[Traced[BatchWritten]].wireTap { batchWritten =>
+      metrics.dbSequencer.watermarkDelay.updateValue(
+        (clock.now - batchWritten.value.latestTimestamp).toMillis
+      )
+    }
+}
+
+object PeriodicCheckpointsForAllMembers {
+
+  /** A Pekko flow that passes the `Traced[BatchWritten]` untouched from input to output,
+    * but asynchronously triggers `store.checkpointCountersAt` every checkpoint interval.
+    * The materialized future completes when all checkpoints have been recorded
+    * after the kill switch has been activated.
+    */
+  def apply(
+      checkpointInterval: FiniteDuration,
+      store: SequencerWriterStore,
+      loggerFactory: NamedLoggerFactory,
+      timeouts: ProcessingTimeout,
+  )(implicit
+      executionContext: ExecutionContext
+  ): Flow[Traced[BatchWritten], Traced[BatchWritten], (KillSwitch, Future[Done])] = {
+
+    val logger = loggerFactory.getTracedLogger(PeriodicCheckpointsForAllMembers.getClass)
+
+    val recordCheckpointSink: Sink[Traced[BatchWritten], (KillSwitch, Future[Done])] = {
+      // in order to make sure database operations do not keep being retried (in case of connectivity issues)
+      // after we start closing the subscription, we create a flag closeable that gets closed when this
+      // subscriptions kill switch is activated. This flag closeable is wrapped in a close context below
+      // which is passed down to saveCounterCheckpoint.
+      val killSwitchFlagCloseable = FlagCloseable(logger, timeouts)
+      val closeContextKillSwitch = new KillSwitchFlagCloseable(killSwitchFlagCloseable)
+      Flow[Traced[BatchWritten]]
+        .buffer(1, OverflowStrategy.dropTail) // we only really need one event and can drop others
+        .throttle(1, checkpointInterval)
+        // The kill switch must sit after the throttle because throttle will pass the completion downstream
+        // only after the bucket with unprocessed events has been drained, which happens only every checkpoint interval
+        .viaMat(KillSwitches.single)(Keep.right)
+        .mapMaterializedValue(killSwitch =>
+          new CombinedKillSwitch(killSwitch, closeContextKillSwitch)
+        )
+        .mapAsync(parallelism = 1) { writtenBatch =>
+          writtenBatch
+            .withTraceContext { implicit traceContext => writtenBatch =>
+              logger.debug(
+                s"Preparing counter checkpoint for all members at ${writtenBatch.latestTimestamp}"
+              )
+              implicit val closeContext: CloseContext = CloseContext(killSwitchFlagCloseable)
+              closeContext.context
+                .performUnlessClosingF(functionFullName) {
+                  store.recordCounterCheckpointsAtTimestamp(writtenBatch.latestTimestamp)
+                }
+                .onShutdown {
+                  logger.info("Skip saving the counter checkpoint due to shutdown")
+                }
+                .recover {
+                  case e: SQLTransientConnectionException if killSwitchFlagCloseable.isClosing =>
+                    // after the subscription is closed, any retries will stop and possibly return an error
+                    // if there are connection problems with the db at the time of subscription close.
+                    // so in order to cleanly shutdown, we should recover from this kind of error.
+                    logger.debug(
+                      "Database connection problems while closing subscription. It can be safely ignored.",
+                      e,
+                    )
+                }
+            }
+            .map(_ => writtenBatch)
+        }
+        .toMat(Sink.ignore)(Keep.both)
+    }
+
+    Flow[Traced[BatchWritten]].wireTapMat(recordCheckpointSink)(Keep.right)
+  }
 }

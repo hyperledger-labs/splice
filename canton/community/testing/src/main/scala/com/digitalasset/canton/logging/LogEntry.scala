@@ -54,9 +54,8 @@ final case class LogEntry(
   }
 
   /** test if the message contains a specific error code */
-  def shouldBeCantonErrorCode(code: ErrorCode)(implicit pos: source.Position): Assertion = {
+  def shouldBeCantonErrorCode(code: ErrorCode)(implicit pos: source.Position): Assertion =
     this.message should include(code.id)
-  }
 
   /** test if a log message corresponds to a particular canton error
     *
@@ -103,9 +102,8 @@ final case class LogEntry(
 
   def shouldBeCommandFailure(code: ErrorCode, message: String = "")(implicit
       pos: source.Position
-  ): Assertion = {
+  ): Assertion =
     commandFailureMessage should (include(code.id) and include(message))
-  }
 
   def commandFailureMessage(implicit pos: source.Position): String = {
     val errors = new StringBuilder()
@@ -129,10 +127,10 @@ final case class LogEntry(
     message
   }
 
-  override def pretty: Pretty[LogEntry] = prettyOfString {
+  override protected def pretty: Pretty[LogEntry] = prettyOfString {
     case entry @ LogEntry(level, _, message, maybeThrowable, mdc) =>
       val throwableStr = maybeThrowable match {
-        case Some(throwable) => "\n" + ErrorUtil.messageWithStacktrace(throwable)
+        case Some(t) => "\n" + ErrorUtil.messageWithStacktrace(t)
         case None => ""
       }
 
@@ -189,13 +187,13 @@ object LogEntry {
 
     forEvery(entries) { entry =>
       withClue(show"Unexpected log entry:\n\t$entry") {
-        forAtLeast(1, mustContain ++ mayContain) { assertion => assertion(entry) }
+        forAtLeast(1, mustContain ++ mayContain)(assertion => assertion(entry))
       }
     }
 
     forEvery(mustContainWithClue) { case (assertion, clue) =>
       withClue(s"Missing log entry: $clue") {
-        forAtLeast(1, entries) { entry => assertion(entry) }
+        forAtLeast(1, entries)(entry => assertion(entry))
       }
     }
   } withClue s"\n\nAll log entries:${LogEntry.format(entries)}"

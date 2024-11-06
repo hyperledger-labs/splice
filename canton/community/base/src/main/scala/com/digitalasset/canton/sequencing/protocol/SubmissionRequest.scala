@@ -59,16 +59,15 @@ final case class SubmissionRequest private (
 
   @VisibleForTesting
   def isConfirmationRequest: Boolean = {
-    val hasParticipantOrPopRecipient = batch.allRecipients.exists {
+    val hasParticipantRecipient = batch.allRecipients.exists {
       case MemberRecipient(_: ParticipantId) => true
-      case ParticipantsOfParty(_) => true
       case _ => false
     }
     val hasMediatorRecipient = batch.allRecipients.exists {
       case _: MediatorGroupRecipient => true
       case _: Recipient => false
     }
-    hasParticipantOrPopRecipient && hasMediatorRecipient
+    hasParticipantRecipient && hasMediatorRecipient
   }
 
   // Caches the serialized request to be able to do checks on its size without re-serializing
@@ -172,7 +171,7 @@ object SubmissionRequest
 
   val supportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> VersionedProtoConverter(
-      ProtocolVersion.v31
+      ProtocolVersion.v32
     )(v30.SubmissionRequest)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,

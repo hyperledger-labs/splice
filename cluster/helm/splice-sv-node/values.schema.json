@@ -1,6 +1,12 @@
 {
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
+  "properties": {
+    "uiPollInterval": {
+      "type": "number",
+      "description": "The interval in milliseconds to poll the UI for updates"
+    }
+  },
   "allOf": [
     {
       "if": {
@@ -168,7 +174,11 @@
         },
         "domain": {
           "type": "object",
-          "required": ["sequencerPublicUrl", "sequencerAddress", "mediatorAddress"],
+          "required": [
+            "sequencerPublicUrl",
+            "sequencerAddress",
+            "mediatorAddress"
+          ],
           "properties": {
             "mediatorAddress": {
               "type": "string"

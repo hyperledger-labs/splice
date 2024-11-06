@@ -10,10 +10,12 @@ import com.digitalasset.canton.ledger.error.groups.{
   ConsistencyErrors,
   RequestValidationErrors,
 }
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.daml.lf.data.Time
-import com.digitalasset.daml.lf.engine.Error.{Interpretation, Package, Preprocessing, Validation}
+import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.daml.lf.data.{Ref, Time}
 import com.digitalasset.daml.lf.engine.Error as LfError
+import com.digitalasset.daml.lf.engine.Error.{Interpretation, Package, Preprocessing, Validation}
 import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
 
 sealed abstract class ErrorCause extends Product with Serializable
@@ -21,6 +23,15 @@ sealed abstract class ErrorCause extends Product with Serializable
 object ErrorCause {
   final case class DamlLf(error: LfError) extends ErrorCause
   final case class LedgerTime(retries: Int) extends ErrorCause
+  sealed abstract class DisclosedContractsDomainIdMismatch extends ErrorCause
+  final case class DisclosedContractsDomainIdsMismatch(
+      mismatchingDisclosedContractDomainIds: Map[LfContractId, DomainId]
+  ) extends DisclosedContractsDomainIdMismatch
+  final case class PrescribedDomainIdMismatch(
+      disclosedContractIds: Set[LfContractId],
+      domainIdOfDisclosedContracts: DomainId,
+      commandsDomainId: DomainId,
+  ) extends DisclosedContractsDomainIdMismatch
 
   final case class InterpretationTimeExceeded(
       ledgerEffectiveTime: Time.Timestamp, // the Ledger Effective Time of the submitted command
@@ -39,9 +50,9 @@ object RejectionGenerators {
       case Package.Validation(validationError) =>
         CommandExecutionErrors.Package.PackageValidationFailed
           .Reject(validationError.pretty)
-      case Package.MissingPackage(packageId, context) =>
+      case Package.MissingPackage(packageRef, context) =>
         RequestValidationErrors.NotFound.Package
-          .InterpretationReject(packageId, context)
+          .InterpretationReject(packageRef, context)
       case Package.AllowedLanguageVersion(packageId, languageVersion, allowedLanguageVersions) =>
         CommandExecutionErrors.Package.AllowedLanguageVersions.Error(
           packageId,
@@ -54,6 +65,9 @@ object RejectionGenerators {
 
     def processPreprocessingError(err: LfError.Preprocessing.Error): DamlError = err match {
       case e: Preprocessing.Internal => LedgerApiErrors.InternalError.Preprocessing(e)
+      case Preprocessing.UnresolvedPackageName(pkgName, context) =>
+        RequestValidationErrors.NotFound.Package
+          .InterpretationReject(Ref.PackageRef.Name(pkgName), context)
       case e => CommandExecutionErrors.Preprocessing.PreprocessingFailed.Reject(e)
     }
 
@@ -66,11 +80,10 @@ object RejectionGenerators {
         err: com.digitalasset.daml.lf.interpretation.Error,
         renderedMessage: String,
         detailMessage: Option[String],
-    ): DamlError = {
+    ): DamlError =
       // detailMessage is only suitable for server side debugging but not for the user, so don't pass except on internal errors
 
       err match {
-        case LfInterpretationError.RejectedAuthorityRequest(_, _) => ??? // TODO(i12291): #15882
         case LfInterpretationError.ContractNotFound(cid) =>
           ConsistencyErrors.ContractNotFound
             .Reject(renderedMessage, cid)
@@ -134,7 +147,6 @@ object RejectionGenerators {
           CommandExecutionErrors.Interpreter.InterpretationDevError
             .Reject(renderedMessage, err)
       }
-    }
 
     def processInterpretationError(
         err: LfError.Interpretation.Error,
@@ -171,6 +183,20 @@ object RejectionGenerators {
       case ErrorCause.InterpretationTimeExceeded(let, tolerance) =>
         CommandExecutionErrors.TimeExceeded.Reject(
           s"Interpretation time exceeds limit of Ledger Effective Time ($let) + tolerance ($tolerance)"
+        )
+      case ErrorCause.DisclosedContractsDomainIdsMismatch(mismatchingDisclosedContractDomainIds) =>
+        CommandExecutionErrors.DisclosedContractsDomainIdMismatch.Reject(
+          mismatchingDisclosedContractDomainIds.view.mapValues(_.toProtoPrimitive).toMap
+        )
+      case ErrorCause.PrescribedDomainIdMismatch(
+            disclosedContractsWithDomainId,
+            domainIdOfDisclosedContracts,
+            commandsDomainId,
+          ) =>
+        CommandExecutionErrors.PrescribedDomainIdMismatch.Reject(
+          disclosedContractsWithDomainId,
+          domainIdOfDisclosedContracts.toProtoPrimitive,
+          commandsDomainId.toProtoPrimitive,
         )
     }
   }

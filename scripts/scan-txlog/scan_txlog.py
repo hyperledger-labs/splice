@@ -12,7 +12,6 @@ from decimal import *
 from datetime import datetime
 import json
 import logging
-import pprint
 import textwrap
 from typing import Any, Dict, List, Optional, TextIO
 import sys
@@ -39,7 +38,10 @@ cli_handler.setFormatter(
         },
     )
 )
-file_handler = None  # set in main() based on CLI args
+file_handler = logging.FileHandler("log/scan_txlog.log")
+file_handler.setFormatter(
+    logging.Formatter("%(levelname)s:%(name)s:%(asctime)s:%(message)s")
+)
 
 # Set precision and rounding mode
 getcontext().prec = 38
@@ -59,7 +61,7 @@ def _default_logger(name, loglevel):
 
 
 # Global logger, always accessible
-LOG = None
+LOG = _default_logger("global", "INFO")
 
 
 def _party_enabled(args, p):
@@ -159,7 +161,6 @@ class TemplateQualifiedNames:
     dso_rules = "Splice.DsoRules:DsoRules"
     dso_bootstrap = "Splice.DsoBootstrap:DsoBootstrap"
     amulet_rules = "Splice.AmuletRules:AmuletRules"
-
     unclaimed_reward = "Splice.Amulet:UnclaimedReward"
 
     all_tracked = set(
@@ -874,6 +875,72 @@ class LfValue:
     def get_buy_member_traffic_result_transfer_summary(self):
         return self.__get_record_field("summary")
 
+    # choice AmuletRules_CreateExternalPartySetupProposal -> inputs
+    def get_create_external_party_setup_proposal_inputs(self):
+        return [
+            x.__get_variant() for x in self.__get_record_field("inputs").__get_list()
+        ]
+
+    # choice AmuletRules_CreateExternalPartySetupProposalResult -> user
+    def get_create_external_party_setup_proposal_user(self):
+        return self.__get_record_field("user").__get_party()
+
+    # choice AmuletRules_CreateExternalPartySetupProposalResult -> validator
+    def get_create_external_party_setup_proposal_validator(self):
+        return self.__get_record_field("validator").__get_party()
+
+    # data AmuletRules_CreateExternalPartySetupProposalResult -> transferResult
+    def get_create_external_party_setup_proposal_result_transfer_result(self):
+        return self.__get_record_field("transferResult")
+
+    # data AmuletRules_CreateExternalPartySetupProposalResult -> amuletPaid
+    def get_create_external_party_setup_proposal_result_amulet_paid(self):
+        return self.__get_record_field("amuletPaid").__get_numeric()
+
+    # choice AmuletRules_CreateTransferPreapproval -> inputs
+    def get_create_transfer_preapproval_inputs(self):
+        return [
+            x.__get_variant() for x in self.__get_record_field("inputs").__get_list()
+        ]
+
+    # choice AmuletRules_CreateTransferPreapproval -> receiver
+    def get_create_transfer_preapproval_receiver(self):
+        return self.__get_record_field("receiver").__get_party()
+
+    # choice AmuletRules_CreateTransferPreapproval -> provider
+    def get_create_transfer_preapproval_provider(self):
+        return self.__get_record_field("provider").__get_party()
+
+    # data AmuletRules_CreateTransferPreapprovalResult -> transferResult
+    def get_create_transfer_preapproval_result_transfer_result(self):
+        return self.__get_record_field("transferResult")
+
+    # data AmuletRules_CreateTransferPreapprovalResult -> amuletPaid
+    def get_create_transfer_preapproval_result_amulet_paid(self):
+        return self.__get_record_field("amuletPaid").__get_numeric()
+
+    # choice TransferPreapproval_Renew -> inputs
+    def get_renew_transfer_preapproval_inputs(self):
+        return [
+            x.__get_variant() for x in self.__get_record_field("inputs").__get_list()
+        ]
+
+    # data TransferPreapproval_RenewResult -> receiver
+    def get_renew_transfer_preapproval_receiver(self):
+        return self.__get_record_field("receiver").__get_party()
+
+    # data TransferPreapproval_RenewResult -> provider
+    def get_renew_transfer_preapproval_provider(self):
+        return self.__get_record_field("provider").__get_party()
+
+    # data TransferPreapproval_RenewResult -> transferResult
+    def get_renew_transfer_preapproval_result_transfer_result(self):
+        return self.__get_record_field("transferResult")
+
+    # data TransferPreapproval_RenewResult -> amuletPaid
+    def get_renew_transfer_preapproval_result_amulet_paid(self):
+        return self.__get_record_field("amuletPaid").__get_numeric()
+
     # data TransferOutput -> receiver
     def get_transfer_output_receiver(self):
         return self.__get_record_field("receiver").__get_party()
@@ -1112,6 +1179,7 @@ class CreatedEvent:
 
 
 class Event:
+    @staticmethod
     def parse(json, event_id):
         template_id = TemplateId(json["template_id"])
         contract_id = json["contract_id"]
@@ -1165,6 +1233,7 @@ class TransactionTree:
         }
         self.synchronizer_id = synchronizer_id
 
+    @staticmethod
     def parse(json):
         return TransactionTree(
             json["root_event_ids"],
@@ -2621,6 +2690,239 @@ class State:
 
         return HandleTransactionResult.for_open_round(round_number)
 
+    def handle_create_external_party_setup_proposal(self, transaction, event):
+        arg = event.exercise_argument
+        res = event.exercise_result
+        return self.handle_transfer_preapproval_purchase(
+            transaction,
+            event,
+            inputs=arg.get_create_external_party_setup_proposal_inputs(),
+            receiver=res.get_create_external_party_setup_proposal_user(),
+            provider=res.get_create_external_party_setup_proposal_validator(),
+            transfer_result=res.get_create_external_party_setup_proposal_result_transfer_result(),
+            amulet_paid=res.get_create_external_party_setup_proposal_result_amulet_paid(),
+            description="create_external_party_setup_proposal",
+        )
+
+    def handle_create_transfer_preapproval(self, transaction, event):
+        arg = event.exercise_argument
+        res = event.exercise_result
+        return self.handle_transfer_preapproval_purchase(
+            transaction,
+            event,
+            inputs=arg.get_create_transfer_preapproval_inputs(),
+            receiver=arg.get_create_transfer_preapproval_receiver(),
+            provider=arg.get_create_transfer_preapproval_provider(),
+            transfer_result=res.get_create_transfer_preapproval_result_transfer_result(),
+            amulet_paid=res.get_create_transfer_preapproval_result_amulet_paid(),
+            description="create_transfer_preapproval",
+        )
+
+    def handle_renew_transfer_preapproval(self, transaction, event):
+        arg = event.exercise_argument
+        res = event.exercise_result
+        return self.handle_transfer_preapproval_purchase(
+            transaction,
+            event,
+            inputs=arg.get_renew_transfer_preapproval_inputs(),
+            receiver=res.get_renew_transfer_preapproval_receiver(),
+            provider=res.get_renew_transfer_preapproval_provider(),
+            transfer_result=res.get_renew_transfer_preapproval_result_transfer_result(),
+            amulet_paid=res.get_renew_transfer_preapproval_result_amulet_paid(),
+            description="renew_transfer_preapproval",
+        )
+
+    def handle_transfer_preapproval_purchase(
+        self,
+        transaction,
+        event,
+        inputs,
+        receiver,
+        provider,
+        transfer_result,
+        amulet_paid,
+        description,
+    ):
+        sender = provider  # True by construction
+        round_number = transfer_result.get_transfer_result_round()
+        transfer_inputs = self.handle_transfer_inputs(
+            transaction, provider, round_number, inputs
+        )
+        (
+            inputs_description,
+            effective_inputs,
+            reward_cc_input,
+            initial_amulet_cc_input,
+            amulet_cc_input,
+            all_inputs,
+        ) = transfer_inputs.summary()
+        sender_change_cid = transfer_result.get_transfer_result_sender_change_amulet()
+        output_fees = transfer_result.get_transfer_result_output_fees()
+        if sender_change_cid:
+            sender_change = transaction.by_contract_id[sender_change_cid]
+            self.active_contracts[sender_change_cid] = sender_change
+        validator_reward = None
+        for i, event_id in enumerate(event.child_event_ids):
+            event = transaction.events_by_id[event_id]
+            LOG.debug(
+                f'{i+1}. {event.__class__.__name__} {event.template_id} {"" if isinstance(event, CreatedEvent) else event.choice_name}'
+            )
+            if (
+                isinstance(event, CreatedEvent)
+                and event.template_id.qualified_name
+                == TemplateQualifiedNames.validator_reward_coupon
+            ):
+                self.active_contracts[event.contract_id] = event
+                validator_reward = event
+        validator_reward_amount = validator_reward.payload.get_validator_reward_amount()
+        sender_change_amount = (
+            transfer_result.get_transfer_result_sender_change_amount()
+        )
+        sender_change_fee = transfer_result.get_transfer_result_sender_change_fee()
+        all_outputs = [
+            TransferOutput(
+                initial_amount=sender_change_amount, owner=sender, lock_holders=[]
+            )
+        ]
+        summary = TransferSummary(
+            effective_inputs,
+            all_outputs,
+            output_fees + [sender_change_fee, amulet_paid],
+        )
+        if transfer_error := summary.get_error(description):
+            msg_prefix = (
+                " ".join(p.capitalize() for p in description.split("_")) + " Error"
+            )
+            self._fail(transaction, f"{msg_prefix}: {transfer_error}")
+
+        interested_parties = [receiver, provider]
+
+        operation = "".join(p.capitalize() for p in description.split("_"))
+        self._txinfo(
+            transaction,
+            operation,
+            textwrap.dedent(
+                f"""\
+                     round: {round_number}
+                     provider: {provider}
+                     receiver: {receiver}
+                     inputs:\n"""
+            )
+            + textwrap.indent(str(inputs_description), "    ")
+            + "\n"
+            + textwrap.indent(
+                textwrap.dedent(
+                    f"""\
+                     burnt_as_part_of_purchase: {amulet_paid}
+                     validator_activity_record for {provider} with amount {validator_reward_amount}
+                     outputs:
+                       sender_change_amount: {sender_change_amount}
+                         fee: {sender_change_fee}"""
+                ),
+                "  ",
+            ),
+            parties=interested_parties,
+        )
+
+        self._report_line(
+            transaction,
+            "TX",
+            {
+                "update_id": transaction.update_id,
+                "record_time": transaction.record_time,
+                "provider": provider,
+                "sender": sender,
+                "input_reward_cc_total": reward_cc_input,
+                "input_amulet_cc_total": amulet_cc_input,
+                "holding_fees_total": initial_amulet_cc_input - amulet_cc_input,
+                "tx_fees_total": summary.get_fees_total(),
+            },
+            parties=interested_parties,
+        )
+
+        for i in all_inputs:
+            self._report_line(
+                transaction,
+                "TXI",
+                {
+                    "update_id": transaction.update_id,
+                    "record_time": transaction.record_time,
+                    "provider": provider,
+                    "sender": sender,
+                    "source": i.source,
+                    "round": i.round,
+                    "initial_amount_cc": i.initial_amount if i.initial_amount else "",
+                    "effective_amount_cc": i.effective_amount,
+                    "holding_fees_total": (
+                        (i.initial_amount - i.effective_amount)
+                        if i.initial_amount
+                        else DamlDecimal(0)
+                    ),
+                    "currency": " CC",
+                },
+                parties=interested_parties,
+            )
+
+        for o in all_outputs:
+            self._report_line(
+                transaction,
+                "TXO",
+                {
+                    "update_id": transaction.update_id,
+                    "record_time": transaction.record_time,
+                    "provider": provider,
+                    "sender": sender,
+                    "owner": o.owner,
+                    "currency": "CC",
+                    "round": round_number,
+                    "initial_amount_cc": o.initial_amount,
+                    "lock_holders": ";".join(o.lock_holders),
+                },
+                parties=interested_parties,
+            )
+
+        self._report_line(
+            transaction,
+            "TXBW",
+            {
+                "update_id": transaction.update_id,
+                "record_time": transaction.record_time,
+                "provider": provider,
+                "receiver": receiver,
+                "cc_burnt": amulet_paid,
+            },
+            parties=interested_parties,
+        )
+
+        return HandleTransactionResult.for_open_round(round_number)
+
+    def handle_transfer_preapproval_send(self, transaction, event):
+        for event_id in event.child_event_ids:
+            event = transaction.events_by_id[event_id]
+            if (
+                isinstance(event, ExercisedEvent)
+                and event.choice_name == "AmuletRules_Transfer"
+            ):
+                return self.handle_transfer(
+                    transaction,
+                    event,
+                    "TransferPreapproval_Send",
+                )
+
+    def handle_transfer_command_send(self, transaction, event):
+        for event_id in event.child_event_ids:
+            event = transaction.events_by_id[event_id]
+            if (
+                isinstance(event, ExercisedEvent)
+                and event.choice_name == "TransferPreapproval_Send"
+            ):
+                return self.handle_transfer_preapproval_send(
+                    transaction,
+                    event,
+                )
+        # This can happen when the transfer failed and the contract just got archived.
+        return HandleTransactionResult.empty()
+
     def handle_locked_amulet_unlock(self, transaction, event, log_prefix="Unlock"):
         summary = event.exercise_result.get_locked_amulet_unlock_result_amulet_sum()
         amulet_cid = summary.get_amulet_summary_amulet()
@@ -3195,6 +3497,22 @@ class State:
                 return self.handle_mint(transaction, event)
             case "AmuletRules_BuyMemberTraffic":
                 return self.handle_buy_member_traffic(transaction, event)
+            case "AmuletRules_CreateExternalPartySetupProposal":
+                return self.handle_create_external_party_setup_proposal(
+                    transaction, event
+                )
+            case "ExternalPartySetupProposal_Accept":
+                return HandleTransactionResult.empty()
+            case "AmuletRules_CreateTransferPreapproval":
+                return self.handle_create_transfer_preapproval(transaction, event)
+            case "TransferPreapproval_Renew":
+                return self.handle_renew_transfer_preapproval(transaction, event)
+            case "TransferPreapproval_Send":
+                return self.handle_transfer_preapproval_send(transaction, event)
+            case "TransferPreapproval_Cancel":
+                return HandleTransactionResult.empty()
+            case "TransferCommand_Send":
+                return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":
                 return self.handle_locked_amulet_unlock(transaction, event)
             case "LockedAmulet_OwnerExpireLock":
@@ -3297,6 +3615,8 @@ class State:
             case "DsoRules_PruneAmuletConfigSchedule":
                 return HandleTransactionResult.empty()
             case "DsoRules_MergeValidatorLicense":
+                return HandleTransactionResult.empty()
+            case "ExternalPartyAmuletRules_CreateTransferCommand":
                 return HandleTransactionResult.empty()
             case choice:
                 choice_str = f"{event.template_id.qualified_name}:{choice}"

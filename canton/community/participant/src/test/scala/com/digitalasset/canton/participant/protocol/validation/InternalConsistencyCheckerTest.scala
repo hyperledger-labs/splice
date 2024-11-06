@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol.validation
 
+import cats.syntax.either.*
 import com.daml.nonempty.NonEmptyUtil
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.FullTransactionViewTree
@@ -25,9 +26,8 @@ class InternalConsistencyCheckerTest extends AnyWordSpec with BaseTest {
   private def check(
       icc: InternalConsistencyChecker,
       views: Seq[FullTransactionViewTree],
-  ): Either[ErrorWithInternalConsistencyCheck, Unit] = {
+  ): Either[ErrorWithInternalConsistencyCheck, Unit] =
     icc.check(NonEmptyUtil.fromUnsafe(views), _ => false)
-  }
 
   "Rollback scope ordering" when {
 
@@ -43,14 +43,14 @@ class InternalConsistencyCheckerTest extends AnyWordSpec with BaseTest {
         _.exitRollback,
       )
 
-      val (_, testScopes) = ops.foldLeft((RollbackContext.empty, Seq(RollbackContext.empty)))({
+      val (_, testScopes) = ops.foldLeft((RollbackContext.empty, Seq(RollbackContext.empty))) {
         case ((c, seq), op) =>
           val nc = op(c)
           (nc, seq :+ nc)
-      })
+      }
 
       Random.shuffle(testScopes).sorted shouldBe testScopes
-      checkRollbackScopeOrder(testScopes) shouldBe Right(())
+      checkRollbackScopeOrder(testScopes) shouldBe Either.unit
       checkRollbackScopeOrder(testScopes.reverse).isLeft shouldBe true
     }
   }
@@ -70,7 +70,7 @@ class InternalConsistencyCheckerTest extends AnyWordSpec with BaseTest {
 
         "reinterpret views individually" in {
           example.transactionViewTrees.foreach { viewTree =>
-            check(sut, Seq(viewTree)) shouldBe Right(())
+            check(sut, Seq(viewTree)) shouldBe Either.unit
           }
         }
       }

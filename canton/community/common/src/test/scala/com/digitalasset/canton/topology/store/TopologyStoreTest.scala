@@ -9,8 +9,9 @@ import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.DefaultTestIdentities
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.version.ProtocolVersion
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -165,12 +166,12 @@ trait TopologyStoreTest extends AsyncWordSpec with TopologyStoreTestBase {
             _ <- update(store, ts5, add = Seq(tx5_DTC))
             _ <- update(store, ts6, add = Seq(tx6_MDS))
 
-            maxTs <- store.maxTimestamp()
+            maxTs <- store.maxTimestamp(CantonTimestamp.MaxValue, includeRejected = true)
             retrievedTx <- store.findStored(CantonTimestamp.MaxValue, tx1_NSD_Proposal)
             txProtocolVersion <- store.findStoredForVersion(
               CantonTimestamp.MaxValue,
               tx1_NSD_Proposal.transaction,
-              ProtocolVersion.v31,
+              ProtocolVersion.v32,
             )
 
             proposalTransactions <- inspect(
@@ -387,17 +388,8 @@ trait TopologyStoreTest extends AsyncWordSpec with TopologyStoreTestBase {
             _ <- update(store, ts6, add = Seq(tx6_MDS))
 
             proposalTransactions <- store.findEssentialStateAtSequencedTime(
-              asOfInclusive = SequencedTime(ts6),
-              excludeMappings = Nil,
+              asOfInclusive = SequencedTime(ts6)
             )
-
-            proposalTransactionsFiltered <- store.findEssentialStateAtSequencedTime(
-              asOfInclusive = SequencedTime(ts6),
-              excludeMappings = TopologyMapping.Code.all.diff(
-                Seq(DomainTrustCertificate.code, OwnerToKeyMapping.code)
-              ),
-            )
-
           } yield {
             expectTransactions(
               proposalTransactions,
@@ -405,13 +397,6 @@ trait TopologyStoreTest extends AsyncWordSpec with TopologyStoreTestBase {
                 tx2_OTK,
                 tx5_DTC,
                 tx6_MDS,
-              ),
-            )
-            expectTransactions(
-              proposalTransactionsFiltered,
-              Seq(
-                tx2_OTK,
-                tx5_DTC,
               ),
             )
           }
@@ -529,6 +514,45 @@ trait TopologyStoreTest extends AsyncWordSpec with TopologyStoreTestBase {
             )
 
           }
+        }
+
+        "correctly store rejected and accepted topology transactions with the same unique key within a batch" in {
+          val store = mk()
+
+          // * create two transactions with the same unique key but different content.
+          // * use the signatures of the transaction to accept for the transaction to reject.
+          // * put the rejected transaction before accepted one in the batch to be stored.
+          // => if the DB unique key is not specific enough (ie doesn't cover the content), then
+          //    the accepted transaction will not be stored correctly.
+
+          val good_otk = makeSignedTx(
+            OwnerToKeyMapping(participantId1, NonEmpty(Seq, factory.SigningKeys.key1))
+          )
+
+          val bad_otk = makeSignedTx(
+            OwnerToKeyMapping(participantId1, NonEmpty(Seq, factory.EncryptionKeys.key2))
+          ).copy(signatures = good_otk.signatures)
+
+          for {
+            _ <- store.update(
+              SequencedTime(ts1),
+              EffectiveTime(ts1),
+              removeMapping = Map.empty,
+              removeTxs = Set.empty,
+              additions = Seq(
+                ValidatedTopologyTransaction(
+                  bad_otk,
+                  Some(TopologyTransactionRejection.InvalidTopologyMapping("bad signature")),
+                ),
+                ValidatedTopologyTransaction(good_otk),
+              ),
+            )
+            txsAtTs2 <- findPositiveTransactions(
+              store,
+              asOf = ts2,
+              types = Seq(Code.OwnerToKeyMapping),
+            )
+          } yield txsAtTs2.result.loneElement.transaction shouldBe good_otk
         }
       }
     }

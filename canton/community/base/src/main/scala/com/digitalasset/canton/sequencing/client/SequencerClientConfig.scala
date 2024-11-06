@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.sequencing.client
 
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 
 /** Client configured options for how to connect to a sequencer
@@ -40,7 +40,7 @@ final case class SequencerClientConfig(
     eventInboxSize: PositiveInt = PositiveInt.tryCreate(100),
     startupConnectionRetryDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(1),
     initialConnectionRetryDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(10),
-    warnDisconnectDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
+    warnDisconnectDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(10),
     maxConnectionRetryDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     handshakeRetryAttempts: NonNegativeInt = NonNegativeInt.tryCreate(50),
     handshakeRetryDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),

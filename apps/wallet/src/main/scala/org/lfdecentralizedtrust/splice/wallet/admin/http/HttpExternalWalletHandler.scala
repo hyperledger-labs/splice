@@ -21,20 +21,13 @@ import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.RetryUtil.{
-  ErrorKind,
-  ExceptionRetryable,
-  FatalErrorKind,
-  NoErrorKind,
-  TransientErrorKind,
-}
+import com.digitalasset.canton.util.retry.{ExceptionRetryPolicy, ErrorKind}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
 
 class HttpExternalWalletHandler(
     override protected val walletManager: UserWalletManager,
@@ -295,22 +288,21 @@ class HttpExternalWalletHandler(
 }
 
 object HttpExternalWalletHandler {
-  case class CreateTransferOfferRetryable(operationName: String) extends ExceptionRetryable {
-    override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
-        implicit tc: TraceContext
-    ): ErrorKind = outcome match {
+  case class CreateTransferOfferRetryable(operationName: String) extends ExceptionRetryPolicy {
+    override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = exception match {
       // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
-      case Failure(ex: io.grpc.StatusRuntimeException)
+      case ex: io.grpc.StatusRuntimeException
           if (ex.getStatus.getCode == Status.Code.FAILED_PRECONDITION && ex.getStatus.getDescription
             .contains("The domain id was not found")) =>
         logger.info(
           s"The operation $operationName failed due to the domain id was not found $ex."
         )
-        TransientErrorKind
-      case Failure(ex) =>
+        ErrorKind.TransientErrorKind()
+      case ex =>
         logThrowable(ex, logger)
-        FatalErrorKind
-      case Success(_) => NoErrorKind
+        ErrorKind.FatalErrorKind
     }
   }
 }

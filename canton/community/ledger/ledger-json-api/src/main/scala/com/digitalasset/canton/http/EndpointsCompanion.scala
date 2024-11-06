@@ -8,10 +8,11 @@ import org.apache.pekko.http.scaladsl.server.RouteResult.Complete
 import org.apache.pekko.http.scaladsl.server.{RequestContext, Route}
 import org.apache.pekko.util.ByteString
 import util.GrpcHttpErrorCodes.*
-import com.daml.jwt.domain.{DecodedJwt, Jwt}
-import com.digitalasset.canton.ledger.api.auth.{
+import com.daml.jwt.{
   AuthServiceJWTCodec,
   AuthServiceJWTPayload,
+  DecodedJwt,
+  Jwt,
   StandardJWTPayload,
 }
 import com.digitalasset.canton.ledger.api.domain.UserRight
@@ -112,7 +113,7 @@ object EndpointsCompanion extends NoTracing {
       UserId
         .fromString(jwt.userId)
         .disjunction
-        .leftMap(Unauthorized)
+        .leftMap(Unauthorized.apply)
 
     private def transformUserTokenTo[B](
         jwt: StandardJWTPayload,
@@ -149,7 +150,7 @@ object EndpointsCompanion extends NoTracing {
                 -\/ apply Unauthorized(
                   "ActAs list of user was empty, this is an invalid state for converting it to a JwtWritePayload"
                 )
-              else \/-(NonEmptyList(actAs.head: String, actAs.tail: _*))
+              else \/-(NonEmptyList(actAs.head: String, actAs.tail*))
           } yield JwtWritePayload(
             lar.ApplicationId(userId),
             lar.Party.subst(actAsNonEmpty),
@@ -177,16 +178,13 @@ object EndpointsCompanion extends NoTracing {
   def notFound(
       logger: TracedLogger
   )(implicit lc: LoggingContextOf[InstanceUUID]): Route = (ctx: RequestContext) =>
-    ctx.request match {
-      case HttpRequest(method, uri, _, _, _) =>
-        extendWithRequestIdLogCtx(implicit lc =>
-          Future.successful(
-            Complete(
-              httpResponseError(NotFound(s"${method: HttpMethod}, uri: ${uri: Uri}"), logger)
-            )
-          )
+    extendWithRequestIdLogCtx(implicit lc =>
+      Future.successful(
+        Complete(
+          httpResponseError(NotFound(s"${ctx.request.method}, uri: ${ctx.request.uri}"), logger)
         )
-    }
+      )
+    )
 
   def httpResponseError(
       error: Error,
@@ -234,12 +232,11 @@ object EndpointsCompanion extends NoTracing {
     }
   }
 
-  def httpResponse(status: StatusCode, data: JsValue): HttpResponse = {
+  def httpResponse(status: StatusCode, data: JsValue): HttpResponse =
     HttpResponse(
       status = status,
       entity = HttpEntity.Strict(ContentTypes.`application/json`, format(data)),
     )
-  }
 
   def format(a: JsValue): ByteString = ByteString(a.compactPrint)
 
@@ -263,7 +260,7 @@ object EndpointsCompanion extends NoTracing {
   )(implicit
       createFromUserToken: CreateFromUserToken[A],
       fm: Monad[Future],
-  ): EitherT[Future, Error, (Jwt, A)] = {
+  ): EitherT[Future, Error, (Jwt, A)] =
     for {
       token <- EitherT.either(decodeAndParseJwt(jwt, decodeJwt))
       p <- token match {
@@ -274,5 +271,4 @@ object EndpointsCompanion extends NoTracing {
           ).leftMap(identity[Error])
       }
     } yield (jwt, p: A)
-  }
 }

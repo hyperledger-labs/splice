@@ -3,13 +3,16 @@
 
 package com.digitalasset.canton.sequencing.client
 
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext}
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.{
   CommonMockMetrics,
+  MetricsUtils,
   SequencerClientMetrics,
   TrafficConsumptionMetrics,
 }
@@ -36,15 +39,15 @@ import org.scalatest.wordspec.AsyncWordSpec
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-class SendTrackerTest extends AsyncWordSpec with BaseTest {
-  val metrics = CommonMockMetrics.sequencerClient
-  val msgId1 = MessageId.tryCreate("msgId1")
-  val msgId2 = MessageId.tryCreate("msgId2")
+class SendTrackerTest extends AsyncWordSpec with BaseTest with MetricsUtils {
+  private lazy val metrics = CommonMockMetrics.sequencerClient
+  private lazy val msgId1 = MessageId.tryCreate("msgId1")
+  private lazy val msgId2 = MessageId.tryCreate("msgId2")
 
-  def sign(event: RawProtocolEvent): SignedContent[RawProtocolEvent] =
+  private def sign(event: RawProtocolEvent): SignedContent[RawProtocolEvent] =
     SignedContent(event, SymbolicCrypto.emptySignature, None, testedProtocolVersion)
 
-  def deliverDefault(timestamp: CantonTimestamp): OrdinaryProtocolEvent =
+  private def deliverDefault(timestamp: CantonTimestamp): OrdinaryProtocolEvent =
     OrdinarySequencedEvent(
       sign(
         SequencerTestUtils.mockDeliver(
@@ -56,7 +59,7 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
       traceContext
     )
 
-  def deliver(
+  private def deliver(
       msgId: MessageId,
       timestamp: CantonTimestamp,
       trafficReceipt: Option[TrafficReceipt] = None,
@@ -76,11 +79,11 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
       )
     )(traceContext)
 
-  def deliverError(
+  private def deliverError(
       msgId: MessageId,
       timestamp: CantonTimestamp,
       trafficReceipt: Option[TrafficReceipt] = None,
-  ): OrdinaryProtocolEvent = {
+  ): OrdinaryProtocolEvent =
     OrdinarySequencedEvent(
       sign(
         DeliverError.create(
@@ -94,18 +97,17 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
         )
       )
     )(traceContext)
-  }
 
-  case class Env(tracker: MySendTracker, store: InMemorySendTrackerStore)
+  private case class Env(tracker: MySendTracker, store: InMemorySendTrackerStore)
 
-  class MySendTracker(
+  private class MySendTracker(
       initialPendingSends: Map[MessageId, CantonTimestamp],
       store: SendTrackerStore,
       metrics: SequencerClientMetrics,
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
       timeoutHandler: MessageId => Future[Unit],
-      trafficStateController: Option[TrafficStateController],
+      val trafficStateController: Option[TrafficStateController],
   )(implicit executionContext: ExecutionContext)
       extends SendTracker(
         initialPendingSends,
@@ -134,22 +136,26 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
 
   }
 
-  def mkSendTracker(timeoutHandler: MessageId => Future[Unit] = _ => Future.unit): Env = {
+  private val initialTrafficState = TrafficState.empty
+  private def mkSendTracker(timeoutHandler: MessageId => Future[Unit] = _ => Future.unit): Env = {
     val store = new InMemorySendTrackerStore()
     val topologyClient =
       TestingTopology(Set(DefaultTestIdentities.domainId))
         .build(loggerFactory)
         .forOwnerAndDomain(participant1, domainId)
+
+    val histogramInventory = new HistogramInventory()
     val trafficStateController = new TrafficStateController(
       DefaultTestIdentities.participant1,
       loggerFactory,
       topologyClient,
-      TrafficState.empty,
+      initialTrafficState,
       testedProtocolVersion,
       new EventCostCalculator(loggerFactory),
       futureSupervisor,
       timeouts,
-      TrafficConsumptionMetrics.noop,
+      new TrafficConsumptionMetrics(MetricName("test"), metricsFactory(histogramInventory)),
+      domainId,
     )
     val tracker =
       new MySendTracker(
@@ -164,6 +170,10 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
 
     Env(tracker, store)
   }
+
+  implicit private val eventSpecificMetricsContext: MetricsContext = MetricsContext(
+    "test" -> "value"
+  )
 
   "tracking sends" should {
     "error if there's a previously tracked send with the same message id" in {
@@ -187,6 +197,124 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
             "track same msgId after receipt"
           )
       } yield tracker.assertNotCalled
+    }
+
+    "propagate metrics context" in {
+      val Env(tracker, _) = mkSendTracker()
+
+      for {
+        _ <- tracker.track(msgId1, CantonTimestamp.MinValue).valueOrFailShutdown("track first")
+        _ <- tracker.update(
+          Seq(
+            deliver(
+              msgId1,
+              initialTrafficState.timestamp.immediateSuccessor,
+              trafficReceipt = Some(
+                TrafficReceipt(
+                  consumedCost = NonNegativeLong.tryCreate(1),
+                  extraTrafficConsumed = NonNegativeLong.tryCreate(2),
+                  baseTrafficRemainder = NonNegativeLong.tryCreate(3),
+                )
+              ),
+            )
+          )
+        )
+        _ = tracker.trafficStateController.value.updateBalance(
+          NonNegativeLong.tryCreate(20),
+          PositiveInt.one,
+          CantonTimestamp.MaxValue,
+        )
+      } yield {
+        assertLongValue("test.extra-traffic-purchased", 20L)
+        assertInContext(
+          "test.extra-traffic-purchased",
+          "member",
+          DefaultTestIdentities.participant1.toString,
+        )
+        assertLongValue("test.event-delivered-cost", 1L)
+        assertInContext(
+          "test.event-delivered-cost",
+          "domain",
+          domainId.toString,
+        )
+        assertInContext(
+          "test.event-delivered-cost",
+          "member",
+          DefaultTestIdentities.participant1.toString,
+        )
+        // Event specific metrics should contain the event specific metrics context
+        assertInContext("test.event-delivered-cost", "test", "value")
+        assertLongValue("test.extra-traffic-consumed", 2L)
+        assertInContext(
+          "test.extra-traffic-consumed",
+          "member",
+          DefaultTestIdentities.participant1.toString,
+        )
+        assertInContext(
+          "test.extra-traffic-consumed",
+          "domain",
+          domainId.toString,
+        )
+        // But not the event agnostic metrics
+        assertNotInContext("test.extra-traffic-consumed", "test")
+      }
+    }
+
+    "not re-export metrics when replaying events older than current state" in {
+      val Env(tracker, _) = mkSendTracker()
+
+      for {
+        _ <- tracker.track(msgId1, CantonTimestamp.MinValue).valueOrFailShutdown("track first")
+        _ <- tracker.update(
+          Seq(
+            deliver(
+              msgId1,
+              initialTrafficState.timestamp,
+              trafficReceipt = Some(
+                TrafficReceipt(
+                  consumedCost = NonNegativeLong.tryCreate(1),
+                  extraTrafficConsumed = NonNegativeLong.tryCreate(2),
+                  baseTrafficRemainder = NonNegativeLong.tryCreate(3),
+                )
+              ),
+            )
+          )
+        )
+      } yield {
+        assertNoValue("event-delivered-cost")
+      }
+    }
+
+    "metrics should contain default labels for unknown sends" in {
+      val Env(tracker, _) = mkSendTracker()
+
+      for {
+        _ <- tracker.update(
+          Seq(
+            deliver(
+              msgId1,
+              initialTrafficState.timestamp.immediateSuccessor,
+              trafficReceipt = Some(
+                TrafficReceipt(
+                  consumedCost = NonNegativeLong.tryCreate(1),
+                  extraTrafficConsumed = NonNegativeLong.tryCreate(2),
+                  baseTrafficRemainder = NonNegativeLong.tryCreate(3),
+                )
+              ),
+            )
+          )
+        )
+      } yield {
+        assertLongValue("test.event-delivered-cost", 1L)
+        assertInContext(
+          "test.event-delivered-cost",
+          "member",
+          DefaultTestIdentities.participant1.toString,
+        )
+        // Check there are labels for application-id and type
+        assertInContext("test.event-delivered-cost", "application-id", "unknown")
+        assertInContext("test.event-delivered-cost", "type", "unknown")
+      }
     }
   }
 
@@ -256,7 +384,7 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
       val concurrentCalls = new AtomicInteger()
       val totalCalls = new AtomicInteger()
 
-      val Env(tracker, _) = mkSendTracker(_msgId => {
+      val Env(tracker, _) = mkSendTracker { _msgId =>
         totalCalls.incrementAndGet()
         if (!concurrentCalls.compareAndSet(0, 1)) {
           fail("timeout handler was called concurrently")
@@ -267,7 +395,7 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
             fail("timeout handler was called concurrently")
           }
         }
-      })
+      }
 
       for {
         _ <- tracker.track(msgId1, CantonTimestamp.MinValue).valueOrFailShutdown("track msgId1")
@@ -328,7 +456,7 @@ class SendTrackerTest extends AsyncWordSpec with BaseTest {
             .valueOrFailShutdown("track msgId1")
           _ <- tracker.update(Seq(deliverDefault(deliverEventTime)))
           calledWith <- sendResultHandler.result.failOnShutdown
-        } yield calledWith should matchPattern { case SendResult.Timeout(deliverEventTime) =>
+        } yield calledWith should matchPattern { case SendResult.Timeout(`deliverEventTime`) =>
         }
       }
     }

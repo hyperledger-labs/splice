@@ -31,14 +31,13 @@ class DbPartyMetadataStore(
 
   override def metadataForParty(
       partyId: PartyId
-  )(implicit traceContext: TraceContext): Future[Option[PartyMetadata]] = {
+  )(implicit traceContext: TraceContext): Future[Option[PartyMetadata]] =
     storage
       .query(
         metadataForPartyQuery(sql"party_id = $partyId #${storage.limit(1)}"),
         functionFullName,
       )
       .map(_.headOption)
-  }
 
   private def metadataForPartyQuery(
       where: SQLActionBuilderChain
@@ -91,7 +90,7 @@ class DbPartyMetadataStore(
                     effective_at = $effectiveTimestamp,
                     notified = false
                  """
-      case _: DbStorage.Profile.H2 | _: DbStorage.Profile.Oracle =>
+      case _: DbStorage.Profile.H2 =>
         sqlu"""merge into common_party_metadata
                   using dual
                   on (party_id = $partyId)
@@ -127,11 +126,10 @@ class DbPartyMetadataStore(
   /** fetch the current set of party data which still needs to be notified */
   override def fetchNotNotified()(implicit
       traceContext: TraceContext
-  ): Future[Seq[PartyMetadata]] = {
+  ): Future[Seq[PartyMetadata]] =
     storage
       .query(
         metadataForPartyQuery(sql"notified = ${false}"),
         functionFullName,
       )
-  }
 }

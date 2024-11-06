@@ -26,20 +26,16 @@ import com.daml.logging.LoggingContext
 import com.daml.platform.v1.page_tokens.ListPartiesPageTokenPayload
 import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.tracing.Telemetry
+import com.digitalasset.canton.auth.AuthorizationChecksErrors
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.ledger.api.domain.{
-  IdentityProviderId,
-  ObjectMeta,
-  ParticipantOffset,
-  PartyDetails,
-}
+import com.digitalasset.canton.ledger.api.domain.types.ParticipantOffset
+import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, ObjectMeta, PartyDetails}
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.validation.FieldValidator.*
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.requirePresence
 import com.digitalasset.canton.ledger.error.groups.{
-  AuthorizationChecksErrors,
   PartyManagementServiceErrors,
   RequestValidationErrors,
 }
@@ -51,12 +47,12 @@ import com.digitalasset.canton.ledger.localstore.api.{
 }
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.index.*
+import com.digitalasset.canton.logging.*
 import com.digitalasset.canton.logging.LoggingContextUtil.createLoggingContext
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
   implicitExtractTraceContext,
   withEnrichedLoggingContext,
 }
-import com.digitalasset.canton.logging.*
 import com.digitalasset.canton.platform.apiserver.services.admin.ApiPartyManagementService.*
 import com.digitalasset.canton.platform.apiserver.services.logging
 import com.digitalasset.canton.platform.apiserver.update
@@ -238,7 +234,7 @@ private[apiserver] final class ApiPartyManagementService private (
       } { case (partyIdHintO, displayNameO, annotations, identityProviderId) =>
         (for {
           _ <- identityProviderExistsOrError(identityProviderId)
-          ledgerEndbeforeRequest <- transactionService.currentLedgerEnd().map(Some(_))
+          ledgerEndbeforeRequest <- transactionService.currentLedgerEnd()
           allocated <- synchronousResponse.submitAndWait(
             submissionId,
             (partyIdHintO, displayNameO),
@@ -672,7 +668,7 @@ private[apiserver] object ApiPartyManagementService {
       writeService.allocateParty(party, displayName, submissionId).toScalaUnwrapped
     }
 
-    override def entries(offset: Option[ParticipantOffset.Absolute])(implicit
+    override def entries(offset: ParticipantOffset)(implicit
         loggingContext: LoggingContextWithTrace
     ): Source[PartyEntry, ?] =
       partyManagementService.partyEntries(offset)
@@ -702,7 +698,7 @@ private[apiserver] object ApiPartyManagementService {
 
   def decodePartyFromPageToken(pageToken: String)(implicit
       loggingContext: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Option[Ref.Party]] = {
+  ): Either[StatusRuntimeException, Option[Ref.Party]] =
     if (pageToken.isEmpty) {
       Right(None)
     } else {
@@ -723,7 +719,6 @@ private[apiserver] object ApiPartyManagementService {
         party
       }
     }
-  }
 
   private def invalidPageToken(details: String)(implicit
       errorLogger: ContextualizedErrorLogger

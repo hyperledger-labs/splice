@@ -4,15 +4,13 @@
 package com.digitalasset.canton.health
 
 import com.daml.error.BaseError
+import com.digitalasset.canton.admin.health.v30 as proto
 import com.digitalasset.canton.health.ComponentHealthState.{Degraded, Failed, Fatal, Ok}
-import com.digitalasset.canton.health.admin.v30 as proto
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.util.ShowUtil
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
-
-import scala.annotation.nowarn
 
 /** Generic State implementation of a component
   * This can be used as a base health state for most component.
@@ -23,7 +21,11 @@ sealed trait ComponentHealthState extends ToComponentHealthState with PrettyPrin
     case ComponentHealthState.Ok(_) => true
     case _ => false
   }
-  def isDegrading: Boolean = this match {
+  def isAlive: Boolean = this match {
+    case _: Ok | _: Degraded => true
+    case _: Fatal | _: Failed => false
+  }
+  def isDegraded: Boolean = this match {
     case ComponentHealthState.Degraded(_) => true
     case _ => false
   }
@@ -37,19 +39,19 @@ sealed trait ComponentHealthState extends ToComponentHealthState with PrettyPrin
     case _ => false
   }
   override def toComponentHealthState: ComponentHealthState = this
-  override def pretty: Pretty[ComponentHealthState] =
+  override protected def pretty: Pretty[ComponentHealthState] =
     ComponentHealthState.prettyComponentHealthState
 
-  def toComponentStatusV0: proto.StatusResponse.ComponentStatus.Status = this match {
+  def toComponentStatusV0: proto.ComponentStatus.Status = this match {
     case Ok(description) =>
-      proto.StatusResponse.ComponentStatus.Status
-        .Ok(proto.StatusResponse.ComponentStatus.StatusData(description))
+      proto.ComponentStatus.Status
+        .Ok(proto.ComponentStatus.StatusData(description))
     case Degraded(degraded) =>
-      proto.StatusResponse.ComponentStatus.Status.Degraded(degraded.toComponentStatusDataV0)
+      proto.ComponentStatus.Status.Degraded(degraded.toComponentStatusDataV0)
     case Failed(failed) =>
-      proto.StatusResponse.ComponentStatus.Status.Failed(failed.toComponentStatusDataV0)
+      proto.ComponentStatus.Status.Failed(failed.toComponentStatusDataV0)
     case Fatal(fatal) =>
-      proto.StatusResponse.ComponentStatus.Status.Fatal(fatal.toComponentStatusDataV0)
+      proto.ComponentStatus.Status.Fatal(fatal.toComponentStatusDataV0)
   }
 }
 
@@ -63,7 +65,6 @@ object ComponentHealthState extends ShowUtil {
 
   // Json encoder implicits
 
-  @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
   implicit val componentHealthStateEncoder: Encoder[ComponentHealthState] =
     deriveEncoder[ComponentHealthState]
 
@@ -99,7 +100,6 @@ object ComponentHealthState extends ShowUtil {
       with HasUnhealthyState
 
   object Degraded {
-    @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
     implicit val degradedEncoder: Encoder[Degraded] = deriveEncoder[Degraded]
   }
 
@@ -112,7 +112,6 @@ object ComponentHealthState extends ShowUtil {
       with HasUnhealthyState
 
   object Failed {
-    @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
     implicit val failedEncoder: Encoder[Failed] = deriveEncoder[Failed]
   }
 
@@ -137,8 +136,8 @@ object ComponentHealthState extends ShowUtil {
       s"${error.code.codeStr(elc.flatMap(_.traceContext.traceId))}: ${error.cause}"
     }
 
-    def toComponentStatusDataV0: proto.StatusResponse.ComponentStatus.StatusData =
-      proto.StatusResponse.ComponentStatus.StatusData(Some(this.show))
+    def toComponentStatusDataV0: proto.ComponentStatus.StatusData =
+      proto.ComponentStatus.StatusData(Some(this.show))
   }
 
   object UnhealthyState {

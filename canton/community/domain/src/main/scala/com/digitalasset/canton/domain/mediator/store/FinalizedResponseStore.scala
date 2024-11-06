@@ -152,14 +152,13 @@ private[mediator] class InMemoryFinalizedResponseStore(
   )(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[Option[CantonTimestamp]] = {
+  ): FutureUnlessShutdown[Option[CantonTimestamp]] =
     FutureUnlessShutdown.pure {
       import cats.Order.*
       val sortedSet =
         SortedSet.empty[CantonTimestamp] ++ finalizedRequests.keySet
       sortedSet.drop(skip).headOption
     }
-  }
 
   override def close(): Unit = ()
 }
@@ -209,22 +208,12 @@ private[mediator] class DbFinalizedResponseStore(
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
   ): FutureUnlessShutdown[Unit] = {
-    val insert = storage.profile match {
-      case _: DbStorage.Profile.Oracle =>
-        sqlu"""insert
-                     /*+  IGNORE_ROW_ON_DUPKEY_INDEX ( med_response_aggregations ( request_id ) ) */
-                     into med_response_aggregations(request_id, mediator_confirmation_request, version, verdict, request_trace_context)
-                     values (
-                       ${finalizedResponse.requestId},${finalizedResponse.request},${finalizedResponse.version},${finalizedResponse.verdict},
-                       ${SerializableTraceContext(finalizedResponse.requestTraceContext)}
-                     )"""
-      case _ =>
-        sqlu"""insert into med_response_aggregations(request_id, mediator_confirmation_request, version, verdict, request_trace_context)
-                     values (
-                       ${finalizedResponse.requestId},${finalizedResponse.request},${finalizedResponse.version},${finalizedResponse.verdict},
-                       ${SerializableTraceContext(finalizedResponse.requestTraceContext)}
-                     ) on conflict do nothing"""
-    }
+    val insert =
+      sqlu"""insert into med_response_aggregations(request_id, mediator_confirmation_request, version, verdict, request_trace_context)
+             values (
+               ${finalizedResponse.requestId},${finalizedResponse.request},${finalizedResponse.version},${finalizedResponse.verdict},
+               ${SerializableTraceContext(finalizedResponse.requestTraceContext)}
+             ) on conflict do nothing"""
 
     CloseContext.withCombinedContext(callerCloseContext, closeContext, timeouts, logger) {
       closeContext =>
@@ -238,7 +227,7 @@ private[mediator] class DbFinalizedResponseStore(
   override def fetch(requestId: RequestId)(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): OptionT[FutureUnlessShutdown, FinalizedResponse] = {
+  ): OptionT[FutureUnlessShutdown, FinalizedResponse] =
     CloseContext.withCombinedContext(callerCloseContext, closeContext, timeouts, logger) {
       closeContext =>
         storage.querySingleUnlessShutdown(
@@ -265,7 +254,6 @@ private[mediator] class DbFinalizedResponseStore(
           operationName = s"${this.getClass}: fetch request $requestId",
         )(traceContext, closeContext)
     }
-  }
 
   override def prune(
       timestamp: CantonTimestamp
@@ -277,7 +265,7 @@ private[mediator] class DbFinalizedResponseStore(
       closeContext =>
         for {
           removedCount <- storage.updateUnlessShutdown(
-            sqlu"delete from med_response_aggregations where request_id <= ${timestamp}",
+            sqlu"delete from med_response_aggregations where request_id <= $timestamp",
             functionFullName,
           )(traceContext, closeContext)
         } yield logger.debug(s"Removed $removedCount finalized responses")
@@ -286,7 +274,7 @@ private[mediator] class DbFinalizedResponseStore(
   override def count()(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[Long] = {
+  ): FutureUnlessShutdown[Long] =
     CloseContext.withCombinedContext(callerCloseContext, closeContext, timeouts, logger) {
       closeContext =>
         storage.queryUnlessShutdown(
@@ -294,14 +282,13 @@ private[mediator] class DbFinalizedResponseStore(
           functionFullName,
         )(traceContext, closeContext)
     }
-  }
 
   override def locatePruningTimestamp(
       skip: Int
   )(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[Option[CantonTimestamp]] = {
+  ): FutureUnlessShutdown[Option[CantonTimestamp]] =
     CloseContext.withCombinedContext(callerCloseContext, closeContext, timeouts, logger) {
       closeContext =>
         storage
@@ -313,6 +300,5 @@ private[mediator] class DbFinalizedResponseStore(
             functionFullName,
           )(traceContext, closeContext)
     }
-  }
 
 }

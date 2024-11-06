@@ -4,7 +4,8 @@
 package com.digitalasset.canton.ledger.participant.state
 
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.protocol.{SourceDomainId, TargetDomainId}
+import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
 import com.digitalasset.daml.lf.transaction.Node
@@ -23,8 +24,8 @@ object Reassignment {
     * @param packageName           Package name of the underlying contract's template.
     * @param stakeholders          Stakeholders of the underlying contract.
     * @param assignmentExclusivity Before this time (measured on the target domain), only the submitter
-    *                              of the unassignment can initiate the assignment. Defined for
-    *                              reassigning participants.
+    *                              of the unassignment can initiate the assignment.
+    *                              Defined for observing reassigning participants.
     */
   final case class Unassign(
       contractId: Value.ContractId,
@@ -66,11 +67,11 @@ object Reassignment {
   *                                command.
   */
 final case class ReassignmentInfo(
-    sourceDomain: SourceDomainId,
-    targetDomain: TargetDomainId,
+    sourceDomain: Source[DomainId],
+    targetDomain: Target[DomainId],
     submitter: Option[Ref.Party],
     reassignmentCounter: Long,
     hostedStakeholders: List[Ref.Party],
     unassignId: CantonTimestamp,
-    isTransferringParticipant: Boolean,
+    isObservingReassigningParticipant: Boolean,
 )

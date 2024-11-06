@@ -2,7 +2,7 @@ import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 import cats.syntax.either._
 import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.domain.config.DomainParametersConfig
-import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.version.ProtocolVersion
 
 def main() {
@@ -12,7 +12,7 @@ def main() {
 
   def staticParameters(sequencer: LocalInstanceReference) =
     domainParametersConfig
-      .toStaticDomainParameters(sequencer.config.crypto, ProtocolVersion.v31)
+      .toStaticDomainParameters(sequencer.config.crypto, ProtocolVersion.v32)
       .map(StaticDomainParameters(_))
       .getOrElse(sys.error("whatever"))
 
@@ -31,6 +31,7 @@ def main() {
             domainOwners = Seq(sequencer),
             sequencers = Seq(sequencer),
             mediators = Seq(mediator),
+            domainThreshold = PositiveInt.one,
             staticDomainParameters = staticParameters(sequencer),
           )
           logger.info("Domain initialized")

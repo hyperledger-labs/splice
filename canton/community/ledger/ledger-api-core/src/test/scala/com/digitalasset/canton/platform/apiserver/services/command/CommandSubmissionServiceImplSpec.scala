@@ -5,7 +5,7 @@ package com.digitalasset.canton.platform.apiserver.services.command
 
 import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.data.DeduplicationPeriod.DeduplicationDuration
-import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands}
+import com.digitalasset.canton.ledger.api.domain.{CommandId, Commands, DisclosedContract}
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.participant.state
@@ -22,6 +22,7 @@ import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutor,
 }
 import com.digitalasset.canton.platform.apiserver.services.{ErrorCause, TimeProviderType}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.digitalasset.daml.lf
@@ -32,14 +33,14 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.engine.Error as LfError
 import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
-import com.digitalasset.daml.lf.language.{LookupError, Reference}
-import com.digitalasset.daml.lf.transaction.*
+import com.digitalasset.daml.lf.language.{LanguageVersion, LookupError, Reference}
 import com.digitalasset.daml.lf.transaction.test.TreeTransactionBuilder.*
 import com.digitalasset.daml.lf.transaction.test.{
   TestNodeBuilder,
   TransactionBuilder,
   TreeTransactionBuilder,
 }
+import com.digitalasset.daml.lf.transaction.{Node as LfNode, *}
 import com.digitalasset.daml.lf.value.Value
 import com.google.rpc.status.Status as RpcStatus
 import io.grpc.{Status, StatusRuntimeException}
@@ -211,23 +212,25 @@ class CommandSubmissionServiceImplSpec
     val commandExecutor = mock[CommandExecutor]
     val metrics = LedgerApiServerMetrics.ForTesting
 
-    val disclosedContract =
-      com.digitalasset.canton.ledger.api.domain.DisclosedContract(
-        templateId = Identifier.assertFromString("some:pkg:identifier"),
-        contractId = TransactionBuilder.newCid,
-        argument = Value.ValueNil,
-        createdAt = Timestamp.Epoch,
-        keyHash = None,
-        driverMetadata = Bytes.Empty,
-        packageName = PackageName.assertFromString("pkg-name"),
-        packageVersion = Some(PackageVersion.assertFromString("0.1.2")),
-        signatories = Set(Ref.Party.assertFromString("alice")),
-        stakeholders = Set(Ref.Party.assertFromString("alice")),
-        keyMaintainers = None,
-        keyValue = None,
-        // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
-        transactionVersion = TransactionVersion.maxVersion,
-      )
+    val domainId: DomainId = DomainId.tryFromString("x::domainId")
+    val disclosedContract = DisclosedContract(
+      FatContractInstance.fromCreateNode(
+        LfNode.Create(
+          coid = TransactionBuilder.newCid,
+          packageName = PackageName.assertFromString("pkg-name"),
+          packageVersion = Some(PackageVersion.assertFromString("0.1.2")),
+          templateId = Identifier.assertFromString("some:pkg:identifier"),
+          arg = Value.ValueNil,
+          signatories = Set(Ref.Party.assertFromString("alice")),
+          stakeholders = Set(Ref.Party.assertFromString("alice")),
+          keyOpt = None,
+          version = LanguageVersion.v2_dev,
+        ),
+        createTime = Timestamp.Epoch,
+        cantonData = Bytes.Empty,
+      ),
+      domainIdO = Some(domainId),
+    )
 
     val processedDisclosedContract = com.digitalasset.canton.data.ProcessedDisclosedContract(
       templateId = Identifier.assertFromString("some:pkg:identifier"),
@@ -241,7 +244,8 @@ class CommandSubmissionServiceImplSpec
       stakeholders = Set.empty,
       keyOpt = None,
       // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
-      version = TransactionVersion.maxVersion,
+      version = LanguageVersion.v2_dev,
+      domainIdO = Some(domainId),
     )
     val commands = Commands(
       workflowId = None,
@@ -257,9 +261,8 @@ class CommandSubmissionServiceImplSpec
         ledgerEffectiveTime = Timestamp.Epoch,
         commandsReference = "",
       ),
-      disclosedContracts = ImmArray(
-        disclosedContract
-      ),
+      disclosedContracts = ImmArray(disclosedContract),
+      domainId = None,
     )
 
     val submitterInfo = SubmitterInfo(
@@ -269,6 +272,7 @@ class CommandSubmissionServiceImplSpec
       commandId = Ref.CommandId.assertFromString("foobar"),
       deduplicationPeriod = DeduplicationDuration(Duration.ofMinutes(1)),
       submissionId = None,
+      externallySignedSubmission = None,
     )
     val transactionMeta = TransactionMeta(
       ledgerEffectiveTime = Timestamp.Epoch,

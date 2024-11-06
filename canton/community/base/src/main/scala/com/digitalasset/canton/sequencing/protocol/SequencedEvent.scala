@@ -4,8 +4,8 @@
 package com.digitalasset.canton.sequencing.protocol
 
 import cats.Applicative
-import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.*
+import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -78,7 +78,7 @@ object SequencedEvent
   override def name: String = "SequencedEvent"
 
   override val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.SequencedEvent)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.SequencedEvent)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -231,7 +231,7 @@ sealed abstract case class DeliverError private[sequencing] (
       F: Applicative[F]
   ): F[SequencedEvent[Env]] = F.pure(this)
 
-  override def pretty: Pretty[DeliverError] = prettyOfClass(
+  override protected def pretty: Pretty[DeliverError] = prettyOfClass(
     param("counter", _.counter),
     param("timestamp", _.timestamp),
     param("domain id", _.domainId),
@@ -253,7 +253,7 @@ sealed abstract case class DeliverError private[sequencing] (
 object DeliverError {
 
   implicit val prettyStatus: Pretty[Status] = new Pretty[Status] {
-    override def treeOf(t: Status): Tree = {
+    override def treeOf(t: Status): Tree =
       Apply(
         "Status",
         Seq(
@@ -261,7 +261,6 @@ object DeliverError {
           KeyValue("Message", Literal(t.message)),
         ).iterator,
       )
-    }
   }
 
   def create(
@@ -272,7 +271,7 @@ object DeliverError {
       sequencerError: SequencerDeliverError,
       protocolVersion: ProtocolVersion,
       trafficReceipt: Option[TrafficReceipt],
-  ): DeliverError = {
+  ): DeliverError =
     new DeliverError(
       counter,
       timestamp,
@@ -284,7 +283,6 @@ object DeliverError {
       SequencedEvent.protocolVersionRepresentativeFor(protocolVersion),
       None,
     ) {}
-  }
 
   def create(
       counter: SequencerCounter,
@@ -375,7 +373,7 @@ case class Deliver[+Env <: Envelope[_]] private[sequencing] (
       deserializedFromO,
     )
 
-  override def pretty: Pretty[this.type] =
+  override protected def pretty: Pretty[this.type] =
     prettyOfClass(
       param("counter", _.counter),
       param("timestamp", _.timestamp),

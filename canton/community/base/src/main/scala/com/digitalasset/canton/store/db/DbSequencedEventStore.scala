@@ -11,7 +11,7 @@ import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.*
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.sequencing.protocol.{SequencedEvent, SignedContent}
@@ -109,8 +109,7 @@ class DbSequencedEventStore(
 
   override def store(
       events: Seq[OrdinarySerializedEvent]
-  )(implicit traceContext: TraceContext, externalCloseContext: CloseContext): Future[Unit] = {
-
+  )(implicit traceContext: TraceContext, externalCloseContext: CloseContext): Future[Unit] =
     if (events.isEmpty) Future.unit
     else {
       withLock(functionFullName) {
@@ -125,26 +124,14 @@ class DbSequencedEventStore(
         }
       }
     }
-  }
 
   private def bulkInsertQuery(
       events: Seq[PossiblyIgnoredSerializedEvent]
   )(implicit traceContext: TraceContext): DBIOAction[Unit, NoStream, Effect.All] = {
-    val insertSql = storage.profile match {
-      case _: DbStorage.Profile.Oracle =>
-        """merge /*+ INDEX ( common_sequenced_events ( ts, domain_id ) ) */
-            |into common_sequenced_events
-            |using (select ? domain_id, ? ts from dual) input
-            |on (sequenced_events.ts = input.ts and common_sequenced_events.domain_id = input.domain_id)
-            |when not matched then
-            |  insert (domain_id, ts, sequenced_event, type, sequencer_counter, trace_context, ignore)
-            |  values (input.domain_id, input.ts, ?, ?, ?, ?, ?)""".stripMargin
-
-      case _ =>
-        "insert into common_sequenced_events (domain_id, ts, sequenced_event, type, sequencer_counter, trace_context, ignore) " +
-          "values (?, ?, ?, ?, ?, ?, ?) " +
-          "on conflict do nothing"
-    }
+    val insertSql =
+      "insert into common_sequenced_events (domain_idx, ts, sequenced_event, type, sequencer_counter, trace_context, ignore) " +
+        "values (?, ?, ?, ?, ?, ?, ?) " +
+        "on conflict do nothing"
     DbStorage.bulkOperation_(insertSql, events, storage.profile) { pp => event =>
       pp >> partitionKey
       pp >> event.timestamp
@@ -164,10 +151,10 @@ class DbSequencedEventStore(
         // The implementation assumes that we timestamps on sequenced events increases monotonically with the sequencer counter
         // It therefore is fine to take the first event that we find.
         sql"""select type, sequencer_counter, ts, sequenced_event, trace_context, ignore from common_sequenced_events
-                where domain_id = $partitionKey and ts = $timestamp"""
+                where domain_idx = $partitionKey and ts = $timestamp"""
       case LatestUpto(inclusive) =>
         sql"""select type, sequencer_counter, ts, sequenced_event, trace_context, ignore from common_sequenced_events
-                where domain_id = $partitionKey and ts <= $inclusive
+                where domain_idx = $partitionKey and ts <= $inclusive
                 order by ts desc #${storage.limit(1)}"""
     }
 
@@ -178,14 +165,16 @@ class DbSequencedEventStore(
 
   override def findRange(criterion: SequencedEventStore.RangeCriterion, limit: Option[Int])(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SequencedEventRangeOverlapsWithPruning, Seq[PossiblyIgnoredSerializedEvent]] =
+  ): EitherT[FutureUnlessShutdown, SequencedEventRangeOverlapsWithPruning, Seq[
+    PossiblyIgnoredSerializedEvent
+  ]] =
     EitherT {
       criterion match {
         case ByTimestampRange(lowerInclusive, upperInclusive) =>
           for {
-            events <- storage.query(
+            events <- storage.queryUnlessShutdown(
               sql"""select type, sequencer_counter, ts, sequenced_event, trace_context, ignore from common_sequenced_events
-                    where domain_id = $partitionKey and $lowerInclusive <= ts  and ts <= $upperInclusive
+                    where domain_idx = $partitionKey and $lowerInclusive <= ts  and ts <= $upperInclusive
                     order by ts #${limit.fold("")(storage.limit(_))}"""
                 .as[PossiblyIgnoredSerializedEvent],
               functionFullName,
@@ -204,27 +193,26 @@ class DbSequencedEventStore(
 
   override def sequencedEvents(
       limit: Option[Int] = None
-  )(implicit traceContext: TraceContext): Future[Seq[PossiblyIgnoredSerializedEvent]] = {
+  )(implicit traceContext: TraceContext): Future[Seq[PossiblyIgnoredSerializedEvent]] =
     storage.query(
       sql"""select type, sequencer_counter, ts, sequenced_event, trace_context, ignore from common_sequenced_events
-              where domain_id = $partitionKey
+              where domain_idx = $partitionKey
               order by ts #${limit.fold("")(storage.limit(_))}"""
         .as[PossiblyIgnoredSerializedEvent],
       functionFullName,
     )
-  }
 
   override protected[canton] def doPrune(
       untilInclusive: CantonTimestamp,
       lastPruning: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): Future[Int] = {
     val query =
-      sqlu"delete from common_sequenced_events where domain_id = $partitionKey and ts <= $untilInclusive"
+      sqlu"delete from common_sequenced_events where domain_idx = $partitionKey and ts <= $untilInclusive"
     storage
       .queryAndUpdate(query, functionFullName)
       .map { nrPruned =>
         logger.info(
-          s"Pruned at least $nrPruned entries from the sequenced event store of domain_id $partitionKey older or equal to $untilInclusive"
+          s"Pruned at least $nrPruned entries from the sequenced event store of domain_idx $partitionKey older or equal to $untilInclusive"
         )
         nrPruned
       }
@@ -245,11 +233,11 @@ class DbSequencedEventStore(
       untilInclusive: SequencerCounter,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, ChangeWouldResultInGap, Unit] = {
+  ): EitherT[Future, ChangeWouldResultInGap, Unit] =
     for {
       lastSequencerCounterAndTimestampO <- EitherT.right(
         storage.query(
-          sql"""select sequencer_counter, ts from common_sequenced_events where domain_id = $partitionKey
+          sql"""select sequencer_counter, ts from common_sequenced_events where domain_idx = $partitionKey
                order by sequencer_counter desc #${storage.limit(1)}"""
             .as[(SequencerCounter, CantonTimestamp)]
             .headOption,
@@ -276,7 +264,6 @@ class DbSequencedEventStore(
 
       _ <- EitherT.right(storage.queryAndUpdate(bulkInsertQuery(events), functionFullName))
     } yield ()
-  }
 
   private def setIgnoreStatus(
       fromInclusive: SequencerCounter,
@@ -284,12 +271,11 @@ class DbSequencedEventStore(
       ignore: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): Future[Unit] = {
+  ): Future[Unit] =
     storage.update_(
-      sqlu"update common_sequenced_events set ignore = $ignore where domain_id = $partitionKey and $fromInclusive <= sequencer_counter and sequencer_counter <= $toInclusive",
+      sqlu"update common_sequenced_events set ignore = $ignore where domain_idx = $partitionKey and $fromInclusive <= sequencer_counter and sequencer_counter <= $toInclusive",
       functionFullName,
     )
-  }
 
   override def unignoreEvents(fromInclusive: SequencerCounter, toInclusive: SequencerCounter)(
       implicit traceContext: TraceContext
@@ -303,12 +289,12 @@ class DbSequencedEventStore(
 
   private def deleteEmptyIgnoredEvents(from: SequencerCounter, to: SequencerCounter)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, ChangeWouldResultInGap, Unit] = {
+  ): EitherT[Future, ChangeWouldResultInGap, Unit] =
     for {
       lastNonEmptyEventSequencerCounter <- EitherT.right(
         storage.query(
           sql"""select sequencer_counter from common_sequenced_events
-              where domain_id = $partitionKey and type != ${SequencedEventDbType.IgnoredEvent}
+              where domain_idx = $partitionKey and type != ${SequencedEventDbType.IgnoredEvent}
               order by sequencer_counter desc #${storage.limit(1)}"""
             .as[SequencerCounter]
             .headOption,
@@ -321,7 +307,7 @@ class DbSequencedEventStore(
       lastSequencerCounter <- EitherT.right(
         storage.query(
           sql"""select sequencer_counter from common_sequenced_events
-              where domain_id = $partitionKey
+              where domain_idx = $partitionKey
               order by sequencer_counter desc #${storage.limit(1)}"""
             .as[SequencerCounter]
             .headOption,
@@ -337,22 +323,20 @@ class DbSequencedEventStore(
       _ <- EitherT.right(
         storage.update(
           sqlu"""delete from common_sequenced_events
-               where domain_id = $partitionKey and type = ${SequencedEventDbType.IgnoredEvent}
+               where domain_idx = $partitionKey and type = ${SequencedEventDbType.IgnoredEvent}
                  and $fromEffective <= sequencer_counter and sequencer_counter <= $to""",
           functionFullName,
         )
       )
     } yield ()
-  }
 
   private[canton] override def delete(
-      from: SequencerCounter
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+      fromInclusive: SequencerCounter
+  )(implicit traceContext: TraceContext): Future[Unit] =
     storage.update_(
-      sqlu"delete from common_sequenced_events where domain_id = $partitionKey and sequencer_counter >= $from",
+      sqlu"delete from common_sequenced_events where domain_idx = $partitionKey and sequencer_counter >= $fromInclusive",
       functionFullName,
     )
-  }
 }
 
 object DbSequencedEventStore {

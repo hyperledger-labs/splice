@@ -5,9 +5,11 @@ import {
   testAuthSchema,
   serviceSchema,
   spliceInstanceNamesSchema,
+  pollIntervalSchema,
   ConfigProvider,
   useConfig,
 } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 import React from 'react';
 import { z } from 'zod';
 
@@ -20,6 +22,7 @@ type WalletConfig = {
   testAuth?: z.infer<typeof testAuthSchema>;
   services: WalletServicesConfig;
   spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
+  pollInterval?: z.infer<typeof pollIntervalSchema>;
 };
 
 const configScheme = z.object({
@@ -29,6 +32,7 @@ const configScheme = z.object({
     validator: serviceSchema,
   }),
   spliceInstanceNames: spliceInstanceNamesSchema,
+  pollInterval: pollIntervalSchema,
 });
 
 export const ConfigContext = React.createContext<WalletConfig | undefined>(undefined);
@@ -44,3 +48,10 @@ export const WalletConfigProvider: React.FC<{
 };
 
 export const useWalletConfig: () => WalletConfig = () => useConfig<WalletConfig>(ConfigContext);
+
+export const useConfigPollInterval: () => number = () => {
+  const config = useWalletConfig();
+
+  // Use default poll interval if not specified in config
+  return config.pollInterval ?? PollingStrategy.FIXED;
+};

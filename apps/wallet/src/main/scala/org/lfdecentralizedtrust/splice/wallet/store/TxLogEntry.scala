@@ -6,13 +6,15 @@ package org.lfdecentralizedtrust.splice.wallet.store
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.Identifier
 import org.lfdecentralizedtrust.splice.history.{
-  AnsRules_CollectEntryRenewalPayment,
-  AnsRules_CollectInitialEntryPayment,
   AmuletExpire,
   AmuletRules_BuyMemberTraffic,
+  AmuletRules_CreateTransferPreapproval,
+  AnsRules_CollectEntryRenewalPayment,
+  AnsRules_CollectInitialEntryPayment,
   LockedAmuletExpireAmulet,
   LockedAmuletOwnerExpireLock,
   LockedAmuletUnlock,
+  TransferPreapproval_Renew,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
@@ -405,7 +407,7 @@ object TxLogEntry extends StoreErrors {
       val companion: ExerciseNodeCompanion,
       val amuletOperation: Option[String],
   ) {
-    val templateId: Identifier = companion.template.TEMPLATE_ID
+    val templateId: Identifier = companion.template.getTemplateIdWithPackageId
     val choice: String = companion.choice.name
 
     def toProto: TransactionSubtype =
@@ -442,6 +444,10 @@ object TxLogEntry extends StoreErrors {
         extends TransferTransactionSubtype(AnsRules_CollectInitialEntryPayment)
     case object EntryRenewalPaymentCollection
         extends TransferTransactionSubtype(AnsRules_CollectEntryRenewalPayment)
+    case object TransferPreapprovalCreation
+        extends TransferTransactionSubtype(AmuletRules_CreateTransferPreapproval)
+    case object TransferPreapprovalRenewal
+        extends TransferTransactionSubtype(TransferPreapproval_Renew)
     case object Transfer
         extends TransferTransactionSubtype(org.lfdecentralizedtrust.splice.history.Transfer)
 
@@ -457,6 +463,7 @@ object TxLogEntry extends StoreErrors {
       ExtraTrafficPurchase,
       InitialEntryPaymentCollection,
       EntryRenewalPaymentCollection,
+      TransferPreapprovalCreation,
       Transfer,
     ).map(txSubtype => txSubtype.choice -> txSubtype).toMap
 

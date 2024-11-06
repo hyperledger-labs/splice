@@ -7,8 +7,6 @@ import com.daml.ledger.api.v2.command_service.SubmitAndWaitRequest
 import com.daml.ledger.api.v2.command_submission_service.SubmitRequest
 import com.daml.ledger.api.v2.commands.Commands
 import com.daml.ledger.api.v2.event.*
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
 import com.daml.ledger.api.v2.transaction.{Transaction, TransactionTree, TreeEvent}
 import com.daml.ledger.api.v2.transaction_filter.{Filters, TransactionFilter}
 import com.daml.ledger.api.v2.value.Value.Sum.Text
@@ -19,9 +17,6 @@ import scala.util.Random
 
 object MockMessages {
 
-  val participantBegin: ParticipantOffset = ParticipantOffset(
-    ParticipantOffset.Value.Boundary(PARTICIPANT_BOUNDARY_BEGIN)
-  )
   val workflowId = "workflowId"
   val applicationId = "applicationId"
   val commandId = "commandId"
@@ -47,7 +42,7 @@ object MockMessages {
   val templateName = "templateName"
   val choice = "choice"
   val templateId: Identifier = Identifier(packageId, moduleName, templateName)
-  val offset = "offset"
+  val offset = 12345678L
 
   val transactionFilter: TransactionFilter =
     TransactionFilter(Map(party -> Filters()))
@@ -63,7 +58,7 @@ object MockMessages {
     choice,
     None,
     List(party),
-    true,
+    consuming = true,
     Nil, // No witnesses
     List(createdEvent.eventId),
   )
@@ -90,7 +85,7 @@ object MockMessages {
     offset,
   )
 
-  private val NO_OF_TRANSACTIONS = 1000
+  private val NO_OF_TRANSACTIONS = 1000L
 
   private def randomId(name: String) = s"$name-${Random.nextInt(10000)}"
 
@@ -107,14 +102,14 @@ object MockMessages {
   )
 
   def generateMockTransactions(): List[TransactionTree] =
-    (1 to NO_OF_TRANSACTIONS).map { i =>
+    (1L to NO_OF_TRANSACTIONS).map { i =>
       val event = generateEvent()
       TransactionTree(
         randomId("transaction"),
         randomId("command"),
         randomId("workflow"),
         Some(ledgerEffectiveTime),
-        i.toString,
+        i,
         Map(event.eventId -> TreeEvent(TreeEvent.Kind.Exercised(event))),
         List(event.eventId),
       )

@@ -7,6 +7,10 @@ import better.files.File.newTemporaryFile
 import better.files.{DisposeableExtensions, File, *}
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.grpc.ByteStringStreamObserverWithContext
+import com.digitalasset.canton.version.{
+  HasProtocolVersionedCompanion,
+  HasRepresentativeProtocolVersion,
+}
 import com.google.protobuf.ByteString
 import io.grpc.Context
 import io.grpc.stub.StreamObserver
@@ -64,13 +68,12 @@ object GrpcStreamingUtils {
     val ref = new AtomicReference[Option[Resp]](None)
 
     val responseObserver = new StreamObserver[Resp] {
-      override def onNext(value: Resp): Unit = {
+      override def onNext(value: Resp): Unit =
         ref.set(Some(value))
-      }
 
       override def onError(t: Throwable): Unit = requestComplete.failure(t)
 
-      override def onCompleted(): Unit = {
+      override def onCompleted(): Unit =
         ref.get() match {
           case Some(response) => requestComplete.success(response)
           case None =>
@@ -81,7 +84,6 @@ object GrpcStreamingUtils {
             )
         }
 
-      }
     }
     val requestObserver = load(responseObserver)
 
@@ -148,6 +150,35 @@ object GrpcStreamingUtils {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
+  def parseDelimitedFromTrusted[T <: HasRepresentativeProtocolVersion](
+      stream: InputStream,
+      objectType: HasProtocolVersionedCompanion[T],
+  ): Either[String, Seq[T]] = {
+    var hasDataInStream = true
+    var errorMessageO: Option[String] = None
+    // assume we can load everything into memory
+    val output =
+      scala.collection.mutable.ListBuffer.empty[T]
+
+    while (hasDataInStream && errorMessageO.isEmpty) {
+      objectType.parseDelimitedFromTrusted(stream) match {
+        case None =>
+          // parseDelimitedFrom returns None to indicate that there is no more data to read from the input stream
+          hasDataInStream = false
+        case Some(contractMetadataE) =>
+          contractMetadataE match {
+            case Left(parsingError) =>
+              // if there is a deserialization error, let's stop processing and return the error message
+              errorMessageO = Some(parsingError.message)
+            case Right(activeContract) =>
+              output.addOne(activeContract)
+          }
+      }
+    }
+    errorMessageO.toLeft(output.toList)
+  }
+
   private def streamResponseChunks[T](
       context: Context.CancellableContext,
       responseObserver: StreamObserver[T],
@@ -155,7 +186,7 @@ object GrpcStreamingUtils {
       inputStream: InputStream,
       chunkSize: Int,
       fromByteString: FromByteString[T],
-  ) = {
+  ): Unit =
     inputStream.autoClosed { s =>
       Iterator
         .continually(s.readNBytes(chunkSize))
@@ -167,12 +198,11 @@ object GrpcStreamingUtils {
           responseObserver.onNext(fromByteString.toT(chunk))
         }
     }
-  }
 
   private def finishStream[T](
       context: Context.CancellableContext,
       responseObserver: StreamObserver[T],
-  )(f: Future[Unit], timeout: Duration): Unit = {
+  )(f: Future[Unit], timeout: Duration): Unit =
     Try(Await.result(f, timeout)) match {
       case Failure(exception) =>
         responseObserver.onError(exception)
@@ -185,7 +215,6 @@ object GrpcStreamingUtils {
           ()
         }
     }
-  }
 }
 
 // Define a type class for converting ByteString to the generic type T

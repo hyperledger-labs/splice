@@ -53,6 +53,8 @@ sealed abstract class DisclosedContracts {
           show"disclosed contracts are not on expected domain $domainId, but on $otherDomainId: $contracts"
         )
     }
+
+  def merge(other: DisclosedContracts): DisclosedContracts
 }
 
 object DisclosedContracts {
@@ -98,6 +100,8 @@ object DisclosedContracts {
       ifExpected
 
     private[splice] override def overwriteDomain(target: DomainId) = target
+
+    override def merge(other: DisclosedContracts) = other
   }
 
   final case class NE(
@@ -125,6 +129,17 @@ object DisclosedContracts {
         retryableError(
           show"contracts must match the domain of other disclosed contracts, $assignedDomain, to be disclosed: $other"
         )
+    }
+
+    override def merge(other: DisclosedContracts): DisclosedContracts = other match {
+      case DisclosedContracts.Empty => this
+      case DisclosedContracts.NE(otherContracts, otherDomain) =>
+        if (assignedDomain == otherDomain)
+          DisclosedContracts.NE(contracts ++ otherContracts, assignedDomain)
+        else
+          throw new IllegalArgumentException(
+            s"Cannot merge disclosed contracts for domain $otherDomain with disclosed contracts for domain $assignedDomain"
+          )
     }
   }
 }

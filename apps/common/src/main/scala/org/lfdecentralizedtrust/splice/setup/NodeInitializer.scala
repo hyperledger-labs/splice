@@ -13,7 +13,8 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.prettyString
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForId}
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
+import com.digitalasset.canton.crypto.{KeyPurpose, SigningKeyUsage}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -60,7 +61,8 @@ class NodeInitializer(
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     for {
       // All nodes need a signing key
-      signingKey <- connection.generateKeyPair("signing")
+      // TODO(#14930) Split namespace and signing key.
+      signingKey <- connection.generateKeyPair("signing", SigningKeyUsage.All)
 
       // Only participants need an encryption key, but for simplicity every node gets one
       encryptionKey <- connection.generateEncryptionKeyPair("encryption")
@@ -88,7 +90,7 @@ class NodeInitializer(
       _ <- connection.ensureInitialOwnerToKeyMapping(
         member = nodeId,
         keys = NonEmpty(Seq, signingKey, encryptionKey),
-        signedBy = namespace.fingerprint,
+        signedBy = Seq(namespace.fingerprint, signingKey.fingerprint).distinct,
         retryFor = RetryFor.Automation,
       )
     } yield {
@@ -208,7 +210,9 @@ class NodeInitializer(
                 connection.ensureInitialOwnerToKeyMapping(
                   expectedId.member,
                   keysNE.map(_.publicKey),
-                  expectedId.uid.namespace.fingerprint,
+                  (expectedId.uid.namespace.fingerprint +: keysNE
+                    .filter(_.purpose == KeyPurpose.Signing)
+                    .map(_.publicKey.fingerprint)).distinct,
                   RetryFor.Automation,
                 )
             }

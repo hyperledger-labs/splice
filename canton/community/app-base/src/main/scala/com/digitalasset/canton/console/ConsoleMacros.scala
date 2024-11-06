@@ -5,7 +5,6 @@ package com.digitalasset.canton.console
 
 import better.files.File
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import ch.qos.logback.classic.Level
@@ -24,7 +23,13 @@ import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.ContractData
 import com.digitalasset.canton.admin.api.client.data
-import com.digitalasset.canton.admin.api.client.data.{ListPartiesResult, TemplateId}
+import com.digitalasset.canton.admin.api.client.data.{
+  ListPartiesResult,
+  MediatorStatus,
+  NodeStatus,
+  SequencerStatus,
+  TemplateId,
+}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -32,17 +37,12 @@ import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.crypto.{CryptoPureApi, Salt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.health.admin.data.{
-  MediatorNodeStatus,
-  NodeStatus,
-  SequencerNodeStatus,
-}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NodeLoggingUtil}
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.admin.repair.RepairService
 import com.digitalasset.canton.participant.config.BaseParticipantConfig
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.sequencing.{
   SequencerConnectionValidation,
   SequencerConnections,
@@ -55,13 +55,13 @@ import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   StoredTopologyTransactions,
 }
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.{
   GenericSignedTopologyTransaction,
   PositiveSignedTopologyTransaction,
 }
-import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
-import com.digitalasset.canton.util.{BinaryFileUtil, EitherUtil}
+import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -73,11 +73,11 @@ import io.circe.syntax.*
 
 import java.io.File as JFile
 import java.time.Instant
-import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.concurrent.duration.*
 
 trait ConsoleMacros extends NamedLogging with NoTracing {
+
   import scala.reflect.runtime.universe.*
 
   @Help.Summary("Console utilities")
@@ -101,8 +101,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Wait for a condition to become true, using default timeouts")
     @Help.Description("""
-       |Wait until condition becomes true, with a timeout taken from the parameters.timeouts.console.bounded
-       |configuration parameter.""")
+        |Wait until condition becomes true, with a timeout taken from the parameters.timeouts.console.bounded
+        |configuration parameter.""")
     final def retry_until_true(
         condition: => Boolean
     )(implicit
@@ -149,12 +149,12 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         env.nodes.all.forall(_.topology.synchronisation.is_idle())
       }
 
-    @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
     private object GenerateDamlScriptParticipantsConf {
 
       private val filename = "participant-config.json"
 
       case class LedgerApi(host: String, port: Int)
+
       // Keys in the exported JSON should have snake_case
       case class Participants(
           default_participant: Option[LedgerApi],
@@ -172,6 +172,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         def participantReference(p: ParticipantId) = if (useParticipantAlias)
           uidToAlias.getOrElse(p, p.uid.toProtoPrimitive)
         else p.uid.toProtoPrimitive
+
         def partyIdToParticipant(p: ListPartiesResult) = p.participants.headOption.map {
           participantDomains =>
             (p.party.filterString, participantReference(participantDomains.participant))
@@ -255,9 +256,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       "Register `AutoCloseable` object to be shutdown if Canton is shut down",
       FeatureFlag.Testing,
     )
-    def auto_close(closeable: AutoCloseable)(implicit environment: ConsoleEnvironment): Unit = {
+    def auto_close(closeable: AutoCloseable)(implicit environment: ConsoleEnvironment): Unit =
       environment.environment.addUserCloseable(closeable)
-    }
 
     @Help.Summary("Convert contract data to a contract instance.")
     @Help.Description(
@@ -563,8 +563,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def exercise(choice: String, arguments: Map[String, Any], event: CreatedEvent): Command = {
       def getOrThrow(desc: String, opt: Option[String]): String =
         opt.getOrElse(
-          throw new IllegalArgumentException(s"Corrupt created event ${event} without ${desc}")
+          throw new IllegalArgumentException(s"Corrupt created event $event without $desc")
         )
+
       exercise(
         getOrThrow(
           "packageId",
@@ -586,9 +587,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @SuppressWarnings(Array("org.wartremover.warts.Null"))
     @Help.Summary("Dynamically change log level (TRACE, DEBUG, INFO, WARN, ERROR, OFF, null)")
-    def set_level(loggerName: String = "com.digitalasset.canton", level: String): Unit = {
+    def set_level(loggerName: String = "com.digitalasset.canton", level: String): Unit =
       NodeLoggingUtil.setLevel(loggerName, level)
-    }
 
     @Help.Summary("Determine current logging level")
     def get_level(loggerName: String = "com.digitalasset.canton"): Option[Level] =
@@ -602,12 +602,11 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       }
 
     @Help.Summary("Returns log events for an error with the same trace-id")
-    def last_error_trace(traceId: String): Seq[String] = {
+    def last_error_trace(traceId: String): Seq[String] =
       NodeLoggingUtil.lastErrorTrace(traceId).getOrElse {
         logger.error(s"No events found for last error trace-id $traceId")
         throw new InteractiveCommandFailure()
       }
-    }
   }
 
   @Help.Summary("Configure behaviour of console")
@@ -636,14 +635,12 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       env.setCommandTimeout(newTimeout)
 
     // this command is intentionally not documented as part of the help system
-    def disable_features(flag: FeatureFlag)(implicit env: ConsoleEnvironment): Unit = {
+    def disable_features(flag: FeatureFlag)(implicit env: ConsoleEnvironment): Unit =
       env.updateFeatureSet(flag, include = false)
-    }
 
     // this command is intentionally not documented as part of the help system
-    def enable_features(flag: FeatureFlag)(implicit env: ConsoleEnvironment): Unit = {
+    def enable_features(flag: FeatureFlag)(implicit env: ConsoleEnvironment): Unit =
       env.updateFeatureSet(flag, include = true)
-    }
   }
 
   @Help.Summary("Functions to bootstrap/setup decentralized namespaces or full domains")
@@ -660,6 +657,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )
     def decentralized_namespace(
         owners: Seq[InstanceReference],
+        threshold: PositiveInt,
         store: String = AuthorizedStore.filterName,
     ): (Namespace, Seq[GenericSignedTopologyTransaction]) = {
       val ownersNE = NonEmpty
@@ -684,9 +682,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
               .map(_.transaction)
 
           existingDnsO.getOrElse(
-            owner.topology.decentralized_namespaces.propose(
+            owner.topology.decentralized_namespaces.propose_new(
               owners.map(_.namespace).toSet,
-              PositiveInt.tryCreate(1.max(owners.size - 1)),
+              threshold,
               store = store,
             )
           )
@@ -750,18 +748,18 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )(domainId: DomainId): Either[String, Option[DomainId]] = {
       def isNotInitializedOrSuccessWithDomain(
           instance: InstanceReference
-      ): Either[String, Boolean /* isInitializedWithDomain */ ] = {
+      ): Either[String, Boolean /* isInitializedWithDomain */ ] =
         instance.health.status match {
           case nonFailure if nonFailure.isActive.contains(false) =>
             Left(s"${instance.id.member} is currently not active")
-          case NodeStatus.Success(status: SequencerNodeStatus) =>
+          case NodeStatus.Success(status: SequencerStatus) =>
             // sequencer is already fully initialized for this domain
             Either.cond(
               status.domainId == domainId,
               true,
               s"${instance.id.member} has already been initialized for domain ${status.domainId} instead of $domainId.",
             )
-          case NodeStatus.Success(status: MediatorNodeStatus) =>
+          case NodeStatus.Success(status: MediatorStatus) =>
             // mediator is already fully initialized for this domain
             Either.cond(
               status.domainId == domainId,
@@ -777,7 +775,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             // Unexpected status response. All cases should be covered by the patterns above
             Left(s"Unexpected status: $otherwise")
         }
-      }
 
       val alreadyFullyInitialized =
         (sequencers ++ mediators).forgetNE.toSeq.traverse(isNotInitializedOrSuccessWithDomain(_))
@@ -790,8 +787,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     }
 
     private def no_domain(nodes: NonEmpty[Seq[InstanceReference]]): Either[String, Unit] =
-      EitherUtil.condUnitE(
+      Either.cond(
         !nodes.exists(_.health.initialized()),
+        (),
         "the domain has not yet been bootstrapped but some sequencers or mediators are already part of one",
       )
 
@@ -808,7 +806,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           .toRight("you need at least one sequencer")
         neMediators <- NonEmpty.from(mediators.distinct).toRight("you need at least one mediator")
         nodes = neOwners ++ neSequencers ++ neMediators
-        _ = EitherUtil.condUnitE(nodes.forall(_.health.is_running()), "all nodes must be running")
+        _ = Either.cond(nodes.forall(_.health.is_running()), (), "all nodes must be running")
         ns <- expected_namespace(neOwners)
         expectedId = ns.map(ns => DomainId(UniqueIdentifier.tryCreate(name, ns.toProtoPrimitive)))
         actualIdIfAllNodesAreInitialized <- expectedId.fold(
@@ -820,12 +818,17 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         domainName: String,
         staticDomainParameters: data.StaticDomainParameters,
         domainOwners: Seq[InstanceReference],
+        domainThreshold: PositiveInt,
         sequencers: Seq[SequencerReference],
         mediatorsToSequencers: Map[MediatorReference, Seq[SequencerReference]],
         mediatorRequestAmplification: SubmissionRequestAmplification,
     ): DomainId = {
       val (decentralizedNamespace, foundingTxs) =
-        bootstrap.decentralized_namespace(domainOwners, store = AuthorizedStore.filterName)
+        bootstrap.decentralized_namespace(
+          domainOwners,
+          domainThreshold,
+          store = AuthorizedStore.filterName,
+        )
 
       val domainId = DomainId(
         UniqueIdentifier.tryCreate(domainName, decentralizedNamespace.toProtoPrimitive)
@@ -921,7 +924,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         domainName: String,
         sequencers: Seq[SequencerReference],
         mediators: Seq[MediatorReference],
-        domainOwners: Seq[InstanceReference] = Seq.empty,
+        domainOwners: Seq[InstanceReference],
+        domainThreshold: PositiveInt,
         staticDomainParameters: data.StaticDomainParameters,
         mediatorRequestAmplification: SubmissionRequestAmplification =
           SubmissionRequestAmplification.NoAmplification,
@@ -931,6 +935,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         sequencers,
         mediators.map(_ -> sequencers).toMap,
         domainOwners,
+        domainThreshold,
         staticDomainParameters,
         mediatorRequestAmplification,
       )
@@ -944,6 +949,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         sequencers: Seq[SequencerReference],
         mediatorsToSequencers: Map[MediatorReference, Seq[SequencerReference]],
         domainOwners: Seq[InstanceReference],
+        domainThreshold: PositiveInt,
         staticDomainParameters: data.StaticDomainParameters,
         mediatorRequestAmplification: SubmissionRequestAmplification,
     ): DomainId = {
@@ -967,6 +973,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             domainName,
             staticDomainParameters,
             domainOwnersOrDefault,
+            domainThreshold,
             uniqueSequencers,
             mediatorsToSequencers,
             mediatorRequestAmplification,
@@ -979,6 +986,77 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     }
   }
 
+  object commitments extends Helpful {
+    // TODO(#9557) R2
+    @Help.Summary(
+      "Inspect ACS commitment mismatch as part of the reconciliation protocol.",
+      FeatureFlag.Preview,
+    )
+    @Help.Description(
+      """ Inspect commitment mismatch between computed local commitment and received commitment from counter-participant.
+        | Writes to files the contracts that cause the mismatch and the transactions that activated them.
+        | Assumes that the console is connected to both participants that observed the mismatch.
+        | The commands outputs an error if the counter-participant sent several commitments for the same interval end
+        | and domain, because, e.g., it executed a repair command in the meantime and it cannot retrieve the data for the
+        | given commitment anymore.
+        | The arguments are:
+        | - domain: The domain where the mismatch occurred
+        | - mismatchTimestamp: The domain timestamp of the commitment mismatch. Needs to correspond to a commitment tick.
+        | - targetParticipant: The participant that reported the mismatch and wants to fix it on its side.
+        | - counterParticipant: The counter participant that sent the mismatching commitment, and with which we interact
+        |   to retrieve the mismatching contracts.
+        | - timeout: Time limit for each streaming grpc calls in the command to complete.
+        |   Optional argument. If not given, the time is unbounded.
+        | - integrityChecks: If true, the command performs additional checks:
+        |    - check that, at the given mismatch timestamp, the participant's own commitment and received
+        |    counterCommitment indeed mismatch
+        |    - check that the received contract metadata matches the counterCommitment
+        | - binaryOutputFile: File where to write the mismatch information in binary format. This can be passed to the
+        | command reconciling the mismatch. The mismatch information has the type CommitmentInspectContracts.
+        |   Optional argument. If not given, the default file name on the console is used.
+        | - readableOutputFile: File where to write the mismatch information in human-readable format. This file can
+        | be edited by users to indicate how to fix mismatches: keep, delete, etc. The data type is CommitmentMismatchInfo
+        | written in json format.
+        | Optional argument. If not given, the default file name on the console is used.""".stripMargin
+    )
+    def inspect_acs_commitment_mismatch(
+        domain: DomainId,
+        mismatchTimestamp: CantonTimestamp,
+        targetParticipant: ParticipantReference,
+        // TODO(#20583) Pass only the ParticipantId and change to participant-to-participant communication when available.
+        counterParticipant: ParticipantReference,
+        timeout: Option[NonNegativeDuration] = None,
+        integrityChecks: Boolean = true,
+        binaryOutputFile: Option[String] = None,
+        readableOutputFile: Option[String] = None,
+    ): Unit = {
+      // TODO(#9557) 0. If integrityChecks is true, check that, at the given mismatch timestamp, the target
+      //  participant's own commitment and received counterCommitment indeed mismatch
+      //  We read these commitment from the target participant's store using R5 endpoints
+
+      // TODO(#9557) 1. Downloading the shared contract metadata from counter-participant:
+      //  counterParticipant.commitments.open_commitment(...)
+
+      // TODO(#9557) 2. If integrityChecks is true, check that the contract metadata sent matches the counter commitment
+      //  by uploading the contract metadata to the target participant.
+      //  The retrieved data might be insufficient for the check, because for example the target participant has never
+      //  seen some of the received cids, therefore it does not know the stakeholders and cannot properly compute the
+      //  hierarchical commitments. In this case, we can perform the check as the last step, after we retrieve the
+      //  contract payloads from the counter-participant.
+
+      // TODO(#9557) 3. Identify mismatching contracts by checking the counterParticipant's contracts metadata
+      //  against the ACS contracts of the target participant:
+      //  targetParticipant.commitments.active_contracts_mismatches(...)
+      // TODO(#20583) Investigate fetching the ACS snapshot via LAPI without the contract payload. LAPI has longer lived data
+      //  and allows for party filtering.
+
+      // TODO(#9557) 4. Request contract payloads from the counterParticipant for shared contracts that cause mismatches
+      //   and write them to the binary output file:
+      //   counterParticipant.commitments.download_contract_reconciliation_payloads(...)
+
+      // TODO(#9557) 5. Write user-readable data in the readable output file regarding mismatching contracts ids
+    }
+  }
 }
 
 object ConsoleMacros extends ConsoleMacros with NamedLogging {
@@ -1044,7 +1122,7 @@ object DebuggingHelpers extends LazyLogging {
     ) = {
       val delta = lft.diff(rght)
       delta.foreach { key =>
-        logger.info(s"${explain} ${key} ${payload.getOrElse(key, sys.error("should be there"))}")
+        logger.info(s"$explain $key ${payload.getOrElse(key, sys.error("should be there"))}")
       }
     }
 

@@ -33,14 +33,14 @@ class TopologyStoreTestData(
         op,
         serial,
         mapping,
-        ProtocolVersion.v31,
+        ProtocolVersion.v32,
       ),
       signatures = NonEmpty(Set, Signature.noSignature),
       isProposal = isProposal,
     )(
       SignedTopologyTransaction.supportedProtoVersions
         .protocolVersionRepresentativeFor(
-          ProtocolVersion.v31
+          ProtocolVersion.v32
         )
     )
 
@@ -81,7 +81,7 @@ class TopologyStoreTestData(
     isProposal = true,
   )
   val tx2_OTK = makeSignedTx(
-    OwnerToKeyMapping(participantId1, domain = None, signingKeys)
+    OwnerToKeyMapping(participantId1, signingKeys)
   )
   val tx3_IDD_Removal = makeSignedTx(
     IdentifierDelegation(daDomainUid, signingKeys.head1),
@@ -91,10 +91,8 @@ class TopologyStoreTestData(
   val tx3_PTP_Proposal = makeSignedTx(
     PartyToParticipant.tryCreate(
       partyId = fredOfCanton,
-      domainId = None,
       threshold = PositiveInt.one,
       participants = Seq(HostingParticipant(participantId1, ParticipantPermission.Submission)),
-      groupAddressing = true,
     ),
     isProposal = true,
   )
@@ -111,33 +109,27 @@ class TopologyStoreTestData(
       .getOrElse(fail())
   )
   val tx4_OTK_Proposal = makeSignedTx(
-    OwnerToKeyMapping(participantId1, domain = None, signingKeys),
+    OwnerToKeyMapping(participantId1, signingKeys),
     isProposal = true,
     serial = PositiveInt.tryCreate(2),
   )
   val tx5_PTP = makeSignedTx(
     PartyToParticipant.tryCreate(
       partyId = fredOfCanton,
-      domainId = None,
       threshold = PositiveInt.one,
       participants = Seq(HostingParticipant(participantId1, ParticipantPermission.Submission)),
-      groupAddressing = true,
     )
   )
   val tx5_DTC = makeSignedTx(
     DomainTrustCertificate(
       participantId2,
       domainId1,
-      transferOnlyToGivenTargetDomains = false,
-      targetDomains = Seq.empty,
     )
   )
   val tx6_DTC_Update = makeSignedTx(
     DomainTrustCertificate(
       participantId2,
       domainId1,
-      transferOnlyToGivenTargetDomains = true,
-      targetDomains = Seq(domainId1),
     ),
     serial = PositiveInt.tryCreate(2),
   )

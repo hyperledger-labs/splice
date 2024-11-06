@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, ContractWithState, PollingStrategy } from 'common-frontend-utils';
+import { Contract, ContractWithState } from 'common-frontend-utils';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules/';
 
@@ -11,7 +11,6 @@ const useGetAmuletRules = (): UseQueryResult<ContractWithState<AmuletRules>> => 
   const scanClient = useValidatorScanProxyClient();
 
   return useQuery({
-    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['scan-api', 'getAmuletRules', AmuletRules],
     queryFn: async () => {
       const response = await scanClient.getAmuletRules();

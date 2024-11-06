@@ -28,7 +28,7 @@ object TlsConfigurationCli {
     opt[String]("crt")
       .optional()
       .text(
-        s"TLS: The crt file to be used as the cert chain.\n${colSpacer}" +
+        s"TLS: The crt file to be used as the cert chain.\n$colSpacer" +
           s"Required for client authentication."
       )
       .validate(validatePath(_, "The file specified via --crt does not exist"))
@@ -60,6 +60,6 @@ object TlsConfigurationCli {
 
   private def validatePath(path: String, message: String): Either[String, Unit] = {
     val valid = Try(Paths.get(path).toFile.canRead).getOrElse(false)
-    if (valid) Right(()) else Left(message)
+    Either.cond(valid, (), message)
   }
 }
