@@ -74,7 +74,7 @@ final case class ViewCommonData private (
 
   override val hashPurpose: HashPurpose = HashPurpose.ViewCommonData
 
-  override def pretty: Pretty[ViewCommonData] = prettyOfClass(
+  override protected def pretty: Pretty[ViewCommonData] = prettyOfClass(
     param("view confirmation parameters", _.viewConfirmationParameters),
     param("salt", _.salt),
   )
@@ -99,7 +99,7 @@ object ViewCommonData
   override val name: String = "ViewCommonData"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.ViewCommonData)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ViewCommonData)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -142,7 +142,7 @@ object ViewCommonData
   )(bytes: ByteString): ParsingResult[ViewCommonData] =
     for {
       informees <- viewCommonDataP.informees.traverse(informee =>
-        ProtoConverter.parseLfPartyId(informee)
+        ProtoConverter.parseLfPartyId(informee, "informees")
       )
       salt <- ProtoConverter
         .parseRequired(Salt.fromProtoV30, "salt", viewCommonDataP.salt)
@@ -171,12 +171,12 @@ final case class ViewConfirmationParameters private (
 ) extends PrettyPrinting
     with NoCopy {
 
-  override def pretty: Pretty[ViewConfirmationParameters] = prettyOfClass(
+  override protected def pretty: Pretty[ViewConfirmationParameters] = prettyOfClass(
     param("informees", _.informees),
     param("quorums", _.quorums),
   )
 
-  lazy val confirmers: Set[LfPartyId] = quorums.flatMap { _.confirmers.keys }.toSet
+  lazy val confirmers: Set[LfPartyId] = quorums.flatMap(_.confirmers.keys).toSet
 }
 
 object ViewConfirmationParameters {
@@ -186,6 +186,14 @@ object ViewConfirmationParameters {
       extends RuntimeException(message)
 
   /** Creates a [[ViewConfirmationParameters]] with a single quorum consisting of all confirming parties and a given threshold.
+    *
+    * Informees are parties involved in the view and can have a weight indicating their confirmation role:
+    * - Non-confirming informees have a weight of 0.
+    * - Confirming informees have a positive weight (with a recommended value of 1).
+    *
+    * The `threshold` parameter determines the minimum number of confirmers required to approve the view.
+    * Currently, only thresholds equal to the total weight of all confirmers are supported
+    * (i.e., threshold == sum of weights of all confirming informees).
     */
   def create(
       informees: Map[LfPartyId, NonNegativeInt],
@@ -205,17 +213,20 @@ object ViewConfirmationParameters {
 
   /** Creates a [[ViewConfirmationParameters]] where all informees are confirmers and
     * includes a single quorum consisting of all confirming parties and a given threshold.
+    *
+    * Confirmers must have a positive weight (with a recommended value of 1). Currently,
+    * only thresholds equal to the sum of all confirmers' weights are supported.
     */
   def createOnlyWithConfirmers(
       confirmers: Map[LfPartyId, PositiveInt],
-      threshold: NonNegativeInt,
+      viewThreshold: NonNegativeInt,
   ): ViewConfirmationParameters =
     ViewConfirmationParameters(
       confirmers.keySet,
       Seq(
         Quorum(
           confirmers,
-          threshold,
+          viewThreshold,
         )
       ),
     )

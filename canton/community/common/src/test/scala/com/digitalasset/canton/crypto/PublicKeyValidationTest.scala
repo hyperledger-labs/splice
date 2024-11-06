@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.crypto
 
+import cats.syntax.either.*
 import com.digitalasset.canton.BaseTest
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -13,23 +14,21 @@ trait PublicKeyValidationTest extends BaseTest with CryptoTestHelper { this: Asy
   private def modifyPublicKey(
       publicKey: PublicKey,
       newFormat: CryptoKeyFormat,
-  ): PublicKey = {
+  ): PublicKey =
     publicKey match {
       case EncryptionPublicKey(_format, key, scheme) =>
         new EncryptionPublicKey(newFormat, key, scheme)
-      case SigningPublicKey(_format, key, scheme) =>
-        new SigningPublicKey(newFormat, key, scheme)
+      case SigningPublicKey(_format, key, scheme, usage) =>
+        new SigningPublicKey(newFormat, key, scheme, usage)
       case _ => fail(s"unsupported key type")
     }
-  }
 
   private def keyValidationTest[K <: PublicKey](
       supportedCryptoKeyFormats: Set[CryptoKeyFormat],
       name: String,
       newCrypto: => Future[Crypto],
       newPublicKey: Crypto => Future[PublicKey],
-  ): Unit = {
-
+  ): Unit =
     // change format
     forAll(supportedCryptoKeyFormats) { format =>
       s"Validate $name public key with $format" in {
@@ -43,7 +42,7 @@ trait PublicKeyValidationTest extends BaseTest with CryptoTestHelper { this: Asy
           )
         } yield
           if (format == publicKey.format || format == CryptoKeyFormat.Symbolic)
-            validationRes shouldEqual Right(())
+            validationRes shouldEqual Either.unit
           else
             validationRes.left.value should include(
               s"Failed to deserialize $format public key: KeyParseAndValidateError"
@@ -51,37 +50,38 @@ trait PublicKeyValidationTest extends BaseTest with CryptoTestHelper { this: Asy
       }
     }
 
-  }
-
   /** Test public key validation
     */
   def publicKeyValidationProvider(
-      supportedSigningKeySchemes: Set[SigningKeyScheme],
+      supportedSigningKeySpecs: Set[SigningKeySpec],
       supportedEncryptionKeySpecs: Set[EncryptionKeySpec],
       supportedCryptoKeyFormats: Set[CryptoKeyFormat],
       newCrypto: => Future[Crypto],
-  ): Unit = {
-
+  ): Unit =
     "Validate public keys" should {
-      forAll(supportedSigningKeySchemes) { signingKeyScheme =>
+      forAll(supportedSigningKeySpecs) { signingKeySpec =>
         keyValidationTest[SigningPublicKey](
           supportedCryptoKeyFormats,
-          signingKeyScheme.toString,
+          if (signingKeySpec.toString == "EC-P256") "EC-P256-Signing" else signingKeySpec.toString,
           newCrypto,
-          crypto => getSigningPublicKey(crypto, signingKeyScheme).failOnShutdown,
+          crypto =>
+            getSigningPublicKey(
+              crypto,
+              SigningKeyUsage.ProtocolOnly,
+              signingKeySpec,
+            ).failOnShutdown,
         )
       }
 
       forAll(supportedEncryptionKeySpecs) { encryptionKeySpec =>
         keyValidationTest[EncryptionPublicKey](
           supportedCryptoKeyFormats,
-          encryptionKeySpec.toString,
+          if (encryptionKeySpec.toString == "EC-P256") "EC-P256-Encryption"
+          else encryptionKeySpec.toString,
           newCrypto,
           crypto => getEncryptionPublicKey(crypto, encryptionKeySpec).failOnShutdown,
         )
       }
     }
-
-  }
 
 }

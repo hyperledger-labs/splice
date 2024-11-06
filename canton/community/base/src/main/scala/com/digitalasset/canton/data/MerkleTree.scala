@@ -74,7 +74,7 @@ trait MerkleTree[+A] extends Product with Serializable with PrettyPrinting {
     // - the node effectively needs to be copied (because it has a blinded descendant).
     //
     // Returns (allRevealed, allBlinded) indicating whether all nodes in tree are revealed/blinded.
-    def optimizeBlindingPolicy(tree: MerkleTree[_]): (Boolean, Boolean) = {
+    def optimizeBlindingPolicy(tree: MerkleTree[_]): (Boolean, Boolean) =
       completeBlindingPolicy(tree) match {
         case BlindSubtree =>
           optimizedBlindingPolicy += tree.rootHash -> BlindSubtree
@@ -93,7 +93,6 @@ trait MerkleTree[+A] extends Product with Serializable with PrettyPrinting {
           optimizedBlindingPolicy += tree.rootHash -> command
           (allRevealed && !allBlinded, allBlinded)
       }
-    }
 
     def completeBlindingPolicy(tree: MerkleTree[_]): BlindingCommand =
       blindingPolicy.applyOrElse[MerkleTree[_], BlindingCommand](
@@ -189,7 +188,7 @@ abstract class MerkleTreeLeaf[+A <: HasCryptographicEvidence](val hashOps: HashO
     RootHash(hash)
   }
 
-  override def unwrap = Right(this)
+  override def unwrap: Right[RootHash, MerkleTreeLeaf[A] & A] = Right(this)
 
   override private[data] def withBlindedSubtrees(
       optimizedBlindingPolicy: PartialFunction[RootHash, BlindingCommand]
@@ -208,7 +207,9 @@ final case class BlindedNode[+A](rootHash: RootHash) extends MerkleTree[A] {
 
   override def unwrap: Either[RootHash, A] = Left(rootHash)
 
-  override def pretty: Pretty[BlindedNode.this.type] = prettyOfClass(unnamedParam(_.rootHash))
+  override protected def pretty: Pretty[BlindedNode.this.type] = prettyOfClass(
+    unnamedParam(_.rootHash)
+  )
 }
 
 object MerkleTree {

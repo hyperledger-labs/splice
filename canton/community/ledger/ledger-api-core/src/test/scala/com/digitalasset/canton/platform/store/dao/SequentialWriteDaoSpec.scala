@@ -228,14 +228,13 @@ object SequentialWriteDaoSpec {
 
   private val someEventCreated = DbDto.EventCreate(
     event_offset = "",
-    transaction_id = "",
+    update_id = "",
     ledger_effective_time = 3,
     command_id = None,
     workflow_id = None,
     application_id = None,
     submitters = None,
     node_index = 3,
-    event_id = "",
     contract_id = "1",
     template_id = "",
     package_name = "2",
@@ -251,7 +250,7 @@ object SequentialWriteDaoSpec {
     create_argument_compression = None,
     create_key_value_compression = None,
     event_sequential_id = 0,
-    driver_metadata = None,
+    driver_metadata = Array.empty,
     domain_id = "x::domain",
     trace_context = serializableTraceContext,
     record_time = 0,
@@ -260,14 +259,13 @@ object SequentialWriteDaoSpec {
   private val someEventExercise = DbDto.EventExercise(
     consuming = true,
     event_offset = "",
-    transaction_id = "",
+    update_id = "",
     ledger_effective_time = 3,
     command_id = None,
     workflow_id = None,
     application_id = None,
     submitters = None,
     node_index = 3,
-    event_id = "",
     contract_id = "1",
     template_id = "",
     package_name = "2",
@@ -333,7 +331,7 @@ object SequentialWriteDaoSpec {
       )
   }
 
-  private val stringInterningViewFixture: StringInterning with InternizingStringInterningView = {
+  private val stringInterningViewFixture: StringInterning with InternizingStringInterningView =
     new StringInterning with InternizingStringInterningView {
       override def templateId: StringInterningDomain[Ref.Identifier] =
         throw new NotImplementedException
@@ -349,13 +347,11 @@ object SequentialWriteDaoSpec {
         throw new NotImplementedException
       override def internize(
           domainStringIterators: DomainStringIterators
-      ): Iterable[(Int, String)] = {
+      ): Iterable[(Int, String)] =
         if (domainStringIterators.templateIds.isEmpty) Nil
         else List(1 -> "a", 2 -> "b")
-      }
 
     }
-  }
 
   private val someConnection = mock[Connection]
 

@@ -56,12 +56,11 @@ final case class MetricsConfig(
 ) {
 
   // if empty, no filter, otherwise, the union of all filters
-  val globalFilters: Seq[MetricsFilterConfig] = {
+  val globalFilters: Seq[MetricsFilterConfig] =
     if (reporters.exists(_.filters.isEmpty)) Seq.empty
     else {
       reporters.flatMap(_.filters).distinct
     }
-  }
 
 }
 
@@ -78,7 +77,7 @@ object MetricsConfig {
   )
 
   object JvmMetrics {
-    def setup(config: JvmMetrics, openTelemetry: OpenTelemetry): Unit = {
+    def setup(config: JvmMetrics, openTelemetry: OpenTelemetry): Unit =
       if (config.enabled) {
         if (config.classes) Classes.registerObservers(openTelemetry).discard
         if (config.cpu) Cpu.registerObservers(openTelemetry).discard
@@ -86,7 +85,6 @@ object MetricsConfig {
         if (config.threads) Threads.registerObservers(openTelemetry).discard
         if (config.gc) GarbageCollector.registerObservers(openTelemetry).discard
       }
-    }
   }
 
 }
@@ -150,7 +148,7 @@ final case class MetricsRegistry(
   private val sequencers = TrieMap[String, SequencerMetrics]()
   private val mediators = TrieMap[String, MediatorMetrics]()
 
-  def forParticipant(name: String): ParticipantMetrics = {
+  def forParticipant(name: String): ParticipantMetrics =
     participants.getOrElseUpdate(
       name, {
         val participantMetricsContext =
@@ -163,9 +161,8 @@ final case class MetricsRegistry(
         )
       },
     )
-  }
 
-  def forSequencer(name: String): SequencerMetrics = {
+  def forSequencer(name: String): SequencerMetrics =
     sequencers.getOrElseUpdate(
       name, {
         val sequencerMetricsContext =
@@ -181,9 +178,8 @@ final case class MetricsRegistry(
         )
       },
     )
-  }
 
-  def forMediator(name: String): MediatorMetrics = {
+  def forMediator(name: String): MediatorMetrics =
     mediators.getOrElseUpdate(
       name, {
         val mediatorMetricsContext = MetricsContext("node" -> name, "component" -> "mediator")
@@ -197,11 +193,10 @@ final case class MetricsRegistry(
         )
       },
     )
-  }
 
   override def generateMetricsFactory(
       extraContext: MetricsContext
-  ): LabeledMetricsFactory = {
+  ): LabeledMetricsFactory =
     factoryType match {
       case MetricsFactoryType.InMemory(provider) =>
         provider.generateMetricsFactory(extraContext)
@@ -220,13 +215,11 @@ final case class MetricsRegistry(
           baseFilter,
         )
     }
-  }
 
   /** returns the documented metrics by possibly creating fake participants / sequencers / mediators */
-  def metricsDoc(): (Seq[MetricDoc.Item], Seq[MetricDoc.Item], Seq[MetricDoc.Item]) = {
+  def metricsDoc(): (Seq[MetricDoc.Item], Seq[MetricDoc.Item], Seq[MetricDoc.Item]) =
     // TODO(#17917) resurrect once the metrics docs have been re-enabled
     (Seq.empty, Seq.empty, Seq.empty)
-  }
 
   override def close(): Unit = ()
 
@@ -243,13 +236,12 @@ object MetricsRegistry extends LazyLogging {
     def buildPeriodicReader(
         exporter: MetricExporter,
         interval: NonNegativeFiniteDuration,
-    ): MetricReader = {
+    ): MetricReader =
       PeriodicMetricReader
         .builder(exporter)
         .setExecutor(scheduledExecutorService)
         .setInterval(interval.asJava)
         .build()
-    }
     config.reporters
       .map {
         case Prometheus(hostname, port, _) =>

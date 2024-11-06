@@ -8,13 +8,14 @@ import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.domain.api.v0.HelloServiceGrpc.{HelloService, HelloServiceStub}
 import com.digitalasset.canton.domain.api.v0.{Hello, HelloServiceGrpc}
+import com.digitalasset.canton.lifecycle.OnShutdownRunner.PureOnShutdownRunner
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.networking.grpc.GrpcError.*
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
+import io.grpc.*
 import io.grpc.ServerInterceptors.intercept
 import io.grpc.Status.Code.*
-import io.grpc.*
 import io.grpc.inprocess.{InProcessChannelBuilder, InProcessServerBuilder}
 import io.grpc.util.MutableHandlerRegistry
 import org.scalatest.Outcome
@@ -55,15 +56,23 @@ object CantonGrpcUtilTest {
       .build()
     val client: HelloServiceGrpc.HelloServiceStub = HelloServiceGrpc.stub(channel)
 
+    val onShutdownRunner = new PureOnShutdownRunner(logger)
+
     def sendRequest(
         timeoutMs: Long = 2000
-    )(implicit traceContext: TraceContext): EitherT[Future, GrpcError, Hello.Response] =
-      CantonGrpcUtil.sendGrpcRequest(client, "serverName")(
-        _.hello(request),
-        "command",
-        Duration(timeoutMs, TimeUnit.MILLISECONDS),
-        logger,
-      )
+    )(implicit
+        traceContext: TraceContext,
+        ec: ExecutionContext,
+    ): EitherT[Future, GrpcError, Hello.Response] =
+      CantonGrpcUtil
+        .sendGrpcRequest(client, "serverName")(
+          _.hello(request),
+          "command",
+          Duration(timeoutMs, TimeUnit.MILLISECONDS),
+          logger,
+          onShutdownRunner,
+        )
+        .onShutdown(throw new IllegalStateException("Unexpected shutdown"))
 
     def close(): Unit = {
       channel.shutdown()
@@ -74,7 +83,9 @@ object CantonGrpcUtilTest {
       server.awaitTermination()
     }
   }
+
 }
+
 @SuppressWarnings(Array("org.wartremover.warts.Null"))
 class CantonGrpcUtilTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContext {
   import CantonGrpcUtilTest.*
@@ -202,9 +213,7 @@ class CantonGrpcUtilTest extends FixtureAnyWordSpec with BaseTest with HasExecut
         import env.*
 
         val requestF = loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          {
-            sendRequest().value
-          },
+          sendRequest().value,
           logEntries => {
             logEntries should not be empty
             val (unavailableEntries, giveUpEntry) = logEntries.splitAt(logEntries.size - 1)
@@ -233,9 +242,7 @@ class CantonGrpcUtilTest extends FixtureAnyWordSpec with BaseTest with HasExecut
         when(service.hello(request)).thenReturn(Future.successful(response))
 
         val requestF = loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          {
-            sendRequest(10000).value
-          },
+          sendRequest(10000).value,
           logEntries => {
             logEntries should not be empty
             forEvery(logEntries) { logEntry =>
@@ -260,9 +267,7 @@ class CantonGrpcUtilTest extends FixtureAnyWordSpec with BaseTest with HasExecut
         registry.removeService(helloServiceDefinition) shouldBe true
 
         val requestF = loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          {
-            sendRequest().value
-          },
+          sendRequest().value,
           logEntries => {
             logEntries should not be empty
             val (unavailableEntries, giveUpEntry) = logEntries.splitAt(logEntries.size - 1)
@@ -380,16 +385,16 @@ class CantonGrpcUtilTest extends FixtureAnyWordSpec with BaseTest with HasExecut
 
         // Send the request
         val requestF = loggerFactory.assertLogs(
-          {
-            CantonGrpcUtil
-              .sendGrpcRequest(brokenClient, "serverName")(
-                _.hello(request),
-                "command",
-                Duration(2000, TimeUnit.MILLISECONDS),
-                logger,
-              )
-              .value
-          },
+          CantonGrpcUtil
+            .sendGrpcRequest(brokenClient, "serverName")(
+              _.hello(request),
+              "command",
+              Duration(2000, TimeUnit.MILLISECONDS),
+              logger,
+              onShutdownRunner,
+            )
+            .value
+            .failOnShutdown,
           logEntry => {
             logEntry.errorMessage shouldBe
               """Request failed for serverName.
@@ -415,13 +420,17 @@ class CantonGrpcUtilTest extends FixtureAnyWordSpec with BaseTest with HasExecut
         import env.*
 
         server.start()
-        val resultET = CantonGrpcUtil.checkCantonApiInfo(
-          "server-name",
-          "correct-api",
-          channel,
-          logger,
-          timeouts.network,
-        )
+        val resultET = CantonGrpcUtil
+          .checkCantonApiInfo(
+            "server-name",
+            "correct-api",
+            channel,
+            logger,
+            timeouts.network,
+            onShutdownRunner,
+            None,
+          )
+          .failOnShutdown
         resultET.futureValue shouldBe ()
       }
 
@@ -429,13 +438,17 @@ class CantonGrpcUtilTest extends FixtureAnyWordSpec with BaseTest with HasExecut
         import env.*
 
         server.start()
-        val requestET = CantonGrpcUtil.checkCantonApiInfo(
-          "server-name",
-          "other-api",
-          channel,
-          logger,
-          timeouts.network,
-        )
+        val requestET = CantonGrpcUtil
+          .checkCantonApiInfo(
+            "server-name",
+            "other-api",
+            channel,
+            logger,
+            timeouts.network,
+            onShutdownRunner,
+            None,
+          )
+          .failOnShutdown
 
         val resultE = requestET.value.futureValue
         inside(resultE) { case Left(message) =>

@@ -7,7 +7,6 @@ import cats.data.EitherT
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.block.data.BlockUpdateEphemeralState
 import com.digitalasset.canton.domain.block.update.SubmissionRequestValidator.{
   SequencedEventValidationF,
   SubmissionRequestValidationResult,
@@ -52,31 +51,25 @@ private[update] class TrafficControlValidator(
     rateLimitManager: SequencerRateLimitManager,
     override val loggerFactory: NamedLoggerFactory,
     metrics: SequencerMetrics,
-    unifiedSequencer: Boolean,
 )(implicit closeContext: CloseContext)
     extends NamedLogging {
 
   private def invalidSubmissionRequest(
-      state: BlockUpdateEphemeralState,
       submissionRequest: SubmissionRequest,
       sequencingTimestamp: CantonTimestamp,
       sequencerError: SequencerDeliverError,
-  )(implicit traceContext: TraceContext): SubmissionRequestOutcome = {
+  )(implicit traceContext: TraceContext): SubmissionRequestOutcome =
     SubmissionRequestValidator.invalidSubmissionRequest(
-      state,
       submissionRequest,
       sequencingTimestamp,
       sequencerError,
       logger,
       domainId,
       protocolVersion,
-      unifiedSequencer = unifiedSequencer,
     )
-  }
 
   def applyTrafficControl(
       submissionValidation: SequencedEventValidationF[SubmissionRequestValidationResult],
-      state: BlockUpdateEphemeralState,
       signedOrderingRequest: SignedOrderingRequest,
       sequencingTimestamp: CantonTimestamp,
       latestSequencerEventTimestamp: Option[CantonTimestamp],
@@ -104,9 +97,12 @@ private[update] class TrafficControlValidator(
             signedOrderingRequest,
             sequencingTimestamp,
             latestSequencerEventTimestamp,
-            warnIfApproximate =
-              state.headCounterAboveGenesis(signedOrderingRequest.submissionRequest.sender),
-            state,
+            // TODO(#18401) set warnIfApproximate to true and check that we don't get warnings
+            // This used to be the following code:
+            // state.headCounterAboveGenesis(signedOrderingRequest.submissionRequest.sender)
+            // but since the state for block sequencer didn't actually contain any checkpoint data anymore,
+            // it always evaluated to false regardless.
+            warnIfApproximate = false,
           )
             .map { receipt =>
               // On successful consumption, updated the result with the receipt
@@ -131,9 +127,17 @@ private[update] class TrafficControlValidator(
               // we replace it with the failed outcome from traffic validation
               val updated = result.outcome.outcome match {
                 case _: DeliverableSubmissionOutcome =>
-                  result.copy(outcome = trafficConsumptionErrorOutcome)
+                  result.copy(
+                    outcome = trafficConsumptionErrorOutcome,
+                    latestSequencerEventTimestamp = None,
+                  )
                 // Otherwise we keep the existing outcome
-                case SubmissionOutcome.Discard => result
+                case SubmissionOutcome.Discard => result.copy(latestSequencerEventTimestamp = None)
+              }
+              if (result.latestSequencerEventTimestamp.isDefined) {
+                logger.debug(
+                  s"An event addressed to the sequencer (likely a topology event) was rejected due to a traffic control error. For that reason the lastSequencerEventTimestamp was not updated, as the event will not be delivered to the sequencer. ${trafficConsumptionErrorOutcome.outcome}"
+                )
               }
               recordSequencingWasted(
                 signedOrderingRequest,
@@ -153,7 +157,6 @@ private[update] class TrafficControlValidator(
       sequencingTimestamp: CantonTimestamp,
       latestSequencerEventTimestamp: Option[CantonTimestamp],
       warnIfApproximate: Boolean,
-      st: BlockUpdateEphemeralState,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -181,7 +184,6 @@ private[update] class TrafficControlValidator(
             s"Sender does not have enough traffic at $sequencingTimestamp for event with cost ${error.trafficCost} processed by sequencer ${orderingRequest.signature.signedBy}"
           )
           invalidSubmissionRequest(
-            st,
             request.content,
             sequencingTimestamp,
             SequencerErrors.TrafficCredit(error.toString),
@@ -201,10 +203,9 @@ private[update] class TrafficControlValidator(
         case error: SequencerRateLimitError.OutdatedEventCost =>
           logger.info(
             s"Event cost for event at $sequencingTimestamp from sender ${request.content.sender} sent" +
-              s" to sequencer ${orderingRequest.signature.signedBy} was outdated: $error."
+              s" to sequencer ${orderingRequest.content.sequencerId} was outdated: $error."
           )
           invalidSubmissionRequest(
-            st,
             request.content,
             sequencingTimestamp,
             SequencerErrors.OutdatedTrafficCost(error.toString),
@@ -231,11 +232,12 @@ private[update] class TrafficControlValidator(
   private def recordTrafficSpentSuccessfully(
       receipt: Option[TrafficReceipt],
       metricsContext: MetricsContext,
-  ): Unit = {
+  ): Unit =
     receipt.map(_.consumedCost.value).foreach { cost =>
-      metrics.trafficControl.eventDelivered.mark(cost)(metricsContext)
+      metrics.trafficControl.trafficConsumption.trafficCostOfDeliveredSequencedEvent
+        .mark(cost)(metricsContext)
+      metrics.trafficControl.trafficConsumption.deliveredEventCounter.inc()(metricsContext)
     }
-  }
 
   // Record when traffic is deducted but results in a event that is not delivered
   private def recordTrafficWasted(
@@ -245,17 +247,18 @@ private[update] class TrafficControlValidator(
   )(implicit traceContext: TraceContext): Unit = {
     val costO = receipt.map(_.consumedCost.value)
     val messageId = signedOrderingRequest.submissionRequest.messageId
-    val sequencerFingerprint = signedOrderingRequest.signature.signedBy
+    val sequencerId = signedOrderingRequest.content.sequencerId.member
     val sender = signedOrderingRequest.submissionRequest.sender
 
     // Note that the fingerprint of the submitting sequencer is not validated yet by the driver layer
     // So it does not protect against malicious sequencers, only notifies when honest sequencers let requests to be sequenced
     // which end up being invalidated on the read path
     logger.debug(
-      s"Wasted traffic cost${costO.map(c => s" (cost = $c)").getOrElse("")} for messageId $messageId accepted by sequencer $sequencerFingerprint from sender $sender."
+      s"Wasted traffic cost${costO.map(c => s" (cost = $c)").getOrElse("")} for messageId $messageId accepted by sequencer $sequencerId from sender $sender."
     )
     costO.foreach { cost =>
       metrics.trafficControl.wastedTraffic.mark(cost)(metricsContext)
+      metrics.trafficControl.wastedTrafficCounter.inc()(metricsContext)
     }
   }
 
@@ -278,6 +281,7 @@ private[update] class TrafficControlValidator(
       s"Wasted sequencing of event with raw byte size $byteSize for messageId $messageId accepted by sequencer $sequencerId from sender $sender."
     )
     metrics.trafficControl.wastedSequencing.mark(byteSize)(metricsContext)
+    metrics.trafficControl.wastedSequencingCounter.inc()(metricsContext)
   }
 
 }

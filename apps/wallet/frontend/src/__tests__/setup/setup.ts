@@ -1,7 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import crypto from 'crypto';
+import { SetupServer } from 'msw/node';
 import { beforeAll, afterAll, afterEach, vi } from 'vitest';
 
 import { buildServer } from '../mocks/server';
@@ -21,7 +23,7 @@ declare global {
   }
 }
 
-const server = buildServer(window.splice_config.services);
+export const server: SetupServer = buildServer(window.splice_config.services);
 
 // Start server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -33,4 +35,5 @@ afterAll(() => server.close());
 afterEach(() => {
   cleanup();
   server.resetHandlers();
+  vi.clearAllMocks();
 });

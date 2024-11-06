@@ -33,8 +33,8 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.resource.DbMigrationsFactory
 import com.digitalasset.canton.telemetry.{ConfiguredOpenTelemetry, OpenTelemetryFactory}
-import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.time.*
+import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
@@ -76,7 +76,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     config.monitoring.metrics.globalFilters,
     config.monitoring.metrics.qualifiers.toSet,
   )
-  lazy val configuredOpenTelemetry: ConfiguredOpenTelemetry = {
+  lazy val configuredOpenTelemetry: ConfiguredOpenTelemetry =
     OpenTelemetryFactory.initializeOpenTelemetry(
       initializeGlobalOpenTelemetry = testingConfig.initializeGlobalOpenTelemetry,
       testingSupportAdhocMetrics = testingConfig.supportAdhocMetrics,
@@ -90,7 +90,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       config.monitoring.metrics.cardinality.unwrap,
       loggerFactory,
     )
-  }
+
   lazy val metricsRegistry: MetricsRegistry = {
     config.monitoring.metrics.jvmMetrics
       .foreach(JvmMetrics.setup(_, configuredOpenTelemetry.openTelemetry))
@@ -249,7 +249,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         clock.advanceTo(parent.now)
         clock
       case ClockConfig.RemoteClock(clientConfig) =>
-        new RemoteClock(
+        RemoteClock(
           clientConfig,
           config.parameters.timeouts.processing,
           clockLoggerFactory,
@@ -300,10 +300,9 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     List(sequencers, mediators, participants)
   private def runningNodes: Seq[CantonNodeBootstrap[CantonNode]] = allNodes.flatMap(_.running)
 
-  private def autoConnectLocalNodes(): Either[StartupError, Unit] = {
+  private def autoConnectLocalNodes(): Either[StartupError, Unit] =
     // TODO(#14048) extend this to x-nodes
     Left(StartFailed("participants", "auto connect local nodes not yet implemented"))
-  }
 
   /** Try to startup all nodes in the configured environment and reconnect them to one another.
     * The first error will prevent further nodes from being started.
@@ -313,13 +312,13 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     withNewTraceContext { implicit traceContext =>
       if (config.parameters.manualStart) {
         logger.info("Manual start requested.")
-        Right(())
+        Either.unit
       } else {
         logger.info("Automatically starting all instances")
         val startup = for {
           _ <- startAll()
           _ <- reconnectParticipants
-          _ <- if (autoConnectLocal) autoConnectLocalNodes() else Right(())
+          _ <- if (autoConnectLocal) autoConnectLocalNodes() else Either.unit
         } yield writePortsFile()
         // log results
         startup
@@ -354,7 +353,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         better.files.File(portsFile).overwrite(out)
       } catch {
         case NonFatal(ex) =>
-          logger.warn(s"Failed to write to port file ${portsFile}. Will ignore the error", ex)
+          logger.warn(s"Failed to write to port file $portsFile. Will ignore the error", ex)
       }
     }
   }
@@ -364,7 +363,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   ): Either[StartupError, Unit] = {
     def reconnect(
         instance: ParticipantNodeBootstrap
-    ): EitherT[Future, StartupError, Unit] = {
+    ): EitherT[Future, StartupError, Unit] =
       instance.getNode match {
         case None =>
           // should not happen, but if it does, display at least a warning.
@@ -381,7 +380,6 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
             .onShutdown(Left(StartFailed(instance.name.unwrap, "aborted due to shutdown")))
 
       }
-    }
     config.parameters.timeouts.processing.unbounded.await("reconnect-participants")(
       MonadUtil
         .parTraverseWithLimit_(config.parameters.getStartupParallelism(numThreads))(
@@ -395,11 +393,10 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     */
   def now: CantonTimestamp = clock.now
 
-  private def allNodesWithGroup = {
+  private def allNodesWithGroup =
     allNodes.flatMap { nodeGroup =>
       nodeGroup.names().map(name => (name, nodeGroup))
     }
-  }
 
   /** Start all instances described in the configuration
     */
@@ -411,25 +408,23 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
   def startNodes(
       nodes: Seq[(String, Nodes[CantonNode, CantonNodeBootstrap[CantonNode]])]
-  )(implicit traceContext: TraceContext): Either[StartupError, Unit] = {
+  )(implicit traceContext: TraceContext): Either[StartupError, Unit] =
     runOnNodesOrderedByStartupGroup(
       "startup-of-all-nodes",
       nodes,
       { case (name, nodes) => nodes.start(name) },
       reverse = false,
     )
-  }
 
   def stopNodes(
       nodes: Seq[(String, Nodes[CantonNode, CantonNodeBootstrap[CantonNode]])]
-  )(implicit traceContext: TraceContext): Either[ShutdownError, Unit] = {
+  )(implicit traceContext: TraceContext): Either[ShutdownError, Unit] =
     runOnNodesOrderedByStartupGroup(
       "stop-of-all-nodes",
       nodes,
       { case (name, nodes) => nodes.stop(name) },
       reverse = true,
     )
-  }
 
   /** run some task on nodes ordered by their startup group
     *
@@ -440,7 +435,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       nodes: Seq[(String, Nodes[CantonNode, CantonNodeBootstrap[CantonNode]])],
       task: (String, Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]) => EitherT[Future, T, I],
       reverse: Boolean,
-  )(implicit traceContext: TraceContext): Either[T, Unit] = {
+  )(implicit traceContext: TraceContext): Either[T, Unit] =
     config.parameters.timeouts.processing.unbounded.await(name)(
       MonadUtil
         .sequentialTraverse_(
@@ -460,7 +455,6 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         }
         .value
     )
-  }
 
   protected def createSequencer(
       name: String,
@@ -475,7 +469,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   protected def createParticipant(
       name: String,
       participantConfig: Config#ParticipantConfigType,
-  ): ParticipantNodeBootstrap = {
+  ): ParticipantNodeBootstrap =
     participantNodeFactory
       .create(
         NodeFactoryArguments(
@@ -494,7 +488,6 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         testingTimeService,
       )
       .valueOr(err => throw new RuntimeException(s"Failed to create participant bootstrap: $err"))
-  }
 
   protected def mediatorNodeFactoryArguments(
       name: String,
@@ -556,13 +549,12 @@ object Environment {
     * of translating all JUL log statements (regardless of whether they are being used).
     * See for more details: https://logback.qos.ch/manual/configuration.html#LevelChangePropagator
     */
-  def installJavaUtilLoggingBridge(): Unit = {
+  def installJavaUtilLoggingBridge(): Unit =
     if (!SLF4JBridgeHandler.isInstalled) {
       // we want everything going to slf4j so remove any default loggers
       SLF4JBridgeHandler.removeHandlersForRootLogger()
       SLF4JBridgeHandler.install()
     }
-  }
 
 }
 

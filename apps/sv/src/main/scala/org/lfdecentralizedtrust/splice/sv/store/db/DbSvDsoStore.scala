@@ -37,7 +37,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.
 }
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
@@ -179,10 +179,10 @@ class DbSvDsoStore(
               where    idle.store_id = $storeId
                 and      idle.migration_id = $domainMigrationId
                 and      idle.template_id_qualified_name = ${QualifiedName(
-              SubscriptionIdleState.COMPANION.TEMPLATE_ID
+              SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
                 and      ctx.template_id_qualified_name = ${QualifiedName(
-              AnsEntryContext.COMPANION.TEMPLATE_ID
+              AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
                 and      idle.subscription_next_payment_due_at < $now
               order by idle.subscription_next_payment_due_at
@@ -210,7 +210,7 @@ class DbSvDsoStore(
               storeId,
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
-                  SvOnboardingConfirmed.TEMPLATE_ID
+                  SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}""",
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
@@ -232,7 +232,7 @@ class DbSvDsoStore(
               storeId,
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
-                  SvOnboardingConfirmed.TEMPLATE_ID
+                  SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID
                 )} and sv_candidate_party = $svParty""",
               orderLimit = sql"limit 1",
             ).headOption,
@@ -252,7 +252,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                    and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(
                 action
               )}""",
@@ -276,7 +278,7 @@ class DbSvDsoStore(
       sql"""select
               sum(case app_reward_is_featured when true then reward_amount else 0 end),
               sum(case app_reward_is_featured when true then 0 else reward_amount end)""",
-      AppRewardCoupon.COMPANION.TEMPLATE_ID,
+      AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       round,
       domainId,
     )
@@ -296,7 +298,7 @@ class DbSvDsoStore(
   ): Future[BigDecimal] =
     selectFromRewardCouponsOnDomain[Option[BigDecimal]](
       sql"select sum(reward_amount)",
-      ValidatorRewardCoupon.COMPANION.TEMPLATE_ID,
+      ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       round,
       domainId,
     ).map(_.headOption.flatten.getOrElse(BigDecimal(0)))
@@ -326,7 +328,7 @@ class DbSvDsoStore(
       tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select count(*)",
-    ValidatorFaucetCoupon.COMPANION.TEMPLATE_ID,
+    ValidatorFaucetCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
     round,
     domainId,
   ).map(_.headOption.flatten.getOrElse(0L))
@@ -344,7 +346,7 @@ class DbSvDsoStore(
       tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select sum(reward_weight)",
-    SvRewardCoupon.COMPANION.TEMPLATE_ID,
+    SvRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
     round,
     domainId,
   ).map(_.headOption.flatten.getOrElse(0L))
@@ -508,8 +510,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where =
-              sql"""template_id_qualified_name = ${QualifiedName(ClosedMiningRound.TEMPLATE_ID)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
               and assigned_domain = ${dsoRules.domain}
               and mining_round is not null""",
             orderLimit = sql"""order by mining_round limit 1""",
@@ -530,7 +533,7 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                SummarizingMiningRound.TEMPLATE_ID
+                SummarizingMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
               )}""",
             orderLimit = sql"""order by mining_round limit ${sqlLimit(limit)}""",
           ),
@@ -553,7 +556,9 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""
-                    template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
+                    template_id_qualified_name = ${QualifiedName(
+                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                 and confirmer = $confirmer
                 and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
                   """,
@@ -585,7 +590,9 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""
-                        template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
+                        template_id_qualified_name = ${QualifiedName(
+                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                     and confirmer = $confirmer
                     and action_ans_entry_context_payment_id = $paymentId
                     and action_ans_entry_context_arc_type = ${lengthLimited(
@@ -620,7 +627,9 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""
-                        template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
+                        template_id_qualified_name = ${QualifiedName(
+                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                     and confirmer = $confirmer
                     and action_ans_entry_context_payment_id = $paymentId
                     and action_ans_entry_context_arc_type = ${lengthLimited(
@@ -655,7 +664,9 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""
-                        template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
+                        template_id_qualified_name = ${QualifiedName(
+                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                     and confirmer = $confirmer
                     and action_ans_entry_context_payment_id = $paymentId
                       """,
@@ -682,7 +693,9 @@ class DbSvDsoStore(
               DsoTables.acsTableName,
               storeId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
+              where = sql"""template_id_qualified_name = ${QualifiedName(
+                  Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
                        and confirmer = $confirmer
                        and action_ans_entry_context_cid IN (
                          select contract_id
@@ -690,7 +703,7 @@ class DbSvDsoStore(
                          where store_id = $storeId
                            and migration_id = $domainMigrationId
                            and template_id_qualified_name = ${QualifiedName(
-                  AnsEntryContext.TEMPLATE_ID
+                  AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
                            and ans_entry_name = ${lengthLimited(name)})""",
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
@@ -714,7 +727,9 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""
-                      template_id_qualified_name = ${QualifiedName(SvOnboardingRequest.TEMPLATE_ID)}
+                      template_id_qualified_name = ${QualifiedName(
+                SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                   and sv_onboarding_token = ${lengthLimited(token)}
                     """,
             orderLimit = sql"limit 1",
@@ -753,7 +768,7 @@ class DbSvDsoStore(
               storeId,
               domainMigrationId,
               where = (sql"""template_id_qualified_name = ${QualifiedName(
-                  SvOnboardingRequest.TEMPLATE_ID
+                  SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
                 )} and (sv_candidate_party, sv_candidate_name) in (""" ++ svCandidates ++ sql")").toActionBuilder,
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
@@ -776,7 +791,7 @@ class DbSvDsoStore(
               storeId,
               domainMigrationId,
               where = sql"""
-                template_id_qualified_name = ${QualifiedName(companion.TEMPLATE_ID)}
+                template_id_qualified_name = ${QualifiedName(companion.getTemplateIdWithPackageId)}
                 and assigned_domain = $domainId
                 and acs.amulet_round_of_expiry <= (
                   select mining_round - 2
@@ -784,7 +799,7 @@ class DbSvDsoStore(
                   where store_id = $storeId
                     and migration_id = $domainMigrationId
                     and template_id_qualified_name = ${QualifiedName(
-                  splice.round.OpenMiningRound.TEMPLATE_ID
+                  splice.round.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
                     and mining_round is not null
                   order by mining_round desc limit 1)""",
@@ -806,8 +821,11 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
-                        and member_traffic_member = $memberId""",
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
+                        and member_traffic_member = $memberId
+                        and member_traffic_domain = $domainId""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listMemberTrafficContracts",
@@ -835,8 +853,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where =
-              (sql"""template_id_qualified_name = ${QualifiedName(AmuletPriceVote.TEMPLATE_ID)}
+            where = (sql"""template_id_qualified_name = ${QualifiedName(
+                AmuletPriceVote.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                  and voter in """ ++ voterParties).toActionBuilder,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
@@ -860,7 +879,7 @@ class DbSvDsoStore(
             domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(
-                SvOnboardingRequest.TEMPLATE_ID
+                SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                     and sv_candidate_party = $candidateParty
                       """,
@@ -888,7 +907,7 @@ class DbSvDsoStore(
             domainMigrationId,
             where = sql"""
                           template_id_qualified_name = ${QualifiedName(
-                ValidatorLicense.TEMPLATE_ID
+                ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                       and validator = $validator
                         """,
@@ -912,8 +931,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where =
-              sql"""template_id_qualified_name = ${QualifiedName(ValidatorLicense.TEMPLATE_ID)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
               AND validator = ${lengthLimited(validator)}
             """,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
@@ -933,8 +953,11 @@ class DbSvDsoStore(
                from #${DsoTables.acsTableName}
                where store_id = $storeId
                 and migration_id = $domainMigrationId
-                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
+                and template_id_qualified_name = ${QualifiedName(
+              MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
+            )}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
+                and member_traffic_domain = $domainId
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",
         )
@@ -1000,7 +1023,7 @@ class DbSvDsoStore(
               domainMigrationId,
               where = sql"""
                               template_id_qualified_name = ${QualifiedName(
-                  VoteRequest.TEMPLATE_ID
+                  VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
                           and vote_request_tracking_cid = $voteRequestCid
                             """,
@@ -1029,7 +1052,9 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""
-                           template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
+                           template_id_qualified_name = ${QualifiedName(
+                VoteRequest.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                        and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
                        and requester_name = ${key.svParty}
                          """,
@@ -1053,7 +1078,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(AmuletPriceVote.TEMPLATE_ID)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                AmuletPriceVote.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                           and voter = ${key.svParty}""",
             orderLimit = sql"""limit 1""",
           ).headOption,
@@ -1077,7 +1104,7 @@ class DbSvDsoStore(
             domainMigrationId,
             where = sql"""
                             template_id_qualified_name = ${QualifiedName(
-                SvOnboardingRequest.TEMPLATE_ID
+                SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                         and sv_candidate_name = ${lengthLimited(candidateName)}
                           """,
@@ -1105,7 +1132,7 @@ class DbSvDsoStore(
             domainMigrationId,
             where = sql"""
                               template_id_qualified_name = ${QualifiedName(
-                SvOnboardingConfirmed.TEMPLATE_ID
+                SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                           and sv_candidate_name = ${lengthLimited(svName)}
                             """,
@@ -1135,8 +1162,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where =
-              (sql"""template_id_qualified_name = ${QualifiedName(ElectionRequest.TEMPLATE_ID)}
+            where = (sql"""template_id_qualified_name = ${QualifiedName(
+                ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                        and requester IN """ ++ requesters ++ sql"""
                        and election_request_epoch = $electionRequestEpoch""").toActionBuilder,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
@@ -1161,7 +1189,7 @@ class DbSvDsoStore(
             domainMigrationId,
             where = sql"""
                               template_id_qualified_name = ${QualifiedName(
-                ElectionRequest.TEMPLATE_ID
+                ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                           and requester = $requester
                           and election_request_epoch = $epoch
@@ -1191,7 +1219,7 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                ElectionRequest.TEMPLATE_ID
+                ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
               )} and election_request_epoch < $epoch""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
@@ -1214,7 +1242,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(AnsEntry.TEMPLATE_ID)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                     and ans_entry_name = ${lengthLimited(name)}
                     and assigned_domain is not null
                     and acs.contract_expires_at >= $now""",
@@ -1245,7 +1275,7 @@ class DbSvDsoStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                SubscriptionInitialPayment.TEMPLATE_ID
+                SubscriptionInitialPayment.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                         and contract_id = $paymentCid
                         and assigned_domain is not null""",
@@ -1275,8 +1305,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where =
-              sql"""template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
                       and featured_app_right_provider = $providerPartyId
                       and assigned_domain is not null""",
             orderLimit = sql"limit 1",
@@ -1340,7 +1371,9 @@ class DbSvDsoStore(
               storeId,
               domainMigrationId,
               where = sql"""
-               template_id_qualified_name = ${QualifiedName(AnsEntryContext.COMPANION.TEMPLATE_ID)}
+               template_id_qualified_name = ${QualifiedName(
+                  AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
            and subscription_reference_contract_id = $reference""",
               orderLimit = sql"""limit 1""",
             ).headOption,
@@ -1370,7 +1403,7 @@ class DbSvDsoStore(
                 storeId,
                 domainMigrationId,
                 where = (sql"""template_id_qualified_name = ${QualifiedName(
-                    ClosedMiningRound.TEMPLATE_ID
+                    ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
                   )} AND assigned_domain = $domainId AND mining_round IN """ ++ roundNumbersClause).toActionBuilder,
                 orderLimit = sql"""limit ${sqlLimit(limit)}""",
               ),
@@ -1416,7 +1449,9 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(SvRewardState.TEMPLATE_ID)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                SvRewardState.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
               AND sv_name = ${lengthLimited(svName)}
             """,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
@@ -1480,6 +1515,97 @@ class DbSvDsoStore(
       } yield row.map(assignedContractFromRow(companion)(_))
     }
   }
+
+  def lookupTransferCommandCounterBySenderWithOffset(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[QueryResult[Option[ContractWithState[
+    splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
+    splice.externalpartyamuletrules.TransferCommandCounter,
+  ]]]] =
+    waitUntilAcsIngested {
+      (for {
+        resultWithOffset <- storage
+          .querySingle(
+            selectFromAcsTableWithStateAndOffset(
+              DsoTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""
+                    template_id_qualified_name = ${QualifiedName(
+                  splice.externalpartyamuletrules.TransferCommandCounter.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
+                and wallet_party = $partyId
+                  """,
+              orderLimit = sql" limit 1",
+            ).headOption,
+            "lookupTransferCommandCounterBySender",
+          )
+      } yield MultiDomainAcsStore.QueryResult(
+        resultWithOffset.offset,
+        resultWithOffset.row.map(
+          contractWithStateFromRow(
+            splice.externalpartyamuletrules.TransferCommandCounter.COMPANION
+          )(_)
+        ),
+      )).getOrRaise(offsetExpectedError())
+    }
+
+  def listTransferCommandCounterConfirmationBySender(
+      confirmer: PartyId,
+      partyId: PartyId,
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.dsorules.Confirmation.ContractId,
+    splice.dsorules.Confirmation,
+  ]]] =
+    for {
+      // TODO(#14568) Hit indices for this instead of doing a linear search
+      confirmations <- multiDomainAcsStore.listContracts(
+        splice.dsorules.Confirmation.COMPANION
+      )
+    } yield {
+      confirmations
+        .map(_.contract)
+        .filter { c =>
+          c.payload.confirmer == confirmer.toProtoPrimitive &&
+          (c.payload.action match {
+            case action: splice.dsorules.actionrequiringconfirmation.ARC_DsoRules =>
+              action.dsoAction match {
+                case action: splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateTransferCommandCounter =>
+                  action.dsoRules_CreateTransferCommandCounterValue.sender == partyId.toProtoPrimitive
+                case _ => false
+              }
+            case _ => false
+          })
+        }
+    }
+
+  override def listExternalPartyAmuletRulesConfirmation(
+      confirmer: PartyId
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.dsorules.Confirmation.ContractId,
+    splice.dsorules.Confirmation,
+  ]]] =
+    for {
+      // TODO(#14568) Hit indices for this instead of doing a linear search
+      confirmations <- multiDomainAcsStore.listContracts(
+        splice.dsorules.Confirmation.COMPANION
+      )
+    } yield {
+      confirmations
+        .map(_.contract)
+        .filter { c =>
+          c.payload.confirmer == confirmer.toProtoPrimitive &&
+          (c.payload.action match {
+            case action: splice.dsorules.actionrequiringconfirmation.ARC_DsoRules =>
+              action.dsoAction match {
+                case _: splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateExternalPartyAmuletRules =>
+                  true
+                case _ => false
+              }
+            case _ => false
+          })
+        }
+    }
 
   def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
       companion: C,

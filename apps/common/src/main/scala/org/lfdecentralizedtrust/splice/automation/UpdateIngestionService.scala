@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import org.apache.pekko.stream.Materializer
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
@@ -55,30 +54,29 @@ class UpdateIngestionService(
           for {
             offset <-
               if (ingestFromParticipantBegin) {
-                logger.debug(s"Starting ingestion from participant begin")
-                val participantBegin = ParticipantOffset(
-                  ParticipantOffset.Value.Boundary(
-                    ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
+                for {
+                  participantBegin <- connection.latestPrunedOffset()
+                  _ = logger.debug(
+                    s"Starting ingestion from participant begin at $participantBegin"
                   )
-                )
-                ingestionSink
-                  .ingestAcs(
-                    MultiDomainAcsStore.fromParticipantOffset(participantBegin),
-                    Seq.empty,
-                    Seq.empty,
-                    Seq.empty,
-                  )
-                  .map(_ => participantBegin)
+                  _ <- ingestionSink
+                    .ingestAcs(
+                      participantBegin,
+                      Seq.empty,
+                      Seq.empty,
+                      Seq.empty,
+                    )
+                } yield participantBegin
               } else
                 for {
                   acsOffset <- connection.ledgerEnd()
                   _ = logger.debug(s"Starting ingestion from ledger end: $acsOffset")
-                  _ <- ingestAcsAndInFlight(acsOffset.value)
-                } yield ParticipantOffset(acsOffset)
+                  _ <- ingestAcsAndInFlight(acsOffset)
+                } yield acsOffset
           } yield offset
         case Some(offset) =>
           logger.debug(s"Resuming ingestion from offset: $offset")
-          Future.successful(MultiDomainAcsStore.toParticipantOffset(offset))
+          Future.successful(offset)
       }
     } yield new SpliceLedgerSubscription(
       source = connection.updates(subscribeFrom, filter),
@@ -92,12 +90,11 @@ class UpdateIngestionService(
   )(implicit traceContext: TraceContext) = ingestionSink.ingestUpdate(msg.domainId, msg.update)
 
   private def ingestAcsAndInFlight(
-      offset: String
+      offset: Long
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val javaOffset = ParticipantOffset.Value.Absolute(offset)
     for {
       // TODO(#5534): stream contracts instead of ingesting them as a single Seq
-      (acs, incompleteOut, incompleteIn) <- connection.activeContracts(filter, javaOffset)
+      (acs, incompleteOut, incompleteIn) <- connection.activeContracts(filter, offset)
       _ <- ingestionSink.ingestAcs(
         offset,
         acs,

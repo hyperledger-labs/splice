@@ -32,6 +32,16 @@ object WalletTables extends AcsTables {
     )
   }
 
+  case class ExternalPartyWalletAcsStoreRowData(
+      contract: Contract[?, ?],
+      rewardCouponRound: Option[Long] = None,
+  ) extends AcsRowData {
+    override val contractExpiresAt: Option[Timestamp] = None
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "reward_coupon_round" -> IndexColumnValue(rewardCouponRound)
+    )
+  }
+
   case class UserWalletTxLogStoreRowData(
       entry: TxLogEntry,
       txLogId: String3,
@@ -71,5 +81,6 @@ object WalletTables extends AcsTables {
   }
 
   val acsTableName: String = "user_wallet_acs_store"
+  val externalPartyAcsTableName: String = "external_party_wallet_acs_store"
   val txLogTableName: String = "user_wallet_txlog_store"
 }

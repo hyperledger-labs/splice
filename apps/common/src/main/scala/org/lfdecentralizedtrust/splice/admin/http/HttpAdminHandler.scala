@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.admin.http
 import org.lfdecentralizedtrust.splice.environment.{BuildInfo, SpliceStatus}
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.external.common_admin as v0
-import com.digitalasset.canton.health.admin.data
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
@@ -14,7 +14,7 @@ import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpAdminHandler(
-    status: => Future[data.NodeStatus[SpliceStatus]],
+    status: => Future[NodeStatus[SpliceStatus]],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,

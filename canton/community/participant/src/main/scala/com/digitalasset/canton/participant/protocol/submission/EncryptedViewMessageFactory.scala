@@ -8,228 +8,393 @@ import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.crypto.{SecureRandomness, SymmetricKey, *}
 import com.digitalasset.canton.data.ViewType
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.RecipientsInfo
+import com.digitalasset.canton.protocol.ViewHash
+import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
 import com.digitalasset.canton.protocol.messages.{EncryptedView, EncryptedViewMessage}
-import com.digitalasset.canton.serialization.DeserializationError
-import com.digitalasset.canton.store.SessionKeyStore
+import com.digitalasset.canton.sequencing.protocol.Recipients
+import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
 import com.digitalasset.canton.store.SessionKeyStore.RecipientGroup
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.{HasVersionedToByteString, ProtocolVersion}
+import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.{ExecutionContext, Future}
 
 object EncryptedViewMessageFactory {
 
+  final case class ViewHashAndRecipients(
+      viewHash: ViewHash,
+      recipients: Recipients,
+  )
+
+  final case class ViewKeyData(
+      viewKeyRandomness: SecureRandomness,
+      viewKey: SymmetricKey,
+      viewKeyRandomnessMap: Seq[AsymmetricEncrypted[SecureRandomness]],
+  )
+
   def create[VT <: ViewType](viewType: VT)(
       viewTree: viewType.View,
+      viewKeyData: (SymmetricKey, Seq[AsymmetricEncrypted[SecureRandomness]]),
       cryptoSnapshot: DomainSnapshotSyncCryptoApi,
-      sessionKeyStore: SessionKeyStore,
       protocolVersion: ProtocolVersion,
-      optRandomness: Option[SecureRandomness] = None,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, EncryptedViewMessage[VT]] = {
+  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, EncryptedViewMessage[VT]] =
+    for {
+      signature <- viewTree.toBeSigned
+        .parTraverse(rootHash =>
+          cryptoSnapshot.sign(rootHash.unwrap).leftMap(FailedToSignViewMessage.apply)
+        )
+      (sessionKey, sessionKeyRandomnessMap) = viewKeyData
+      sessionKeyRandomnessMapNE <- EitherT.fromEither[FutureUnlessShutdown](
+        NonEmpty
+          .from(sessionKeyRandomnessMap)
+          .toRight(
+            UnableToDetermineSessionKeyRandomness(
+              "The session key randomness map is empty"
+            )
+          )
+      )
+      encryptedView <- EitherT.fromEither[FutureUnlessShutdown](
+        EncryptedView
+          .compressed[VT](cryptoSnapshot.pureCrypto, sessionKey, viewType)(viewTree)
+          .leftMap[EncryptedViewMessageCreationError](FailedToEncryptViewMessage.apply)
+      )
+    } yield EncryptedViewMessage[VT](
+      signature,
+      viewTree.viewHash,
+      sessionKeyRandomnessMapNE,
+      encryptedView,
+      viewTree.domainId,
+      cryptoSnapshot.pureCrypto.defaultSymmetricKeyScheme,
+      protocolVersion,
+    )
 
-    val cryptoPureApi = cryptoSnapshot.pureCrypto
+  final case class ViewParticipantsKeysAndParentRecipients(
+      informeeParticipants: NonEmpty[Set[ParticipantId]],
+      encryptionKeys: Set[Fingerprint],
+      parentRecipients: Option[Recipients],
+  )
 
-    val viewEncryptionScheme = cryptoPureApi.defaultSymmetricKeyScheme
-    val viewKeyLength = viewEncryptionScheme.keySizeInBytes
-    val randomnessLength = EncryptedViewMessage.computeRandomnessLength(cryptoPureApi)
-    val randomness: SecureRandomness =
-      optRandomness.getOrElse(cryptoPureApi.generateSecureRandomness(randomnessLength))
+  final case class RandomnessAndReference(
+      randomness: SecureRandomness,
+      reference: Object,
+  )
 
-    val informeeParties = viewTree.informees.toList
+  final case class RandomnessRevocationInfo(
+      randomnessAndReference: RandomnessAndReference,
+      encryptedBy: Option[Object],
+      informeeParticipants: NonEmpty[Set[ParticipantId]],
+      newKey: Boolean,
+  )
 
-    def eitherT[B](
-        value: Either[EncryptedViewMessageCreationError, B]
-    ): EitherT[Future, EncryptedViewMessageCreationError, B] =
-      EitherT.fromEither[Future](value)
+  @VisibleForTesting
+  private[canton] def computeSessionKeyRandomness(
+      sessionKeyStoreSnapshot: Map[RecipientGroup, SessionKeyInfo],
+      randomnessRevocationMap: Map[RecipientGroup, RandomnessRevocationInfo],
+      recipients: Recipients,
+      viewMetadata: ViewParticipantsKeysAndParentRecipients,
+      pureCrypto: CryptoPureApi,
+  ): Map[RecipientGroup, RandomnessRevocationInfo] = {
+
+    val viewEncryptionScheme = pureCrypto.defaultSymmetricKeyScheme
+    val randomnessLength = computeRandomnessLength(pureCrypto)
+
+    // creates a brand-new session key randomness with the correct reference to the parent's randomness
+    def generateNewSessionKeyRandomness(
+        recipients: Recipients,
+        encryptedBy: Option[Object],
+        informeeParticipants: NonEmpty[Set[ParticipantId]],
+    ): Map[RecipientGroup, RandomnessRevocationInfo] =
+      randomnessRevocationMap.get(RecipientGroup(recipients, viewEncryptionScheme)) match {
+        case Some(_) => randomnessRevocationMap
+        case None =>
+          val sessionKeyRandomness = pureCrypto.generateSecureRandomness(randomnessLength)
+          val symbolicReference = new Object()
+
+          // save the new randomness to our `state` map with the `new/revocation` flag set to true
+          randomnessRevocationMap + (RecipientGroup(recipients, viewEncryptionScheme) ->
+            RandomnessRevocationInfo(
+              RandomnessAndReference(sessionKeyRandomness, symbolicReference),
+              encryptedBy,
+              informeeParticipants,
+              newKey = true,
+            ))
+      }
+
+    def getParentRandomnessReference(recipientsO: Option[Recipients]): Option[Object] =
+      recipientsO.map { recipients =>
+        randomnessRevocationMap(
+          RecipientGroup(recipients, viewEncryptionScheme)
+        ).randomnessAndReference.reference
+      }
+
+    // check that we already have a session key for a similar transaction that we can reuse
+    sessionKeyStoreSnapshot.get(
+      RecipientGroup(recipients, viewEncryptionScheme)
+    ) match {
+      case Some(sessionKeyInfo) =>
+        // we need to check that the public keys match, or if they have been changed in the meantime. If they did
+        // we are revoking the session key because that public key could have been compromised
+        val allPubKeysIdsInMessage = sessionKeyInfo.encryptedSessionKeys.map(_.encryptedFor)
+        // check that that all recipients are represented in the message, in other words,
+        // that at least one of their active public keys is present in the sequence `encryptedSessionKeys`
+        val checkActiveParticipantKeys =
+          allPubKeysIdsInMessage.forall(viewMetadata.encryptionKeys.contains)
+
+        // check that the reference to the parent's randomness is correct (parent randomness has not been revoked)
+        // if we are dealing with non transaction requests (e.g. (un)assignments), there are is no parent randomness,
+        // so we simply revoke the randomness if the keys are not active.
+        val (parentRandomnessRef, checkEncryptedBy) = getParentRandomnessReference(
+          viewMetadata.parentRecipients
+        ) match {
+          case Some(pRandomnessRef) =>
+            (
+              Some(pRandomnessRef),
+              sessionKeyInfo.encryptedBy.contains(pRandomnessRef),
+            )
+          // it's a root node
+          case None => (sessionKeyInfo.encryptedBy, true)
+        }
+
+        // if everything is correct we can use the randomness stored in the cache and store the entry in our `state`
+        // map with the `new/revocation` flag set to false
+        if (checkActiveParticipantKeys && checkEncryptedBy) {
+          randomnessRevocationMap + (RecipientGroup(recipients, viewEncryptionScheme) ->
+            RandomnessRevocationInfo(
+              RandomnessAndReference(
+                sessionKeyInfo.sessionKeyAndReference.randomness,
+                sessionKeyInfo.sessionKeyAndReference.reference,
+              ),
+              sessionKeyInfo.encryptedBy,
+              viewMetadata.informeeParticipants,
+              newKey = false,
+            ))
+        } else
+          // if not, we need to revoke the session key and save it with `new/revocation` flag set to true
+          generateNewSessionKeyRandomness(
+            recipients,
+            parentRandomnessRef,
+            viewMetadata.informeeParticipants,
+          )
+      case None =>
+        // if not in cache we need to generate a new session key for this view and save it
+        generateNewSessionKeyRandomness(
+          recipients,
+          getParentRandomnessReference(viewMetadata.parentRecipients),
+          viewMetadata.informeeParticipants,
+        )
+    }
+  }
+
+  /** Generates session keys based on the recipients trees and on the values already cached.
+    *
+    * @param viewRecipients the list of views and their respective recipients, parent recipients and informees. For
+    *                       this function to work correctly the views MUST be passed in PRE-ORDER.
+    */
+  def generateKeysFromRecipients(
+      viewRecipients: Seq[(ViewHashAndRecipients, Option[Recipients], List[LfPartyId])],
+      parallel: Boolean,
+      pureCrypto: CryptoPureApi,
+      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+      sessionKeyStore: ConfirmationRequestSessionKeyStore,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): EitherT[
+    FutureUnlessShutdown,
+    EncryptedViewMessageCreationError,
+    Map[ViewHash, ViewKeyData],
+  ] = {
+    val viewEncryptionScheme = pureCrypto.defaultSymmetricKeyScheme
+
+    // create a snapshot of the data from the cache to use during key generation
+    val allRecipientsGroup = viewRecipients.map { case (viewHashAndRecipients, _, _) =>
+      RecipientGroup(viewHashAndRecipients.recipients, viewEncryptionScheme)
+    }
+    val sessionKeyStoreSnapshot = sessionKeyStore.getSessionKeysInfoIfPresent(allRecipientsGroup)
 
     def eitherTUS[B](
         value: Either[EncryptedViewMessageCreationError, B]
     ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, B] =
       EitherT.fromEither[FutureUnlessShutdown](value)
 
-    def getRecipientInfo: EitherT[Future, UnableToDetermineParticipant, RecipientsInfo] = {
+    def encryptSessionKeyRandomness(
+        sessionKeyRandomness: SecureRandomness,
+        informeeParticipants: NonEmpty[Set[ParticipantId]],
+    ): EitherT[
+      FutureUnlessShutdown,
+      EncryptedViewMessageCreationError,
+      ViewKeyData,
+    ] =
+      for {
+        sessionKey <- eitherTUS(
+          pureCrypto
+            .createSymmetricKey(sessionKeyRandomness, viewEncryptionScheme)
+            .leftMap(FailedToCreateEncryptionKey.apply)
+        )
+        // generates the session key map, which contains the session key randomness encrypted for all informee participants
+        sessionKeyMap <- createDataMap(
+          informeeParticipants.forgetNE.to(LazyList),
+          sessionKeyRandomness,
+          cryptoSnapshot,
+          protocolVersion,
+        ).map(_.values.toSeq).mapK(FutureUnlessShutdown.outcomeK)
+      } yield ViewKeyData(sessionKeyRandomness, sessionKey, sessionKeyMap)
+
+    def getInformeeParticipantsAndKeys(
+        informeeParties: List[LfPartyId]
+    ): EitherT[
+      FutureUnlessShutdown,
+      EncryptedViewMessageCreationError,
+      (Set[ParticipantId], Set[Fingerprint]),
+    ] =
       for {
         informeeParticipants <- cryptoSnapshot.ipsSnapshot
           .activeParticipantsOfAll(informeeParties)
           .leftMap(UnableToDetermineParticipant(_, cryptoSnapshot.domainId))
-        partiesWithGroupAddressing <- EitherT.right(
-          cryptoSnapshot.ipsSnapshot.partiesWithGroupAddressing(informeeParties)
-        )
-      } yield RecipientsInfo(informeeParticipants = informeeParticipants)
-    }
+          .mapK(FutureUnlessShutdown.outcomeK)
+        memberEncryptionKeys <- EitherT
+          .right[EncryptedViewMessageCreationError](
+            cryptoSnapshot.ipsSnapshot
+              .encryptionKeys(informeeParticipants.toSeq)
+          )
+          .mapK(FutureUnlessShutdown.outcomeK)
 
-    def generateAndEncryptSessionKeyRandomness(
-        recipients: NonEmpty[Set[ParticipantId]]
+        memberEncryptionKeysIds = memberEncryptionKeys.flatMap { case (_, keys) =>
+          keys.map(_.id)
+        }.toSet
+
+      } yield (informeeParticipants, memberEncryptionKeysIds)
+
+    def mkSessionKeyData(
+        recipientGroup: RecipientGroup,
+        randomnessRevocationInfo: RandomnessRevocationInfo,
     ): EitherT[
-      Future,
+      FutureUnlessShutdown,
       EncryptedViewMessageCreationError,
-      (SymmetricKey, Seq[AsymmetricEncrypted[SecureRandomness]]),
+      (RecipientGroup, (ViewKeyData, Object, Option[Object], Boolean)),
     ] =
       for {
-        keyRandomness <- eitherT(
-          cryptoPureApi
-            .computeHkdf(
-              cryptoPureApi.generateSecureRandomness(randomnessLength).unwrap,
-              viewKeyLength,
-              HkdfInfo.SessionKey,
-            )
-            .leftMap(FailedToExpandKey)
-        )
-        key <- eitherT(
-          cryptoPureApi
-            .createSymmetricKey(keyRandomness, viewEncryptionScheme)
-            .leftMap(FailedToCreateEncryptionKey)
-        )
-        // generates the session key map, which contains the session key randomness encrypted for all recipients
-        keyMap <- createDataMap(
-          recipients.forgetNE.to(LazyList),
-          keyRandomness,
-          cryptoSnapshot,
-          protocolVersion,
-        ).map(_.values.toSeq)
-        _ = sessionKeyStore.saveSessionKeyInfo(
-          RecipientGroup(recipients, viewEncryptionScheme),
-          SessionKeyInfo(keyRandomness, keyMap),
-        )
-      } yield (key, keyMap)
-
-    // Either we generate and encrypt the session key (randomness) or we retrieve it from the cache
-    def getSessionKey(
-        recipientsInfo: RecipientsInfo
-    ): EitherT[
-      Future,
-      EncryptedViewMessageCreationError,
-      (SymmetricKey, Seq[AsymmetricEncrypted[SecureRandomness]]),
-    ] =
-      for {
-        recipients <- eitherT(
-          NonEmpty
-            .from(recipientsInfo.informeeParticipants)
-            .toRight(UnableToDetermineRecipients("The list of recipients is empty"))
-        )
-        sessionKeyAndMap <-
-          // check that we already have a session key for a similar transaction that we can reuse
-          sessionKeyStore.getSessionKeyInfoIfPresent(
-            RecipientGroup(recipients, viewEncryptionScheme)
-          ) match {
-            case Some(sessionKeyInfo) =>
-              // we need to check that the public keys match if they have been changed in the meantime. If they did
-              // we are revoking the session key because that public key could have been compromised
-              val allPubKeysIdsInMessage = sessionKeyInfo.encryptedSessionKeys.map(_.encryptedFor)
-              for {
-                // check that that all recipients are represented in the message, in other words,
-                // that at least one of their active public keys is present in the sequence `encryptedSessionKeys`
-                checkActiveParticipantKeys <-
-                  EitherT
-                    .right[EncryptedViewMessageCreationError](
-                      cryptoSnapshot.ipsSnapshot
-                        .encryptionKeys(recipients.forgetNE.toSeq)
-                        .map { memberToKeysMap =>
-                          recipients.map(recipient =>
-                            memberToKeysMap
-                              .getOrElse(recipient, Seq.empty)
-                              .exists(key => allPubKeysIdsInMessage.contains(key.id))
-                          )
-                        }
-                    )
-                    .map(_.forall(_ == true))
-                // all public keys used to encrypt the session key must be present and active for each recipient
-                sessionKeyData <-
-                  if (checkActiveParticipantKeys)
-                    eitherT(
-                      cryptoPureApi
-                        .createSymmetricKey(
-                          sessionKeyInfo.sessionKeyRandomness,
-                          viewEncryptionScheme,
-                        )
-                        .leftMap(FailedToCreateEncryptionKey)
-                        .map((_, sessionKeyInfo.encryptedSessionKeys))
-                    )
-                  else
-                    generateAndEncryptSessionKeyRandomness(recipients)
-              } yield sessionKeyData
-            case None =>
-              // if not in cache we need to generate a new session key for this view and save it
-              generateAndEncryptSessionKeyRandomness(recipients)
-          }
-      } yield sessionKeyAndMap
-
-    def createEncryptedViewMessage(
-        recipientsInfo: RecipientsInfo,
-        signature: Option[Signature],
-        encryptedView: EncryptedView[VT],
-    ): EitherT[Future, EncryptedViewMessageCreationError, EncryptedViewMessage[VT]] =
-      for {
-        sessionKeyAndRandomnessMap <- getSessionKey(recipientsInfo)
-        (sessionKey, sessionKeyRandomnessMap) = sessionKeyAndRandomnessMap
-        sessionKeyRandomnessMapNE <- EitherT.fromEither[Future](
-          NonEmpty
-            .from(sessionKeyRandomnessMap)
-            .toRight(
-              UnableToDetermineSessionKeyRandomness(
-                "The session key randomness map is empty"
+        sessionKeyData <-
+          // if it's a new randomness with reference to the cache we encrypt it
+          if (randomnessRevocationInfo.newKey) {
+            encryptSessionKeyRandomness(
+              randomnessRevocationInfo.randomnessAndReference.randomness,
+              randomnessRevocationInfo.informeeParticipants,
+            ).map(
+              (
+                _,
+                randomnessRevocationInfo.randomnessAndReference.reference,
+                randomnessRevocationInfo.encryptedBy,
+                true,
               )
             )
-        )
-        encryptedRandomness <- encryptRandomnessWithSessionKey(sessionKey)
-      } yield {
-        EncryptedViewMessage[VT](
-          signature,
-          viewTree.viewHash,
-          encryptedRandomness,
-          sessionKeyRandomnessMapNE,
-          encryptedView,
-          viewTree.domainId,
-          viewEncryptionScheme,
-          protocolVersion,
-        )
+          } // if it's not a new randomness we re-use its encryption from the cache
+          else
+            EitherT.rightT[FutureUnlessShutdown, EncryptedViewMessageCreationError] {
+              val sessionKeyInfo = sessionKeyStoreSnapshot(recipientGroup)
+              (
+                ViewKeyData(
+                  sessionKeyInfo.sessionKeyAndReference.randomness,
+                  sessionKeyInfo.sessionKeyAndReference.key,
+                  sessionKeyInfo.encryptedSessionKeys,
+                ),
+                sessionKeyInfo.sessionKeyAndReference.reference,
+                sessionKeyInfo.encryptedBy,
+                false,
+              )
+            }
+      } yield recipientGroup -> sessionKeyData
+
+    // we start from top to bottom of the tree (i.e., pre-order) so the parent's randomness is created before it's
+    // actually needed
+    for {
+      viewRecipientsAndInformeeParticipants <- viewRecipients.parTraverse {
+        case (vhR, parentRecipientsO, informees) =>
+          getInformeeParticipantsAndKeys(informees).flatMap {
+            case (informeeParticipants, encryptionKeys) =>
+              NonEmpty
+                .from(informeeParticipants)
+                .toRight(
+                  UnableToDetermineRecipients(
+                    "The list of informee participants is empty"
+                  ): EncryptedViewMessageCreationError
+                )
+                .map(informeeParticipantsNE =>
+                  vhR -> ViewParticipantsKeysAndParentRecipients(
+                    informeeParticipantsNE,
+                    encryptionKeys,
+                    parentRecipientsO,
+                  )
+                )
+                .toEitherT[FutureUnlessShutdown]
+          }
       }
 
-    def encryptRandomnessWithSessionKey(
-        sessionKey: SymmetricKey
-    ): EitherT[Future, EncryptedViewMessageCreationError, Encrypted[
-      SecureRandomness
-    ]] =
-      eitherT(
-        cryptoPureApi
-          .encryptWith(randomness, sessionKey, protocolVersion)
-          .leftMap(FailedToEncryptRandomness)
-      )
+      // this map keeps track of the randomnesses that we generate/revoke or use directly from the cache
+      // the generation of the randomness for the encryption session keys has to be done sequentially,
+      // because we need to revoke the topmost views' keys before so their children can also revoke their keys.
+      randomnessRevocationMap = viewRecipientsAndInformeeParticipants
+        .foldLeft(Map.empty[RecipientGroup, RandomnessRevocationInfo]) {
+          case (stateMap, (viewHashAndRecipients, viewMetadata)) =>
+            computeSessionKeyRandomness(
+              sessionKeyStoreSnapshot,
+              stateMap,
+              viewHashAndRecipients.recipients,
+              viewMetadata,
+              pureCrypto,
+            )
+        }
+      viewKeyDataWithReferences <-
+        if (parallel)
+          randomnessRevocationMap.toList
+            .parTraverse { case (recipientGroup, randomnessRevocationInfo) =>
+              mkSessionKeyData(
+                recipientGroup,
+                randomnessRevocationInfo,
+              )
+            }
+            .map(_.toMap)
+        else
+          MonadUtil
+            .sequentialTraverse(randomnessRevocationMap.toList) {
+              case (recipientGroup, randomnessRevocationInfo) =>
+                mkSessionKeyData(
+                  recipientGroup,
+                  randomnessRevocationInfo,
+                )
+            }
+            .map(_.toMap)
 
-    for {
-      symmetricViewKeyRandomness <- eitherTUS(
-        cryptoPureApi
-          .computeHkdf(randomness.unwrap, viewKeyLength, HkdfInfo.ViewKey)
-          .leftMap(FailedToExpandKey)
-      )
-      symmetricViewKey <- eitherTUS(
-        cryptoPureApi
-          .createSymmetricKey(symmetricViewKeyRandomness, viewEncryptionScheme)
-          .leftMap(FailedToCreateEncryptionKey)
-      )
-      recipientsInfo <- getRecipientInfo.mapK(FutureUnlessShutdown.outcomeK)
-      signature <- viewTree.toBeSigned
-        .parTraverse(rootHash =>
-          cryptoSnapshot.sign(rootHash.unwrap).leftMap(FailedToSignViewMessage)
-        )
-      encryptedView <- eitherTUS(
-        EncryptedView
-          .compressed[VT](cryptoPureApi, symmetricViewKey, viewType)(viewTree)
-          .leftMap(FailedToEncryptViewMessage)
-      )
-      message <- createEncryptedViewMessage(recipientsInfo, signature, encryptedView).mapK(
-        FutureUnlessShutdown.outcomeK
-      )
-    } yield message
+      viewKeyData = viewRecipients.map { case (vhr, _, _) =>
+        val (viewKeyData, _, _, _) =
+          viewKeyDataWithReferences(RecipientGroup(vhr.recipients, viewEncryptionScheme))
+        vhr.viewHash -> viewKeyData
+      }.toMap
+
+      // save all data to cache to be used by other transactions
+      sessionKeysInfoMap = viewKeyDataWithReferences.collect {
+        case (recipientsGroup, (vkd, ref, parentRef, newKey)) if newKey =>
+          recipientsGroup ->
+            SessionKeyInfo(
+              SessionKeyAndReference(vkd.viewKeyRandomness, vkd.viewKey, ref),
+              parentRef,
+              vkd.viewKeyRandomnessMap,
+            )
+      }
+      _ = sessionKeyStore.saveSessionKeysInfo(sessionKeysInfoMap)
+    } yield viewKeyData
+
   }
 
   private def createDataMap[M <: HasVersionedToByteString](
@@ -263,7 +428,7 @@ object EncryptedViewMessageFactory {
     */
   final case class UnableToDetermineRecipients(cause: String)
       extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[UnableToDetermineRecipients] = prettyOfClass(
+    override protected def pretty: Pretty[UnableToDetermineRecipients] = prettyOfClass(
       param("cause", _.cause.unquoted)
     )
   }
@@ -272,7 +437,7 @@ object EncryptedViewMessageFactory {
     */
   final case class UnableToDetermineParticipant(party: Set[LfPartyId], domain: DomainId)
       extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[UnableToDetermineParticipant] =
+    override protected def pretty: Pretty[UnableToDetermineParticipant] =
       prettyOfClass(unnamedParam(_.party), unnamedParam(_.domain))
   }
 
@@ -283,48 +448,29 @@ object EncryptedViewMessageFactory {
       cause: SyncCryptoError,
       domain: DomainId,
   ) extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[UnableToDetermineKey] = prettyOfClass(
+    override protected def pretty: Pretty[UnableToDetermineKey] = prettyOfClass(
       param("participant", _.participant),
       param("cause", _.cause),
     )
   }
 
-  final case class FailedToGenerateEncryptionKey(cause: EncryptionKeyGenerationError)
-      extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[FailedToGenerateEncryptionKey] = prettyOfClass(
-      unnamedParam(_.cause)
-    )
-  }
-
   final case class FailedToCreateEncryptionKey(cause: EncryptionKeyCreationError)
       extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[FailedToCreateEncryptionKey] = prettyOfClass(
+    override protected def pretty: Pretty[FailedToCreateEncryptionKey] = prettyOfClass(
       unnamedParam(_.cause)
     )
-  }
-
-  final case class FailedToExpandKey(cause: HkdfError) extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[FailedToExpandKey] = prettyOfClass(unnamedParam(_.cause))
   }
 
   final case class FailedToSignViewMessage(cause: SyncCryptoError)
       extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[FailedToSignViewMessage] = prettyOfClass(unnamedParam(_.cause))
-  }
-
-  final case class FailedToEncryptRandomness(cause: EncryptionError)
-      extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[FailedToEncryptRandomness] = prettyOfClass(unnamedParam(_.cause))
+    override protected def pretty: Pretty[FailedToSignViewMessage] = prettyOfClass(
+      unnamedParam(_.cause)
+    )
   }
 
   final case class FailedToEncryptViewMessage(cause: EncryptionError)
       extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[FailedToEncryptViewMessage] = prettyOfClass(unnamedParam(_.cause))
-  }
-
-  final case class FailedToDeserializeEncryptedRandomness(cause: DeserializationError)
-      extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[FailedToDeserializeEncryptedRandomness] = prettyOfClass(
+    override protected def pretty: Pretty[FailedToEncryptViewMessage] = prettyOfClass(
       unnamedParam(_.cause)
     )
   }
@@ -333,7 +479,7 @@ object EncryptedViewMessageFactory {
     */
   final case class UnableToDetermineSessionKeyRandomness(cause: String)
       extends EncryptedViewMessageCreationError {
-    override def pretty: Pretty[UnableToDetermineSessionKeyRandomness] = prettyOfClass(
+    override protected def pretty: Pretty[UnableToDetermineSessionKeyRandomness] = prettyOfClass(
       param("cause", _.cause.unquoted)
     )
   }

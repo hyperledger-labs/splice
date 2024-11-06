@@ -200,6 +200,7 @@ object PackageIdResolver {
     "Splice.AmuletRules" -> Package.SpliceAmulet,
     "Splice.AmuletImport" -> Package.SpliceAmulet,
     "Splice.DecentralizedSynchronizer" -> Package.SpliceAmulet,
+    "Splice.ExternalPartyAmuletRules" -> Package.SpliceAmulet,
     "Splice.ValidatorLicense" -> Package.SpliceAmulet,
     "Splice.Round" -> Package.SpliceAmulet,
     "Splice.Ans" -> Package.SpliceAmuletNameService,
@@ -214,6 +215,8 @@ object PackageIdResolver {
     "Splice.Wallet.TransferOffer" -> Package.SpliceWallet,
     "Splice.Wallet.Payment" -> Package.SpliceWalletPayments,
     "Splice.Wallet.Subscriptions" -> Package.SpliceWalletPayments,
+    "Splice.Wallet.ExternalParty" -> Package.SpliceWallet,
+    "Splice.Wallet.TransferPreapproval" -> Package.SpliceWallet,
   )
 
   sealed abstract class Package extends Product with Serializable {
@@ -280,5 +283,15 @@ object PackageIdResolver {
     val amuletVersion =
       PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
     amuletVersion >= DarResources.amulet_0_1_5.metadata.version
+  }
+
+  def supportsExternalPartyAmuletRules(
+      now: CantonTimestamp,
+      amuletRules: AmuletRules,
+  ): Boolean = {
+    val currentConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(now)
+    val amuletVersion =
+      PackageVersion.assertFromString(currentConfig.packageConfig.amulet)
+    amuletVersion >= DarResources.amulet_0_1_6.metadata.version
   }
 }

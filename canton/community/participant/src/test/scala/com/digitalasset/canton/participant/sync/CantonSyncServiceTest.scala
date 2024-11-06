@@ -5,38 +5,36 @@ package com.digitalasset.canton.participant.sync
 
 import cats.Eval
 import cats.data.EitherT
+import cats.syntax.either.*
 import com.digitalasset.canton.common.domain.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.crypto.SyncCryptoApiProvider
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.ChangeId
+import com.digitalasset.canton.ledger.participant.state.{ChangeId, Update}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressingLogger
-import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.{PackageService, ResourceManagementService}
 import com.digitalasset.canton.participant.domain.{DomainAliasManager, DomainRegistry}
+import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
 import com.digitalasset.canton.participant.protocol.submission.{
   CommandDeduplicatorImpl,
   InFlightSubmissionTracker,
 }
-import com.digitalasset.canton.participant.pruning.NoOpPruningProcessor
-import com.digitalasset.canton.participant.store.InFlightSubmissionStore.InFlightReference
-import com.digitalasset.canton.participant.store.ParticipantEventLog.ProductionParticipantEventLogId
+import com.digitalasset.canton.participant.pruning.PruningProcessor
 import com.digitalasset.canton.participant.store.*
-import com.digitalasset.canton.participant.store.memory.{
-  InMemoryParticipantEventLog,
-  InMemoryParticipantSettingsStore,
-}
-import com.digitalasset.canton.participant.sync.TimestampedEvent.EventId
+import com.digitalasset.canton.participant.store.InFlightSubmissionStore.InFlightReference
+import com.digitalasset.canton.participant.store.memory.InMemoryParticipantSettingsStore
 import com.digitalasset.canton.participant.topology.{
   LedgerServerPartyNotifier,
   ParticipantTopologyDispatcher,
-  ParticipantTopologyManagerOps,
+  PartyOps,
 }
 import com.digitalasset.canton.participant.util.DAMLe
+import com.digitalasset.canton.participant.{LifeCycleContainer, ParticipantNodeParameters}
+import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SimClock}
@@ -49,7 +47,7 @@ import org.mockito.ArgumentMatchers
 import org.scalatest.Outcome
 import org.scalatest.wordspec.FixtureAnyWordSpec
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
 
 class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContext {
@@ -64,20 +62,18 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
     private val syncDomainPersistentStateManager = mock[SyncDomainPersistentStateManager]
     private val domainConnectionConfigStore = mock[DomainConnectionConfigStore]
     private val packageService = mock[PackageService]
-    val topologyManagerOps: ParticipantTopologyManagerOps = mock[ParticipantTopologyManagerOps]
+    val partyOps: PartyOps = mock[PartyOps]
 
     private val identityPusher = mock[ParticipantTopologyDispatcher]
     val partyNotifier = mock[LedgerServerPartyNotifier]
     private val syncCrypto = mock[SyncCryptoApiProvider]
-    private val multiDomainEventLog = mock[MultiDomainEventLog]
+    private val ledgerApiIndexer = mock[LedgerApiIndexer]
     val participantNodePersistentState = mock[ParticipantNodePersistentState]
     private val participantSettingsStore = new InMemoryParticipantSettingsStore(loggerFactory)
     val participantEventPublisher = mock[ParticipantEventPublisher]
-    private val participantEventLog =
-      new InMemoryParticipantEventLog(ProductionParticipantEventLogId, loggerFactory)
     private val indexedStringStore = InMemoryIndexedStringStore()
     private val participantNodeEphemeralState = mock[ParticipantNodeEphemeralState]
-    private val pruningProcessor = NoOpPruningProcessor
+    private val pruningProcessor = mock[PruningProcessor]
     private val commandDeduplicationStore = mock[CommandDeduplicationStore]
     private val inFlightSubmissionStore = mock[InFlightSubmissionStore]
     private val sequencerInfoLoader = mock[SequencerInfoLoader]
@@ -91,24 +87,12 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       .failOnShutdown
       .futureValue
 
-    when(participantNodePersistentState.participantEventLog).thenReturn(participantEventLog)
-    when(participantNodePersistentState.multiDomainEventLog).thenReturn(multiDomainEventLog)
     when(participantNodePersistentState.settingsStore).thenReturn(participantSettingsStore)
     when(participantNodePersistentState.commandDeduplicationStore).thenReturn(
       commandDeduplicationStore
     )
     when(participantNodePersistentState.inFlightSubmissionStore).thenReturn(inFlightSubmissionStore)
     when(partyNotifier.resumePending()).thenReturn(Future.unit)
-
-    when(
-      multiDomainEventLog.fetchUnpublished(
-        ArgumentMatchers.eq(ProductionParticipantEventLogId),
-        ArgumentMatchers.eq(None),
-      )(anyTraceContext)
-    )
-      .thenReturn(Future.successful(List.empty))
-    when(multiDomainEventLog.lookupByEventIds(any[Seq[EventId]])(anyTraceContext))
-      .thenReturn(Future.successful(Map.empty))
 
     when(participantNodeEphemeralState.participantEventPublisher).thenReturn(
       participantEventPublisher
@@ -122,9 +106,9 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       commandDeduplicationStore.storeDefiniteAnswers(
         any[Seq[(ChangeId, DefiniteAnswerEvent, Boolean)]]
       )(anyTraceContext)
-    ).thenReturn(Future.unit)
+    ).thenReturn(FutureUnlessShutdown.unit)
     when(inFlightSubmissionStore.delete(any[Seq[InFlightReference]])(anyTraceContext))
-      .thenReturn(Future.unit)
+      .thenReturn(FutureUnlessShutdown.unit)
 
     val clock = new SimClock(loggerFactory = loggerFactory)
 
@@ -138,13 +122,19 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
     val inFlightSubmissionTracker = new InFlightSubmissionTracker(
       store = Eval.now(inFlightSubmissionStore),
       deduplicator = commandDeduplicator,
-      multiDomainEventLog = Eval.now(multiDomainEventLog),
       timeouts = LocalNodeParameters.processingTimeouts,
       loggerFactory = loggerFactory,
     )
 
     when(participantNodeEphemeralState.inFlightSubmissionTracker).thenReturn(
       inFlightSubmissionTracker
+    )
+
+    private val commandProgressTracker = mock[CommandProgressTracker]
+    private val ledgerApiLifeCycleContainer = new LifeCycleContainer[LedgerApiIndexer](
+      stateName = "mock-lapi-indexer",
+      create = () => FutureUnlessShutdown.pure(ledgerApiIndexer),
+      loggerFactory = loggerFactory,
     )
 
     val sync = new CantonSyncService(
@@ -156,15 +146,17 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       participantNodeEphemeralState,
       syncDomainPersistentStateManager,
       Eval.now(packageService),
-      topologyManagerOps,
+      partyOps,
       identityPusher,
       partyNotifier,
       syncCrypto,
       pruningProcessor,
       DAMLe.newEngine(enableLfDev = false, enableLfBeta = false, enableStackTraces = false),
+      commandProgressTracker,
       syncDomainStateFactory,
       clock,
-      new ResourceManagementService.CommunityResourceManagementService(
+      new ResourceManagementService(
+        Eval.now(participantSettingsStore),
         None,
         ParticipantTestMetrics,
       ),
@@ -178,6 +170,7 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       FutureSupervisor.Noop,
       SuppressingLogger(getClass),
       TestingConfigInternal(),
+      ledgerApiLifeCycleContainer,
     )
   }
 
@@ -189,15 +182,18 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
   "Canton sync service" should {
     "emit add party event" in { f =>
       when(
-        f.topologyManagerOps.allocateParty(
-          any[String255],
+        f.partyOps.allocateParty(
           any[PartyId],
           any[ParticipantId],
           any[ProtocolVersion],
-        )(any[TraceContext])
+        )(any[TraceContext], any[ExecutionContext])
       ).thenReturn(EitherT.rightT(()))
 
-      when(f.participantEventPublisher.publish(any[LedgerSyncEvent])(anyTraceContext))
+      when(
+        f.participantEventPublisher.publishEventDelayableByRepairOperation(any[Update])(
+          anyTraceContext
+        )
+      )
         .thenReturn(FutureUnlessShutdown.unit)
 
       when(
@@ -207,7 +203,7 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
           any[String255],
           any[Option[String255]],
         )
-      ).thenReturn(Right(()))
+      ).thenReturn(Either.unit)
 
       val lfInputPartyId = LfPartyId.assertFromString("desiredPartyName")
       val partyId =
@@ -228,15 +224,14 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
         )
         .asScala
 
-      val result = fut.map(_ => {
-        verify(f.topologyManagerOps).allocateParty(
-          eqTo(String255.tryCreate(submissionId)),
+      val result = fut.map { _ =>
+        verify(f.partyOps).allocateParty(
           eqTo(partyId),
           eqTo(f.participantId),
           eqTo(ProtocolVersion.latest),
-        )(anyTraceContext)
+        )(anyTraceContext, any[ExecutionContext])
         succeed
-      })
+      }
 
       result.futureValue
     }

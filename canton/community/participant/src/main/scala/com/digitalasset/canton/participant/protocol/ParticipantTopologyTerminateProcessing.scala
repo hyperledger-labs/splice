@@ -3,108 +3,117 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.syntax.parallel.*
 import com.digitalasset.canton.config.RequireTypes.NegativeLong
+import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.participant.state.{DomainIndex, SequencerIndex, Update}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.TopologyOffset
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
-import com.digitalasset.canton.participant.sync.{LedgerSyncEvent, TimestampedEvent}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.PositiveStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.TopologyMapping
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import com.digitalasset.canton.{SequencerCounter, topology}
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.{LedgerTransactionId, SequencerCounter, topology}
+import com.google.protobuf.ByteString
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class ParticipantTopologyTerminateProcessingTicker(
+object ParticipantTopologyTerminateProcessing {
+
+  private[canton] val enabledWarningMessage =
+    "Topology events are enabled. This is an experimental feature, unsafe for production use."
+
+  private val minTopologyTieBreaker = NegativeLong.tryCreate(Long.MinValue + 1)
+
+}
+
+class ParticipantTopologyTerminateProcessing(
+    domainId: DomainId,
     recordOrderPublisher: RecordOrderPublisher,
+    store: TopologyStore[TopologyStoreId.DomainStore],
     override protected val loggerFactory: NamedLoggerFactory,
 ) extends topology.processing.TerminateProcessing
     with NamedLogging {
 
-  override def terminate(
-      sc: SequencerCounter,
-      sequencedTime: SequencedTime,
-      effectiveTime: EffectiveTime,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    recordOrderPublisher.tick(sc, sequencedTime.value)
-    Future.unit
-  }
-}
+  import ParticipantTopologyTerminateProcessing.enabledWarningMessage
 
-class ParticipantTopologyTerminateProcessing(
-    recordOrderPublisher: RecordOrderPublisher,
-    store: TopologyStore[TopologyStoreId.DomainStore],
-    override protected val loggerFactory: NamedLoggerFactory,
-)(implicit executionContext: ExecutionContext)
-    extends topology.processing.TerminateProcessing
-    with NamedLogging {
-  private val topologyTransactionsToEvents: TopologyTransactionsToEvents =
-    new TopologyTransactionsToEvents(loggerFactory)
+  noTracingLogger.warn(enabledWarningMessage)
 
   override def terminate(
       sc: SequencerCounter,
       sequencedTime: SequencedTime,
       effectiveTime: EffectiveTime,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    val minimumTieBreaker = Long.MinValue + 1
-
-    def offset(idx: Int) =
-      TopologyOffset.tryCreate(effectiveTime, NegativeLong.tryCreate(minimumTieBreaker + idx))
-
+  )(implicit traceContext: TraceContext, executionContext: ExecutionContext): Future[Unit] =
     for {
-      events <- getNewEvents(sequencedTime, effectiveTime)
-
+      events <- getNewEvents(sc, sequencedTime, effectiveTime)
       _ <-
-        if (events.nonEmpty) {
-          logger.debug(
-            s"Batch of topology transactions with sc=$sc yielded ${events.size} new events"
-          )
-
-          events.zipWithIndex.parTraverse_ { case (event, idx) =>
-            val localOffset = offset(idx)
-            val timestampedEvent = TimestampedEvent(event, localOffset, None)
-
-            recordOrderPublisher.schedulePublication(sc, localOffset, timestampedEvent)
-          }
-
-        } else Future.unit
-
-      _ = recordOrderPublisher.tick(sc, sequencedTime.value)
+        // TODO(i21243) This is a rudimentary first approach, and only proper if epsilon is 0
+        recordOrderPublisher.tick(
+          sc,
+          sequencedTime.value,
+          events.events.headOption.map(_ => Traced(events)),
+          requestCounterO = None,
+        )
     } yield ()
-  }
+
+  private def queryStore(asOf: CantonTimestamp, asOfInclusive: Boolean)(implicit
+      traceContext: TraceContext
+  ): Future[PositiveStoredTopologyTransactions] =
+    store.findPositiveTransactions(
+      // the effectiveTime of topology transactions is exclusive. so if we want to find
+      // the old and new state, we need to take the immediateSuccessor of the effectiveTime
+      asOf = asOf,
+      asOfInclusive = asOfInclusive,
+      isProposal = false,
+      types = Seq(TopologyMapping.Code.PartyToParticipant),
+      filterUid = None,
+      filterNamespace = None,
+    )
 
   private def getNewEvents(
+      sc: SequencerCounter,
       sequencedTime: SequencedTime,
       effectiveTime: EffectiveTime,
-  )(implicit traceContext: TraceContext): Future[Seq[LedgerSyncEvent]] = {
-    def queryStore(asOfInclusive: Boolean): Future[PositiveStoredTopologyTransactions] =
-      store.findPositiveTransactions(
-        // the effectiveTime of topology transactions is exclusive. so if we want to find
-        // the old and new state, we need to take the immediateSuccessor of the effectiveTime
-        asOf = effectiveTime.value.immediateSuccessor,
-        asOfInclusive = asOfInclusive,
-        isProposal = false,
-        types = Seq(TopologyMapping.Code.PartyToParticipant),
-        filterUid = None,
-        filterNamespace = None,
-      )
+  )(implicit
+      traceContext: TraceContext,
+      executionContext: ExecutionContext,
+  ): Future[Update.TopologyTransactionEffective] = {
+
+    val beforeF = queryStore(asOf = effectiveTime.value, asOfInclusive = false)
+    val afterF = queryStore(asOf = effectiveTime.value, asOfInclusive = true)
 
     for {
-      old <- queryStore(asOfInclusive = false)
-      current <- queryStore(asOfInclusive = true)
+      before <- beforeF
+      after <- afterF
+    } yield Update.TopologyTransactionEffective(
+      updateId = randomUpdateId,
+      events = TopologyTransactionDiff(before.signedTransactions, after.signedTransactions),
+      // TODO(i21243) Use effective time when emitting with delay
+      recordTime = sequencedTime.toLf,
+      domainId = domainId,
+      // TODO(i21243) Use effective time when emitting with delay
+      domainIndex = DomainIndex.of(SequencerIndex(sc, sequencedTime.value)),
+    )
+  }
 
-      events = topologyTransactionsToEvents.events(
-        sequencedTime,
-        effectiveTime,
-        old.signedTransactions,
-        current.signedTransactions,
-      )
-
-    } yield events
+  // TODO(i21341): Create an update ID that would be the same across all participants,
+  // submission-id is only stored in the LedgerServerPartyNotifier of the calling participant
+  // hash of the transaction could play that role, because it is universally known to all
+  // participants.
+  private def randomUpdateId: LedgerTransactionId = {
+    val bytes = new Array[Byte](8)
+    scala.util.Random.nextBytes(bytes)
+    LedgerTransactionId.assertFromString(
+      Hash
+        .digest(
+          HashPurpose.TopologyTransactionSignature,
+          ByteString.copyFrom(bytes),
+          HashAlgorithm.Sha256,
+        )
+        .toHexString
+    )
   }
 
 }

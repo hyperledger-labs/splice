@@ -68,12 +68,11 @@ trait ApplicationHandler[-Box[+_ <: Envelope[_]], -Env <: Envelope[_]]
         _ <- other.subscriptionStartsAt(start, domainTimeTracker)
       } yield ()
 
-    override def apply(boxedEnvelope: BoxedEnvelope[Box2, Env2]): HandlerResult = {
+    override def apply(boxedEnvelope: BoxedEnvelope[Box2, Env2]): HandlerResult =
       for {
         r1 <- ApplicationHandler.this.apply(boxedEnvelope: BoxedEnvelope[Box, Env])
         r2 <- other.apply(boxedEnvelope)
       } yield Monoid[AsyncResult].combine(r1, r2)
-    }
   }
 }
 
@@ -125,7 +124,7 @@ object SubscriptionStart {
     * The application handler has never been called with an event.
     */
   case object FreshSubscription extends SubscriptionStart {
-    override def pretty: Pretty[FreshSubscription] = prettyOfObject[FreshSubscription]
+    override protected def pretty: Pretty[FreshSubscription] = prettyOfObject[FreshSubscription]
   }
   type FreshSubscription = FreshSubscription.type
 
@@ -136,7 +135,7 @@ object SubscriptionStart {
   final case class CleanHeadResubscriptionStart(cleanPrehead: CantonTimestamp)
       extends ResubscriptionStart {
 
-    override def pretty: Pretty[CleanHeadResubscriptionStart] = prettyOfClass(
+    override protected def pretty: Pretty[CleanHeadResubscriptionStart] = prettyOfClass(
       param("clean prehead", _.cleanPrehead)
     )
   }
@@ -152,7 +151,7 @@ object SubscriptionStart {
       firstReplayed: CantonTimestamp,
       cleanPreheadO: Option[CantonTimestamp],
   ) extends ResubscriptionStart {
-    override def pretty: Pretty[ReplayResubscriptionStart] = prettyOfClass(
+    override protected def pretty: Pretty[ReplayResubscriptionStart] = prettyOfClass(
       param("first replayed", _.firstReplayed),
       paramIfDefined("clean prehead", _.cleanPreheadO),
     )

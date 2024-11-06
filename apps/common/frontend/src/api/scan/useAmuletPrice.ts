@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { Contract, PollingStrategy } from 'common-frontend-utils';
+import { Contract } from 'common-frontend-utils';
 import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
 import { OpenMiningRound } from '@daml.js/splice-amulet/lib/Splice/Round';
@@ -30,7 +30,6 @@ export function useAmuletPriceFromOpenRounds(
   getOpenRounds: () => Promise<Contract<OpenMiningRound>[]>
 ): UseQueryResult<BigNumber> {
   return useQuery({
-    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['scan-api', 'amuletPrice'],
     queryFn: async () => {
       const openOpenRounds = (await getOpenRounds()).filter(

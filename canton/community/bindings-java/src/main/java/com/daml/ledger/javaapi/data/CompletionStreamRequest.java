@@ -8,6 +8,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class CompletionStreamRequest {
 
@@ -15,12 +16,12 @@ public final class CompletionStreamRequest {
 
   @NonNull private final List<@NonNull String> parties;
 
-  @NonNull private final String beginExclusive;
+  @NonNull private final Long beginExclusive;
 
   public CompletionStreamRequest(
       @NonNull String applicationId,
       @NonNull List<@NonNull String> parties,
-      @NonNull String beginExclusive) {
+      @NonNull Long beginExclusive) {
     this.applicationId = applicationId;
     this.parties = List.copyOf(parties);
     this.beginExclusive = beginExclusive;
@@ -36,7 +37,7 @@ public final class CompletionStreamRequest {
     return parties;
   }
 
-  public String getBeginExclusive() {
+  public Long getBeginExclusive() {
     return beginExclusive;
   }
 
@@ -47,11 +48,13 @@ public final class CompletionStreamRequest {
   }
 
   public CommandCompletionServiceOuterClass.CompletionStreamRequest toProto() {
-    return CommandCompletionServiceOuterClass.CompletionStreamRequest.newBuilder()
-        .setApplicationId(applicationId)
-        .addAllParties(parties)
-        .setBeginExclusive(beginExclusive)
-        .build();
+    CommandCompletionServiceOuterClass.CompletionStreamRequest.Builder builder =
+        CommandCompletionServiceOuterClass.CompletionStreamRequest.newBuilder()
+            .setApplicationId(applicationId)
+            .addAllParties(parties)
+            .setBeginExclusive(beginExclusive);
+
+    return builder.build();
   }
 
   @Override

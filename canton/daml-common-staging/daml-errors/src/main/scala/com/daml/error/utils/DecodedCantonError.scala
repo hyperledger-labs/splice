@@ -5,9 +5,9 @@ package com.daml.error.utils
 
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
+import com.daml.error.*
 import com.daml.error.BaseError.SecuritySensitiveMessage
 import com.daml.error.ErrorCategory.GenericErrorCategory
-import com.daml.error.*
 import com.google.protobuf.any
 import com.google.rpc.error_details.{ErrorInfo, RequestInfo, ResourceInfo, RetryInfo}
 import com.google.rpc.status.Status as RpcStatus
@@ -34,6 +34,7 @@ final case class DecodedCantonError(
     traceId: Option[String],
     override val context: Map[String, String],
     override val resources: Seq[(ErrorResource, String)],
+    override val definiteAnswerO: Option[Boolean] = None,
 ) extends BaseError {
   def toRpcStatusWithForwardedRequestId: RpcStatus = super.rpcStatus(None)(
     new NoLogging(properties = Map.empty, correlationId = correlationId, traceId = traceId)
@@ -86,7 +87,7 @@ object DecodedCantonError {
       errorInfoSeq <- extractErrorDetail[ErrorInfo](rawDetails)
       errorInfo <- errorInfoSeq.exactlyOne
       requestInfoSeq <- extractErrorDetail[RequestInfo](rawDetails)
-      requestInfo <- requestInfoSeq.atMostOne
+      requestInfoO <- requestInfoSeq.atMostOne
       retryInfoSeq <- extractErrorDetail[RetryInfo](rawDetails)
       retryInfo <- retryInfoSeq.atMostOne
       resourceInfo <- extractErrorDetail[ResourceInfo](rawDetails)
@@ -102,7 +103,7 @@ object DecodedCantonError {
       cause = extractCause(status)
       // The RequestInfo.requestId is set primarily to the ContextualizedErrorLogger.correlationId
       // with the ContextualizedErrorLogger.traceId as a fallback.
-      correlationId = requestInfo.collect {
+      correlationId = requestInfoO.collect {
         case requestInfo if !traceId.contains(requestInfo.requestId) => requestInfo.requestId
       }
     } yield DecodedCantonError(
@@ -158,7 +159,7 @@ object DecodedCantonError {
         // If we log it, we use INFO since it's received from an
         // external component
         logLevel = Level.INFO,
-        retryable = retryableDuration.map(ErrorCategoryRetry),
+        retryable = retryableDuration.map(ErrorCategoryRetry.apply),
         securitySensitive = false,
         asInt = categoryId,
         rank = -1,

@@ -99,7 +99,7 @@ object AuthenticationCheck {
     override def authenticate(
         member: Member,
         authenticatedMember: Option[Member],
-    ): Either[String, Unit] = Right(())
+    ): Either[String, Unit] = Either.unit
 
     override def lookupCurrentMember(): Option[Member] = None
   }
@@ -115,7 +115,6 @@ object GrpcSequencerService {
       domainParamsLookup: DynamicDomainParametersLookup[SequencerDomainParameters],
       parameters: SequencerParameters,
       protocolVersion: ProtocolVersion,
-      domainTopologyManager: DomainTopologyManager,
       topologyStateForInitializationService: TopologyStateForInitializationService,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext, materializer: Materializer): GrpcSequencerService =
@@ -137,7 +136,6 @@ object GrpcSequencerService {
       ),
       domainParamsLookup,
       parameters,
-      domainTopologyManager,
       topologyStateForInitializationService,
       protocolVersion,
     )
@@ -166,7 +164,6 @@ class GrpcSequencerService(
     directSequencerSubscriptionFactory: DirectSequencerSubscriptionFactory,
     domainParamsLookup: DynamicDomainParametersLookup[SequencerDomainParameters],
     parameters: SequencerParameters,
-    domainTopologyManager: DomainTopologyManager,
     topologyStateForInitializationService: TopologyStateForInitializationService,
     protocolVersion: ProtocolVersion,
     maxItemsInTopologyResponse: PositiveInt = PositiveInt.tryCreate(100),
@@ -372,11 +369,8 @@ class GrpcSequencerService(
       // Rate limiting only if participants send to participants.
       case participantId: ParticipantId if request.isConfirmationRequest =>
         for {
-          confirmationRequestsMaxRate <- EitherTUtil
-            .fromFuture(
-              domainParamsLookup.getApproximateOrDefaultValue(),
-              e => SendAsyncError.Internal(s"Unable to retrieve domain parameters: ${e.getMessage}"),
-            )
+          confirmationRequestsMaxRate <- EitherT
+            .right(domainParamsLookup.getApproximateOrDefaultValue())
             .map(_.confirmationRequestsMaxRate)
           _ <- EitherT.fromEither[Future](checkRate(participantId, confirmationRequestsMaxRate))
         } yield ()
@@ -480,7 +474,7 @@ class GrpcSequencerService(
     val acknowledgeRequestE = SignedContent
       .fromByteString(protocolVersion)(request.signedAcknowledgeRequest)
       .flatMap(_.deserializeContent(AcknowledgeRequest.fromByteString(protocolVersion)))
-    performAcknowledge(acknowledgeRequestE.map(SignedAcknowledgeRequest))
+    performAcknowledge(acknowledgeRequestE.map(SignedAcknowledgeRequest.apply))
   }
 
   private def performAcknowledge(

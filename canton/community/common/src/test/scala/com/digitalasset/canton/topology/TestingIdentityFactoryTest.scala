@@ -60,12 +60,12 @@ class TestingIdentityFactoryTest extends AnyWordSpec with BaseTest with HasExecu
       "signature of participant1 is verifiable by participant1" in {
         await(
           p1.currentSnapshotApproximation.verifySignature(hash, participant1, signature)
-        ) shouldBe Right(())
+        ) shouldBe Either.unit
       }
       "signature of participant1 is verifiable by participant2" in {
         await(
           p2.currentSnapshotApproximation.verifySignature(hash, participant1, signature)
-        ) shouldBe Right(())
+        ) shouldBe Either.unit
       }
       "signature verification fails for wrong key owner" in {
         await(
@@ -90,9 +90,9 @@ class TestingIdentityFactoryTest extends AnyWordSpec with BaseTest with HasExecu
       "party1 is active" in {
         p1.currentSnapshotApproximation.ipsSnapshot
           .activeParticipantsOf(party1.toLf)
-          .futureValue shouldBe (Map(
+          .futureValue shouldBe Map(
           participant1 -> ParticipantAttributes(ParticipantPermission.Confirmation)
-        ))
+        )
       }
       "participant2 can't sign messages without appropriate keys" in {
         Await
@@ -113,7 +113,7 @@ class TestingIdentityFactoryTest extends AnyWordSpec with BaseTest with HasExecu
           .futureValue
         allMembers
           .flatMap(membersToKeys.get(_))
-          .foreach(_ should have length (expectedLength.toLong))
+          .foreach(_ should have length expectedLength.toLong)
       }
 
       "domain entities have keys" in {
@@ -162,16 +162,19 @@ class TestingIdentityFactoryTest extends AnyWordSpec with BaseTest with HasExecu
           participant1 -> ParticipantPermission.Confirmation
         )
       )
-      val setup = TestingTopology(
-        topology = topology,
-        domainParameters = domainParameters,
-        participants = Map(
-          participant1 -> ParticipantAttributes(ParticipantPermission.Confirmation)
-        ),
-      ).build()
+      val setup = TestingTopology
+        .from(
+          topology = topology,
+          domainParameters = domainParameters,
+          participants = Map(
+            participant1 -> ParticipantAttributes(ParticipantPermission.Confirmation)
+          ),
+        )
+        .build()
       compare(setup)
       // extend with admin parties should give participant2 a signing key
-      val crypto2 = TestingTopology(topology = topology, domainParameters = domainParameters)
+      val crypto2 = TestingTopology
+        .from(topology = topology, domainParameters = domainParameters)
         .withParticipants(
           participant1 -> ParticipantAttributes(ParticipantPermission.Confirmation),
           participant2 -> ParticipantAttributes(ParticipantPermission.Submission),
@@ -202,7 +205,7 @@ class TestingIdentityFactoryTest extends AnyWordSpec with BaseTest with HasExecu
       "participant2 signatures are valid" in {
         await(
           p2.currentSnapshotApproximation.verifySignature(hash, participant2, signature)
-        ) shouldBe Right(())
+        ) shouldBe Either.unit
         await(
           p1.currentSnapshotApproximation.verifySignature(hash, participant1, signature)
         ).left.value shouldBe a[SignatureCheckError]

@@ -3,9 +3,7 @@
 
 package com.digitalasset.canton.platform.store.dao.events
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.event.Event
-import com.daml.ledger.api.v2.state_service.{ActiveContract, GetActiveContractsResponse}
 import com.daml.ledger.api.v2.trace_context.TraceContext as DamlTraceContext
 import com.daml.ledger.api.v2.transaction.{
   Transaction as ApiTransaction,
@@ -19,11 +17,10 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdatesResponse,
 }
 import com.digitalasset.canton.ledger.api.util.TimestampConversion
-import com.digitalasset.canton.ledger.error.IndexErrors
 import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.platform.store.ScalaPbStreamingOptimizations.*
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.Entry
-import com.digitalasset.canton.platform.store.utils.EventOps.{EventOps, TreeEventOps}
+import com.digitalasset.canton.platform.store.utils.EventOps.TreeEventOps
 
 object EventsTable {
 
@@ -34,7 +31,7 @@ object EventsTable {
     ): Option[DamlTraceContext] =
       events
         .map(_.traceContext)
-        .collectFirst({ case Some(tc) => tc })
+        .collectFirst { case Some(tc) => tc }
         .map(DamlTraceContext.parseFrom)
 
     private def flatTransaction(events: Vector[Entry[Event]]): Option[ApiTransaction] =
@@ -48,11 +45,11 @@ object EventsTable {
         if (flatEvents.nonEmpty || first.commandId.nonEmpty)
           Some(
             ApiTransaction(
-              updateId = first.transactionId,
-              commandId = first.commandId,
+              updateId = first.updateId,
+              commandId = first.commandId.getOrElse(""),
               effectiveAt = Some(TimestampConversion.fromLf(first.ledgerEffectiveTime)),
-              workflowId = first.workflowId,
-              offset = ApiOffset.toApiString(first.eventOffset),
+              workflowId = first.workflowId.getOrElse(""),
+              offset = ApiOffset.assertFromStringToLong(first.offset),
               events = flatEvents,
               domainId = first.domainId,
               traceContext = extractTraceContext(events),
@@ -64,7 +61,7 @@ object EventsTable {
 
     def toGetTransactionsResponse(
         events: Vector[Entry[Event]]
-    ): List[(String, GetUpdatesResponse)] =
+    ): List[(Long, GetUpdatesResponse)] =
       flatTransaction(events).toList.map(tx =>
         tx.offset -> GetUpdatesResponse(GetUpdatesResponse.Update.Transaction(tx))
           .withPrecomputedSerializedSize()
@@ -74,33 +71,6 @@ object EventsTable {
         events: Vector[Entry[Event]]
     ): Option[GetTransactionResponse] =
       flatTransaction(events).map(tx => GetTransactionResponse(Some(tx)))
-
-    def toGetActiveContractsResponse(
-        events: Vector[Entry[Event]]
-    )(implicit
-        contextualizedErrorLogger: ContextualizedErrorLogger
-    ): Vector[GetActiveContractsResponse] = {
-      events.map {
-        case entry if entry.event.isCreated =>
-          GetActiveContractsResponse(
-            offset = "", // only the last response will have an offset.
-            workflowId = entry.workflowId,
-            contractEntry = GetActiveContractsResponse.ContractEntry.ActiveContract(
-              ActiveContract(
-                createdEvent = Some(entry.event.getCreated),
-                domainId = "", // not used for V1
-                reassignmentCounter = 0L, // not used for V1
-              )
-            ),
-          ).withPrecomputedSerializedSize()
-        case entry =>
-          throw IndexErrors.DatabaseErrors.ResultSetError
-            .Reject(
-              s"Non-create event ${entry.event.eventId} fetched as part of the active contracts"
-            )
-            .asGrpcError
-      }
-    }
 
     private def treeOf(
         events: Vector[Entry[TreeEvent]]
@@ -136,11 +106,11 @@ object EventsTable {
       events.headOption.map { first =>
         val (eventsById, rootEventIds, traceContext) = treeOf(events)
         ApiTransactionTree(
-          updateId = first.transactionId,
-          commandId = first.commandId,
-          workflowId = first.workflowId,
+          updateId = first.updateId,
+          commandId = first.commandId.getOrElse(""),
+          workflowId = first.workflowId.getOrElse(""),
           effectiveAt = Some(TimestampConversion.fromLf(first.ledgerEffectiveTime)),
-          offset = ApiOffset.toApiString(first.eventOffset),
+          offset = ApiOffset.assertFromStringToLong(first.offset),
           eventsById = eventsById,
           rootEventIds = rootEventIds,
           domainId = first.domainId,
@@ -151,7 +121,7 @@ object EventsTable {
 
     def toGetTransactionTreesResponse(
         events: Vector[Entry[TreeEvent]]
-    ): List[(String, GetUpdateTreesResponse)] =
+    ): List[(Long, GetUpdateTreesResponse)] =
       transactionTree(events).toList.map(tx =>
         tx.offset -> GetUpdateTreesResponse(GetUpdateTreesResponse.Update.TransactionTree(tx))
           .withPrecomputedSerializedSize()

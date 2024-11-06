@@ -5,7 +5,7 @@ package com.digitalasset.canton
 
 import com.digitalasset.canton.SerializationDeserializationTestHelpers.DefaultValueUntilExclusive
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 import org.reflections.Reflections
@@ -46,33 +46,30 @@ trait SerializationDeserializationTestHelpers extends BaseTest with ScalaCheckPr
   ], DeserializedValueClass <: HasRepresentativeProtocolVersion](
       companion: HasProtocolVersionedWrapperWithoutContextCompanion[T, DeserializedValueClass],
       protocolVersion: ProtocolVersion,
-  )(implicit arb: Arbitrary[T]): Assertion = {
+  )(implicit arb: Arbitrary[T]): Assertion =
     testProtocolVersionedCommon(
       companion,
       companion.fromByteString(protocolVersion),
     )
-  }
 
   protected def testMemoizedProtocolVersioned[T <: HasProtocolVersionedWrapper[T]](
       companion: HasMemoizedProtocolVersionedWrapperCompanion[T],
       protocolVersion: ProtocolVersion,
-  )(implicit arb: Arbitrary[T]): Assertion = {
+  )(implicit arb: Arbitrary[T]): Assertion =
     testProtocolVersionedCommon(
       companion,
       companion.fromByteString(protocolVersion),
     )
-  }
   protected def testMemoizedProtocolVersioned2[T <: HasProtocolVersionedWrapper[
     T
   ], U <: HasProtocolVersionedWrapper[?]](
       companion: HasMemoizedProtocolVersionedWrapperCompanion2[T, U],
       protocolVersion: ProtocolVersion,
-  )(implicit arb: Arbitrary[T]): Assertion = {
+  )(implicit arb: Arbitrary[T]): Assertion =
     testProtocolVersionedCommon(
       companion,
       companion.fromByteString(protocolVersion),
     )
-  }
 
   protected def testMemoizedProtocolVersionedWithCtx[T <: HasProtocolVersionedWrapper[T], Context](
       companion: HasMemoizedProtocolVersionedWithContextCompanion[T, Context],
@@ -106,7 +103,7 @@ trait SerializationDeserializationTestHelpers extends BaseTest with ScalaCheckPr
         Context,
       ],
       context: Context,
-      protocolVersion: TargetProtocolVersion,
+      protocolVersion: Target[ProtocolVersion],
   )(implicit arb: Arbitrary[T]): Assertion =
     testProtocolVersionedCommon(
       companion,
@@ -124,7 +121,7 @@ trait SerializationDeserializationTestHelpers extends BaseTest with ScalaCheckPr
         Context,
       ],
       context: Context,
-      protocolVersion: SourceProtocolVersion,
+      protocolVersion: Source[ProtocolVersion],
   )(implicit arb: Arbitrary[T]): Assertion =
     testProtocolVersionedCommon(
       companion,

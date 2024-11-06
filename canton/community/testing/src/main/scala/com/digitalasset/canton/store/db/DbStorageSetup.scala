@@ -4,8 +4,8 @@
 package com.digitalasset.canton.store.db
 
 import com.daml.nameof.NameOf.functionFullName
-import com.digitalasset.canton.config.CommunityDbConfig.{H2, Postgres}
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.CommunityDbConfig.{H2, Postgres}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext}
@@ -134,10 +134,14 @@ abstract class PostgresDbStorageSetup(
 /** Assumes Postgres is available on a already running and that connections details are
   * provided through environment variables.
   * In CI this is done by running a Postgres docker container alongside the build.
+  * @param migrationMode migration mode to use
+  * @param mkDbConfig function to create a db config from a basic config
+  * @param useDbNameO optional name of the database to use for the tests (will be created if it does not exist)
   */
 class PostgresCISetup(
     override val migrationMode: MigrationMode,
     override val mkDbConfig: DbBasicConfig => DbConfig with PostgresDbConfig,
+    useDbNameO: Option[String] = None,
     loggerFactory: NamedLoggerFactory,
 )(implicit
     override val executionContext: ExecutionContext
@@ -147,7 +151,8 @@ class PostgresCISetup(
   private lazy val envDb = env("POSTGRES_DB")
 
   /** name of db to use for the tests (avoiding flyway migration conflicts) */
-  private lazy val useDb = envDb + (if (migrationMode == MigrationMode.DevVersion) "_dev" else "")
+  private lazy val useDb =
+    useDbNameO.getOrElse(envDb) + (if (migrationMode == MigrationMode.DevVersion) "_dev" else "")
 
   private lazy val useHost = sys.env.getOrElse("POSTGRES_HOST", "localhost")
 
@@ -159,62 +164,62 @@ class PostgresCISetup(
     5432,
   )
 
-  @SuppressWarnings(Array("com.digitalasset.canton.SlickString"))
-  override protected def prepareDatabase(): Unit = if (migrationMode == MigrationMode.DevVersion) {
-    val envDbConfig =
-      CommunityDbConfig.Postgres(basicConfig.copy(dbName = envDb).toPostgresConfig)
-    val envDbStorage = mkStorage(envDbConfig)
+  override protected def prepareDatabase(): Unit =
+    if (useDb != envDb) { // for provided db name or dev migrations
+      val envDbConfig =
+        CommunityDbConfig.Postgres(basicConfig.copy(dbName = envDb).toPostgresConfig)
+      val envDbStorage = mkStorage(envDbConfig)
 
-    def transformQueryResult[T](v: T): PartialFunction[Throwable, T] = {
-      // Due to a race condition, it may happen that between checking if the database exists and creating it,
-      // it has already been created and a duplicate database error is thrown.
-      // We can safely ignore this error.
-      case ex: PSQLException
-          // 23505 means "unique_violation"
-          // 42P04 means "duplicate_database"
-          // either of these 2 errors could happen when trying to create a database that already exists
-          // (source: https://www.postgresql.org/docs/current/errcodes-appendix.html)
-          if ex.getSQLState == "23505" || ex.getSQLState == "42P04" =>
-        v
+      def transformQueryResult[T](v: T): PartialFunction[Throwable, T] = {
+        // Due to a race condition, it may happen that between checking if the database exists and creating it,
+        // it has already been created and a duplicate database error is thrown.
+        // We can safely ignore this error.
+        case ex: PSQLException
+            // 23505 means "unique_violation"
+            // 42P04 means "duplicate_database"
+            // either of these 2 errors could happen when trying to create a database that already exists
+            // (source: https://www.postgresql.org/docs/current/errcodes-appendix.html)
+            if ex.getSQLState == "23505" || ex.getSQLState == "42P04" =>
+          v
 
-      // Two concurrent calls try to do some operation
-      case ex: PSQLException if ex.getMessage.contains("ERROR: tuple concurrently updated") =>
-        v
+        // Two concurrent calls try to do some operation
+        case ex: PSQLException if ex.getMessage.contains("ERROR: tuple concurrently updated") =>
+          v
+      }
+
+      try {
+        import envDbStorage.api.*
+        val genF = envDbStorage
+          .query(sql"SELECT 1 FROM pg_database WHERE datname = $useDb".as[Int], functionFullName)
+          .recover(transformQueryResult(Vector(1)))
+          .flatMap { res =>
+            if (res.isEmpty) {
+              logger.debug(s"Creating database $useDb using connection to $envDb")
+              envDbStorage
+                .update_(sqlu"CREATE DATABASE #$useDb", functionFullName)
+                .recover(transformQueryResult(()))
+                .flatMap(_ =>
+                  Future {
+                    val useDbConfig =
+                      CommunityDbConfig.Postgres(basicConfig.copy(dbName = useDb).toPostgresConfig)
+                    val useDbStorage = mkStorage(useDbConfig)
+                    try {
+                      import useDbStorage.api.*
+                      val adaptSchemaF = useDbStorage.update_(
+                        sqlu"""GRANT ALL ON SCHEMA public TO "#${env("POSTGRES_USER")}"""",
+                        functionFullName,
+                      )
+                      DefaultProcessingTimeouts.default.await_(
+                        s"granting rights on public schema for database $useDb"
+                      )(adaptSchemaF)
+                    } finally useDbStorage.close()
+                  }.recover(transformQueryResult(()))
+                )
+            } else Future.unit
+          }
+        DefaultProcessingTimeouts.default.await_(s"creating database $useDb")(genF)
+      } finally envDbStorage.close()
     }
-
-    try {
-      import envDbStorage.api.*
-      val genF = envDbStorage
-        .query(sql"SELECT 1 FROM pg_database WHERE datname = $useDb".as[Int], functionFullName)
-        .recover(transformQueryResult(Vector(1)))
-        .flatMap { res =>
-          if (res.isEmpty) {
-            logger.debug(s"Creating database ${useDb} using connection to ${envDb}")
-            envDbStorage
-              .update_(sqlu"CREATE DATABASE #${useDb}", functionFullName)
-              .recover(transformQueryResult(()))
-              .flatMap(_ =>
-                Future {
-                  val useDbConfig =
-                    CommunityDbConfig.Postgres(basicConfig.copy(dbName = useDb).toPostgresConfig)
-                  val useDbStorage = mkStorage(useDbConfig)
-                  try {
-                    import useDbStorage.api.*
-                    val adaptSchemaF = useDbStorage.update_(
-                      sqlu"""GRANT ALL ON SCHEMA public TO "#${env("POSTGRES_USER")}"""",
-                      functionFullName,
-                    )
-                    DefaultProcessingTimeouts.default.await_(
-                      s"granting rights on public schema for database $useDb"
-                    )(adaptSchemaF)
-                  } finally useDbStorage.close()
-                }.recover(transformQueryResult(()))
-              )
-          } else Future.unit
-        }
-      DefaultProcessingTimeouts.default.await_(s"creating database $useDb")(genF)
-    } finally envDbStorage.close()
-  }
 
   override protected def destroyDatabase(): Unit = ()
 }
@@ -231,7 +236,7 @@ class PostgresTestContainerSetup(
 ) extends PostgresDbStorageSetup(loggerFactory)
     with NamedLogging {
 
-  private lazy val postgresContainer = new PostgreSQLContainer(s"${PostgreSQLContainer.IMAGE}:12")
+  private lazy val postgresContainer = new PostgreSQLContainer(s"${PostgreSQLContainer.IMAGE}:14")
 
   override protected def prepareDatabase(): Unit = {
     // up the connection limit to deal with everyone using connection pools in tests that can run concurrently.
@@ -240,7 +245,7 @@ class PostgresTestContainerSetup(
     postgresContainer.setCommandParts(command.toArray)
     noTracingLogger.debug(s"Starting postgres container with $command")
 
-    val startF = Future { postgresContainer.start() }
+    val startF = Future(postgresContainer.start())
     dbStartupTimeout.await_("startup of postgres container")(startF)
   }
 
@@ -291,6 +296,7 @@ object DbStorageSetup {
       migrationMode: MigrationMode = MigrationMode.Standard,
       mkDbConfig: DbBasicConfig => DbConfig with PostgresDbConfig = _.toPostgresDbConfig,
       forceTestContainer: Boolean = false,
+      useDbNameO: Option[String] = None,
   )(implicit ec: ExecutionContext): PostgresDbStorageSetup = {
 
     val isCI = sys.env.contains("CI")
@@ -298,7 +304,7 @@ object DbStorageSetup {
     val useTestContainerByForce = sys.env.contains("DB_FORCE_TEST_CONTAINER") || forceTestContainer
 
     if (!useTestContainerByForce && (isCI && !isMachine))
-      new PostgresCISetup(migrationMode, mkDbConfig, loggerFactory).initialized()
+      new PostgresCISetup(migrationMode, mkDbConfig, useDbNameO, loggerFactory).initialized()
     else new PostgresTestContainerSetup(migrationMode, mkDbConfig, loggerFactory).initialized()
   }
 
@@ -353,14 +359,5 @@ object DbStorageSetup {
     )
 
     def toH2DbConfig: H2 = H2(toH2Config)
-
-    def toOracleConfig: Config = configOfMap(
-      Map(
-        "driver" -> "oracle.jdbc.OracleDriver",
-        "url" -> DbConfig.oracleUrl(host, port, dbName),
-        "user" -> username,
-        "password" -> password,
-      )
-    )
   }
 }

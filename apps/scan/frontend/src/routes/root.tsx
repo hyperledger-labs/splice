@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { PollingStrategy } from 'common-frontend-utils';
 import { useGetRoundOfLatestData } from 'common-frontend/scan-api';
 import React, { useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -25,7 +24,7 @@ const Root: React.FC = () => {
   const currentPath = useLocation().pathname;
   const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];
 
-  const { data: latestRound, error } = useGetRoundOfLatestData(PollingStrategy.FIXED);
+  const { data: latestRound, error } = useGetRoundOfLatestData();
 
   const round = useMemo(() => {
     if (error) {

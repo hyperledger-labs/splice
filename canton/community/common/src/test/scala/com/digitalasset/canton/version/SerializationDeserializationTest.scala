@@ -7,6 +7,7 @@ import com.digitalasset.canton.crypto.TestHash
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
@@ -29,7 +30,7 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
   TopologyTransaction,
 }
-import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.{BaseTest, SerializationDeserializationTestHelpers}
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
@@ -113,15 +114,15 @@ class SerializationDeserializationTest
         testMemoizedProtocolVersionedWithCtx(ParticipantMetadata, TestHash)
         testMemoizedProtocolVersionedWithCtx(SubmitterMetadata, TestHash)
         testMemoizedProtocolVersionedWithCtx(
-          TransferInCommonData,
-          (TestHash, TargetProtocolVersion(version)),
+          AssignmentCommonData,
+          (TestHash, Target(version)),
         )
-        testMemoizedProtocolVersionedWithCtx(TransferInView, TestHash)
+        testMemoizedProtocolVersionedWithCtx(AssignmentView, TestHash)
         testMemoizedProtocolVersionedWithCtx(
-          TransferOutCommonData,
-          (TestHash, SourceProtocolVersion(version)),
+          UnassignmentCommonData,
+          (TestHash, Source(version)),
         )
-        testMemoizedProtocolVersionedWithCtx(TransferOutView, TestHash)
+        testMemoizedProtocolVersionedWithCtx(UnassignmentView, TestHash)
 
         testMemoizedProtocolVersionedWithCtx(
           ViewCommonData,
@@ -146,6 +147,9 @@ class SerializationDeserializationTest
         )
         testVersioned(SequencerConnections)
         testProtocolVersioned(GetTrafficStateForMemberRequest, version)
+        // This fails, which is expected, because PartySignatures serialization is only defined on PV.dev
+        // We do this on purpose to make clear that this is a work in progress and should **NOT** be merged to 3.1
+        testProtocolVersioned(ExternalAuthorization, version)
         testProtocolVersioned(GetTrafficStateForMemberResponse, version)
         testProtocolVersioned(TopologyStateForInitRequest, version)
         testProtocolVersioned(SubscriptionRequest, version)
@@ -177,17 +181,22 @@ class SerializationDeserializationTest
           version,
         )
 
-        testProtocolVersionedWithCtxAndValidation(LightTransactionViewTree, TestHash, version)
+        val randomnessLength = computeRandomnessLength(ExampleTransactionFactory.pureCrypto)
+        testProtocolVersionedWithCtxAndValidation(
+          LightTransactionViewTree,
+          (TestHash, randomnessLength),
+          version,
+        )
 
         testProtocolVersionedWithCtxAndValidationWithTargetProtocolVersion(
-          TransferInViewTree,
+          AssignmentViewTree,
           TestHash,
-          TargetProtocolVersion(version),
+          Target(version),
         )
         testProtocolVersionedWithCtxAndValidationWithSourceProtocolVersion(
-          TransferOutViewTree,
+          UnassignmentViewTree,
           TestHash,
-          SourceProtocolVersion(version),
+          Source(version),
         )
       }
     }

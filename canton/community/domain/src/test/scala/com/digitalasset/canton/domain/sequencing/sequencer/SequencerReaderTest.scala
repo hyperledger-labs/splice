@@ -44,7 +44,12 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.{BaseTest, SequencerCounter, config}
+import com.digitalasset.canton.{
+  BaseTest,
+  ProtocolVersionChecksFixtureAsyncWordSpec,
+  SequencerCounter,
+  config,
+}
 import com.google.protobuf.ByteString
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
@@ -61,7 +66,10 @@ import scala.collection.immutable.SortedSet
 import scala.concurrent.duration.*
 import scala.concurrent.{Future, Promise}
 
-class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
+class SequencerReaderTest
+    extends FixtureAsyncWordSpec
+    with BaseTest
+    with ProtocolVersionChecksFixtureAsyncWordSpec {
 
   private val alice = ParticipantId("alice")
   private val bob = ParticipantId("bob")
@@ -70,7 +78,7 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
   private val topologyClientMember = SequencerId(domainId.uid)
   private val crypto = TestingTopology(
     sequencerGroup = SequencerGroup(
-      active = NonEmpty.mk(Seq, SequencerId(domainId.uid)),
+      active = Seq(SequencerId(domainId.uid)),
       passive = Seq.empty,
       threshold = PositiveInt.one,
     ),
@@ -124,7 +132,7 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
     val store = new InMemorySequencerStore(
       protocolVersion = testedProtocolVersion,
       sequencerMember = topologyClientMember,
-      unifiedSequencer = testedUseUnifiedSequencer,
+      blockSequencerMode = true,
       loggerFactory = loggerFactory,
     )
     val instanceIndex: Int = 0
@@ -147,6 +155,7 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
       testedProtocolVersion,
       timeouts,
       loggerFactory,
+      blockSequencerMode = true,
     )
     val defaultTimeout: FiniteDuration = 20.seconds
     implicit val closeContext: CloseContext = CloseContext(reader)
@@ -200,12 +209,11 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
 
     def pullFromQueue(
         queue: SinkQueueWithCancel[OrdinarySerializedEvent]
-    ): Future[Option[OrdinarySerializedEvent]] = {
+    ): Future[Option[OrdinarySerializedEvent]] =
       loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
         queue.pull(),
         ignoreWarningsFromLackOfTopologyUpdates,
       )
-    }
 
     def waitFor(duration: FiniteDuration): Future[Unit] = {
       val promise = Promise[Unit]()
@@ -440,7 +448,9 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
     }
 
     "counter checkpoint" should {
-      "issue counter checkpoints occasionally" in { env =>
+      // Note: unified sequencer mode creates checkpoints using sequencer writer
+      // TODO(#16087) revive test for blockSequencerMode=false
+      "issue counter checkpoints occasionally" ignore { env =>
         import env.*
 
         import scala.jdk.CollectionConverters.*
@@ -803,7 +813,8 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
         }
       }
 
-      "do not update the topology client timestamp" in { env =>
+      // TODO(#16087) revive test for blockSequencerMode=false
+      "do not update the topology client timestamp" ignore { env =>
         import env.*
 
         for {

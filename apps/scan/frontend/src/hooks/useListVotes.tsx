@@ -3,7 +3,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 // TODO(#7675) - do we need this model?
 import { SvVote } from 'common-frontend';
-import { Contract, PollingStrategy } from 'common-frontend-utils';
+import { Contract } from 'common-frontend-utils';
 import { useScanClient } from 'common-frontend/scan-api';
 
 import * as damlTypes from '@daml/types';
@@ -19,7 +19,6 @@ function getVoteStatus(votes: damlTypes.Map<string, Vote>): Vote[] {
 export const useListVotes = (contractIds: ContractId<VoteRequest>[]): UseQueryResult<SvVote[]> => {
   const scanClient = useScanClient();
   return useQuery({
-    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listVoteRequestsByTrackingCid', contractIds],
     queryFn: async () => {
       if (contractIds.length === 0) {

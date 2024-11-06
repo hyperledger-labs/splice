@@ -29,7 +29,6 @@ class ContractStorageBackendTemplate(
     ledgerEndCache: LedgerEndCache,
     stringInterning: StringInterning,
 ) extends ContractStorageBackend {
-  import com.digitalasset.canton.platform.store.backend.Conversions.ArrayColumnToIntArray.*
 
   override def keyState(key: Key, validAt: Offset)(connection: Connection): KeyState = {
     val resultParser =
@@ -102,7 +101,7 @@ class ContractStorageBackendTemplate(
       ~ byteArray("create_key_value").?
       ~ int("create_key_value_compression").?
       ~ array[Int]("create_key_maintainers").?
-      ~ byteArray("driver_metadata").?)
+      ~ byteArray("driver_metadata"))
       .map {
         case coid ~ internedTemplateId ~ internedPackageName ~ internedPackageVersion ~ flatEventWitnesses ~ createArgument ~ createArgumentCompression ~ ledgerEffectiveTime ~ signatories ~ createKey ~ createKeyCompression ~ keyMaintainers ~ driverMetadata =>
           ContractId.assertFromString(coid) -> RawCreatedContract(

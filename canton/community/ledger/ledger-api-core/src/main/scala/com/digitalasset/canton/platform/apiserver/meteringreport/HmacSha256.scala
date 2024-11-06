@@ -33,7 +33,7 @@ object HmacSha256 {
     private[this] val base = implicitly[JsonFormat[String]]
     override def write(obj: Bytes): JsValue = base.write(obj.toBase64)
     override def read(json: JsValue): Bytes = fromBase64(base.read(json))
-      .map(Bytes)
+      .map(Bytes.apply)
       .fold(deserializationError(s"Failed to deserialize $json", _), identity)
   }
 
@@ -50,14 +50,13 @@ object HmacSha256 {
   val algorithm = "HmacSHA256"
   private val macPrototype = new MacPrototype(algorithm)
 
-  def compute(key: Key, message: Array[Byte]): Either[Throwable, Array[Byte]] = {
+  def compute(key: Key, message: Array[Byte]): Either[Throwable, Array[Byte]] =
     Try {
       val mac = macPrototype.newMac
       val secretKey = new SecretKeySpec(key.encoded.bytes, key.algorithm)
       mac.init(secretKey)
       mac.doFinal(message)
     }.toEither
-  }
 
   def generateKey(scheme: String): Key = {
     val generator = KeyGenerator.getInstance(algorithm)

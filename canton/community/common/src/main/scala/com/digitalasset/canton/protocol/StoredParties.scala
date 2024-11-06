@@ -31,7 +31,7 @@ object StoredParties
     with HasVersionedMessageCompanionDbHelpers[StoredParties] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v31,
+      ProtocolVersion.v32,
       supportedProtoVersion(v30.StoredParties)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -46,7 +46,7 @@ object StoredParties
   def fromProtoV30(proto0: v30.StoredParties): ParsingResult[StoredParties] = {
     val v30.StoredParties(partiesP) = proto0
     for {
-      parties <- partiesP.traverse(ProtoConverter.parseLfPartyId)
+      parties <- partiesP.traverse(ProtoConverter.parseLfPartyId(_, "parties"))
     } yield StoredParties.fromIterable(parties)
   }
 }

@@ -9,6 +9,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.participant.state.ChangeId
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.protocol.submission.ChangeIdHash
@@ -28,7 +29,7 @@ import com.digitalasset.canton.{ApplicationId, CommandId}
 import slick.jdbc.SetParameter
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class DbCommandDeduplicationStore(
     override protected val storage: DbStorage,
@@ -53,7 +54,9 @@ class DbCommandDeduplicationStore(
 
   override def lookup(
       changeIdHash: ChangeIdHash
-  )(implicit traceContext: TraceContext): OptionT[Future, CommandDeduplicationData] = {
+  )(implicit
+      traceContext: TraceContext
+  ): OptionT[FutureUnlessShutdown, CommandDeduplicationData] = {
     val query =
       sql"""
         select application_id, command_id, act_as,
@@ -62,12 +65,12 @@ class DbCommandDeduplicationStore(
         from par_command_deduplication
         where change_id_hash = $changeIdHash
         """.as[CommandDeduplicationData].headOption
-    storage.querySingle(query, functionFullName)
+    storage.querySingleUnlessShutdown(query, functionFullName)
   }
 
   override def storeDefiniteAnswers(
       answers: Seq[(ChangeId, DefiniteAnswerEvent, Boolean)]
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val update = storage.profile match {
       case _: DbStorage.Profile.Postgres =>
         """
@@ -94,53 +97,6 @@ class DbCommandDeduplicationStore(
               submission_id_acceptance = (case when ? = '1' then excluded.submission_id_acceptance else par_command_deduplication.submission_id_acceptance end),
               trace_context_acceptance = (case when ? = '1' then excluded.trace_context_acceptance else par_command_deduplication.trace_context_acceptance end)
             where par_command_deduplication.offset_definite_answer < excluded.offset_definite_answer
-            """
-      case _: DbStorage.Profile.Oracle =>
-        """
-          merge into par_command_deduplication using
-             (select
-                ? as change_id_hash,
-                ? as application_id,
-                ? as command_id,
-                ? as act_as,
-                ? as offset_definite_answer,
-                ? as publication_time_definite_answer,
-                ? as submission_id_definite_answer,
-                ? as trace_context_definite_answer,
-                ? as offset_acceptance,
-                ? as publication_time_acceptance,
-                cast(? as nvarchar2(300)) as submission_id_acceptance,
-                to_blob(?) as trace_context_acceptance
-              from dual) excluded
-            on (par_command_deduplication.change_id_hash = excluded.change_id_hash)
-            when matched then
-              update set
-                offset_definite_answer = excluded.offset_definite_answer,
-                publication_time_definite_answer = excluded.publication_time_definite_answer,
-                submission_id_definite_answer = excluded.submission_id_definite_answer,
-                trace_context_definite_answer = excluded.trace_context_definite_answer,
-                offset_acceptance = (case when ? = '1' then excluded.offset_acceptance else par_command_deduplication.offset_acceptance end),
-                publication_time_acceptance = (case when ? = '1' then excluded.publication_time_acceptance else par_command_deduplication.publication_time_acceptance end),
-                submission_id_acceptance = (case when ? = '1' then excluded.submission_id_acceptance else par_command_deduplication.submission_id_acceptance end),
-                trace_context_acceptance = (case when ? = '1' then excluded.trace_context_acceptance else par_command_deduplication.trace_context_acceptance end)
-              where par_command_deduplication.offset_definite_answer < excluded.offset_definite_answer
-            when not matched then
-              insert (
-                change_id_hash,
-                application_id, command_id, act_as,
-                offset_definite_answer, publication_time_definite_answer,
-                submission_id_definite_answer, trace_context_definite_answer,
-                offset_acceptance, publication_time_acceptance,
-                submission_id_acceptance, trace_context_acceptance
-              )
-              values (
-                excluded.change_id_hash,
-                excluded.application_id, excluded.command_id, excluded.act_as,
-                excluded.offset_definite_answer, excluded.publication_time_definite_answer,
-                excluded.submission_id_definite_answer, excluded.trace_context_definite_answer,
-                excluded.offset_acceptance, excluded.publication_time_acceptance,
-                excluded.submission_id_acceptance, excluded.trace_context_acceptance
-              )
             """
       case _: DbStorage.Profile.H2 =>
         """
@@ -210,7 +166,6 @@ class DbCommandDeduplicationStore(
         pp >> acceptance.flatMap(_.serializableSubmissionId)
         pp >> acceptance.map(accept => SerializableTraceContext(accept.traceContext))
 
-        @SuppressWarnings(Array("com.digitalasset.canton.SlickString"))
         def setAcceptFlag(): Unit = {
           val acceptedFlag = if (accepted) "1" else "0"
           pp >> acceptedFlag
@@ -223,8 +178,8 @@ class DbCommandDeduplicationStore(
     // No need for synchronous commit across DB replicas, because this method is driven from the
     // published events in the multi-domain event log, which itself uses synchronous commits and
     // therefore ensures synchronization. After a crash, crash recovery will sync the
-    // command deduplication data with the MultiDomainEventLog.
-    storage.queryAndUpdate(bulkUpdate, functionFullName).flatMap { rowCounts =>
+    // command deduplication data with the indexer DB.
+    storage.queryAndUpdateUnlessShutdown(bulkUpdate, functionFullName).flatMap { rowCounts =>
       MonadUtil.sequentialTraverse_(rowCounts.iterator.zip(answers.tails)) {
         case (rowCount, currentAndLaterAnswers) =>
           val (changeId, definiteAnswerEvent, accepted) =
@@ -245,13 +200,13 @@ class DbCommandDeduplicationStore(
       definiteAnswerEvent: DefiniteAnswerEvent,
       accepted: Boolean,
       laterAnswersInBatch: Seq[(ChangeId, DefiniteAnswerEvent, Boolean)],
-  ): Future[Unit] = {
+  ): FutureUnlessShutdown[Unit] = {
     implicit val traceContext: TraceContext = definiteAnswerEvent.traceContext
     if (rowCount == 1) {
       val acceptance = if (accepted) definiteAnswerEvent.some else None
       val data = CommandDeduplicationData.tryCreate(changeId, definiteAnswerEvent, acceptance)
       logger.debug(s"Updated command deduplication data for ${changeId.hash} to $data")
-      Future.unit
+      FutureUnlessShutdown.unit
     } else if (rowCount == 0) {
       val changeIdHash = ChangeIdHash(changeId)
       // Check what's in the DB
@@ -276,19 +231,17 @@ class DbCommandDeduplicationStore(
             )
           }
         } else {
-          def error(): Unit = {
+          def error(): Unit =
             ErrorUtil.internalError(
               new IllegalArgumentException(
                 s"Cannot update command deduplication data for $changeIdHash from offset ${data.latestDefiniteAnswer.offset} to offset ${definiteAnswerEvent.offset}\n Found data: $data\nDefinite answer update: $definiteAnswerEvent"
               )
             )
-          }
 
-          def laterOverwrite(): Unit = {
+          def laterOverwrite(): Unit =
             logger.debug(
               s"Command deduplication data for ${changeId.hash} is being overwritten by later completion."
             )
-          }
 
           /* If the bulk insertion query is retried, we may find a later definite answer than the current one.
            * So we check for this possibility before we complain.
@@ -313,7 +266,7 @@ class DbCommandDeduplicationStore(
         }
       }
     } else {
-      ErrorUtil.internalErrorAsync(
+      ErrorUtil.internalErrorAsyncShutdown(
         new DbSerializationException(
           s"Updating the command deduplication for ${changeId.hash} updated $rowCount rows"
         )
@@ -323,7 +276,7 @@ class DbCommandDeduplicationStore(
 
   override def prune(upToInclusive: GlobalOffset, prunedPublicationTime: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[Unit] = {
+  ): FutureUnlessShutdown[Unit] = {
     cachedLastPruning.updateAndGet {
       case Some(Some(OffsetAndPublicationTime(currentOffset, currentPublicationTime))) =>
         Some(
@@ -349,7 +302,7 @@ class DbCommandDeduplicationStore(
               pruning_offset = (case when par_command_deduplication_pruning.pruning_offset < excluded.pruning_offset then excluded.pruning_offset else par_command_deduplication_pruning.pruning_offset end),
               publication_time = (case when par_command_deduplication_pruning.publication_time < excluded.publication_time then excluded.publication_time else par_command_deduplication_pruning.publication_time end)
             """
-        case _: DbStorage.Profile.Oracle | _: DbStorage.Profile.H2 =>
+        case _: DbStorage.Profile.H2 =>
           sqlu"""
             merge into par_command_deduplication_pruning using dual
               on (client = 0)
@@ -364,13 +317,13 @@ class DbCommandDeduplicationStore(
       }
       val doPrune =
         sqlu"""delete from par_command_deduplication where offset_definite_answer <= $upToInclusive"""
-      storage.update_(updatePruneOffset.andThen(doPrune), functionFullName)
+      storage.updateUnlessShutdown_(updatePruneOffset.andThen(doPrune), functionFullName)
     }
   }
 
   override def latestPruning()(implicit
       traceContext: TraceContext
-  ): OptionT[Future, CommandDeduplicationStore.OffsetAndPublicationTime] = {
+  ): OptionT[FutureUnlessShutdown, CommandDeduplicationStore.OffsetAndPublicationTime] =
     cachedLastPruning.get() match {
       case None =>
         {
@@ -379,14 +332,13 @@ class DbCommandDeduplicationStore(
           select pruning_offset, publication_time
           from par_command_deduplication_pruning
              """.as[OffsetAndPublicationTime].headOption
-          storage.querySingle(query, functionFullName)
+          storage.querySingleUnlessShutdown(query, functionFullName)
         }
           .transform { offset =>
             // only replace if we haven't raced with another thread
             cachedLastPruning.compareAndSet(None, Some(offset))
             offset
           }
-      case Some(value) => OptionT.fromOption[Future](value)
+      case Some(value) => OptionT.fromOption[FutureUnlessShutdown](value)
     }
-  }
 }

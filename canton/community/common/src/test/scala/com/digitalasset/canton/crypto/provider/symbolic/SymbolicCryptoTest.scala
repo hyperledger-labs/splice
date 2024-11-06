@@ -33,14 +33,17 @@ class SymbolicCryptoTest
         )
       )
 
-    behave like signingProvider(SymbolicCryptoProvider.supportedSigningKeySchemes, symbolicCrypto())
+    behave like signingProvider(
+      SymbolicCryptoProvider.supportedSigningSpecs.algorithms.forgetNE,
+      symbolicCrypto(),
+    )
     behave like encryptionProvider(
       SymbolicCryptoProvider.supportedEncryptionSpecs.algorithms.forgetNE,
       SymbolicCryptoProvider.supportedSymmetricKeySchemes,
       symbolicCrypto(),
     )
     behave like privateKeySerializerProvider(
-      SymbolicCryptoProvider.supportedSigningKeySchemes,
+      SymbolicCryptoProvider.supportedSigningSpecs.keys.forgetNE,
       SymbolicCryptoProvider.supportedEncryptionSpecs.keys.forgetNE,
       symbolicCrypto(),
     )
@@ -52,7 +55,6 @@ class SymbolicCryptoTest
       symbolicCrypto().map(_.pureCrypto),
     )
 
-    // Symbolic crypto does not satisfy golden tests for HKDF
     // Symbolic crypto does not support Java key conversion, thus not tested
 
     // Symbolic crypto does not support public key validation, thus not tested

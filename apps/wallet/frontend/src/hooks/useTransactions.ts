@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useInfiniteQuery, UseInfiniteQueryResult } from '@tanstack/react-query';
-import { PollingStrategy } from 'common-frontend-utils';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { Transaction } from '../models/models';
@@ -10,7 +9,6 @@ export const useTransactions: () => UseInfiniteQueryResult<Transaction[]> = () =
   const { listTransactions } = useWalletClient();
 
   return useInfiniteQuery({
-    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['transactions'],
     queryFn: async ({ pageParam }) => {
       const txs = await listTransactions(pageParam);

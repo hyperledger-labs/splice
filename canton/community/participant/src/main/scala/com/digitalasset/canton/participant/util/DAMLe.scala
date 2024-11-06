@@ -17,12 +17,10 @@ import com.digitalasset.canton.participant.util.DAMLe.{
   PackageResolver,
 }
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
-import com.digitalasset.canton.platform.apiserver.execution.AuthorityResolver
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{LfCommand, LfCreateCommand, LfKeyResolver, LfPartyId, LfVersioned}
 import com.digitalasset.daml.lf.VersionRange
 import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName}
@@ -32,11 +30,7 @@ import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
 import com.digitalasset.daml.lf.language.Ast.Package
 import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.language.LanguageVersion.v2_dev
-import com.digitalasset.daml.lf.transaction.{
-  ContractKeyUniquenessMode,
-  TransactionVersion,
-  Versioned,
-}
+import com.digitalasset.daml.lf.transaction.{ContractKeyUniquenessMode, Versioned}
 
 import java.nio.file.Path
 import scala.annotation.tailrec
@@ -82,11 +76,11 @@ object DAMLe {
   sealed trait ReinterpretationError extends PrettyPrinting
 
   final case class EngineError(cause: Error) extends ReinterpretationError {
-    override def pretty: Pretty[EngineError] = adHocPrettyInstance
+    override protected def pretty: Pretty[EngineError] = adHocPrettyInstance
   }
 
   final case class EngineAborted(reason: String) extends ReinterpretationError {
-    override def pretty: Pretty[EngineAborted] = prettyOfClass(
+    override protected def pretty: Pretty[EngineAborted] = prettyOfClass(
       param("reason", _.reason.doubleQuoted)
     )
   }
@@ -144,7 +138,6 @@ object DAMLe {
   */
 class DAMLe(
     resolvePackage: PackageResolver,
-    authorityResolver: AuthorityResolver,
     domainId: Option[DomainId],
     engine: Engine,
     engineLoggingConfig: EngineLoggingConfig,
@@ -153,7 +146,7 @@ class DAMLe(
     extends NamedLogging
     with HasReinterpret {
 
-  import DAMLe.{ReinterpretationError, EngineError, EngineAborted}
+  import DAMLe.{EngineAborted, EngineError, ReinterpretationError}
 
   logger.debug(engine.info.show)(TraceContext.empty)
 
@@ -232,7 +225,7 @@ class DAMLe(
     for {
       txWithMetadata <- EitherT(handleResult(contracts, result, getEngineAbortStatus))
       (tx, metadata) = txWithMetadata
-      peeledTxE = peelAwayRootLevelRollbackNode(tx).leftMap(EngineError)
+      peeledTxE = peelAwayRootLevelRollbackNode(tx).leftMap(EngineError.apply)
       txNoRootRollback <- EitherT.fromEither[Future](
         peeledTxE: Either[ReinterpretationError, LfVersionedTransaction]
       )
@@ -251,7 +244,7 @@ class DAMLe(
       getEngineAbortStatus: GetEngineAbortStatus,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, ReinterpretationError, LfNodeCreate] = {
+  ): EitherT[Future, ReinterpretationError, LfNodeCreate] =
     LoggingContextUtil.createLoggingContext(loggerFactory) { implicit loggingContext =>
       val result = engine.reinterpret(
         submitters = submitters,
@@ -280,7 +273,6 @@ class DAMLe(
         create <- EitherT.pure[Future, ReinterpretationError](singleCreate)
       } yield create
     }
-  }
 
   def contractWithMetadata(
       contractInstance: LfContractInst,
@@ -352,7 +344,7 @@ class DAMLe(
       @tailrec
       def iterateOverInterrupts(
           continue: () => Result[A]
-      ): Either[EngineAborted, Result[A]] = {
+      ): Either[EngineAborted, Result[A]] =
         continue() match {
           case ResultInterruption(continue) =>
             getEngineAbortStatus().reasonO match {
@@ -364,7 +356,6 @@ class DAMLe(
 
           case otherResult => Right(otherResult)
         }
-      }
 
       result match {
         case ResultNeedPackage(packageId, resume) =>
@@ -403,25 +394,8 @@ class DAMLe(
             case Left(abort) => Future.successful(Left(abort))
             case Right(result) => handleResultInternal(contracts, result)
           }
-        case ResultNeedAuthority(holding, requesting, resume) =>
-          authorityResolver
-            .resolve(
-              AuthorityResolver
-                .AuthorityRequest(holding, requesting, domainId)
-            )
-            .flatMap {
-              case AuthorityResolver.AuthorityResponse.Authorized =>
-                handleResultInternal(contracts, resume(true))
-              case AuthorityResolver.AuthorityResponse.MissingAuthorisation(parties) =>
-                val receivedAuthorityFor = parties -- requesting
-                logger.debug(
-                  show"Authorisation failed. Missing authority: [$parties]. Received authority: [$receivedAuthorityFor]"
-                )
-                handleResultInternal(contracts, resume(false))
-            }
-
         case ResultNeedUpgradeVerification(coid, signatories, observers, keyOpt, resume) =>
-          val unusedTxVersion = TransactionVersion.StableVersions.max
+          val unusedTxVersion = LfLanguageVersion.StableVersions(LfLanguageVersion.Major.V2).max
           val metadata = ContractMetadata.tryCreate(
             signatories = signatories,
             stakeholders = signatories ++ observers,

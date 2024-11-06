@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.platform.store
 
-import com.daml.ledger.api.v2.checkpoint.Checkpoint
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
+import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse.CompletionResponse
 import com.daml.ledger.api.v2.completion.Completion
+import com.daml.ledger.api.v2.offset_checkpoint.DomainTime
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.util.TimestampConversion.fromInstant
-import com.digitalasset.canton.platform.ApiOffset.ApiOffsetConverter
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.duration.Duration
@@ -18,27 +18,28 @@ import io.grpc.Status
 // Turn a stream of transactions into a stream of completions for a given application and set of parties
 object CompletionFromTransaction {
   val OkStatus = StatusProto.of(Status.Code.OK.value(), "", Seq.empty)
-  private val RejectionTransactionId = ""
+  private val RejectionUpdateId = ""
 
   def acceptedCompletion(
+      submitters: Set[String],
       recordTime: Timestamp,
       offset: Offset,
       commandId: String,
-      transactionId: String,
+      updateId: String,
       applicationId: String,
       domainId: String,
       traceContext: TraceContext,
       optSubmissionId: Option[String] = None,
-      optDeduplicationOffset: Option[String] = None,
+      optDeduplicationOffset: Option[Long] = None,
       optDeduplicationDurationSeconds: Option[Long] = None,
       optDeduplicationDurationNanos: Option[Int] = None,
   ): CompletionStreamResponse =
     CompletionStreamResponse.of(
-      checkpoint = Some(toApiCheckpoint(recordTime, offset)),
-      completion = Some(
+      completionResponse = CompletionResponse.Completion(
         toApiCompletion(
+          submitters = submitters,
           commandId = commandId,
-          transactionId = transactionId,
+          updateId = updateId,
           applicationId = applicationId,
           traceContext = traceContext,
           optStatus = Some(OkStatus),
@@ -46,12 +47,14 @@ object CompletionFromTransaction {
           optDeduplicationOffset = optDeduplicationOffset,
           optDeduplicationDurationSeconds = optDeduplicationDurationSeconds,
           optDeduplicationDurationNanos = optDeduplicationDurationNanos,
+          offset = offset.toLong,
+          domainTime = Some(toApiDomainTime(domainId, recordTime)),
         )
-      ),
-      domainId = domainId,
+      )
     )
 
   def rejectedCompletion(
+      submitters: Set[String],
       recordTime: Timestamp,
       offset: Offset,
       commandId: String,
@@ -60,16 +63,16 @@ object CompletionFromTransaction {
       domainId: String,
       traceContext: TraceContext,
       optSubmissionId: Option[String] = None,
-      optDeduplicationOffset: Option[String] = None,
+      optDeduplicationOffset: Option[Long] = None,
       optDeduplicationDurationSeconds: Option[Long] = None,
       optDeduplicationDurationNanos: Option[Int] = None,
   ): CompletionStreamResponse =
     CompletionStreamResponse.of(
-      checkpoint = Some(toApiCheckpoint(recordTime, offset)),
-      completion = Some(
+      completionResponse = CompletionResponse.Completion(
         toApiCompletion(
+          submitters = submitters,
           commandId = commandId,
-          transactionId = RejectionTransactionId,
+          updateId = RejectionUpdateId,
           applicationId = applicationId,
           traceContext = traceContext,
           optStatus = Some(status),
@@ -77,34 +80,41 @@ object CompletionFromTransaction {
           optDeduplicationOffset = optDeduplicationOffset,
           optDeduplicationDurationSeconds = optDeduplicationDurationSeconds,
           optDeduplicationDurationNanos = optDeduplicationDurationNanos,
+          offset = offset.toLong,
+          domainTime = Some(toApiDomainTime(domainId, recordTime)),
         )
-      ),
-      domainId = domainId,
+      )
     )
 
-  private def toApiCheckpoint(recordTime: Timestamp, offset: Offset): Checkpoint =
-    Checkpoint.of(
+  private def toApiDomainTime(domainId: String, recordTime: Timestamp): DomainTime =
+    DomainTime.of(
+      domainId = domainId,
       recordTime = Some(fromInstant(recordTime.toInstant)),
-      offset = offset.toApiString,
     )
 
   def toApiCompletion(
+      submitters: Set[String],
       commandId: String,
-      transactionId: String,
+      updateId: String,
       applicationId: String,
       traceContext: TraceContext,
       optStatus: Option[StatusProto],
       optSubmissionId: Option[String],
-      optDeduplicationOffset: Option[String],
+      optDeduplicationOffset: Option[Long],
       optDeduplicationDurationSeconds: Option[Long],
       optDeduplicationDurationNanos: Option[Int],
+      offset: Long,
+      domainTime: Option[DomainTime],
   ): Completion = {
     val completionWithMandatoryFields = Completion(
+      actAs = submitters.toSeq,
       commandId = commandId,
       status = optStatus,
-      updateId = transactionId,
+      updateId = updateId,
       applicationId = applicationId,
       traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
+      offset = offset,
+      domainTime = domainTime,
     )
     val optDeduplicationPeriod = toApiDeduplicationPeriod(
       optDeduplicationOffset = optDeduplicationOffset,
@@ -131,7 +141,7 @@ object CompletionFromTransaction {
   }
 
   private def toApiDeduplicationPeriod(
-      optDeduplicationOffset: Option[String],
+      optDeduplicationOffset: Option[Long],
       optDeduplicationDurationSeconds: Option[Long],
       optDeduplicationDurationNanos: Option[Int],
   ): Option[Completion.DeduplicationPeriod] =
@@ -143,7 +153,9 @@ object CompletionFromTransaction {
     ) match {
       case (None, (None, None)) => None
       case (Some(offset), _) =>
-        Some(Completion.DeduplicationPeriod.DeduplicationOffset(offset))
+        Some(
+          Completion.DeduplicationPeriod.DeduplicationOffset(offset)
+        )
       case (_, (Some(deduplicationDurationSeconds), Some(deduplicationDurationNanos))) =>
         Some(
           Completion.DeduplicationPeriod.DeduplicationDuration(

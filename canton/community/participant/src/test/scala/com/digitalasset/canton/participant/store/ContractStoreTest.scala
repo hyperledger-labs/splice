@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.store
 
+import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.{
@@ -92,7 +93,7 @@ trait ContractStoreTest { this: AsyncWordSpec & BaseTest =>
       }
     }
 
-    "update a created contract with instance size > 32kB (oracle related, see DbContractStore)" in {
+    "update a created contract with instance size > 32kB" in {
       val store = mk()
 
       val manySignatories = 1
@@ -301,7 +302,7 @@ trait ContractStoreTest { this: AsyncWordSpec & BaseTest =>
         res1 <- store.deleteContract(contractId).value
         c <- store.lookupE(contractId).value
       } yield {
-        res1 shouldEqual Right(())
+        res1 shouldEqual Either.unit
         c shouldEqual Left(UnknownContract(contractId))
       }
     }
@@ -313,7 +314,7 @@ trait ContractStoreTest { this: AsyncWordSpec & BaseTest =>
       } yield res shouldEqual Left(UnknownContract(contractId))
     }
 
-    "delete a set of contracts" in {
+    "delete a set of contracts as done by pruning" in {
       val store = mk()
       for {
         _ <- List(contract, contract2, contract4, contract5)
@@ -334,7 +335,7 @@ trait ContractStoreTest { this: AsyncWordSpec & BaseTest =>
       }
     }
 
-    "delete divulged contracts" in {
+    "delete divulged contracts as done by pruning" in {
       val store = mk()
       for {
         _ <- store.storeDivulgedContract(RequestCounter(0), contract)
@@ -354,6 +355,31 @@ trait ContractStoreTest { this: AsyncWordSpec & BaseTest =>
         c3 shouldBe None
         c4 shouldBe Some(contract4)
         c5 shouldBe Some(contract5)
+      }
+    }
+
+    "purge contract store deletes all contracts" in {
+      val store = mk()
+      for {
+        _ <- store.storeCreatedContract(rc, transactionId1, contract)
+        _ <- store.storeCreatedContract(rc2, transactionId1, contract2)
+        _ <- store.storeCreatedContract(rc2, transactionId1, contract3)
+        contractsBeforePurge <- store.find(
+          filterId = None,
+          filterPackage = None,
+          filterTemplate = None,
+          limit = 5,
+        )
+        _ <- store.purge()
+        contractsAfterPurge <- store.find(
+          filterId = None,
+          filterPackage = None,
+          filterTemplate = None,
+          limit = 5,
+        )
+      } yield {
+        contractsBeforePurge.toSet shouldEqual Set(contract, contract2, contract3)
+        contractsAfterPurge shouldBe empty
       }
     }
 

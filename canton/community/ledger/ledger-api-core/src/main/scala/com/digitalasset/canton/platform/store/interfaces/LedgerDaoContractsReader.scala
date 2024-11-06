@@ -38,7 +38,6 @@ private[platform] trait LedgerDaoContractsReader {
 object LedgerDaoContractsReader {
   import com.digitalasset.daml.lf.value.Value as lfval
   private type ContractId = lfval.ContractId
-  private type Value = lfval.VersionedValue
   private type Contract = lfval.VersionedContractInstance
 
   sealed trait ContractState extends Product with Serializable {
@@ -53,7 +52,7 @@ object LedgerDaoContractsReader {
       signatories: Set[Party],
       globalKey: Option[GlobalKey],
       keyMaintainers: Option[Set[Party]],
-      driverMetadata: Option[Array[Byte]],
+      driverMetadata: Array[Byte],
   ) extends ContractState
 
   final case class ArchivedContract(stakeholders: Set[Party]) extends ContractState

@@ -8,15 +8,22 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
+import com.digitalasset.canton
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.LoggingConfig
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.data.*
+import com.digitalasset.canton.data.GenTransactionTree.ViewWithWitnessesAndRecipients
+import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
+import com.digitalasset.canton.ledger.participant.state.SubmitterInfo.ExternallySignedSubmission
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMessageFactory.{
+  ViewHashAndRecipients,
+  ViewKeyData,
+}
 import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.*
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.{
   SerializableContractOfId,
@@ -27,10 +34,14 @@ import com.digitalasset.canton.participant.protocol.validation.{
   ContractConsistencyChecker,
   ExtractUsedContractsFromRootViews,
 }
-import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.messages.*
-import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, OpenEnvelope}
+import com.digitalasset.canton.sequencing.protocol.{
+  MediatorGroupRecipient,
+  OpenEnvelope,
+  Recipients,
+}
 import com.digitalasset.canton.store.SessionKeyStore
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
@@ -39,7 +50,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.ProtocolVersion
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** Factory class for creating transaction confirmation requests from Daml-LF transactions.
   *
@@ -73,7 +84,6 @@ class TransactionConfirmationRequestFactory(
       cryptoSnapshot: DomainSnapshotSyncCryptoApi,
       sessionKeyStore: SessionKeyStore,
       contractInstanceOfId: SerializableContractOfId,
-      optKeySeed: Option[SecureRandomness],
       maxSequencingTime: CantonTimestamp,
       protocolVersion: ProtocolVersion,
   )(implicit
@@ -86,14 +96,9 @@ class TransactionConfirmationRequestFactory(
     val transactionUuid = seedGenerator.generateUuid()
     val ledgerTime = wfTransaction.metadata.ledgerTime
 
-    val keySeed = optKeySeed.getOrElse(createDefaultSeed(cryptoSnapshot.pureCrypto))
-
     for {
-      _ <- assertSubmittersNodeAuthorization(submitterInfo.actAs, cryptoSnapshot.ipsSnapshot).mapK(
-        FutureUnlessShutdown.outcomeK
-      )
 
-      // Starting with Daml 1.6.0, the daml engine performs authorization validation.
+      _ <- assertPartiesCanSubmit(submitterInfo, cryptoSnapshot)
 
       transactionSeed = seedGenerator.generateSaltSeed()
 
@@ -111,7 +116,7 @@ class TransactionConfirmationRequestFactory(
           maxSequencingTime,
           validatePackageVettings = true,
         )
-        .leftMap(TransactionTreeFactoryError)
+        .leftMap(TransactionTreeFactoryError.apply)
 
       rootViews = transactionTree.rootViews.unblindedElements.toList
       inputContracts = ExtractUsedContractsFromRootViews(rootViews)
@@ -125,22 +130,15 @@ class TransactionConfirmationRequestFactory(
         transactionTree,
         cryptoSnapshot,
         sessionKeyStore,
-        keySeed,
         protocolVersion,
       )
     } yield confirmationRequest
-  }
-
-  def createDefaultSeed(pureCrypto: CryptoPureApi): SecureRandomness = {
-    val randomnessLength = EncryptedViewMessage.computeRandomnessLength(pureCrypto)
-    pureCrypto.generateSecureRandomness(randomnessLength)
   }
 
   def createConfirmationRequest(
       transactionTree: GenTransactionTree,
       cryptoSnapshot: DomainSnapshotSyncCryptoApi,
       sessionKeyStore: SessionKeyStore,
-      keySeed: SecureRandomness,
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
@@ -154,12 +152,11 @@ class TransactionConfirmationRequestFactory(
         transactionTree,
         cryptoSnapshot,
         sessionKeyStore,
-        keySeed,
         protocolVersion,
       )
       submittingParticipantSignature <- cryptoSnapshot
         .sign(transactionTree.rootHash.unwrap)
-        .leftMap[TransactionConfirmationRequestCreationError](TransactionSigningError)
+        .leftMap[TransactionConfirmationRequestCreationError](TransactionSigningError.apply)
     } yield {
       if (loggingConfig.eventDetails) {
         logger.debug(
@@ -176,10 +173,59 @@ class TransactionConfirmationRequestFactory(
       )
     }
 
-  private def assertSubmittersNodeAuthorization(
+  private def assertNonLocalPartiesCanSubmit(
+      submitterInfo: SubmitterInfo,
+      signedTx: ExternallySignedSubmission,
+      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, ParticipantAuthorizationError, Unit] = {
+    val signedAs = signedTx.signatures.keySet.map(_.toLf)
+    val unauthorized = submitterInfo.actAs.toSet -- signedAs
+    for {
+      _ <- EitherT.cond[FutureUnlessShutdown](
+        unauthorized.isEmpty,
+        (),
+        ParticipantAuthorizationError(
+          s"External authorization has not been provided for: $unauthorized"
+        ),
+      )
+      commandId <- EitherT
+        .fromEither[FutureUnlessShutdown](
+          canton.CommandId.fromProtoPrimitive(submitterInfo.commandId)
+        )
+        .leftMap(ParticipantAuthorizationError.apply)
+      hash = InteractiveSubmission.computeHash(commandId)
+      _ <- EitherT.cond[FutureUnlessShutdown](
+        hash == signedTx.hash,
+        (),
+        ParticipantAuthorizationError(
+          s"Signed hash (${signedTx.hash}) does not match recomputed hash: $hash"
+        ),
+      )
+      _ <- InteractiveSubmission
+        .verifySignatures(hash, signedTx.signatures, cryptoSnapshot)
+        .leftMap(ParticipantAuthorizationError.apply)
+    } yield ()
+  }
+
+  private def assertPartiesCanSubmit(
+      submitterInfo: SubmitterInfo,
+      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, ParticipantAuthorizationError, Unit] =
+    submitterInfo.externallySignedSubmission match {
+      case Some(e) => assertNonLocalPartiesCanSubmit(submitterInfo, e, cryptoSnapshot)
+      case None => assertLocalPartiesCanSubmit(submitterInfo.actAs, cryptoSnapshot.ipsSnapshot)
+    }
+
+  private def assertLocalPartiesCanSubmit(
       submitters: List[LfPartyId],
       identities: TopologySnapshot,
-  )(implicit traceContext: TraceContext): EitherT[Future, ParticipantAuthorizationError, Unit] = {
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, ParticipantAuthorizationError, Unit] =
     EitherT(
       identities
         .hostedOn(submitters.toSet, submitterNode)
@@ -205,14 +251,12 @@ class TransactionConfirmationRequestFactory(
             )
             .void
         }
-    )
-  }
+    ).mapK(FutureUnlessShutdown.outcomeK)
 
   private def createTransactionViewEnvelopes(
       transactionTree: GenTransactionTree,
       cryptoSnapshot: DomainSnapshotSyncCryptoApi,
       sessionKeyStore: SessionKeyStore,
-      keySeed: SecureRandomness,
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
@@ -222,45 +266,80 @@ class TransactionConfirmationRequestFactory(
     val pureCrypto = cryptoSnapshot.pureCrypto
 
     def createOpenEnvelopeWithTransaction(
-        vt: LightTransactionViewTree,
-        seed: SecureRandomness,
-        witnesses: Witnesses,
-    ): EitherT[FutureUnlessShutdown, TransactionConfirmationRequestCreationError, OpenEnvelope[
-      TransactionViewMessage
-    ]] =
+        vt: FullTransactionViewTree,
+        viewsToKeyMap: Map[
+          ViewHash,
+          ViewKeyData,
+        ],
+        recipients: Recipients,
+    ) = {
+      val subviewsKeys = vt.subviewHashes
+        .map(subviewHash => viewsToKeyMap(subviewHash).viewKeyRandomness)
       for {
-        viewMessage <- EncryptedViewMessageFactory
+        lvt <- LightTransactionViewTree
+          .fromTransactionViewTree(vt, subviewsKeys, protocolVersion)
+          .leftMap[TransactionConfirmationRequestCreationError](
+            LightTransactionViewTreeCreationError.apply
+          )
+          .toEitherT[FutureUnlessShutdown]
+        ViewKeyData(_, viewKey, viewKeyMap) = viewsToKeyMap(vt.viewHash)
+        envelope <- EncryptedViewMessageFactory
           .create(TransactionViewType)(
-            vt,
+            lvt,
+            (viewKey, viewKeyMap),
             cryptoSnapshot,
-            sessionKeyStore,
             protocolVersion,
-            Some(seed),
           )
-          .leftMap(EncryptedViewMessageCreationError)
-        recipients <- witnesses
-          .toRecipients(cryptoSnapshot.ipsSnapshot)
-          .leftMap[TransactionConfirmationRequestCreationError](e =>
-            RecipientsCreationError(e.message)
+          .leftMap[TransactionConfirmationRequestCreationError](
+            EncryptedViewMessageCreationError.apply
           )
-          .mapK(FutureUnlessShutdown.outcomeK)
-      } yield OpenEnvelope(viewMessage, recipients)(protocolVersion)
+          .map(viewMessage => OpenEnvelope(viewMessage, recipients)(protocolVersion))
+      } yield envelope
+    }
 
     for {
-      lightTreesWithMetadata <- EitherT.fromEither[FutureUnlessShutdown](
-        transactionTree
-          .allLightTransactionViewTreesWithWitnessesAndSeeds(keySeed, pureCrypto, protocolVersion)
-          .leftMap(KeySeedError)
-      )
-
+      lightTreesWithMetadata <- transactionTree
+        .allTransactionViewTreesWithRecipients(cryptoSnapshot.ipsSnapshot)
+        .leftMap[TransactionConfirmationRequestCreationError](e =>
+          RecipientsCreationError(e.message)
+        )
+      viewsToKeyMap <- EncryptedViewMessageFactory
+        .generateKeysFromRecipients(
+          lightTreesWithMetadata.map {
+            case ViewWithWitnessesAndRecipients(tvt, _, recipients, parentRecipients) =>
+              (
+                ViewHashAndRecipients(tvt.viewHash, recipients),
+                parentRecipients,
+                tvt.informees.toList,
+              )
+          },
+          parallel,
+          pureCrypto,
+          cryptoSnapshot,
+          sessionKeyStore.convertStore,
+          protocolVersion,
+        )
+        .leftMap[TransactionConfirmationRequestCreationError](e =>
+          EncryptedViewMessageCreationError(e)
+        )
       res <-
-        if (parallel)
-          lightTreesWithMetadata.toList.parTraverse { case (vt, witnesses, seed) =>
-            createOpenEnvelopeWithTransaction(vt, seed, witnesses)
+        if (parallel) {
+          lightTreesWithMetadata.toList.parTraverse {
+            case ViewWithWitnessesAndRecipients(tvt, _, recipients, _) =>
+              createOpenEnvelopeWithTransaction(
+                tvt,
+                viewsToKeyMap,
+                recipients,
+              )
           }
-        else
-          MonadUtil.sequentialTraverse(lightTreesWithMetadata) { case (vt, witnesses, seed) =>
-            createOpenEnvelopeWithTransaction(vt, seed, witnesses)
+        } else
+          MonadUtil.sequentialTraverse(lightTreesWithMetadata) {
+            case ViewWithWitnessesAndRecipients(tvt, _, recipients, _) =>
+              createOpenEnvelopeWithTransaction(
+                tvt,
+                viewsToKeyMap,
+                recipients,
+              )
           }
     } yield res.toList
   }
@@ -300,7 +379,7 @@ object TransactionConfirmationRequestFactory {
     */
   final case class ParticipantAuthorizationError(message: String)
       extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[ParticipantAuthorizationError] = prettyOfClass(
+    override protected def pretty: Pretty[ParticipantAuthorizationError] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
@@ -309,7 +388,7 @@ object TransactionConfirmationRequestFactory {
     */
   final case class MalformedLfTransaction(message: String)
       extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[MalformedLfTransaction] = prettyOfClass(
+    override protected def pretty: Pretty[MalformedLfTransaction] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
@@ -318,7 +397,7 @@ object TransactionConfirmationRequestFactory {
     */
   final case class MalformedSubmitter(message: String)
       extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[MalformedSubmitter] = prettyOfClass(
+    override protected def pretty: Pretty[MalformedSubmitter] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
@@ -327,14 +406,18 @@ object TransactionConfirmationRequestFactory {
     */
   final case class ContractConsistencyError(errors: Seq[ReferenceToFutureContractError])
       extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[ContractConsistencyError] = prettyOfClass(unnamedParam(_.errors))
+    override protected def pretty: Pretty[ContractConsistencyError] = prettyOfClass(
+      unnamedParam(_.errors)
+    )
   }
 
   /** Indicates that the encrypted view message could not be created. */
   final case class EncryptedViewMessageCreationError(
       error: EncryptedViewMessageFactory.EncryptedViewMessageCreationError
   ) extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[EncryptedViewMessageCreationError] = prettyOfParam(_.error)
+    override protected def pretty: Pretty[EncryptedViewMessageCreationError] = prettyOfParam(
+      _.error
+    )
   }
 
   /** Indicates that the transaction could not be converted to a transaction tree.
@@ -342,23 +425,27 @@ object TransactionConfirmationRequestFactory {
     */
   final case class TransactionTreeFactoryError(cause: TransactionTreeConversionError)
       extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[TransactionTreeFactoryError] = prettyOfParam(_.cause)
+    override protected def pretty: Pretty[TransactionTreeFactoryError] = prettyOfParam(_.cause)
   }
 
   final case class RecipientsCreationError(message: String)
       extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[RecipientsCreationError] = prettyOfClass(
+    override protected def pretty: Pretty[RecipientsCreationError] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
 
-  final case class KeySeedError(cause: HkdfError)
+  final case class LightTransactionViewTreeCreationError(message: String)
       extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[KeySeedError] = prettyOfParam(_.cause)
+    override protected def pretty: Pretty[LightTransactionViewTreeCreationError] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
   }
 
   final case class TransactionSigningError(cause: SyncCryptoError)
       extends TransactionConfirmationRequestCreationError {
-    override def pretty: Pretty[TransactionSigningError] = prettyOfClass(unnamedParam(_.cause))
+    override protected def pretty: Pretty[TransactionSigningError] = prettyOfClass(
+      unnamedParam(_.cause)
+    )
   }
 }

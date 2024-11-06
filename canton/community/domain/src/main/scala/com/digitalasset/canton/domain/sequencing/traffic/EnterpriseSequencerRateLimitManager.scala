@@ -9,8 +9,6 @@ import cats.syntax.bifunctor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.caching.CaffeineCache
-import com.digitalasset.canton.caching.CaffeineCache.FutureAsyncCacheLoader
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.{
@@ -29,7 +27,6 @@ import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
 }
 import com.digitalasset.canton.domain.sequencing.traffic.EnterpriseSequencerRateLimitManager.*
 import com.digitalasset.canton.domain.sequencing.traffic.store.TrafficConsumedStore
-import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
 import com.digitalasset.canton.lifecycle.{
   CloseContext,
   FlagCloseable,
@@ -40,22 +37,19 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.client.SequencedEventValidator
 import com.digitalasset.canton.sequencing.client.SequencedEventValidator.TopologyTimestampAfterSequencingTime
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.traffic.*
 import com.digitalasset.canton.sequencing.traffic.EventCostCalculator.EventCostDetails
 import com.digitalasset.canton.sequencing.traffic.TrafficConsumedManager.NotEnoughTraffic
-import com.digitalasset.canton.sequencing.traffic.*
 import com.digitalasset.canton.sequencing.{GroupAddressResolver, TrafficControlParameters}
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{MediatorId, Member, ParticipantId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.version.ProtocolVersion
-import com.github.benmanes.caffeine.cache as caffeine
 import com.google.common.annotations.VisibleForTesting
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.CollectionHasAsScala
-import scala.util.Success
 
 class EnterpriseSequencerRateLimitManager(
     @VisibleForTesting
@@ -75,37 +69,32 @@ class EnterpriseSequencerRateLimitManager(
     with NamedLogging
     with FlagCloseable {
 
+  // We keep traffic consumed records per member to avoid unnecessary db lookups and enable async db writes.
+  // We don't use a cache here, as it is not safe to retrieve invalidated member records from the database,
+  // as it is only written to the database at the end of the chunk processing together with events
+  // to enable high throughput.
   private val trafficConsumedPerMember
-      : CaffeineCache.AsyncLoadingCaffeineCache[Member, TrafficConsumedManager] = {
-    import TraceContext.Implicits.Empty.emptyTraceContext
-    new CaffeineCache.AsyncLoadingCaffeineCache(
-      caffeine.Caffeine
-        .newBuilder()
-        // Automatically cleans up inactive members from the cache
-        .expireAfterAccess(trafficConfig.trafficConsumedCacheTTL.asJava)
-        .maximumSize(trafficConfig.maximumTrafficConsumedCacheSize.value.toLong)
-        .buildAsync(
-          new FutureAsyncCacheLoader[Member, TrafficConsumedManager](member =>
-            trafficConsumedStore
-              .lookupLast(member)
-              .map(lastConsumed =>
-                sequencerMemberRateLimiterFactory.create(
-                  member,
-                  lastConsumed.getOrElse(TrafficConsumed.init(member)),
-                  loggerFactory,
-                  metrics.trafficControl.trafficConsumption,
-                )
-              )
-          )
-        ),
-      metrics.trafficControl.consumedCache,
-    )
-  }
+      : TrieMap[Member, FutureUnlessShutdown[TrafficConsumedManager]] = TrieMap.empty
 
   private def getOrCreateTrafficConsumedManager(
       member: Member
-  ): FutureUnlessShutdown[TrafficConsumedManager] = FutureUnlessShutdown.outcomeF {
-    trafficConsumedPerMember.get(member)
+  ): FutureUnlessShutdown[TrafficConsumedManager] = {
+    import TraceContext.Implicits.Empty.emptyTraceContext
+    trafficConsumedPerMember.getOrElseUpdate(
+      member,
+      performUnlessClosingF("getOrCreateTrafficConsumedManager") {
+        trafficConsumedStore
+          .lookupLast(member)
+          .map(lastConsumed =>
+            sequencerMemberRateLimiterFactory.create(
+              member,
+              lastConsumed.getOrElse(TrafficConsumed.init(member)),
+              loggerFactory,
+              metrics.trafficControl.trafficConsumption,
+            )
+          )
+      },
+    )
   }
 
   // Only participants and mediators are rate limited
@@ -123,10 +112,12 @@ class EnterpriseSequencerRateLimitManager(
       tc: TraceContext
   ): FutureUnlessShutdown[Unit] = FutureUnlessShutdown.outcomeF {
     trafficConsumedStore.store(
-      TrafficConsumed.empty(
-        member,
-        timestamp,
-        trafficControlParameters.maxBaseTrafficAmount,
+      Seq(
+        TrafficConsumed.empty(
+          member,
+          timestamp,
+          trafficControlParameters.maxBaseTrafficAmount,
+        )
       )
     )
   }
@@ -139,7 +130,7 @@ class EnterpriseSequencerRateLimitManager(
       tc: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerRateLimitError.TrafficNotFound, Option[
     TrafficPurchased
-  ]] = {
+  ]] =
     trafficPurchasedManager
       .getTrafficPurchasedAt(member, timestamp, lastBalanceUpdateTimestamp, warnIfApproximate)
       .leftMap { case TrafficPurchasedManager.TrafficPurchasedAlreadyPruned(member, timestamp) =>
@@ -148,29 +139,26 @@ class EnterpriseSequencerRateLimitManager(
         )
         SequencerRateLimitError.TrafficNotFound(member)
       }
-  }
 
   override def lastKnownBalanceFor(member: Member)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[TrafficPurchased]] =
     trafficPurchasedManager.getLatestKnownBalance(member)
 
-  override def onClosed(): Unit = {
+  override def onClosed(): Unit =
     Lifecycle.close(trafficPurchasedManager)(logger)
-  }
   override def balanceUpdateSubscriber: SequencerTrafficControlSubscriber =
     trafficPurchasedManager.subscription
 
   override def prune(upToExclusive: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[String] = {
+  ): Future[String] =
     (
       trafficPurchasedManager.prune(upToExclusive),
       trafficConsumedStore.pruneBelowExclusive(upToExclusive),
     ).parMapN { case (purchasePruningResult, consumedPruningResult) =>
       s"$purchasePruningResult\n$consumedPruningResult"
     }
-  }
 
   override def balanceKnownUntil: Option[CantonTimestamp] = trafficPurchasedManager.maxTsO
 
@@ -235,7 +223,7 @@ class EnterpriseSequencerRateLimitManager(
       parameters: TrafficControlParameters,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerRateLimitError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, SequencerRateLimitError, Unit] =
     for {
       trafficConsumedManager <- EitherT
         .liftF[FutureUnlessShutdown, SequencerRateLimitError, TrafficConsumedManager](
@@ -268,7 +256,6 @@ class EnterpriseSequencerRateLimitManager(
         }
         .leftWiden[SequencerRateLimitError]
     } yield ()
-  }
 
   override def validateRequestAtSubmissionTime(
       request: SubmissionRequest,
@@ -505,7 +492,7 @@ class EnterpriseSequencerRateLimitManager(
 
     def handleIncorrectCost(
         correctCostDetails: EventCostDetails
-    ): EitherT[FutureUnlessShutdown, SequencingCostValidationError, Option[ValidCost]] = {
+    ): EitherT[FutureUnlessShutdown, SequencingCostValidationError, Option[ValidCost]] =
       submissionTimestampO match {
         case Some(submissionTimestamp) =>
           handleIncorrectCostWithSubmissionTimestamp(submissionTimestamp, correctCostDetails)
@@ -525,7 +512,6 @@ class EnterpriseSequencerRateLimitManager(
           )
           EitherT.leftT(error)
       }
-    }
 
     validateCostIsCorrect(request, validationSnapshot)
       .biflatMap(
@@ -577,7 +563,7 @@ class EnterpriseSequencerRateLimitManager(
     Option[TrafficReceipt],
   ] = if (isRateLimited(request.sender)) {
     val sender = request.sender
-    implicit val senderMetricsContext: MetricsContext = MetricsContext("sender" -> sender.toString)
+    implicit val memberMetricsContext: MetricsContext = MetricsContext("member" -> sender.toString)
 
     def consumeEvent(
         validCost: ValidCost
@@ -613,22 +599,14 @@ class EnterpriseSequencerRateLimitManager(
               .leftMap(notEnoughTraffic =>
                 SequencerRateLimitError.AboveTrafficLimit(notEnoughTraffic)
               )
-              // Regardless of the outcome, record it into the store
-              .thereafterF {
-                case Success(Outcome(Right(consumed))) =>
-                  trafficConsumedStore.store(consumed)
-                case Success(Outcome(Left(aboveTrafficLimit))) =>
-                  // Even if above traffic limit, record the current traffic consumed state
-                  // (extra traffic consumed won't have changed but the base traffic remainder may have since time advanced)
-                  trafficConsumedStore.store(
-                    aboveTrafficLimit.trafficState.toTrafficConsumed(sender)
-                  )
-                // Other failures (shutdown or failed future) are not recoverable so we don't have anything to store
-                case _ => Future.unit
-              }
               .leftWiden[SequencerRateLimitError]
           } else {
             // If not, we will NOT consume, because we assume the event has already been consumed
+            // We then fetch the traffic consumed state at the sequencing time from the store
+            // This should not really happen, as messages are processed in order
+            logger.debug(
+              s"Tried to consume traffic at $sequencingTime for $sender, but the traffic consumed state is already at $currentTrafficConsumedTs"
+            )
             EitherT
               .fromOptionF[Future, SequencerRateLimitError, TrafficConsumed](
                 trafficConsumedStore
@@ -646,12 +624,11 @@ class EnterpriseSequencerRateLimitManager(
     // Whatever happens in terms of traffic consumption we'll want to at
     // least make sure the traffic consumed state is at sequencing timestamp.
     // That includes updating the timestamp itself and the base traffic remainder accumulation that results.
-    def ensureTrafficConsumedAtSequencingTime(snapshotAtSequencingTime: TopologySnapshot) = {
+    def ensureTrafficConsumedAtSequencingTime(snapshotAtSequencingTime: TopologySnapshot) =
       for {
         tcm <- getOrCreateTrafficConsumedManager(sender)
         paramsO <- snapshotAtSequencingTime.trafficControlParameters(protocolVersion)
       } yield paramsO.map(params => tcm.updateAt(sequencingTime, params, logger))
-    }
 
     def processWithTopologySnapshot(topologyAtSequencingTime: SyncCryptoApi) = {
       val snapshotAtSequencingTime = topologyAtSequencingTime.ipsSnapshot
@@ -675,7 +652,7 @@ class EnterpriseSequencerRateLimitManager(
 
       result
         // Even if we fail, make sure the traffic consumed state is updated with the sequencing time
-        .leftFlatMap(err => {
+        .leftFlatMap { err =>
           val errorUpdatedWithTrafficConsumed
               : EitherT[FutureUnlessShutdown, SequencerRateLimitError, SequencerRateLimitError] =
             for {
@@ -711,7 +688,7 @@ class EnterpriseSequencerRateLimitManager(
           EitherT[FutureUnlessShutdown, SequencerRateLimitError, Option[TrafficReceipt]](
             errorUpdatedWithTrafficConsumed.merge.map(err => Left(err))
           )
-        })
+        }
     }
 
     for {
@@ -783,7 +760,7 @@ class EnterpriseSequencerRateLimitManager(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerRateLimitError.TrafficNotFound, Option[
     TrafficState
-  ]] = {
+  ]] =
     for {
       trafficConsumedO <- EitherT
         .liftF(
@@ -791,10 +768,15 @@ class EnterpriseSequencerRateLimitManager(
         )
         .mapK(FutureUnlessShutdown.outcomeK)
       trafficStateO <- trafficConsumedO.traverse(
-        getTrafficState(_, member, None, lastSequencerEventTimestamp, warnIfApproximate = true)
+        getTrafficState(
+          _,
+          member,
+          Some(timestamp),
+          lastSequencerEventTimestamp,
+          warnIfApproximate = true,
+        )
       )
     } yield trafficStateO
-  }
 
   override def getStates(
       requestedMembers: Set[Member],
@@ -805,10 +787,10 @@ class EnterpriseSequencerRateLimitManager(
       executionContext: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[Map[Member, Either[String, TrafficState]]] = {
-    // If the requested set is empty, get all members from the cache
+    // If the requested set is empty, get all members from the in-memory state
     val membersToGetTrafficFor = {
       if (requestedMembers.isEmpty) {
-        trafficConsumedPerMember.underlying.asMap().keySet().asScala
+        trafficConsumedPerMember.keySet
       } else requestedMembers
     }.toSeq
       .filter(isRateLimited)

@@ -26,14 +26,17 @@ import Dso from './routes/dso';
 import Root from './routes/root';
 import ValidatorOnboarding from './routes/validatorOnboarding';
 import Voting from './routes/voting';
-import { useSvConfig } from './utils';
+import { useConfigPollInterval, useSvConfig } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const config = useSvConfig();
+  const refetchInterval = useConfigPollInterval();
+
   const navigate = useNavigate();
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
+        refetchInterval,
         structuralSharing: replaceEqualDeep,
       },
     },

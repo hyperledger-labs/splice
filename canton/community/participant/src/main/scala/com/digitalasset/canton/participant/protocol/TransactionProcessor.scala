@@ -5,17 +5,18 @@ package com.digitalasset.canton.participant.protocol
 
 import cats.data.EitherT
 import com.daml.error.*
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.data.ViewType.TransactionViewType
-import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.SubmissionErrorGroup
 import com.digitalasset.canton.error.*
+import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.SubmissionErrorGroup
 import com.digitalasset.canton.ledger.error.groups.ConsistencyErrors
 import com.digitalasset.canton.ledger.participant.state.{ChangeId, SubmitterInfo, TransactionMeta}
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
@@ -38,8 +39,8 @@ import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
-import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.sequencing.client.{SendAsyncClientError, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
@@ -68,6 +69,7 @@ class TransactionProcessor(
     futureSupervisor: FutureSupervisor,
     packageResolver: PackageResolver,
     override val testingConfig: TestingConfigInternal,
+    promiseFactory: PromiseUnlessShutdownFactory,
 )(implicit val ec: ExecutionContext)
     extends ProtocolProcessor[
       TransactionProcessingSteps.SubmissionParam,
@@ -88,7 +90,7 @@ class TransactionProcessor(
         ModelConformanceChecker(
           damle,
           confirmationRequestFactory.transactionTreeFactory,
-          SerializableContractAuthenticator(crypto.pureCrypto, parameters),
+          SerializableContractAuthenticator(crypto.pureCrypto),
           participantId,
           packageResolver,
           loggerFactory,
@@ -97,9 +99,9 @@ class TransactionProcessor(
         crypto,
         ephemeral.contractStore,
         metrics,
-        SerializableContractAuthenticator(crypto.pureCrypto, parameters),
+        SerializableContractAuthenticator(crypto.pureCrypto),
         new AuthenticationValidator(),
-        new AuthorizationValidator(participantId),
+        new AuthorizationValidator(participantId, parameters.enableExternalAuthorization),
         new InternalConsistencyChecker(
           staticDomainParameters.protocolVersion,
           loggerFactory,
@@ -113,11 +115,19 @@ class TransactionProcessor(
       crypto,
       sequencerClient,
       domainId,
-      staticDomainParameters,
       staticDomainParameters.protocolVersion,
       loggerFactory,
       futureSupervisor,
+      promiseFactory,
     ) {
+
+  override protected def metricsContextForSubmissionParam(
+      submissionParam: TransactionProcessingSteps.SubmissionParam
+  ): MetricsContext =
+    MetricsContext(
+      "application-id" -> submissionParam.submitterInfo.applicationId,
+      "type" -> "send-confirmation-request",
+    )
 
   def submit(
       submitterInfo: SubmitterInfo,
@@ -154,7 +164,7 @@ object TransactionProcessor {
   }
 
   trait TransactionSubmissionError extends TransactionProcessorError with TransactionError {
-    override def pretty: Pretty[TransactionSubmissionError] = {
+    override protected def pretty: Pretty[TransactionSubmissionError] =
       this.prettyOfString(_ =>
         this.code.toMsg(
           cause,
@@ -164,7 +174,6 @@ object TransactionProcessor {
           context
         )
       )
-    }
   }
 
   object SubmissionErrors extends SubmissionErrorGroup {
@@ -209,7 +218,7 @@ object TransactionProcessor {
     @Explanation(
       """This error occurs if a transaction was submitted referring to a contract that
         |is not known on the domain. This can occur in case of race conditions between a transaction and
-        |an archival or transfer-out."""
+        |an archival or unassignment."""
     )
     @Resolution(
       """Check domain for submission and/or re-submit the transaction."""
@@ -236,6 +245,22 @@ object TransactionProcessor {
           ConsistencyErrors.SubmissionAlreadyInFlight.code
         )
         with TransactionSubmissionError
+
+    @Explanation(
+      """This error occurs when the sequencer refuses to accept a command due to backpressure."""
+    )
+    @Resolution("Wait a bit and retry, preferably with some backoff factor.")
+    object DomainBackpressure
+        extends ErrorCode(id = "DOMAIN_BACKPRESSURE", ErrorCategory.ContentionOnSharedResources) {
+      override def logLevel: Level = Level.INFO
+
+      final case class Rejection(reason: String)
+          extends TransactionErrorImpl(
+            cause = "The domain is overloaded.",
+            // Only reported asynchronously, so covered by submission rank guarantee
+            definiteAnswer = true,
+          )
+    }
 
     @Explanation(
       """The participant has rejected all incoming commands during a configurable grace period."""
@@ -389,7 +414,7 @@ object TransactionProcessor {
 
   final case class DomainParametersError(domainId: DomainId, context: String)
       extends TransactionProcessorError {
-    override def pretty: Pretty[DomainParametersError] = prettyOfClass(
+    override protected def pretty: Pretty[DomainParametersError] = prettyOfClass(
       param("domain", _.domainId),
       param("context", _.context.unquoted),
     )
@@ -398,7 +423,7 @@ object TransactionProcessor {
   final case class GenericStepsError(error: ProcessorError) extends TransactionProcessorError {
     override def underlyingProcessorError(): Option[ProcessorError] = Some(error)
 
-    override def pretty: Pretty[GenericStepsError] = prettyOfParam(_.error)
+    override protected def pretty: Pretty[GenericStepsError] = prettyOfParam(_.error)
   }
 
   final case class ViewParticipantDataError(
@@ -406,7 +431,7 @@ object TransactionProcessor {
       viewHash: ViewHash,
       error: String,
   ) extends TransactionProcessorError {
-    override def pretty: Pretty[ViewParticipantDataError] = prettyOfClass(
+    override protected def pretty: Pretty[ViewParticipantDataError] = prettyOfClass(
       param("transaction id", _.transactionId),
       param("view hash", _.viewHash),
       param("error", _.error.unquoted),
@@ -415,7 +440,7 @@ object TransactionProcessor {
 
   final case class FieldConversionError(field: String, error: String)
       extends TransactionProcessorError {
-    override def pretty: Pretty[FieldConversionError] = prettyOfClass(
+    override protected def pretty: Pretty[FieldConversionError] = prettyOfClass(
       param("field", _.field.unquoted),
       param("error", _.error.unquoted),
     )

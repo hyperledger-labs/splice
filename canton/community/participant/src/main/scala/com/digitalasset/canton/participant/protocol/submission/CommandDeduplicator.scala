@@ -6,27 +6,27 @@ package com.digitalasset.canton.participant.protocol.submission
 import cats.Eval
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.functorFilter.*
 import com.digitalasset.canton.LedgerSubmissionId
-import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
+import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod, Offset}
 import com.digitalasset.canton.ledger.participant.state.ChangeId
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.protocol.submission.CommandDeduplicator.{
   AlreadyExists,
   DeduplicationFailed,
   DeduplicationPeriodTooEarly,
   MalformedOffset,
 }
-import com.digitalasset.canton.participant.store.CommandDeduplicationStore.OffsetAndPublicationTime
 import com.digitalasset.canton.participant.store.*
+import com.digitalasset.canton.participant.store.CommandDeduplicationStore.OffsetAndPublicationTime
 import com.digitalasset.canton.participant.sync.UpstreamOffsetConvert
-import com.digitalasset.canton.participant.{GlobalOffset, LedgerSyncOffset}
 import com.digitalasset.canton.platform.indexer.parallel.PostPublishData
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** Implements the command deduplication logic.
   *
@@ -38,24 +38,17 @@ trait CommandDeduplicator {
 
   /** Register the publication of the events in the [[com.digitalasset.canton.participant.store.CommandDeduplicationStore]] */
   def processPublications(
-      publications: Seq[MultiDomainEventLog.OnPublish.Publication]
+      publications: Seq[PostPublishData]
   )(implicit
       traceContext: TraceContext
-  ): Future[Unit]
-
-  /** Register the publication of the events in the [[com.digitalasset.canton.participant.store.CommandDeduplicationStore]] */
-  def processPublications(
-      publications: Vector[PostPublishData]
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit]
+  ): FutureUnlessShutdown[Unit]
 
   /** Perform deduplication for the given [[com.digitalasset.canton.participant.protocol.submission.ChangeIdHash]]
     * and [[com.digitalasset.canton.data.DeduplicationPeriod]].
     *
     * @param changeIdHash The change ID hash of the submission to be deduplicated
     * @param deduplicationPeriod The deduplication period specified with the submission
-    * @return The [[canton.data.DeduplicationPeriod.DeduplicationOffset]]
+    * @return The [[com.digitalasset.canton.data.DeduplicationPeriod.DeduplicationOffset]]
     *         to be included in the command completion's [[com.digitalasset.canton.ledger.participant.state.CompletionInfo]].
     *         Canton always returns a [[com.digitalasset.canton.data.DeduplicationPeriod.DeduplicationOffset]]
     *         because it cannot meet the record time requirements for the other kinds of
@@ -63,7 +56,7 @@ trait CommandDeduplicator {
     */
   def checkDuplication(changeIdHash: ChangeIdHash, deduplicationPeriod: DeduplicationPeriod)(
       implicit traceContext: TraceContext
-  ): EitherT[Future, DeduplicationFailed, DeduplicationPeriod.DeduplicationOffset]
+  ): EitherT[FutureUnlessShutdown, DeduplicationFailed, DeduplicationPeriod.DeduplicationOffset]
 }
 
 object CommandDeduplicator {
@@ -93,34 +86,8 @@ class CommandDeduplicatorImpl(
     with NamedLogging {
 
   override def processPublications(
-      publications: Seq[MultiDomainEventLog.OnPublish.Publication]
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    val offsetsAndCompletionInfos = publications.mapFilter {
-      case MultiDomainEventLog.OnPublish.Publication(
-            globalOffset,
-            publicationTime,
-            _inFlightReferenceO,
-            deduplicationInfoO,
-            _event,
-          ) =>
-        deduplicationInfoO.map { dedupInfo =>
-          (
-            dedupInfo.changeId,
-            DefiniteAnswerEvent(
-              globalOffset,
-              publicationTime,
-              dedupInfo.submissionId,
-            )(dedupInfo.eventTraceContext),
-            dedupInfo.acceptance,
-          )
-        }
-    }
-    store.value.storeDefiniteAnswers(offsetsAndCompletionInfos)
-  }
-
-  override def processPublications(
-      publications: Vector[PostPublishData]
-  )(implicit traceContext: TraceContext): Future[Unit] =
+      publications: Seq[PostPublishData]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     store.value.storeDefiniteAnswers(
       publications.map(publication =>
         (
@@ -144,7 +111,7 @@ class CommandDeduplicatorImpl(
       deduplicationPeriod: DeduplicationPeriod,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, DeduplicationFailed, DeduplicationPeriod.DeduplicationOffset] = {
+  ): EitherT[FutureUnlessShutdown, DeduplicationFailed, DeduplicationPeriod.DeduplicationOffset] = {
 
     def dedupPeriodTooEarly(prunedOffset: GlobalOffset): DeduplicationFailed =
       DeduplicationPeriodTooEarly(
@@ -162,11 +129,11 @@ class CommandDeduplicatorImpl(
     // So we report the first ledger offset as the deduplication start instead.
     // This difference does not matter in practice for command deduplication
     // as the first offset always contains the ledger configuration and can therefore never be a command completion.
-    def unprunedDedupOffset: GlobalOffset = MultiDomainEventLog.ledgerFirstOffset
+    def unprunedDedupOffset: GlobalOffset = GlobalOffset.FirstOffset
 
     def dedupDuration(
         duration: java.time.Duration
-    ): EitherT[Future, DeduplicationFailed, GlobalOffset] = {
+    ): EitherT[FutureUnlessShutdown, DeduplicationFailed, GlobalOffset] = {
       // Convert the duration into a timestamp based on the local participant clock
       // and check against the publication time of the definite answer events.
       //
@@ -184,7 +151,7 @@ class CommandDeduplicatorImpl(
 
       def checkAgainstPruning(
           deduplicationStart: CantonTimestamp
-      ): EitherT[Future, DeduplicationFailed, GlobalOffset] = {
+      ): EitherT[FutureUnlessShutdown, DeduplicationFailed, GlobalOffset] =
         EitherTUtil.leftSubflatMap(store.value.latestPruning().toLeft(unprunedDedupOffset)) {
           case OffsetAndPublicationTime(prunedOffset, prunedPublicationTime) =>
             Either.cond(
@@ -193,10 +160,9 @@ class CommandDeduplicatorImpl(
               dedupPeriodTooEarly(prunedOffset),
             )
         }
-      }
 
       for {
-        deduplicationStart <- EitherT.fromEither[Future](
+        deduplicationStart <- EitherT.fromEither[FutureUnlessShutdown](
           CantonTimestamp.fromInstant(baseline.minus(duration)).leftMap[DeduplicationFailed] {
             err =>
               logger.info(s"Deduplication period underflow: $err")
@@ -217,7 +183,7 @@ class CommandDeduplicatorImpl(
             latestAcceptance match {
               case None => checkAgainstPruning(deduplicationStart)
               case Some(acceptance) =>
-                EitherT.cond[Future](
+                EitherT.cond[FutureUnlessShutdown](
                   acceptance.publicationTime < deduplicationStart,
                   // Use the found offset rather than deduplicationStart
                   // so that we don't have to check whether deduplicationStart is at most the ledger end
@@ -234,23 +200,22 @@ class CommandDeduplicatorImpl(
     }
 
     def dedupOffset(
-        offset: LedgerSyncOffset
-    ): EitherT[Future, DeduplicationFailed, GlobalOffset] = {
+        offset: Offset
+    ): EitherT[FutureUnlessShutdown, DeduplicationFailed, GlobalOffset] = {
       def checkAgainstPruning(
           dedupOffset: GlobalOffset
-      ): EitherT[Future, DeduplicationFailed, GlobalOffset] = {
+      ): EitherT[FutureUnlessShutdown, DeduplicationFailed, GlobalOffset] =
         EitherTUtil.leftSubflatMap(store.value.latestPruning().toLeft(unprunedDedupOffset)) {
-          case OffsetAndPublicationTime(prunedOffset, prunedPublicationTime) =>
+          case OffsetAndPublicationTime(prunedOffset, _prunedPublicationTime) =>
             Either.cond(
               prunedOffset <= dedupOffset,
               prunedOffset,
               dedupPeriodTooEarly(prunedOffset),
             )
         }
-      }
 
       for {
-        dedupOffset <- EitherT.fromEither[Future](
+        dedupOffset <- EitherT.fromEither[FutureUnlessShutdown](
           UpstreamOffsetConvert
             .toGlobalOffset(offset)
             .leftMap[DeduplicationFailed](err => MalformedOffset(err))
@@ -264,7 +229,7 @@ class CommandDeduplicatorImpl(
             latestAcceptance match {
               case None => checkAgainstPruning(dedupOffset)
               case Some(acceptance) =>
-                EitherT.cond[Future](
+                EitherT.cond[FutureUnlessShutdown](
                   acceptance.offset <= dedupOffset,
                   acceptance.offset,
                   AlreadyExists(

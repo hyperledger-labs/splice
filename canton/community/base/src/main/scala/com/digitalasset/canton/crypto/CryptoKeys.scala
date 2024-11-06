@@ -38,7 +38,7 @@ final case class Fingerprint private (protected val str: String68)
     with PrettyPrinting {
   def toLengthLimitedString: String68 = str
 
-  override def pretty: Pretty[Fingerprint] = prettyOfParam(_.unwrap.readableHash)
+  override protected def pretty: Pretty[Fingerprint] = prettyOfParam(_.unwrap.readableHash)
 }
 
 trait HasFingerprint {
@@ -70,7 +70,7 @@ object Fingerprint {
   def fromProtoPrimitive(str: String): ParsingResult[Fingerprint] =
     UniqueIdentifier
       .verifyValidString(str) // verify that we can represent the string as part of the UID.
-      .leftMap(ProtoDeserializationError.StringConversionError)
+      .leftMap(ProtoDeserializationError.StringConversionError.apply(_))
       .flatMap(String68.fromProtoPrimitive(_, "Fingerprint"))
       .map(Fingerprint(_))
 
@@ -110,7 +110,7 @@ trait CryptoKeyPair[+PK <: PublicKey, +SK <: PrivateKey]
     "Public and private key of the same key pair must have the same ids.",
   )
 
-  override protected def companionObj = CryptoKeyPair
+  override protected def companionObj: CryptoKeyPair.type = CryptoKeyPair
 
   def publicKey: PK
   def privateKey: SK
@@ -129,7 +129,7 @@ object CryptoKeyPair extends HasVersionedMessageCompanion[CryptoKeyPair[PublicKe
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v31,
+      ProtocolVersion.v32,
       supportedProtoVersion(v30.CryptoKeyPair)(fromProtoCryptoKeyPairV30),
       _.toProtoCryptoKeyPairV30.toByteString,
     )
@@ -163,10 +163,9 @@ trait PublicKey extends CryptoKeyPairKey {
 
   def fingerprint: Fingerprint = id
 
-  override lazy val id: Fingerprint = {
+  override lazy val id: Fingerprint =
     // TODO(i15649): Consider the key format and fingerprint scheme before computing
     Fingerprint.create(key)
-  }
 
   def purpose: KeyPurpose
 
@@ -199,7 +198,9 @@ final case class KeyName(protected val str: String300)
     extends LengthLimitedStringWrapper
     with PrettyPrinting {
   def emptyStringAsNone: Option[KeyName] = if (str.unwrap.isEmpty) None else Some(this)
-  override def pretty: Pretty[KeyName] = prettyOfClass(unnamedParam(_.str.unwrap.unquoted))
+  override protected def pretty: Pretty[KeyName] = prettyOfClass(
+    unnamedParam(_.str.unwrap.unquoted)
+  )
 }
 object KeyName extends LengthLimitedStringWrapperCompanion[String300, KeyName] {
   override def instanceName: String = "KeyName"
@@ -217,7 +218,8 @@ trait PublicKeyWithName
 
   def id: Fingerprint
 
-  override protected def companionObj = PublicKeyWithName
+  override protected def companionObj: PublicKeyWithName.type =
+    PublicKeyWithName
 
   def toProtoV30: v30.PublicKeyWithName =
     v30.PublicKeyWithName(
@@ -234,7 +236,7 @@ object PublicKeyWithName extends HasVersionedMessageCompanion[PublicKeyWithName]
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v31,
+      ProtocolVersion.v32,
       supportedProtoVersion(v30.PublicKeyWithName)(fromProto30),
       _.toProtoV30.toByteString,
     )
@@ -286,7 +288,7 @@ object PrivateKey {
 sealed trait CryptoKeyFormat extends Product with Serializable with PrettyPrinting {
   def name: String
   def toProtoEnum: v30.CryptoKeyFormat
-  override def pretty: Pretty[this.type] = prettyOfString(_.name)
+  override protected def pretty: Pretty[this.type] = prettyOfString(_.name)
 }
 
 object CryptoKeyFormat {
@@ -333,7 +335,7 @@ sealed trait KeyPurpose extends Product with Serializable with PrettyPrinting {
 
   def toProtoEnum: v30.KeyPurpose
 
-  override def pretty: Pretty[KeyPurpose.this.type] = prettyOfString(_.name)
+  override protected def pretty: Pretty[KeyPurpose.this.type] = prettyOfString(_.name)
 }
 
 object KeyPurpose {
@@ -377,10 +379,24 @@ object KeyPurpose {
 
 /** Information that is cached for each view and is to be re-used if another view has
   * the same recipients and transparency can be respected.
-  * @param sessionKeyRandomness the randomness to create the session key that is then used to encrypt the randomness of the view.
+  *
+  * @param sessionKeyAndReference the randomness, the corresponding symmetric key used to
+  *                               encrypt the view, and a symbolic reference to use in the 'encryptedBy' field.
+  * @param encryptedBy an optional symbolic reference for the parent session key (if it exists) that encrypts a view
+  *                    containing this session key’s randomness. This cache entry must be revoked if the
+  *                    reference no longer matches.
   * @param encryptedSessionKeys the randomness of the session key encrypted for each recipient.
   */
 final case class SessionKeyInfo(
-    sessionKeyRandomness: SecureRandomness,
+    sessionKeyAndReference: SessionKeyAndReference,
+    encryptedBy: Option[Object],
     encryptedSessionKeys: Seq[AsymmetricEncrypted[SecureRandomness]],
+)
+
+/** The randomness and corresponding session key, as well as a temporary reference to it that lives as long as the cache lives.
+  */
+final case class SessionKeyAndReference(
+    randomness: SecureRandomness,
+    key: SymmetricKey,
+    reference: Object,
 )

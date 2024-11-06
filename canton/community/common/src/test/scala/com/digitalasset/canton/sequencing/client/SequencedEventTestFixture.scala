@@ -25,8 +25,8 @@ import com.digitalasset.canton.sequencing.{
   SequencerTestUtils,
 }
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
-import com.digitalasset.canton.topology.DefaultTestIdentities.namespace
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.DefaultTestIdentities.namespace
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
@@ -135,7 +135,7 @@ class SequencedEventTestFixture(
 
   def mkValidator(
       syncCryptoApi: DomainSyncCryptoClient = subscriberCryptoApi
-  )(implicit executionContext: ExecutionContext): SequencedEventValidatorImpl = {
+  )(implicit executionContext: ExecutionContext): SequencedEventValidatorImpl =
     new SequencedEventValidatorImpl(
       defaultDomainId,
       testedProtocolVersion,
@@ -143,7 +143,6 @@ class SequencedEventTestFixture(
       loggerFactory,
       timeouts,
     )(executionContext)
-  }
 
   def createEvent(
       domainId: DomainId = defaultDomainId,

@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.ledger.localstore
 
+import cats.syntax.either.*
 import com.daml.metrics.DatabaseMetrics
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{IdentityProviderConfig, IdentityProviderId}
@@ -71,11 +72,11 @@ class PersistentIdentityProviderConfigStore(
       loggingContext: LoggingContextWithTrace
   ): Future[Result[Unit]] =
     inTransaction(_.deleteIdpConfig) { implicit connection =>
-      if (!backend.deleteIdentityProviderConfig(id)(connection)) {
-        Left(IdentityProviderConfigNotFound(id))
-      } else {
-        Right(())
-      }
+      Either.cond(
+        backend.deleteIdentityProviderConfig(id)(connection),
+        (),
+        IdentityProviderConfigNotFound(id),
+      )
     }.map(tapSuccess { _ =>
       logger.info(
         s"Deleted identity provider configuration with id $id"
@@ -84,15 +85,14 @@ class PersistentIdentityProviderConfigStore(
 
   override def listIdentityProviderConfigs()(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Result[Seq[domain.IdentityProviderConfig]]] = {
+  ): Future[Result[Seq[domain.IdentityProviderConfig]]] =
     inTransaction(_.listIdpConfigs) { implicit connection =>
       Right(backend.listIdentityProviderConfigs()(connection))
     }
-  }
 
   override def updateIdentityProviderConfig(update: IdentityProviderConfigUpdate)(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Result[domain.IdentityProviderConfig]] = {
+  ): Future[Result[domain.IdentityProviderConfig]] =
     inTransaction(_.updateIdpConfig) { implicit connection =>
       val id = update.identityProviderId
       for {
@@ -111,7 +111,6 @@ class PersistentIdentityProviderConfigStore(
         s"Updated identity provider configuration with id ${update.identityProviderId}"
       )
     })
-  }
 
   override def getIdentityProviderConfig(issuer: String)(implicit
       loggingContext: LoggingContextWithTrace
@@ -125,11 +124,10 @@ class PersistentIdentityProviderConfigStore(
 
   def identityProviderConfigExists(id: IdentityProviderId.Id)(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[Boolean] = {
+  ): Future[Boolean] =
     dbDispatcher.executeSql(metrics.identityProviderConfigStore.getIdpConfig) { connection =>
       backend.idpConfigByIdExists(id)(connection)
     }
-  }
 
   private def updateIssuer(
       update: IdentityProviderConfigUpdate
@@ -200,7 +198,7 @@ class PersistentIdentityProviderConfigStore(
         (),
         IdentityProviderConfigWithIssuerExists(value),
       )
-    case None => Right(())
+    case None => Either.unit
   }
 
   private def inTransaction[T](

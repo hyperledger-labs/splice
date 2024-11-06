@@ -20,7 +20,7 @@ final case class StateChange[+Status <: PrettyPrinting](status: Status, asOf: Ti
 
   def timestamp: CantonTimestamp = asOf.timestamp
 
-  override def pretty: Pretty[StateChange.this.type] = prettyOfClass(
+  override protected def pretty: Pretty[StateChange.this.type] = prettyOfClass(
     param("status", _.status),
     param("asOf", _.asOf),
   )
@@ -31,9 +31,8 @@ object StateChange {
       status: Status,
       rc: RequestCounter,
       timestamp: CantonTimestamp,
-  ): StateChange[Status] = {
+  ): StateChange[Status] =
     StateChange[Status](status, TimeOfChange(rc, timestamp))
-  }
 
   implicit def stateChangeGetResult[A <: PrettyPrinting](implicit
       getResultStatus: GetResult[A]
