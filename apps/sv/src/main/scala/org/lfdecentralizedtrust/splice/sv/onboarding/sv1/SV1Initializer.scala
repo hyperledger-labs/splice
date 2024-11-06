@@ -216,6 +216,11 @@ class SV1Initializer(
         SetupUtil.ensureDsoPartyMetadataAnnotation(svAutomation.connection, config, dsoParty),
         svStore.domains.waitForDomainConnection(config.domains.global.alias),
       ).tupled
+      _ <- SetupUtil.ensureSvNameMetadataAnnotation(
+        svAutomation.connection,
+        config,
+        sv1Config.name,
+      )
       _ <- DomainMigrationInfo.saveToUserMetadata(
         svAutomation.connection,
         config.ledgerApiUser,

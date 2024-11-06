@@ -605,9 +605,11 @@ object BftScanConnection {
         if (scansInDsoRules.isEmpty) {
           // This is expected on app init, and is retried when building the BftScanConnection
           Future.failed(
-            new IllegalStateException(
-              s"Scan list in DsoRules is empty. Last known list: $currentState"
-            )
+            io.grpc.Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Scan list in DsoRules is empty. Last known list: $currentState"
+              )
+              .asRuntimeException()
           )
         } else if (newScans.isEmpty && removedScans.isEmpty && currentFailed.isEmpty) {
           logger.debug("Not updating scan list as there are no changes.")

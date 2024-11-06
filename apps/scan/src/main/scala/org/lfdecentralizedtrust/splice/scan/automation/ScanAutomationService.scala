@@ -41,6 +41,7 @@ class ScanAutomationService(
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
     svParty: PartyId,
+    svName: String,
     upgradesConfig: UpgradesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -69,7 +70,7 @@ class ScanAutomationService(
     registerTrigger(
       new ScanHistoryBackfillingTrigger(
         store,
-        config.svUser,
+        svName,
         ledgerClient,
         config.updateHistoryBackfillBatchSize,
         svParty,

@@ -129,6 +129,9 @@ class ScanApp(
           config.svUser,
         )
       }
+      svName <- appInitStep(s"Get SV name from ${config.svUser}") {
+        appInitConnection.getSvNameFromUserMetadata(config.svUser)
+      }
       _ = if (config.domainMigrationId != migrationInfo.currentMigrationId) {
         throw Status.INVALID_ARGUMENT
           .withDescription(
@@ -172,6 +175,7 @@ class ScanApp(
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,
         serviceUserPrimaryParty,
+        svName,
         amuletAppParameters.upgradesConfig,
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {

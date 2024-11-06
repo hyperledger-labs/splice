@@ -156,6 +156,11 @@ class DomainMigrationInitializer(
         "true",
         RetryFor.WaitingOnInitDependency,
       )
+      _ <- SetupUtil.ensureSvNameMetadataAnnotation(
+        readOnlyConnection,
+        config,
+        domainMigrationConfig.name,
+      )
       migrationInfo =
         DomainMigrationInfo(
           currentMigrationId = config.domainMigrationId,
