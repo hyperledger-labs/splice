@@ -9,12 +9,12 @@ import com.digitalasset.canton.data.GenTransactionTree
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.DefaultParticipantStateValues
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.*
-import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.{
   defaultTestingIdentityFactory,
   defaultTestingTopology,
 }
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.store.PackageDependencyResolverUS
 import com.digitalasset.canton.tracing.TraceContext
@@ -207,12 +207,13 @@ final class TransactionTreeFactoryImplTest
     val exampleDependency: IdString.PackageId = PackageId.assertFromString("example-dependency")
     override def packageDependencies(packageId: PackageId)(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] = {
       packageId match {
         case ExampleTransactionFactory.packageId =>
           Right(Set(exampleDependency)).toEitherT[FutureUnlessShutdown]
         case _ => Right(Set.empty[PackageId]).toEitherT[FutureUnlessShutdown]
       }
+    }
   }
 
   object MisconfiguredPackageDependencyResolver extends PackageDependencyResolverUS {
@@ -220,8 +221,9 @@ final class TransactionTreeFactoryImplTest
     val exampleDependency: IdString.PackageId = PackageId.assertFromString("example-dependency")
     override def packageDependencies(packageId: PackageId)(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] = {
       Left(packageId).toEitherT[FutureUnlessShutdown]
+    }
   }
 
 }

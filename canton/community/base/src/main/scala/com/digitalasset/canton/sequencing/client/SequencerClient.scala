@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.sequencing.client
 
-import cats.Monad
 import cats.data.EitherT
 import cats.implicits.catsSyntaxOptionId
 import cats.syntax.alternative.*
@@ -17,8 +16,8 @@ import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi, SyncCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -28,9 +27,9 @@ import com.digitalasset.canton.health.{
   DelegatingMutableHealthComponent,
   HealthComponent,
 }
-import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.lifecycle.Lifecycle.toCloseableOption
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
+import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.{CantonPrettyPrinter, Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.SequencerClientMetrics
@@ -39,20 +38,18 @@ import com.digitalasset.canton.protocol.DomainParametersLookup.SequencerDomainPa
 import com.digitalasset.canton.protocol.DynamicDomainParametersLookup
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
-import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.SequencerAggregator.MessageAggregationConfig
 import com.digitalasset.canton.sequencing.SequencerAggregatorPekko.{
   HasSequencerSubscriptionFactoryPekko,
   SubscriptionControl,
 }
+import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.PeriodicAcknowledgements.FetchCleanTimestamp
-import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.SendCallback.CallbackFuture
 import com.digitalasset.canton.sequencing.client.SequencerClient.SequencerTransports
 import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionError.*
 import com.digitalasset.canton.sequencing.client.transports.{
   SequencerClientTransport,
-  SequencerClientTransportCommon,
   SequencerClientTransportPekko,
 }
 import com.digitalasset.canton.sequencing.handlers.{
@@ -63,25 +60,24 @@ import com.digitalasset.canton.sequencing.handlers.{
 }
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.{TrafficReceipt, TrafficStateController}
-import com.digitalasset.canton.store.*
 import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.store.SequencedEventStore.PossiblyIgnoredSequencedEvent
+import com.digitalasset.canton.store.*
 import com.digitalasset.canton.time.{Clock, DomainTimeTracker}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.tracing.{HasTraceContext, Spanning, TraceContext, Traced}
-import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.FutureUtil.defaultStackTraceFilter
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.PekkoUtil.{CombinedKillSwitch, WithKillSwitch}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.TryUtil.*
-import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
+import com.digitalasset.canton.util.*
+import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerAlias, SequencerCounter, time}
 import com.google.common.annotations.VisibleForTesting
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
@@ -97,11 +93,6 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
 trait SequencerClient extends SequencerClientSend with FlagCloseable {
-
-  /** Provides an entry point to revoke all the authentication tokens for a member on a given
-    * sequencer, and close the connection to that sequencer.
-    */
-  def logout()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit]
 
   /** The sequencer client computes the cost of submission requests sent to the sequencer,
     * and update the traffic state when receiving confirmation that the event has been sequenced.
@@ -219,11 +210,6 @@ abstract class SequencerClientImpl(
     with Spanning
     with HasCloseContext {
 
-  override def logout()(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Status, Unit] =
-    sequencersTransportState.logout()
-
   protected val sequencersTransportState: SequencersTransportState =
     new SequencersTransportState(
       sequencerTransports,
@@ -244,20 +230,20 @@ abstract class SequencerClientImpl(
       callback: SendCallback,
       amplify: Boolean,
   )(implicit
-      traceContext: TraceContext,
-      metricsContext: MetricsContext,
+      traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] =
-    // TODO(#12950): Validate that group addresses map to at least one member
-    sendAsyncInternal(
-      batch,
-      topologyTimestamp,
-      maxSequencingTime,
-      messageId,
-      aggregationRule,
-      callback,
-      amplify,
-      metricsContext,
-    )
+    for {
+      // TODO(#12950): Validate that group addresses map to at least one member
+      result <- sendAsyncInternal(
+        batch,
+        topologyTimestamp,
+        maxSequencingTime,
+        messageId,
+        aggregationRule,
+        callback,
+        amplify,
+      )
+    } yield result
 
   private def checkRequestSize(
       request: SubmissionRequest,
@@ -284,12 +270,9 @@ abstract class SequencerClientImpl(
       aggregationRule: Option[AggregationRule],
       callback: SendCallback,
       amplify: Boolean,
-      metricsContext: MetricsContext,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = {
-    implicit val metricsContextImplicit =
-      metricsContext.withExtraLabels("domain" -> domainId.toString)
+  ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] =
     withSpan("SequencerClient.sendAsync") { implicit traceContext => span =>
       def mkRequestE(
           cost: Option[SequencingSubmissionCost]
@@ -332,11 +315,15 @@ abstract class SequencerClientImpl(
         case _: ParticipantId => true
         case _ => false
       }
-      val domainParamsF = EitherT.liftF(
-        FutureUnlessShutdown.outcomeF(
-          domainParametersLookup.getApproximateOrDefaultValue(warnOnUsingDefaults)
+      val domainParamsF = EitherTUtil
+        .fromFuture(
+          domainParametersLookup.getApproximateOrDefaultValue(warnOnUsingDefaults),
+          throwable =>
+            SendAsyncClientError.RequestFailed(
+              s"failed to retrieve maxRequestSize because ${throwable.getMessage}"
+            ),
         )
-      )
+        .mapK(FutureUnlessShutdown.outcomeK)
 
       if (replayEnabled) {
         val syncCryptoApi = syncCryptoClient.currentSnapshotApproximation
@@ -378,7 +365,7 @@ abstract class SequencerClientImpl(
           callback(result)
         }
 
-        def trackSend: EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] =
+        def trackSend: EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = {
           sendTracker
             .track(
               messageId,
@@ -389,6 +376,7 @@ abstract class SequencerClientImpl(
               // we're already tracking this message id
               SendAsyncClientError.DuplicateMessageId
             }
+        }
 
         def peekAtSendResult(): Option[UnlessShutdown[SendResult]] =
           sendResultPromise.future.value.map(_.valueOr { ex =>
@@ -424,7 +412,6 @@ abstract class SequencerClientImpl(
         } yield ()
       }
     }
-  }
 
   /** Perform the send, without any check.
     */
@@ -435,16 +422,16 @@ abstract class SequencerClientImpl(
       peekAtSendResult: () => Option[UnlessShutdown[SendResult]],
       topologySnapshot: SyncCryptoApi,
   )(implicit
-      traceContext: TraceContext,
-      metricsContext: MetricsContext,
-  ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] =
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = {
     EitherTUtil
       .timed(metrics.submissions.sends) {
-        val (sequencerAlias, sequencerId, transport, patienceO) =
-          sequencersTransportState.nextAmplifiedTransport(Seq.empty)
         // Do not add an aggregation rule for amplifiable requests if amplification has not been configured
+        val amplificationConfigured =
+          sequencersTransportState.getSubmissionRequestAmplification.factor.value > 1
+        val doAmplify = amplify && amplificationConfigured
         val amplifiableRequest =
-          if (amplify && request.aggregationRule.isEmpty && patienceO.isDefined) {
+          if (doAmplify && request.aggregationRule.isEmpty) {
             val aggregationRule =
               AggregationRule(NonEmpty(Seq, member), PositiveInt.one, protocolVersion)
             logger.debug(
@@ -465,30 +452,14 @@ abstract class SequencerClientImpl(
               logger.error(message)
               SendAsyncClientError.RequestRefused(SendAsyncError.RequestRefused(message))
             }
-
-          _ <- amplifiedSend(
-            signedContent,
-            sequencerAlias,
-            sequencerId,
-            transport,
-            if (amplify) patienceO else None,
-            peekAtSendResult,
-          )
-        } yield ()
-
+        } yield amplifiedSend(signedContent, doAmplify, peekAtSendResult)
       }
       .leftSemiflatMap { err =>
-        // increment appropriate error metrics
-        err match {
-          case SendAsyncClientError.RequestRefused(SendAsyncError.Overloaded(_)) =>
-            metrics.submissions.overloaded.inc()
-          case _ =>
-        }
-
         // cancel pending send now as we know the request will never cause a sequenced result
         logger.debug(s"Cancelling the pending send as the sequencer returned error: $err")
         FutureUnlessShutdown.outcomeF(sendTracker.cancelPendingSend(messageId).map(_ => err))
       }
+  }
 
   /** Send the `signedRequest` to the `firstSequencer` via `firstTransport`.
     * If `firstPatienceO` is defined, continue sending the request to more sequencers until
@@ -496,129 +467,19 @@ abstract class SequencerClientImpl(
     */
   private def amplifiedSend(
       signedRequest: SignedContent[SubmissionRequest],
-      firstSequencerAlias: SequencerAlias,
-      firstSequencer: SequencerId,
-      firstTransport: SequencerClientTransportCommon,
-      firstPatienceO: Option[NonNegativeFiniteDuration],
+      amplify: Boolean,
       peekAtSendResult: () => Option[UnlessShutdown[SendResult]],
-  )(implicit
-      traceContext: TraceContext,
-      metricsContext: MetricsContext,
-  ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = {
-    val timeout = timeouts.network.duration
-    val messageId = signedRequest.content.messageId
-
-    import SequencerClientImpl.AmplifiedSendState as State
-
-    def step(
-        state: State
-    ): FutureUnlessShutdown[Either[State, Either[SendAsyncClientError, Unit]]] = {
-      val State(previousSequencers, sequencerAlias, sequencerId, transport, patienceO) = state
-
-      def nextState: State = {
-        val sequencers = sequencerId +: previousSequencers
-        val (nextSequencerAlias, nextSequencerId, nextTransport, nextPatienceO) =
-          sequencersTransportState.nextAmplifiedTransport(sequencers)
-        State(sequencers, nextSequencerAlias, nextSequencerId, nextTransport, nextPatienceO)
-      }
-
-      def handleSyncError(
-          error: SendAsyncClientResponseError
-      ): Either[State, Either[SendAsyncClientError, Unit]] =
-        error match {
-          case _: SendAsyncClientError.RequestFailed =>
-            // Immediately try the next sequencer because this was a problem talking to the chosen sequencer
-            logger.debug(
-              s"Failed to send request with message id $messageId to $sequencerId: $error"
-            )
-            Either.cond(
-              patienceO.isDefined,
-              Left(error),
-              nextState,
-            )
-          case _: SendAsyncClientError.RequestRefused =>
-            logger.debug(
-              s"Send request with message id $messageId was refused by $sequencerId: $error"
-            )
-            // Trust the single sequencer to determine whether the request should indeed be refused and give up.
-            // TODO(#12377) Do not trust the sequencer and instead retry sensibly
-            Right(Left(error))
-        }
-
-      def maybeResendAfterPatience(): FutureUnlessShutdown[Either[SendAsyncClientError, Unit]] =
-        peekAtSendResult() match {
-          case Some(Outcome(result)) =>
-            noTracingLogger.whenDebugEnabled {
-              result match {
-                case SendResult.Success(deliver) =>
-                  logger.debug(
-                    s"Aborting amplification for message ID $messageId because it has been sequenced at ${deliver.timestamp}"
-                  )
-                case SendResult.Error(error) =>
-                  // The BFT sequencer group has decided that the submission request shall not be sequenced.
-                  // We accept this decision here because amplification is about overcoming individual faulty sequencer nodes,
-                  // not about dealing with concurrent changes that might render the request valid later on (e.g., traffic top-ups)
-                  logger.debug(
-                    s"Aborting amplification for message ID $messageId because it has been rejected at ${error.timestamp}"
-                  )
-                case SendResult.Timeout(timestamp) =>
-                  logger.debug(
-                    s"Aborting amplification for message ID $messageId because the max sequencing time ${signedRequest.content.maxSequencingTime} has elapsed: observed time $timestamp"
-                  )
-              }
-            }
-            FutureUnlessShutdown.pure(Either.unit)
-          case None =>
-            Monad[FutureUnlessShutdown].tailRecM(nextState)(step)
-          case Some(AbortedDueToShutdown) =>
-            logger.debug(
-              s"Aborting amplification for message ID $messageId due to shutdown"
-            )
-            FutureUnlessShutdown.abortedDueToShutdown
-        }
-
-      def scheduleAmplification(): Unit =
-        patienceO match {
-          case Some(patience) =>
-            logger.debug(
-              s"Scheduling amplification for message ID $messageId after $patience"
-            )
-            FutureUtil.doNotAwaitUnlessShutdown(
-              clock.scheduleAfter(_ => maybeResendAfterPatience(), patience.asJava).flatten,
-              s"Submission request amplification failed for message ID $messageId",
-            )
-          case None =>
-            logger.debug(
-              s"Not scheduling amplification for message ID $messageId"
-            )
-        }
-
-      performUnlessClosingEitherUSF(s"sending message $messageId to sequencer $sequencerId") {
-        logger.debug(
-          s"Sending message ID ${signedRequest.content.messageId} to sequencer $sequencerId"
-        )
-        val submissionCostOrZero =
-          signedRequest.content.submissionCost.map(_.cost.value).getOrElse(0L)
-        metrics.trafficConsumption.trafficCostOfSubmittedEvent.mark(submissionCostOrZero)(
-          metricsContext.withExtraLabels("target-sequencer" -> sequencerAlias.toString)
-        )
-        transport.sendAsyncSigned(signedRequest, timeout)
-      }.value.map {
-        case Right(()) =>
-          // Do not await the patience. This would defeat the point of asynchronous send.
-          scheduleAmplification()
-          Right(Either.unit)
-        case Left(error) =>
-          handleSyncError(error)
-      }
-    }
-
-    val initialState =
-      State(Seq.empty, firstSequencerAlias, firstSequencer, firstTransport, firstPatienceO)
-
-    EitherT(
-      Monad[FutureUnlessShutdown].tailRecM(initialState)(step)
+  )(implicit traceContext: TraceContext): Unit = {
+    val amplifier = new SendAmplifier(
+      clock,
+      signedRequest,
+      sequencersTransportState,
+      loggerFactory,
+      peekAtSendResult,
+      this,
+      timeouts.network.duration,
     )
+    if (amplify) amplifier.sendAmplified() else amplifier.sendOnce()
   }
 
   override def generateMaxSequencingTime: CantonTimestamp =
@@ -640,7 +501,7 @@ abstract class SequencerClientImpl(
       eventHandler: PossiblyIgnoredApplicationHandler[ClosedEnvelope],
       timeTracker: DomainTimeTracker,
       onCleanHandler: Traced[SequencerCounterCursorPrehead] => Unit = _ => (),
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     sequencerCounterTrackerStore.preheadSequencerCounter.flatMap { cleanPrehead =>
       val priorTimestamp = cleanPrehead.fold(CantonTimestamp.MinValue)(
         _.timestamp
@@ -658,6 +519,7 @@ abstract class SequencerClientImpl(
         PeriodicAcknowledgements.fetchCleanCounterFromStore(sequencerCounterTrackerStore),
       )
     }
+  }
 
   /** Create a subscription for sequenced events for this member,
     * starting after the last event in the [[com.digitalasset.canton.store.SequencedEventStore]] up to `priorTimestamp`.
@@ -729,24 +591,15 @@ abstract class SequencerClientImpl(
 
   override def downloadTopologyStateForInit()(implicit
       traceContext: TraceContext
-  ): EitherT[Future, String, GenericStoredTopologyTransactions] =
+  ): EitherT[Future, String, GenericStoredTopologyTransactions] = {
     // TODO(i12076): Download topology state from one of the sequencers based on the health
     sequencersTransportState.transport
       .downloadTopologyStateForInit(TopologyStateForInitRequest(member, protocolVersion))
       .map(_.topologyTransactions.value)
+  }
 
   protected val periodicAcknowledgementsRef =
     new AtomicReference[Option[PeriodicAcknowledgements]](None)
-}
-
-object SequencerClientImpl {
-  private final case class AmplifiedSendState(
-      previousSequencers: Seq[SequencerId],
-      nextSequencerAlias: SequencerAlias,
-      nextSequencer: SequencerId,
-      nextTransport: SequencerClientTransportCommon,
-      nextPatienceO: Option[NonNegativeFiniteDuration],
-  )
 }
 
 /** The sequencer client facilitates access to the individual domain sequencer. A client centralizes the
@@ -891,22 +744,24 @@ class RichSequencerClientImpl(
           s"Processing events from the SequencedEventStore from $replayStartTimeInclusive on"
         )
 
-        replayEvents <- sequencedEventStore
-          .findRange(
-            SequencedEventStore
-              .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
-            limit = None,
-          )
-          .valueOr { overlap =>
-            ErrorUtil.internalError(
-              new IllegalStateException(
-                s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
-              )
+        replayEvents <- FutureUnlessShutdown.outcomeF(
+          sequencedEventStore
+            .findRange(
+              SequencedEventStore
+                .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
+              limit = None,
             )
-          }
+            .valueOr { overlap =>
+              ErrorUtil.internalError(
+                new IllegalStateException(
+                  s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
+                )
+              )
+            }
+        )
         subscriptionStartsAt = replayEvents.headOption.fold(
           cleanPreheadTsO.fold(SubscriptionStart.FreshSubscription: SubscriptionStart)(
-            SubscriptionStart.CleanHeadResubscriptionStart.apply
+            SubscriptionStart.CleanHeadResubscriptionStart
           )
         )(replayEv =>
           SubscriptionStart.ReplayResubscriptionStart(replayEv.timestamp, cleanPreheadTsO)
@@ -953,7 +808,7 @@ class RichSequencerClientImpl(
           PeriodicAcknowledgements
             .create(
               config.acknowledgementInterval.underlying,
-              isHealthy = deferredSubscriptionHealth.getState.isAlive,
+              deferredSubscriptionHealth.getState.isOk,
               RichSequencerClientImpl.this,
               fetchCleanTimestamp,
               clock,
@@ -985,7 +840,7 @@ class RichSequencerClientImpl(
       traceContext: TraceContext
   ): ResilientSequencerSubscription[SequencerClientSubscriptionError] = {
     val loggerFactoryWithSequencerAlias =
-      SequencerClient.loggerFactoryWithSequencerAlias(loggerFactory, sequencerAlias)
+      SequencerClient.loggerFactoryWithSequencerConnection(loggerFactory, sequencerAlias)
     // previously seen counter takes precedence over the lower bound
     val nextCounter = preSubscriptionEvent.fold(initialCounterLowerBound)(_.counter)
     val eventValidator = eventValidatorFactory.create(loggerFactoryWithSequencerAlias)
@@ -1096,7 +951,7 @@ class RichSequencerClientImpl(
           )
           eventValidator
             .validateOnReconnect(priorEvent.get(), serializedEvent, sequencerId)
-            .leftMap[SequencerClientSubscriptionError](EventValidationError.apply)
+            .leftMap[SequencerClientSubscriptionError](EventValidationError)
             .value
         } else {
           logger.debug(
@@ -1109,7 +964,7 @@ class RichSequencerClientImpl(
             _ = logger.debug(s"Processing delay $processingDelay completed successfully")
             _ <- eventValidator
               .validate(priorEvent.get(), serializedEvent, sequencerId)
-              .leftMap[SequencerClientSubscriptionError](EventValidationError.apply)
+              .leftMap[SequencerClientSubscriptionError](EventValidationError)
             _ = logger.debug("Event validation completed successfully")
             _ = priorEvent.set(Some(serializedEvent))
             _ = delayLogger.checkForDelay(serializedEvent)
@@ -1121,7 +976,7 @@ class RichSequencerClientImpl(
                   serializedEvent,
                 )
             )
-              .leftMap[SequencerClientSubscriptionError](EventAggregationError.apply)
+              .leftMap[SequencerClientSubscriptionError](EventAggregationError)
             _ = logger.debug("Event combined and merged successfully by the sequencer aggregator")
           } yield
             if (toSignalHandler) {
@@ -1263,13 +1118,15 @@ class RichSequencerClientImpl(
             failure
           }
 
-          def handleException(error: Throwable, syncProcessing: Boolean)
-              : ApplicationHandlerFailure = {
+          def handleException(
+              error: Throwable,
+              syncProcessing: Boolean,
+          ): ApplicationHandlerFailure = {
             val sync = if (syncProcessing) "Synchronous" else "Asynchronous"
 
             error match {
               case PassiveInstanceException(reason) =>
-                logger.info(
+                logger.warn(
                   s"$sync event processing stopped because instance became passive"
                 )
                 putApplicationHandlerFailure(ApplicationHandlerPassive(reason))
@@ -1293,33 +1150,34 @@ class RichSequencerClientImpl(
           def handleAsyncResult(
               asyncResultF: Future[UnlessShutdown[AsyncResult]]
           ): EitherT[Future, ApplicationHandlerFailure, Unit] =
-            EitherT(asyncResultF.transform {
-              case Success(UnlessShutdown.Outcome(asyncResult)) =>
-                val asyncSignalledF = asyncResult.unwrap.transformIntoSuccess { result =>
-                  // record errors and shutdown in `applicationHandlerFailure` and move on
-                  result match {
-                    case Success(outcome) =>
-                      outcome.onShutdown(
-                        putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
-                      )
-                    case Failure(error) =>
-                      handleException(error, syncProcessing = false).discard
-                  }
-                  UnlessShutdown.unit
-                }.unwrap
-                // note, we are adding our async processing to the flush future, so we know once the async processing has finished
-                addToFlushAndLogError(
-                  s"asynchronous event processing for event batch with sequencer counters $firstSc to $lastSc"
-                )(asyncSignalledF)
-                // we do not wait for the async results to finish, we are done here once the synchronous part is done
-                Success(Either.unit)
-              case Success(UnlessShutdown.AbortedDueToShutdown) =>
-                putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
-                Success(Left(ApplicationHandlerShutdown))
-              case Failure(ex) =>
-                val failure = handleException(ex, syncProcessing = true)
-                Success(Left(failure))
-            })
+            EitherTUtil
+              .fromFuture(asyncResultF, handleException(_, syncProcessing = true))
+              .subflatMap {
+                case UnlessShutdown.Outcome(asyncResult) =>
+                  val asyncSignalledF = asyncResult.unwrap.transformIntoSuccess { result =>
+                    // record errors and shutdown in `applicationHandlerFailure` and move on
+                    result match {
+                      case Success(outcome) =>
+                        outcome
+                          .onShutdown(
+                            putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
+                          )
+                          .discard
+                      case Failure(error) =>
+                        handleException(error, syncProcessing = false).discard
+                    }
+                    UnlessShutdown.unit
+                  }.unwrap
+                  // note, we are adding our async processing to the flush future, so we know once the async processing has finished
+                  addToFlushAndLogError(
+                    s"asynchronous event processing for event batch with sequencer counters $firstSc to $lastSc"
+                  )(asyncSignalledF)
+                  // we do not wait for the async results to finish, we are done here once the synchronous part is done
+                  Right(())
+                case UnlessShutdown.AbortedDueToShutdown =>
+                  putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
+                  Left(ApplicationHandlerShutdown)
+              }
 
           // note, here, we created the asyncResultF, which means we've completed the synchronous processing part.
           asyncResultFT.fold(
@@ -1358,7 +1216,7 @@ class RichSequencerClientImpl(
     ).discard
   }
 
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     Seq(
       SyncCloseable("sequencer-aggregator", sequencerAggregator.close()),
       SyncCloseable("sequencer-send-tracker", sendTracker.close()),
@@ -1374,6 +1232,7 @@ class RichSequencerClientImpl(
       SyncCloseable("sequencer-client-recorder", recorderO.foreach(_.close())),
       SyncCloseable("deferred-subscription-health", deferredSubscriptionHealth.close()),
     )
+  }
 
   /** Returns a future that completes after asynchronous processing has completed for all events
     * whose synchronous processing has been completed prior to this call. May complete earlier if event processing
@@ -1512,26 +1371,27 @@ class SequencerClientImplPekko[E: Pretty](
           .fold(CantonTimestamp.MinValue)(_.timestamp)
           .immediateSuccessor
         _ = logger.info(
-          s"Processing events from the SequencedEventStore from $replayStartTimeInclusive on"
+          s"Processing events from the SequencedEventStore from ${replayStartTimeInclusive} on"
         )
 
-        replayEvents <- sequencedEventStore
-          .findRange(
-            SequencedEventStore
-              .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
-            limit = None,
-          )
-          .valueOr { overlap =>
-            ErrorUtil.internalError(
-              new IllegalStateException(
-                s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
-              )
+        replayEvents <- FutureUnlessShutdown.outcomeF(
+          sequencedEventStore
+            .findRange(
+              SequencedEventStore
+                .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
+              limit = None,
             )
-          }
-
+            .valueOr { overlap =>
+              ErrorUtil.internalError(
+                new IllegalStateException(
+                  s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
+                )
+              )
+            }
+        )
         subscriptionStartsAt = replayEvents.headOption.fold(
           cleanPreheadTsO.fold(SubscriptionStart.FreshSubscription: SubscriptionStart)(
-            SubscriptionStart.CleanHeadResubscriptionStart.apply
+            SubscriptionStart.CleanHeadResubscriptionStart
           )
         )(replayEv =>
           SubscriptionStart.ReplayResubscriptionStart(replayEv.timestamp, cleanPreheadTsO)
@@ -1711,7 +1571,7 @@ class SequencerClientImplPekko[E: Pretty](
           PeriodicAcknowledgements
             .create(
               config.acknowledgementInterval.underlying,
-              isHealthy = health.getState.isAlive,
+              health.getState.isOk,
               this,
               fetchCleanTimestamp,
               clock,
@@ -1757,7 +1617,7 @@ class SequencerClientImplPekko[E: Pretty](
         batchesOrError
       }
 
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     subscriptionHandle.get.toList.flatMap { handle =>
       import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.*
 
@@ -1775,6 +1635,7 @@ class SequencerClientImplPekko[E: Pretty](
         ),
       )
     }
+  }
 }
 
 object SequencerClientImplPekko {
@@ -1797,12 +1658,11 @@ object SequencerClientImplPekko {
 
   private sealed trait BatchCounterRange extends Product with Serializable with PrettyPrinting
   private case object EmptyBatch extends BatchCounterRange {
-    override protected def pretty: Pretty[EmptyBatch.type] = prettyOfObject[EmptyBatch.type]
+    override def pretty: Pretty[EmptyBatch.type] = prettyOfObject[EmptyBatch.type]
   }
   private final case class NonEmptyBatchCounterRange(start: SequencerCounter, end: SequencerCounter)
       extends BatchCounterRange {
-    override protected def pretty: Pretty[NonEmptyBatchCounterRange] =
-      prettyInfix(_.start, "->", _.end)
+    override def pretty: Pretty[NonEmptyBatchCounterRange] = prettyInfix(_.start, "->", _.end)
   }
   private object BatchCounterRange {
     def apply(
@@ -1833,10 +1693,11 @@ object SequencerClient {
     def expectedSequencers: NonEmpty[Set[SequencerId]] =
       sequencerToTransportMap.map(_._2.sequencerId).toSet
 
-    def sequencerIdToTransportMap: NonEmpty[Map[SequencerId, SequencerTransportContainer[E]]] =
+    def sequencerIdToTransportMap: NonEmpty[Map[SequencerId, SequencerTransportContainer[E]]] = {
       sequencerToTransportMap.map { case (_, transport) =>
         transport.sequencerId -> transport
       }.toMap
+    }
 
     def transports: Set[SequencerClientTransport] =
       sequencerToTransportMap.values.map(_.clientTransport).toSet
@@ -1874,14 +1735,17 @@ object SequencerClient {
         sequencerAlias: SequencerAlias,
         sequencerId: SequencerId,
         transport: SequencerClientTransport & SequencerClientTransportPekko.Aux[E],
-    ): SequencerTransports[E] = {
-      val container = SequencerTransportContainer(sequencerAlias, sequencerId, transport)
+    ): SequencerTransports[E] =
       SequencerTransports(
-        NonEmpty.mk(Seq, sequencerAlias -> container).toMap,
+        NonEmpty
+          .mk(
+            Seq,
+            sequencerAlias -> SequencerTransportContainer(sequencerAlias, sequencerId, transport),
+          )
+          .toMap,
         PositiveInt.one,
         SubmissionRequestAmplification.NoAmplification,
       )
-    }
 
     def default[E](
         sequencerId: SequencerId,
@@ -1961,22 +1825,22 @@ object SequencerClient {
     }
     retry
       .Pause(loggingContext.logger, performUnlessClosing, maxRetries, delay, sendDescription)
-      .unlessShutdown(doSend(), AllExceptionRetryPolicy)(
+      .unlessShutdown(doSend(), AllExnRetryable)(
         retry.Success.always,
         ec,
         loggingContext.traceContext,
       )
   }
 
-  def loggerFactoryWithSequencerAlias(
+  def loggerFactoryWithSequencerConnection(
       loggerFactory: NamedLoggerFactory,
       sequencerAlias: SequencerAlias,
   ): NamedLoggerFactory =
-    loggerFactory.append("sequencerAlias", sequencerAlias.unwrap)
+    loggerFactory.append("sequencerConnection", sequencerAlias.unwrap)
 
-  def loggerFactoryWithSequencerId(
+  def loggerFactoryWithSequencerConnection(
       loggerFactory: NamedLoggerFactory,
       sequencerId: SequencerId,
   ): NamedLoggerFactory =
-    loggerFactory.append("sequencerId", sequencerId.uid.toString)
+    loggerFactory.append("sequencerConnection", sequencerId.uid.toString)
 }

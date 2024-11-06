@@ -5,9 +5,7 @@ package com.digitalasset.canton.ledger.api.validation
 
 import com.daml.error.{ContextualizedErrorLogger, NoLogging}
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamRequest as GrpcCompletionStreamRequest
-import com.digitalasset.canton.ledger.api.domain.ParticipantOffset
 import com.digitalasset.canton.ledger.api.messages.command.completion.CompletionStreamRequest
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.daml.lf.data.Ref
 import io.grpc.Status.Code.*
 import org.mockito.MockitoSugar
@@ -21,12 +19,12 @@ class CompletionServiceRequestValidatorTest
   private val grpcCompletionReq = GrpcCompletionStreamRequest(
     expectedApplicationId,
     List(party),
-    offsetLong,
+    absoluteOffset,
   )
   private val completionReq = CompletionStreamRequest(
     Ref.ApplicationId.assertFromString(expectedApplicationId),
     List(party).toSet,
-    offset,
+    absoluteOffset,
   )
 
   private val validator = new CompletionServiceRequestValidator(
@@ -57,22 +55,14 @@ class CompletionServiceRequestValidatorTest
         )
       }
 
-      "accept requests with begin exclusive offset zero" in {
-        inside(
-          validator.validateGrpcCompletionStreamRequest(grpcCompletionReq.withBeginExclusive(0))
-        ) { case Right(req) =>
-          req shouldBe completionReq.copy(offset = ParticipantOffset.fromString(""))
-        }
-      }
-
-      "return the correct error on negative begin exclusive offset" in {
+      "return the correct error on unknown begin boundary" in {
         requestMustFailWith(
           request = validator.validateGrpcCompletionStreamRequest(
-            grpcCompletionReq.withBeginExclusive(-100)
+            grpcCompletionReq.withBeginExclusive("@#!#$@")
           ),
           code = INVALID_ARGUMENT,
           description =
-            "NEGATIVE_OFFSET(8,0): Offset -100 in begin_exclusive is a negative integer: the offset in begin_exclusive field has to be a non-negative integer (>=0)",
+            "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: non expected character 0x40 in Daml-LF Ledger String \"@#!#$@\"",
           metadata = Map.empty,
         )
       }
@@ -88,7 +78,7 @@ class CompletionServiceRequestValidatorTest
       "tolerate empty offset (participant begin)" in {
         inside(
           validator.validateGrpcCompletionStreamRequest(
-            grpcCompletionReq.withBeginExclusive(0L)
+            grpcCompletionReq.withBeginExclusive("")
           )
         ) { case Right(req) =>
           req.applicationId shouldEqual expectedApplicationId
@@ -127,16 +117,13 @@ class CompletionServiceRequestValidatorTest
         requestMustFailWith(
           request = validator.validateCompletionStreamRequest(
             completionReq.copy(offset =
-              ParticipantOffset.fromString(
-                ApiOffset.fromLong(ApiOffset.assertFromStringToLong(ledgerEnd) + 1)
-              )
+              Ref.LedgerString.assertFromString((ledgerEnd.value.toInt + 1).toString)
             ),
             ledgerEnd,
           ),
           code = OUT_OF_RANGE,
-          description = s"OFFSET_AFTER_LEDGER_END(12,0): Begin offset (${ApiOffset
-              .assertFromStringToLong(ledgerEnd) + 1}) is after ledger end (${ApiOffset
-              .assertFromStringToLong(ledgerEnd)})",
+          description =
+            "OFFSET_AFTER_LEDGER_END(12,0): Begin offset (1001) is after ledger end (1000)",
           metadata = Map.empty,
         )
       }
@@ -144,7 +131,7 @@ class CompletionServiceRequestValidatorTest
       "tolerate empty offset (participant begin)" in {
         inside(
           validator.validateCompletionStreamRequest(
-            completionReq.copy(offset = ParticipantOffset.ParticipantBegin),
+            completionReq.copy(offset = ""),
             ledgerEnd,
           )
         ) { case Right(req) =>

@@ -30,6 +30,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
     )
 
   private val signatory = Ref.Party.assertFromString("signatory")
+  private val readers = Set(signatory)
 
   {
     val dtos = Vector(
@@ -225,11 +226,11 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           val assignedEvents =
             executeSql(
               backend.event.assignEventBatch(1L to 100L, Some(Set.empty))
-            ).map(_.event.rawCreatedEvent.contractId)
+            ).map(_.rawCreatedEvent.contractId)
           val unassignedEvents =
             executeSql(
               backend.event.unassignEventBatch(1L to 100L, Some(Set.empty))
-            ).map(_.event.contractId)
+            ).map(_.contractId)
           contractsCreated.get(hashCid("#101")) should not be empty
           contractsCreated.get(hashCid("#201")) should not be empty
           contractsArchived.get(hashCid("#101")) shouldBe empty
@@ -243,7 +244,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
             _.coid
           ) // not constrained by ledger end
           fetchIdsFromTransactionMeta(allDtos.collect { case meta: DbDto.TransactionMeta =>
-            meta.update_id
+            meta.transaction_id
           }) shouldBe Set((1, 1), (2, 4))
           fetchIdsCreateStakeholder() shouldBe List(
             1L,
@@ -275,11 +276,11 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           val assignedEvents =
             executeSql(
               backend.event.assignEventBatch(1L to 100L, Some(Set.empty))
-            ).map(_.event.rawCreatedEvent.contractId)
+            ).map(_.rawCreatedEvent.contractId)
           val unassignedEvents =
             executeSql(
               backend.event.unassignEventBatch(1L to 100L, Some(Set.empty))
-            ).map(_.event.contractId)
+            ).map(_.contractId)
           contractsCreated.get(hashCid("#101")) should not be empty
           contractsCreated.get(hashCid("#201")) shouldBe empty
           contractsArchived.get(hashCid("#101")) shouldBe empty
@@ -291,7 +292,7 @@ private[backend] trait StorageBackendTestsInitializeIngestion
             _.coid
           ) // not constrained by ledger end
           fetchIdsFromTransactionMeta(allDtos.collect { case meta: DbDto.TransactionMeta =>
-            meta.update_id
+            meta.transaction_id
           }) shouldBe Set((1, 1), (2, 4))
           fetchIdsCreateStakeholder() shouldBe List(1L)
           fetchIdsCreateNonStakeholder() shouldBe List(1L)
@@ -323,18 +324,18 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           val assignedEvents =
             executeSql(
               backend.event.assignEventBatch(1L to 100L, Some(Set.empty))
-            ).map(_.event.rawCreatedEvent.contractId)
+            ).map(_.rawCreatedEvent.contractId)
           val unassignedEvents =
             executeSql(
               backend.event.unassignEventBatch(1L to 100L, Some(Set.empty))
-            ).map(_.event.contractId)
+            ).map(_.contractId)
           contractsCreated.get(hashCid("#101")) shouldBe None
           contractsAssigned.get(hashCid("#103")) shouldBe empty
           contractsAssigned.get(hashCid("#203")) shouldBe empty
           assignedEvents shouldBe empty
           unassignedEvents shouldBe empty
           fetchIdsFromTransactionMeta(dtos.collect { case meta: DbDto.TransactionMeta =>
-            meta.update_id
+            meta.transaction_id
           }) shouldBe empty
           fetchIdsCreateStakeholder() shouldBe empty
           fetchIdsCreateNonStakeholder() shouldBe empty
@@ -348,16 +349,15 @@ private[backend] trait StorageBackendTestsInitializeIngestion
     }
   }
 
-  // TODO(i21346) Implement initialization tests for topology events
-
-  private def fetchIdsNonConsuming(): Vector[Long] =
+  private def fetchIdsNonConsuming(): Vector[Long] = {
     executeSql(
       backend.event.transactionStreamingQueries.fetchEventIdsForInformee(
         EventIdSourceForInformees.NonConsumingInformee
       )(informeeO = Some(someParty), startExclusive = 0, endInclusive = 1000, limit = 1000)
     )
+  }
 
-  private def fetchIdsConsumingNonStakeholder(): Vector[Long] =
+  private def fetchIdsConsumingNonStakeholder(): Vector[Long] = {
     executeSql(
       backend.event.transactionStreamingQueries
         .fetchEventIdsForInformee(EventIdSourceForInformees.ConsumingNonStakeholder)(
@@ -367,8 +367,9 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           limit = 1000,
         )
     )
+  }
 
-  private def fetchIdsConsumingStakeholder(): Vector[Long] =
+  private def fetchIdsConsumingStakeholder(): Vector[Long] = {
     executeSql(
       backend.event.transactionStreamingQueries
         .fetchEventIdsForInformee(EventIdSourceForInformees.ConsumingStakeholder)(
@@ -378,8 +379,9 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           limit = 1000,
         )
     )
+  }
 
-  private def fetchIdsCreateNonStakeholder(): Vector[Long] =
+  private def fetchIdsCreateNonStakeholder(): Vector[Long] = {
     executeSql(
       backend.event.transactionStreamingQueries
         .fetchEventIdsForInformee(EventIdSourceForInformees.CreateNonStakeholder)(
@@ -389,8 +391,9 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           limit = 1000,
         )
     )
+  }
 
-  private def fetchIdsCreateStakeholder(): Vector[Long] =
+  private def fetchIdsCreateStakeholder(): Vector[Long] = {
     executeSql(
       backend.event.transactionStreamingQueries
         .fetchEventIdsForInformee(EventIdSourceForInformees.CreateStakeholder)(
@@ -400,8 +403,9 @@ private[backend] trait StorageBackendTestsInitializeIngestion
           limit = 1000,
         )
     )
+  }
 
-  private def fetchIdsAssignStakeholder(): Vector[Long] =
+  private def fetchIdsAssignStakeholder(): Vector[Long] = {
     executeSql(
       backend.event.fetchAssignEventIdsForStakeholder(
         stakeholderO = Some(someParty),
@@ -411,8 +415,9 @@ private[backend] trait StorageBackendTestsInitializeIngestion
         limit = 1000,
       )
     )
+  }
 
-  private def fetchIdsUnassignStakeholder(): Vector[Long] =
+  private def fetchIdsUnassignStakeholder(): Vector[Long] = {
     executeSql(
       backend.event.fetchUnassignEventIdsForStakeholder(
         stakeholderO = Some(someParty),
@@ -422,13 +427,14 @@ private[backend] trait StorageBackendTestsInitializeIngestion
         limit = 1000,
       )
     )
+  }
 
-  private def fetchIdsFromTransactionMeta(udpateIds: Seq[String]): Set[(Long, Long)] = {
+  private def fetchIdsFromTransactionMeta(transactionIds: Seq[String]): Set[(Long, Long)] = {
     val txPointwiseQueries = backend.event.transactionPointwiseQueries
-    udpateIds
+    transactionIds
       .map(Ref.TransactionId.assertFromString)
-      .map { updateId =>
-        executeSql(txPointwiseQueries.fetchIdsFromTransactionMeta(updateId))
+      .map { transactionId =>
+        executeSql(txPointwiseQueries.fetchIdsFromTransactionMeta(transactionId))
       }
       .flatMap(_.toList)
       .toSet

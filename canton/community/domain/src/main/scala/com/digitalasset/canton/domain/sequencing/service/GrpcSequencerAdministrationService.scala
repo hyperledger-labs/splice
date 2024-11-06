@@ -210,12 +210,6 @@ class GrpcSequencerAdministrationService(
 
       sequencerSnapshot <- sequencer.snapshot(referenceEffective.value)
 
-      // wait for the snapshot's lastTs to be processed by the topology client,
-      // which implies that all topology transactions will have been properly processed and stored.
-      _ <- EitherT.right(
-        topologyClient.awaitTimestamp(sequencerSnapshot.lastTs).getOrElse(Future.unit)
-      )
-
       topologySnapshot <- EitherT.right[BaseCantonError](
         topologyStore.findEssentialStateAtSequencedTime(SequencedTime(sequencerSnapshot.lastTs))
       )
@@ -252,28 +246,34 @@ class GrpcSequencerAdministrationService(
     */
   override def setTrafficPurchased(
       requestP: SetTrafficPurchasedRequest
-  ): Future[SetTrafficPurchasedResponse] = {
+  ): Future[
+    SetTrafficPurchasedResponse
+  ] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
 
-    val result = for {
-      member <- wrapErrUS(Member.fromProtoPrimitive(requestP.member, "member"))
-      serial <- wrapErrUS(ProtoConverter.parsePositiveInt("serial", requestP.serial))
-      totalTrafficPurchased <- wrapErrUS(
-        ProtoConverter.parseNonNegativeLong(
-          "total_traffic_purchased",
-          requestP.totalTrafficPurchased,
+    val result = {
+      for {
+        member <- wrapErrUS(Member.fromProtoPrimitive(requestP.member, "member"))
+        serial <- wrapErrUS(ProtoConverter.parsePositiveInt("serial", requestP.serial))
+        totalTrafficPurchased <- wrapErrUS(
+          ProtoConverter.parseNonNegativeLong(
+            "total_traffic_purchased",
+            requestP.totalTrafficPurchased,
+          )
         )
+        highestMaxSequencingTimestamp <- sequencer
+          .setTrafficPurchased(
+            member,
+            serial,
+            totalTrafficPurchased,
+            sequencerClient,
+            domainTimeTracker,
+          )
+          .leftWiden[CantonError]
+      } yield SetTrafficPurchasedResponse(
+        maxSequencingTimestamp = Some(highestMaxSequencingTimestamp.toProtoTimestamp)
       )
-      _ <- sequencer
-        .setTrafficPurchased(
-          member,
-          serial,
-          totalTrafficPurchased,
-          sequencerClient,
-          domainTimeTracker,
-        )
-        .leftWiden[CantonError]
-    } yield SetTrafficPurchasedResponse()
+    }
 
     mapErrNewEUS(result)
   }

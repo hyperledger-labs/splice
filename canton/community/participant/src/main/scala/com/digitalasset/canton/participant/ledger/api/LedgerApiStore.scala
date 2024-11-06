@@ -11,6 +11,7 @@ import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.participant.state.DomainIndex
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.platform.ResourceCloseable
 import com.digitalasset.canton.platform.config.ServerRole
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.DomainOffset
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
@@ -18,8 +19,6 @@ import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSou
 import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
 import com.digitalasset.canton.platform.store.interning.StringInterningView
 import com.digitalasset.canton.platform.store.{DbSupport, FlywayMigrations}
-import com.digitalasset.canton.platform.{ResourceCloseable, ResourceOwnerFlagCloseableOps}
-import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{LedgerParticipantId, config}
@@ -27,7 +26,7 @@ import com.digitalasset.canton.{LedgerParticipantId, config}
 import java.sql.Connection
 import scala.concurrent.{ExecutionContext, Future}
 
-class LedgerApiStore(
+final class LedgerApiStore(
     val ledgerApiDbSupport: DbSupport,
     val ledgerApiStorage: LedgerApiStorage,
     val ledgerEndCache: MutableLedgerEndCache,
@@ -63,10 +62,10 @@ class LedgerApiStore(
       integrityStorageBackend.onlyForTestingVerifyIntegrity(failForEmptyDB)
     )
 
-  def onlyForTestingMoveLedgerEndBackToScratch()(implicit
+  def onlyForTestingMoveLedgerAndBackToScratch()(implicit
       traceContext: TraceContext
   ): Future[Unit] =
-    executeSql(DatabaseMetrics.ForTesting("onlyForTestingMoveLedgerEndBackToScratch"))(
+    executeSql(DatabaseMetrics.ForTesting("onlyForTestingMoveLedgerAndBackToScratch"))(
       integrityStorageBackend.onlyForTestingMoveLedgerEndBackToScratch()
     )
 
@@ -129,20 +128,13 @@ class LedgerApiStore(
       )
     )
 
-  def lastDomainOffsetBeforeOrAtPublicationTime(
+  def lastDomainOffsetBeforerOrAtPublicationTime(
       beforeOrAtPublicationTimeInclusive: CantonTimestamp
   )(implicit traceContext: TraceContext): Future[Option[DomainOffset]] =
     executeSql(metrics.index.db.lastDomainOffsetBeforeOrAtPublicationTime)(
-      eventStorageBackend.lastDomainOffsetBeforeOrAtPublicationTime(
+      eventStorageBackend.lastDomainOffsetBeforerOrAtPublicationTime(
         beforeOrAtPublicationTimeInclusive.underlying
       )
-    )
-
-  def archivals(fromExclusive: Option[Offset], toInclusive: Offset)(implicit
-      traceContext: TraceContext
-  ): Future[Set[LfContractId]] =
-    executeSql(metrics.index.db.archivals)(
-      eventStorageBackend.archivals(fromExclusive, toInclusive)
     )
 
   private[api] def initializeInMemoryState(implicit
@@ -213,7 +205,7 @@ object LedgerApiStore {
           ).migrate()
         case _ => Future.unit
       }
-      dbSupport = DbSupport
+      ledgerApiStore <- DbSupport
         .owner(
           serverRole = ServerRole.ApiServer,
           metrics = metrics,
@@ -231,10 +223,7 @@ object LedgerApiStore {
             timeouts = timeouts,
           )
         )
-
-      ledgerApiStore <- new ResourceOwnerFlagCloseableOps(dbSupport).acquireFlagCloseable(
-        "Ledger API DB Support"
-      )
+        .acquireFlagCloseable("Ledger API DB Support")
       _ <-
         if (onlyForTesting_DoNotInitializeInMemoryState) Future.unit
         else ledgerApiStore.initializeInMemoryState

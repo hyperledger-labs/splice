@@ -82,6 +82,7 @@ object GrpcHealthService {
   private[grpc] val notServingResponse =
     HealthCheckResponse(HealthCheckResponse.ServingStatus.NOT_SERVING)
 
-  private def serviceFrom(request: HealthCheckRequest): Option[String] =
+  private def serviceFrom(request: HealthCheckRequest): Option[String] = {
     Option(request.service).filter(_.nonEmpty)
+  }
 }

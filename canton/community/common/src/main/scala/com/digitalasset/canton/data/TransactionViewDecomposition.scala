@@ -4,6 +4,7 @@
 package com.digitalasset.canton.data
 
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.*
 
@@ -41,6 +42,14 @@ object TransactionViewDecomposition {
       override val rbContext: RollbackContext,
   ) extends TransactionViewDecomposition {
 
+    childViews.foreach { sv =>
+      require(
+        sv.viewConfirmationParameters != viewConfirmationParameters,
+        s"Children must have different informees or quorums than parent. " +
+          s"Found informees ${viewConfirmationParameters.informees} and quorums ${viewConfirmationParameters.quorums}",
+      )
+    }
+
     override def lfNode: LfActionNode = rootNode
 
     /** All nodes of this view, i.e. core nodes and subviews, in execution order */
@@ -49,7 +58,23 @@ object TransactionViewDecomposition {
 
     def childViews: Seq[NewView] = tailNodes.collect { case v: NewView => v }
 
-    override protected def pretty: Pretty[NewView] = prettyOfClass(
+    /** This view with the submittingAdminParty (if defined) added as an extra confirming party.
+      * This needs to be called on root views to guarantee proper authorization.
+      * It adds an extra quorum with the submitting party.
+      */
+    def withSubmittingAdminParty(
+        submittingAdminPartyO: Option[LfPartyId]
+    ): NewView = {
+      val newViewConfirmationParameters =
+        TransactionViewDecompositionFactory.withSubmittingAdminParty(submittingAdminPartyO)(
+          viewConfirmationParameters
+        )
+      copy(
+        viewConfirmationParameters = newViewConfirmationParameters
+      )
+    }
+
+    override def pretty: Pretty[NewView] = prettyOfClass(
       param("root node template", _.rootNode.templateId),
       param("view confirmation parameters", _.viewConfirmationParameters),
       param("node ID", _.nodeId),
@@ -67,7 +92,7 @@ object TransactionViewDecomposition {
       override val rbContext: RollbackContext,
   ) extends TransactionViewDecomposition {
 
-    override protected def pretty: Pretty[SameView] = prettyOfClass(
+    override def pretty: Pretty[SameView] = prettyOfClass(
       param("lf node template", _.lfNode.templateId),
       param("node ID", _.nodeId),
       param("rollback context", _.rbContext),
@@ -76,7 +101,7 @@ object TransactionViewDecomposition {
 
   // Count all the NewViews representing actual views (in contrast to SameViews that are part of their parent)
   @tailrec
-  def countNestedViews(views: Seq[TransactionViewDecomposition], count: Int = 0): Int =
+  def countNestedViews(views: Seq[TransactionViewDecomposition], count: Int = 0): Int = {
     views match {
       case head +: rest =>
         head match {
@@ -88,4 +113,5 @@ object TransactionViewDecomposition {
       case _ => // scala compiler is not happy matching on Seq() thinking that there is some other missing case
         count
     }
+  }
 }

@@ -4,7 +4,6 @@
 package com.digitalasset.canton.crypto.provider.symbolic
 
 import cats.data.EitherT
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreExtended
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -30,13 +29,13 @@ class SymbolicPrivateCrypto(
   override protected val encryptionOps: EncryptionOps = pureCrypto
 
   // NOTE: These schemes are not really used by Symbolic crypto
-  override val defaultSigningAlgorithmSpec: SigningAlgorithmSpec = SigningAlgorithmSpec.Ed25519
-  override val defaultSigningKeySpec: SigningKeySpec = SigningKeySpec.EcCurve25519
+  override val defaultSigningKeyScheme: SigningKeyScheme = SigningKeyScheme.Ed25519
   override val defaultEncryptionKeySpec: EncryptionKeySpec = EncryptionKeySpec.EcP256
 
   @VisibleForTesting
-  def setRandomKeysFlag(newValue: Boolean): Unit =
+  def setRandomKeysFlag(newValue: Boolean): Unit = {
     randomKeys.set(newValue)
+  }
 
   private def genKeyPair[K](keypair: (ByteString, ByteString) => K): K = {
     val key = if (randomKeys.get()) {
@@ -49,15 +48,12 @@ class SymbolicPrivateCrypto(
     keypair(publicKey, privateKey)
   }
 
-  override protected[crypto] def generateSigningKeypair(
-      keySpec: SigningKeySpec,
-      usage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
-  )(implicit
+  override protected[crypto] def generateSigningKeypair(scheme: SigningKeyScheme)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SigningKeyGenerationError, SigningKeyPair] =
     EitherT.rightT(
       genKeyPair((pubKey, privKey) =>
-        SigningKeyPair.create(CryptoKeyFormat.Symbolic, pubKey, privKey, keySpec, usage)
+        SigningKeyPair.create(CryptoKeyFormat.Symbolic, pubKey, privKey, scheme)
       )
     )
 

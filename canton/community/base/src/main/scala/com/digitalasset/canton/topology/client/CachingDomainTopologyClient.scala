@@ -3,11 +3,12 @@
 
 package com.digitalasset.canton.topology.client
 
-import com.digitalasset.canton.SequencerCounter
+import cats.data.EitherT
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, ProcessingTimeout}
+import com.digitalasset.canton.crypto.SigningPublicKey
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, Lifecycle}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
   DynamicDomainParametersWithValidity,
@@ -22,12 +23,13 @@ import com.digitalasset.canton.topology.store.{
   TopologyStore,
   TopologyStoreId,
 }
-import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.tracing.{TraceContext, TracedAsyncLoadingCache, TracedScaffeine}
+import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.tracing.{TraceContext, TracedScaffeine}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.{LfPartyId, SequencerCounter}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import java.util.concurrent.atomic.AtomicReference
@@ -35,7 +37,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 final class CachingDomainTopologyClient(
-    delegate: StoreBasedDomainTopologyClient,
+    delegate: DomainTopologyClientWithInit,
     cachingConfigs: CachingConfigs,
     batchingConfig: BatchingConfig,
     val timeouts: ProcessingTimeout,
@@ -46,60 +48,30 @@ final class CachingDomainTopologyClient(
     with NamedLogging {
 
   override def updateHead(
-      sequencedTimestamp: SequencedTime,
       effectiveTimestamp: EffectiveTime,
       approximateTimestamp: ApproximateTime,
       potentialTopologyChange: Boolean,
   )(implicit traceContext: TraceContext): Unit = {
+    if (snapshots.get().isEmpty) {
+      appendSnapshot(approximateTimestamp.value)
+    }
     if (potentialTopologyChange)
       appendSnapshot(effectiveTimestamp.value)
-    delegate.updateHead(
-      sequencedTimestamp,
-      effectiveTimestamp,
-      approximateTimestamp,
-      potentialTopologyChange,
-    )
+    delegate.updateHead(effectiveTimestamp, approximateTimestamp, potentialTopologyChange)
   }
 
-  private val maxTimestampCache: TracedAsyncLoadingCache[
-    FutureUnlessShutdown,
-    CantonTimestamp,
-    Option[(SequencedTime, EffectiveTime)],
-  ] = TracedScaffeine
-    .buildTracedAsyncFutureUS[CantonTimestamp, Option[
-      (SequencedTime, EffectiveTime)
-    ]](
-      cache = cachingConfigs.domainClientMaxTimestamp.buildScaffeine(),
-      loader = traceContext => delegate.awaitMaxTimestampUS(_)(traceContext),
-    )(logger)
-
-  /** An entry with a given `timestamp` refers to the snapshot at timestamp `timestamp.immediateSuccessor`.
-    * This is the snapshot that covers all committed topology transactions
-    * with `validFrom <= timestamp` and `validUntil.forall(timestamp < _)`.
-    */
+  // snapshot caching entry
+  // this one is quite a special cache. generally, we want to avoid loading too much data from the database.
+  // now, we know that if there was no identity update between tx and ty, then snapshot(ty) == snapshot(tx)
+  // therefore, we remember the list of timestamps when updates happened and used that list in order to figure
+  // out which snapshot we can use instead of loading the data again and again.
+  // so we use the snapshots list to figure out the update timestamp and then we use the pointwise cache
+  // to load that update timestamp.
   protected class SnapshotEntry(val timestamp: CantonTimestamp) {
     def get(): CachingTopologySnapshot = pointwise.get(timestamp.immediateSuccessor)
   }
-
-  /** List of timestamps for which snapshots are cached.
-    * Invariants:
-    * - Entries are sorted descending by timestamp.
-    * - For every entry, the snapshot at `entry.timestamp.immediateSuccessor` must be available.
-    * - If it contains entries with timestamps `ts1` and `ts3`,
-    *   if there is a valid topology transaction at timestamp `ts2`,
-    *   if `ts1 < ts2 < ts3`,
-    *   then there must be an entry with `ts2` as well.
-    */
   protected val snapshots = new AtomicReference[List[SnapshotEntry]](List.empty)
 
-  /** Cache of snapshots.
-    * We want to avoid loading redundant data from the database.
-    * Now, we know that if there was no topology transaction between tx and ty, then snapshot(ty) == snapshot(tx).
-    * Therefore, we remember the list of timestamps when updates happened (in `snapshots`) and
-    * use that list in order to figure out which snapshot we can use instead of loading the same data again and again.
-    * So we use `snapshots` to figure out the update timestamp and then we use the `pointwise` cache
-    * to load the corresponding snapshot.
-    */
   private val pointwise = cachingConfigs.topologySnapshot
     .buildScaffeine()
     .build[CantonTimestamp, CachingTopologySnapshot] { (ts: CantonTimestamp) =>
@@ -117,11 +89,11 @@ final class CachingDomainTopologyClient(
       if (cur.headOption.exists(_.timestamp > timestamp))
         cur
       else
-        item :: cur.filter(
+        item :: (cur.filter(
           _.timestamp.plusMillis(
             cachingConfigs.topologySnapshot.expireAfterAccess.duration.toMillis
           ) > timestamp
-        )
+        ))
     }
   }
 
@@ -134,7 +106,7 @@ final class CachingDomainTopologyClient(
     )
     // find a matching existing snapshot
     val cur =
-      snapshots.get().find(_.timestamp < timestamp) // Using <, as timestamps are asOf exclusive
+      snapshots.get().find(_.timestamp < timestamp) // note that timestamps are asOf exclusive
     cur match {
       // we'll use the cached snapshot client which defines the time-period this timestamp is in
       case Some(snapshotEntry) =>
@@ -152,14 +124,16 @@ final class CachingDomainTopologyClient(
   override def snapshotAvailable(timestamp: CantonTimestamp): Boolean =
     delegate.snapshotAvailable(timestamp)
   override def awaitTimestamp(
-      timestamp: CantonTimestamp
+      timestamp: CantonTimestamp,
+      waitForEffectiveTime: Boolean,
   )(implicit traceContext: TraceContext): Option[Future[Unit]] =
-    delegate.awaitTimestamp(timestamp)
+    delegate.awaitTimestamp(timestamp, waitForEffectiveTime)
 
   override def awaitTimestampUS(
-      timestamp: CantonTimestamp
+      timestamp: CantonTimestamp,
+      waitForEffectiveTime: Boolean,
   )(implicit traceContext: TraceContext): Option[FutureUnlessShutdown[Unit]] =
-    delegate.awaitTimestampUS(timestamp)
+    delegate.awaitTimestampUS(timestamp, waitForEffectiveTime)
 
   override def approximateTimestamp: CantonTimestamp = delegate.approximateTimestamp
 
@@ -179,8 +153,9 @@ final class CachingDomainTopologyClient(
   override private[topology] def scheduleAwait(condition: => Future[Boolean], timeout: Duration) =
     delegate.scheduleAwait(condition, timeout)
 
-  override def close(): Unit =
-    Lifecycle.close(delegate)(logger)
+  override def close(): Unit = {
+    delegate.close()
+  }
 
   override def numPendingChanges: Int = delegate.numPendingChanges
 
@@ -204,11 +179,6 @@ final class CachingDomainTopologyClient(
     delegate.setDomainTimeTracker(tracker)
     super.setDomainTimeTracker(tracker)
   }
-
-  override def awaitMaxTimestampUS(sequencedTime: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
-    maxTimestampCache.get(sequencedTime)
 }
 
 object CachingDomainTopologyClient {
@@ -248,10 +218,10 @@ object CachingDomainTopologyClient {
         futureSupervisor,
         loggerFactory,
       )
-    store.maxTimestamp(CantonTimestamp.MaxValue, includeRejected = true).map { x =>
-      x.foreach { case (sequenced, effective) =>
+    store.maxTimestamp().map { x =>
+      x.foreach { case (_, effective) =>
         caching
-          .updateHead(sequenced, effective, effective.toApproximate, potentialTopologyChange = true)
+          .updateHead(effective, effective.toApproximate, potentialTopologyChange = true)
       }
       caching
     }
@@ -291,25 +261,21 @@ private class ForwardingTopologySnapshotClient(
   override def inspectKnownParties(
       filterParty: String,
       filterParticipant: String,
+      limit: Int,
   )(implicit traceContext: TraceContext): Future[Set[PartyId]] =
-    parent.inspectKnownParties(filterParty, filterParticipant)
+    parent.inspectKnownParties(filterParty, filterParticipant, limit)
 
-  override private[client] def loadVettedPackages(participant: ParticipantId)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[PackageId, VettedPackage]] = parent.loadVettedPackages(participant)
+  override def findUnvettedPackagesOrDependencies(
+      participantId: ParticipantId,
+      packages: Set[PackageId],
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    parent.findUnvettedPackagesOrDependencies(participantId, packages)
 
-  override private[client] def loadUnvettedPackagesOrDependenciesUsingLoader(
+  override private[client] def loadUnvettedPackagesOrDependencies(
       participant: ParticipantId,
       packageId: PackageId,
-      ledgerTime: CantonTimestamp,
-      vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
-    parent.loadUnvettedPackagesOrDependenciesUsingLoader(
-      participant,
-      packageId,
-      ledgerTime,
-      vettedPackagesLoader,
-    )
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    parent.loadUnvettedPackagesOrDependencies(participant, packageId)
 
   /** returns the list of currently known mediators */
   override def mediatorGroups()(implicit traceContext: TraceContext): Future[Seq[MediatorGroup]] =
@@ -357,10 +323,18 @@ private class ForwardingTopologySnapshotClient(
   )(implicit traceContext: TraceContext) =
     parent.loadBatchActiveParticipantsOf(parties, loadParticipantStates)
 
-  override def partyAuthorization(party: PartyId)(implicit
+  /** Returns the Authority-Of delegations for consortium parties. Non-consortium parties delegate to themselves
+    * with threshold one
+    */
+  override def authorityOf(
+      parties: Set[LfPartyId]
+  )(implicit traceContext: TraceContext): Future[PartyTopologySnapshotClient.AuthorityOfResponse] =
+    parent.authorityOf(parties)
+
+  override def signingKeysUS(owner: Member)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyAuthorizationInfo]] =
-    parent.partyAuthorization(party)
+  ): FutureUnlessShutdown[Seq[SigningPublicKey]] =
+    parent.signingKeysUS(owner)
 }
 
 class CachingTopologySnapshot(
@@ -422,9 +396,9 @@ class CachingTopologySnapshot(
 
   private val packageVettingCache =
     TracedScaffeine
-      .buildTracedAsyncFutureUS[ParticipantId, Map[PackageId, VettedPackage]](
+      .buildTracedAsyncFutureUS[(ParticipantId, PackageId), Either[PackageId, Set[PackageId]]](
         cache = cachingConfigs.packageVettingCache.buildScaffeine(),
-        traceContext => x => parent.loadVettedPackages(x)(traceContext),
+        traceContext => x => loadUnvettedPackagesOrDependencies(x._1, x._2)(traceContext).value,
       )(logger)
 
   private val mediatorsCache = new AtomicReference[Option[Future[Seq[MediatorGroup]]]](None)
@@ -459,13 +433,11 @@ class CachingTopologySnapshot(
       Option[Future[Seq[DynamicDomainParametersWithValidity]]]
     ](None)
 
-  private val partyAuthorizationsCache =
+  private val authorityOfCache =
     TracedScaffeine
-      .buildTracedAsyncFutureUS[PartyId, Option[
-        PartyKeyTopologySnapshotClient.PartyAuthorizationInfo
-      ]](
+      .buildTracedAsyncFuture[Set[LfPartyId], PartyTopologySnapshotClient.AuthorityOfResponse](
         cache = cachingConfigs.partyCache.buildScaffeine(),
-        loader = traceContext => party => parent.partyAuthorization(party)(traceContext),
+        loader = traceContext => party => parent.authorityOf(party)(traceContext),
       )(logger)
 
   override def allKeys(owner: Member)(implicit traceContext: TraceContext): Future[KeyCollection] =
@@ -485,38 +457,36 @@ class CachingTopologySnapshot(
   override private[client] def loadBatchActiveParticipantsOf(
       parties: Seq[PartyId],
       loadParticipantStates: Seq[ParticipantId] => Future[Map[ParticipantId, ParticipantAttributes]],
-  )(implicit traceContext: TraceContext) =
+  )(implicit traceContext: TraceContext) = {
     // split up the request into separate chunks so that we don't block the cache for too long
     // when loading very large batches
     MonadUtil
-      .batchedSequentialTraverse(batchingConfig.parallelism, batchingConfig.maxItemsInBatch)(
+      .batchedSequentialTraverse(batchingConfig.parallelism, batchingConfig.maxItemsInSqlClause)(
         parties
       )(parties => partyCache.getAll(parties)(traceContext).map(_.toSeq))
       .map(_.toMap)
+  }
 
   override def loadParticipantStates(
       participants: Seq[ParticipantId]
   )(implicit traceContext: TraceContext): Future[Map[ParticipantId, ParticipantAttributes]] =
     participantCache.getAll(participants).map(_.collect { case (k, Some(v)) => (k, v) })
 
-  override private[client] def loadVettedPackages(participant: ParticipantId)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[PackageId, VettedPackage]] =
-    packageVettingCache.get(participant)
+  override def findUnvettedPackagesOrDependencies(
+      participantId: ParticipantId,
+      packages: Set[PackageId],
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    findUnvettedPackagesOrDependenciesUsingLoader(
+      participantId,
+      packages,
+      (x, y) => EitherT(packageVettingCache.getUS((x, y))),
+    )
 
-  private[client] def loadUnvettedPackagesOrDependenciesUsingLoader(
+  private[client] def loadUnvettedPackagesOrDependencies(
       participant: ParticipantId,
       packageId: PackageId,
-      ledgerTime: CantonTimestamp,
-      vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
-    parent.loadUnvettedPackagesOrDependenciesUsingLoader(
-      participant,
-      packageId,
-      ledgerTime,
-      // use the caching vetted package loader
-      this,
-    )
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    parent.loadUnvettedPackagesOrDependencies(participant, packageId)
 
   override def inspectKeys(
       filterOwner: String,
@@ -528,8 +498,9 @@ class CachingTopologySnapshot(
   override def inspectKnownParties(
       filterParty: String,
       filterParticipant: String,
+      limit: Int,
   )(implicit traceContext: TraceContext): Future[Set[PartyId]] =
-    parent.inspectKnownParties(filterParty, filterParticipant)
+    parent.inspectKnownParties(filterParty, filterParticipant, limit)
 
   /** returns the list of currently known mediators */
   override def mediatorGroups()(implicit traceContext: TraceContext): Future[Seq[MediatorGroup]] =
@@ -555,13 +526,14 @@ class CachingTopologySnapshot(
 
   override def memberFirstKnownAt(
       member: Member
-  )(implicit traceContext: TraceContext): Future[Option[(SequencedTime, EffectiveTime)]] =
+  )(implicit traceContext: TraceContext): Future[Option[(SequencedTime, EffectiveTime)]] = {
     isMemberKnown(member).flatMap {
       // TODO(#18394): Consider caching this call as well,
       //  should only happen during topology transactions with potential new members: DTC/SDS/MDS
       case true => parent.memberFirstKnownAt(member)
       case false => Future.successful(None)
     }
+  }
 
   /** Returns the value if it is present in the cache. Otherwise, use the
     * `getter` to fetch it and cache the result.
@@ -592,8 +564,16 @@ class CachingTopologySnapshot(
   ): Future[Seq[DynamicDomainParametersWithValidity]] =
     getAndCache(domainParametersChangesCache, parent.listDynamicDomainParametersChanges())
 
-  override def partyAuthorization(party: PartyId)(implicit
+  /** Returns the Authority-Of delegations for consortium parties. Non-consortium parties delegate to themselves
+    * with threshold one
+    */
+  override def authorityOf(
+      parties: Set[LfPartyId]
+  )(implicit traceContext: TraceContext): Future[PartyTopologySnapshotClient.AuthorityOfResponse] =
+    authorityOfCache.get(parties)
+
+  override def signingKeysUS(owner: Member)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyAuthorizationInfo]] =
-    partyAuthorizationsCache.get(party)
+  ): FutureUnlessShutdown[Seq[SigningPublicKey]] =
+    FutureUnlessShutdown.outcomeF(signingKeys(owner))
 }

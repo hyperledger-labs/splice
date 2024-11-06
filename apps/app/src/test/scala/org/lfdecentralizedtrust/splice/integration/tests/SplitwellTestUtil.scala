@@ -21,8 +21,6 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
-import scala.concurrent.duration.DurationInt
-
 trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil {
   protected def splitwellUpgradeAlias = DomainAlias.tryCreate("splitwellUpgrade")
   protected def splitwellAlias = DomainAlias.tryCreate("splitwell")
@@ -41,9 +39,7 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
 
     participant.domains.connect(splitwellUpgradeAlias, url)
 
-    // This can be a bit slow since it first pushes all vetting transactions before pushing
-    // the PartyToParticipant transaction.
-    eventually(40.seconds) {
+    eventually() {
       splitwellBackend
         .getConnectedDomains(ensurePartyIsOnNewDomain)
         .map(_.uid.identifier.str) should contain("splitwellUpgrade")

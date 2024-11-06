@@ -5,7 +5,6 @@ package com.digitalasset.canton.platform.store.cache
 
 import cats.syntax.bifunctor.toBifunctorOps
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
-import com.daml.ledger.api.v2.completion.Completion
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
@@ -15,6 +14,7 @@ import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer.{
   UnorderedException,
 }
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
+import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate.CompletionDetails
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.Traced
 import com.digitalasset.daml.lf.data.Time
@@ -138,9 +138,9 @@ class InMemoryFanoutBufferSpec
 
           // Assert that the buffer does not include the rejected transaction
           buffer._lookupMap should contain theSameElementsAs Map(
-            txAccepted2.value.updateId -> txAccepted2,
-            txAccepted3.value.updateId -> txAccepted3,
-            txAccepted4.value.updateId -> txAccepted4,
+            txAccepted2.value.transactionId -> txAccepted2,
+            txAccepted3.value.transactionId -> txAccepted3,
+            txAccepted4.value.transactionId -> txAccepted4,
           )
         }
       }
@@ -239,19 +239,19 @@ class InMemoryFanoutBufferSpec
             Vector.empty,
             maxFetchSize = 1000,
           ) { buffer =>
-            (0 until 1000).foreach { idx =>
+            (0 until 1000).foreach(idx => {
               val updateOffset = offset(idx.toLong)
               buffer.push(updateOffset, Traced(txAccepted(idx.toLong, updateOffset)))
-            } // fill buffer to max size
+            }) // fill buffer to max size
 
             val pushExecutor, sliceExecutor =
               ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))
 
             (0 until 1000).foreach { idx =>
-              val expected = ((idx + 901) to (1000 + idx)).map { idx =>
+              val expected = ((idx + 901) to (1000 + idx)).map(idx => {
                 val updateOffset = offset(idx.toLong)
                 updateOffset -> txAccepted(idx.toLong, updateOffset)
-              }
+              })
 
               implicit val ec: ExecutionContextExecutorService = pushExecutor
 
@@ -494,12 +494,12 @@ class InMemoryFanoutBufferSpec
 
   private def txAccepted(idx: Long, offset: Offset) =
     TransactionLogUpdate.TransactionAccepted(
-      updateId = s"tx-$idx",
+      transactionId = s"tx-$idx",
       workflowId = s"workflow-$idx",
       effectiveAt = Time.Timestamp.Epoch,
       offset = offset,
       events = Vector.empty,
-      completionStreamResponse = None,
+      completionDetails = None,
       commandId = "",
       domainId = someDomainId.toProtoPrimitive,
       recordTime = Time.Timestamp.Epoch,
@@ -508,10 +508,9 @@ class InMemoryFanoutBufferSpec
   private def txRejected(idx: Long, offset: Offset) =
     TransactionLogUpdate.TransactionRejected(
       offset = offset,
-      completionStreamResponse = CompletionStreamResponse.defaultInstance.withCompletion(
-        Completion(
-          actAs = Seq(s"submitter-$idx")
-        )
+      completionDetails = CompletionDetails(
+        completionStreamResponse = CompletionStreamResponse(),
+        submitters = Set(s"submitter-$idx"),
       ),
     )
 
@@ -521,7 +520,7 @@ class InMemoryFanoutBufferSpec
   ): Assertion =
     txs.foldLeft(succeed) {
       case (Succeeded, tx) =>
-        buffer.lookup(tx.value.updateId) shouldBe Some(tx)
+        buffer.lookup(tx.value.transactionId) shouldBe Some(tx)
       case (failed, _) => failed
     }
 
@@ -531,7 +530,7 @@ class InMemoryFanoutBufferSpec
   ): Assertion =
     txs.foldLeft(succeed) {
       case (Succeeded, Traced(tx)) =>
-        buffer.lookup(tx.updateId) shouldBe None
+        buffer.lookup(tx.transactionId) shouldBe None
       case (failed, _) => failed
     }
 

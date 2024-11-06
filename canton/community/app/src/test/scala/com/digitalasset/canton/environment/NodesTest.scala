@@ -6,14 +6,12 @@ package com.digitalasset.canton.environment
 import better.files.File
 import cats.Applicative
 import cats.data.EitherT
-import cats.syntax.either.*
 import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricName
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.daml.metrics.grpc.GrpcServerMetrics
 import com.digitalasset.canton.*
-import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -35,7 +33,6 @@ import com.digitalasset.canton.metrics.{
   LedgerApiServerMetrics,
   OnDemandMetricsReader,
 }
-import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.{
   CommunityDbMigrationsFactory,
   CommunityStorageFactory,
@@ -45,18 +42,12 @@ import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
-import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
-import com.digitalasset.canton.topology.{
-  AuthorizedTopologyManager,
-  DomainTopologyManager,
-  Member,
-  UniqueIdentifier,
-}
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.{AuthorizedTopologyManager, Member, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TracingConfig
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.PekkoUtil
 import com.digitalasset.canton.version.ProtocolVersion
-import io.grpc.ServerServiceDefinition
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.trace.SdkTracerProvider
 import org.scalatest.Outcome
@@ -86,6 +77,7 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
     override def parameters: LocalNodeParametersConfig = new LocalNodeParametersConfig {
       override def batching: BatchingConfig = BatchingConfig()
       override def caching: CachingConfigs = CachingConfigs()
+      override def useUnifiedSequencer: Boolean = testedUseUnifiedSequencer
       override def alphaVersionSupport: Boolean = false
       override def watchdog: Option[WatchdogConfig] = None
     }
@@ -110,6 +102,7 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       dontWarnOnDeprecatedPV: Boolean = false,
       initialProtocolVersion: ProtocolVersion = testedProtocolVersion,
       exitOnFatalFailures: Boolean = true,
+      useUnifiedSequencer: Boolean = testedUseUnifiedSequencer,
       watchdog: Option[WatchdogConfig] = None,
   ) extends CantonNodeParameters
 
@@ -166,13 +159,9 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       executionContext
     )
 
-    override protected val adminTokenConfig: Option[String] = None
-
     override protected def customNodeStages(
         storage: Storage,
         crypto: Crypto,
-        adminServerRegistry: CantonMutableHandlerRegistry,
-        adminToken: CantonAdminToken,
         nodeId: UniqueIdentifier,
         manager: AuthorizedTopologyManager,
         healthReporter: GrpcHealthReporter,
@@ -185,19 +174,12 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
         storage: Storage
     ): (DependenciesHealthService, LivenessHealthService) =
       ???
-
-    override protected def bindNodeStatusService(): ServerServiceDefinition = ???
-
-    override def start(): EitherT[Future, String, Unit] =
+    override def start(): EitherT[Future, String, Unit] = {
       EitherT.pure[Future, String](())
+    }
     override protected def lookupTopologyClient(
         storeId: TopologyStoreId
     ): Option[DomainTopologyClientWithInit] = ???
-
-    override protected def sequencedTopologyStores
-        : Seq[TopologyStore[TopologyStoreId.DomainStore]] = Nil
-
-    override protected def sequencedTopologyManagers: Seq[DomainTopologyManager] = Nil
   }
 
   class TestNodeFactory {
@@ -219,7 +201,10 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
         new CommunityDbMigrationsFactory(loggerFactory),
         timeouts,
         configs,
-        _ => MockedNodeParameters.cantonNodeParameters(),
+        _ =>
+          MockedNodeParameters.cantonNodeParameters(
+            _useUnifiedSequencer = testedUseUnifiedSequencer
+          ),
         startUpGroup = 0,
         NodesTest.this.loggerFactory,
       ) {
@@ -252,12 +237,12 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       f.nodes.startAndWait("nope") shouldEqual Left(ConfigurationNotFound("nope"))
     }
     "not error if the node is already running when we try to start" in { f =>
-      f.nodes.startAndWait("n1").map(_ => ()) shouldBe Either.unit // first create should work
-      f.nodes.startAndWait("n1").map(_ => ()) shouldBe Either.unit // second is now a noop
+      f.nodes.startAndWait("n1").map(_ => ()) shouldBe Right(()) // first create should work
+      f.nodes.startAndWait("n1").map(_ => ()) shouldBe Right(()) // second is now a noop
     }
     "return an initialization failure if an exception is thrown during startup" in { f =>
       val exception = new RuntimeException("Nope!")
-      f.nodeFactory.setupCreate(throw exception)
+      f.nodeFactory.setupCreate { throw exception }
       the[RuntimeException] thrownBy Await.result(
         f.nodes.start("n1").value,
         10.seconds,
@@ -277,17 +262,18 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       f.nodes.stopAndWait("nope") shouldEqual Left(ConfigurationNotFound("nope"))
     }
     "return successfully if the node is not running" in { f =>
-      f.nodes.stopAndWait("n1") shouldBe Either.unit
+      f.nodes.stopAndWait("n1") shouldBe Right(())
     }
     "return an initialization failure if an exception is thrown during shutdown" in { f =>
       val anException = new RuntimeException("Nope!")
       val node = new TestNodeBootstrap(f.config) {
-        override def onClosed() =
+        override def onClosed() = {
           throw anException
+        }
       }
       f.nodeFactory.setupCreate(node)
 
-      f.nodes.startAndWait("n1") shouldBe Either.unit
+      f.nodes.startAndWait("n1") shouldBe Right(())
 
       loggerFactory.assertThrowsAndLogs[ShutdownFailedException](
         f.nodes.stopAndWait("n1"),
@@ -299,9 +285,9 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
     }
     "properly stop a running node" in { f =>
       f.nodeFactory.setupCreate(new TestNodeBootstrap(f.config))
-      f.nodes.startAndWait("n1") shouldBe Either.unit
+      f.nodes.startAndWait("n1") shouldBe Right(())
       f.nodes.isRunning("n1") shouldBe true
-      f.nodes.stopAndWait("n1") shouldBe Either.unit
+      f.nodes.stopAndWait("n1") shouldBe Right(())
       f.nodes.isRunning("n1") shouldBe false
     }
   }
@@ -322,7 +308,7 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
     // push start result
     startPromise.success(startupResult)
     // node should be properly closed and stop should succeed
-    stop.value.futureValue shouldBe Either.unit
+    stop.value.futureValue shouldBe Right(())
     node.isClosing shouldBe true
     // wait for start to be have completed all callbacks including removing n1 from nodes.
     start.value.futureValue.discard
@@ -336,7 +322,7 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
 
   "work when we are just starting" when {
     "start succeeded" in { f =>
-      startStopBehavior(f, Either.unit)
+      startStopBehavior(f, Right(()))
     }
     "start failed" in { f =>
       startStopBehavior(f, Left("Stinky"))

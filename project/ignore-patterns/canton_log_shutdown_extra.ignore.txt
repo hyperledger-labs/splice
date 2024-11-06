@@ -8,7 +8,7 @@ INDEX_DB_SQL_NON_TRANSIENT_ERROR.*\(this database is empty\)
 INDEX_DB_SQL_NON_TRANSIENT_ERROR.*Database is already closed
 Error while running indexer
 handleChunkUpdate failed with error: ShuttingDown
-retryWithDelay failed unexpectedly
+retryWithDelay failed unexpectedly java.util.concurrent.RejectedExecutionException: null
 
 # shutdown can be slower than the timeouts
 Task closing .* did not complete

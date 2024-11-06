@@ -30,7 +30,7 @@ import './index.css';
 import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
 import Root from './routes/root';
-import { useConfig, useConfigPollInterval } from './utils/config';
+import { useConfig } from './utils/config';
 
 // We only support splitwell upgrades in the backend.
 class SplitwellPackageIdResolver extends PackageIdResolver {
@@ -47,12 +47,9 @@ class SplitwellPackageIdResolver extends PackageIdResolver {
 }
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const refetchInterval = useConfigPollInterval();
-
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        refetchInterval,
         structuralSharing: replaceEqualDeep,
       },
       mutations: {

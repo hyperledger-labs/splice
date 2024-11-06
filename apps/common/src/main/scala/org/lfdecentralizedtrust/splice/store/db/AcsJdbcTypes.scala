@@ -270,7 +270,7 @@ trait AcsJdbcTypes {
       .fromCreatedEvent(companion)(createdEvent)
       .map(toData)
       .toRight(
-        s"Failed to decode ${companion.getTemplateIdWithPackageId} from CreatedEvent of contract id ${createdEvent.getContractId}."
+        s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
       )
   }
 }

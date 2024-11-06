@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.error.generator
 
-import com.daml.error.*
 import com.daml.error.ErrorCategory.TransientServerFailure
+import com.daml.error.*
 import com.digitalasset.canton.error.generator.ErrorCodeDocumentationGenerator.DeprecatedItem
 import com.digitalasset.canton.error.testpackage.subpackage.MildErrorsParent
 import com.digitalasset.canton.error.testpackage.subpackage.MildErrorsParent.MildErrors
@@ -122,8 +122,9 @@ class ErrorCodeDocumentationGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "parse annotations" in {
     import scala.reflect.runtime.universe as ru
 
-    def getFirstAnnotation[T: ClassTag](obj: T): ru.Annotation =
+    def getFirstAnnotation[T: ClassTag](obj: T): ru.Annotation = {
       ru.runtimeMirror(getClass.getClassLoader).reflect(obj).symbol.annotations.head
+    }
 
     ErrorCodeDocumentationGenerator.parseScalaDeprecatedAnnotation(
       getFirstAnnotation(Foo1): @nowarn("cat=deprecation")

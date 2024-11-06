@@ -6,10 +6,10 @@ package com.digitalasset.canton.platform.apiserver.validation
 import com.daml.error.*
 import com.daml.error.utils.ErrorDetails
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.auth.AuthorizationChecksErrors
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidDeduplicationPeriodField.ValidMaxDeduplicationFieldKey
 import com.digitalasset.canton.ledger.error.groups.{
   AdminServiceErrors,
+  AuthorizationChecksErrors,
   ConsistencyErrors,
   RequestValidationErrors,
 }
@@ -376,14 +376,14 @@ class ErrorFactoriesSpec
       )
     }
 
-    "return a nonPositiveOffset error" in {
+    "return a nonHexOffset error" in {
       val msg =
-        s"NON_POSITIVE_OFFSET(8,$truncatedCorrelationId): Offset -123 in fieldName123 is not a positive integer: message123"
+        s"NON_HEXADECIMAL_OFFSET(8,$truncatedCorrelationId): Offset in fieldName123 not specified in hexadecimal: offsetValue123: message123"
       assertError(
-        RequestValidationErrors.NonPositiveOffset
+        RequestValidationErrors.NonHexOffset
           .Error(
             fieldName = "fieldName123",
-            offsetValue = -123L,
+            offsetValue = "offsetValue123",
             message = "message123",
           )(contextualizedErrorLogger)
           .asGrpcError
@@ -392,7 +392,7 @@ class ErrorFactoriesSpec
         message = msg,
         details = Seq[ErrorDetails.ErrorDetail](
           ErrorDetails.ErrorInfoDetail(
-            "NON_POSITIVE_OFFSET",
+            "NON_HEXADECIMAL_OFFSET",
             Map("category" -> "8", "test" -> getClass.getSimpleName),
           ),
           expectedCorrelationIdRequestInfo,
@@ -404,11 +404,11 @@ class ErrorFactoriesSpec
     }
 
     "return an offsetAfterLedgerEnd error" in {
-      val expectedMessage = s"Absolute offset (12345678) is after ledger end (42)"
+      val expectedMessage = s"Absolute offset (AABBCC) is after ledger end (E)"
       val msg = s"OFFSET_AFTER_LEDGER_END(12,$truncatedCorrelationId): $expectedMessage"
       assertError(
         RequestValidationErrors.OffsetAfterLedgerEnd
-          .Reject("Absolute", 12345678L, 42L)(contextualizedErrorLogger)
+          .Reject("Absolute", "AABBCC", "E")(contextualizedErrorLogger)
       )(
         code = Code.OUT_OF_RANGE,
         message = msg,
@@ -539,7 +539,7 @@ class ErrorFactoriesSpec
         RequestValidationErrors.ParticipantPrunedDataAccessed
           .Reject(
             "my message",
-            0L,
+            "00",
           )(contextualizedErrorLogger)
       )(
         code = Code.FAILED_PRECONDITION,
@@ -550,7 +550,7 @@ class ErrorFactoriesSpec
             Map(
               "category" -> "9",
               "definite_answer" -> "false",
-              LedgerApiErrors.EarliestOffsetMetadataKey -> "0",
+              LedgerApiErrors.EarliestOffsetMetadataKey -> "00",
               "test" -> getClass.getSimpleName,
             ),
           ),
@@ -559,7 +559,7 @@ class ErrorFactoriesSpec
         logLevel = Level.INFO,
         logMessage = msg,
         logErrorContextRegEx =
-          expectedErrContextRegex(s"${LedgerApiErrors.EarliestOffsetMetadataKey}=0"),
+          expectedErrContextRegex(s"${LedgerApiErrors.EarliestOffsetMetadataKey}=00"),
       )
     }
 

@@ -4,15 +4,11 @@
 package com.digitalasset.canton.topology.transaction
 
 import cats.Monoid
-import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.ProtoDeserializationError.{
-  FieldNotSet,
-  InvariantViolation,
-  UnrecognizedEnum,
-}
+import com.digitalasset.canton.ProtoDeserializationError.{FieldNotSet, UnrecognizedEnum}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -23,7 +19,6 @@ import com.digitalasset.canton.protocol.{DynamicDomainParameters, DynamicSequenc
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.RequiredAuth.*
 import com.digitalasset.canton.topology.transaction.TopologyMapping.{
@@ -37,7 +32,6 @@ import com.digitalasset.canton.{LfPackageId, ProtoDeserializationError}
 import com.google.common.annotations.VisibleForTesting
 import slick.jdbc.SetParameter
 
-import scala.annotation.nowarn
 import scala.math.Ordering.Implicits.*
 import scala.reflect.ClassTag
 
@@ -45,7 +39,7 @@ sealed trait TopologyMapping extends Product with Serializable with PrettyPrinti
 
   require(maybeUid.forall(_.namespace == namespace), "namespace is inconsistent")
 
-  override protected def pretty: Pretty[this.type] = adHocPrettyInstance
+  override def pretty: Pretty[this.type] = adHocPrettyInstance
 
   /** Returns the code used to store & index this mapping */
   def code: Code
@@ -116,35 +110,31 @@ object TopologyMapping {
 
   final case class MappingHash(hash: Hash) extends AnyVal
 
-  sealed abstract class Code private (val dbInt: Int, val code: String)
-      extends Product
-      with Serializable
+  sealed case class Code private (dbInt: Int, code: String)
   object Code {
 
-    case object NamespaceDelegation extends Code(1, "nsd")
-    case object IdentifierDelegation extends Code(2, "idd")
-    case object DecentralizedNamespaceDefinition extends Code(3, "dnd")
+    object NamespaceDelegation extends Code(1, "nsd")
+    object IdentifierDelegation extends Code(2, "idd")
+    object DecentralizedNamespaceDefinition extends Code(3, "dnd")
 
-    case object OwnerToKeyMapping extends Code(4, "otk")
+    object OwnerToKeyMapping extends Code(4, "otk")
 
-    case object DomainTrustCertificate extends Code(5, "dtc")
-    case object ParticipantDomainPermission extends Code(6, "pdp")
-    case object PartyHostingLimits extends Code(7, "phl")
-    case object VettedPackages extends Code(8, "vtp")
+    object DomainTrustCertificate extends Code(5, "dtc")
+    object ParticipantDomainPermission extends Code(6, "pdp")
+    object PartyHostingLimits extends Code(7, "phl")
+    object VettedPackages extends Code(8, "vtp")
 
-    case object PartyToParticipant extends Code(9, "ptp")
+    object PartyToParticipant extends Code(9, "ptp")
+    object AuthorityOf extends Code(10, "auo")
 
-    // reserved Code(10), was AuthorityOf
+    object DomainParametersState extends Code(11, "dop")
+    object MediatorDomainState extends Code(12, "mds")
+    object SequencerDomainState extends Code(13, "sds")
+    object OffboardParticipant extends Code(14, "ofp")
 
-    case object DomainParametersState extends Code(11, "dop")
-    case object MediatorDomainState extends Code(12, "mds")
-    case object SequencerDomainState extends Code(13, "sds")
-    case object OffboardParticipant extends Code(14, "ofp")
-
-    case object PurgeTopologyTransaction extends Code(15, "ptt")
+    object PurgeTopologyTransaction extends Code(15, "ptt")
     // Don't reuse 16, It was the TrafficControlState code mapping
-    case object SequencingDynamicParametersState extends Code(17, "sep")
-    case object PartyToKeyMapping extends Code(18, "ptk")
+    object SequencingDynamicParametersState extends Code(17, "sep")
 
     lazy val all: Seq[Code] = Seq(
       NamespaceDelegation,
@@ -156,12 +146,12 @@ object TopologyMapping {
       PartyHostingLimits,
       VettedPackages,
       PartyToParticipant,
+      AuthorityOf,
       DomainParametersState,
       MediatorDomainState,
       SequencerDomainState,
       OffboardParticipant,
       PurgeTopologyTransaction,
-      PartyToKeyMapping,
     )
 
     def fromString(code: String): ParsingResult[Code] =
@@ -175,7 +165,7 @@ object TopologyMapping {
   }
 
   // Small wrapper to not have to work with (Set[Namespace], Set[Namespace], Set[Uid])
-  final case class ReferencedAuthorizations(
+  final case class RequiredAuthAuthorizations(
       namespacesWithRoot: Set[Namespace] = Set.empty,
       namespaces: Set[Namespace] = Set.empty,
       uids: Set[UniqueIdentifier] = Set.empty,
@@ -184,7 +174,7 @@ object TopologyMapping {
     def isEmpty: Boolean =
       namespacesWithRoot.isEmpty && namespaces.isEmpty && uids.isEmpty && extraKeys.isEmpty
 
-    override protected def pretty: Pretty[ReferencedAuthorizations.this.type] = prettyOfClass(
+    override def pretty: Pretty[RequiredAuthAuthorizations.this.type] = prettyOfClass(
       paramIfNonEmpty("namespacesWithRoot", _.namespacesWithRoot),
       paramIfNonEmpty("namespaces", _.namespaces),
       paramIfNonEmpty("uids", _.uids),
@@ -192,19 +182,19 @@ object TopologyMapping {
     )
   }
 
-  object ReferencedAuthorizations {
+  object RequiredAuthAuthorizations {
 
-    val empty: ReferencedAuthorizations = ReferencedAuthorizations()
+    val empty: RequiredAuthAuthorizations = RequiredAuthAuthorizations()
 
-    implicit val monoid: Monoid[ReferencedAuthorizations] =
-      new Monoid[ReferencedAuthorizations] {
-        override def empty: ReferencedAuthorizations = ReferencedAuthorizations.empty
+    implicit val monoid: Monoid[RequiredAuthAuthorizations] =
+      new Monoid[RequiredAuthAuthorizations] {
+        override def empty: RequiredAuthAuthorizations = RequiredAuthAuthorizations.empty
 
         override def combine(
-            x: ReferencedAuthorizations,
-            y: ReferencedAuthorizations,
-        ): ReferencedAuthorizations =
-          ReferencedAuthorizations(
+            x: RequiredAuthAuthorizations,
+            y: RequiredAuthAuthorizations,
+        ): RequiredAuthAuthorizations =
+          RequiredAuthAuthorizations(
             namespacesWithRoot = x.namespacesWithRoot ++ y.namespacesWithRoot,
             namespaces = x.namespaces ++ y.namespaces,
             uids = x.uids ++ y.uids,
@@ -216,30 +206,38 @@ object TopologyMapping {
   sealed trait RequiredAuth extends PrettyPrinting {
     def requireRootDelegation: Boolean = false
     def satisfiedByActualAuthorizers(
-        provided: ReferencedAuthorizations
-    ): Either[ReferencedAuthorizations, Unit]
+        provided: RequiredAuthAuthorizations
+    ): Either[RequiredAuthAuthorizations, Unit]
 
     final def or(next: RequiredAuth): RequiredAuth =
       RequiredAuth.Or(this, next)
 
-    /** Authorizations referenced by this instance.
-      * Note that the result is not equivalent to this instance, as an "or" gets translated to an "and".
-      * Instead, the result indicates which authorization keys need to be evaluated in order to check
-      * if this RequiredAuth is met.
-      */
-    def referenced: ReferencedAuthorizations
+    final def foldMap[T](
+        namespaceCheck: RequiredNamespaces => T,
+        uidCheck: RequiredUids => T,
+    )(implicit T: Monoid[T]): T = {
+      def loop(x: RequiredAuth): T = x match {
+        case ns @ RequiredNamespaces(_, _) => namespaceCheck(ns)
+        case uids @ RequiredUids(_, _) => uidCheck(uids)
+        case EmptyAuthorization => T.empty
+        case Or(first, second) => T.combine(loop(first), loop(second))
+      }
+      loop(this)
+    }
+
+    def authorizations: RequiredAuthAuthorizations
   }
 
   object RequiredAuth {
 
     private[transaction] case object EmptyAuthorization extends RequiredAuth {
       override def satisfiedByActualAuthorizers(
-          provided: ReferencedAuthorizations
-      ): Either[ReferencedAuthorizations, Unit] = Either.unit
+          provided: RequiredAuthAuthorizations
+      ): Either[RequiredAuthAuthorizations, Unit] = Either.unit
 
-      override def referenced: ReferencedAuthorizations = ReferencedAuthorizations()
+      override def authorizations: RequiredAuthAuthorizations = RequiredAuthAuthorizations()
 
-      override protected def pretty: Pretty[EmptyAuthorization.this.type] = adHocPrettyInstance
+      override def pretty: Pretty[EmptyAuthorization.this.type] = adHocPrettyInstance
     }
 
     final case class RequiredNamespaces(
@@ -247,26 +245,26 @@ object TopologyMapping {
         override val requireRootDelegation: Boolean = false,
     ) extends RequiredAuth {
       override def satisfiedByActualAuthorizers(
-          provided: ReferencedAuthorizations
-      ): Either[ReferencedAuthorizations, Unit] = {
+          provided: RequiredAuthAuthorizations
+      ): Either[RequiredAuthAuthorizations, Unit] = {
         val filter = if (requireRootDelegation) provided.namespacesWithRoot else provided.namespaces
         val missing = namespaces.filter(ns => !filter(ns))
         Either.cond(
           missing.isEmpty,
           (),
-          ReferencedAuthorizations(
+          RequiredAuthAuthorizations(
             namespacesWithRoot = if (requireRootDelegation) missing else Set.empty,
             namespaces = if (requireRootDelegation) Set.empty else missing,
           ),
         )
       }
 
-      override def referenced: ReferencedAuthorizations = ReferencedAuthorizations(
+      override def authorizations: RequiredAuthAuthorizations = RequiredAuthAuthorizations(
         namespacesWithRoot = if (requireRootDelegation) namespaces else Set.empty,
         namespaces = if (requireRootDelegation) Set.empty else namespaces,
       )
 
-      override protected def pretty: Pretty[RequiredNamespaces.this.type] = prettyOfClass(
+      override def pretty: Pretty[RequiredNamespaces.this.type] = prettyOfClass(
         unnamedParam(_.namespaces),
         paramIfTrue("requireRootDelegation", _.requireRootDelegation),
       )
@@ -277,13 +275,13 @@ object TopologyMapping {
         extraKeys: Set[Fingerprint] = Set.empty,
     ) extends RequiredAuth {
       override def satisfiedByActualAuthorizers(
-          provided: ReferencedAuthorizations
-      ): Either[ReferencedAuthorizations, Unit] = {
+          provided: RequiredAuthAuthorizations
+      ): Either[RequiredAuthAuthorizations, Unit] = {
         val missingUids =
           uids.filter(uid => !provided.uids(uid) && !provided.namespaces(uid.namespace))
         val missingExtraKeys = extraKeys -- provided.extraKeys
         val missingAuth =
-          ReferencedAuthorizations(uids = missingUids, extraKeys = missingExtraKeys)
+          RequiredAuthAuthorizations(uids = missingUids, extraKeys = missingExtraKeys)
         Either.cond(
           missingAuth.isEmpty,
           (),
@@ -291,12 +289,12 @@ object TopologyMapping {
         )
       }
 
-      override def referenced: ReferencedAuthorizations = ReferencedAuthorizations(
+      override def authorizations: RequiredAuthAuthorizations = RequiredAuthAuthorizations(
         uids = uids,
         extraKeys = extraKeys,
       )
 
-      override protected def pretty: Pretty[RequiredUids.this.type] = prettyOfClass(
+      override def pretty: Pretty[RequiredUids.this.type] = prettyOfClass(
         paramIfNonEmpty("uids", _.uids),
         paramIfNonEmpty("extraKeys", _.extraKeys),
       )
@@ -307,16 +305,16 @@ object TopologyMapping {
         second: RequiredAuth,
     ) extends RequiredAuth {
       override def satisfiedByActualAuthorizers(
-          provided: ReferencedAuthorizations
-      ): Either[ReferencedAuthorizations, Unit] =
+          provided: RequiredAuthAuthorizations
+      ): Either[RequiredAuthAuthorizations, Unit] =
         first
           .satisfiedByActualAuthorizers(provided)
           .orElse(second.satisfiedByActualAuthorizers(provided))
 
-      override def referenced: ReferencedAuthorizations =
-        ReferencedAuthorizations.monoid.combine(first.referenced, second.referenced)
+      override def authorizations: RequiredAuthAuthorizations =
+        RequiredAuthAuthorizations.monoid.combine(first.authorizations, second.authorizations)
 
-      override protected def pretty: Pretty[Or.this.type] =
+      override def pretty: Pretty[Or.this.type] =
         prettyOfClass(unnamedParam(_.first), unnamedParam(_.second))
     }
   }
@@ -330,12 +328,12 @@ object TopologyMapping {
       case Mapping.DecentralizedNamespaceDefinition(value) =>
         DecentralizedNamespaceDefinition.fromProtoV30(value)
       case Mapping.OwnerToKeyMapping(value) => OwnerToKeyMapping.fromProtoV30(value)
-      case Mapping.PartyToKeyMapping(value) => PartyToKeyMapping.fromProtoV30(value)
       case Mapping.DomainTrustCertificate(value) => DomainTrustCertificate.fromProtoV30(value)
       case Mapping.PartyHostingLimits(value) => PartyHostingLimits.fromProtoV30(value)
       case Mapping.ParticipantPermission(value) => ParticipantDomainPermission.fromProtoV30(value)
       case Mapping.VettedPackages(value) => VettedPackages.fromProtoV30(value)
       case Mapping.PartyToParticipant(value) => PartyToParticipant.fromProtoV30(value)
+      case Mapping.AuthorityOf(value) => AuthorityOf.fromProtoV30(value)
       case Mapping.DomainParametersState(value) => DomainParametersState.fromProtoV30(value)
       case Mapping.SequencingDynamicParametersState(value) =>
         DynamicSequencingParametersState.fromProtoV30(value)
@@ -388,9 +386,10 @@ final case class NamespaceDelegation private (
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth =
+  ): RequiredAuth = {
     // All namespace delegation creations require the root delegation privilege.
     RequiredNamespaces(Set(namespace), requireRootDelegation = true)
+  }
 
   override lazy val uniqueKey: MappingHash =
     NamespaceDelegation.uniqueKey(namespace, target.fingerprint)
@@ -425,7 +424,7 @@ object NamespaceDelegation {
   def code: TopologyMapping.Code = Code.NamespaceDelegation
 
   /** Returns true if the given transaction is a self-signed root certificate */
-  def isRootCertificate(sit: GenericSignedTopologyTransaction): Boolean =
+  def isRootCertificate(sit: GenericSignedTopologyTransaction): Boolean = {
     sit.mapping
       .select[transaction.NamespaceDelegation]
       .exists(ns =>
@@ -434,15 +433,17 @@ object NamespaceDelegation {
           ns.isRootDelegation &&
           ns.target.fingerprint == ns.namespace.fingerprint
       )
+  }
 
   /** Returns true if the given transaction is a root delegation */
-  def isRootDelegation(sit: GenericSignedTopologyTransaction): Boolean =
+  def isRootDelegation(sit: GenericSignedTopologyTransaction): Boolean = {
     isRootCertificate(sit) || (
       sit.operation == TopologyChangeOp.Replace &&
         sit.mapping
           .select[transaction.NamespaceDelegation]
           .exists(ns => ns.isRootDelegation)
     )
+  }
 
   def fromProtoV30(
       value: v30.NamespaceDelegation
@@ -491,19 +492,25 @@ final case class DecentralizedNamespaceDefinition private (
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth =
-    previous
-      .collect {
-        case TopologyTransaction(
+  ): RequiredAuth = {
+    previous match {
+      case None =>
+        RequiredNamespaces(owners.forgetNE)
+      case Some(
+            TopologyTransaction(
               _op,
               _serial,
               DecentralizedNamespaceDefinition(`namespace`, _previousThreshold, previousOwners),
-            ) =>
-          val added = owners.diff(previousOwners)
-          // all added owners and the quorum of existing owners MUST sign
-          RequiredNamespaces(added + namespace)
-      }
-      .getOrElse(RequiredNamespaces(owners.forgetNE))
+            )
+          ) =>
+        val added = owners.diff(previousOwners)
+        // all added owners and the quorum of existing owners MUST sign
+        RequiredNamespaces(added + namespace)
+      case Some(_topoTx) =>
+        // TODO(#14048): proper error or ignore
+        sys.error(s"unexpected transaction data: $previous")
+    }
+  }
 
   override def uniqueKey: MappingHash = DecentralizedNamespaceDefinition.uniqueKey(namespace)
 }
@@ -524,7 +531,7 @@ object DecentralizedNamespaceDefinition {
       _ <- Either.cond(
         owners.size >= threshold.value,
         (),
-        s"Invalid threshold ($threshold) for $decentralizedNamespace with ${owners.size} owners",
+        s"Invalid threshold (${threshold}) for ${decentralizedNamespace} with ${owners.size} owners",
       )
     } yield DecentralizedNamespaceDefinition(decentralizedNamespace, threshold, owners)
 
@@ -547,7 +554,7 @@ object DecentralizedNamespaceDefinition {
           )
         )
       item <- create(decentralizedNamespace, threshold, ownersNE.map(Namespace(_)))
-        .leftMap(ProtoDeserializationError.OtherError.apply)
+        .leftMap(ProtoDeserializationError.OtherError)
     } yield item
   }
 
@@ -592,7 +599,7 @@ final case class IdentifierDelegation(identifier: UniqueIdentifier, target: Sign
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth = RequiredNamespaces(Set(namespace), requireRootDelegation = false)
+  ): RequiredAuth = RequiredUids(Set(identifier))
 
   override def uniqueKey: MappingHash =
     IdentifierDelegation.uniqueKey(identifier, target.fingerprint)
@@ -626,12 +633,14 @@ object IdentifierDelegation {
   */
 final case class OwnerToKeyMapping(
     member: Member,
+    domain: Option[DomainId],
     keys: NonEmpty[Seq[PublicKey]],
 ) extends TopologyMapping {
 
   def toProto: v30.OwnerToKeyMapping = v30.OwnerToKeyMapping(
     member = member.toProtoPrimitive,
     publicKeys = keys.map(_.toProtoPublicKeyV30),
+    domain = domain.map(_.toProtoPrimitive).getOrElse(""),
   )
 
   def toProtoV30: v30.TopologyMapping =
@@ -646,7 +655,7 @@ final case class OwnerToKeyMapping(
   override def namespace: Namespace = member.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(member.uid)
 
-  override def restrictedToDomain: Option[DomainId] = None
+  override def restrictedToDomain: Option[DomainId] = domain
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
@@ -661,20 +670,22 @@ final case class OwnerToKeyMapping(
     RequiredUids(Set(member.uid), extraKeys = newKeys)
   }
 
-  override def uniqueKey: MappingHash = OwnerToKeyMapping.uniqueKey(member)
+  override def uniqueKey: MappingHash = OwnerToKeyMapping.uniqueKey(member, domain)
 }
 
 object OwnerToKeyMapping {
 
-  def uniqueKey(member: Member): MappingHash =
-    TopologyMapping.buildUniqueKey(code)(_.add(member.uid.toProtoPrimitive))
+  def uniqueKey(member: Member, domain: Option[DomainId]): MappingHash =
+    TopologyMapping.buildUniqueKey(code)(b =>
+      TopologyMapping.addDomainId(b.add(member.uid.toProtoPrimitive), domain)
+    )
 
   def code: TopologyMapping.Code = Code.OwnerToKeyMapping
 
   def fromProtoV30(
       value: v30.OwnerToKeyMapping
   ): ParsingResult[OwnerToKeyMapping] = {
-    val v30.OwnerToKeyMapping(memberP, keysP) = value
+    val v30.OwnerToKeyMapping(memberP, keysP, domainP) = value
     for {
       member <- Member.fromProtoPrimitive(memberP, "member")
       keys <- keysP.traverse(x =>
@@ -684,125 +695,10 @@ object OwnerToKeyMapping {
       keysNE <- NonEmpty
         .from(keys)
         .toRight(ProtoDeserializationError.FieldNotSet("public_keys"): ProtoDeserializationError)
-    } yield OwnerToKeyMapping(member, keysNE)
-  }
-
-}
-
-/** A party to key mapping
-  *
-  * In Canton, we can delegate the submission authorisation to a participant
-  * node, or we can sign the transaction outside of the node with a party
-  * key. This mapping is used to map the party to a set of public keys authorized to sign submissions.
-  */
-final case class PartyToKeyMapping private (
-    party: PartyId,
-    domain: Option[DomainId],
-    threshold: PositiveInt,
-    signingKeys: NonEmpty[Seq[SigningPublicKey]],
-) extends TopologyMapping {
-
-  def toProto: v30.PartyToKeyMapping = v30.PartyToKeyMapping(
-    party = party.toProtoPrimitive,
-    domain = domain.map(_.toProtoPrimitive).getOrElse(""),
-    threshold = threshold.unwrap,
-    signingKeys = signingKeys.map(_.toProtoV30),
-  )
-
-  def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.PartyToKeyMapping(
-        toProto
-      )
-    )
-
-  def code: TopologyMapping.Code = Code.PartyToKeyMapping
-
-  override def namespace: Namespace = party.namespace
-  override def maybeUid: Option[UniqueIdentifier] = Some(party.uid)
-
-  override def restrictedToDomain: Option[DomainId] = domain
-
-  override def requiredAuth(
-      previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth = {
-    val previouslyRegisteredKeys = previous
-      .flatMap(_.select[TopologyChangeOp.Replace, PartyToKeyMapping])
-      .toList
-      .flatMap(_.mapping.signingKeys.forgetNE)
-      .toSet
-    val newKeys = signingKeys.toSet -- previouslyRegisteredKeys
-    RequiredUids(Set(party.uid), newKeys.map(_.fingerprint))
-  }
-
-  override def uniqueKey: MappingHash = PartyToKeyMapping.uniqueKey(party, domain)
-}
-
-object PartyToKeyMapping {
-
-  def create(
-      partyId: PartyId,
-      domainId: Option[DomainId],
-      threshold: PositiveInt,
-      signingKeys: NonEmpty[Seq[SigningPublicKey]],
-  ): Either[String, PartyToKeyMapping] = {
-    val noDuplicateKeys = {
-      val duplicateKeys = signingKeys.groupBy(_.fingerprint).values.filter(_.size > 1).toList
-      Either.cond(
-        duplicateKeys.isEmpty,
-        (),
-        s"All signing keys must be unique. Duplicate keys: $duplicateKeys",
-      )
-    }
-
-    val thresholdCanBeMet =
-      Either
-        .cond(
-          threshold.value <= signingKeys.size,
-          (),
-          s"Party $partyId cannot meet threshold of $threshold signing keys with participants ${signingKeys.size} keys",
-        )
-        .map(_ => PartyToKeyMapping(partyId, domainId, threshold, signingKeys))
-
-    noDuplicateKeys.flatMap(_ => thresholdCanBeMet)
-  }
-
-  def tryCreate(
-      partyId: PartyId,
-      domainId: Option[DomainId],
-      threshold: PositiveInt,
-      signingKeys: NonEmpty[Seq[SigningPublicKey]],
-  ): PartyToKeyMapping =
-    create(partyId, domainId, threshold, signingKeys).valueOr(err =>
-      throw new IllegalArgumentException(err)
-    )
-
-  def uniqueKey(party: PartyId, domain: Option[DomainId]): MappingHash =
-    TopologyMapping.buildUniqueKey(code)(b =>
-      TopologyMapping.addDomainId(b.add(party.uid.toProtoPrimitive), domain)
-    )
-
-  def code: TopologyMapping.Code = Code.PartyToKeyMapping
-
-  def fromProtoV30(
-      value: v30.PartyToKeyMapping
-  ): ParsingResult[PartyToKeyMapping] = {
-    val v30.PartyToKeyMapping(partyP, domainP, thresholdP, signingKeysP) = value
-    for {
-      party <- PartyId.fromProtoPrimitive(partyP, "party")
-      signingKeysNE <-
-        ProtoConverter.parseRequiredNonEmpty(
-          SigningPublicKey.fromProtoV30,
-          "signing_keys",
-          signingKeysP,
-        )
       domain <- OptionUtil
         .emptyStringAsNone(domainP)
         .traverse(DomainId.fromProtoPrimitive(_, "domain"))
-      threshold <- PositiveInt
-        .create(thresholdP)
-        .leftMap(InvariantViolation.toProtoDeserializationError("threshold", _))
-    } yield PartyToKeyMapping(party, domain, threshold, signingKeysNE)
+    } yield OwnerToKeyMapping(member, domain, keysNE)
   }
 
 }
@@ -812,12 +708,17 @@ object PartyToKeyMapping {
 final case class DomainTrustCertificate(
     participantId: ParticipantId,
     domainId: DomainId,
+    // TODO(#15399): respect this restriction when reassigning contracts
+    transferOnlyToGivenTargetDomains: Boolean,
+    targetDomains: Seq[DomainId],
 ) extends TopologyMapping {
 
   def toProto: v30.DomainTrustCertificate =
     v30.DomainTrustCertificate(
       participantUid = participantId.uid.toProtoPrimitive,
       domain = domainId.toProtoPrimitive,
+      transferOnlyToGivenTargetDomains = transferOnlyToGivenTargetDomains,
+      targetDomains = targetDomains.map(_.toProtoPrimitive),
     )
 
   override def toProtoV30: v30.TopologyMapping =
@@ -860,9 +761,15 @@ object DomainTrustCertificate {
         "participant_uid",
       )
       domainId <- DomainId.fromProtoPrimitive(value.domain, "domain")
+      transferOnlyToGivenTargetDomains = value.transferOnlyToGivenTargetDomains
+      targetDomains <- value.targetDomains.traverse(
+        DomainId.fromProtoPrimitive(_, "target_domains")
+      )
     } yield DomainTrustCertificate(
       participantId,
       domainId,
+      transferOnlyToGivenTargetDomains,
+      targetDomains,
     )
 }
 
@@ -921,28 +828,23 @@ object ParticipantPermission {
     fst.max(snd)
 }
 
-/** @param confirmationRequestsMaxRate maximum number of mediator confirmation requests sent per participant per second
-  */
 final case class ParticipantDomainLimits(
-    confirmationRequestsMaxRate: NonNegativeInt
-) extends PrettyPrinting {
-
-  override protected def pretty: Pretty[ParticipantDomainLimits] =
-    prettyOfClass(
-      param("confirmation requests max rate", _.confirmationRequestsMaxRate)
-    )
-
+    confirmationRequestsMaxRate: Int,
+    maxNumParties: Int,
+    maxNumPackages: Int,
+) {
   def toProto: v30.ParticipantDomainLimits =
-    v30.ParticipantDomainLimits(confirmationRequestsMaxRate.unwrap)
+    v30.ParticipantDomainLimits(confirmationRequestsMaxRate, maxNumParties, maxNumPackages)
 }
 object ParticipantDomainLimits {
-  def fromProtoV30(value: v30.ParticipantDomainLimits): ParsingResult[ParticipantDomainLimits] =
-    for {
-      confirmationRequestsMaxRate <- NonNegativeInt
-        .create(value.confirmationRequestsMaxRate)
-        .leftMap(ProtoDeserializationError.InvariantViolation("confirmation_requests_max_rate", _))
-    } yield ParticipantDomainLimits(confirmationRequestsMaxRate)
+  def fromProtoV30(value: v30.ParticipantDomainLimits): ParticipantDomainLimits =
+    ParticipantDomainLimits(
+      value.confirmationRequestsMaxRate,
+      value.maxNumParties,
+      value.maxNumPackages,
+    )
 }
+
 final case class ParticipantDomainPermission(
     domainId: DomainId,
     participantId: ParticipantId,
@@ -1031,7 +933,7 @@ object ParticipantDomainPermission {
         "participant_uid",
       )
       permission <- ParticipantPermission.fromProtoV30(value.permission)
-      limits <- value.limits.traverse(ParticipantDomainLimits.fromProtoV30)
+      limits = value.limits.map(ParticipantDomainLimits.fromProtoV30)
       loginAfter <- value.loginAfter.traverse(CantonTimestamp.fromProtoPrimitive)
     } yield ParticipantDomainPermission(
       domainId,
@@ -1046,12 +948,14 @@ object ParticipantDomainPermission {
 final case class PartyHostingLimits(
     domainId: DomainId,
     partyId: PartyId,
+    quota: Int,
 ) extends TopologyMapping {
 
   def toProto: v30.PartyHostingLimits =
     v30.PartyHostingLimits(
       domain = domainId.toProtoPrimitive,
       party = partyId.toProtoPrimitive,
+      quota = quota,
     )
 
   override def toProtoV30: v30.TopologyMapping =
@@ -1091,63 +995,22 @@ object PartyHostingLimits {
     for {
       domainId <- DomainId.fromProtoPrimitive(value.domain, "domain")
       partyId <- PartyId.fromProtoPrimitive(value.party, "party")
-    } yield PartyHostingLimits(domainId, partyId)
-}
-
-/** Represents a package with an optional validity period. No start or end means that the validity
-  * of the package is unbounded. The validity period is expected to be compared to the
-  * ledger effective time of Daml transactions.
-  * @param packageId the hash of the package
-  * @param validFrom optional exclusive start of the validity period
-  * @param validUntil optional inclusive end of the validity period
-  */
-final case class VettedPackage(
-    packageId: LfPackageId,
-    validFrom: Option[CantonTimestamp],
-    validUntil: Option[CantonTimestamp],
-) extends PrettyPrinting {
-
-  def validAt(ts: CantonTimestamp): Boolean = validFrom.forall(_ < ts) && validUntil.forall(_ >= ts)
-
-  def toProtoV30: v30.VettedPackages.VettedPackage = v30.VettedPackages.VettedPackage(
-    packageId,
-    validFrom = validFrom.map(_.toProtoTimestamp),
-    validUntil = validUntil.map(_.toProtoTimestamp),
-  )
-  override protected def pretty: Pretty[VettedPackage.this.type] = prettyOfClass(
-    param("packageId", _.packageId),
-    paramIfDefined("validFrom", _.validFrom),
-    paramIfDefined("validUntil", _.validUntil),
-    paramIfTrue("unbounded", vp => vp.validFrom.isEmpty && vp.validUntil.isEmpty),
-  )
-}
-
-object VettedPackage {
-  def unbounded(packageIds: Seq[LfPackageId]): Seq[VettedPackage] =
-    packageIds.map(VettedPackage(_, None, None))
-
-  def fromProtoV30(
-      value: v30.VettedPackages.VettedPackage
-  ): ParsingResult[VettedPackage] = for {
-    pkgId <- LfPackageId
-      .fromString(value.packageId)
-      .leftMap(ProtoDeserializationError.ValueConversionError("package_id", _))
-    validFrom <- value.validFrom.traverse(CantonTimestamp.fromProtoTimestamp)
-    validUntil <- value.validUntil.traverse(CantonTimestamp.fromProtoTimestamp)
-  } yield VettedPackage(pkgId, validFrom, validUntil)
+      quota = value.quota
+    } yield PartyHostingLimits(domainId, partyId, quota)
 }
 
 // Package vetting
-final case class VettedPackages private (
+final case class VettedPackages(
     participantId: ParticipantId,
-    packages: Seq[VettedPackage],
+    domainId: Option[DomainId],
+    packageIds: Seq[LfPackageId],
 ) extends TopologyMapping {
 
   def toProto: v30.VettedPackages =
     v30.VettedPackages(
       participantUid = participantId.uid.toProtoPrimitive,
-      packageIds = Seq.empty,
-      packages = packages.map(_.toProtoV30),
+      packageIds = packageIds,
+      domain = domainId.fold("")(_.toProtoPrimitive),
     )
 
   override def toProtoV30: v30.TopologyMapping =
@@ -1162,61 +1025,25 @@ final case class VettedPackages private (
   override def namespace: Namespace = participantId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(participantId.uid)
 
-  override def restrictedToDomain: Option[DomainId] = None
+  override def restrictedToDomain: Option[DomainId] = domainId
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth =
     RequiredUids(Set(participantId.uid))
 
-  override def uniqueKey: MappingHash = VettedPackages.uniqueKey(participantId)
+  override def uniqueKey: MappingHash = VettedPackages.uniqueKey(participantId, domainId)
 }
 
 object VettedPackages {
 
-  def uniqueKey(participantId: ParticipantId): MappingHash =
-    TopologyMapping.buildUniqueKey(code)(_.add(participantId.toProtoPrimitive))
+  def uniqueKey(participantId: ParticipantId, domainId: Option[DomainId]): MappingHash =
+    TopologyMapping.buildUniqueKey(code)(
+      _.add(participantId.toProtoPrimitive).add(domainId.fold("")(_.toProtoPrimitive))
+    )
 
   def code: Code = Code.VettedPackages
 
-  def create(
-      participantId: ParticipantId,
-      packages: Seq[VettedPackage],
-  ): Either[String, VettedPackages] = {
-    val multipleValidityPeriods = packages
-      .groupBy(_.packageId)
-      .view
-      .collect { case (_, pkgs) if pkgs.sizeIs > 1 => pkgs }
-      .flatten
-      .toList
-
-    val emptyValidity = packages.filter(vp =>
-      (vp.validFrom, vp.validUntil).tupled.exists { case (from, until) => from >= until }
-    )
-
-    for {
-      _ <- Either.cond(
-        multipleValidityPeriods.isEmpty,
-        (),
-        s"a package may only have one validty period: ${multipleValidityPeriods.mkString(", ")}",
-      )
-      _ <- Either.cond(
-        emptyValidity.isEmpty,
-        (),
-        s"packages with empty validity period: ${emptyValidity.mkString(", ")}",
-      )
-    } yield {
-      VettedPackages(participantId, packages)
-    }
-  }
-
-  def tryCreate(
-      participantId: ParticipantId,
-      packages: Seq[VettedPackage],
-  ): VettedPackages =
-    create(participantId, packages).valueOr(err => throw new IllegalArgumentException(err))
-
-  @nowarn("cat=deprecation")
   def fromProtoV30(
       value: v30.VettedPackages
   ): ParsingResult[VettedPackages] =
@@ -1225,28 +1052,14 @@ object VettedPackages {
         value.participantUid,
         "participant_uid",
       )
-      packageIdsUnbounded <- value.packageIds
-        .traverse(
-          LfPackageId
-            .fromString(_)
-            .leftMap(ProtoDeserializationError.ValueConversionError("package_ids", _))
-        )
-        .map(VettedPackage.unbounded)
-      packages <- value.packages.traverse(VettedPackage.fromProtoV30)
-
-      duplicatePackages = packageIdsUnbounded
-        .map(_.packageId)
-        .intersect(packages.map(_.packageId))
-        .toSet
-      _ <- Either.cond(
-        duplicatePackages.isEmpty,
-        (),
-        ProtoDeserializationError.InvariantViolation(
-          None,
-          s"packages $duplicatePackages are listed in both fields 'package_ids' and 'packages' but may only be set in one.",
-        ),
-      )
-    } yield VettedPackages(participantId, packageIdsUnbounded ++ packages)
+      packageIds <- value.packageIds
+        .traverse(LfPackageId.fromString)
+        .leftMap(ProtoDeserializationError.ValueConversionError("package_ids", _))
+      domainId <-
+        if (value.domain.nonEmpty)
+          DomainId.fromProtoPrimitive(value.domain, "domain").map(_.some)
+        else Right(None)
+    } yield VettedPackages(participantId, domainId, packageIds)
 }
 
 // Party to participant mappings
@@ -1275,8 +1088,10 @@ object HostingParticipant {
 
 final case class PartyToParticipant private (
     partyId: PartyId,
+    domainId: Option[DomainId],
     threshold: PositiveInt,
     participants: Seq[HostingParticipant],
+    groupAddressing: Boolean,
 ) extends TopologyMapping {
 
   def toProto: v30.PartyToParticipant =
@@ -1284,6 +1099,8 @@ final case class PartyToParticipant private (
       party = partyId.toProtoPrimitive,
       threshold = threshold.value,
       participants = participants.map(_.toProto),
+      groupAddressing = groupAddressing,
+      domain = domainId.fold("")(_.toProtoPrimitive),
     )
 
   override def toProtoV30: v30.TopologyMapping =
@@ -1298,19 +1115,19 @@ final case class PartyToParticipant private (
   override def namespace: Namespace = partyId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(partyId.uid)
 
-  override def restrictedToDomain: Option[DomainId] = None
+  override def restrictedToDomain: Option[DomainId] = domainId
 
   def participantIds: Seq[ParticipantId] = participants.map(_.participantId)
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth =
+  ): RequiredAuth = {
     previous
       .collect {
         case TopologyTransaction(
               TopologyChangeOp.Replace,
               _,
-              PartyToParticipant(_, prevThreshold, prevParticipants),
+              PartyToParticipant(_, _, prevThreshold, prevParticipants, prevGroupAddressing),
             ) =>
           val current = this
           val currentParticipantIds = participants.map(_.participantId.uid).toSet
@@ -1318,11 +1135,12 @@ final case class PartyToParticipant private (
           val removedParticipants = prevParticipantIds -- currentParticipantIds
           val addedParticipants = currentParticipantIds -- prevParticipantIds
 
-          val contentHasChanged = prevThreshold != current.threshold
+          val contentHasChanged =
+            prevGroupAddressing != current.groupAddressing || prevThreshold != current.threshold
 
           // check whether a participant can unilaterally unhost a party
           if (
-            // no change in threshold
+            // no change in group addressing or threshold
             !contentHasChanged
             // no participant added
             && addedParticipants.isEmpty
@@ -1339,16 +1157,19 @@ final case class PartyToParticipant private (
       .getOrElse(
         RequiredUids(Set(partyId.uid) ++ participants.map(_.participantId.uid))
       )
+  }
 
-  override def uniqueKey: MappingHash = PartyToParticipant.uniqueKey(partyId)
+  override def uniqueKey: MappingHash = PartyToParticipant.uniqueKey(partyId, domainId)
 }
 
 object PartyToParticipant {
 
   def create(
       partyId: PartyId,
+      domainId: Option[DomainId],
       threshold: PositiveInt,
       participants: Seq[HostingParticipant],
+      groupAddressing: Boolean,
   ): Either[String, PartyToParticipant] = {
     val noDuplicatePParticipants = {
       val duplicatePermissions =
@@ -1371,7 +1192,7 @@ object PartyToParticipant {
           (),
           s"Party $partyId cannot meet threshold of $threshold confirming participants with participants $participants",
         )
-        .map(_ => PartyToParticipant(partyId, threshold, participants))
+        .map(_ => PartyToParticipant(partyId, domainId, threshold, participants, groupAddressing))
     }
 
     noDuplicatePParticipants.flatMap(_ => thresholdCanBeMet)
@@ -1379,13 +1200,19 @@ object PartyToParticipant {
 
   def tryCreate(
       partyId: PartyId,
+      domainId: Option[DomainId],
       threshold: PositiveInt,
       participants: Seq[HostingParticipant],
+      groupAddressing: Boolean,
   ): PartyToParticipant =
-    create(partyId, threshold, participants).valueOr(err => throw new IllegalArgumentException(err))
+    create(partyId, domainId, threshold, participants, groupAddressing).valueOr(err =>
+      throw new IllegalArgumentException(err)
+    )
 
-  def uniqueKey(partyId: PartyId): MappingHash =
-    TopologyMapping.buildUniqueKey(code)(_.add(partyId.toProtoPrimitive))
+  def uniqueKey(partyId: PartyId, domainId: Option[DomainId]): MappingHash =
+    TopologyMapping.buildUniqueKey(code)(
+      _.add(partyId.toProtoPrimitive).add(domainId.fold("")(_.toProtoPrimitive))
+    )
 
   def code: Code = Code.PartyToParticipant
 
@@ -1396,7 +1223,92 @@ object PartyToParticipant {
       partyId <- PartyId.fromProtoPrimitive(value.party, "party")
       threshold <- ProtoConverter.parsePositiveInt("threshold", value.threshold)
       participants <- value.participants.traverse(HostingParticipant.fromProtoV30)
-    } yield PartyToParticipant(partyId, threshold, participants)
+      groupAddressing = value.groupAddressing
+      domainId <-
+        if (value.domain.nonEmpty)
+          DomainId.fromProtoPrimitive(value.domain, "domain").map(_.some)
+        else Right(None)
+    } yield PartyToParticipant(partyId, domainId, threshold, participants, groupAddressing)
+}
+
+// AuthorityOf
+final case class AuthorityOf private (
+    partyId: PartyId,
+    domainId: Option[DomainId],
+    threshold: PositiveInt,
+    parties: Seq[PartyId],
+) extends TopologyMapping {
+
+  def toProto: v30.AuthorityOf =
+    v30.AuthorityOf(
+      party = partyId.toProtoPrimitive,
+      threshold = threshold.unwrap,
+      parties = parties.map(_.toProtoPrimitive),
+      domain = domainId.fold("")(_.toProtoPrimitive),
+    )
+
+  override def toProtoV30: v30.TopologyMapping =
+    v30.TopologyMapping(
+      v30.TopologyMapping.Mapping.AuthorityOf(
+        toProto
+      )
+    )
+
+  override def code: Code = Code.AuthorityOf
+
+  override def namespace: Namespace = partyId.namespace
+  override def maybeUid: Option[UniqueIdentifier] = Some(partyId.uid)
+
+  override def restrictedToDomain: Option[DomainId] = domainId
+
+  override def requiredAuth(
+      previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
+  ): RequiredAuth = {
+    // TODO(#12390): take the previous transaction into account
+    RequiredUids(Set(partyId.uid) ++ parties.map(_.uid))
+  }
+
+  override def uniqueKey: MappingHash = AuthorityOf.uniqueKey(partyId, domainId)
+}
+
+object AuthorityOf {
+
+  def create(
+      partyId: PartyId,
+      domainId: Option[DomainId],
+      threshold: PositiveInt,
+      parties: Seq[PartyId],
+  ): Either[String, AuthorityOf] = {
+    Either
+      .cond(
+        threshold.value <= parties.size,
+        (),
+        s"Invalid threshold $threshold for $partyId with authorizers $parties",
+      )
+      .map(_ => AuthorityOf(partyId, domainId, threshold, parties))
+  }
+
+  def uniqueKey(partyId: PartyId, domainId: Option[DomainId]): MappingHash =
+    TopologyMapping.buildUniqueKey(code)(
+      _.add(partyId.toProtoPrimitive).add(domainId.fold("")(_.toProtoPrimitive))
+    )
+
+  def code: Code = Code.AuthorityOf
+
+  def fromProtoV30(
+      value: v30.AuthorityOf
+  ): ParsingResult[AuthorityOf] =
+    for {
+      partyId <- PartyId.fromProtoPrimitive(value.party, "party")
+      threshold <- ProtoConverter.parsePositiveInt("threshold", value.threshold)
+      parties <- value.parties.traverse(PartyId.fromProtoPrimitive(_, "parties"))
+      domainId <-
+        if (value.domain.nonEmpty)
+          DomainId.fromProtoPrimitive(value.domain, "domain").map(_.some)
+        else Right(None)
+      authorityOf <- create(partyId, domainId, threshold, parties)
+        .leftMap(ProtoDeserializationError.OtherError)
+    } yield authorityOf
 }
 
 /** Dynamic domain parameter settings for the domain
@@ -1515,12 +1427,12 @@ object DynamicSequencingParametersState {
 /** Mediator definition for a domain
   *
   * Each domain needs at least one mediator (group), but can have multiple.
-  * Mediators can be temporarily turned off by making them observers. This way,
+  * Mediators can be temporarily be turned off by making them observers. This way,
   * they get informed but they don't have to reply.
   */
 final case class MediatorDomainState private (
     domain: DomainId,
-    group: MediatorGroupIndex,
+    group: NonNegativeInt,
     threshold: PositiveInt,
     active: NonEmpty[Seq[MediatorId]],
     observers: Seq[MediatorId],
@@ -1560,14 +1472,14 @@ final case class MediatorDomainState private (
 
 object MediatorDomainState {
 
-  def uniqueKey(domainId: DomainId, group: MediatorGroupIndex): MappingHash =
+  def uniqueKey(domainId: DomainId, group: NonNegativeInt): MappingHash =
     TopologyMapping.buildUniqueKey(code)(_.add(domainId.toProtoPrimitive).add(group.unwrap))
 
   def code: TopologyMapping.Code = Code.MediatorDomainState
 
   def create(
       domain: DomainId,
-      group: MediatorGroupIndex,
+      group: NonNegativeInt,
       threshold: PositiveInt,
       active: Seq[MediatorId],
       observers: Seq[MediatorId],
@@ -1577,17 +1489,10 @@ object MediatorDomainState {
       (),
       s"threshold ($threshold) of mediator domain state higher than number of mediators ${active.length}",
     )
-    mediatorsBothActiveAndObserver = active.intersect(observers)
-    _ <- Either.cond(
-      mediatorsBothActiveAndObserver.isEmpty,
-      (),
-      s"the following mediators were defined both as active and observer: ${mediatorsBothActiveAndObserver
-          .mkString(", ")}",
-    )
     activeNE <- NonEmpty
-      .from(active.distinct)
+      .from(active)
       .toRight("mediator domain state requires at least one active mediator")
-  } yield MediatorDomainState(domain, group, threshold, activeNE, observers.distinct)
+  } yield MediatorDomainState(domain, group, threshold, activeNE, observers)
 
   def fromProtoV30(
       value: v30.MediatorDomainState
@@ -1606,7 +1511,7 @@ object MediatorDomainState {
         UniqueIdentifier.fromProtoPrimitive(_, "observers").map(MediatorId(_))
       )
       result <- create(domainId, group, threshold, active, observers).leftMap(
-        ProtoDeserializationError.OtherError.apply
+        ProtoDeserializationError.OtherError
       )
     } yield result
   }
@@ -1677,17 +1582,10 @@ object SequencerDomainState {
       (),
       s"threshold ($threshold) of sequencer domain state higher than number of active sequencers ${active.length}",
     )
-    sequencersBothActiveAndObserver = active.intersect(observers)
-    _ <- Either.cond(
-      sequencersBothActiveAndObserver.isEmpty,
-      (),
-      s"the following sequencers were defined both as active and observer: ${sequencersBothActiveAndObserver
-          .mkString(", ")}",
-    )
     activeNE <- NonEmpty
-      .from(active.distinct)
+      .from(active)
       .toRight("sequencer domain state requires at least one active sequencer")
-  } yield SequencerDomainState(domain, threshold, activeNE, observers.distinct)
+  } yield SequencerDomainState(domain, threshold, activeNE, observers)
 
   def fromProtoV30(
       value: v30.SequencerDomainState
@@ -1703,7 +1601,7 @@ object SequencerDomainState {
         UniqueIdentifier.fromProtoPrimitive(_, "observers").map(SequencerId(_))
       )
       result <- create(domainId, threshold, active, observers).leftMap(
-        ProtoDeserializationError.OtherError.apply
+        ProtoDeserializationError.OtherError
       )
     } yield result
   }
@@ -1767,7 +1665,7 @@ object PurgeTopologyTransaction {
       domainId <- DomainId.fromProtoPrimitive(domainIdP, "domain")
       mappings <- mappingsP.traverse(TopologyMapping.fromProtoV30)
       result <- create(domainId, mappings).leftMap(
-        ProtoDeserializationError.OtherError.apply
+        ProtoDeserializationError.OtherError
       )
     } yield result
   }

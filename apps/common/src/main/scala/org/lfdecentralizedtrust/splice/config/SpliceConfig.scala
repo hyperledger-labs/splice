@@ -66,5 +66,7 @@ case class SharedSpliceAppParameters(
 
   override val exitOnFatalFailures: Boolean = true
 
+  override def useUnifiedSequencer: Boolean = false
+
   override def watchdog: Option[WatchdogConfig] = None
 }

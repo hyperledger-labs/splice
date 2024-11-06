@@ -42,7 +42,7 @@ class BufferedStreamsReaderSpec
           transactionsBuffer = inMemoryFanoutBuffer,
           startExclusive = offset1,
           endInclusive = offset3,
-          bufferSliceFilter = noFilterBufferSlice(_).filterNot(_.updateId == "tx-3"),
+          bufferSliceFilter = noFilterBufferSlice(_).filterNot(_.transactionId == "tx-3"),
         )
         streamElements should contain theSameElementsInOrderAs Seq(
           offset2 -> "tx-2"
@@ -128,7 +128,7 @@ class BufferedStreamsReaderSpec
           endInclusive = offset3,
           fetchFromPersistence = fetchFromPersistence,
           persistenceFetchArgs = filterMock,
-          bufferSliceFilter = noFilterBufferSlice(_).filterNot(_.updateId == "tx-3"),
+          bufferSliceFilter = noFilterBufferSlice(_).filterNot(_.transactionId == "tx-3"),
         )
 
         streamElements should contain theSameElementsInOrderAs Seq(
@@ -242,6 +242,7 @@ class BufferedStreamsReaderSpec
   }
 }
 
+@nowarn("msg=match may not be exhaustive")
 object BufferedStreamsReaderSpec {
 
   trait TestFixtures
@@ -255,8 +256,7 @@ object BufferedStreamsReaderSpec {
     implicit val ec: ExecutionContext = executorService
 
     val metrics = LedgerApiServerMetrics.ForTesting
-    val Seq(offset0, offset1, offset2, offset3) =
-      (0 to 3) map { idx => offset(idx.toLong) }: @nowarn("msg=match may not be exhaustive")
+    val Seq(offset0, offset1, offset2, offset3) = (0 to 3) map { idx => offset(idx.toLong) }
     val offsetUpdates: Seq[(Offset, Traced[TransactionLogUpdate.TransactionAccepted])] =
       Seq(offset1, offset2, offset3).zip((1 to 3).map(idx => Traced(transaction(s"tx-$idx"))))
 
@@ -265,7 +265,7 @@ object BufferedStreamsReaderSpec {
       tracedUpdate =>
         tracedUpdate.value match {
           case update: TransactionLogUpdate.TransactionAccepted => Some(update)
-          case _ => None
+          case _: TransactionLogUpdate.TransactionRejected => None
         }
 
     val inMemoryFanoutBuffer: InMemoryFanoutBuffer = new InMemoryFanoutBuffer(
@@ -326,7 +326,7 @@ object BufferedStreamsReaderSpec {
             endInclusive = endInclusive,
             persistenceFetchArgs = persistenceFetchArgs,
             bufferFilter = bufferSliceFilter,
-            toApiResponse = tx => Future.successful(tx.updateId),
+            toApiResponse = tx => Future.successful(tx.transactionId),
           )
           .runWith(Sink.foreach(streamElements.addOne))
           .futureValue
@@ -368,15 +368,16 @@ object BufferedStreamsReaderSpec {
             filter: Object,
         )(implicit
             loggingContext: LoggingContextWithTrace
-        ): Source[(Offset, String), NotUsed] =
+        ): Source[(Offset, String), NotUsed] = {
           if (startExclusive > endInclusive) fail("startExclusive after endInclusive")
           else if (endInclusive > offset(ledgerEndIndex)) fail("endInclusive after ledgerEnd")
           else
             persistenceStore
               .dropWhile(_._1 <= startExclusive)
               .takeWhile(_._1 <= endInclusive)
-              .map { case (o, tx) => o -> tx.updateId }
+              .map { case (o, tx) => o -> tx.transactionId }
               .pipe(Source(_))
+        }
       }
 
       private val streamReader = new BufferedStreamsReader[Object, String](
@@ -430,7 +431,7 @@ object BufferedStreamsReaderSpec {
             endInclusive = offset(endInclusiveIdx.toLong),
             persistenceFetchArgs = new Object, // Not used
             bufferFilter = noFilterBufferSlice, // Do not filter
-            toApiResponse = tx => Future.successful(tx.updateId),
+            toApiResponse = tx => Future.successful(tx.transactionId),
           )
           .async
           .mapAsync(1) { idx =>
@@ -469,13 +470,13 @@ object BufferedStreamsReaderSpec {
 
   private def transaction(discriminator: String) =
     TransactionLogUpdate.TransactionAccepted(
-      updateId = discriminator,
+      transactionId = discriminator,
       commandId = "",
       workflowId = "",
       effectiveAt = Timestamp.Epoch,
       offset = Offset.beforeBegin,
       events = Vector(null),
-      completionStreamResponse = None,
+      completionDetails = None,
       domainId = someDomainId.toProtoPrimitive,
       recordTime = Timestamp.Epoch,
     )

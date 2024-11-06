@@ -25,7 +25,7 @@ final case class TrafficPurchased(
     extraTrafficPurchased: NonNegativeLong,
     sequencingTimestamp: CantonTimestamp,
 ) extends PrettyPrinting {
-  override protected def pretty: Pretty[TrafficPurchased] =
+  override def pretty: Pretty[TrafficPurchased] =
     prettyOfClass(
       param("member", _.member),
       param("sequencingTimestamp", _.sequencingTimestamp),
@@ -33,13 +33,14 @@ final case class TrafficPurchased(
       param("serial", _.serial),
     )
 
-  def toProtoV30: TrafficPurchasedP =
+  def toProtoV30: TrafficPurchasedP = {
     TrafficPurchasedP(
       member = member.toProtoPrimitive,
       serial = serial.value,
       extraTrafficPurchased = extraTrafficPurchased.value,
       sequencingTimestamp = sequencingTimestamp.toProtoPrimitive,
     )
+  }
 }
 
 object TrafficPurchased {

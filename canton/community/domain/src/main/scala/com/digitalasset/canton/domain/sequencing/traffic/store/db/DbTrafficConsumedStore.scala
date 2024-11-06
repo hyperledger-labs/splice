@@ -30,37 +30,14 @@ class DbTrafficConsumedStore(
   import storage.api.*
 
   override def store(
-      trafficUpdates: Seq[TrafficConsumed]
+      trafficConsumed: TrafficConsumed
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val insertSql =
-      """insert into seq_traffic_control_consumed_journal (member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost)
-             values (?, ?, ?, ?, ?)
+      sqlu"""insert into seq_traffic_control_consumed_journal (member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost)
+             values (${trafficConsumed.member}, ${trafficConsumed.sequencingTimestamp}, ${trafficConsumed.extraTrafficConsumed}, ${trafficConsumed.baseTrafficRemainder}, ${trafficConsumed.lastConsumedCost})
              on conflict do nothing"""
 
-    val bulkInsert = DbStorage
-      .bulkOperation(insertSql, trafficUpdates, storage.profile) { pp => trafficConsumed =>
-        val TrafficConsumed(
-          member,
-          sequencingTimestamp,
-          extraTrafficConsumed,
-          baseTrafficRemainder,
-          lastConsumedCost,
-        ) = trafficConsumed
-        pp >> member
-        pp >> sequencingTimestamp
-        pp >> extraTrafficConsumed
-        pp >> baseTrafficRemainder
-        pp >> lastConsumedCost
-      }
-      .map(_.sum)
-    storage
-      .queryAndUpdateUnlessShutdown(bulkInsert, functionFullName)
-      .map(updateCount => logger.debug(s"Stored $updateCount traffic consumed entries"))
-      .onShutdown {
-        logger.debug(
-          "DbTrafficConsumedStore is shutting down, cancelling storing traffic consumed entries"
-        )
-      }
+    storage.update_(insertSql, functionFullName)
   }
 
   override def lookup(
@@ -81,49 +58,42 @@ class DbTrafficConsumedStore(
       sql"""select member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost
            from seq_traffic_control_consumed_journal
            where member = $member
-           order by sequencing_timestamp desc
-           limit 1"""
+           order by sequencing_timestamp desc"""
     storage.querySingle(query.as[TrafficConsumed].headOption, functionFullName).value
   }
 
   override def lookupLatestBeforeInclusive(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Future[Seq[TrafficConsumed]] = {
-    val query = storage.profile match {
-      case _: DbStorage.Profile.Postgres =>
-        sql"""select m.member, tc.sequencing_timestamp, tc.extra_traffic_consumed, tc.base_traffic_remainder, tc.last_consumed_cost
-            from sequencer_members m
-            inner join lateral (
-              select sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost
-              from seq_traffic_control_consumed_journal
-              where member = m.member and sequencing_timestamp <= $timestamp
-              order by member, sequencing_timestamp desc
-              limit 1) tc
-            on true"""
-      case _ =>
-        // H2 does't support lateral joins
-        sql"""select member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost
-                    from
-                      (select member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost,
-                              rank() over (partition by member order by sequencing_timestamp desc) as pos
-                       from seq_traffic_control_consumed_journal
-                       where sequencing_timestamp <= $timestamp
-                      ) as with_pos
-                    where pos = 1
-                   """
-    }
+    // TODO(#18394): Check if performance of this query is good (looks a lot like a group by)
+    val query =
+      sql"""select member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost
+            from
+              (select member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost,
+                      rank() over (partition by member order by sequencing_timestamp desc) as pos
+               from seq_traffic_control_consumed_journal
+               where sequencing_timestamp <= $timestamp
+              ) as with_pos
+            where pos = 1
+           """
+
     storage.query(query.as[TrafficConsumed], functionFullName)
   }
 
   def lookupLatestBeforeInclusiveForMember(member: Member, timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Future[Option[TrafficConsumed]] = {
+    // TODO(#18394): Check if performance of this query is good (looks a lot like a group by)
     val query =
       sql"""select member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost
-            from seq_traffic_control_consumed_journal
-            where sequencing_timestamp <= $timestamp and member = $member
-            order by member, sequencing_timestamp desc
-            limit 1""".as[TrafficConsumed].headOption
+            from
+              (select member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost,
+                      rank() over (partition by member order by sequencing_timestamp desc) as pos
+               from seq_traffic_control_consumed_journal
+               where sequencing_timestamp <= $timestamp and member = $member
+              ) as with_pos
+            where pos = 1
+           """.as[TrafficConsumed].headOption
 
     storage.querySingle(query, functionFullName).value
   }
@@ -134,8 +104,7 @@ class DbTrafficConsumedStore(
     val query =
       sql"""select member, sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost
            from seq_traffic_control_consumed_journal
-           where member = $member and sequencing_timestamp = $timestamp
-           limit 1"""
+           where member = $member and sequencing_timestamp = $timestamp"""
     storage.querySingle(query.as[TrafficConsumed].headOption, functionFullName).value
   }
 
@@ -147,49 +116,25 @@ class DbTrafficConsumedStore(
     // upToExclusive, we need to keep it.
     // To do that we first find the latest timestamp for all members before the pruning timestamp.
     // Then we delete all rows below that timestamp for each member.
-    val lookupQuery = storage.profile match {
-      case _: DbStorage.Profile.Postgres =>
-        sql"""select m.member, tc.sequencing_timestamp
-              from sequencer_members m
-              inner join lateral (
-                select sequencing_timestamp, extra_traffic_consumed, base_traffic_remainder, last_consumed_cost
-                from seq_traffic_control_consumed_journal
-                where member = m.member and sequencing_timestamp <= $upToExclusive
-                order by member, sequencing_timestamp desc
-                limit 1) tc
-              on true"""
-      case _ =>
-        sql"""select member, max(sequencing_timestamp) as sequencing_timestamp
+    // TODO(#18394): Check performance of the group by query here
+    val deleteQuery =
+      sqlu"""with last_before_pruning_timestamp(member, sequencing_timestamp) as (
+              select member, max(sequencing_timestamp)
               from seq_traffic_control_consumed_journal
               where sequencing_timestamp <= $upToExclusive
-              group by member"""
+              group by member
+            )
+            delete from seq_traffic_control_consumed_journal
+            where (member, sequencing_timestamp) in (
+              select consumed.member, consumed.sequencing_timestamp
+              from last_before_pruning_timestamp last
+              join seq_traffic_control_consumed_journal consumed
+              on consumed.member = last.member
+              where consumed.sequencing_timestamp < last.sequencing_timestamp
+            )
+            """
+    storage.update(deleteQuery, functionFullName).map { pruned =>
+      s"Removed $pruned traffic consumed entries"
     }
-
-    val deleteQuery =
-      """delete from seq_traffic_control_consumed_journal
-        |where member = ? and sequencing_timestamp < ?
-        |""".stripMargin
-    val pruningQuery = for {
-      membersTimestamps <- lookupQuery.as[(Member, CantonTimestamp)]
-      deletedTotalCount <- DbStorage
-        .bulkOperation(deleteQuery, membersTimestamps, storage.profile) { pp => memberTimestamp =>
-          val (member, timestamp) = memberTimestamp
-          pp >> member
-          pp >> timestamp
-        }
-        .map(_.sum)
-    } yield deletedTotalCount
-
-    storage
-      .queryAndUpdateUnlessShutdown(pruningQuery, functionFullName)
-      .onShutdown {
-        logger.debug(
-          "DbTrafficConsumedStore is shutting down, cancelling pruning traffic consumed entries"
-        )
-        0
-      }
-      .map { pruned =>
-        s"Removed $pruned traffic consumed entries"
-      }
   }
 }

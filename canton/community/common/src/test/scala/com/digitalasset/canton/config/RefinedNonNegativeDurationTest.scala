@@ -246,13 +246,14 @@ class RefinedNonNegativeDurationTest extends AnyWordSpec with BaseTest {
     else infos
   }
 
-  private def cumulative(expectedAwaits: List[FiniteDuration]) =
+  private def cumulative(expectedAwaits: List[FiniteDuration]) = {
     expectedAwaits
       .foldLeft(List.empty[Duration]) { case (acc, x) =>
         val total = acc.headOption.getOrElse(0.seconds)
         x.plus(total) :: acc
       }
       .reverse
+  }
 
   private def state
       : (mutable.ArrayDeque[(Level, String)], (Level, String) => Unit, AtomicInteger) = {

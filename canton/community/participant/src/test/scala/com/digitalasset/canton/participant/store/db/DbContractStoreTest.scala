@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.store.db
 
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.config.RequireTypes.PositiveNumeric
 import com.digitalasset.canton.config.{
   BatchAggregatorConfig,
   CachingConfigs,
@@ -30,10 +31,7 @@ trait DbContractStoreTest extends AsyncWordSpec with BaseTest with ContractStore
 
   override def cleanDb(storage: DbStorage): Future[Int] = {
     import storage.api.*
-    storage.update(
-      sqlu"delete from par_contracts where domain_idx = $domainIndex",
-      functionFullName,
-    )
+    storage.update(sqlu"delete from par_contracts where domain_id = $domainIndex", functionFullName)
   }
 
   "DbContractStore" should {
@@ -56,20 +54,22 @@ object DbContractStoreTest {
       protocolVersion: ProtocolVersion,
       domainIndex: Int,
       loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext): DbContractStore =
+  )(implicit ec: ExecutionContext): DbContractStore = {
     new DbContractStore(
       storage = storage,
-      indexedDomain = IndexedDomain.tryCreate(
+      domainIdIndexed = IndexedDomain.tryCreate(
         domainId,
         domainIndex,
       ),
       protocolVersion = protocolVersion,
+      maxContractIdSqlInListSize = PositiveNumeric.tryCreate(2),
       cacheConfig = CachingConfigs.testing.contractStore,
       dbQueryBatcherConfig = BatchAggregatorConfig.defaultsForTesting,
       insertBatchAggregatorConfig = BatchAggregatorConfig.defaultsForTesting,
       timeouts = DefaultProcessingTimeouts.testing,
       loggerFactory = loggerFactory,
     )
+  }
 }
 
 class ContractStoreTestH2 extends DbContractStoreTest with H2Test

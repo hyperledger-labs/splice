@@ -4,7 +4,7 @@
 package com.digitalasset.canton.version
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
+import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -17,7 +17,6 @@ import com.digitalasset.canton.version.ProtocolVersion.{
   stable,
   supported,
 }
-import io.circe.Encoder
 import pureconfig.error.FailureReason
 import pureconfig.{ConfigReader, ConfigWriter}
 import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
@@ -92,7 +91,7 @@ sealed case class ProtocolVersion private[version] (v: Int)
 
   def isSupported: Boolean = supported.contains(this)
 
-  override protected def pretty: Pretty[ProtocolVersion] =
+  override def pretty: Pretty[ProtocolVersion] =
     prettyOfString(_ => if (isDev) "dev" else v.toString)
 
   def toProtoPrimitive: Int = v
@@ -129,19 +128,17 @@ object ProtocolVersion {
   implicit val protocolVersionWriter: ConfigWriter[ProtocolVersion] =
     ConfigWriter.toString(_.toProtoPrimitiveS)
 
-  lazy implicit val protocolVersionReader: ConfigReader[ProtocolVersion] =
+  lazy implicit val protocolVersionReader: ConfigReader[ProtocolVersion] = {
     ConfigReader.fromString[ProtocolVersion] { str =>
-      ProtocolVersion.create(str).leftMap[FailureReason](InvalidProtocolVersion.apply)
+      ProtocolVersion.create(str).leftMap[FailureReason](InvalidProtocolVersion)
     }
+  }
 
   implicit val getResultProtocolVersion: GetResult[ProtocolVersion] =
-    GetResult(r => ProtocolVersion(r.nextInt()))
+    GetResult { r => ProtocolVersion(r.nextInt()) }
 
   implicit val setParameterProtocolVersion: SetParameter[ProtocolVersion] =
     (pv: ProtocolVersion, pp: PositionedParameters) => pp >> pv.v
-
-  implicit val protocolVersionEncoder: Encoder[ProtocolVersion] =
-    Encoder.encodeString.contramap[ProtocolVersion](p => if (p.isDev) "dev" else p.v.toString)
 
   private[version] def unsupportedErrorMessage(
       pv: ProtocolVersion,
@@ -149,7 +146,7 @@ object ProtocolVersion {
   ) = {
     val deleted = Option.when(includeDeleted)(ProtocolVersion.deleted.forgetNE).getOrElse(Nil)
 
-    val supportedPVs: NonEmpty[List[String]] = (supported ++ deleted).sorted.map(_.toString)
+    val supportedPVs: NonEmpty[List[String]] = (supported ++ deleted).map(_.toString)
 
     s"Protocol version $pv is not supported. The supported versions are ${supportedPVs.mkString(", ")}."
   }
@@ -164,7 +161,7 @@ object ProtocolVersion {
     *
     * Otherwise, use one of the other factory methods.
     */
-  def parseUncheckedS(rawVersion: String): Either[String, ProtocolVersion] =
+  private[version] def parseUnchecked(rawVersion: String): Either[String, ProtocolVersion] = {
     rawVersion.toIntOption match {
       case Some(value) => Right(ProtocolVersion(value))
 
@@ -176,10 +173,7 @@ object ProtocolVersion {
             Left(s"Unable to convert string `$rawVersion` to a protocol version.")
           }
     }
-
-  /** Same as above when parsing a raw version value */
-  def parseUnchecked(rawVersion: Int): Either[String, ProtocolVersion] =
-    Right(ProtocolVersion(rawVersion))
+  }
 
   /** Creates a [[ProtocolVersion]] from the given raw version value and ensures that it is a supported version.
     * @param rawVersion   String to be parsed.
@@ -193,7 +187,7 @@ object ProtocolVersion {
       rawVersion: String,
       allowDeleted: Boolean = false,
   ): Either[String, ProtocolVersion] =
-    parseUncheckedS(rawVersion).flatMap { pv =>
+    parseUnchecked(rawVersion).flatMap { pv =>
       val isSupported = pv.isSupported || (allowDeleted && pv.isDeleted)
 
       Either.cond(isSupported, pv, unsupportedErrorMessage(pv, includeDeleted = allowDeleted))
@@ -215,12 +209,19 @@ object ProtocolVersion {
     Either.cond(isSupported, pv, OtherError(unsupportedErrorMessage(pv)))
   }
 
+  /** Like [[create]] ensures a supported protocol version; tailored to (de-)serialization purposes.
+    * For handshake, we want to use a string as the primitive type and not an int because that is
+    * an endpoint that should never change. Using string allows us to evolve the scheme if needed.
+    */
+  def fromProtoPrimitiveHandshake(rawVersion: String): ParsingResult[ProtocolVersion] = {
+    ProtocolVersion.create(rawVersion).leftMap(OtherError)
+  }
+
   final case class InvalidProtocolVersion(override val description: String) extends FailureReason
 
   // All stable protocol versions supported by this release
-  // TODO(#15561) Switch to non-empty again
-  val stable: List[ProtocolVersion] =
-    parseFromBuildInfo(BuildInfo.stableProtocolVersions.toSeq)
+  val stable: NonEmpty[List[ProtocolVersion]] =
+    NonEmptyUtil.fromUnsafe(parseFromBuildInfo(BuildInfo.stableProtocolVersions.toSeq))
 
   private val deprecated: Seq[ProtocolVersion] = Seq()
 
@@ -233,11 +234,10 @@ object ProtocolVersion {
       ProtocolVersion(5),
       ProtocolVersion(6),
       ProtocolVersion(30),
-      ProtocolVersion(31),
     )
 
   val alpha: NonEmpty[List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha]]] =
-    NonEmpty.mk(List, ProtocolVersion.v32, ProtocolVersion.dev)
+    NonEmpty.mk(List, ProtocolVersion.dev)
 
   val beta: List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Beta]] =
     parseFromBuildInfo(BuildInfo.betaProtocolVersions.toSeq)
@@ -250,23 +250,22 @@ object ProtocolVersion {
   require(
     allProtocolVersions.sizeCompare(allProtocolVersions.distinct) == 0,
     s"All the protocol versions should be distinct." +
-      s"Found: ${Map("deprecated" -> deprecated, "deleted" -> deleted.forgetNE, "alpha" -> alpha.forgetNE, "stable" -> stable)}",
+      s"Found: ${Map("deprecated" -> deprecated, "deleted" -> deleted, "alpha" -> alpha, "stable" -> stable)}",
   )
 
-  // TODO(i15561): change back to `stableAndSupported.max1` once there is a stable Daml 3 protocol version
-  val latest: ProtocolVersion = stable.lastOption.getOrElse(alpha.head1)
+  val latest: ProtocolVersion = stable.last1
 
   lazy val dev: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
     ProtocolVersion.createAlpha(Int.MaxValue)
 
-  lazy val v32: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
-    ProtocolVersion.createAlpha(32)
+  lazy val v31: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
+    ProtocolVersion.createStable(31)
 
   // Minimum stable protocol version introduced
-  lazy val minimum: ProtocolVersion = v32
+  lazy val minimum: ProtocolVersion = v31
 
   private def parseFromBuildInfo(pv: Seq[String]): List[ProtocolVersion] =
-    pv.map(parseUncheckedS)
+    pv.map(parseUnchecked)
       .map(_.valueOr(sys.error))
       .toList
 }
@@ -279,6 +278,30 @@ final case class ReleaseProtocolVersion(v: ProtocolVersion) extends AnyVal
 
 object ReleaseProtocolVersion {
   val latest: ReleaseProtocolVersion = ReleaseProtocolVersion(ProtocolVersion.latest)
+}
+
+object Transfer {
+
+  /** When dealing with transfer, allow to be more precise with respect to the domain */
+  final case class SourceProtocolVersion(v: ProtocolVersion) extends AnyVal
+
+  object SourceProtocolVersion {
+    implicit val getResultSourceProtocolVersion: GetResult[SourceProtocolVersion] =
+      GetResult[ProtocolVersion].andThen(SourceProtocolVersion(_))
+
+    implicit val setParameterSourceProtocolVersion: SetParameter[SourceProtocolVersion] =
+      (pv: SourceProtocolVersion, pp: PositionedParameters) => pp >> pv.v
+  }
+
+  final case class TargetProtocolVersion(v: ProtocolVersion) extends AnyVal
+
+  object TargetProtocolVersion {
+    implicit val getResultTargetProtocolVersion: GetResult[TargetProtocolVersion] =
+      GetResult[ProtocolVersion].andThen(TargetProtocolVersion(_))
+
+    implicit val setParameterTargetProtocolVersion: SetParameter[TargetProtocolVersion] =
+      (pv: TargetProtocolVersion, pp: PositionedParameters) => pp >> pv.v
+  }
 }
 
 final case class ProtoVersion(v: Int) extends AnyVal

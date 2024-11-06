@@ -77,9 +77,7 @@ class DbSvSvStore(
             storeId,
             domainMigrationId,
             sql"""
-            template_id_qualified_name = ${QualifiedName(
-                ValidatorOnboarding.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
+            template_id_qualified_name = ${QualifiedName(ValidatorOnboarding.TEMPLATE_ID)}
               and onboarding_secret = ${lengthLimited(secret)}
           """,
           ).headOption,
@@ -103,9 +101,7 @@ class DbSvSvStore(
               storeId,
               domainMigrationId,
               sql"""
-                  template_id_qualified_name = ${QualifiedName(
-                  UsedSecret.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
+                  template_id_qualified_name = ${QualifiedName(UsedSecret.TEMPLATE_ID)}
                     and onboarding_secret = ${lengthLimited(secret)}
                 """,
             ).headOption,

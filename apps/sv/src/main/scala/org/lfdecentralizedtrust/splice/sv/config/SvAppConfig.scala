@@ -87,7 +87,6 @@ object SvOnboardingConfig {
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
       initialPackageConfig: InitialPackageConfig = InitialPackageConfig.defaultInitialPackageConfig,
-      initialTransferPreapprovalFee: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -245,11 +244,6 @@ case class SvAppBackendConfig(
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,
-    // Defaults to 24h to allow for 24h between preparation and execution of an externally signed transaction
-    submissionTimeRecordTimeTolerance: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofHours(24),
-    // Defaults to 48h as it must be at least 2x submissionTimeRecordtimeTolerance
-    mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

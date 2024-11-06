@@ -17,7 +17,7 @@ final case class GlobalOffset(v: PositiveLong) extends Ordered[GlobalOffset] wit
 
   override def compare(that: GlobalOffset): Int = this.toLong.compare(that.toLong)
 
-  override protected def pretty: Pretty[GlobalOffset.this.type] = prettyOfString(_ => v.toString)
+  override def pretty: Pretty[GlobalOffset.this.type] = prettyOfString(_ => v.toString)
 
   def min(other: GlobalOffset): GlobalOffset = GlobalOffset(
     PositiveLong.tryCreate(v.unwrap.min(other.toLong))
@@ -45,7 +45,6 @@ object GlobalOffset {
     pp >> v.map(_.unwrap.unwrap)
 
   val MaxValue: GlobalOffset = GlobalOffset(PositiveLong.MaxValue)
-  val FirstOffset = tryFromLong(Offset.firstOffset.toLong)
 
   def tryFromLong(i: Long): GlobalOffset =
     fromLong(i).valueOr(err => throw new IllegalArgumentException(err))

@@ -6,8 +6,14 @@ package org.lfdecentralizedtrust.splice.store
 import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  ExercisedEvent,
+  Identifier,
+  ParticipantOffset,
+  TransactionTree,
+}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -25,18 +31,22 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
   DestinationHistory,
   SourceMigrationInfo,
 }
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
+  ContractCompanion,
+  HasIngestionSink,
+  IngestionFilter,
+}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   DomainRecordTimeRange,
+  TemplateJsonDecoder,
   ValueJsonCodecProtobuf as ProtobufCodec,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -157,9 +167,7 @@ class UpdateHistory(
         storage.queryAndUpdate(action.transactionally, "issue12777Workaround")
       }
 
-      override def initialize()(implicit
-          traceContext: TraceContext
-      ): Future[Option[Long]] = {
+      override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] = {
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         // Notes:
@@ -220,7 +228,6 @@ class UpdateHistory(
             .getOrRaise(
               new RuntimeException(s"No row for $newHistoryId found, which was just inserted!")
             )
-            .map(_.map(ApiOffset.assertFromStringToLong(_)))
 
           _ <- cleanUpDataAfterDomainMigration(newHistoryId)
         } yield {
@@ -244,7 +251,7 @@ class UpdateHistory(
         s"UpdateHistory(party=$updateStreamParty, participantId=$participantId, migrationId=$domainMigrationId, historyId=$historyId)"
 
       override def ingestAcs(
-          offset: Long,
+          offset: String,
           acs: Seq[ActiveContract],
           incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
           incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
@@ -269,8 +276,8 @@ class UpdateHistory(
       override def ingestUpdate(domain: DomainId, update: TreeUpdate)(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
-        val offset: Long = update match {
-          case ReassignmentUpdate(reassignment) => reassignment.offset
+        val offset = update match {
+          case ReassignmentUpdate(reassignment) => reassignment.offset.getOffset
           case TransactionTreeUpdate(tree) => tree.getOffset
         }
         val recordTime = update match {
@@ -313,14 +320,14 @@ class UpdateHistory(
         storage.queryAndUpdate(action, "ingestUpdate")
       }
 
-      private def updateOffset(offset: Long): DBIOAction[?, NoStream, Effect.Write] =
+      private def updateOffset(offset: String): DBIOAction[?, NoStream, Effect.Write] =
         sqlu"""
         update update_history_last_ingested_offsets
-        set last_ingested_offset = ${lengthLimited(ApiOffset.fromLong(offset))}
+        set last_ingested_offset = ${lengthLimited(offset)}
         where history_id = $historyId and migration_id = $domainMigrationId
       """
 
-      private def readOffset(): DBIOAction[Option[Long], NoStream, Effect.Read] =
+      private def readOffset(): DBIOAction[Option[String], NoStream, Effect.Read] =
         sql"""
         select last_ingested_offset
         from update_history_last_ingested_offsets
@@ -328,7 +335,6 @@ class UpdateHistory(
       """
           .as[Option[String]]
           .head
-          .map(_.map(ApiOffset.assertFromStringToLong(_)))
     }
 
   private def ingestUpdate_(
@@ -362,7 +368,7 @@ class UpdateHistory(
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
-    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(reassignment.offset))
+    val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.contractId.contractId)
     sqlu"""
@@ -390,7 +396,7 @@ class UpdateHistory(
   ): DBIOAction[?, NoStream, Effect.Write] = {
     val safeUpdateId = lengthLimited(reassignment.updateId)
     val safeRecordTime = reassignment.recordTime
-    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(reassignment.offset))
+    val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.createdEvent.getContractId)
     val safeEventId = lengthLimited(event.createdEvent.getEventId)
@@ -460,7 +466,7 @@ class UpdateHistory(
   ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
     val safeUpdateId = lengthLimited(tree.getUpdateId)
     val safeRecordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
-    val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(tree.getOffset))
+    val safeParticipantOffset = lengthLimited(tree.getOffset)
     val safeDomainId = lengthLimited(tree.getDomainId)
     val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
     val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
@@ -958,6 +964,13 @@ class UpdateHistory(
     }
   }
 
+  // TODO (#13511): implement or remove placeholder
+  def getCreateEvents()(implicit tc: TraceContext): Future[Seq[CreatedEvent]] = {
+    queryCreateEvents((1L to 100L).toSeq).map { result =>
+      result.values.flatten.map(_.toCreatedEvent).toSeq
+    }
+  }
+
   private def queryCreateEvents(
       transactionRowIds: Seq[Long]
   )(implicit tc: TraceContext): Future[Map[Long, Seq[SelectFromCreateEvents]]] = {
@@ -988,43 +1001,6 @@ class UpdateHistory(
         )
         .map(_.groupBy(_.updateRowId))
     }
-  }
-
-  def lookupContractById[TCId <: ContractId[_], T <: DamlRecord[_]](
-      companion: Contract.Companion.Template[TCId, T]
-  )(contractId: TCId)(implicit tc: TraceContext): Future[Option[Contract[TCId, T]]] = {
-    for {
-      // Annoyingly our index for contract id lookups does not include the history id.
-      // In production, we only ever have one history id per database but at least in tests
-      // postgres sometimes picks an index to filter by history_id and does a linear search over contract_id.
-      // The materialized CTE forces it to pick the contract_id index.
-      r <- storage
-        .querySingle(
-          sql"""
-            with unfiltered_contracts as materialized (select
-              update_row_id,
-              event_id,
-              contract_id,
-              created_at,
-              template_id_package_id,
-              template_id_module_name,
-              template_id_entity_name,
-              package_name,
-              create_arguments,
-              signatories,
-              observers,
-              contract_key,
-              history_id
-            from update_history_creates
-            where contract_id = $contractId)
-            select * from unfiltered_contracts where history_id = $historyId""".toActionBuilder
-            .as[SelectFromCreateEvents]
-            .headOption,
-          "lookupContractById",
-        )
-        .value
-        .map(_.map(_.toContract(companion)))
-    } yield r
   }
 
   private def queryExerciseEvents(
@@ -1107,7 +1083,7 @@ class UpdateHistory(
           /*commandId = */ updateRow.commandId.getOrElse(missingString),
           /*workflowId = */ updateRow.workflowId.getOrElse(missingString),
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
-          /*offset = */ ApiOffset.assertFromStringToLong(updateRow.participantOffset),
+          /*offset = */ updateRow.participantOffset,
           /*eventsById = */ eventsById.asJava,
 
           /*rootEventIds = */ rootEventsIds.asJava,
@@ -1127,7 +1103,7 @@ class UpdateHistory(
       ReassignmentUpdate(
         Reassignment[Assign](
           updateId = row.updateId,
-          offset = row.participantOffset,
+          offset = new ParticipantOffset.Absolute(row.participantOffset),
           recordTime = row.recordTime,
           event = Assign(
             submitter = row.submitter,
@@ -1168,7 +1144,7 @@ class UpdateHistory(
       ReassignmentUpdate(
         Reassignment[Unassign](
           updateId = row.updateId,
-          offset = row.participantOffset,
+          offset = new ParticipantOffset.Absolute(row.participantOffset),
           recordTime = row.recordTime,
           event = Unassign(
             submitter = row.submitter,
@@ -1235,7 +1211,7 @@ class UpdateHistory(
         (
           <<[String],
           <<[CantonTimestamp],
-          ApiOffset.assertFromStringToLong(<<[String]),
+          <<[String],
           <<[DomainId],
           <<[Long],
           <<[Long],
@@ -1264,7 +1240,7 @@ class UpdateHistory(
         (
           <<[String],
           <<[CantonTimestamp],
-          ApiOffset.assertFromStringToLong(<<[String]),
+          <<[String],
           <<[DomainId],
           <<[Long],
           <<[Long],
@@ -1610,15 +1586,29 @@ object UpdateHistory {
       contractKey: Option[String],
   ) {
 
-    def toContract[TCId <: ContractId[_], T <: DamlRecord[_]](
-        companion: Contract.Companion.Template[TCId, T]
+    def toContract[C, TCId <: ContractId[_], T](companion: C)(implicit
+        companionClass: ContractCompanion[C, TCId, T],
+        decoder: TemplateJsonDecoder,
     ): Contract[TCId, T] = {
-      Contract
-        .fromCreatedEvent(companion)(this.toCreatedEvent)
-        .getOrElse(
-          throw new IllegalStateException(
-            s"Stored a contract that cannot be decoded as ${companion.TEMPLATE_ID}: $this"
-          )
+      companionClass
+        .fromJson(companion)(
+          new Identifier(
+            templatePackageId,
+            templateModuleName,
+            templateEntityName,
+          ),
+          contractId,
+          io.circe.parser
+            .parse(createArguments)
+            .getOrElse(
+              throw new IllegalStateException(s"Failed to parse create arguments: $createArguments")
+            ),
+          ByteString.EMPTY,
+          createdAt.toInstant,
+        )
+        .fold(
+          err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
+          identity,
         )
     }
 
@@ -1692,7 +1682,7 @@ object UpdateHistory {
   private case class SelectFromAssignments(
       updateId: String,
       recordTime: CantonTimestamp,
-      participantOffset: Long,
+      participantOffset: String,
       domainId: DomainId,
       migrationId: Long,
       reassignmentCounter: Long,
@@ -1715,7 +1705,7 @@ object UpdateHistory {
   private case class SelectFromUnassignments(
       updateId: String,
       recordTime: CantonTimestamp,
-      participantOffset: Long,
+      participantOffset: String,
       domainId: DomainId,
       migrationId: Long,
       reassignmentCounter: Long,

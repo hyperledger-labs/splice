@@ -4,7 +4,6 @@
 package com.digitalasset.canton.crypto.provider.symbolic
 
 import cats.data.{EitherT, OptionT}
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.*
@@ -48,71 +47,75 @@ class SymbolicCrypto(
   )(fn: TraceContext => OptionT[FutureUnlessShutdown, A]): Option[A] =
     process(description)(fn(_).value)
 
-  private def process[A](description: String)(fn: TraceContext => FutureUnlessShutdown[A]): A =
+  private def process[A](description: String)(fn: TraceContext => FutureUnlessShutdown[A]): A = {
     TraceContext.withNewTraceContext { implicit traceContext =>
       timeouts.default.await(description) {
         fn(traceContext)
           .onShutdown(sys.error("aborted due to shutdown"))
       }
     }
+  }
 
-  def getOrGenerateSymbolicSigningKey(
-      name: String,
-      usage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
-  ): SigningPublicKey =
+  def getOrGenerateSymbolicSigningKey(name: String): SigningPublicKey = {
     processO("get or generate symbolic signing key") { implicit traceContext =>
       cryptoPublicStore
         .findSigningKeyIdByName(KeyName.tryCreate(name))
-    }.getOrElse(generateSymbolicSigningKey(Some(name), usage))
+    }.getOrElse(generateSymbolicSigningKey(Some(name)))
+  }
 
-  def getOrGenerateSymbolicEncryptionKey(name: String): EncryptionPublicKey =
+  def getOrGenerateSymbolicEncryptionKey(name: String): EncryptionPublicKey = {
     processO("get or generate symbolic encryption key") { implicit traceContext =>
       cryptoPublicStore
         .findEncryptionKeyIdByName(KeyName.tryCreate(name))
     }.getOrElse(generateSymbolicEncryptionKey(Some(name)))
+  }
 
   /** Generates a new symbolic signing keypair and stores the public key in the public store */
   def generateSymbolicSigningKey(
-      name: Option[String] = None,
-      usage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
-  ): SigningPublicKey =
+      name: Option[String] = None
+  ): SigningPublicKey = {
     processE("generate symbolic signing key") { implicit traceContext =>
       // We don't care about the signing key scheme in symbolic crypto
-      generateSigningKey(usage = usage, name = name.map(KeyName.tryCreate))
+      generateSigningKey(SigningKeyScheme.Ed25519, name.map(KeyName.tryCreate))
     }
+  }
 
   /** Generates a new symbolic signing keypair but does not store it in the public store */
-  def newSymbolicSigningKeyPair(
-      usage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All
-  ): SigningKeyPair =
+  def newSymbolicSigningKeyPair(): SigningKeyPair = {
     processE("generate symbolic signing keypair") { implicit traceContext =>
       // We don't care about the signing key scheme in symbolic crypto
       privateCrypto
-        .generateSigningKeypair(SigningKeySpec.EcCurve25519, usage)
+        .generateSigningKeypair(SigningKeyScheme.Ed25519)
     }
+  }
 
   def generateSymbolicEncryptionKey(
       name: Option[String] = None
   ): EncryptionPublicKey =
     processE("generate symbolic encryption key") { implicit traceContext =>
       // We don't care about the encryption key specification in symbolic crypto
-      generateEncryptionKey(name = name.map(KeyName.tryCreate))
+      generateEncryptionKey(
+        privateCrypto.defaultEncryptionKeySpec,
+        name.map(KeyName.tryCreate),
+      )
     }
 
-  def newSymbolicEncryptionKeyPair(): EncryptionKeyPair =
+  def newSymbolicEncryptionKeyPair(): EncryptionKeyPair = {
     processE("generate symbolic encryption keypair") { implicit traceContext =>
       // We don't care about the encryption key specification in symbolic crypto
       privateCrypto
         .generateEncryptionKeypair(privateCrypto.defaultEncryptionKeySpec)
     }
+  }
 
   def sign(hash: Hash, signingKeyId: Fingerprint): Signature =
     processE("symbolic signing") { implicit traceContext =>
       privateCrypto.sign(hash, signingKeyId)
     }
 
-  def setRandomKeysFlag(newValue: Boolean): Unit =
+  def setRandomKeysFlag(newValue: Boolean): Unit = {
     privateCrypto.setRandomKeysFlag(newValue)
+  }
 }
 
 object SymbolicCrypto {

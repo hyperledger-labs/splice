@@ -4,7 +4,7 @@
 package com.digitalasset.canton
 
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.environment.CantonNodeParameters
+import com.digitalasset.canton.environment.{CantonNodeParameters, DefaultNodeParameters}
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TracingConfig
@@ -17,6 +17,7 @@ object MockedNodeParameters {
       _loggingConfig: LoggingConfig = LoggingConfig(),
       _enableAdditionalConsistencyChecks: Boolean = true,
       _nonStandardConfig: Boolean = false,
+      _useUnifiedSequencer: Boolean = DefaultNodeParameters.UseUnifiedSequencer,
   ): CantonNodeParameters = new CantonNodeParameters {
     override def delayLoggingThreshold: NonNegativeFiniteDuration = ???
 
@@ -49,6 +50,8 @@ object MockedNodeParameters {
     override def dbMigrateAndStart: Boolean = false
 
     override def exitOnFatalFailures: Boolean = true
+
+    override def useUnifiedSequencer: Boolean = _useUnifiedSequencer
 
     override def watchdog: Option[WatchdogConfig] = None
   }

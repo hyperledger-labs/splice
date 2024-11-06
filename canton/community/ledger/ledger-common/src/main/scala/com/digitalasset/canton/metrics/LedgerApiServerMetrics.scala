@@ -78,7 +78,13 @@ final class LedgerApiServerMetrics(
         openTelemetryMetricsFactory,
       )
 
-  object indexer extends IndexerMetrics(inventory.indexer, openTelemetryMetricsFactory)
+  object indexer extends IndexerMetrics(prefix :+ "indexer", openTelemetryMetricsFactory)
+
+  object indexerEvents
+      extends IndexedUpdatesMetrics(prefix :+ "indexer", openTelemetryMetricsFactory)
+
+  object parallelIndexer
+      extends ParallelIndexerMetrics(inventory.parallelIndexer, openTelemetryMetricsFactory)
 
   object services
       extends ServicesMetrics(
@@ -100,7 +106,7 @@ class LedgerApiServerHistograms(val prefix: MetricName)(implicit
   private[metrics] val commands = new CommandHistograms(prefix :+ "commands")
   private[metrics] val execution = new ExecutionHistograms(prefix :+ "execution")
   private[metrics] val index = new IndexHistograms(prefix :+ "index")
-  private[metrics] val indexer = new IndexerHistograms(prefix :+ "indexer")
+  private[metrics] val parallelIndexer = new ParallelIndexerHistograms(prefix :+ "parallel_indexer")
 
   private val _grpc = new DamlGrpcServerHistograms()
   // the ledger api server creates these metrics all over the place, but their prefix

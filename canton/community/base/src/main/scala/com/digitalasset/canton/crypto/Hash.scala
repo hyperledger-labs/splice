@@ -38,7 +38,7 @@ sealed abstract class HashAlgorithm(val name: String, val index: Long, val lengt
     extends PrettyPrinting {
   def toProtoEnum: v30.HashAlgorithm
 
-  override protected def pretty: Pretty[HashAlgorithm] = prettyOfString(_.name)
+  override def pretty: Pretty[HashAlgorithm] = prettyOfString(_.name)
 }
 
 object HashAlgorithm {
@@ -101,8 +101,9 @@ final case class Hash private (private val hash: ByteString, private val algorit
   val toLengthLimitedHexString: String68 =
     String68.tryCreate(toHexString, Some("HexString of hash"))
 
-  def compare(that: Hash): Int =
+  def compare(that: Hash): Int = {
     this.toHexString.compare(that.toHexString)
+  }
 
   override val pretty: Pretty[Hash] = prettyOfString(hash =>
     s"${hash.algorithm.name}:${HexString.toHexString(hash.hash).readableHash}"
@@ -153,16 +154,17 @@ object Hash {
   def build(purpose: HashPurpose, algorithm: HashAlgorithm): HashBuilder =
     new HashBuilderFromMessageDigest(algorithm, purpose)
 
-  def digest(purpose: HashPurpose, bytes: ByteString, algorithm: HashAlgorithm): Hash =
+  def digest(purpose: HashPurpose, bytes: ByteString, algorithm: HashAlgorithm): Hash = {
     // It's safe to use `addWithoutLengthPrefix` because there cannot be hash collisions due to concatenation
     // as we're immediately calling `finish`.
     build(purpose, algorithm).addWithoutLengthPrefix(bytes).finish()
+  }
 
   def fromProtoPrimitive(bytes: ByteString): ParsingResult[Hash] =
-    fromByteString(bytes).leftMap(CryptoDeserializationError.apply)
+    fromByteString(bytes).leftMap(CryptoDeserializationError)
 
   def fromProtoPrimitiveOption(bytes: ByteString): ParsingResult[Option[Hash]] =
-    fromByteStringOption(bytes).leftMap(CryptoDeserializationError.apply)
+    fromByteStringOption(bytes).leftMap(CryptoDeserializationError)
 
   /** Decode a serialized [[Hash]] from a multi-hash format. */
   def fromByteString(bytes: ByteString): Either[DeserializationError, Hash] =

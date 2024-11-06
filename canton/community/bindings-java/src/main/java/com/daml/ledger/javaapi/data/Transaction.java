@@ -24,7 +24,7 @@ public final class Transaction {
 
   @NonNull private final List<@NonNull Event> events;
 
-  @NonNull private final Long offset;
+  @NonNull private final String offset;
 
   @NonNull private final String domainId;
 
@@ -38,7 +38,7 @@ public final class Transaction {
       @NonNull String workflowId,
       @NonNull Instant effectiveAt,
       @NonNull List<@NonNull Event> events,
-      @NonNull Long offset,
+      @NonNull String offset,
       @NonNull String domainId,
       TraceContextOuterClass.@NonNull TraceContext traceContext,
       @NonNull Instant recordTime) {
@@ -79,7 +79,7 @@ public final class Transaction {
   }
 
   @NonNull
-  public Long getOffset() {
+  public String getOffset() {
     return offset;
   }
 

@@ -457,26 +457,6 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.ListTransactions(beginAfterId, pageSize))
     }
   }
-
-  @Help.Summary("Create transfer preapproval")
-  @Help.Description("Create transfer preapproval for the requesting party")
-  def createTransferPreapproval(): HttpWalletAppClient.CreateTransferPreapprovalResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.CreateTransferPreapproval)
-    }
-
-  @Help.Summary("Send amulet to the receiver using their TransferPreapproval")
-  @Help.Description(
-    "Send the given amulet to the receiver using their TransferPreapproval contract, fails if they do not have one"
-  )
-  def transferPreapprovalSend(
-      receiver: PartyId,
-      amount: BigDecimal,
-      deduplicationId: String,
-  ): Unit =
-    consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.TransferPreapprovalSend(receiver, amount, deduplicationId))
-    }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

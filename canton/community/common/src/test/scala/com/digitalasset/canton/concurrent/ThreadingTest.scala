@@ -238,10 +238,11 @@ class ThreadingTest extends AnyWordSpec with BaseTest {
           noTracingLogger,
         )
 
-      def rec(n: Int): Future[Int] =
+      def rec(n: Int): Future[Int] = {
         Future
           .successful(n)
           .flatMap(i => if (i > 0) rec(i - 1) else Future.successful(0))(parallelExecutionContext)
+      }
 
       try {
         rec(100000).futureValue
@@ -256,14 +257,14 @@ class ThreadingTest extends AnyWordSpec with BaseTest {
       lazy val blocker: Int = {
         // The `blocking` here does not suffice because the Scala compiler inserts a `this.synchronized` around
         // this initialization block without wrapping it in a `blocking` call itself.
-        blocking(semaphore.acquire())
+        blocking { semaphore.acquire() }
         semaphore.release()
         1
       }
 
       def blockerWithContext: Int = _blockerWithContext.get(())
       private[this] val _blockerWithContext = new LazyValWithContext[Int, Unit]({ _ =>
-        blocking(semaphore.acquire())
+        blocking { semaphore.acquire() }
         semaphore.release()
         1
       })
@@ -272,7 +273,7 @@ class ThreadingTest extends AnyWordSpec with BaseTest {
     "deplete the threads in a fork-join pool" in {
       withNewExecutionContext { implicit ec =>
         val semaphore = new Semaphore(1)
-        blocking(semaphore.acquire())
+        blocking { semaphore.acquire() }
         val lvt = new LazyValTest(semaphore)
 
         // Use a few more threads to avoid flakes
@@ -306,7 +307,7 @@ class ThreadingTest extends AnyWordSpec with BaseTest {
     "not deplete the threads in a fork-join pool when using LazyValWithContext" in {
       withNewExecutionContext { implicit ec =>
         val semaphore = new Semaphore(1)
-        blocking(semaphore.acquire())
+        blocking { semaphore.acquire() }
         val lvt = new LazyValTest(semaphore)
 
         // Use a few more threads to avoid flakes
@@ -326,7 +327,7 @@ class ThreadingTest extends AnyWordSpec with BaseTest {
     }
   }
 
-  def submitExtraTasks(description: String)(implicit ec: ExecutionContext): Future[Unit] =
+  def submitExtraTasks(description: String)(implicit ec: ExecutionContext): Future[Unit] = {
     // Run some extra tasks to keep submitting to the fork join pool.
     // This is necessary, because the fork join pool occasionally fails to create a worker thread.
     // It is ok to do so in this test, because there are plenty of extra tasks in production.
@@ -335,6 +336,7 @@ class ThreadingTest extends AnyWordSpec with BaseTest {
         logger.debug(s"$description: Running extra task $i...")
       }
     }
+  }
 
   def withNewExecutionContext(body: ExecutionContext => Unit): Unit =
     ResourceUtil.withResource(

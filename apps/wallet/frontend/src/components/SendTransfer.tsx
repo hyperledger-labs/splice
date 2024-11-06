@@ -13,7 +13,6 @@ import {
   Button,
   Card,
   CardContent,
-  Checkbox,
   FormControl,
   InputAdornment,
   NativeSelect,
@@ -25,13 +24,12 @@ import {
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
-import useLookupTransferPreapproval from '../hooks/scan-proxy/useLookupTransferPreapproval';
 import { useWalletConfig } from '../utils/config';
 import BftAnsField from './BftAnsField';
 
 const SendTransfer: React.FC = () => {
   const config = useWalletConfig();
-  const { createTransferOffer, transferPreapprovalSend } = useWalletClient();
+  const { createTransferOffer } = useWalletClient();
   const amuletPriceQuery = useAmuletPrice();
 
   const [receiver, setReceiver] = useState<string>('');
@@ -39,8 +37,6 @@ const SendTransfer: React.FC = () => {
   const [ccAmountText, setCCAmountText] = useState<string>('1');
   const [expDays, setExpDays] = useState('1');
   const [description, setDescription] = useState<string>('');
-  const [useTransferPreapproval, setUseTransferPreapproval] = useState<boolean>(true);
-  const preapprovalResult = useLookupTransferPreapproval(receiver);
 
   const expiryOptions = [
     { name: '1 day', value: 1 },
@@ -52,17 +48,17 @@ const SendTransfer: React.FC = () => {
 
   const ccAmount = useMemo(() => new BigNumber(ccAmountText), [ccAmountText]);
 
-  // Only set deduplication id once. In the success case, it doesn't matter because of `isSending` & the `navigate`.
+  // Only set trackingId once. In the success case, it doesn't matter because of `isSending` & the `navigate`.
   // But: if the transfer is accepted by the BE, but the response fails to reach the FE (e.g., timeout),
   // you need to make sure that if the user clicks "Send" again it will be with the same key to prevent double-sends.
-  const deduplicationId: string = useMemo(() => uuidv4(), []);
+  const trackingId: string = useMemo(() => uuidv4(), []);
 
   const navigate = useNavigate();
-  const createTransferOfferMutation = useMutation({
+  const transferMutation = useMutation({
     mutationFn: async () => {
       const now = new Date();
       const expires = addHours(now, Number(expDays) * 24);
-      return await createTransferOffer(receiver, ccAmount, description, expires, deduplicationId);
+      return await createTransferOffer(receiver, ccAmount, description, expires, trackingId);
     },
     onSuccess: () => {
       navigate('/transactions');
@@ -70,28 +66,12 @@ const SendTransfer: React.FC = () => {
     onError: error => {
       // TODO (#5491): show an error to the user.
       console.error(
-        `Failed to create transfer offer to ${receiver} of ${ccAmount} CC with trackingId ${deduplicationId}`,
+        `Failed to send transfer to ${receiver} of ${ccAmount} CC with trackingId ${trackingId}`,
         error
       );
     },
     // in case the participant is unavailable
     retry: 4,
-  });
-
-  const transferPreapprovalSendMutation = useMutation({
-    mutationFn: async () => {
-      return await transferPreapprovalSend(receiver, ccAmount, deduplicationId);
-    },
-    onSuccess: () => {
-      navigate('/transactions');
-    },
-    onError: error => {
-      // TODO (#5491): show an error to the user.
-      console.error(
-        `Failed to send transfer to ${receiver} of ${ccAmount} CC with deduplicationId ${deduplicationId}`,
-        error
-      );
-    },
   });
 
   useMemo(() => {
@@ -112,31 +92,15 @@ const SendTransfer: React.FC = () => {
       </Typography>
       <Card variant="outlined">
         <CardContent sx={{ paddingX: '64px' }}>
-          <Stack direction="row" spacing={5} sx={{ justifyContent: 'space-between' }}>
-            <Stack direction="column" mb={4} spacing={1}>
-              <Typography variant="h6">Recipient</Typography>
-              <BftAnsField
-                name="Receiver"
-                label="Receiver"
-                aria-label="Receiver"
-                id="create-offer-receiver"
-                onPartyChanged={setReceiver}
-              />
-            </Stack>
-            <Stack
-              direction="column"
-              sx={{ alignItems: 'flex-end', display: preapprovalResult.data ? undefined : 'none' }}
-            >
-              <Typography variant="h6">
-                Receiver has approved incoming transfers, transfer directly instead of creating a
-                transfer offer
-              </Typography>
-              <Checkbox
-                id="use-transfer-preapproval-checkbox"
-                checked={useTransferPreapproval}
-                onChange={e => setUseTransferPreapproval(e.target.checked)}
-              ></Checkbox>
-            </Stack>
+          <Stack direction="column" mb={4} spacing={1}>
+            <Typography variant="h6">Recipient</Typography>
+            <BftAnsField
+              name="Receiver"
+              label="Receiver"
+              aria-label="Receiver"
+              id="create-offer-receiver"
+              onPartyChanged={setReceiver}
+            />
           </Stack>
 
           <Stack direction="column" mb={4} spacing={1}>
@@ -175,65 +139,45 @@ const SendTransfer: React.FC = () => {
               </FormControl>
             </Box>
           </Stack>
-          {!(preapprovalResult.data && useTransferPreapproval) && (
-            <Stack direction="column" mb={4} spacing={1}>
-              <Typography variant="h6">Expiration</Typography>
-              <FormControl fullWidth>
-                <NativeSelect
-                  inputProps={{ id: 'create-offer-expiration-days' }}
-                  value={expDays}
-                  onChange={e => setExpDays(e.target.value)}
-                >
-                  {expiryOptions.map((exp, index) => (
-                    <option key={'exp-option-' + index} value={exp.value}>
-                      {exp.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </FormControl>
-            </Stack>
-          )}
-          {!(preapprovalResult.data && useTransferPreapproval) && (
-            <Stack direction="column" mb={4} spacing={1}>
-              <Typography variant="h6">
-                Description <Typography variant="caption">(optional)</Typography>{' '}
-              </Typography>
-              <TextField
-                id="create-offer-description"
-                rows={4}
-                multiline
-                inputProps={{ 'aria-label': 'description' }}
-                onChange={e => setDescription(e.target.value)}
-              />
-            </Stack>
-          )}
+
+          <Stack direction="column" mb={4} spacing={1}>
+            <Typography variant="h6">Expiration</Typography>
+            <FormControl fullWidth>
+              <NativeSelect
+                inputProps={{ id: 'create-offer-expiration-days' }}
+                value={expDays}
+                onChange={e => setExpDays(e.target.value)}
+              >
+                {expiryOptions.map((exp, index) => (
+                  <option key={'exp-option-' + index} value={exp.value}>
+                    {exp.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FormControl>
+          </Stack>
+
+          <Stack direction="column" mb={4} spacing={1}>
+            <Typography variant="h6">
+              Description <Typography variant="caption">(optional)</Typography>{' '}
+            </Typography>
+            <TextField
+              id="create-offer-description"
+              rows={4}
+              multiline
+              onChange={e => setDescription(e.target.value)}
+            />
+          </Stack>
 
           <DisableConditionally
-            conditions={[
-              {
-                disabled: createTransferOfferMutation.isLoading,
-                reason: 'Creating transfer offer...',
-              },
-              {
-                disabled: transferPreapprovalSendMutation.isLoading,
-                reason: 'Executing preapproved transfer...',
-              },
-              {
-                disabled: preapprovalResult.isLoading,
-                reason: 'Loading preapproval data...',
-              },
-            ]}
+            conditions={[{ disabled: transferMutation.isLoading, reason: 'Loading...' }]}
           >
             <Button
               id="create-offer-submit-button"
               variant="pill"
               fullWidth
               size="large"
-              onClick={() =>
-                useTransferPreapproval && preapprovalResult.data
-                  ? transferPreapprovalSendMutation.mutate()
-                  : createTransferOfferMutation.mutate()
-              }
+              onClick={() => transferMutation.mutate()}
             >
               Send
             </Button>

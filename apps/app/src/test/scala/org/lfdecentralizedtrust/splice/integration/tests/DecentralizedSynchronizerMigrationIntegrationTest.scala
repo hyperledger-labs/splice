@@ -87,7 +87,6 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -95,7 +94,6 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import com.digitalasset.canton.util.HexString
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
@@ -112,7 +110,6 @@ import scala.util.Using
 
 class DecentralizedSynchronizerMigrationIntegrationTest
     extends IntegrationTest
-    with ExternallySignedPartyTestUtil
     with ProcessTestUtil
     with SvTestUtil
     with WalletTestUtil
@@ -500,31 +497,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       walletUserParty
     }
 
-    def createExternalParty(
-        validatorBackend: ValidatorAppBackendReference,
-        walletClient: WalletAppClientReference,
-    ) = {
-      val onboarding @ OnboardingResult(externalParty, _, _) =
-        onboardExternalParty(validatorBackend)
-      walletClient.tap(50.0)
-      walletClient.createTransferPreapproval()
-      createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
-      eventually() {
-        validatorBackend.lookupTransferPreapprovalByParty(externalParty) should not be empty
-        validatorBackend.scanProxy.lookupTransferPreapprovalByParty(
-          externalParty
-        ) should not be empty
-      }
-      validatorBackend
-        .getExternalPartyBalance(externalParty)
-        .totalUnlockedCoin shouldBe "0.0000000000"
-      walletClient.transferPreapprovalSend(externalParty, 40.0, UUID.randomUUID.toString)
-      validatorBackend
-        .getExternalPartyBalance(externalParty)
-        .totalUnlockedCoin shouldBe "40.0000000000"
-      onboarding
-    }
-
     val bobValidatorLocalBackend: ValidatorAppBackendReference = v("bobValidatorLocal")
 
     withCanton(
@@ -577,9 +549,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       val aliceUserParty = startValidatorAndTapAmulet(aliceValidatorBackend, aliceWalletClient)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val splitwellGroupKey = createSplitwellGroupAndTransfer(aliceUserParty, charlieUserParty)
-      val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
-        createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
-      }
 
       val sequencerUrlSetBeforeUpgrade =
         clue("validator should connect to all sequencer urls on the old network") {
@@ -883,49 +852,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               )
             }
 
-            clue("External party's balance has been preserved and it can transfer") {
-              aliceValidatorLocal
-                .getExternalPartyBalance(externalPartyOnboarding.party)
-                .totalUnlockedCoin shouldBe "40.0000000000"
-              val prepareSend =
-                aliceValidatorLocal.prepareTransferPreapprovalSend(
-                  externalPartyOnboarding.party,
-                  aliceValidatorLocal.getValidatorPartyId(),
-                  BigDecimal(10.0),
-                  CantonTimestamp.now().plus(Duration.ofHours(24)),
-                  0L,
-                )
-              actAndCheck(
-                "Submit signed TransferCommand creation",
-                aliceValidatorLocal.submitTransferPreapprovalSend(
-                  externalPartyOnboarding.party,
-                  prepareSend.transaction,
-                  HexString.toHexString(
-                    crypto
-                      .sign(
-                        Hash
-                          .fromByteString(HexString.parseToByteString(prepareSend.txHash).value)
-                          .value,
-                        externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
-                      )
-                      .value
-                      .signature
-                  ),
-                  HexString.toHexString(externalPartyOnboarding.publicKey.key),
-                ),
-              )(
-                "validator automation completes transfer",
-                _ => {
-                  // 40-10-some fees
-                  BigDecimal(
-                    aliceValidatorLocal
-                      .getExternalPartyBalance(externalPartyOnboarding.party)
-                      .totalUnlockedCoin
-                  ) should beWithin(BigDecimal(28), BigDecimal(30))
-                },
-              )
-            }
-
             clue(s"scan should expose sequencers in both pre-upgrade or upgraded domain") {
               eventually() {
                 inside(sv1ScanLocalBackend.listDsoSequencers()) {
@@ -1062,11 +988,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   migrationId = 1L,
                   pageSize = 1000,
                   templates = Some(
-                    Vector(
-                      DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID,
-                      AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
-                      AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID,
-                    ).map(
+                    Vector(DsoRules.TEMPLATE_ID, AmuletRules.TEMPLATE_ID, AnsRules.TEMPLATE_ID).map(
                       PackageQualifiedName(_)
                     )
                   ),

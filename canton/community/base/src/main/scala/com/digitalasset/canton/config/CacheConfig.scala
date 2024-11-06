@@ -70,7 +70,6 @@ final case class CachingConfigs(
     indexedStrings: CacheConfig = CachingConfigs.defaultStaticStringCache,
     contractStore: CacheConfig = CachingConfigs.defaultContractStoreCache,
     topologySnapshot: CacheConfig = CachingConfigs.defaultTopologySnapshotCache,
-    domainClientMaxTimestamp: CacheConfig = CachingConfigs.defaultDomainClientMaxTimestampCache,
     partyCache: CacheConfig = CachingConfigs.defaultPartyCache,
     participantCache: CacheConfig = CachingConfigs.defaultParticipantCache,
     keyCache: CacheConfig = CachingConfigs.defaultKeyCache,
@@ -81,7 +80,6 @@ final case class CachingConfigs(
     kmsMetadataCache: CacheConfig = CachingConfigs.kmsMetadataCache,
     finalizedMediatorConfirmationRequests: CacheConfig =
       CachingConfigs.defaultFinalizedMediatorConfirmationRequestsCache,
-    sequencerPayloadCache: CacheConfig = CachingConfigs.defaultSequencerPayloadCache,
 )
 
 object CachingConfigs {
@@ -89,8 +87,6 @@ object CachingConfigs {
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(10000))
   val defaultContractStoreCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(10000))
-  val defaultDomainClientMaxTimestampCache: CacheConfig =
-    CacheConfig(maximumSize = PositiveNumeric.tryCreate(100))
   val defaultTopologySnapshotCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(100))
   val defaultPartyCache: CacheConfig = CacheConfig(maximumSize = PositiveNumeric.tryCreate(10000))
@@ -119,8 +115,6 @@ object CachingConfigs {
   val kmsMetadataCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(20))
   val defaultFinalizedMediatorConfirmationRequestsCache =
-    CacheConfig(maximumSize = PositiveNumeric.tryCreate(1000))
-  val defaultSequencerPayloadCache: CacheConfig =
     CacheConfig(maximumSize = PositiveNumeric.tryCreate(1000))
   @VisibleForTesting
   val testing =

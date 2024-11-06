@@ -4,6 +4,7 @@
 package com.digitalasset.canton.participant.protocol.validation
 
 import cats.data.EitherT
+import cats.implicits.toTraverseOps
 import cats.syntax.alternative.*
 import cats.syntax.bifunctor.*
 import cats.syntax.parallel.*
@@ -38,12 +39,12 @@ import com.digitalasset.canton.participant.store.{
 }
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.participant.util.DAMLe.{HasReinterpret, PackageResolver}
-import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.{
   WithSuffixes,
   WithSuffixesAndMerged,
   WithoutSuffixes,
 }
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
@@ -199,7 +200,7 @@ class ModelConformanceChecker(
       getEngineAbortStatus: GetEngineAbortStatus,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, Map[LfContractId, StoredContract]] =
+  ): EitherT[FutureUnlessShutdown, Error, Map[LfContractId, StoredContract]] = {
     view.tryFlattenToParticipantViews
       .flatMap(_.viewParticipantData.coreInputs)
       .parTraverse { case (cid, InputContract(contract, _)) =>
@@ -214,19 +215,21 @@ class ModelConformanceChecker(
       }
       .map(_.toMap)
       .mapK(FutureUnlessShutdown.outcomeK)
+  }
 
   private def buildPackageNameMap(
       packageIds: Set[PackageId]
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, Map[PackageName, PackageId]] =
+  ): EitherT[FutureUnlessShutdown, Error, Map[PackageName, PackageId]] = {
+
     EitherT(for {
       resolvedE <- packageIds.toSeq.parTraverse(pId =>
         packageResolver(pId)(traceContext)
-          .map {
+          .map({
             case None => Left(pId)
             case Some(ast) => Right((pId, ast.metadata.name))
-          }
+          })
       )
     } yield {
       for {
@@ -235,12 +238,13 @@ class ModelConformanceChecker(
           case (unresolved, _) =>
             Left(PackageNotFound(Map(participantId -> unresolved.toSet)): Error)
         }
-        resolvedNameBindings = resolved.map { case (pId, name) => name -> pId }
+        resolvedNameBindings = resolved.map({ case (pId, name) => name -> pId })
         nameBindings <- MapsUtil.toNonConflictingMap(resolvedNameBindings) leftMap { conflicts =>
           ConflictingNameBindings(Map(participantId -> conflicts))
         }
       } yield nameBindings
     }).mapK(FutureUnlessShutdown.outcomeK)
+  }
 
   private def checkView(
       view: TransactionView,
@@ -298,7 +302,7 @@ class ModelConformanceChecker(
 
       (lfTx, metadata, resolverFromReinterpretation, usedPackages) = lfTxAndMetadata
 
-      _ <- checkPackageVetting(view, topologySnapshot, usedPackages, metadata.ledgerTime)
+      _ <- checkPackageVetting(view, topologySnapshot, usedPackages)
 
       // For transaction views of protocol version 3 or higher,
       // the `resolverFromReinterpretation` is the same as the `resolverFromView`.
@@ -345,7 +349,6 @@ class ModelConformanceChecker(
       view: TransactionView,
       snapshot: TopologySnapshot,
       packageIds: Set[PackageId],
-      ledgerTime: CantonTimestamp,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Error, Unit] = {
 
     val informees = view.viewCommonData.tryUnwrap.viewConfirmationParameters.informees
@@ -355,15 +358,22 @@ class ModelConformanceChecker(
         snapshot.activeParticipantsOfParties(informees.toSeq)
       )
       informeeParticipants = informeeParticipantsByParty.values.flatten.toSet
-      unvetted <- informeeParticipants.toSeq
+      unvettedResult <- informeeParticipants.toSeq
         .parTraverse(p =>
-          snapshot
-            .findUnvettedPackagesOrDependencies(p, packageIds, ledgerTime)
-            .map(p -> _)
+          snapshot.findUnvettedPackagesOrDependencies(p, packageIds).map(p -> _).value
         )
-
+        .map(_.sequence)
+      unvettedPackages = unvettedResult match {
+        case Left(packageId) =>
+          // The package is not in the store and thus the package is not vetted.
+          // If the admin has tampered with the package store and the package is still vetted,
+          // we consider this participant as malicious;
+          // in that case, other participants may still commit the view.
+          Seq(participantId -> Set(packageId))
+        case Right(unvettedSeq) =>
+          unvettedSeq.filter { case (_, packageIds) => packageIds.nonEmpty }
+      }
     } yield {
-      val unvettedPackages = unvetted.filter { case (_, packageIds) => packageIds.nonEmpty }
       Either.cond(unvettedPackages.isEmpty, (), UnvettedPackages(unvettedPackages.toMap))
     })
   }
@@ -379,7 +389,8 @@ object ModelConformanceChecker {
       participantId: ParticipantId,
       packageResolver: PackageResolver,
       loggerFactory: NamedLoggerFactory,
-  )(implicit executionContext: ExecutionContext): ModelConformanceChecker =
+  )(implicit executionContext: ExecutionContext): ModelConformanceChecker = {
+
     new ModelConformanceChecker(
       damlE,
       validateSerializedContract(damlE),
@@ -389,6 +400,7 @@ object ModelConformanceChecker {
       packageResolver,
       loggerFactory,
     )
+  }
 
   private[validation] sealed trait ContractValidationFailure
   private[validation] final case class DAMLeFailure(error: DAMLe.ReinterpretationError)
@@ -459,7 +471,7 @@ object ModelConformanceChecker {
   ) extends PrettyPrinting {
     require(validSubTransactionO.isEmpty == validSubViews.isEmpty)
 
-    override protected def pretty: Pretty[ErrorWithSubTransaction] = prettyOfClass(
+    override def pretty: Pretty[ErrorWithSubTransaction] = prettyOfClass(
       param("valid subtransaction", _.validSubTransactionO.toString.unquoted),
       param("valid subviews", _.validSubViews),
       param("errors", _.errors),
@@ -482,14 +494,14 @@ object ModelConformanceChecker {
   /** Indicates that [[ModelConformanceChecker.reinterpreter]] has failed. */
   final case class DAMLeError(cause: DAMLe.ReinterpretationError, viewHash: ViewHash)
       extends Error {
-    override protected def pretty: Pretty[DAMLeError] = prettyOfClass(
+    override def pretty: Pretty[DAMLeError] = prettyOfClass(
       param("cause", _.cause),
       param("view hash", _.viewHash),
     )
   }
 
   final case class TransactionNotWellFormed(cause: String, viewHash: ViewHash) extends Error {
-    override protected def pretty: Pretty[TransactionNotWellFormed] = prettyOfClass(
+    override def pretty: Pretty[TransactionNotWellFormed] = prettyOfClass(
       param("cause", _.cause.unquoted),
       unnamedParam(_.viewHash),
     )
@@ -502,7 +514,7 @@ object ModelConformanceChecker {
 
     def cause: String = "Failed to construct transaction tree."
 
-    override protected def pretty: Pretty[TransactionTreeError] = prettyOfClass(
+    override def pretty: Pretty[TransactionTreeError] = prettyOfClass(
       param("cause", _.cause.unquoted),
       unnamedParam(_.details),
       unnamedParam(_.viewHash),
@@ -516,7 +528,7 @@ object ModelConformanceChecker {
 
     def cause = "Reconstructed view differs from received view."
 
-    override protected def pretty: Pretty[ViewReconstructionError] = prettyOfClass(
+    override def pretty: Pretty[ViewReconstructionError] = prettyOfClass(
       param("cause", _.cause.unquoted),
       param("received", _.received),
       param("reconstructed", _.reconstructed),
@@ -532,7 +544,7 @@ object ModelConformanceChecker {
     def cause =
       "Details of supplied contract to not match those that result from command reinterpretation"
 
-    override protected def pretty: Pretty[InvalidInputContract] = prettyOfClass(
+    override def pretty: Pretty[InvalidInputContract] = prettyOfClass(
       param("cause", _.cause.unquoted),
       param("contractId", _.contractId),
       param("templateId", _.templateId),
@@ -543,7 +555,7 @@ object ModelConformanceChecker {
   final case class UnvettedPackages(
       unvetted: Map[ParticipantId, Set[PackageId]]
   ) extends Error {
-    override protected def pretty: Pretty[UnvettedPackages] = prettyOfClass(
+    override def pretty: Pretty[UnvettedPackages] = prettyOfClass(
       unnamedParam(
         _.unvetted
           .map { case (participant, packageIds) =>
@@ -557,7 +569,7 @@ object ModelConformanceChecker {
   final case class PackageNotFound(
       missing: Map[ParticipantId, Set[PackageId]]
   ) extends Error {
-    override protected def pretty: Pretty[PackageNotFound] = prettyOfClass(
+    override def pretty: Pretty[PackageNotFound] = prettyOfClass(
       unnamedParam(
         _.missing
           .map { case (participant, packageIds) =>
@@ -571,7 +583,7 @@ object ModelConformanceChecker {
   final case class ConflictingNameBindings(
       conflicting: Map[ParticipantId, Map[PackageName, Set[PackageId]]]
   ) extends Error {
-    override protected def pretty: Pretty[ConflictingNameBindings] = prettyOfClass(
+    override def pretty: Pretty[ConflictingNameBindings] = prettyOfClass(
       unnamedParam(
         _.conflicting
           .map { case (participant, conflicts) =>

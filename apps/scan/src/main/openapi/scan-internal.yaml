@@ -87,24 +87,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetAmuletRulesResponse"
-  /v0/external-party-amulet-rules:
-    post:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "getExternalPartyAmuletRules"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/GetExternalPartyAmuletRulesRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetExternalPartyAmuletRulesResponse"
   /v0/ans-rules:
     post:
       tags: [scan]
@@ -762,75 +744,6 @@ paths:
                 "$ref": "#/components/schemas/LookupEntryByNameResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /v0/transfer-preapprovals/by-party/{party}:
-    get:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "lookupTransferPreapprovalByParty"
-      parameters:
-        - name: "party"
-          in: "path"
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/LookupTransferPreapprovalByPartyResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /v0/transfer-command-counter/{party}:
-    get:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "lookupTransferCommandCounterByParty"
-      parameters:
-        - name: "party"
-          in: "path"
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/LookupTransferCommandCounterByPartyResponse"
-        "404":
-          description: No TransferCommandCounter exists for this party. This means the nonce that should be used is 0.
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /v0/transfer-command/status:
-    get:
-      description: Retrieve the status of all transfer commands of the given sender for the specified nonce. 
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "lookupTransferCommandStatus"
-      parameters:
-        - name: sender
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: nonce
-          in: query
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/LookupTransferCommandStatusResponse"
-        "404":
-          description: No TransferCommand exists with this contract id within the last 24h
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/acs/{party}:
     get:
       tags: [scan]
@@ -1208,19 +1121,6 @@ components:
         amulet_rules_update:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
       required: ["amulet_rules_update"]
-    GetExternalPartyAmuletRulesRequest:
-      type: object
-      properties:
-        cached_external_party_amulet_rules_contract_id:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
-        cached_external_party_amulet_rules_domain_id:
-          type: string
-    GetExternalPartyAmuletRulesResponse:
-      type: object
-      properties:
-        external_party_amulet_rules_update:
-          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
-      required: ["external_party_amulet_rules_update"]
     GetAnsRulesRequest:
       type: object
       properties:
@@ -2357,103 +2257,6 @@ components:
       properties:
         entry:
           "$ref": "#/components/schemas/AnsEntry"
-    LookupTransferPreapprovalByPartyResponse:
-      type: object
-      required: ["transfer_preapproval"]
-      properties:
-        transfer_preapproval:
-          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
-    LookupTransferCommandCounterByPartyResponse:
-      type: object
-      required: ["transfer_command_counter"]
-      properties:
-        transfer_command_counter:
-          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
-
-    LookupTransferCommandStatusResponse:
-      type: object
-      required: ["transfer_commands_by_contract_id"]
-      properties:
-        transfer_commands_by_contract_id:
-          $ref: "#/components/schemas/TransferCommandMap"
-
-    TransferCommandMap:
-      type: object
-      additionalProperties:
-        $ref: "#/components/schemas/TransferCommandContractWithStatus"
-
-    TransferCommandContractWithStatus:
-      type: object
-      required: ["contract", "status"]
-      properties:
-        contract:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        status:
-          $ref: "#/components/schemas/TransferCommandContractStatus"
-
-    TransferCommandContractStatus:
-      type: object
-      oneOf:
-        - "$ref": "#/components/schemas/TransferCommandCreatedResponse"
-        - "$ref": "#/components/schemas/TransferCommandSentResponse"
-        - "$ref": "#/components/schemas/TransferCommandFailedResponse"
-      discriminator:
-        propertyName: status
-        mapping:
-          created: "#/components/schemas/TransferCommandCreatedResponse"
-          sent: "#/components/schemas/TransferCommandSentResponse"
-          failed: "#/components/schemas/TransferCommandFailedResponse"
-    BaseLookupTransferCommandStatusResponse:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          description: |
-            The status of the transfer command.
-            created:
-              The transfer command has been created and is waiting for automation to complete it.
-            sent:
-              The transfer command has been completed and the transfer to the receiver has finished.
-            failed:
-              The transfer command has failed permanently and nothing has been transferred. Refer to
-              failure_reason for details. A new transfer command can be created.
-    TransferCommandCreatedResponse:
-      type: object
-      allOf:
-        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
-    TransferCommandSentResponse:
-      type: object
-      allOf:
-        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
-    TransferCommandFailedResponse:
-      type: object
-      allOf:
-        - "$ref": "#/components/schemas/BaseLookupTransferCommandStatusResponse"
-        - type: object
-          required:
-            - failure_kind
-            - reason
-          properties:
-            failure_kind:
-              type: string
-              description: |
-                The reason for the failure of the TransferCommand.
-                failed:
-                  Completing the transfer failed, check the reason for details.
-                withdrawn:
-                  The sender has withdrawn the TransferCommand before it could be completed.
-                expired:
-                  The expiry time on the TransferCommand was reached before it could be completed.
-              enum:
-                - failed
-                - expired
-                - withdrawn
-            reason:
-              type: string
-              description: |
-                Human readable description of the failure
     GetAcsSnapshotResponse:
       type: object
       required: ["acs_snapshot"]

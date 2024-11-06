@@ -20,7 +20,7 @@ object SafeSimpleString {
 
   val delimiter = "::"
 
-  def fromProtoPrimitive(str: String): Either[String, String] =
+  def fromProtoPrimitive(str: String): Either[String, String] = {
     for {
       _ <- LfPartyId.fromString(str)
       opt <- Either.cond(
@@ -29,6 +29,7 @@ object SafeSimpleString {
         s"String contains reserved delimiter `$delimiter`.",
       )
     } yield opt
+  }
 
 }
 
@@ -50,7 +51,7 @@ final case class Namespace(fingerprint: Fingerprint) extends HasFingerprint with
   def toProtoPrimitive: String = fingerprint.toProtoPrimitive
   def toLengthLimitedString: String68 = fingerprint.toLengthLimitedString
   def filterString: String = fingerprint.unwrap
-  override protected def pretty: Pretty[Namespace] = prettyOfParam(_.fingerprint)
+  override def pretty: Pretty[Namespace] = prettyOfParam(_.fingerprint)
 }
 
 trait HasNamespace extends HasFingerprint {
@@ -88,7 +89,7 @@ final case class UniqueIdentifier private (identifier: String185, namespace: Nam
       nsPrefix
     )
 
-  override protected def pretty: Pretty[this.type] =
+  override def pretty: Pretty[this.type] =
     prettyOfString(uid => uid.identifier.str.show + UniqueIdentifier.delimiter + uid.namespace.show)
 
 }
@@ -99,7 +100,7 @@ object UniqueIdentifier {
   val delimiter = "::"
 
   /** verifies that the string conforms to the lf standard and does not contain the delimiter */
-  def verifyValidString(str: String): Either[String, String] =
+  def verifyValidString(str: String): Either[String, String] = {
     for {
       // use LfPartyId to verify that the string matches the lf specification
       _ <- LfPartyId.fromString(str)
@@ -109,6 +110,7 @@ object UniqueIdentifier {
         s"String contains reserved delimiter `$delimiter`.",
       )
     } yield opt
+  }
 
   private def validIdentifier(id: String): Either[String, String185] =
     verifyValidString(id).flatMap(String185.create(_))
@@ -162,7 +164,7 @@ object UniqueIdentifier {
     } else {
       Left(s"Invalid unique identifier `$str` with missing namespace.")
     }
-    ret.leftMap(ProtoDeserializationError.StringConversionError.apply(_))
+    ret.leftMap(ProtoDeserializationError.StringConversionError)
   }
 
   def fromProtoPrimitive(

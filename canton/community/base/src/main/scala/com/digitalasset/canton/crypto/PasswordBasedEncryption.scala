@@ -47,7 +47,7 @@ object PasswordBasedEncrypted extends HasVersionedMessageCompanion[PasswordBased
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v32,
+      ProtocolVersion.v31,
       supportedProtoVersion(v30.PasswordBasedEncrypted)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -73,7 +73,7 @@ object PasswordBasedEncrypted extends HasVersionedMessageCompanion[PasswordBased
 /** Password-Based Encryption (PBE) */
 trait PasswordBasedEncryptionOps { this: EncryptionOps =>
 
-  protected[crypto] def defaultPbkdfScheme: PbkdfScheme
+  protected def defaultPbkdfScheme: PbkdfScheme
 
   /** Derive a symmetric encryption key from a given password.
     *
@@ -98,7 +98,7 @@ trait PasswordBasedEncryptionOps { this: EncryptionOps =>
   ): Either[PasswordBasedEncryptionError, PasswordBasedEncrypted] = for {
     pbkey <- deriveSymmetricKey(password, symmetricKeyScheme, pbkdfScheme, saltO = None)
     encrypted <- encryptWith(message, pbkey.key, protocolVersion).leftMap(
-      PasswordBasedEncryptionError.EncryptError.apply
+      PasswordBasedEncryptionError.EncryptError
     )
   } yield PasswordBasedEncrypted(encrypted.ciphertext, symmetricKeyScheme, pbkdfScheme, pbkey.salt)
 
@@ -114,7 +114,7 @@ trait PasswordBasedEncryptionOps { this: EncryptionOps =>
     message <- decryptWith(Encrypted.fromByteString[M](pbencrypted.ciphertext), pbkey.key)(
       deserialize
     )
-      .leftMap(PasswordBasedEncryptionError.DecryptError.apply)
+      .leftMap(PasswordBasedEncryptionError.DecryptError)
   } yield message
 
 }
@@ -166,20 +166,20 @@ sealed trait PasswordBasedEncryptionError extends Product with Serializable with
 object PasswordBasedEncryptionError {
 
   final case class DecryptError(error: DecryptionError) extends PasswordBasedEncryptionError {
-    override protected def pretty: Pretty[DecryptError] = prettyOfClass(
+    override def pretty: Pretty[DecryptError] = prettyOfClass(
       unnamedParam(_.error)
     )
   }
 
   final case class EncryptError(error: EncryptionError) extends PasswordBasedEncryptionError {
-    override protected def pretty: Pretty[EncryptError] = prettyOfClass(
+    override def pretty: Pretty[EncryptError] = prettyOfClass(
       unnamedParam(_.error)
     )
   }
 
   final case class PbkdfOutputLengthInvalid(expectedLength: Int, actualLength: Int)
       extends PasswordBasedEncryptionError {
-    override protected def pretty: Pretty[PbkdfOutputLengthInvalid] = prettyOfClass(
+    override def pretty: Pretty[PbkdfOutputLengthInvalid] = prettyOfClass(
       param("expectedLength", _.expectedLength),
       param("actualLength", _.actualLength),
     )

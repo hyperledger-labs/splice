@@ -204,34 +204,7 @@ object BuildCommon {
         // so we explicitly remove all Splice DARs here, just in case
         addCommandAlias(
           "clean-splice",
-          Seq(
-            "apps-common/clean",
-            "apps-common-sv/clean",
-            "apps-validator/clean",
-            "apps-scan/clean",
-            "apps-splitwell/clean",
-            "apps-sv/clean",
-            "apps-wallet/clean",
-            "apps-app/clean",
-            "splice-amulet-daml/clean",
-            "splice-amulet-name-service-daml/clean",
-            "splice-amulet-name-service-test-daml/clean",
-            "splice-amulet-test-daml/clean",
-            "splice-app-manager-daml/clean",
-            "splice-dso-governance-daml/clean",
-            "splice-dso-governance-test-daml/clean",
-            "splice-util-daml/clean",
-            "splice-validator-lifecycle-daml/clean",
-            "splice-validator-lifecycle-test-daml/clean",
-            "splice-wallet-daml/clean",
-            "splice-wallet-payments-daml/clean",
-            "splice-wallet-test-daml/clean",
-            "splitwell-daml/clean",
-            "splitwell-test-daml/clean",
-            "apps-frontends/clean",
-            "cleanCnDars",
-            "docs/clean",
-          ).map(";" + _).mkString(""),
+          "; apps-common/clean; apps-common-sv/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; splice-util-daml/clean; splice-amulet-daml/clean; splice-dso-governance-daml/clean; splice-wallet-daml/clean; splice-wallet-payments-daml/clean; splice-amulet-name-service-daml/clean; splitwell-daml/clean; splice-validator-lifecycle-daml/clean; splice-app-manager-daml/clean; apps-frontends/clean; cleanCnDars; docs/clean",
         ) ++
         addCommandAlias("splice-clean", "; clean-splice")
     val buildSettings = inThisBuild(
@@ -249,6 +222,7 @@ object BuildCommon {
   lazy val cantonWarts = Seq(
     wartremoverErrors += Wart.custom("com.digitalasset.canton.DiscardedFuture"),
     wartremoverErrors += Wart.custom("com.digitalasset.canton.RequireBlocking"),
+    wartremoverErrors += Wart.custom("com.digitalasset.canton.SlickString"),
     wartremover.WartRemover.dependsOnLocalProjectWarts(
       `canton-wartremover-extension`
     ),
@@ -370,43 +344,6 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-daml-grpc-utils` = {
-    import CantonDependencies._
-    sbt.Project
-      .apply("canton-daml-grpc-utils", file("canton/daml-common-staging/grpc-utils"))
-      .dependsOn(
-        `canton-google-common-protos-scala`
-      )
-      .settings(
-        sharedCantonSettings,
-        libraryDependencies ++= Seq(
-          grpc_api,
-          scalapb_runtime_grpc,
-          scalatest % Test,
-        ),
-      )
-  }
-
-  lazy val `canton-daml-jwt` = {
-    import CantonDependencies._
-    sbt.Project
-      .apply("canton-daml-jwt", file("canton/daml-common-staging/daml-jwt"))
-      .disablePlugins(WartRemover)
-      .settings(
-        sharedSettings,
-        libraryDependencies ++= Seq(
-          auth0_java,
-          auth0_jwks,
-          daml_http_test_utils % Test,
-          daml_libs_struct_spray_json,
-          daml_test_evidence_generator_scalatest % Test,
-          scalatest % Test,
-          scalaz_core,
-          slf4j_api,
-        ),
-      )
-  }
-
   // Project for general utilities used inside the Canton repo only
   lazy val `canton-util-internal` = {
     import CantonDependencies._
@@ -445,13 +382,13 @@ object BuildCommon {
       .apply("canton-util-logging", file("canton/community/util-logging"))
       .dependsOn(
         `canton-daml-errors`,
-        `canton-daml-grpc-utils`,
         `canton-wartremover-extension` % "compile->compile;test->test",
       )
       .settings(
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
+          daml_grpc_utils exclude ("com.daml", "ledger-api-scalapb_2.13"),
           daml_lf_data,
           daml_nonempty_cats,
           daml_metrics,
@@ -567,8 +504,6 @@ object BuildCommon {
       .dependsOn(
         `canton-slick-fork`,
         `canton-util-external`,
-        `canton-daml-grpc-utils`,
-        `canton-daml-jwt`,
         `canton-daml-tls`,
         `canton-ledger-common`,
         `canton-bindings-java`,
@@ -623,7 +558,7 @@ object BuildCommon {
           scalaVersion,
           sbtVersion,
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("stableProtocolVersions" -> List()),
+          BuildInfoKey("stableProtocolVersions" -> List("31")),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",
@@ -842,7 +777,6 @@ object BuildCommon {
         removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
-          pekko_actor_typed,
           scala_logging,
           scalatest % Test,
           scalacheck % Test,
@@ -942,7 +876,7 @@ object BuildCommon {
           Seq(
             (
               (Compile / baseDirectory).value,
-              (Compile / damlDarOutput).value / "AdminWorkflows-current.dar",
+              (Compile / damlDarOutput).value / "AdminWorkflows-3.1.0.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             )
           ),
@@ -1001,7 +935,6 @@ object BuildCommon {
         sharedSettings,
         libraryDependencies ++= Seq(
           cats,
-          grpc_stub,
           mockito_scala % Test,
           scalatestMockito % Test,
           scalatest % Test,
@@ -1066,7 +999,6 @@ object BuildCommon {
       .dependsOn(
         `canton-util-external`,
         `canton-daml-errors` % "compile->compile;test->test",
-        `canton-daml-grpc-utils`,
         `canton-util-logging`,
         `canton-ledger-api`,
       )
@@ -1082,6 +1014,7 @@ object BuildCommon {
         //      addProtobufFilesToHeaderCheck(Compile),
         libraryDependencies ++= Seq(
           daml_contextualized_logging,
+          daml_grpc_utils exclude ("com.daml", "ledger-api-scalapb_2.13"),
           daml_lf_engine,
           daml_lf_archive_reader,
           daml_tracing,
@@ -1151,6 +1084,7 @@ object BuildCommon {
           auth0_java,
           auth0_jwks,
           circe_core,
+          daml_jwt,
           daml_ports,
           daml_struct_spray_json,
           netty_boring_ssl,
@@ -1318,7 +1252,6 @@ object BuildCommon {
         `canton-ledger-api-core`,
         `canton-ledger-common` % "test->test",
         `canton-community-testing` % Test,
-        `canton-transcode`,
       )
       .disablePlugins(
         ScalafixPlugin,
@@ -1346,16 +1279,11 @@ object BuildCommon {
           daml_lf_api_type_signature,
           tapir_json_circe,
           tapir_pekko_http_server,
-          tapir_openapi_docs,
-          tapir_asyncapi_docs,
-          sttp_apiscpec_openapi_circe_yaml,
-          sttp_apiscpec_asyncapi_circe_yaml,
           pekko_stream_testkit % Test,
           scalatest % Test,
           scalacheck % Test,
           scalaz_scalacheck % Test,
           scalatestScalacheck % Test,
-          ujson_circe,
         ),
         Test / damlCodeGeneration := Seq(
           (
@@ -1365,23 +1293,6 @@ object BuildCommon {
           )
         ),
       )
-  }
-
-  lazy val `canton-transcode` = {
-    import CantonDependencies._
-    sbt.Project
-      .apply("canton-transcode", file("canton/community/ledger/transcode/"))
-      .settings(
-        sharedSettings,
-        scalacOptions --= removeCompileFlagsForDaml
-          // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3"),
-        libraryDependencies ++= Seq(
-          daml_lf_language,
-          "com.lihaoyi" %% "ujson" % "4.0.2",
-        ),
-      )
-      .dependsOn(`canton-ledger-api`)
   }
 
   lazy val `canton-sequencer-driver-api` = {

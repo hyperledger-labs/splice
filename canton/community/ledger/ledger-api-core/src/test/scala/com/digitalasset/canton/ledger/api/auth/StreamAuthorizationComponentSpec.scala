@@ -6,19 +6,12 @@ package com.digitalasset.canton.ledger.api.auth
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.transaction_filter.{Filters, TransactionFilter}
-import com.daml.ledger.api.v2.update_service.*
 import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.{UpdateService, UpdateServiceStub}
+import com.daml.ledger.api.v2.update_service.*
 import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
 import com.daml.tracing.NoOpTelemetry
-import com.digitalasset.canton.auth.{
-  AuthorizationInterceptor,
-  Authorizer,
-  Claim,
-  ClaimPublic,
-  ClaimReadAsParty,
-  ClaimSet,
-}
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.ledger.api.auth.interceptor.AuthorizationInterceptor
 import com.digitalasset.canton.ledger.api.auth.services.UpdateServiceAuthorization
 import com.digitalasset.canton.ledger.api.domain.UserRight.CanReadAs
 import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, User}
@@ -53,7 +46,7 @@ class StreamAuthorizationComponentSpec
     with Matchers
     with PekkoBeforeAndAfterAll {
 
-  private val OngoingAuthorizationObserverLoggerName = "UserBasedOngoingAuthorization"
+  private val OngoingAuthorizationObserverLoggerName = "OngoingAuthorizationObserver"
 
   private implicit val ec: ExecutionContextExecutor = materializer.executionContext
 
@@ -171,7 +164,7 @@ class StreamAuthorizationComponentSpec
       ).toEither.swap.toOption
     }
 
-    def changeUserRights =
+    def changeUserRights = {
       userManagementStore
         .revokeRights(
           id = Ref.UserId.assertFromString(userId),
@@ -180,6 +173,7 @@ class StreamAuthorizationComponentSpec
         )(LoggingContextWithTrace.ForTesting)
         .futureValue
         .isRight shouldBe true
+    }
 
     def expireUserClaims =
       nowRef.getAndUpdate(x => x.plusSeconds(20))
@@ -197,7 +191,7 @@ class StreamAuthorizationComponentSpec
       participantId = Some(participantId),
       applicationId = Some(userId),
       expiration = Some(nowRef.get().plusSeconds(10)),
-      identityProviderId = None,
+      identityProviderId = IdentityProviderId.Default,
       resolvedFromUser = true,
     )
     val authorizationClaimSetFixtureInterceptor = new ServerInterceptor {
@@ -229,15 +223,10 @@ class StreamAuthorizationComponentSpec
     val authorizer = new Authorizer(
       now = () => nowRef.get(),
       participantId = participantId,
-      ongoingAuthorizationFactory = UserBasedOngoingAuthorization.Factory(
-        now = () => nowRef.get(),
-        userManagementStore = userManagementStore,
-        userRightsCheckIntervalInSeconds = 1,
-        pekkoScheduler = system.scheduler,
-        jwtTimestampLeeway = None,
-        tokenExpiryGracePeriodForStreams = None,
-        loggerFactory = loggerFactory,
-      )(ec, traceContext),
+      userManagementStore = userManagementStore,
+      ec = ec,
+      userRightsCheckIntervalInSeconds = 1,
+      pekkoScheduler = system.scheduler,
       jwtTimestampLeeway = None,
       telemetry = NoOpTelemetry,
       loggerFactory = loggerFactory,

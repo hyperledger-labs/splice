@@ -27,17 +27,17 @@ object CantonErrorGroups {
 
   abstract class TrafficControlErrorGroup extends ErrorGroup()
 
-  abstract class AuthorizationChecksErrorGroup extends ErrorGroup()
-
   object ParticipantErrorGroup extends ErrorGroup() {
 
+    abstract class DomainConnectivityErrorGroup extends ErrorGroup()
     abstract class SyncServiceErrorGroup extends ErrorGroup()
     abstract class PackageServiceErrorGroup extends ErrorGroup()
     abstract class PruningServiceErrorGroup extends ErrorGroup()
-    abstract class InspectionServiceErrorGroup extends ErrorGroup()
     abstract class RepairServiceErrorGroup extends ErrorGroup()
 
     object TransactionErrorGroup extends ErrorGroup() {
+      // Errors emitted by Ledger Api server
+      abstract class LedgerApiErrorGroup extends ErrorGroup()
       // TransactionInjectErrors are initial injection errors resulting from the canton sync service
       abstract class InjectionErrorGroup extends ErrorGroup()
       // TransactionRoutingErrors are routing errors resulting from the domain router
@@ -59,6 +59,7 @@ object CantonErrorGroups {
 
   object TopologyManagementErrorGroup extends ErrorGroup() {
     abstract class TopologyManagerErrorGroup extends ErrorGroup()
+    abstract class TopologyDispatchingErrorGroup extends ErrorGroup()
   }
 
   abstract class StorageErrorGroup extends ErrorGroup()

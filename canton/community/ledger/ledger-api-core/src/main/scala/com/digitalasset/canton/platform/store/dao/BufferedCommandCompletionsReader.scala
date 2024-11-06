@@ -11,6 +11,7 @@ import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer
 import com.digitalasset.canton.platform.store.dao.BufferedCommandCompletionsReader.CompletionsFilter
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReader.FetchFromPersistence
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
+import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate.CompletionDetails
 import com.digitalasset.canton.platform.{ApplicationId, Party}
 import com.digitalasset.canton.tracing.Traced
 import org.apache.pekko.NotUsed
@@ -43,30 +44,38 @@ class BufferedCommandCompletionsReader(
       parties: Set[Party],
       applicationId: String,
   ): Option[CompletionStreamResponse] = (transactionLogUpdate.value match {
-    case accepted: TransactionLogUpdate.TransactionAccepted => accepted.completionStreamResponse
-    case rejected: TransactionLogUpdate.TransactionRejected =>
-      Some(rejected.completionStreamResponse)
-    case u: TransactionLogUpdate.ReassignmentAccepted => u.completionStreamResponse
+    case TransactionLogUpdate.TransactionAccepted(
+          _,
+          _,
+          _,
+          _,
+          _,
+          _,
+          Some(completionDetails),
+          _,
+          _,
+        ) =>
+      Some(completionDetails)
+    case TransactionLogUpdate.TransactionRejected(_, completionDetails) => Some(completionDetails)
+    case TransactionLogUpdate.TransactionAccepted(_, _, _, _, _, _, None, _, _) =>
+      // Completion details missing highlights submitter is not local to this participant
+      None
+    case u: TransactionLogUpdate.ReassignmentAccepted => u.completionDetails
   }).flatMap(toApiCompletion(_, parties, applicationId))
 
   private def toApiCompletion(
-      completionStreamResponse: CompletionStreamResponse,
+      completionDetails: CompletionDetails,
       parties: Set[Party],
       applicationId: String,
   ): Option[CompletionStreamResponse] = {
-    val completion = {
-      val originalCompletion = completionStreamResponse.completionResponse.completion
-        .getOrElse(throw new RuntimeException("No completion in completion stream response"))
-      originalCompletion.withActAs(originalCompletion.actAs.filter(parties.map(_.toString)))
-    }
+    val completion = completionDetails.completionStreamResponse.completion
+      .getOrElse(throw new RuntimeException("No completion in completion stream response"))
 
     val visibilityPredicate =
       completion.applicationId == applicationId &&
-        completion.actAs.nonEmpty
+        parties.iterator.exists(completionDetails.submitters)
 
-    Option.when(visibilityPredicate)(
-      CompletionStreamResponse.defaultInstance.withCompletion(completion)
-    )
+    Option.when(visibilityPredicate)(completionDetails.completionStreamResponse)
   }
 }
 

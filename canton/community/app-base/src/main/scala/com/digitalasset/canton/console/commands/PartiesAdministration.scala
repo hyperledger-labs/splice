@@ -21,6 +21,7 @@ import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
+  BaseInspection,
   CantonInternalError,
   CommandFailure,
   ConsoleCommandResult,
@@ -30,10 +31,13 @@ import com.digitalasset.canton.console.{
   FeatureFlagFilter,
   Help,
   Helpful,
+  InstanceReference,
+  LocalParticipantReference,
   ParticipantReference,
 }
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
@@ -93,11 +97,12 @@ class PartiesAdministrationGroup(
 
 class ParticipantPartiesAdministrationGroup(
     participantId: => ParticipantId,
-    reference: ParticipantReference,
-    override protected val consoleEnvironment: ConsoleEnvironment,
-    override protected val loggerFactory: NamedLoggerFactory,
-) extends PartiesAdministrationGroup(reference, consoleEnvironment)
-    with FeatureFlagFilter {
+    runner: AdminCommandRunner
+      & ParticipantAdministration
+      & BaseLedgerApiAdministration
+      & InstanceReference,
+    consoleEnvironment: ConsoleEnvironment,
+) extends PartiesAdministrationGroup(runner, consoleEnvironment) {
 
   @Help.Summary("List parties hosted by this participant")
   @Help.Description("""Inspect the parties hosted by this participant as used for synchronisation.
@@ -116,7 +121,7 @@ class ParticipantPartiesAdministrationGroup(
       filterDomain: String = "",
       asOf: Option[Instant] = None,
       limit: PositiveInt = defaultLimit,
-  ): Seq[ListPartiesResult] =
+  ): Seq[ListPartiesResult] = {
     list(
       filterParty,
       filterParticipant = participantId.filterString,
@@ -124,19 +129,21 @@ class ParticipantPartiesAdministrationGroup(
       asOf = asOf,
       limit = limit,
     )
+  }
 
   @Help.Summary("Find a party from a filter string")
   @Help.Description(
     """Will search for all parties that match this filter string. If it finds exactly one party, it
       |will return that one. Otherwise, the function will throw."""
   )
-  def find(filterParty: String): PartyId =
+  def find(filterParty: String): PartyId = {
     list(filterParty).map(_.party).distinct.toList match {
       case one :: Nil => one
       case Nil => throw new IllegalArgumentException(s"No party matching $filterParty")
       case more =>
         throw new IllegalArgumentException(s"Multiple parties match $filterParty: $more")
     }
+  }
 
   @Help.Summary("Enable/add party to participant")
   @Help.Description("""This function registers a new party with the current participant within the participants
@@ -159,28 +166,30 @@ class ParticipantPartiesAdministrationGroup(
       // TODO(i10809) replace wait for domain for a clean topology synchronisation using the dispatcher info
       waitForDomain: DomainChoice = DomainChoice.Only(Seq()),
       synchronizeParticipants: Seq[ParticipantReference] = Seq(),
+      groupAddressing: Boolean = false,
       mustFullyAuthorize: Boolean = true,
   ): PartyId = {
 
-    def registered(lst: => Seq[ListPartiesResult]): Set[DomainId] =
+    def registered(lst: => Seq[ListPartiesResult]): Set[DomainId] = {
       lst
         .flatMap(_.participants.flatMap(_.domains))
         .map(_.domain)
         .toSet
+    }
     def primaryRegistered(partyId: PartyId) =
       registered(
         list(filterParty = partyId.filterString, filterParticipant = participantId.filterString)
       )
 
     def primaryConnected: Either[String, Seq[ListConnectedDomainsResult]] =
-      reference
+      runner
         .adminCommand(ParticipantAdminCommands.DomainConnectivity.ListConnectedDomains())
         .toEither
 
     def findDomainIds(
         name: String,
         connected: Either[String, Seq[ListConnectedDomainsResult]],
-    ): Either[String, Set[DomainId]] =
+    ): Either[String, Set[DomainId]] = {
       for {
         domainIds <- waitForDomain match {
           case DomainChoice.All =>
@@ -194,23 +203,26 @@ class ParticipantPartiesAdministrationGroup(
             }
         }
       } yield domainIds.toSet
-    def retryE(condition: => Boolean, message: => String): Either[String, Unit] =
+    }
+    def retryE(condition: => Boolean, message: => String): Either[String, Unit] = {
       AdminCommandRunner
         .retryUntilTrue(consoleEnvironment.commandTimeouts.ledgerCommand)(condition)
         .toEither
         .leftMap(_ => message)
+    }
     def waitForParty(
         partyId: PartyId,
         domainIds: Set[DomainId],
         registered: => Set[DomainId],
         queriedParticipant: ParticipantId = participantId,
-    ): Either[String, Unit] =
+    ): Either[String, Unit] = {
       if (domainIds.nonEmpty) {
         retryE(
           domainIds subsetOf registered,
           show"Party $partyId did not appear for $queriedParticipant on domain ${domainIds.diff(registered)}",
         )
-      } else Either.unit
+      } else Right(())
+    }
     val syncLedgerApi = waitForDomain match {
       case DomainChoice.All => true
       case DomainChoice.Only(aliases) => aliases.nonEmpty
@@ -243,12 +255,13 @@ class ParticipantPartiesAdministrationGroup(
             partyId,
             participants,
             threshold,
+            groupAddressing,
             mustFullyAuthorize,
           ).toEither
           _ <- validDisplayName match {
-            case None => Either.unit
+            case None => Right(())
             case Some(name) =>
-              reference
+              runner
                 .adminCommand(
                   ParticipantAdminCommands.PartyNameManagement
                     .SetPartyDisplayName(partyId, name.unwrap)
@@ -260,10 +273,10 @@ class ParticipantPartiesAdministrationGroup(
             // sync with ledger-api server if this node is connected to at least one domain
             if (syncLedgerApi && primaryConnected.exists(_.nonEmpty))
               retryE(
-                reference.ledger_api.parties.list().map(_.party).contains(partyId),
+                runner.ledger_api.parties.list().map(_.party).contains(partyId),
                 show"The party $partyId never appeared on the ledger API server",
               )
-            else Either.unit
+            else Right(())
           _ <- additionalSync.traverse_ { case (p, domains) =>
             waitForParty(
               partyId,
@@ -287,19 +300,18 @@ class ParticipantPartiesAdministrationGroup(
       partyId: PartyId,
       participants: Seq[ParticipantId],
       threshold: PositiveInt,
+      groupAddressing: Boolean,
       mustFullyAuthorize: Boolean,
   ): ConsoleCommandResult[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
-    // determine the next serial
-    val nextSerial = reference.topology.party_to_participant_mappings
-      .list_from_authorized(filterParty = partyId.filterString)
-      .maxByOption(_.context.serial)
-      .map(_.context.serial.increment)
 
-    reference
+    runner
       .adminCommand(
         TopologyAdminCommands.Write.Propose(
+          // TODO(#14048) properly set the serial or introduce auto-detection so we don't
+          //              have to set it on the client side
           mapping = PartyToParticipant.create(
             partyId,
+            None,
             threshold,
             participants.map(pid =>
               HostingParticipant(
@@ -308,9 +320,10 @@ class ParticipantPartiesAdministrationGroup(
                 else ParticipantPermission.Submission,
               )
             ),
+            groupAddressing,
           ),
           signedBy = Seq(this.participantId.fingerprint),
-          serial = nextSerial,
+          serial = None,
           store = AuthorizedStore.filterName,
           mustFullyAuthorize = mustFullyAuthorize,
           change = TopologyChangeOp.Replace,
@@ -320,14 +333,15 @@ class ParticipantPartiesAdministrationGroup(
   }
 
   @Help.Summary("Disable party on participant")
-  def disable(name: String, force: ForceFlags = ForceFlags.none): Unit =
-    reference.topology.party_to_participant_mappings
+  // TODO(#14067): reintroduce `force` once it is implemented on the server side and threaded through properly.
+  def disable(name: String /*, force: Boolean = false*/ ): Unit = {
+    runner.topology.party_to_participant_mappings
       .propose_delta(
-        PartyId(reference.id.member.uid.tryChangeId(name)),
+        PartyId(runner.id.member.uid.tryChangeId(name)),
         removes = List(this.participantId),
-        force = force,
       )
       .discard
+  }
 
   @Help.Summary("Update participant-local party details")
   @Help.Description(
@@ -339,11 +353,12 @@ class ParticipantPartiesAdministrationGroup(
   def update(
       party: PartyId,
       modifier: PartyDetails => PartyDetails,
-  ): PartyDetails =
-    reference.ledger_api.parties.update(
+  ): PartyDetails = {
+    runner.ledger_api.parties.update(
       party = party,
       modifier = modifier,
     )
+  }
 
   @Help.Summary("Set party display name")
   @Help.Description(
@@ -351,34 +366,25 @@ class ParticipantPartiesAdministrationGroup(
   )
   def set_display_name(party: PartyId, displayName: String): Unit = consoleEnvironment.run {
     // takes displayName as String argument which is validated at GrpcPartyNameManagementService
-    reference.adminCommand(
+    runner.adminCommand(
       ParticipantAdminCommands.PartyNameManagement.SetPartyDisplayName(party, displayName)
     )
   }
+}
 
-  @Help.Summary("Start party replication from a source participant", FeatureFlag.Preview)
-  @Help.Description(
-    """Initiate replicating a party from the specified source participant to this participant on the specified domain.
-      |Performs some checks synchronously and then initiates the replication asynchronously. The optional `id`
-      |parameter allows identifying asynchronous progress and errors."""
-  )
-  def start_party_replication(
-      party: PartyId,
-      sourceParticipant: ParticipantId,
-      domain: DomainId,
-      id: Option[String] = None,
-  ): Unit = check(FeatureFlag.Preview) {
-    consoleEnvironment.run {
-      reference.adminCommand(
-        ParticipantAdminCommands.PartyManagement.StartPartyReplication(
-          id,
-          party,
-          sourceParticipant,
-          domain,
-        )
-      )
-    }
-  }
+class LocalParticipantPartiesAdministrationGroup(
+    reference: LocalParticipantReference,
+    runner: AdminCommandRunner
+      & BaseInspection[ParticipantNode]
+      & ParticipantAdministration
+      & BaseLedgerApiAdministration
+      & InstanceReference,
+    val consoleEnvironment: ConsoleEnvironment,
+    val loggerFactory: NamedLoggerFactory,
+) extends ParticipantPartiesAdministrationGroup(reference.id, runner, consoleEnvironment)
+    with FeatureFlagFilter {
+
+  import runner.*
 
   @Help.Summary("Waits for any topology changes to be observed", FeatureFlag.Preview)
   @Help.Description(
@@ -389,9 +395,11 @@ class ParticipantPartiesAdministrationGroup(
       timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded,
   )(implicit env: ConsoleEnvironment): Unit =
     check(FeatureFlag.Preview) {
-      reference.health.wait_for_initialized()
-      TopologySynchronisation.awaitTopologyObserved(reference, partyAssignment, timeout)
+      access(node =>
+        TopologySynchronisation.awaitTopologyObserved(reference, partyAssignment, timeout)
+      )
     }
+
 }
 
 object TopologySynchronisation {

@@ -138,23 +138,6 @@ object ListOwnerToKeyMappingResult {
     } yield ListOwnerToKeyMappingResult(context, item)
 }
 
-final case class ListPartyToKeyMappingResult(
-    context: BaseResult,
-    item: PartyToKeyMapping,
-)
-
-object ListPartyToKeyMappingResult {
-  def fromProtoV30(
-      value: v30.ListPartyToKeyMappingResponse.Result
-  ): ParsingResult[ListPartyToKeyMappingResult] =
-    for {
-      contextProto <- ProtoConverter.required("context", value.context)
-      context <- BaseResult.fromProtoV30(contextProto)
-      itemProto <- ProtoConverter.required("item", value.item)
-      item <- PartyToKeyMapping.fromProtoV30(itemProto)
-    } yield ListPartyToKeyMappingResult(context, item)
-}
-
 final case class ListDomainTrustCertificateResult(
     context: BaseResult,
     item: DomainTrustCertificate,
@@ -238,6 +221,23 @@ object ListPartyToParticipantResult {
       itemProto <- ProtoConverter.required("item", value.item)
       item <- PartyToParticipant.fromProtoV30(itemProto)
     } yield ListPartyToParticipantResult(context, item)
+}
+
+final case class ListAuthorityOfResult(
+    context: BaseResult,
+    item: AuthorityOf,
+)
+
+object ListAuthorityOfResult {
+  def fromProtoV30(
+      value: v30.ListAuthorityOfResponse.Result
+  ): ParsingResult[ListAuthorityOfResult] =
+    for {
+      contextProto <- ProtoConverter.required("context", value.context)
+      context <- BaseResult.fromProtoV30(contextProto)
+      itemProto <- ProtoConverter.required("item", value.item)
+      item <- AuthorityOf.fromProtoV30(itemProto)
+    } yield ListAuthorityOfResult(context, item)
 }
 
 final case class ListDomainParametersStateResult(

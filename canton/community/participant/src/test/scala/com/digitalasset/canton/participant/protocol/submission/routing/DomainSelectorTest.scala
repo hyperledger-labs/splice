@@ -5,13 +5,12 @@ package com.digitalasset.canton.participant.protocol.submission.routing
 
 import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, SuppressingLogger}
-import com.digitalasset.canton.participant.protocol.submission.DomainSelectionFixture.*
 import com.digitalasset.canton.participant.protocol.submission.DomainSelectionFixture.Transactions.{
   ExerciseByInterface,
   ThreeExercises,
 }
+import com.digitalasset.canton.participant.protocol.submission.DomainSelectionFixture.*
 import com.digitalasset.canton.participant.protocol.submission.UsableDomain.{
   UnknownPackage,
   UnsupportedMinimumProtocolVersion,
@@ -21,18 +20,14 @@ import com.digitalasset.canton.participant.sync.TransactionRoutingError.Configur
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.RoutingInternalError.InputContractsOnDifferentDomains
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.NoDomainForSubmission
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.UnableToQueryTopologySnapshot
-import com.digitalasset.canton.protocol.{
-  LfContractId,
-  LfLanguageVersion,
-  LfVersionedTransaction,
-  Stakeholders,
-}
+import com.digitalasset.canton.protocol.{LfContractId, LfTransactionVersion, LfVersionedTransaction}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{DamlLfVersionToProtocolVersions, ProtocolVersion}
-import com.digitalasset.canton.{BaseTest, HasExecutionContext, LfPartyId}
+import com.digitalasset.canton.{BaseTest, HasExecutionContext, LfPackageId, LfPartyId}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.transaction.TransactionVersion
 import com.digitalasset.daml.lf.transaction.test.TransactionBuilder.Implicits.*
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -67,10 +62,10 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
     val defaultDomainRank = DomainRank(Map.empty, 0, da)
 
-    def reassignmentsDaToAcme(contracts: Set[LfContractId]) = DomainRank(
-      reassignments = contracts.map(_ -> (signatory, da)).toMap, // current domain is da
+    def transfersDaToAcme(contracts: Set[LfContractId]) = DomainRank(
+      transfers = contracts.map(_ -> (signatory, da)).toMap, // current domain is da
       priority = 0,
-      domainId = acme, // reassign to acme
+      domainId = acme, // transfer to acme
     )
 
     "return correct value in happy path" in {
@@ -106,8 +101,8 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
           domainsOfAllInformee = NonEmpty.mk(Set, acme),
         )
 
-      // Multi domain: reassignment proposal (da -> acme)
-      val domainRank = reassignmentsDaToAcme(selector.inputContractIds)
+      // Multi domain: transfer proposal (da -> acme)
+      val domainRank = transfersDaToAcme(selector.inputContractIds)
       selector.forMultiDomain.futureValue shouldBe domainRank
 
       // Multi domain, missing connection to acme: error
@@ -123,7 +118,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
     "take priority into account (multi domain setting)" in {
       def pickDomain(bestDomain: DomainId): DomainId = selectorForExerciseByInterface(
-        // da is not in the list to force reassignment
+        // da is not in the list to force transfer
         admissibleDomains = NonEmpty.mk(Set, acme, repair),
         connectedDomains = Set(acme, da, repair),
         priorityOfDomain = d => if (d == bestDomain) 10 else 0,
@@ -133,17 +128,16 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
       pickDomain(repair) shouldBe repair
     }
 
-    // TODO(#15561) Re-enable this test when we have a stable protocol version
-    "take minimum protocol version into account" ignore {
-      val oldPV = ProtocolVersion.v32
+    "take minimum protocol version into account" in {
+      val oldPV = ProtocolVersion.v31
 
-      val transactionVersion = LfLanguageVersion.v2_dev
+      val transactionVersion = LfTransactionVersion.VDev
       val newPV = DamlLfVersionToProtocolVersions.damlLfVersionToMinimumProtocolVersions
         .get(transactionVersion)
         .value
 
       val selectorOldPV = selectorForExerciseByInterface(
-        transactionVersion = transactionVersion, // requires protocol version dev
+        transactionVersion = TransactionVersion.VDev, // requires protocol version dev
         domainProtocolVersion = _ => oldPV,
       )
 
@@ -166,7 +160,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
       // Happy path
       val selectorNewPV = selectorForExerciseByInterface(
-        transactionVersion = LfLanguageVersion.v2_dev, // requires protocol version dev
+        transactionVersion = TransactionVersion.VDev, // requires protocol version dev
         domainProtocolVersion = _ => newPV,
       )
 
@@ -176,47 +170,28 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
     "refuse to route to a domain with missing package vetting" in {
       val missingPackage = ExerciseByInterface.interfacePackageId
-      val ledgerTime = CantonTimestamp.now()
 
-      def runWithModifiedPackages(packages: Seq[VettedPackage]) = {
-        val selector =
-          selectorForExerciseByInterface(vettedPackages = packages, ledgerTime = ledgerTime)
-
-        val expectedError = UnknownPackage(
-          da,
-          List(
-            unknownPackageFor(submitterParticipantId, missingPackage),
-            unknownPackageFor(observerParticipantId, missingPackage),
-          ),
-        )
-
-        selector.forSingleDomain.leftValue shouldBe InvalidPrescribedDomainId.Generic(
-          da,
-          expectedError.toString,
-        )
-
-        selector.forMultiDomain.leftValue shouldBe NoDomainForSubmission.Error(
-          Map(da -> expectedError.toString)
-        )
-      }
-
-      runWithModifiedPackages(
-        ExerciseByInterface.correctPackages.filterNot(_.packageId == missingPackage)
+      val selector = selectorForExerciseByInterface(
+        vettedPackages = ExerciseByInterface.correctPackages.filterNot(_ == missingPackage)
       )
 
-      val packageNotYetValid = ExerciseByInterface.correctPackages.map(vp =>
-        if (vp.packageId == missingPackage) vp.copy(validFrom = Some(ledgerTime.plusMillis(1L)))
-        else vp
+      val expectedError = UnknownPackage(
+        da,
+        List(
+          unknownPackageFor(submitterParticipantId, missingPackage),
+          unknownPackageFor(observerParticipantId, missingPackage),
+        ),
       )
-      runWithModifiedPackages(packageNotYetValid)
 
-      val packageNotValidAnymore = ExerciseByInterface.correctPackages.map(vp =>
-        if (vp.packageId == missingPackage) vp.copy(validUntil = Some(ledgerTime.minusMillis(1L)))
-        else vp
+      selector.forSingleDomain.leftValue shouldBe InvalidPrescribedDomainId.Generic(
+        da,
+        expectedError.toString,
       )
-      runWithModifiedPackages(packageNotValidAnymore)
+
+      selector.forMultiDomain.leftValue shouldBe NoDomainForSubmission.Error(
+        Map(da -> expectedError.toString)
+      )
     }
-
     "route to domain where all submitter have submission rights" in {
       val treeExercises = ThreeExercises()
       val domainOfContracts: Map[LfContractId, DomainId] =
@@ -225,15 +200,10 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
           treeExercises.inputContract2Id -> repair,
           treeExercises.inputContract3Id -> da,
         )
-      val inputContractStakeholders = Map(
-        treeExercises.inputContract1Id -> Stakeholders
-          .withSignatoriesAndObservers(Set(party3), Set(observer)),
-        treeExercises.inputContract2Id -> Stakeholders
-          .withSignatoriesAndObservers(Set(party3), Set(observer)),
-        treeExercises.inputContract3Id -> Stakeholders.withSignatoriesAndObservers(
-          Set(signatory),
-          Set(party3),
-        ),
+      val inputContractStakeholders: Map[LfContractId, Set[Ref.Party]] = Map(
+        treeExercises.inputContract1Id -> Set(party3, observer),
+        treeExercises.inputContract2Id -> Set(party3, observer),
+        treeExercises.inputContract3Id -> Set(signatory, party3),
       )
       val topology: Map[LfPartyId, List[ParticipantId]] = Map(
         signatory -> List(submitterParticipantId),
@@ -241,7 +211,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
         party3 -> List(participantId3),
       )
 
-      // this test requires a reassignment that is only possible from da to repair.
+      // this test requires a transfer that is only possible from da to repair.
       // All submitters are connected to the repair domain as follow:
       //        Map(
       //          submitterParticipantId -> Set(da, repair),
@@ -259,7 +229,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
       selector.forSingleDomain.leftValue shouldBe InputContractsOnDifferentDomains(Set(da, repair))
       selector.forMultiDomain.futureValue shouldBe DomainRank(
-        reassignments = Map(treeExercises.inputContract3Id -> (signatory, da)),
+        transfers = Map(treeExercises.inputContract3Id -> (signatory, da)),
         priority = 0,
         domainId = repair,
       )
@@ -296,7 +266,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
           )
       }
 
-      "propose reassignments when needed" in {
+      "propose transfers when needed" in {
         val selector = selectorForExerciseByInterface(
           prescribedDomainId = Some(acme),
           connectedDomains = Set(acme, da),
@@ -310,8 +280,8 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
             inputContractDomain = da,
           )
 
-        // Multi domain: reassignment proposal (da -> acme)
-        val domainRank = reassignmentsDaToAcme(selector.inputContractIds)
+        // Multi domain: transfer proposal (da -> acme)
+        val domainRank = transfersDaToAcme(selector.inputContractIds)
         selector.forMultiDomain.futureValue shouldBe domainRank
       }
     }
@@ -335,7 +305,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
     import DomainSelectorTest.ForSimpleTopology.*
     import SimpleTopology.*
 
-    "minimize the number of reassignments" in {
+    "minimize the number of transfers" in {
       val threeExercises = ThreeExercises(fixtureTransactionVersion)
 
       val domains = NonEmpty.mk(Set, acme, da, repair)
@@ -350,7 +320,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
       /*
         Two contracts on acme, one on repair
-        Expected: reassign to acme
+        Expected: transfer to acme
        */
       {
         val domainsOfContracts = Map(
@@ -360,9 +330,9 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
         )
 
         val expectedDomainRank = DomainRank(
-          reassignments = Map(threeExercises.inputContract3Id -> (signatory, repair)),
+          transfers = Map(threeExercises.inputContract3Id -> (signatory, repair)),
           priority = 0,
-          domainId = acme, // reassign to acme
+          domainId = acme, // transfer to acme
         )
 
         selectDomain(domainsOfContracts) shouldBe expectedDomainRank
@@ -370,7 +340,7 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
       /*
         Two contracts on repair, one on acme
-        Expected: reassign to repair
+        Expected: transfer to repair
        */
       {
         val domainsOfContracts = Map(
@@ -380,9 +350,9 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
         )
 
         val expectedDomainRank = DomainRank(
-          reassignments = Map(threeExercises.inputContract1Id -> (signatory, acme)),
+          transfers = Map(threeExercises.inputContract1Id -> (signatory, acme)),
           priority = 0,
-          domainId = repair, // reassign to repair
+          domainId = repair, // transfer to repair
         )
 
         selectDomain(domainsOfContracts) shouldBe expectedDomainRank
@@ -427,9 +397,8 @@ private[routing] object DomainSelectorTest {
         admissibleDomains: NonEmpty[Set[DomainId]] = defaultAdmissibleDomains,
         prescribedDomainId: Option[DomainId] = defaultPrescribedDomainId,
         domainProtocolVersion: DomainId => ProtocolVersion = defaultDomainProtocolVersion,
-        transactionVersion: LfLanguageVersion = fixtureTransactionVersion,
-        vettedPackages: Seq[VettedPackage] = ExerciseByInterface.correctPackages,
-        ledgerTime: CantonTimestamp = CantonTimestamp.now(),
+        transactionVersion: TransactionVersion = fixtureTransactionVersion,
+        vettedPackages: Seq[LfPackageId] = ExerciseByInterface.correctPackages,
     )(implicit
         ec: ExecutionContext,
         traceContext: TraceContext,
@@ -439,10 +408,7 @@ private[routing] object DomainSelectorTest {
       val exerciseByInterface = ExerciseByInterface(transactionVersion)
 
       val inputContractStakeholders = Map(
-        exerciseByInterface.inputContractId -> Stakeholders.withSignatoriesAndObservers(
-          Set(signatory),
-          Set(observer),
-        )
+        exerciseByInterface.inputContractId -> Set(signatory, observer)
       )
 
       new Selector(loggerFactory)(
@@ -454,7 +420,6 @@ private[routing] object DomainSelectorTest {
         domainProtocolVersion,
         vettedPackages,
         exerciseByInterface.tx,
-        ledgerTime,
         inputContractStakeholders,
       )
     }
@@ -467,9 +432,8 @@ private[routing] object DomainSelectorTest {
         connectedDomains: Set[DomainId] = Set(defaultDomain),
         admissibleDomains: NonEmpty[Set[DomainId]] = defaultAdmissibleDomains,
         domainProtocolVersion: DomainId => ProtocolVersion = defaultDomainProtocolVersion,
-        vettedPackages: Seq[VettedPackage] = ExerciseByInterface.correctPackages,
-        ledgerTime: CantonTimestamp = CantonTimestamp.now(),
-        inputContractStakeholders: Map[LfContractId, Stakeholders] = Map.empty,
+        vettedPackages: Seq[LfPackageId] = ExerciseByInterface.correctPackages,
+        inputContractStakeholders: Map[LfContractId, Set[Ref.Party]] = Map.empty,
         topology: Map[LfPartyId, List[ParticipantId]] = correctTopology,
     )(implicit
         ec: ExecutionContext,
@@ -480,10 +444,7 @@ private[routing] object DomainSelectorTest {
       val contractStakeholders =
         if (inputContractStakeholders.isEmpty)
           threeExercises.inputContractIds.map { inputContractId =>
-            inputContractId -> Stakeholders.withSignatoriesAndObservers(
-              Set(signatory),
-              Set(observer),
-            )
+            inputContractId -> Set(signatory, observer)
           }.toMap
         else inputContractStakeholders
 
@@ -496,7 +457,6 @@ private[routing] object DomainSelectorTest {
         domainProtocolVersion,
         vettedPackages,
         threeExercises.tx,
-        ledgerTime,
         contractStakeholders,
         topology,
       )
@@ -509,10 +469,9 @@ private[routing] object DomainSelectorTest {
         admissibleDomains: NonEmpty[Set[DomainId]],
         prescribedSubmitterDomainId: Option[DomainId],
         domainProtocolVersion: DomainId => ProtocolVersion,
-        vettedPackages: Seq[VettedPackage],
+        vettedPackages: Seq[LfPackageId],
         tx: LfVersionedTransaction,
-        ledgerTime: CantonTimestamp,
-        inputContractStakeholders: Map[LfContractId, Stakeholders],
+        inputContractStakeholders: Map[LfContractId, Set[Ref.Party]],
         topology: Map[LfPartyId, List[ParticipantId]] = correctTopology,
     )(implicit ec: ExecutionContext, traceContext: TraceContext) {
 
@@ -551,13 +510,10 @@ private[routing] object DomainSelectorTest {
 
       private val transactionDataET = TransactionData
         .create(
-          actAs = Set(signatory),
-          readAs = Set(),
-          signedExternally = Set(),
-          ledgerTime = ledgerTime,
+          submitters = Set(signatory),
           transaction = tx,
           domainStateProvider = TestDomainStateProvider,
-          contractsStakeholders = inputContractStakeholders,
+          contractRoutingParties = inputContractStakeholders,
           prescribedDomainIdO = prescribedSubmitterDomainId,
           disclosedContracts = Nil,
         )

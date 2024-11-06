@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.ledger.metering
 
-import cats.syntax.either.*
 import com.digitalasset.canton.platform.apiserver.meteringreport.HmacSha256.Key
 import com.digitalasset.canton.platform.apiserver.meteringreport.JcsSigner.VerificationStatus
 import com.digitalasset.canton.platform.apiserver.meteringreport.{JcsSigner, MeteringReportKey}
@@ -99,15 +98,17 @@ object Main {
     }
   }
 
-  private def checkUsage(args: Array[String]): ExitCodeOr[(String, String)] =
+  private def checkUsage(args: Array[String]): ExitCodeOr[(String, String)] = {
     args.toList match {
       case List(dir, report) => Right((dir, report))
       case _ => Left(ErrUsage("metering-verification-app"))
     }
+  }
 
-  private def readKey(keyPath: Path): ExitCodeOr[Key] =
+  private def readKey(keyPath: Path): ExitCodeOr[Key] = {
     Try(MeteringReportKey.assertParseKey(Files.readAllBytes(keyPath)))
       .fold(t => Left(NotKeyFile(keyPath, t)), Right(_))
+  }
 
   private def readKeys(keyDir: String): ExitCodeOr[Map[String, Key]] = {
 
@@ -120,7 +121,7 @@ object Main {
     if (Files.isDirectory(dir)) {
       for {
         keys <- Files.list(dir).toScala(List).traverse(readKey)
-        _ <- Either.cond(keys.nonEmpty, (), NoKeys(keyDir))
+        _ <- if (keys.isEmpty) Left(NoKeys(keyDir)) else Right(())
       } yield {
         keys.map(k => k.scheme -> k).toMap
       }
@@ -139,10 +140,11 @@ object Main {
     }
   }
 
-  private def verifyReport(json: String, keys: Map[String, Key]): ExitCodeOr[Unit] =
+  private def verifyReport(json: String, keys: Map[String, Key]): ExitCodeOr[Unit] = {
     JcsSigner.verify(json, keys.get) match {
-      case VerificationStatus.Ok => Either.unit
+      case VerificationStatus.Ok => Right(())
       case status => Left(FailedVerification(status))
     }
+  }
 
 }

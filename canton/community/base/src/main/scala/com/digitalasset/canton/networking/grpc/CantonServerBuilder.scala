@@ -3,12 +3,11 @@
 
 package com.digitalasset.canton.networking.grpc
 
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.MetricName
 import com.daml.metrics.grpc.GrpcServerMetrics
-import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.CantonAdminToken
-import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.TlsServerConfig.logTlsProtocolsAndCipherSuites
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TracingConfig
@@ -87,12 +86,13 @@ object CantonServerBuilder {
           this
         }
 
-        override def close(): Unit =
+        override def close(): Unit = {
           for (_ <- 0 until registry.getServices.size()) {
             registry
               .removeService(registry.getServices.get(registry.getServices.size() - 1))
               .discard[Boolean]
           }
+        }
       }
 
     override def addService(service: BindableService, withLogging: Boolean): CantonServerBuilder = {
@@ -119,7 +119,7 @@ object CantonServerBuilder {
   def configureKeepAlive(
       keepAlive: Option[KeepAliveServerConfig],
       builder: NettyServerBuilder,
-  ): NettyServerBuilder =
+  ): NettyServerBuilder = {
     keepAlive.fold(builder) { opt =>
       val time = opt.time.unwrap.toMillis
       val timeout = opt.timeout.unwrap.toMillis
@@ -132,6 +132,7 @@ object CantonServerBuilder {
           TimeUnit.MILLISECONDS,
         ) // gracefully allowing a bit more aggressive keep alives from clients
     }
+  }
 
   /** Create a GRPC server build using conventions from our configuration.
     * @param config server configuration
@@ -139,13 +140,13 @@ object CantonServerBuilder {
     */
   def forConfig(
       config: ServerConfig,
-      adminToken: Option[CantonAdminToken],
+      metricsPrefix: MetricName,
+      metricsFactory: LabeledMetricsFactory,
       executor: Executor,
       loggerFactory: NamedLoggerFactory,
       apiLoggingConfig: ApiLoggingConfig,
       tracing: TracingConfig,
       grpcMetrics: GrpcServerMetrics,
-      telemetry: Telemetry,
   ): CantonServerBuilder = {
     val builder =
       NettyServerBuilder
@@ -165,12 +166,10 @@ object CantonServerBuilder {
       config.instantiateServerInterceptors(
         tracing,
         apiLoggingConfig,
+        metricsPrefix,
+        metricsFactory,
         loggerFactory,
         grpcMetrics,
-        config.authServices,
-        adminToken,
-        config.jwtTimestampLeeway,
-        telemetry,
       ),
     )
   }
@@ -185,19 +184,13 @@ object CantonServerBuilder {
 
   def baseSslContext(config: TlsBaseServerConfig): SslContext = baseSslBuilder(config).build()
 
-  def sslContext(
-      config: TlsServerConfig,
-      logTlsProtocolAndCipherSuites: Boolean = false,
-  ): SslContext = {
+  def sslContext(config: TlsServerConfig): SslContext = {
     val s1 = baseSslBuilder(config)
     val s2 = config.trustCollectionFile.fold(s1)(trustCollection =>
       s1.trustManager(trustCollection.unwrap)
     )
     val s3 = s2.clientAuth(config.clientAuth.clientAuth)
-    val sslContext = s3.build()
-    if (logTlsProtocolAndCipherSuites)
-      logTlsProtocolsAndCipherSuites(sslContext, isServer = true)
-    sslContext
+    s3.build()
   }
 
   /** We know this operation is safe due to the definition of [[io.grpc.ServerBuilder]].

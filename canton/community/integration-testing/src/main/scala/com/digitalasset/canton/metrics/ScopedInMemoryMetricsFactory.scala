@@ -12,8 +12,9 @@ class ScopedInMemoryMetricsFactory extends MetricsFactoryProvider {
 
   private val factories = TrieMap[MetricsContext, InMemoryMetricsFactory]()
 
-  override def generateMetricsFactory(metricsContext: MetricsContext): InMemoryMetricsFactory =
+  override def generateMetricsFactory(metricsContext: MetricsContext): InMemoryMetricsFactory = {
     factories.getOrElseUpdate(metricsContext, new InMemoryMetricsFactory)
+  }
 
   def findSingle(condition: MetricsContext => Boolean): InMemoryMetricsFactory = {
     val filteredFactories = factories.toMap.view.filter { case (context, _) =>

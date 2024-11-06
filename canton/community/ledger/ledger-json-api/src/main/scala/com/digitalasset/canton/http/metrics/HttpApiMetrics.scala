@@ -10,6 +10,7 @@ import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification}
 import com.daml.metrics.http.{DamlHttpHistograms, DamlHttpMetrics, DamlWebSocketMetrics, DamlWebSocketsHistograms}
 import com.daml.metrics.api.HistogramInventory
 import com.daml.metrics.api.HistogramInventory.Item
+import com.digitalasset.canton.http.metrics.HttpApiMetrics.ComponentName
 
 object HttpApiMetrics {
   lazy val ForTesting =

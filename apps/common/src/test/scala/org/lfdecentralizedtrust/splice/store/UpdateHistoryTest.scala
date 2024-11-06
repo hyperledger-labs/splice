@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, ExercisedEvent, Int64, Value}
 import com.digitalasset.daml.lf.data.Bytes
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   LedgerClient,
@@ -40,25 +39,11 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
 
     "ingestion" should {
 
-      "handle single create and query it by contract id" in {
+      "handle single create" in {
         val store = mkStore()
         for {
           _ <- initStore(store)
-          result <- store.lookupContractById(AppRewardCoupon.COMPANION)(
-            new AppRewardCoupon.ContractId(cid1)
-          )
-          _ = result shouldBe None
           _ <- create(domain1, cid1, offset1, party1, store, time(1))
-          result <- store.lookupContractById(AppRewardCoupon.COMPANION)(
-            new AppRewardCoupon.ContractId(cid1)
-          )
-          _ = result shouldBe Some(
-            appRewardCoupon(
-              round = 0,
-              provider = party1,
-              contractId = cid1,
-            )
-          )
           updates <- updates(store)
         } yield checkUpdates(
           updates,

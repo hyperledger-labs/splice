@@ -23,7 +23,7 @@ public final class TransactionTree {
 
   @NonNull private final Instant effectiveAt;
 
-  @NonNull private final Long offset;
+  @NonNull private final String offset;
 
   @NonNull private final Map<String, TreeEvent> eventsById;
 
@@ -40,7 +40,7 @@ public final class TransactionTree {
       @NonNull String commandId,
       @NonNull String workflowId,
       @NonNull Instant effectiveAt,
-      @NonNull Long offset,
+      @NonNull String offset,
       @NonNull Map<@NonNull String, @NonNull TreeEvent> eventsById,
       List<String> rootEventIds,
       @NonNull String domainId,
@@ -129,7 +129,7 @@ public final class TransactionTree {
   }
 
   @NonNull
-  public Long getOffset() {
+  public String getOffset() {
     return offset;
   }
 

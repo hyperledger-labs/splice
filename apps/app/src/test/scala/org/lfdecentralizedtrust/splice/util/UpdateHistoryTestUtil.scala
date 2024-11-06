@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.util
 
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
@@ -39,8 +40,9 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.scalatest.Assertion
 
 trait UpdateHistoryTestUtil extends TestCommon {
+
   def updateHistoryFromParticipant(
-      beginExclusive: Long,
+      beginExclusive: ParticipantOffset,
       partyId: PartyId,
       participant: ParticipantClientReference,
   ): Seq[GetTreeUpdatesResponse] = {
@@ -50,8 +52,8 @@ trait UpdateHistoryTestUtil extends TestCommon {
       .trees(
         partyIds = Set(partyId),
         completeAfter = Int.MaxValue,
-        beginOffsetExclusive = beginExclusive,
-        endOffsetInclusive = Some(ledgerEnd),
+        beginOffset = beginExclusive,
+        endOffset = Some(ledgerEnd),
         verbose = false,
       )
       .map {
@@ -76,7 +78,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
   def compareHistory(
       participant: ParticipantClientReference,
       updateHistory: UpdateHistory,
-      ledgerBegin: Long,
+      ledgerBegin: ParticipantOffset,
       mustIncludeReassignments: Boolean = false,
   ): Assertion = {
     val actualUpdates =
@@ -158,7 +160,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
   }
 
   def compareHistoryViaScanApi(
-      ledgerBegin: Long,
+      ledgerBegin: ParticipantOffset,
       svAppBackend: SvAppBackendReference,
       scanClient: ScanAppClientReference,
   ): Assertion = {

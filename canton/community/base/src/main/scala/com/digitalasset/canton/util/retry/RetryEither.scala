@@ -29,7 +29,7 @@ object RetryEither {
   )(implicit
       loggingContext: ErrorLoggingContext,
       closeContext: CloseContext,
-  ): EitherT[UnlessShutdown, A, B] =
+  ): EitherT[UnlessShutdown, A, B] = {
     retryUnlessShutdown(
       maxRetries,
       waitInMs,
@@ -41,6 +41,7 @@ object RetryEither {
     )(
       EitherT(UnlessShutdown.Outcome(body))
     )
+  }
 
   def retryUnlessShutdown[A, B](
       maxRetries: Int,
@@ -55,7 +56,7 @@ object RetryEither {
   )(implicit
       loggingContext: ErrorLoggingContext,
       closeContext: CloseContext,
-  ): EitherT[UnlessShutdown, A, B] =
+  ): EitherT[UnlessShutdown, A, B] = {
     maxRetries.tailRecM { retryCount =>
       EitherT {
         closeContext.context
@@ -89,5 +90,6 @@ object RetryEither {
           }
       }
     }
+  }
 
 }

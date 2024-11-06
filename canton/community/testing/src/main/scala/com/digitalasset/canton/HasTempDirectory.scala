@@ -20,9 +20,10 @@ trait HasTempDirectory extends BeforeAndAfterAll { this: Suite =>
     directory
   }
 
-  override def afterAll(): Unit =
+  override def afterAll(): Unit = {
     try super.afterAll()
     finally tempDirectoryO.foreach(_.delete())
+  }
 }
 
 final case class TempDirectory(directory: File) {

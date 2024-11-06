@@ -44,47 +44,47 @@ class PruningDtoQueries {
 
   def eventCreate(implicit c: Connection): Seq[EventCreate] =
     SQL"SELECT event_sequential_id FROM lapi_events_create ORDER BY event_sequential_id"
-      .asVectorOf(seqIdParser(EventCreate.apply))(c)
+      .asVectorOf(seqIdParser(EventCreate))(c)
   def eventConsuming(implicit c: Connection): Seq[EventConsuming] =
     SQL"SELECT event_sequential_id FROM lapi_events_consuming_exercise ORDER BY event_sequential_id"
-      .asVectorOf(seqIdParser(EventConsuming.apply))(c)
+      .asVectorOf(seqIdParser(EventConsuming))(c)
   def eventNonConsuming(implicit c: Connection): Seq[EventNonConsuming] =
     SQL"SELECT event_sequential_id FROM lapi_events_non_consuming_exercise ORDER BY event_sequential_id"
-      .asVectorOf(seqIdParser(EventNonConsuming.apply))(c)
+      .asVectorOf(seqIdParser(EventNonConsuming))(c)
   def eventAssign(implicit c: Connection): Seq[EventAssign] =
     SQL"SELECT event_sequential_id FROM lapi_events_assign ORDER BY event_sequential_id"
-      .asVectorOf(seqIdParser(EventAssign.apply))(c)
+      .asVectorOf(seqIdParser(EventAssign))(c)
   def eventUnassign(implicit c: Connection): Seq[EventUnassign] =
     SQL"SELECT event_sequential_id FROM lapi_events_unassign ORDER BY event_sequential_id"
-      .asVectorOf(seqIdParser(EventUnassign.apply))(c)
+      .asVectorOf(seqIdParser(EventUnassign))(c)
 
   def filterCreateStakeholder(implicit c: Connection): Seq[FilterCreateStakeholder] =
     SQL"SELECT event_sequential_id, party_id FROM lapi_pe_create_id_filter_stakeholder ORDER BY event_sequential_id, party_id"
-      .asVectorOf(idFilterParser(FilterCreateStakeholder.apply))(c)
+      .asVectorOf(idFilterParser(FilterCreateStakeholder))(c)
   def filterCreateNonStakeholder(implicit c: Connection): Seq[FilterCreateNonStakeholder] =
     SQL"SELECT event_sequential_id, party_id FROM lapi_pe_create_id_filter_non_stakeholder_informee ORDER BY event_sequential_id, party_id"
-      .asVectorOf(idFilterParser(FilterCreateNonStakeholder.apply))(c)
+      .asVectorOf(idFilterParser(FilterCreateNonStakeholder))(c)
   def filterConsumingStakeholder(implicit c: Connection): Seq[FilterConsumingStakeholder] =
     SQL"SELECT event_sequential_id, party_id FROM lapi_pe_consuming_id_filter_stakeholder ORDER BY event_sequential_id, party_id"
-      .asVectorOf(idFilterParser(FilterConsumingStakeholder.apply))(c)
+      .asVectorOf(idFilterParser(FilterConsumingStakeholder))(c)
   def filterConsumingNonStakeholder(implicit c: Connection): Seq[FilterConsumingNonStakeholder] =
     SQL"SELECT event_sequential_id, party_id FROM lapi_pe_consuming_id_filter_non_stakeholder_informee ORDER BY event_sequential_id, party_id"
-      .asVectorOf(idFilterParser(FilterConsumingNonStakeholder.apply))(c)
+      .asVectorOf(idFilterParser(FilterConsumingNonStakeholder))(c)
   def filterNonConsuming(implicit c: Connection): Seq[FilterNonConsuming] =
     SQL"SELECT event_sequential_id, party_id FROM lapi_pe_non_consuming_id_filter_informee ORDER BY event_sequential_id, party_id"
-      .asVectorOf(idFilterParser(FilterNonConsuming.apply))(c)
+      .asVectorOf(idFilterParser(FilterNonConsuming))(c)
   def filterAssign(implicit c: Connection): Seq[FilterAssign] =
     SQL"SELECT event_sequential_id, party_id FROM lapi_pe_assign_id_filter_stakeholder ORDER BY event_sequential_id, party_id"
-      .asVectorOf(idFilterParser(FilterAssign.apply))(c)
+      .asVectorOf(idFilterParser(FilterAssign))(c)
   def filterUnassign(implicit c: Connection): Seq[FilterUnassign] =
     SQL"SELECT event_sequential_id, party_id FROM lapi_pe_unassign_id_filter_stakeholder ORDER BY event_sequential_id, party_id"
-      .asVectorOf(idFilterParser(FilterUnassign.apply))(c)
+      .asVectorOf(idFilterParser(FilterUnassign))(c)
 
   def txMeta(implicit c: Connection): Seq[TxMeta] =
     SQL"SELECT event_offset AS ledger_offset FROM lapi_transaction_meta ORDER BY event_offset"
-      .asVectorOf(offsetParser(TxMeta.apply))(c)
+      .asVectorOf(offsetParser(TxMeta))(c)
   def completions(implicit c: Connection): Seq[Completion] =
     SQL"SELECT completion_offset AS ledger_offset FROM lapi_command_completions ORDER BY completion_offset"
-      .asVectorOf(offsetParser(Completion.apply))(c)
+      .asVectorOf(offsetParser(Completion))(c)
 
 }

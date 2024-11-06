@@ -4,11 +4,13 @@
 package com.digitalasset.canton.platform.apiserver.services
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.state_service.*
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.{GrpcApiService, StreamingServiceLifecycleManagement}
 import com.digitalasset.canton.ledger.api.validation.{FieldValidator, TransactionFilterValidator}
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.ledger.participant.state.WriteService
 import com.digitalasset.canton.ledger.participant.state.index.{
   IndexActiveContractsService as ACSBackend,
@@ -59,10 +61,16 @@ final class ApiStateService(
         filters <- TransactionFilterValidator.validate(
           request.getFilter
         )
-
-        activeAt <- FieldValidator.requireNonNegativeOffset(
-          request.activeAtOffset,
-          "active_at_offset",
+        activeAtO <- FieldValidator.optionalString(request.activeAtOffset)(str =>
+          ApiOffset.fromString(str).left.map { errorMsg =>
+            RequestValidationErrors.NonHexOffset
+              .Error(
+                fieldName = "active_at_offset",
+                offsetValue = request.activeAtOffset,
+                message = s"Reason: $errorMsg",
+              )
+              .asGrpcError
+          }
         )
       } yield {
         withEnrichedLoggingContext(telemetry)(
@@ -75,7 +83,7 @@ final class ApiStateService(
             .getActiveContracts(
               filter = filters,
               verbose = request.verbose,
-              activeAt = activeAt,
+              activeAtO = activeAtO,
             )
         }
       }
@@ -95,19 +103,14 @@ final class ApiStateService(
   override def getConnectedDomains(
       request: GetConnectedDomainsRequest
   ): Future[GetConnectedDomainsResponse] = {
-    implicit val loggingContext: LoggingContextWithTrace =
-      LoggingContextWithTrace(loggerFactory, telemetry)
-    (for {
-      party <- FieldValidator
-        .requirePartyField(request.party, "party")
-      participantId <- FieldValidator
-        .optionalParticipantId(request.participantId, "participant_id")
-    } yield WriteService.ConnectedDomainRequest(party, participantId))
+    implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
+    FieldValidator
+      .requirePartyField(request.party, "party")
       .fold(
         t => Future.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
-        request =>
+        party =>
           writeService
-            .getConnectedDomains(request)
+            .getConnectedDomains(WriteService.ConnectedDomainRequest(party))
             .map(response =>
               GetConnectedDomainsResponse(
                 response.connectedDomains.flatMap { connectedDomain =>
@@ -140,7 +143,11 @@ final class ApiStateService(
       .currentLedgerEnd()
       .map(offset =>
         GetLedgerEndResponse(
-          ApiOffset.assertFromStringToLong(offset)
+          Some(
+            ParticipantOffset(
+              ParticipantOffset.Value.Absolute(offset.value)
+            )
+          )
         )
       )
       .andThen(logger.logErrorsOnCall[GetLedgerEndResponse])
@@ -155,8 +162,11 @@ final class ApiStateService(
       .latestPrunedOffsets()
       .map { case (prunedUptoInclusive, divulgencePrunedUptoInclusive) =>
         GetLatestPrunedOffsetsResponse(
-          participantPrunedUpToInclusive = prunedUptoInclusive,
-          allDivulgedContractsPrunedUpToInclusive = divulgencePrunedUptoInclusive,
+          participantPrunedUpToInclusive =
+            Some(ParticipantOffset(ParticipantOffset.Value.Absolute(prunedUptoInclusive.value))),
+          allDivulgedContractsPrunedUpToInclusive = Some(
+            ParticipantOffset(ParticipantOffset.Value.Absolute(divulgencePrunedUptoInclusive.value))
+          ),
         )
       }
       .andThen(logger.logErrorsOnCall[GetLatestPrunedOffsetsResponse])

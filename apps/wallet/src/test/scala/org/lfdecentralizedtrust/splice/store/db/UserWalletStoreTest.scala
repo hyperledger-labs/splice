@@ -13,14 +13,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   payment as paymentCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
-  transferpreapproval as preapprovalCodegen,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_MintResult
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
   BuyTrafficRequestStatusRejected,
@@ -183,7 +181,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       }
 
       "return None after ingesting unrelated entries only" in {
-        def mkUnrelatedEntry()(offset: Long) = {
+        def mkUnrelatedEntry()(offset: String) = {
           mintTransaction(user1, 11.0, 1L, 1.0)(offset)
         }
         for {
@@ -196,7 +194,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       }
 
       "return entry stored by multiple stores" in {
-        def mkSharedTx()(offset: Long) = {
+        def mkSharedTx()(offset: String) = {
           mkTransferOfferTx(offset, "trackingId", user1, user2, nextCid())
         }
 
@@ -218,10 +216,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         val goodAcceptedTransferOfferCid = nextCid()
         val badTransferOfferCid = nextCid()
 
-        def mkTransferOffer(trackingId: String, cid: String)(offset: Long) = {
+        def mkTransferOffer(trackingId: String, cid: String)(offset: String) = {
           mkTransferOfferTx(offset, trackingId, user1, user2, cid)
         }
-        def mkAcceptTransfer(trackingId: String, cid: String)(offset: Long) = {
+        def mkAcceptTransfer(trackingId: String, cid: String)(offset: String) = {
           mkAcceptTransferTx(offset, trackingId, user1, user2, cid)
         }
 
@@ -269,7 +267,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       }
 
       "return None after ingesting unrelated entries only" in {
-        def mkUnrelatedEntry()(offset: Long) = {
+        def mkUnrelatedEntry()(offset: String) = {
           mintTransaction(user1, 11.0, 1L, 1.0)(offset)
         }
 
@@ -285,11 +283,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       def mkBuyTrafficRequest(
           trackingId: String,
           cid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
-      )(offset: Long) = {
+      )(offset: String) = {
         mkBuyTrafficRequestTx(offset, trackingId, user1, participantId, dummyDomain, cid)
       }
       def mkCancelTrafficRequest(trackingId: String, reason: String, cid: String)(
-          offset: Long
+          offset: String
       ) = {
         mkCancelTrafficRequestTx(offset, trackingId, user1, reason, cid)
       }
@@ -344,7 +342,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           result <- store2.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
         } yield {
-          result.offset shouldBe cancelledTree.getOffset
+          result.offset should be(cancelledTree.getOffset)
           result.value.map(_.status) should be(
             Some(
               BuyTrafficRequestTxLogEntry.Status.Rejected(
@@ -842,7 +840,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
-      def mkMint(amount: Double)(offset: Long) = {
+      def mkMint(amount: Double)(offset: String) = {
         mintTransaction(user1, amount, 1, 1)(offset)
       }
 
@@ -1007,29 +1005,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     }
   }
 
-  "lookupTransferPreapprovalProposal" should {
-    "return correct results" in {
-      for {
-        store <- mkStore(user1)
-        proposal1 = transferPreapprovalProposal(user1, validator)
-        proposal2 = transferPreapprovalProposal(user2, validator)
-        proposal3 = transferPreapprovalProposal(user1, provider1)
-        _ <- dummyDomain.create(proposal1, createdEventSignatories = Seq(user1))(
-          store.multiDomainAcsStore
-        )
-        _ <- dummyDomain.create(proposal2, createdEventSignatories = Seq(user2))(
-          store.multiDomainAcsStore
-        )
-        _ <- dummyDomain.create(proposal3, createdEventSignatories = Seq(user1))(
-          store.multiDomainAcsStore
-        )
-        result <- store.lookupTransferPreapprovalProposal()
-      } yield {
-        result.value.value shouldBe proposal1
-      }
-    }
-  }
-
   private lazy val provider1 = providerParty(1)
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)
@@ -1041,8 +1016,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     endUserParty = endUserParty,
   )
 
+  private def time(n: Long) = CantonTimestamp.ofEpochSecond(n)
+
   private def walletInstall(endUserParty: PartyId) = {
-    val templateId = installCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = installCodegen.WalletAppInstall.TEMPLATE_ID
     val template = new installCodegen.WalletAppInstall(
       dsoParty.toProtoPrimitive,
       validator.toProtoPrimitive,
@@ -1066,7 +1043,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId: transferOffersCodegen.TransferOffer.ContractId =
         new transferOffersCodegen.TransferOffer.ContractId(nextCid()),
   ) = {
-    val templateId = transferOffersCodegen.TransferOffer.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = transferOffersCodegen.TransferOffer.TEMPLATE_ID
     val template = new transferOffersCodegen.TransferOffer(
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
@@ -1092,7 +1069,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       trackingId: String = UUID.randomUUID().toString,
       cid: String = nextCid(),
   ) = {
-    val templateId = transferOffersCodegen.AcceptedTransferOffer.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = transferOffersCodegen.AcceptedTransferOffer.TEMPLATE_ID
     val template = new transferOffersCodegen.AcceptedTransferOffer(
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
@@ -1117,7 +1094,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       trackingId: String,
       cid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
   ) = {
-    val templateId = trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID
     val template = new trafficRequestCodegen.BuyTrafficRequest(
       dsoParty.toProtoPrimitive,
       buyer.toProtoPrimitive,
@@ -1143,7 +1120,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       expiresAt: CantonTimestamp,
       description: String,
   ) = {
-    val templateId = paymentCodegen.AppPaymentRequest.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = paymentCodegen.AppPaymentRequest.TEMPLATE_ID
     val template = new paymentCodegen.AppPaymentRequest(
       sender.toProtoPrimitive,
       java.util.List.of(
@@ -1169,7 +1146,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       provider: PartyId,
       reference: subsCodegen.SubscriptionRequest.ContractId,
   ) = {
-    val templateId = subsCodegen.Subscription.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = subsCodegen.Subscription.TEMPLATE_ID
     val template = new subsCodegen.Subscription(
       new subsCodegen.SubscriptionData(
         user.toProtoPrimitive,
@@ -1192,7 +1169,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       payData: subsCodegen.SubscriptionPayData,
       nextPaymentDueAt: CantonTimestamp,
   ) = {
-    val templateId = subsCodegen.SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = subsCodegen.SubscriptionIdleState.TEMPLATE_ID
     val template = new subsCodegen.SubscriptionIdleState(
       subscriptionContract.contractId,
       subscriptionContract.payload.subscriptionData,
@@ -1214,7 +1191,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       lockedAmuletCid: amuletCodegen.LockedAmulet.ContractId,
       round: Long,
   ) = {
-    val templateId = subsCodegen.SubscriptionPayment.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = subsCodegen.SubscriptionPayment.TEMPLATE_ID
     val template = new subsCodegen.SubscriptionPayment(
       subscription.contractId,
       subscription.payload.subscriptionData,
@@ -1287,7 +1264,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       subscriptionData: subsCodegen.SubscriptionData,
       payData: subsCodegen.SubscriptionPayData,
   ) = {
-    val templateId = subsCodegen.SubscriptionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = subsCodegen.SubscriptionRequest.TEMPLATE_ID
     val template = new subsCodegen.SubscriptionRequest(
       subscriptionData,
       payData,
@@ -1306,7 +1283,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       entryUrl: String = "https://ans-entry-url.com",
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = ansCodegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = ansCodegen.AnsEntry.TEMPLATE_ID
     val template = new ansCodegen.AnsEntry(
       user.toProtoPrimitive,
       provider.toProtoPrimitive,
@@ -1329,7 +1306,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       entryUrl: String = "https://ans-entry-url.com",
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = ansCodegen.AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = ansCodegen.AnsEntryContext.TEMPLATE_ID
     val template = new ansCodegen.AnsEntryContext(
       dsoParty.toProtoPrimitive,
       user.toProtoPrimitive,
@@ -1345,17 +1322,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  protected def transferPreapprovalProposal(receiver: PartyId, provider: PartyId) = {
-    val templateId = preapprovalCodegen.TransferPreapprovalProposal.TEMPLATE_ID
-    val template =
-      new TransferPreapprovalProposal(receiver.toProtoPrimitive, provider.toProtoPrimitive)
-    contract(
-      identifier = templateId,
-      contractId = new preapprovalCodegen.TransferPreapprovalProposal.ContractId(nextCid()),
-      payload = template,
-    )
-  }
-
   /** A AmuletRules_Mint exercise event with one child Amulet create event */
   private def mintTransaction(
       receiver: PartyId,
@@ -1364,7 +1330,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       ratePerRound: Double,
       amuletPrice: Double = 1.0,
   )(
-      offset: Long
+      offset: String
   ) = {
     val amuletContract = amulet(receiver, amount, round, ratePerRound)
 
@@ -1376,7 +1342,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         amuletRulesCid,
-        amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+        amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
         None,
         amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_Mint.name,
         consuming = false,
@@ -1399,7 +1365,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def mkTransferOfferTx(
-      offset: Long,
+      offset: String,
       trackingId: String,
       sender: PartyId,
       receiver: PartyId,
@@ -1412,7 +1378,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         walletAppInstallCid,
-        installCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID,
+        installCodegen.WalletAppInstall.TEMPLATE_ID,
         None,
         installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_CreateTransferOffer.name,
         consuming = false,
@@ -1449,7 +1415,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def mkAcceptTransferTx(
-      offset: Long,
+      offset: String,
       trackingId: String,
       sender: PartyId,
       receiver: PartyId,
@@ -1461,7 +1427,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         walletAppInstallCid,
-        transferOffersCodegen.TransferOffer.TEMPLATE_ID_WITH_PACKAGE_ID,
+        transferOffersCodegen.TransferOffer.TEMPLATE_ID,
         None,
         transferOffersCodegen.TransferOffer.CHOICE_TransferOffer_Accept.name,
         consuming = false,
@@ -1489,7 +1455,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def mkBuyTrafficRequestTx(
-      offset: Long,
+      offset: String,
       trackingId: String,
       buyer: PartyId,
       memberId: Member,
@@ -1503,7 +1469,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         walletAppInstallCid,
-        installCodegen.WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID,
+        installCodegen.WalletAppInstall.TEMPLATE_ID,
         None,
         installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_CreateBuyTrafficRequest.name,
         consuming = false,
@@ -1538,7 +1504,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def mkCancelTrafficRequestTx(
-      offset: Long,
+      offset: String,
       trackingId: String,
       buyer: PartyId,
       reason: String,
@@ -1548,7 +1514,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         requestCid,
-        trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
+        trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID,
         None,
         trafficRequestCodegen.BuyTrafficRequest.CHOICE_BuyTrafficRequest_Cancel.name,
         consuming = false,

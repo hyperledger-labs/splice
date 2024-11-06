@@ -9,13 +9,9 @@ import com.daml.ledger.api.v2.commands.{
   DisclosedContract as ProtoDisclosedContract,
 }
 import com.digitalasset.canton.ledger.api.domain.DisclosedContract
-import com.digitalasset.canton.ledger.api.validation.FieldValidator.{
-  requireContractId,
-  requireDomainId,
-}
+import com.digitalasset.canton.ledger.api.validation.FieldValidator.requireContractId
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.invalidArgument
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
-import com.digitalasset.canton.util.OptionUtil
 import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.transaction.TransactionCoder
 import io.grpc.StatusRuntimeException
@@ -26,13 +22,8 @@ class ValidateDisclosedContracts {
   def apply(commands: ProtoCommands)(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
   ): Either[StatusRuntimeException, ImmArray[DisclosedContract]] =
-    fromDisclosedContracts(commands.disclosedContracts)
-
-  def fromDisclosedContracts(disclosedContracts: Seq[ProtoDisclosedContract])(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, ImmArray[DisclosedContract]] =
     for {
-      validatedDisclosedContracts <- validateDisclosedContracts(disclosedContracts)
+      validatedDisclosedContracts <- validateDisclosedContracts(commands.disclosedContracts)
     } yield validatedDisclosedContracts
 
   private def validateDisclosedContracts(
@@ -74,10 +65,6 @@ class ValidateDisclosedContracts {
           disclosedContract.contractId,
           "DisclosedContract.contract_id",
         )
-        domainIdO <- OptionUtil
-          .emptyStringAsNone(disclosedContract.domainId)
-          .map(requireDomainId(_, "DisclosedContract.domain_id").map(Some(_)))
-          .getOrElse(Right(None))
         fatContractInstance <- TransactionCoder
           .decodeFatContractInstance(disclosedContract.createdEventBlob)
           .left
@@ -98,8 +85,22 @@ class ValidateDisclosedContracts {
             s"Mismatch between DisclosedContract.template_id ($validatedTemplateId) and template_id from decoded DisclosedContract.created_event_blob (${fatContractInstance.templateId})"
           ),
         )
-      } yield DisclosedContract(
-        fatContractInstance = fatContractInstance,
-        domainIdO = domainIdO,
-      )
+      } yield {
+        import fatContractInstance.*
+        DisclosedContract(
+          contractId = validatedContractId,
+          templateId = templateId,
+          packageName = packageName,
+          packageVersion = packageVersion,
+          argument = createArg,
+          createdAt = createdAt,
+          keyHash = contractKeyWithMaintainers.map(_.globalKey.hash),
+          driverMetadata = cantonData,
+          keyMaintainers = contractKeyWithMaintainers.map(_.maintainers),
+          signatories = signatories,
+          stakeholders = stakeholders,
+          keyValue = contractKeyWithMaintainers.map(_.value),
+          transactionVersion = version,
+        )
+      }
 }

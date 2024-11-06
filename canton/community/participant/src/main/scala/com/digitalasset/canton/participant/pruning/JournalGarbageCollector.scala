@@ -8,10 +8,11 @@ import cats.syntax.foldable.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestampSecond
-import com.digitalasset.canton.ledger.participant.state.DomainIndex
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.*
+import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
+import com.digitalasset.canton.store.SequencerCounterTrackerStore
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -29,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
   */
 private[participant] class JournalGarbageCollector(
     requestJournalStore: RequestJournalStore,
-    domainIndexF: TraceContext => Future[DomainIndex],
+    sequencerCounterTrackerStore: SequencerCounterTrackerStore,
     sortedReconciliationIntervalsProvider: SortedReconciliationIntervalsProvider,
     acsCommitmentStore: AcsCommitmentStore,
     acs: ActiveContractStore,
@@ -46,29 +47,32 @@ private[participant] class JournalGarbageCollector(
       traceContext: TraceContext
   ): Unit = flush(traceContext)
 
-  override protected def run()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    performUnlessClosingUSF(functionFullName) {
+  override protected def run()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+    performUnlessClosingF(functionFullName) {
       for {
-        domainIndex <- FutureUnlessShutdown.outcomeF(domainIndexF(implicitly))
+        requestCounterCursorPrehead <- requestJournalStore.preheadClean
+        sequencerCounterCursorPrehead <- sequencerCounterTrackerStore.preheadSequencerCounter
         safeToPruneTsO <-
-          PruningProcessor.latestSafeToPruneTick(
+          AcsCommitmentProcessor.safeToPrune(
             requestJournalStore,
-            domainIndex,
+            requestCounterCursorPrehead,
+            sequencerCounterCursorPrehead,
             sortedReconciliationIntervalsProvider,
             acsCommitmentStore,
             inFlightSubmissionStore.value,
             domainId,
             checkForOutstandingCommitments = false,
           )
-        _ <- safeToPruneTsO.fold(FutureUnlessShutdown.unit) { ts =>
+        _ <- safeToPruneTsO.fold(Future.unit) { ts =>
           val maxDelay = (ts - CantonTimestampSecond.MinValue).toSeconds
           val cappedJournalGarbageCollectionDelay =
             journalGarbageCollectionDelay.duration.toSeconds.min(maxDelay)
 
-          FutureUnlessShutdown.outcomeF(prune(ts.minusSeconds(cappedJournalGarbageCollectionDelay)))
+          prune(ts.minusSeconds(cappedJournalGarbageCollectionDelay))
         }
       } yield ()
     }
+  }
 
   private def prune(pruneTs: CantonTimestampSecond)(implicit
       traceContext: TraceContext
@@ -76,15 +80,31 @@ private[participant] class JournalGarbageCollector(
     logger.debug(s"Starting periodic background pruning of journals up to $pruneTs")
     val acsDescription = s"Periodic ACS prune at $pruneTs"
     // Clean unused entries from the ACS
-    val acsF = performUnlessClosingUSF(acsDescription)(acs.prune(pruneTs.forgetRefinement))
+    val acsF = performUnlessClosingF(acsDescription)(
+      recoverPassiveInstance(acs.prune(pruneTs.forgetRefinement), acsDescription)
+    )
     val submissionTrackerStoreDescription =
       s"Periodic submission tracker store prune at $pruneTs"
     // Clean unused entries from the submission tracker store
-    val submissionTrackerStoreF = performUnlessClosingUSF(submissionTrackerStoreDescription)(
-      submissionTrackerStore.prune(pruneTs.forgetRefinement)
+    val submissionTrackerStoreF = performUnlessClosingF(submissionTrackerStoreDescription)(
+      recoverPassiveInstance(
+        submissionTrackerStore.prune(pruneTs.forgetRefinement),
+        submissionTrackerStoreDescription,
+      )
     )
     Seq(acsF, submissionTrackerStoreF).sequence_.onShutdown(())
   }
+
+  private def recoverPassiveInstance(action: Future[Unit], desc: => String)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    action.recover {
+      case e: PassiveInstanceException =>
+        logger.info(s"$desc: ${e.getMessage}")
+      case err =>
+        logger.error(desc, err)
+        throw err
+    }
 }
 
 private[pruning] object JournalGarbageCollector {
@@ -113,10 +133,11 @@ private[pruning] object JournalGarbageCollector {
 
     private[pruning] def flush(
         traceContext: TraceContext
-    ): Unit =
+    ): Unit = {
       // set request flag and kick off pruning if flag was not already set
       if (!state.getAndUpdate(_.copy(requested = true)).requested)
         doFlush()(traceContext)
+    }
 
     /** Temporarily turn off journal pruning (in order to download an ACS)
       *
@@ -137,7 +158,7 @@ private[pruning] object JournalGarbageCollector {
       }
     }
 
-    private def doFlush()(implicit traceContext: TraceContext): Unit =
+    private def doFlush()(implicit traceContext: TraceContext): Unit = {
       // if we are not closing and not running, then we can start a new prune
       if (!isClosing) {
         val currentState = state.getAndUpdate {
@@ -159,6 +180,7 @@ private[pruning] object JournalGarbageCollector {
           FutureUtil.doNotAwait(runningF, "Periodic background journal pruning failed")
         }
       }
+    }
 
   }
 }
