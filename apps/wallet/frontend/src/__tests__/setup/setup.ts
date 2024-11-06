@@ -3,6 +3,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import crypto from 'crypto';
+import { SetupServer } from 'msw/node';
 import { beforeAll, afterAll, afterEach, vi } from 'vitest';
 
 import { buildServer } from '../mocks/server';
@@ -22,7 +23,7 @@ declare global {
   }
 }
 
-const server = buildServer(window.splice_config.services);
+export const server: SetupServer = buildServer(window.splice_config.services);
 
 // Start server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));

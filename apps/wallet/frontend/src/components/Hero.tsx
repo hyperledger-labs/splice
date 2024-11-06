@@ -17,7 +17,6 @@ const Hero: React.FC = () => {
 
   const isLoading = balanceQuery.isLoading || amuletPriceQuery.isLoading;
   const isError = balanceQuery.isError || amuletPriceQuery.isError;
-
   return (
     <Stack mt={4} mb={4} spacing={4} direction="row" justifyContent="space-between">
       <Stack direction="column" spacing={1}>

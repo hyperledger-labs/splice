@@ -72,6 +72,7 @@ export interface WalletClient {
     expiresAt: Date,
     trackingId: string
   ) => Promise<void>;
+  createTransferPreapproval: () => Promise<void>;
   transferPreapprovalSend: (
     receiverPartyId: string,
     amount: BigNumber,
@@ -222,6 +223,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           tracking_id: trackingId,
         };
         await externalWalletClient.createTransferOffer(request);
+      },
+      createTransferPreapproval: async () => {
+        await walletClient.createTransferPreapproval();
       },
       transferPreapprovalSend: async (
         receiverPartyId: string,

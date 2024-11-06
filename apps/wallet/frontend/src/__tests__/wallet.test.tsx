@@ -2,13 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { rest } from 'msw';
+import { LookupTransferPreapprovalByPartyResponse } from 'scan-openapi';
 import { test, expect, describe } from 'vitest';
 import { vi } from 'vitest';
 
 import App from '../App';
 import { WalletConfigProvider } from '../utils/config';
-import { aliceEntry, nameServiceEntries, userLogin } from './mocks/constants';
+import {
+  aliceEntry,
+  alicePartyId,
+  aliceTransferPreapproval,
+  nameServiceEntries,
+  userLogin,
+} from './mocks/constants';
 import { requestMocks } from './mocks/wallet-api';
+import { server } from './setup/setup';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
 
@@ -39,6 +48,43 @@ describe('Wallet user can', () => {
     user.click(button);
 
     expect(await screen.findByText(aliceEntry.name)).toBeDefined();
+  });
+
+  test('create a transfer preapproval', async () => {
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+    const preapproveTransfersBtn = await screen.findByRole('button', {
+      name: 'Pre-approve all incoming transfers',
+    });
+    expect(preapproveTransfersBtn).toBeEnabled();
+    // Check that clicking the button calls the correct backend endpoint
+    await user.click(preapproveTransfersBtn);
+    expect(requestMocks.createTransferPreapproval).toHaveBeenCalled();
+    // Mock the request to fetch the created pre-approval
+    server.use(
+      rest.get(
+        `${window.splice_config.services.validator.url}/v0/scan-proxy/transfer-preapprovals/by-party/:party`,
+        (req, res, ctx) => {
+          const { party } = req.params;
+          if (party === alicePartyId) {
+            return res(
+              ctx.json<LookupTransferPreapprovalByPartyResponse>({
+                transfer_preapproval: aliceTransferPreapproval,
+              })
+            );
+          } else {
+            return res(ctx.status(404), ctx.json({}));
+          }
+        }
+      )
+    );
+    // Check that the UI responds to the newly created pre-approval
+    await vi.waitFor(() => expect(screen.getByTestId('ApprovalIcon')).toBeInTheDocument(), 2000);
+    expect(preapproveTransfersBtn).not.toBeInTheDocument();
   });
 
   test('not see dso in list of transfer-offer receivers', async () => {

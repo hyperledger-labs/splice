@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend-utils';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { ApiException } from 'scan-proxy-openapi';
 
 import { TransferPreapproval } from '@daml.js/splice-amulet/lib/Splice/AmuletRules/module';
@@ -9,15 +9,16 @@ import { TransferPreapproval } from '@daml.js/splice-amulet/lib/Splice/AmuletRul
 import { useValidatorScanProxyClient } from '../../contexts/ValidatorScanProxyContext';
 
 const useLookupTransferPreapproval = (
-  party: string
+  party?: string
 ): UseQueryResult<Contract<TransferPreapproval> | null> => {
   const scanClient = useValidatorScanProxyClient();
 
   return useQuery<Contract<TransferPreapproval> | null>({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['scan-api', 'lookupTransferPreapproval', party, TransferPreapproval],
     queryFn: async () => {
       try {
-        const response = await scanClient.lookupTransferPreapprovalByParty(party);
+        const response = await scanClient.lookupTransferPreapprovalByParty(party!);
         return Contract.decodeOpenAPI(response.transfer_preapproval.contract, TransferPreapproval);
       } catch (e: unknown) {
         if ((e as ApiException<undefined>).code === 404) {
@@ -33,6 +34,7 @@ const useLookupTransferPreapproval = (
         }
       }
     },
+    enabled: !!party,
   });
 };
 

@@ -24,9 +24,12 @@ export const requestMocks: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createTransferOffer: Mock<(request: any) => Promise<any>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createTransferPreapproval: Mock<() => Promise<any>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transferPreapprovalSend: Mock<(request: any) => Promise<any>>;
 } = {
   createTransferOffer: vi.fn(),
+  createTransferPreapproval: vi.fn(),
   transferPreapprovalSend: vi.fn(),
 };
 
@@ -42,7 +45,7 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
     );
   }),
   rest.get(
-    `${walletUrl}v0/scan-proxy/featured-apps/alice__wallet__user%3A%3A12201d5aa725ec9491490fd860e86f849358604f6fd387053771cafb90384a94c3e2`,
+    `${walletUrl}/v0/scan-proxy/featured-apps/alice__wallet__user%3A%3A12201d5aa725ec9491490fd860e86f849358604f6fd387053771cafb90384a94c3e2`,
     (_, res, ctx) => {
       return res(ctx.json({ featured_app_right: null }));
     }
@@ -122,6 +125,11 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
 
   rest.post(`${walletUrl}/v0/wallet/transfer-offers`, async (req, res, ctx) => {
     requestMocks.createTransferOffer(await req.json());
+    return res(ctx.json({}));
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/transfer-preapproval`, async (_, res, ctx) => {
+    requestMocks.createTransferPreapproval();
     return res(ctx.json({}));
   }),
 

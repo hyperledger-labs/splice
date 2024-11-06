@@ -132,7 +132,7 @@ const SendTransfer: React.FC = () => {
                 transfer offer
               </Typography>
               <Checkbox
-                id="transfer-preapproval-checkbox"
+                id="use-transfer-preapproval-checkbox"
                 checked={useTransferPreapproval}
                 onChange={e => setUseTransferPreapproval(e.target.checked)}
               ></Checkbox>

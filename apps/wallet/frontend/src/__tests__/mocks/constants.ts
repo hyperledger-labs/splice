@@ -88,6 +88,28 @@ export const bobTransferPreapproval = {
   domain_id: 'global-domain::1220fb89d62774bd5b3fd8a11c1b22c8c5453e8286c3cf7add515c98d7bca192ef18',
 };
 
+export const aliceTransferPreapproval = {
+  contract: {
+    template_id:
+      'ea77bb255205999e75fa88faa06d228a62d7cf82dff249081079d3e8ae4f01fc:Splice.AmuletRules:TransferPreapproval',
+    contract_id:
+      '008ccb034f80137091417093367b06aea7ef1db3b81641fc6b235a5b06c0c8c370ca101220b3e427d522de646cd9f2a81d35a70fcc03c3602f75f07d3356987c25b2077b28',
+    payload: {
+      dso: 'DSO::122010c424982ba7befadd6a14131ac8b5021958e924bd1d3cbca9b44f8727e329ee',
+      expiresAt: '2025-02-03T05:02:56.720670Z',
+      receiver: alicePartyId,
+      validFrom: '2024-11-05T05:02:56.732754Z',
+      provider:
+        'alice-validator-1::12208214ed2f54232298f1e81f83f084af7e4dd84f75e916bcf0cc8d99fe2b48ac8f',
+      lastRenewedAt: '2024-11-05T05:02:56.732754Z',
+    },
+    created_event_blob:
+      'CgMyLjESsAYKRQCMywNPgBNwkUFwkzZ7Bq6n7x2zuBZB/GsjWlsGwMjDcMoQEiCz5CfVIt5kbNnyqB01pw/MA8NgL3XwfTNWmHwlsgd7KBINc3BsaWNlLWFtdWxldBpsCkBlYTc3YmIyNTUyMDU5OTllNzVmYTg4ZmFhMDZkMjI4YTYyZDdjZjgyZGZmMjQ5MDgxMDc5ZDNlOGFlNGYwMWZjEgZTcGxpY2USC0FtdWxldFJ1bGVzGhNUcmFuc2ZlclByZWFwcHJvdmFsIrUCarICCk0KSzpJRFNPOjoxMjIwMTBjNDI0OTgyYmE3YmVmYWRkNmExNDEzMWFjOGI1MDIxOTU4ZTkyNGJkMWQzY2JjYTliNDRmODcyN2UzMjllZQpdCls6WWFsaWNlX193YWxsZXRfX3VzZXI6OjEyMjA4MjE0ZWQyZjU0MjMyMjk4ZjFlODFmODNmMDg0YWY3ZTRkZDg0Zjc1ZTkxNmJjZjBjYzhkOTlmZTJiNDhhYzhmClsKWTpXYWxpY2UtdmFsaWRhdG9yLTE6OjEyMjA4MjE0ZWQyZjU0MjMyMjk4ZjFlODFmODNmMDg0YWY3ZTRkZDg0Zjc1ZTkxNmJjZjBjYzhkOTlmZTJiNDhhYzhmCgsKCSlS7oJQIyYGAAoLCgkpUu6CUCMmBgAKCwoJKR5/Os41LQYAKklEU086OjEyMjAxMGM0MjQ5ODJiYTdiZWZhZGQ2YTE0MTMxYWM4YjUwMjE5NThlOTI0YmQxZDNjYmNhOWI0NGY4NzI3ZTMyOWVlKldhbGljZS12YWxpZGF0b3ItMTo6MTIyMDgyMTRlZDJmNTQyMzIyOThmMWU4MWY4M2YwODRhZjdlNGRkODRmNzVlOTE2YmNmMGNjOGQ5OWZlMmI0OGFjOGYqWWFsaWNlX193YWxsZXRfX3VzZXI6OjEyMjA4MjE0ZWQyZjU0MjMyMjk4ZjFlODFmODNmMDg0YWY3ZTRkZDg0Zjc1ZTkxNmJjZjBjYzhkOTlmZTJiNDhhYzhmOVLuglAjJgYAQioKJgokCAESICA0JODCs5vjO9IpNdmdNL4APOZg8u1gtzLnY+u8DtyrEB4=',
+    created_at: '2024-11-05T05:02:56.732754Z',
+  },
+  domain_id: 'global-domain::122010c424982ba7befadd6a14131ac8b5021958e924bd1d3cbca9b44f8727e329ee',
+};
+
 export const amuletRules = {
   amulet_rules: {
     contract: {
