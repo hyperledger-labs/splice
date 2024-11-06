@@ -56,6 +56,8 @@ enableWallet: true
 #    maxBalanceUSD: <maxBalanceUSD>
 #    minBalanceUSD: <minBalanceUSD>
 #    receiver: "<receiverPartyId>"
+#    useTransferPreapproval: false # sweep by transferring directly through the transfer preapproval of the receiver,
+#                                    if set to false sweeping creates transfer offers that need to be accepted on the receiver side.
 # SWEEP_END
 
 # AUTO_ACCEPT_START

@@ -2,7 +2,11 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllValidatorConfigs
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAllValidatorConfigs,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, EnvironmentImpl}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -11,7 +15,10 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.ccToDollars
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TriggerTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.wallet.automation.AutoAcceptTransferOffersTrigger
+import org.lfdecentralizedtrust.splice.wallet.automation.{
+  AutoAcceptTransferOffersTrigger,
+  WalletPreapprovalSweepTrigger,
+}
 import org.lfdecentralizedtrust.splice.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
@@ -20,6 +27,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.slf4j.event.Level
 
+import io.grpc.{Status, StatusRuntimeException}
 import scala.concurrent.duration.DurationInt
 
 class WalletSweepIntegrationTest
@@ -46,6 +54,15 @@ class WalletSweepIntegrationTest
         val alicePartyId = PartyId
           .tryFromProtoPrimitive(
             s"${alicePartyHint}::${aliceParticipant.split("::").last}"
+          )
+        val bobParticipant =
+          ConfigTransforms
+            .getParticipantIds(config.parameters.clock)("bob_validator_user")
+        val bobPartyHint =
+          config.validatorApps(InstanceName.tryCreate("bobValidator")).validatorPartyHint.value
+        val bobPartyId = PartyId
+          .tryFromProtoPrimitive(
+            s"${bobPartyHint}::${bobParticipant.split("::").last}"
           )
         val sv1Participant =
           ConfigTransforms
@@ -75,12 +92,29 @@ class WalletSweepIntegrationTest
                   AutoAcceptTransfersConfig(fromParties = Seq(sv1PartyId))
               )
             )
+          } else if (name == "bobValidator") {
+            c.copy(
+              walletSweep = Map(
+                bobPartyId.toProtoPrimitive -> WalletSweepConfig(
+                  NonNegativeNumeric.tryCreate(maxBalanceUsd),
+                  NonNegativeNumeric.tryCreate(minBalanceUsd),
+                  alicePartyId,
+                  useTransferPreapproval = true,
+                )
+              )
+            )
           } else {
             c
           }
         }(config)
       })
       .withAmuletPrice(amuletPrice)
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Validator)(
+          // Disable by default so we can explictly control when it runs
+          _.withPausedTrigger[WalletPreapprovalSweepTrigger]
+        )(config)
+      )
       .withSequencerConnectionsFromScanDisabled()
 
   "SV1's wallet" should {
@@ -125,7 +159,7 @@ class WalletSweepIntegrationTest
         ) {
           val firstTransferAmountUsd = loggerFactory.assertEventuallyLogsSeq(
             SuppressionRule.LevelAndAbove(Level.INFO) && SuppressionRule.LoggerNameContains(
-              "WalletSweepTrigger"
+              "WalletTransferOfferSweepTrigger"
             )
           )(
             {
@@ -152,7 +186,7 @@ class WalletSweepIntegrationTest
             logs =>
               forAtLeast(1, logs) {
                 _.infoMessage should include regex (
-                  "but there are outstanding transfer offers with a sum of 1\\d\\."
+                  "but there are outstanding transfer offers with a value of 1\\d\\."
                 )
               },
           )
@@ -221,6 +255,71 @@ class WalletSweepIntegrationTest
           .longValue should be > aliceBalanceAtStart
       }
     }
+  }
+
+  "sweep through transfer preapproval should work" in { implicit env =>
+    onboardWalletUser(bobValidatorWalletClient, bobValidatorBackend)
+    val alicePartyId = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
+    inside(
+      bobValidatorBackend
+        .userWalletAutomation(bobValidatorWalletClient.config.ledgerApiUser)
+        .futureValue
+        .trigger[WalletPreapprovalSweepTrigger]
+        .runOnce()
+        .failed
+        .futureValue
+    ) { case ex: StatusRuntimeException =>
+      ex.getStatus.getCode shouldBe Status.Code.INVALID_ARGUMENT
+      ex.getStatus.getDescription() should include("No transfer preapproval for receiver")
+    }
+    actAndCheck(
+      "Alice creates transfer preapproval", {
+        aliceValidatorWalletClient.tap(50.0)
+        aliceValidatorWalletClient.createTransferPreapproval()
+      },
+    )(
+      "Transfer preapproval is visible in scan",
+      _ => sv1ScanBackend.lookupTransferPreapprovalByParty(alicePartyId) shouldBe a[Some[_]],
+    )
+    clue("Sweep no longer errors now that preapproval is created") {
+      bobValidatorBackend
+        .userWalletAutomation(bobValidatorWalletClient.config.ledgerApiUser)
+        .futureValue
+        .trigger[WalletPreapprovalSweepTrigger]
+        .runOnce()
+        .futureValue shouldBe false
+    }
+    actAndCheck(
+      "Bob taps to have enough CC for sweep to kick in",
+      bobValidatorWalletClient.tap(20),
+    )(
+      "bob's balance is updated",
+      _ => {
+        bobValidatorWalletClient.balance().unlockedQty should beAround(20.0)
+      },
+    )
+    val previousBalance = aliceValidatorWalletClient.balance().unlockedQty.longValue
+    actAndCheck(
+      "Sweep kicks in",
+      bobValidatorBackend
+        .userWalletAutomation(bobValidatorWalletClient.config.ledgerApiUser)
+        .futureValue
+        .trigger[WalletPreapprovalSweepTrigger]
+        .runOnce()
+        .futureValue shouldBe true,
+    )(
+      "balances are updated",
+      _ => {
+        bobValidatorWalletClient.balance().unlockedQty should beAround(2)
+        aliceValidatorWalletClient.balance().unlockedQty should beAround(previousBalance + 18)
+      },
+    )
+    bobValidatorBackend
+      .userWalletAutomation(bobValidatorWalletClient.config.ledgerApiUser)
+      .futureValue
+      .trigger[WalletPreapprovalSweepTrigger]
+      .runOnce()
+      .futureValue shouldBe false
   }
 
   private def sv1Balance()(implicit env: SpliceTestConsoleEnvironment) = BigDecimal(
