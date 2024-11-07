@@ -8,6 +8,17 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* SV App
+
+  * The query to fetch the vote results has been fixed for postgres 15.
+
+* Sequencer
+
+  * Fix an inefficient query when querying the onboarding snapshot for a new SV that tries to onboard.
+
 0.2.7
 -----
 
