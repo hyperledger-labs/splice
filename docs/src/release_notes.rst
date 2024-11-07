@@ -13,10 +13,19 @@ Upcoming
 
 * Deployment
 
-  * The query to fetch the vote results has been fixed for postgres 15.
   * An optional value ``uiPollInterval`` has been added to the Helm charts for ``splice-scan``, ``splice-sv-node``, and ``splice-validator``. This value allows you to configure the interval at which the deployed UIs poll the services for updates in milliseconds. If unspecified, the default value is 1000 (1 second).
   * The log field ``labels."k8s-pod/cn-component"`` has been renamed to ``labels."k8s-pod/splice-component"``.
 
+0.2.8
+--------
+
+* SV App
+
+  * The query to fetch the vote results has been fixed for postgres 15.
+
+* Sequencer
+
+  * Fix an inefficient query when querying the onboarding snapshot for a new SV that tries to onboard.
 
 0.2.7
 -----
