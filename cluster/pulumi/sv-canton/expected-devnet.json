@@ -763,7 +763,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-1-cometbft-global-domain-3",
     "provider": "",
@@ -915,7 +915,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-1-global-domain-3",
     "provider": "",
@@ -1241,7 +1241,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-1-participant-3",
     "provider": "",
@@ -1516,7 +1516,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-2-cometbft-global-domain-3",
     "provider": "",
@@ -1668,7 +1668,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-2-global-domain-3",
     "provider": "",
@@ -1994,7 +1994,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-2-participant-3",
     "provider": "",
@@ -2269,7 +2269,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-3-cometbft-global-domain-3",
     "provider": "",
@@ -2421,7 +2421,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-3-global-domain-3",
     "provider": "",
@@ -2747,7 +2747,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-3-participant-3",
     "provider": "",
@@ -3022,7 +3022,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-4-cometbft-global-domain-3",
     "provider": "",
@@ -3174,7 +3174,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-4-global-domain-3",
     "provider": "",
@@ -3500,7 +3500,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-4-participant-3",
     "provider": "",
@@ -3760,7 +3760,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-cometbft-global-domain-3",
     "provider": "",
@@ -3912,7 +3912,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-global-domain-3",
     "provider": "",
@@ -4238,7 +4238,7 @@
           }
         ]
       },
-      "version": "0.2.7"
+      "version": "0.2.8"
     },
     "name": "sv-participant-3",
     "provider": "",
