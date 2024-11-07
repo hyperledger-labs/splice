@@ -12,6 +12,7 @@ import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME } from 
 
 const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
 const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
+const preserveDbsOnDelete = !config.envFlag('DISABLE_PRESERVE_DBS_ON_DELETE', false);
 // default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
 const cloudSqlDbInstance = config.optionalEnv('CLOUDSQL_DB_INSTANCE') || 'db-custom-2-7680';
 
@@ -56,9 +57,8 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     instanceName: string,
     alias: string,
     secretName: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     active: boolean = true,
-    disableProtection?: boolean,
+    disableProtection: boolean = false,
     migrationId?: string
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
@@ -66,6 +66,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     const baseOpts = {
       protect: disableProtection ? false : protectCloudSql,
       aliases: [{ name: instanceLogicalNameAlias }],
+      retainOnDelete: preserveDbsOnDelete,
     };
     super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
     this.instanceName = instanceName;
@@ -78,7 +79,8 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         deletionProtection: disableProtection ? false : protectCloudSql,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
-          activationPolicy: 'ALWAYS', // TODO(#15974): set to NEVER when enabling archived instance
+          activationPolicy: active ? 'ALWAYS' : 'ALWAYS',
+          deletionProtectionEnabled: disableProtection ? false : protectCloudSql,
           databaseFlags: [{ name: 'temp_file_limit', value: '100000000' }],
           backupConfiguration: {
             enabled: true,
@@ -119,11 +121,13 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       {
         instance: this.pgSvc.name,
         name: 'cantonnet',
+        deletionPolicy: preserveDbsOnDelete ? 'ABANDON' : 'DELETE',
       },
       {
         parent: this,
         deletedWith: this.pgSvc,
         protect: disableProtection ? false : protectCloudSql,
+        retainOnDelete: preserveDbsOnDelete,
         aliases: [{ name: `${this.namespace.logicalName}-db-${alias}-cantonnet` }],
       }
     );
@@ -140,6 +144,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       `user-${instanceLogicalName}`,
       {
         instance: this.pgSvc.name,
+        deletionPolicy: preserveDbsOnDelete ? 'ABANDON' : '',
         name: 'cnadmin',
         password: password,
       },
@@ -148,6 +153,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         deletedWith: pgDB,
         dependsOn: [passwordSecret],
         protect: disableProtection ? false : protectCloudSql,
+        retainOnDelete: preserveDbsOnDelete,
         aliases: [{ name: `user-${instanceLogicalNameAlias}` }],
       }
     );
@@ -252,7 +258,7 @@ export function installPostgres(
       alias,
       secretName,
       isActive,
-      undefined,
+      false,
       migrationId?.toString()
     );
   } else {
