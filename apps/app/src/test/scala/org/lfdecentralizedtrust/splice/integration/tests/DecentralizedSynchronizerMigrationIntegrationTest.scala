@@ -55,7 +55,6 @@ import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellDomains,
   SplitwellSynchronizerConfig,
 }
-import org.lfdecentralizedtrust.splice.store.{PageLimit, TreeUpdateWithMigrationId}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvNamespaceMembershipTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.DomainMigration
@@ -958,6 +957,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 },
             )
 
+            // Backfilling will never be enabled on 0.2, no need to run integration tests with it
+            /*
             withClueAndLog("Backfilled history includes ACS import") {
               eventually() {
                 sv1ScanLocalBackend.appState.store.updateHistory.sourceHistory
@@ -976,6 +977,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   tree
               } should not be empty
             }
+             */
 
             withClueAndLog("ACS snapshot includes the ACS import") {
               val dsoInfo = sv1ScanLocalBackend.getDsoInfo()
