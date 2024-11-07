@@ -194,14 +194,6 @@ commands:
           cmd_name: Check Daml choice return types
           cmd: ./scripts/check-daml-return-types.sh
 
-  set-failed-parallel-run-url:
-    steps:
-      - run:
-          name: Set FAILED_PARALLEL_RUN_URL
-          when: always
-          command: |
-            echo "export FAILED_PARALLEL_RUN_URL=\"https://app.circleci.com/pipelines/github/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/<< pipeline.number >>/workflows/${CIRCLE_WORKFLOW_ID}/jobs/${CIRCLE_BUILD_NUM}/parallel-runs/${CIRCLE_NODE_INDEX}\"" >> "$BASH_ENV"
-
   print_gcloud_logs_commands:
     parameters:
       <<: *cluster-parameter

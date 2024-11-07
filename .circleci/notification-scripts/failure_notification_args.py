@@ -21,7 +21,7 @@ class FailureArgs:
 
 def parse_args() -> FailureArgs:
   parser = argparse.ArgumentParser()
-  parser.add_argument('--cluster', required=True)
+  parser.add_argument('--cluster', default="")
   # The default channel is #team-canton-network-internal-ci
   parser.add_argument('--slack_channel', default="C05DT77QF5M")
   parser.add_argument('--branch_pattern', default=".*")

@@ -18,7 +18,8 @@ def build_msg(args: FailureArgs, gh_url: str):
     workflow.pipeline_number, args.branch, workflow, args.job_name)
   now = datetime.now(timezone.utc)
 
-  text=f"""*Job {workflow.name}:{args.job_name} {workflow.pipeline_number}:{args.job_num} failed on cluster {args.cluster}* :dumpster-fire:.
+  cluster_text = f" on cluster {args.cluster}" if args.cluster else ""
+  text=f"""*Job {workflow.name}:{args.job_name} {workflow.pipeline_number}:{args.job_num} failed {cluster_text}:dumpster-fire:.
   (<{gh_url}|Issue in GitHub>)
   {failure_stat(f"workflow {workflow.name}", stats.failed_workflows, stats.last_workflow_success, stats, now)}
   {failure_stat(f"Job {args.job_name}", stats.failed_jobs, stats.last_job_success, stats, now)}"""

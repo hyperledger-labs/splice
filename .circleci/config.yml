@@ -104,22 +104,14 @@ parameters:
 notify-fail: &notify-fail
   context: slack-context
   post-steps:
-    - set-failed-parallel-run-url
     - run:
-        name: Dump input sent to slack/notify
-        when: always
+        name: Notify on slack & create GH issue
+        when: on_fail
         command: |
-          echo "Sending the following as input to slack/notify"
-          echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
-    # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
-    # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
-    - slack/notify:
-        branch_pattern: (deployment\/.*|main|release-line.*)
-        # #team-canton-network-internal-ci
-        channel: C05DT77QF5M
-        event: fail
-        custom: |
-          { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
+          .circleci/notification-scripts/failure_notification.sh \
+              --slack_channel C05DT77QF5M \
+              --branch_pattern "(deployment\\/.*|main|release-line.*)"
+        # (C05DT77QF5M = team-canton-network-internal-ci)
 
 channel-notify-parameter: &channel-notify-parameter
   channel_notify:
@@ -385,14 +377,6 @@ commands:
       - run_bash_command_in_nix:
           cmd_name: Check Daml choice return types
           cmd: ./scripts/check-daml-return-types.sh
-
-  set-failed-parallel-run-url:
-    steps:
-      - run:
-          name: Set FAILED_PARALLEL_RUN_URL
-          when: always
-          command: |
-            echo "export FAILED_PARALLEL_RUN_URL=\"https://app.circleci.com/pipelines/github/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/<< pipeline.number >>/workflows/${CIRCLE_WORKFLOW_ID}/jobs/${CIRCLE_BUILD_NUM}/parallel-runs/${CIRCLE_NODE_INDEX}\"" >> "$BASH_ENV"
 
   print_gcloud_logs_commands:
     parameters:

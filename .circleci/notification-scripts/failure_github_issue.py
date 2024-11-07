@@ -225,7 +225,8 @@ def failure_github_issue(args: FailureArgs) -> str:
 
   issue_id = create_issue(client, repo_id, title, body)
   issue_project_item_id = add_issue_to_project(client, project_id, issue_id)
-  set_field_value(client, project_id, issue_project_item_id, cluster_field_id, args.cluster)
+  if args.cluster:
+    set_field_value(client, project_id, issue_project_item_id, cluster_field_id, args.cluster)
   set_field_value(client, project_id, issue_project_item_id, job_field_id, f"{workflow.name}:{args.job_name}")
 
   issue_number = get_issue_number(client, issue_id)
