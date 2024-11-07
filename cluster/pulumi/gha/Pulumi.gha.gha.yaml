@@ -1,0 +1,2 @@
+secretsprovider: gcpkms://projects/da-cn-ci/locations/us-central1/keyRings/pulumi/cryptoKeys/gha
+encryptedkey: CiQA/aoOiuDRFP4EcQDQsYcm8d8SyT31guwR5AuviLDgYPcx/rcSSQAW5FcyJ1vhSm3KakQ3oHohOf7V6ovrnl75kKkblwZdSv3+23SD9ndrhv7gdVhcgnvS2rm+o2pEZQ79+trR4oRleu3xpIeFcgk=
