@@ -12,7 +12,9 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
 
 - [ ] Wait for everything to be merged that we want in it
   - [ ] ...
-- [ ] Merge a PR into `origin/main` with the following changes:
+- [ ] Figure out from which branch we want to release. This can be `origin/main` or `origin/release-line-0.x`.
+      For the rest of this checklist, this will be called the _ancestor branch_.
+- [ ] Merge a PR into the _ancestor branch_ with the following changes:
   - [ ] Update the release notes (`docs/src/release_notes.rst`):
     - Replace `Upcoming` by the target version
     - Fix any spelling mistakes and make sure the RST rendering is not broken
@@ -21,8 +23,9 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
 - [ ] Create a release branch called `release-line-0.x.y` from the merged commit with the `[release]` tag
   - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
 - [ ] Trigger a CircleCI pipeline on the release branch with `run-job: publish-public-artifacts`
-- [ ] Merge a PR into `origin/main` with the following changes:
-  - Update `VERSION` and `LATEST_RELEASE` on main. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
+- [ ] Merge a PR into the _ancestor branch_ with the following changes:
+  - Update `VERSION` and `LATEST_RELEASE`. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
+- [ ] If _ancestor branch_ is not `origin/main`, forward port all changes made to the _ancestor branch_ as part of this release to `origin/main`
 - [ ] Update the Open source repos, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
   - [ ] Merge the auto-generated PR in https://github.com/digital-asset/decentralized-canton-sync
   - [ ] Merge the auto-generated PR in https://github.com/hyperledger-labs/splice
