@@ -1,0 +1,50 @@
+name: "Post SBT job"
+description: "Post SBT job"
+inputs:
+  cache_version:
+    description: "Version of the cache"
+    required: true
+  setup_sbt_cache_hits:
+    description: "Cache hits from the setup SBT job (should be the cache_hits output from the setup SBT job)"
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Compute openAPI cache key
+      shell: bash
+      run: find . -wholename '*/openapi/*.yaml' | LC_ALL=C sort | xargs sha256sum > openapi-cache-key.txt
+
+    - name: Archive precompiled classes
+      if: ${{ ! fromJson(inputs.setup_sbt_cache_hits).classes }}
+      shell: bash
+      run: ./.github/actions/scripts/archive_precompiled_classes.sh
+    - name: Cache precompiled classes
+      if: ${{ ! fromJson(inputs.setup_sbt_cache_hits).classes }}
+      uses: actions/cache/save@v4
+      with:
+        path: /tmp/classes
+        key: classes-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }} rev:${{ github.sha }}
+
+    - name: Not archiving preceompiled classes
+      if : ${{ fromJson(inputs.setup_sbt_cache_hits).classes }}
+      shell: bash
+      run: |
+        echo "Skipping precompiled classes cache, as there was a cache hit"
+
+    - name: Store SBT cache
+      if: ${{ ! fromJson(inputs.setup_sbt_cache_hits).sbt }}
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          # ~/.ivy2/cache
+          # ~/.sbt
+          # I'm not clear where /home/circleci comes from, but it will probably go away once
+          # we switch away from the CCI image, so not worth cleaning up now.
+          /home/circleci/.ivy2/cache
+          /home/circleci/.sbt
+        key: sbt job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/BuildCommon.scala', 'project/build.properties', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt') }}
+    - name: Not storing SBT cache
+      if: ${{ fromJson(inputs.setup_sbt_cache_hits).sbt }}
+      shell: bash
+      run: |
+        echo "Skipping SBT cache, as there was a cache hit"

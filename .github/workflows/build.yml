@@ -1,0 +1,9 @@
+name: Build
+on: pull_request
+# TODO(#15988): also on commits on main and release branches
+
+
+jobs:
+  static_tests:
+    uses: ./.github/workflows/static_tests.yml
+    secrets: inherit

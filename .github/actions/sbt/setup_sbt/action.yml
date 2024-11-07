@@ -1,0 +1,53 @@
+name: "Setup SBT test job"
+description: "Setup SBT test job"
+inputs:
+  cache_version:
+    description: "Version of the cache"
+    required: true
+outputs:
+  cache_hits:
+    description: "Cache hits"
+    value: ${{ steps.cache_hits.outputs.cache_hits }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Compute openAPI cache key
+      shell: bash
+      run: find . -wholename '*/openapi/*.yaml' | LC_ALL=C sort | xargs sha256sum > openapi-cache-key.txt
+    - name: Restore precompiled classes
+      id: classes
+      uses: actions/cache/restore@v4
+      with:
+        path: /tmp/classes
+        key: classes-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }} rev:${{ github.sha }}
+        restore-keys: |
+          classes-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }}
+          classes-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }}
+    - name: Extract precompiled classes
+      shell: bash
+      run: ./.github/actions/scripts/extract_precompiled_classes.sh
+    - name: Restore SBT cache
+      id: sbt
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          # ~/.ivy2/cache
+          # ~/.sbt
+          # I'm not clear where /home/circleci comes from, but it will probably go away once
+          # we switch away from the CCI image, so not worth cleaning up now.
+          /home/circleci/.ivy2/cache
+          /home/circleci/.sbt
+        key: sbt job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/BuildCommon.scala', 'project/build.properties', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt') }}
+    - name: Collect cache hits
+      id: cache_hits
+      shell: bash
+      run: |
+        # We've seen cases where the output from cache/restore is empty instead of false,
+        # (perhaps when there's a complete miss rather than a hit on an alternative key)
+        # so we guard against that.
+        classes=${{ steps.classes.outputs.cache-hit }}
+        sbt=${{ steps.sbt.outputs.cache-hit }}
+        echo "cache_hits={ \
+          \"classes\": ${classes:-false}, \
+          \"sbt\": ${sbt:-false} \
+        }" >> $GITHUB_OUTPUT

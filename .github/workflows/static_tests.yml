@@ -1,0 +1,94 @@
+name: Static Tests
+on: workflow_call
+
+jobs:
+  static_tests:
+    runs-on: self-hosted-docker
+    # Docker Hub image that `container-job` executes in
+    container:
+      # TODO(#15988): We're currently (ab)using the cimg/base image as a base image for our self-hosted runners.
+      # Ideally, we'd build our own image that includes the necessary dependencies. But then
+      # we need to either push it somewhere public or grant access to the runner to pull it.
+      # We also can't simply use ubuntu:latest because its default user is root, and building
+      # nix as root fails.
+      image: cimg/base:current
+      volumes:
+        - /cache:/cache
+      # TODO(#15988): running as privileged for now for the bind-mount of /nix/store.
+      options: --privileged
+
+    steps:
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup
+        shell: bash
+        run: ./.github/actions/scripts/common_setup.sh
+
+      - name: Set up Nix
+        uses: ./.github/actions/nix/setup_self_hosted_nix
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          # TODO(#15988): consider this trick for setting cache_version globally: https://stackoverflow.com/a/74217028
+          cache_version: 0
+
+      - name: Set up SBT
+        id: setup_sbt
+        uses: ./.github/actions/sbt/setup_sbt
+        with:
+          cache_version: 0
+
+      - name: Check trailing whitespace
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-trailing-whitespace.sh
+
+      - name: Run Daml warts check
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-daml-warts.sh
+
+      - name: Run Daml return types check
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-daml-return-types.sh
+
+      - name: Checking TODOs
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: |
+            echo "PR number: $CIRCLE_PULL_REQUEST"
+            ./scripts/check-todos.sh
+          additional_nix_args: "--keep GITHUB_USER --keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
+        env:
+          # TODO(#15988): For now, the script assumes CCI env vars, so we map GHA ones to CCI ones here
+          GITHUB_USER: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CIRCLE_BRANCH: ${{ github.ref }}
+          CIRCLE_PULL_REQUEST: ${{ github.event.pull_request.number }}
+
+      - name: Store TODOs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: todos
+          path: todo-out/todos
+
+      - name: SBT-based static checks
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          cmd: "Test/compile lint printTests"
+
+      - name: Verify no changes in SBT test files
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: git add . && git diff --staged --exit-code test*.log
+
+      - name: Post-SBT job
+        uses: ./.github/actions/sbt/post_sbt
+        with:
+          cache_version: 0
+          setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}

@@ -250,7 +250,7 @@ val identifierRegex = "(TODO)(.*?)\\((.+?)\\)".r
 val todoStyleExcludePrefixes =
   Seq("canton/", "project/CantonDependencies.scala", "experiments/", "README.md")
 val todoStyleExcludeSuffixes =
-  Seq("/checkTodos.sc")
+  Seq("/checkTodos.sc", "/static_tests.yml")
 
 def addToBucket(
     acc: Map[Bucket, List[String]],
