@@ -1576,7 +1576,7 @@ function subcmd_backup_nodes() {
 
     for node in $nodes; do
         case "$node" in
-            sv-1|sv-2|sv-3|sv-4)
+            sv-1|sv-2|sv-3|sv-4|sv-5|sv-6|sv-7|sv-8|sv-9|sv-10|sv-11|sv-12|sv-13|sv-14|sv-15)
                 _info "Backing up sv node $node"
                 SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
                 ;;
