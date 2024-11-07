@@ -773,6 +773,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-1-db-mediator-2-pg-cantonnet",
@@ -783,6 +784,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-1-db-mediator-3-pg-cantonnet",
@@ -793,6 +795,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-1-db-participant-2-pg-cantonnet",
@@ -803,6 +806,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-1-db-participant-3-pg-cantonnet",
@@ -813,6 +817,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-1-db-sequencer-2-pg-cantonnet",
@@ -823,6 +828,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-1-db-sequencer-3-pg-cantonnet",
@@ -960,6 +966,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1021,6 +1028,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1082,6 +1090,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1143,6 +1152,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1286,6 +1296,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1347,6 +1358,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1526,6 +1538,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-2-db-mediator-2-pg-cantonnet",
@@ -1536,6 +1549,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-2-db-mediator-3-pg-cantonnet",
@@ -1546,6 +1560,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-2-db-participant-2-pg-cantonnet",
@@ -1556,6 +1571,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-2-db-participant-3-pg-cantonnet",
@@ -1566,6 +1582,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-2-db-sequencer-2-pg-cantonnet",
@@ -1576,6 +1593,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-2-db-sequencer-3-pg-cantonnet",
@@ -1713,6 +1731,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1774,6 +1793,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1835,6 +1855,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -1896,6 +1917,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -2039,6 +2061,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -2100,6 +2123,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -2279,6 +2303,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-3-db-mediator-2-pg-cantonnet",
@@ -2289,6 +2314,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-3-db-mediator-3-pg-cantonnet",
@@ -2299,6 +2325,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-3-db-participant-2-pg-cantonnet",
@@ -2309,6 +2336,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-3-db-participant-3-pg-cantonnet",
@@ -2319,6 +2347,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-3-db-sequencer-2-pg-cantonnet",
@@ -2329,6 +2358,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-3-db-sequencer-3-pg-cantonnet",
@@ -2466,6 +2496,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -2527,6 +2558,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -2588,6 +2620,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -2649,6 +2682,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -2792,6 +2826,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -2853,6 +2888,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -3032,6 +3068,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-4-db-mediator-2-pg-cantonnet",
@@ -3042,6 +3079,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-4-db-mediator-3-pg-cantonnet",
@@ -3052,6 +3090,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-4-db-participant-2-pg-cantonnet",
@@ -3062,6 +3101,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-4-db-participant-3-pg-cantonnet",
@@ -3072,6 +3112,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-4-db-sequencer-2-pg-cantonnet",
@@ -3082,6 +3123,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-4-db-sequencer-3-pg-cantonnet",
@@ -3219,6 +3261,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -3280,6 +3323,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -3341,6 +3385,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -3402,6 +3447,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -3545,6 +3591,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -3606,6 +3653,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -3770,6 +3818,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-db-mediator-2-pg-cantonnet",
@@ -3780,6 +3829,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-db-mediator-3-pg-cantonnet",
@@ -3790,6 +3840,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-db-participant-2-pg-cantonnet",
@@ -3800,6 +3851,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-db-participant-3-pg-cantonnet",
@@ -3810,6 +3862,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-db-sequencer-2-pg-cantonnet",
@@ -3820,6 +3873,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "sv-db-sequencer-3-pg-cantonnet",
@@ -3957,6 +4011,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -4018,6 +4073,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -4079,6 +4135,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -4140,6 +4197,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -4283,6 +4341,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -4344,6 +4403,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -4404,6 +4464,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4418,6 +4479,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4432,6 +4494,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4446,6 +4509,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4460,6 +4524,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4474,6 +4539,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4488,6 +4554,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4502,6 +4569,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4516,6 +4584,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4530,6 +4599,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4544,6 +4614,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4558,6 +4629,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4572,6 +4644,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4586,6 +4659,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4600,6 +4674,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4614,6 +4689,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4628,6 +4704,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4642,6 +4719,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4656,6 +4734,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4670,6 +4749,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4684,6 +4764,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4698,6 +4779,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4712,6 +4794,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4726,6 +4809,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4740,6 +4824,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4754,6 +4839,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4768,6 +4854,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4782,6 +4869,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4796,6 +4884,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -4810,6 +4899,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",

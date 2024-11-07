@@ -405,6 +405,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "splitwell-db-participant-pg-cantonnet",
@@ -415,6 +416,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "splitwell-db-sw-pg-cantonnet",
@@ -425,6 +427,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cantonnet"
     },
     "name": "splitwell-db-validator-pg-cantonnet",
@@ -645,6 +648,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -774,6 +778,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -834,6 +839,7 @@
             "value": "100000000"
           }
         ],
+        "deletionProtectionEnabled": true,
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -998,6 +1004,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -1012,6 +1019,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -1026,6 +1034,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "deletionPolicy": "ABANDON",
       "name": "cnadmin",
       "password": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
