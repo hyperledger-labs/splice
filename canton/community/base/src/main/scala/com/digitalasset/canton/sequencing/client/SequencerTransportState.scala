@@ -3,20 +3,14 @@
 
 package com.digitalasset.canton.sequencing.client
 
-import cats.data.EitherT
-import cats.syntax.either.*
 import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{
-  FlagCloseable,
-  FutureUnlessShutdown,
-  Lifecycle,
-  UnlessShutdown,
-}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.sequencing.client.SequencerClient.{
@@ -37,7 +31,6 @@ import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.{SequencerAlias, config}
-import io.grpc.Status
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
@@ -98,7 +91,7 @@ class SequencersTransportState(
 
   private val lock = new Object()
 
-  private val states = new mutable.HashMap[SequencerId, SequencerTransportState]()
+  private val state = new mutable.HashMap[SequencerId, SequencerTransportState]()
 
   private val sequencerTrustThreshold =
     new AtomicReference[PositiveInt](initialSequencerTransports.sequencerTrustThreshold)
@@ -118,14 +111,14 @@ class SequencersTransportState(
       case (sequencerId, transport) =>
         (sequencerId, SequencerTransportState(transport))
     }
-    states.addAll(sequencerIdToTransportStateMap).discard
+    state.addAll(sequencerIdToTransportStateMap).discard
   })
 
   private def transportState(
       sequencerId: SequencerId
   )(implicit traceContext: TraceContext): UnlessShutdown[SequencerTransportState] =
     performUnlessClosing(functionFullName)(blocking(lock.synchronized {
-      states.getOrElse(
+      state.getOrElse(
         sequencerId,
         ErrorUtil.internalError(
           new IllegalArgumentException(s"sequencerId=$sequencerId is unknown")
@@ -140,7 +133,7 @@ class SequencersTransportState(
     performUnlessClosing(functionFullName) {
       blocking(lock.synchronized {
         transportState(sequencerId).map { transportStateBefore =>
-          states
+          state
             .put(sequencerId, transportStateBefore.withTransport(updatedTransport))
             .discard
           transportStateBefore
@@ -184,7 +177,7 @@ class SequencersTransportState(
     // (In general, ThreadLocalRandom would void contention on the random number generation, but
     // the plain Random has the advantage that we can hard-code the seed so that the chosen sequencers
     // are easier to reproduce for debugging and tests.)
-    val healthySequencers = states.view.collect {
+    val healthySequencers = state.view.collect {
       case (_sequencerId, state) if state.isSubscriptionHealthy => state.transport
     }.toVector
     if (healthySequencers.isEmpty) pickUnhealthySequencer
@@ -203,7 +196,7 @@ class SequencersTransportState(
   ): SequencerTransportContainer[_] = {
     // TODO(i12377): Can we fallback to first sequencer transport here or should we
     //               introduce EitherT and propagate error handling?
-    val (_, transportState) = states.headOption.getOrElse(
+    val (_, transportState) = state.headOption.getOrElse(
       // TODO(i12377): Error handling
       ErrorUtil.invalidState("No sequencer subscription at the moment. Try again later.")
     )
@@ -237,7 +230,7 @@ class SequencersTransportState(
             }
             subscription.closeReason.onComplete(closeWithSubscriptionReason(sequencerId))
 
-            states
+            state
               .put(
                 sequencerId,
                 currentSequencerTransportStateForAlias.withSubscription(
@@ -257,7 +250,7 @@ class SequencersTransportState(
     val transportCloseFutures = Future.fromTry(Try(blocking(lock.synchronized {
       sequencerTrustThreshold.set(sequencerTransports.sequencerTrustThreshold)
       submissionRequestAmplification.set(sequencerTransports.submissionRequestAmplification)
-      val oldSequencerIds = states.keySet.toSet
+      val oldSequencerIds = state.keySet.toSet
       val newSequencerIds = sequencerTransports.sequencerIdToTransportMap.keySet
 
       val newValues: Set[SequencerId] = newSequencerIds.diff(oldSequencerIds)
@@ -288,7 +281,7 @@ class SequencersTransportState(
     transportCloseFutures.flatMap(_.parTraverse_(_.parTraverse_ { case (transport, closeFutureO) =>
       closeFutureO
         .getOrElse(Future.unit)
-        .thereafter(_ => transport.clientTransport.close())
+        .thereafter { _ => transport.clientTransport.close() }
     }))
   }
 
@@ -310,7 +303,7 @@ class SequencersTransportState(
   def closeAllSubscriptions(): Unit = blocking(lock.synchronized {
     import TraceContext.Implicits.Empty.*
 
-    states.toList.foreach { case (sequencerId, subscription) =>
+    state.toList.foreach { case (sequencerId, subscription) =>
       closeSubscription(sequencerId, subscription)
     }
 
@@ -319,13 +312,8 @@ class SequencersTransportState(
       .discard
   })
 
-  def logout()(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Status, Unit] =
-    states.values.toSeq.parTraverse_ { transportState =>
-      transportState.transport.clientTransport.logout()
-    }
-
   private def isEnoughSequencersToOperateWithoutSequencer: Boolean =
-    states.size > sequencerTrustThreshold.get().unwrap
+    state.size > sequencerTrustThreshold.get().unwrap
 
   private def closeWithSubscriptionReason(sequencerId: SequencerId)(
       subscriptionCloseReason: Try[SubscriptionCloseReason[SequencerClientSubscriptionError]]
@@ -348,8 +336,8 @@ class SequencersTransportState(
             if (!isEnoughSequencersToOperateWithoutSequencer)
               Left(SequencerClient.CloseReason.PermissionDenied(s"$permissionDenied"))
             else {
-              states.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
-              Either.unit
+              state.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
+              Right(())
             }
           })
         case subscriptionError: SubscriptionCloseReason.SubscriptionError =>
@@ -361,8 +349,8 @@ class SequencersTransportState(
                 )
               )
             else {
-              states.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
-              Either.unit
+              state.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
+              Right(())
             }
           })
         case SubscriptionCloseReason.Closed =>
@@ -370,13 +358,13 @@ class SequencersTransportState(
             if (!isEnoughSequencersToOperateWithoutSequencer)
               Left(SequencerClient.CloseReason.ClientShutdown)
             else {
-              states.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
-              Either.unit
+              state.remove(sequencerId).foreach(closeSubscription(sequencerId, _))
+              Right(())
             }
           })
         case SubscriptionCloseReason.Shutdown => Left(SequencerClient.CloseReason.ClientShutdown)
         case SubscriptionCloseReason.TransportChange =>
-          Either.unit // we don't want to close the sequencer client when changing transport
+          Right(()) // we don't want to close the sequencer client when changing transport
       }
 
     def complete(reason: Try[SequencerClient.CloseReason]): Unit = {
@@ -395,8 +383,9 @@ class SequencersTransportState(
     }
   }
 
-  override protected def onClosed(): Unit =
+  override protected def onClosed(): Unit = {
     closeAllSubscriptions()
+  }
 }
 
 final case class SequencerTransportState(

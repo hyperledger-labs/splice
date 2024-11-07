@@ -82,8 +82,9 @@ object ComparesLfTransactions {
       unnamedParamIfNonEmpty(_.childNodes),
     )
 
-    def lfTransaction: LfVersionedTransaction =
+    def lfTransaction: LfVersionedTransaction = {
       buildLfTransaction(this)
+    }
   }
 
   def buildLfTransaction(trees: TxTree*): LfVersionedTransaction = {

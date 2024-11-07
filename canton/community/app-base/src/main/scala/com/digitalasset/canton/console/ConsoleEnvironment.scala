@@ -38,15 +38,15 @@ import com.digitalasset.canton.sequencing.{
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
+import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.{DomainAlias, LfPartyId}
 import com.typesafe.scalalogging.Logger
 import io.opentelemetry.api.trace.Tracer
-import org.tpolecat.typename.TypeName
 
 import java.time.{Duration as JDuration, Instant}
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.Duration as SDuration
-import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe as ru
 import scala.util.control.NonFatal
 
 final case class NodeReferences[A, R <: A, L <: A](
@@ -135,8 +135,9 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
       Help.Item("$participant", None, Summary(""), Description(""), Topic(Seq()), subItems)
     }
 
-    lazy val filteredHelpItems =
+    lazy val filteredHelpItems = {
       helpItems.filter(x => scope.contains(x.summary.flag))
+    }
 
     lazy val all = filteredHelpItems :+ participantHelperItems
 
@@ -170,19 +171,16 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
   /** Holder for top level values including their name, their value, and a description to display when `help` is printed.
     */
-  protected case class TopLevelValue[T: universe.TypeTag](
+  protected case class TopLevelValue[T](
       nameUnsafe: String,
       summary: String,
       value: T,
       topic: Seq[String] = Seq(),
-  ) {
+  )(implicit tag: ru.TypeTag[T]) {
+
     // Surround with back-ticks to handle the case that name is a reserved keyword in scala.
     lazy val asBind: Either[InstanceName.InvalidInstanceName, Bind[T]] =
-      InstanceName.create(nameUnsafe).map { name =>
-        val typeTag: universe.TypeTag[T] = scala.reflect.runtime.universe.typeTag[T]
-        val typeName = TypeName[T](typeTag.tpe.toString)
-        Bind(s"`${name.unwrap}`", value)(typeName)
-      }
+      InstanceName.create(nameUnsafe).map(name => Bind(s"`${name.unwrap}`", value))
 
     lazy val asHelpItem: Help.Item =
       Help.Item(nameUnsafe, None, Help.Summary(summary), Help.Description(""), Help.Topic(topic))
@@ -195,7 +193,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
       * use as scala's runtime reflection can't easily take advantage of the type members we have available here.
       */
     case class Partial(name: String, summary: String, topics: Seq[String] = Seq.empty) {
-      def apply[T: universe.TypeTag](value: T): TopLevelValue[T] =
+      def apply[T](value: T)(implicit t: ru.TypeTag[T]): TopLevelValue[T] =
         TopLevelValue(name, summary, value, topics)
     }
   }
@@ -210,8 +208,9 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   lazy val grpcDomainCommandRunner: ConsoleGrpcAdminCommandRunner =
     createAdminCommandRunner(this, CantonGrpcUtil.ApiName.SequencerPublicApi)
 
-  def runE[E, A](result: => Either[E, A]): A =
+  def runE[E, A](result: => Either[E, A]): A = {
     run(ConsoleCommandResult.fromEither(result.leftMap(_.toString)))
+  }
 
   /** Run a console command.
     */
@@ -256,7 +255,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
       case err: GenericCommandError =>
         val errMsg = findInvocationSite() match {
           case Some((funcName, site)) =>
-            err.cause + s"\n  Command $funcName invoked from $site"
+            err.cause + s"\n  Command ${funcName} invoked from ${site}"
           case None => err.cause
         }
         logger.error(errMsg)
@@ -286,8 +285,9 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
   /** Print help for items in the top level scope.
     */
-  def help(): Unit =
+  def help(): Unit = {
     consoleOutput.info(Help.format(featureSetReference.get().filteredHelpItems*))
+  }
 
   /** Print detailed help for a top-level item in the top level scope.
     */
@@ -359,7 +359,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
     InstanceReference,
     InstanceReference,
     LocalInstanceReference,
-  ] =
+  ] = {
     NodeReferences(
       mergeLocalInstances(
         participants.local,
@@ -372,9 +372,10 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
         mediators.remote,
       ),
     )
+  }
 
   protected def helpText(typeName: String, name: String) =
-    s"Manage $typeName '$name'; type '$name help' or '$name help" + "(\"<methodName>\")' for more help"
+    s"Manage $typeName '${name}'; type '${name} help' or '${name} help" + "(\"<methodName>\")' for more help"
 
   protected val topicNodeReferences = "Node References"
   protected val topicGenericNodeReferences = "Generic Node References"
@@ -454,9 +455,8 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
         case (name, occurrences) if occurrences.sizeIs > 1 =>
           s"$name (${occurrences.size} occurrences)"
       }
-    Either.cond(
+    EitherUtil.condUnitE(
       nonUniqueNames.isEmpty,
-      (),
       new IllegalStateException(
         s"""Node names must be unique and must differ from reserved keywords. Please revisit node names in your config file.
          |Offending names: ${nonUniqueNames.mkString("(", ", ", ")")}""".stripMargin
@@ -485,13 +485,14 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
     */
   protected def selfAlias(): Bind[_] = Bind(ConsoleEnvironmentBinding.BindingName, this)
 
-  override def onClosed(): Unit =
+  override def onClosed(): Unit = {
     Lifecycle.close(
       grpcAdminCommandRunner,
       grpcLedgerCommandRunner,
       grpcDomainCommandRunner,
       environment,
     )(logger)
+  }
 
   def closeChannels(): Unit = {
     grpcAdminCommandRunner.closeChannels()

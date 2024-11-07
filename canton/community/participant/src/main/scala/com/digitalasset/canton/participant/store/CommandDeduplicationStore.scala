@@ -9,7 +9,6 @@ import cats.syntax.option.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.participant.state.ChangeId
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.GlobalOffset
@@ -28,7 +27,7 @@ import com.digitalasset.canton.version.ReleaseProtocolVersion
 import com.digitalasset.canton.{ApplicationId, CommandId, LedgerSubmissionId}
 import slick.jdbc.GetResult
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 trait CommandDeduplicationStore extends AutoCloseable {
 
@@ -37,7 +36,7 @@ trait CommandDeduplicationStore extends AutoCloseable {
     */
   def lookup(changeIdHash: ChangeIdHash)(implicit
       traceContext: TraceContext
-  ): OptionT[FutureUnlessShutdown, CommandDeduplicationData]
+  ): OptionT[Future, CommandDeduplicationData]
 
   /** Updates the [[com.digitalasset.canton.participant.protocol.submission.ChangeIdHash]]'s for the given
     * [[com.digitalasset.canton.ledger.participant.state.ChangeId]]s with the given [[DefiniteAnswerEvent]]s.
@@ -48,7 +47,7 @@ trait CommandDeduplicationStore extends AutoCloseable {
     */
   def storeDefiniteAnswers(answers: Seq[(ChangeId, DefiniteAnswerEvent, Boolean)])(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit]
+  ): Future[Unit]
 
   /** Updates the [[com.digitalasset.canton.participant.protocol.submission.ChangeIdHash]]'s for the given
     * [[com.digitalasset.canton.ledger.participant.state.ChangeId]] with the given [[DefiniteAnswerEvent]].
@@ -60,7 +59,7 @@ trait CommandDeduplicationStore extends AutoCloseable {
       changeId: ChangeId,
       definiteAnswerEvent: DefiniteAnswerEvent,
       accepted: Boolean,
-  ): FutureUnlessShutdown[Unit] =
+  ): Future[Unit] =
     storeDefiniteAnswers(Seq((changeId, definiteAnswerEvent, accepted)))(
       definiteAnswerEvent.traceContext
     )
@@ -68,17 +67,17 @@ trait CommandDeduplicationStore extends AutoCloseable {
   /** Prunes all command deduplication entries whose [[CommandDeduplicationData.latestDefiniteAnswer]] offset
     * is less or equal to `upToInclusive`.
     *
-    * @param prunedPublicationTime The publication time of the given offset
+    * @param prunedPublicationTime The publication time of the given offset in the [[MultiDomainEventLog]].
     */
   def prune(upToInclusive: GlobalOffset, prunedPublicationTime: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit]
+  ): Future[Unit]
 
   /** Returns the highest offset with which [[prune]] was called, and an upper bound on its publication time, if any.
     */
   def latestPruning()(implicit
       traceContext: TraceContext
-  ): OptionT[FutureUnlessShutdown, OffsetAndPublicationTime]
+  ): OptionT[Future, OffsetAndPublicationTime]
 }
 
 object CommandDeduplicationStore {
@@ -99,7 +98,7 @@ object CommandDeduplicationStore {
 
   final case class OffsetAndPublicationTime(offset: GlobalOffset, publicationTime: CantonTimestamp)
       extends PrettyPrinting {
-    override protected def pretty: Pretty[OffsetAndPublicationTime] = prettyOfClass(
+    override def pretty: Pretty[OffsetAndPublicationTime] = prettyOfClass(
       param("offset", _.offset),
       param("publication time", _.publicationTime),
     )
@@ -136,7 +135,7 @@ final case class CommandDeduplicationData private (
     }
   }
 
-  override protected def pretty: Pretty[CommandDeduplicationData] = prettyOfClass(
+  override def pretty: Pretty[CommandDeduplicationData] = prettyOfClass(
     param("change id", _.changeId),
     param("latest definite answer", _.latestDefiniteAnswer),
     paramIfDefined("latest acceptance", _.latestAcceptance),
@@ -184,7 +183,7 @@ object CommandDeduplicationData {
   }
 }
 
-/** @param offset A completion offset
+/** @param offset A completion offset in the [[MultiDomainEventLog]]
   * @param publicationTime The publication time associated with the `offset`
   * @param traceContext The trace context that created the completion offset.
   */
@@ -199,7 +198,7 @@ final case class DefiniteAnswerEvent(
   def serializableSubmissionId: Option[SerializableSubmissionId] =
     submissionIdO.map(SerializableSubmissionId(_))
 
-  override protected def pretty: Pretty[DefiniteAnswerEvent] = prettyOfClass(
+  override def pretty: Pretty[DefiniteAnswerEvent] = prettyOfClass(
     param("offset", _.offset),
     param("publication time", _.publicationTime),
     paramIfNonEmpty("submission id", _.submissionIdO),

@@ -5,8 +5,10 @@ syntax = "proto3";
 
 package com.digitalasset.canton.v30;
 
+import "google/protobuf/wrappers.proto";
+
 message TraceContext {
   // https://www.w3.org/TR/trace-context/
-  optional string traceparent = 1;
-  optional string tracestate = 2;
+  google.protobuf.StringValue traceparent = 1;
+  google.protobuf.StringValue tracestate = 2;
 }

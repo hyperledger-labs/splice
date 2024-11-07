@@ -94,7 +94,7 @@ object RootHashMessage
     ], ByteString => ParsingResult[RootHashMessagePayload]] {
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.RootHashMessage)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.RootHashMessage)(
       supportedProtoVersion(_)((deserializer, proto) => fromProtoV30(deserializer)(proto)),
       _.toProtoV30.toByteString,
     )
@@ -142,7 +142,7 @@ object RootHashMessage
       cast: RootHashMessagePayloadCast[Payload]
   ): ProtocolMessageContentCast[RootHashMessage[Payload]] =
     ProtocolMessageContentCast.create[RootHashMessage[Payload]]("RootHashMessage") {
-      case rhm: RootHashMessage[?] => rhm.traverse(cast.toKind)
+      case rhm: RootHashMessage[_] => rhm.traverse(cast.toKind)
       case _ => None
     }
 
@@ -166,8 +166,7 @@ object RootHashMessage
 trait RootHashMessagePayload extends PrettyPrinting with HasCryptographicEvidence
 
 case object EmptyRootHashMessagePayload extends RootHashMessagePayload {
-  override protected def pretty: Pretty[EmptyRootHashMessagePayload.type] =
-    prettyOfString(_ => "\"\"")
+  override def pretty: Pretty[EmptyRootHashMessagePayload.type] = prettyOfString(_ => "\"\"")
   def fromByteString(
       bytes: ByteString
   ): ParsingResult[EmptyRootHashMessagePayload.type] =
@@ -189,7 +188,7 @@ case object EmptyRootHashMessagePayload extends RootHashMessagePayload {
 final case class SerializedRootHashMessagePayload(bytes: ByteString)
     extends RootHashMessagePayload {
 
-  override protected def pretty: Pretty[SerializedRootHashMessagePayload] = prettyOfClass(
+  override def pretty: Pretty[SerializedRootHashMessagePayload] = prettyOfClass(
     param("payload size", _.bytes.size)
   )
 

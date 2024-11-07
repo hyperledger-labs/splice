@@ -4,7 +4,6 @@
 package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
-import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
@@ -37,10 +36,6 @@ trait SequencerClientSend {
     *  - If witnessing an event causes many prior sends to timeout there is no guaranteed order in which the
     *    callbacks of these sends will be notified.
     *  - If replay is enabled, the callback will be called immediately with a fake `SendResult`.
-    *  - When the send tracker is closed, the callback will be called immediately with AbortedDueToShutdown.
-    *  - the closing of objects should not synchronize with the completion of the callback via performUnlessClosing
-    *    unless the synchronized object is responsible for closing the sequencer client itself (possibly transitively).
-    *    Otherwise shutdown deadlocks are to be expected between the synchronized object and the send tracker or sequencer client.
     *  For more robust send result tracking callers should persist metadata about the send they will make and
     *  monitor the sequenced events when read, so actions can be taken even if in-memory state is lost.
     *
@@ -60,10 +55,7 @@ trait SequencerClientSend {
       aggregationRule: Option[AggregationRule] = None,
       callback: SendCallback = SendCallback.empty,
       amplify: Boolean = false,
-  )(implicit
-      traceContext: TraceContext,
-      metricsContext: MetricsContext,
-  ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit]
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit]
 
   /** Provides a value for max-sequencing-time to use for `sendAsync` if no better application provided timeout is available.
     * Is currently a configurable offset from our clock.

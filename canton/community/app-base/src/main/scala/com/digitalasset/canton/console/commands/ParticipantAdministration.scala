@@ -3,12 +3,11 @@
 
 package com.digitalasset.canton.console.commands
 
-import better.files.File
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.admin.api.client.commands.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Inspection.{
   CounterParticipantInfo,
   DomainTimeRange,
@@ -34,27 +33,17 @@ import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommand
   GetResourceLimits,
   SetResourceLimits,
 }
+import com.digitalasset.canton.admin.api.client.commands.*
 import com.digitalasset.canton.admin.api.client.data.{
   DarMetadata,
-  InFlightCount,
   ListConnectedDomainsResult,
-  NodeStatus,
   ParticipantPruningSchedule,
-  ParticipantStatus,
 }
 import com.digitalasset.canton.admin.participant.v30
+import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
-import com.digitalasset.canton.admin.participant.v30.{
-  InspectCommitmentContracts,
-  OpenCommitment,
-  PruningServiceGrpc,
-}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.{
-  ConsoleCommandTimeout,
-  DomainTimeTrackerConfig,
-  NonNegativeDuration,
-}
+import com.digitalasset.canton.config.{DomainTimeTrackerConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   BaseInspection,
@@ -70,26 +59,25 @@ import com.digitalasset.canton.console.{
   SequencerReference,
 }
 import com.digitalasset.canton.crypto.SyncCryptoApiProvider
-import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.grpc.{ByteStringStreamObserver, FileStreamObserver}
+import com.digitalasset.canton.health.admin.data.ParticipantStatus
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.admin.ResourceLimits
+import com.digitalasset.canton.participant.admin.grpc.TransferSearchResult
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
   ReceivedCmtState,
   SentCmtState,
 }
-import com.digitalasset.canton.participant.pruning.{CommitmentContractMetadata, MismatchReason}
+import com.digitalasset.canton.protocol.SerializableContract
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
   CommitmentPeriod,
-  CommitmentPeriodState,
   SignedProtocolMessage,
 }
-import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
 import com.digitalasset.canton.sequencing.{
   PossiblyIgnoredProtocolEvent,
   SequencerConnection,
@@ -101,15 +89,12 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.*
 import com.digitalasset.canton.{DomainAlias, SequencerAlias, config}
 import com.google.protobuf.ByteString
-import io.grpc.Context
-import spray.json.DeserializationException
 
 import java.time.Instant
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
 
 sealed trait DomainChoice
@@ -158,7 +143,7 @@ private[console] object ParticipantCommands {
         sequencerTrustThreshold: PositiveInt = PositiveInt.one,
         submissionRequestAmplification: SubmissionRequestAmplification =
           SubmissionRequestAmplification.NoAmplification,
-    ): DomainConnectionConfig =
+    ): DomainConnectionConfig = {
       DomainConnectionConfig(
         domainAlias,
         SequencerConnections.tryMany(
@@ -175,6 +160,7 @@ private[console] object ParticipantCommands {
         maxRetryDelay,
         DomainTimeTrackerConfig(),
       )
+    }
 
     def to_config(
         domainAlias: DomainAlias,
@@ -190,7 +176,7 @@ private[console] object ParticipantCommands {
       // architecture-handbook-entry-begin: OnboardParticipantToConfig
       val certificates = OptionUtil.emptyStringAsNone(certificatesPath).map { path =>
         BinaryFileUtil.readByteStringFromFile(path) match {
-          case Left(err) => throw new IllegalArgumentException(s"failed to load $path: $err")
+          case Left(err) => throw new IllegalArgumentException(s"failed to load ${path}: ${err}")
           case Right(bs) => bs
         }
       }
@@ -220,10 +206,11 @@ private[console] object ParticipantCommands {
           .RegisterDomain(config, handshakeOnly = handshakeOnly, validation)
       )
 
-    def reconnect(runner: AdminCommandRunner, domainAlias: DomainAlias, retry: Boolean) =
+    def reconnect(runner: AdminCommandRunner, domainAlias: DomainAlias, retry: Boolean) = {
       runner.adminCommand(
         ParticipantAdminCommands.DomainConnectivity.ConnectDomain(domainAlias, retry)
       )
+    }
 
     def list_connected(runner: AdminCommandRunner) =
       runner.adminCommand(
@@ -272,13 +259,14 @@ class ParticipantTestingGroup(
       domainId: Option[DomainId] = None,
       workflowId: String = "",
       id: String = "",
-  ): Duration =
+  ): Duration = {
     consoleEnvironment.runE(
       maybe_bong(targets, validators, timeout, levels, domainId, workflowId, id)
         .toRight(
           s"Unable to bong $targets with $levels levels within ${LoggerUtil.roundDurationForHumans(timeout.duration)}"
         )
     )
+  }
 
   @Help.Summary("Like bong, but returns None in case of failure.", FeatureFlag.Testing)
   def maybe_bong(
@@ -483,7 +471,7 @@ class LocalParticipantTestingGroup(
     """The state inspection methods can fatally and permanently corrupt the state of a participant.
       |The API is subject to change in any way."""
   )
-  def state_inspection: SyncStateInspection = check(FeatureFlag.Testing)(stateInspection)
+  def state_inspection: SyncStateInspection = check(FeatureFlag.Testing) { stateInspection }
 
   private def stateInspection: SyncStateInspection = access(node => node.sync.stateInspection)
 
@@ -519,11 +507,11 @@ class ParticipantPruningAdministrationGroup(
       |Note that upon successful pruning, subsequent attempts to read transactions via ``ledger_api.transactions.flat`` or
       |``ledger_api.transactions.trees`` or command completions via ``ledger_api.completions.list`` by specifying a begin offset
       |lower than the returned pruning offset will result in a ``NOT_FOUND`` error.
-      |The ``prune`` operation performs a "full prune" freeing up significantly more space and also
+      |In the Enterprise Edition, ``prune`` performs a "full prune" freeing up significantly more space and also
       |performs additional safety checks returning a ``NOT_FOUND`` error if ``pruneUpTo`` is higher than the
       |offset returned by ``find_safe_offset`` on any domain with events preceding the pruning offset."""
   )
-  def prune(pruneUpTo: Long): Unit =
+  def prune(pruneUpTo: ParticipantOffset): Unit =
     consoleEnvironment.run(
       ledgerApiCommand(LedgerApiCommands.ParticipantPruningService.Prune(pruneUpTo))
     )
@@ -532,12 +520,11 @@ class ParticipantPruningAdministrationGroup(
     "Return the highest participant ledger offset whose record time is before or at the given one (if any) at which pruning is safely possible",
     FeatureFlag.Preview,
   )
-  def find_safe_offset(beforeOrAt: Instant = Instant.now()): Option[Long] =
+  def find_safe_offset(beforeOrAt: Instant = Instant.now()): Option[ParticipantOffset] = {
     check(FeatureFlag.Preview) {
       val ledgerEnd = consoleEnvironment.run(
         ledgerApiCommand(LedgerApiCommands.StateService.LedgerEnd())
       )
-
       consoleEnvironment
         .run(
           adminCommand(
@@ -546,13 +533,14 @@ class ParticipantPruningAdministrationGroup(
           )
         )
     }
+  }
 
   @Help.Summary(
     "Prune only internal ledger state up to the specified offset inclusively.",
     FeatureFlag.Preview,
   )
   @Help.Description(
-    """Special-purpose variant of the ``prune`` command that prunes only partial,
+    """Special-purpose variant of the ``prune`` command only available in the Enterprise Edition that prunes only partial,
       |internal participant ledger state freeing up space not needed for serving ``ledger_api.transactions``
       |and ``ledger_api.completions`` requests. In conjunction with ``prune``, ``prune_internally`` enables pruning
       |internal ledger state more aggressively than externally observable data via the ledger api. In most use cases
@@ -561,7 +549,8 @@ class ParticipantPruningAdministrationGroup(
       |performs additional safety checks returning a ``NOT_FOUND`` error if ``pruneUpTo`` is higher than the
       |offset returned by ``find_safe_offset`` on any domain with events preceding the pruning offset."""
   )
-  def prune_internally(pruneUpTo: Long): Unit =
+  // Consider adding an "Enterprise" annotation if we end up having more enterprise-only commands than this lone enterprise command.
+  def prune_internally(pruneUpTo: ParticipantOffset): Unit =
     check(FeatureFlag.Preview) {
       consoleEnvironment.run(
         adminCommand(ParticipantAdminCommands.Pruning.PruneInternallyCommand(pruneUpTo))
@@ -617,21 +606,42 @@ class ParticipantPruningAdministrationGroup(
       |the event. Returns ``None`` if no such offset exists.
     """
   )
-  def get_offset_by_time(upToInclusive: Instant): Option[Long] =
+  def get_offset_by_time(upToInclusive: Instant): Option[ParticipantOffset] =
     consoleEnvironment.run(
       adminCommand(
         ParticipantAdminCommands.Inspection.LookupOffsetByTime(
           ProtoConverter.InstantConverter.toProtoPrimitive(upToInclusive)
         )
       )
-    )
+    ) match {
+      case "" => None
+      case offset => Some(ParticipantOffset(ParticipantOffset.Value.Absolute(offset)))
+    }
+
+  @Help.Summary("Identify the participant ledger offset to prune up to.", FeatureFlag.Preview)
+  @Help.Description(
+    """Return the participant ledger offset that corresponds to pruning "n" number of transactions
+      |from the beginning of the ledger. Errors if the ledger holds less than "n" transactions. Specifying "n" of 1
+      |returns the offset of the first transaction (if the ledger is non-empty).
+    """
+  )
+  def locate_offset(n: Long): ParticipantOffset =
+    check(FeatureFlag.Preview) {
+      val rawOffset = consoleEnvironment.run(
+        adminCommand(ParticipantAdminCommands.Inspection.LookupOffsetByIndex(n))
+      )
+      ParticipantOffset(ParticipantOffset.Value.Absolute(rawOffset))
+    }
+
 }
 
 class LocalCommitmentsAdministrationGroup(
     runner: AdminCommandRunner with BaseInspection[ParticipantNode],
-    override val consoleEnvironment: ConsoleEnvironment,
-    override val loggerFactory: NamedLoggerFactory,
-) extends CommitmentsAdministrationGroup(runner, consoleEnvironment, loggerFactory) {
+    val consoleEnvironment: ConsoleEnvironment,
+    val loggerFactory: NamedLoggerFactory,
+) extends FeatureFlagFilter
+    with Helpful
+    with NoTracing {
 
   import runner.*
 
@@ -649,7 +659,7 @@ class LocalCommitmentsAdministrationGroup(
       start: Instant,
       end: Instant,
       counterParticipant: Option[ParticipantId] = None,
-  ): Iterable[SignedProtocolMessage[AcsCommitment]] =
+  ): Iterable[SignedProtocolMessage[AcsCommitment]] = {
     access(node =>
       node.sync.stateInspection
         .findReceivedCommitments(
@@ -659,6 +669,7 @@ class LocalCommitmentsAdministrationGroup(
           counterParticipant,
         )
     )
+  }
 
   @Help.Summary("Lookup ACS commitments locally computed as part of the reconciliation protocol")
   def computed(
@@ -681,7 +692,7 @@ class LocalCommitmentsAdministrationGroup(
       start: Instant,
       end: Instant,
       counterParticipant: Option[ParticipantId] = None,
-  ): Iterable[(CommitmentPeriod, ParticipantId, CommitmentPeriodState)] =
+  ): Iterable[(CommitmentPeriod, ParticipantId)] =
     access { node =>
       node.sync.stateInspection.outstandingCommitments(
         domain,
@@ -703,158 +714,7 @@ class LocalCommitmentsAdministrationGroup(
       )
     }
 
-  def lastComputedAndSent(
-      domain: DomainAlias
-  ): Option[CantonTimestampSecond] =
-    access { node =>
-      node.sync.stateInspection.findLastComputedAndSent(domain)
-    }
-}
-
-class CommitmentsAdministrationGroup(
-    runner: AdminCommandRunner,
-    val consoleEnvironment: ConsoleEnvironment,
-    val loggerFactory: NamedLoggerFactory,
-) extends FeatureFlagFilter
-    with Helpful
-    with NoTracing {
-
-  import runner.*
-
-  // TODO(#9557) R2
-  @Help.Summary(
-    "Opens a commitment by retrieving the metadata of active contracts shared with the counter-participant.",
-    FeatureFlag.Preview,
-  )
-  @Help.Description(
-    """ Retrieves the contract ids and the reassignment counters of the shared active contracts at the given timestamp
-      | and on the given domain.
-      | Returns an error if the participant cannot retrieve the data for the given commitment anymore.
-      | The arguments are:
-      | - commitment: The commitment to be opened
-      | - domain: The domain for which the commitment was computed
-      | - timestamp: The timestamp of the commitment. Needs to correspond to a commitment tick.
-      | - counterParticipant: The counter participant to whom we previously sent the commitment
-      | - timeout: Time limit for the grpc call to complete
-      """.stripMargin
-  )
-  def open_commitment(
-      commitment: AcsCommitment.CommitmentType,
-      domain: DomainId,
-      timestamp: CantonTimestamp,
-      counterParticipant: ParticipantId,
-      timeout: NonNegativeDuration = timeouts.unbounded,
-  ): Seq[CommitmentContractMetadata] =
-    check(FeatureFlag.Preview) {
-      val counterContracts = consoleEnvironment.run {
-        val responseObserver =
-          new ByteStringStreamObserver[OpenCommitment.Response](_.chunk)
-
-        def call: ConsoleCommandResult[Context.CancellableContext] =
-          adminCommand(
-            ParticipantAdminCommands.Inspection.OpenCommitment(
-              responseObserver,
-              commitment,
-              domain,
-              counterParticipant,
-              timestamp,
-            )
-          )
-
-        processResult(
-          call,
-          responseObserver.resultBytes,
-          timeout,
-          "Retrieving the shared contract metadata",
-        )
-      }
-
-      val counterContractsMetadata =
-        GrpcStreamingUtils.parseDelimitedFromTrusted[CommitmentContractMetadata](
-          counterContracts.newInput(),
-          CommitmentContractMetadata,
-        ) match {
-          case Left(msg) => throw DeserializationException(msg)
-          case Right(output) => output
-        }
-      logger.debug(
-        s"Retrieved metadata for ${counterContractsMetadata.size} contracts shared with $counterParticipant at time $timestamp on domain $domain"
-      )
-      counterContractsMetadata
-    }
-
-  // TODO(#9557) R2. We'll either reuse the existing export ACS mechanism or, if that doesn't work, we'll introduce a
-  //  new gRPC download endpoint, and filter by parties hosted on the counter-participant. The output will be contracts
-  //  for parties hosted by both the counter-participant and the local participant, as the local participant doesn't have
-  //  access to contracts of parties that it doesn't host.
-  @Help.Summary(
-    "From a given set of contract ids and reassignment counters, identify the contracts that are either not active, or have" +
-      "a different reassignment counter, or are not shared with the given counter-participant.",
-    FeatureFlag.Preview,
-  )
-  @Help.Description(
-    """ Returns the contract ids and the mismatch reason.
-      | Returns an error if the participant cannot anymore retrieve the data for the given contracts.
-      | The arguments are:
-      | - counterParticipantContracts: The contract ids and reassignment counters that we check against our ACS
-      | - expectedDomain: The domain that the counterParticipant believes the given contracts reside on
-      | - timestamp: The timestamp when the given contracts are active on the counter-participant
-      | - counterParticipant: The counter participant with whom the contracts should be shared
-      | - timeout: Time limit for the grpc call to complete
-      """.stripMargin
-  )
-  def active_contracts_mismatches(
-      counterParticipantContracts: Seq[CommitmentContractMetadata],
-      expectedDomain: DomainId,
-      timestamp: CantonTimestamp,
-      counterParticipant: ParticipantId,
-      timeout: NonNegativeDuration = timeouts.unbounded,
-  ): Map[LfContractId, MismatchReason] =
-    check(FeatureFlag.Preview) {
-      Map.empty[LfContractId, MismatchReason]
-    }
-
-  @Help.Summary(
-    "Download the contract payloads from the counter participant necessary for reconciliation",
-    FeatureFlag.Preview,
-  )
-  @Help.Description(
-    """ Returns the contract ids and the mismatch reason.
-      | Returns an error if the participant cannot retrieve the data for the given commitment anymore.
-      | The arguments are:
-      | - contracts: The contract ids whose payload we want to download from the counterParticipant
-      | - timeout: Time limit for the grpc call to complete
-      | - binaryOutputFile: The file where to write the payload and mismatch information for the given mismatching
-      """.stripMargin
-  )
-  def download_contract_reconciliation_payloads(
-      contracts: Seq[LfContractId],
-      timeout: NonNegativeDuration = timeouts.unbounded,
-      binaryOutputFile: String = CommitmentsAdministrationGroup.ExportMismatchDefaultBinaryFile,
-  ): Unit = check(FeatureFlag.Preview) {
-    val file = File(binaryOutputFile)
-    consoleEnvironment.run {
-      val responseObserver =
-        new FileStreamObserver[InspectCommitmentContracts.Response](file, _.chunk)
-
-      def call: ConsoleCommandResult[Context.CancellableContext] =
-        adminCommand(
-          ParticipantAdminCommands.Inspection.CommitmentContracts(
-            responseObserver,
-            contracts,
-          )
-        )
-
-      processResult(
-        call,
-        responseObserver.result,
-        timeout,
-        request = "Downloading contract from counter-participant that cause mismatch",
-        cleanupOnError = () => file.delete(),
-      )
-    }
-  }
-
+  // TODO(#18451) R5
   @Help.Summary(
     "List the counter-participants of a participant and the ACS commitments received from them together with" +
       "the commitment state."
@@ -898,6 +758,7 @@ class CommitmentsAdministrationGroup(
       )
     )
 
+  // TODO(#18451) R5
   @Help.Summary(
     "List the counter-participants of a participant and the ACS commitments that the participant computed and sent to" +
       "them, together with the commitment state."
@@ -956,8 +817,8 @@ class CommitmentsAdministrationGroup(
   def set_no_wait_commitments_from(
       counterParticipants: Seq[ParticipantId],
       domainIds: Seq[DomainId],
-      startingAt: Either[Instant, String],
-  ): Map[ParticipantId, Seq[DomainId]] =
+      startingAt: Either[Instant, ParticipantOffset],
+  ): Map[ParticipantId, Seq[DomainId]] = {
     consoleEnvironment.run(
       runner.adminCommand(
         SetNoWaitCommitmentsFrom(
@@ -967,6 +828,7 @@ class CommitmentsAdministrationGroup(
         )
       )
     )
+  }
 
   // TODO(#18453) R6: The code below should be sufficient.
   @Help.Summary(
@@ -982,7 +844,7 @@ class CommitmentsAdministrationGroup(
   def set_wait_commitments_from(
       counterParticipants: Seq[ParticipantId],
       domainIds: Seq[DomainId],
-  ): Map[ParticipantId, Seq[DomainId]] =
+  ): Map[ParticipantId, Seq[DomainId]] = {
     consoleEnvironment.run(
       runner.adminCommand(
         SetWaitCommitmentsFrom(
@@ -991,6 +853,7 @@ class CommitmentsAdministrationGroup(
         )
       )
     )
+  }
 
   // TODO(#18453) R6: The code below should be sufficient.
   @Help.Summary(
@@ -1037,7 +900,7 @@ class CommitmentsAdministrationGroup(
         |participant is behind""")
   def set_config_for_slow_counter_participants(
       configs: Seq[SlowCounterParticipantDomainConfig]
-  ): Unit =
+  ): Unit = {
     consoleEnvironment.run(
       runner.adminCommand(
         SetConfigForSlowCounterParticipants(
@@ -1045,6 +908,7 @@ class CommitmentsAdministrationGroup(
         )
       )
     )
+  }
 
   // TODO(#10436) R7
   def add_config_for_slow_counter_participants(
@@ -1087,7 +951,7 @@ class CommitmentsAdministrationGroup(
       reconciliation intervals that participant is behind""")
   def get_config_for_slow_counter_participants(
       domains: Seq[DomainId]
-  ): Seq[SlowCounterParticipantDomainConfig] =
+  ): Seq[SlowCounterParticipantDomainConfig] = {
     consoleEnvironment.run(
       runner.adminCommand(
         GetConfigForSlowCounterParticipants(
@@ -1095,6 +959,7 @@ class CommitmentsAdministrationGroup(
         )
       )
     )
+  }
 
   case class SlowCounterParticipantInfo(
       domains: Seq[DomainId],
@@ -1127,7 +992,7 @@ class CommitmentsAdministrationGroup(
       counterParticipants: Seq[ParticipantId],
       domains: Seq[DomainId],
       threshold: Option[NonNegativeInt],
-  ): Seq[CounterParticipantInfo] =
+  ): Seq[CounterParticipantInfo] = {
     consoleEnvironment.run(
       runner.adminCommand(
         GetIntervalsBehindForCounterParticipants(
@@ -1137,14 +1002,7 @@ class CommitmentsAdministrationGroup(
         )
       )
     )
-
-  private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
-  private implicit val ec: ExecutionContext = consoleEnvironment.environment.executionContext
-}
-
-object CommitmentsAdministrationGroup {
-  private val ExportMismatchDefaultBinaryFile = "canton-acs-mismatch-export.gz"
-  private val ExportMismatchDefaultReadableFile = "canton-acs-mismatch-export.json"
+  }
 }
 
 class ParticipantReplicationAdministrationGroup(
@@ -1156,12 +1014,14 @@ class ParticipantReplicationAdministrationGroup(
   @Help.Description(
     "Trigger a graceful fail-over from this active replica to another passive replica. Returns true if another replica became active."
   )
-  def set_passive(): Boolean =
+  def set_passive(): Boolean = {
     consoleEnvironment.run {
       runner.adminCommand(
         ParticipantAdminCommands.Replication.SetPassiveCommand()
       )
     }
+  }
+
 }
 
 /** Administration commands supported by a participant.
@@ -1260,6 +1120,9 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         path: String,
         vetAllPackages: Boolean = true,
         synchronizeVetting: Boolean = true,
+        synchronize: Option[NonNegativeDuration] = Some(
+          consoleEnvironment.commandTimeouts.bounded
+        ),
         darDataO: Option[ByteString] = None,
     ): String = {
       val res = consoleEnvironment.runE {
@@ -1369,10 +1232,11 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         |removes the package. The force flag can be used to disable the checks, but do not use the force flag unless
         |you're certain you know what you're doing. """
     )
-    def remove(packageId: String, force: Boolean = false): Unit =
+    def remove(packageId: String, force: Boolean = false): Unit = {
       check(FeatureFlag.Preview)(consoleEnvironment.run {
         adminCommand(ParticipantAdminCommands.Package.RemovePackage(packageId, force))
       })
+    }
 
     @Help.Summary(
       "Ensure that all vetting transactions issued by this participant have been observed by all configured participants"
@@ -1414,10 +1278,11 @@ trait ParticipantAdministration extends FeatureFlagFilter {
   object domains extends Helpful {
 
     @Help.Summary("Returns the id of the given domain alias")
-    def id_of(domainAlias: DomainAlias): DomainId =
+    def id_of(domainAlias: DomainAlias): DomainId = {
       consoleEnvironment.run {
         adminCommand(ParticipantAdminCommands.DomainConnectivity.GetDomainId(domainAlias))
       }
+    }
 
     @Help.Summary(
       "Test whether a participant is connected to and permissioned on a domain."
@@ -1427,12 +1292,15 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         |Yields false, if the domain is configured in the Canton configuration and
         |the participant is not active from the perspective of the domain."""
     )
-    def active(domainAlias: DomainAlias): Boolean =
-      list_connected().exists { r =>
+    def active(domainAlias: DomainAlias): Boolean = {
+      list_connected().exists(r => {
+        // TODO(#14053): Filter out participants that are not permissioned on the domain. The TODO is because the daml 2.x
+        //  also asks the domain whether the participant is permissioned, i.e. do we need to for a ParticipantDomainPermission?
         r.domainAlias == domainAlias &&
         r.healthy &&
         participantIsActiveOnDomain(r.domainId, id)
-      }
+      })
+    }
 
     @Help.Summary(
       "Test whether a participant is connected to a domain"
@@ -1480,7 +1348,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         The arguments are:
           domain - A local domain or sequencer reference
           alias - The name you will be using to refer to this domain. Can not be changed anymore.
-          handshake only - If yes, only the handshake will be performed (no domain connection)
+          handshake only - If yes, only the handshake will be perfomed (no domain connection)
           maxRetryDelayMillis - Maximal amount of time (in milliseconds) between two connection attempts.
           priority - The priority of the domain. The higher the more likely a domain will be used.
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
@@ -1513,7 +1381,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     @Help.Description("""
         The arguments are:
           config - Config for the domain connection
-          handshake only - If yes, only the handshake will be performed (no domain connection)
+          handshake only - If yes, only the handshake will be perfomed (no domain connection)
           validation - Whether to validate the connectivity and ids of the given sequencers (default All)
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
         """)
@@ -1803,10 +1671,11 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     }
 
     @Help.Summary("Disconnect this participant from all connected domains")
-    def disconnect_all(): Unit =
+    def disconnect_all(): Unit = {
       list_connected().foreach { connected =>
         disconnect(connected.domainAlias)
       }
+    }
 
     @Help.Summary("Disconnect this participant from the given local domain")
     def disconnect_local(domain: DomainAlias): Unit = consoleEnvironment.run {
@@ -1836,7 +1705,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         domain: DomainAlias,
         modifier: DomainConnectionConfig => DomainConnectionConfig,
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
-    ): Unit =
+    ): Unit = {
       consoleEnvironment.runE {
         for {
           configured <- adminCommand(
@@ -1845,13 +1714,11 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           cfg <- configured
             .map(_._1)
             .find(_.domain == domain)
-            .toRight(s"No such domain $domain configured")
+            .toRight(s"No such domain ${domain} configured")
           newConfig = modifier(cfg)
-          _ <- Either.cond(
-            newConfig.domain == cfg.domain,
-            (),
-            "We don't support modifying the domain alias of a DomainConnectionConfig.",
-          )
+          _ <-
+            if (newConfig.domain == cfg.domain) Right(())
+            else Left("We don't support modifying the domain alias of a DomainConnectionConfig.")
           _ <- adminCommand(
             ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(
               modifier(cfg),
@@ -1860,22 +1727,37 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           ).toEither
         } yield ()
       }
-
-    @Help.Summary(
-      "Revoke this participant's authentication tokens and close all the sequencer connections in the given domain"
-    )
-    @Help.Description("""
-      domainAlias: the domain alias from which to logout
-      On all the sequencers from the specified domain, all existing authentication tokens for this participant
-      will be revoked.
-      Note that the participant is not disconnected from the domain; only the connections to the sequencers are closed.
-      The participant will automatically reopen connections, perform a challenge-response and obtain new tokens.
-      """)
-    def logout(domainAlias: DomainAlias): Unit = consoleEnvironment.run {
-      adminCommand(
-        ParticipantAdminCommands.DomainConnectivity.Logout(domainAlias)
-      )
     }
+
+  }
+
+  @Help.Summary("Composability related functionality", FeatureFlag.Preview)
+  @Help.Group("Transfer")
+  object transfer extends Helpful {
+
+    @Help.Summary("Search the currently in-flight transfers", FeatureFlag.Testing)
+    @Help.Description(
+      "Returns all in-flight transfers with the given target domain that match the filters, but no more than the limit specifies."
+    )
+    def search(
+        targetDomain: DomainAlias,
+        filterSourceDomain: Option[DomainAlias],
+        filterTimestamp: Option[Instant],
+        filterSubmittingParty: Option[PartyId],
+        limit: PositiveInt = defaultLimit,
+    ): Seq[TransferSearchResult] =
+      check(FeatureFlag.Preview)(consoleEnvironment.run {
+        adminCommand(
+          ParticipantAdminCommands.Transfer
+            .TransferSearch(
+              targetDomain,
+              filterSourceDomain,
+              filterTimestamp,
+              filterSubmittingParty,
+              limit.value,
+            )
+        )
+      })
   }
 
   @Help.Summary("Functionality for managing resources")
@@ -1914,7 +1796,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         |In the community edition, the server uses fixed limits that cannot be changed."""
     )
     def set_resource_limits(limits: ResourceLimits): Unit =
-      consoleEnvironment.run(adminCommand(SetResourceLimits(limits)))
+      consoleEnvironment.run { adminCommand(SetResourceLimits(limits)) }
 
     @Help.Summary("Get the resource limits of the participant.")
     def resource_limits(): ResourceLimits = consoleEnvironment.run {
@@ -1935,6 +1817,7 @@ trait ParticipantHealthAdministrationCommon extends FeatureFlagFilter {
       participantId: ParticipantId,
       timeout: NonNegativeDuration,
       domainId: Option[DomainId],
+      workflowId: String,
       id: String,
   ): Either[String, Duration] =
     consoleEnvironment.run {
@@ -1963,11 +1846,11 @@ trait ParticipantHealthAdministrationCommon extends FeatureFlagFilter {
       id: String = "",
   ): Duration = {
     val adminApiRes: Either[String, Duration] =
-      ping_internal(participantId, timeout, domainId, id)
+      ping_internal(participantId, timeout, domainId, "", id)
     consoleEnvironment.runE(
       adminApiRes.leftMap { reason =>
         s"Unable to ping $participantId within ${LoggerUtil
-            .roundDurationForHumans(timeout.duration)}: $reason"
+            .roundDurationForHumans(timeout.duration)}: ${reason}"
       }
     )
 
@@ -1983,7 +1866,7 @@ trait ParticipantHealthAdministrationCommon extends FeatureFlagFilter {
       domainId: Option[DomainId] = None,
       id: String = "",
   ): Option[Duration] = check(FeatureFlag.Testing) {
-    ping_internal(participantId, timeout, domainId, id).toOption
+    ping_internal(participantId, timeout, domainId, "", id).toOption
   }
 }
 
@@ -1991,35 +1874,10 @@ class ParticipantHealthAdministration(
     val runner: AdminCommandRunner,
     val consoleEnvironment: ConsoleEnvironment,
     override val loggerFactory: NamedLoggerFactory,
-) extends HealthAdministration[ParticipantStatus](
+) extends HealthAdministration(
       runner,
       consoleEnvironment,
+      ParticipantStatus.fromProtoV30,
     )
     with FeatureFlagFilter
-    with ParticipantHealthAdministrationCommon {
-  override protected def nodeStatusCommand: GrpcAdminCommand[?, ?, NodeStatus[ParticipantStatus]] =
-    ParticipantAdminCommands.Health.ParticipantStatusCommand()
-
-  @Help.Summary("Counts pending command submissions and transactions on a domain.")
-  @Help.Description(
-    """This command finds the current number of pending command submissions and transactions on a selected domain.
-      |
-      |There is no synchronization between pending command submissions and transactions. And the respective
-      |counts are an indication only!
-      |
-      |This command is in particular useful to re-assure oneself that there are currently no in-flight submissions
-      |or transactions present for the selected domain. Such re-assurance is then helpful to proceed with repair
-      |operations, for example."""
-  )
-  def count_in_flight(domainAlias: DomainAlias): InFlightCount = {
-    val domainId = consoleEnvironment.run {
-      runner.adminCommand(ParticipantAdminCommands.DomainConnectivity.GetDomainId(domainAlias))
-    }
-
-    consoleEnvironment.run {
-      runner.adminCommand(
-        ParticipantAdminCommands.Inspection.CountInFlight(domainId)
-      )
-    }
-  }
-}
+    with ParticipantHealthAdministrationCommon

@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend-utils';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { useScanClient } from 'common-frontend/scan-api';
 
 import {
@@ -21,6 +21,7 @@ export type ListVoteRequestResultParams = {
 export const useListDsoRulesVoteRequests = (): UseQueryResult<Contract<VoteRequest>[]> => {
   const scanClient = useScanClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listDsoRulesVoteRequests'],
     queryFn: async () => {
       const result = await scanClient.listDsoRulesVoteRequests();
@@ -35,6 +36,7 @@ export const useListVoteRequestResult = (
 ): UseQueryResult<DsoRules_CloseVoteRequestResult[]> => {
   const scanClient = useScanClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listVoteRequestResults', DsoRules_CloseVoteRequestResult, limit, query],
     keepPreviousData: true,
     queryFn: async () => {

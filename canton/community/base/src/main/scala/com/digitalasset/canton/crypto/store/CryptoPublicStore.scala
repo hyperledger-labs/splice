@@ -176,12 +176,13 @@ object CryptoPublicStore {
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ec: ExecutionContext
-  ): CryptoPublicStore =
+  ): CryptoPublicStore = {
     storage match {
       case _: MemoryStorage => new InMemoryCryptoPublicStore(loggerFactory)
       case dbStorage: DbStorage =>
         new DbCryptoPublicStore(dbStorage, releaseProtocolVersion, timeouts, loggerFactory)
     }
+  }
 }
 
 sealed trait CryptoPublicStoreError extends Product with Serializable with PrettyPrinting
@@ -203,7 +204,7 @@ object CryptoPublicStoreError extends CantonErrorGroups.CommandErrorGroup {
 
   final case class FailedToInsertKey(keyId: Fingerprint, reason: String)
       extends CryptoPublicStoreError {
-    override protected def pretty: Pretty[FailedToInsertKey] =
+    override def pretty: Pretty[FailedToInsertKey] =
       prettyOfClass(param("keyId", _.keyId), param("reason", _.reason.unquoted))
   }
 
@@ -212,7 +213,7 @@ object CryptoPublicStoreError extends CantonErrorGroups.CommandErrorGroup {
       existingPublicKey: K,
       newPublicKey: K,
   ) extends CryptoPublicStoreError {
-    override protected def pretty: Pretty[KeyAlreadyExists[K]] =
+    override def pretty: Pretty[KeyAlreadyExists[K]] =
       prettyOfClass(
         param("keyId", _.keyId),
         param("existingPublicKey", _.existingPublicKey),

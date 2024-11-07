@@ -60,6 +60,7 @@ final case class CantonCommunityConfig(
       .modify(_.fmap(_.withDefaults(ports)))
 }
 
+@nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 object CantonCommunityConfig {
 
   private val logger: Logger = LoggerFactory.getLogger(classOf[CantonCommunityConfig])
@@ -72,7 +73,7 @@ object CantonCommunityConfig {
   import CantonConfig.*
 
   // Implemented as a def so we can pass the ErrorLoggingContext to be used during parsing
-  @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
+  @nowarn("cat=unused")
   private implicit val cantonCommunityConfigReader: ConfigReader[CantonCommunityConfig] = {
     import ConfigReaders.*
     import DeprecatedConfigUtils.*
@@ -87,7 +88,7 @@ object CantonCommunityConfig {
     deriveReader[CantonCommunityConfig]
   }
 
-  @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
+  @nowarn("cat=unused")
   private lazy implicit val cantonCommunityConfigWriter: ConfigWriter[CantonCommunityConfig] = {
     val writers = new CantonConfig.ConfigWriters(confidential = true)
     import writers.*

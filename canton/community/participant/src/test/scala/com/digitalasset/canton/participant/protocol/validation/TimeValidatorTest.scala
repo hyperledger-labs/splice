@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.protocol.validation
 
-import cats.syntax.either.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.protocol.TransactionProcessingSteps.CommonData
@@ -21,23 +20,22 @@ class TimeValidatorTest extends AnyWordSpec with BaseTest {
   val sequencerTimestamp: CantonTimestamp = CantonTimestamp.ofEpochSecond(0)
   val ledgerTimeRecordTimeTolerance: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.tryOfSeconds(10)
-  val submissionTimeRecordTimeTolerance: NonNegativeFiniteDuration =
-    NonNegativeFiniteDuration.tryOfSeconds(60)
   val transactionId: TransactionId = ExampleTransactionFactory.transactionId(0)
 
   private def checkTimestamps(
       ledgerTime: CantonTimestamp,
       submissionTime: CantonTimestamp,
       sequencerTimestamp: CantonTimestamp,
-  ) =
+      ledgerTimeRecordTimeTolerance: NonNegativeFiniteDuration,
+  ) = {
     TimeValidator.checkTimestamps(
       CommonData(transactionId, ledgerTime, submissionTime),
       sequencerTimestamp,
-      ledgerTimeRecordTimeTolerance = ledgerTimeRecordTimeTolerance,
-      submissionTimeRecordTimeTolerance = submissionTimeRecordTimeTolerance,
+      ledgerTimeRecordTimeTolerance,
       amSubmitter = false,
       logger,
     )
+  }
 
   "ledger time" when {
 
@@ -54,15 +52,17 @@ class TimeValidatorTest extends AnyWordSpec with BaseTest {
             ledgerTimeEarliest,
             submissionTime,
             sequencerTime,
+            ledgerTimeRecordTimeTolerance,
           )
         val latestRes = checkTimestamps(
           ledgerTimeLatest,
           submissionTime,
           sequencerTime,
+          ledgerTimeRecordTimeTolerance,
         )
 
-        earliestRes shouldBe Either.unit
-        latestRes shouldBe Either.unit
+        earliestRes shouldBe Right(())
+        latestRes shouldBe Right(())
       }
     }
 
@@ -82,12 +82,14 @@ class TimeValidatorTest extends AnyWordSpec with BaseTest {
             ledgerTime,
             submissionTime,
             sequencerTimestamp = futureSeqTimestamp,
+            ledgerTimeRecordTimeTolerance,
           )
         val tooEarly =
           checkTimestamps(
             ledgerTime,
             submissionTime,
             pastSeqTimestamp,
+            ledgerTimeRecordTimeTolerance,
           )
 
         tooLate shouldBe Left(
@@ -114,62 +116,66 @@ class TimeValidatorTest extends AnyWordSpec with BaseTest {
 
     "valid" should {
       "yield a Right" in {
-        val submissionTimeEarliest = sequencerTime - submissionTimeRecordTimeTolerance
-        val submissionTimeLatest = sequencerTime + submissionTimeRecordTimeTolerance
+        val submissionTimeEarliest = sequencerTime - ledgerTimeRecordTimeTolerance
+        val submissionTimeLatest = sequencerTime + ledgerTimeRecordTimeTolerance
 
         val earliestRes =
           checkTimestamps(
             ledgerTime,
             submissionTimeEarliest,
             sequencerTime,
+            ledgerTimeRecordTimeTolerance,
           )
         val latestRes = checkTimestamps(
           ledgerTime,
           submissionTimeLatest,
           sequencerTime,
+          ledgerTimeRecordTimeTolerance,
         )
 
-        earliestRes shouldBe Either.unit
-        latestRes shouldBe Either.unit
+        earliestRes shouldBe Right(())
+        latestRes shouldBe Right(())
       }
     }
 
     "too far from sequencer timestamp" should {
       val submissionTimeBeforeSeq: CantonTimestamp = CantonTimestamp.Epoch.minusMillis(9)
       val futureSeqTimestamp =
-        (submissionTimeBeforeSeq + submissionTimeRecordTimeTolerance).add(Duration.ofMillis(1))
+        (submissionTimeBeforeSeq + ledgerTimeRecordTimeTolerance).add(Duration.ofMillis(1))
 
       val submissionTimeAfterSeq = CantonTimestamp.ofEpochSecond(1)
       val pastSeqTimestamp =
-        (submissionTimeAfterSeq - submissionTimeRecordTimeTolerance).minus(Duration.ofMillis(1))
+        (submissionTimeAfterSeq - ledgerTimeRecordTimeTolerance).minus(Duration.ofMillis(1))
 
       "yield an error" in {
         val tooLate =
           checkTimestamps(
-            ledgerTime = futureSeqTimestamp, // Set the ledger time to the seq time to make it valid
+            ledgerTime,
             submissionTimeBeforeSeq,
             futureSeqTimestamp,
+            ledgerTimeRecordTimeTolerance,
           )
 
         val tooEarly =
           checkTimestamps(
-            ledgerTime = pastSeqTimestamp, // Set the ledger time to the seq time to make it valid
+            ledgerTime,
             submissionTimeAfterSeq,
             pastSeqTimestamp,
+            ledgerTimeRecordTimeTolerance,
           )
 
         tooLate shouldBe Left(
           SubmissionTimeRecordTimeDeltaTooLargeError(
             submissionTimeBeforeSeq,
             futureSeqTimestamp,
-            submissionTimeRecordTimeTolerance,
+            ledgerTimeRecordTimeTolerance,
           )
         )
         tooEarly shouldBe Left(
           SubmissionTimeRecordTimeDeltaTooLargeError(
             submissionTimeAfterSeq,
             pastSeqTimestamp,
-            submissionTimeRecordTimeTolerance,
+            ledgerTimeRecordTimeTolerance,
           )
         )
       }

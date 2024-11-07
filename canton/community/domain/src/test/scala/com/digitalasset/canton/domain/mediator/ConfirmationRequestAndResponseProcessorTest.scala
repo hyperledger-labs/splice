@@ -9,8 +9,8 @@ import com.digitalasset.canton.config.CachingConfigs
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
+import com.digitalasset.canton.data.ViewType.{TransactionViewType, TransferInViewType}
 import com.digitalasset.canton.data.*
-import com.digitalasset.canton.data.ViewType.{AssignmentViewType, TransactionViewType}
 import com.digitalasset.canton.domain.mediator.ResponseAggregation.ConsortiumVotingState
 import com.digitalasset.canton.domain.mediator.store.{
   InMemoryFinalizedResponseStore,
@@ -21,13 +21,13 @@ import com.digitalasset.canton.domain.metrics.MediatorTestMetrics
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.Verdict.{Approve, MediatorReject}
+import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.TestSequencerClientSend
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.time.{Clock, DomainTimeTracker, NonNegativeFiniteDuration}
-import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.util.MonadUtil.{sequentialTraverse, sequentialTraverse_}
@@ -66,13 +66,13 @@ class ConfirmationRequestAndResponseProcessorTest
 
   protected val mediatorGroup: MediatorGroup = MediatorGroup(
     index = MediatorGroupIndex.zero,
-    active = Seq(activeMediator1, activeMediator2),
+    active = NonEmpty.mk(Seq, activeMediator1, activeMediator2),
     passive = Seq(passiveMediator3),
     threshold = PositiveInt.tryCreate(2),
   )
   protected val mediatorGroup2: MediatorGroup = MediatorGroup(
     index = MediatorGroupIndex.one,
-    active = Seq(activeMediator4),
+    active = NonEmpty.mk(Seq, activeMediator4),
     passive = Seq.empty,
     threshold = PositiveInt.one,
   )
@@ -80,17 +80,12 @@ class ConfirmationRequestAndResponseProcessorTest
   protected val sequencer = SequencerId(UniqueIdentifier.tryCreate("sequencer", "one"))
 
   protected val sequencerGroup =
-    SequencerGroup(active = Seq(sequencer), Seq.empty, PositiveInt.one)
+    SequencerGroup(active = NonEmpty.mk(Seq, sequencer), Seq.empty, PositiveInt.one)
 
   private lazy val mediatorId: MediatorId = activeMediator2
   private lazy val mediatorGroupRecipient: MediatorGroupRecipient = MediatorGroupRecipient(
     mediatorGroup.index
   )
-  private def addRecipients(
-      request: MediatorConfirmationRequest,
-      recipients: Recipients = Recipients.cc(mediatorGroupRecipient),
-  ): OpenEnvelope[MediatorConfirmationRequest] =
-    OpenEnvelope(request, recipients)(testedProtocolVersion)
 
   protected lazy val factory: ExampleTransactionFactory =
     new ExampleTransactionFactory()(domainId = domainId, mediatorGroup = mediatorGroupRecipient)
@@ -138,7 +133,7 @@ class ConfirmationRequestAndResponseProcessorTest
   private lazy val crypto =
     SymbolicCrypto.create(testedReleaseProtocolVersion, timeouts, loggerFactory)
 
-  private lazy val topology: TestingTopology = TestingTopology.from(
+  private lazy val topology: TestingTopology = TestingTopology(
     domains = Set(domainId),
     topology = Map(
       submitter -> Map(participant -> ParticipantPermission.Confirmation),
@@ -162,7 +157,7 @@ class ConfirmationRequestAndResponseProcessorTest
   )
 
   private lazy val identityFactory2 = {
-    val topology2 = TestingTopology.from(
+    val topology2 = TestingTopology(
       domains = Set(domainId),
       topology = Map(
         submitter -> Map(participant1 -> ParticipantPermission.Confirmation),
@@ -194,7 +189,7 @@ class ConfirmationRequestAndResponseProcessorTest
 
   private lazy val identityFactoryOnlySubmitter =
     TestingIdentityFactory(
-      TestingTopology.from(
+      TestingTopology(
         domains = Set(domainId),
         topology = Map(
           submitter -> Map(participant1 -> ParticipantPermission.Confirmation)
@@ -329,7 +324,7 @@ class ConfirmationRequestAndResponseProcessorTest
             super.informeesAndConfirmationParamsByViewPosition.head
 
           override def informeesAndConfirmationParamsByViewPosition
-              : Map[ViewPosition, ViewConfirmationParameters] =
+              : Map[ViewPosition, ViewConfirmationParameters] = {
             super.informeesAndConfirmationParamsByViewPosition map {
               case (key, ViewConfirmationParameters(informees, quorums)) =>
                 (
@@ -340,6 +335,7 @@ class ConfirmationRequestAndResponseProcessorTest
                   ),
                 )
             }
+          }
         }
       val requestTimestamp = CantonTimestamp.Epoch.plusSeconds(120)
       for {
@@ -351,7 +347,7 @@ class ConfirmationRequestAndResponseProcessorTest
               requestTimestamp.plusSeconds(60),
               requestTimestamp.plusSeconds(120),
               NonNegativeFiniteDuration.tryOfHours(1),
-              addRecipients(testMediatorRequest),
+              testMediatorRequest,
               rootHashMessages,
               batchAlsoContainsTopologyTransaction = false,
             )
@@ -383,7 +379,7 @@ class ConfirmationRequestAndResponseProcessorTest
               participantResponseDeadline,
               decisionTime,
               NonNegativeFiniteDuration.tryOfHours(1),
-              addRecipients(informeeMessage),
+              informeeMessage,
               rootHashMessages,
               batchAlsoContainsTopologyTransaction = false,
             )
@@ -422,7 +418,7 @@ class ConfirmationRequestAndResponseProcessorTest
             requestTimestamp.plusSeconds(60),
             requestTimestamp.plusSeconds(120),
             NonNegativeFiniteDuration.tryOfHours(1),
-            addRecipients(informeeMessage),
+            informeeMessage,
             rootHashMessages,
             batchAlsoContainsTopologyTransaction = false,
           )
@@ -522,6 +518,20 @@ class ConfirmationRequestAndResponseProcessorTest
           ),
           Recipients.cc(MemberRecipient(participant3), mediatorGroupRecipient),
         ),
+        "group addresses and member recipients" -> Seq(
+          Recipients.recipientGroups(
+            NonEmpty.mk(
+              Seq,
+              NonEmpty.mk(
+                Set,
+                ParticipantsOfParty(PartyId.tryFromLfParty(submitter)),
+                mediatorGroupRecipient,
+              ),
+              NonEmpty.mk(Set, MemberRecipient(participant2), mediatorGroupRecipient),
+              NonEmpty.mk(Set, MemberRecipient(participant3), mediatorGroupRecipient),
+            )
+          )
+        ),
       )
 
       sequentialTraverse_(tests.zipWithIndex) { case ((testName, recipients), i) =>
@@ -536,7 +546,7 @@ class ConfirmationRequestAndResponseProcessorTest
               ts.plusSeconds(60),
               ts.plusSeconds(120),
               NonNegativeFiniteDuration.tryOfHours(1),
-              addRecipients(informeeMessage),
+              informeeMessage,
               rootHashMessages,
               batchAlsoContainsTopologyTransaction = false,
             )
@@ -556,7 +566,7 @@ class ConfirmationRequestAndResponseProcessorTest
           domainSyncCryptoApi.pureCrypto.digest(TestHash.testHashPurpose, ByteString.EMPTY)
         )
       val correctViewType = informeeMessage.viewType
-      val wrongViewType = AssignmentViewType
+      val wrongViewType = TransferInViewType
       require(correctViewType != wrongViewType)
       val correctRootHashMessage =
         RootHashMessage(
@@ -704,7 +714,7 @@ class ConfirmationRequestAndResponseProcessorTest
                     ts.plusSeconds(60),
                     ts.plusSeconds(120),
                     NonNegativeFiniteDuration.tryOfHours(1),
-                    addRecipients(req),
+                    req,
                     rootHashMessages,
                     batchAlsoContainsTopologyTransaction = false,
                   )
@@ -771,7 +781,7 @@ class ConfirmationRequestAndResponseProcessorTest
               ts.plusSeconds(60),
               ts.plusSeconds(120),
               NonNegativeFiniteDuration.tryOfHours(1),
-              addRecipients(mediatorRequest),
+              mediatorRequest,
               List(
                 OpenEnvelope(
                   rootHashMessage,
@@ -793,46 +803,6 @@ class ConfirmationRequestAndResponseProcessorTest
           ),
         )
       } yield succeed
-    }
-
-    "reject when the recipients are wrong" in {
-      val sut = new Fixture()
-
-      val informeeMessage =
-        new InformeeMessage(fullInformeeTree, sign(fullInformeeTree))(testedProtocolVersion)
-      val wrongRecipients = Recipients.cc(MediatorGroupRecipient(MediatorGroupIndex.one))
-      val expectedRecipients = Recipients.cc(mediatorGroupRecipient)
-
-      for {
-        _ <- loggerFactory.assertLogs(
-          sut.processor
-            .processRequest(
-              requestId,
-              notSignificantCounter,
-              participantResponseDeadline,
-              decisionTime,
-              NonNegativeFiniteDuration.tryOfHours(1),
-              addRecipients(
-                informeeMessage,
-                wrongRecipients,
-              ),
-              rootHashMessages,
-              batchAlsoContainsTopologyTransaction = false,
-            )
-            .failOnShutdown,
-          _.shouldBeCantonError(
-            MediatorError.MalformedMessage,
-            _ shouldBe s"Rejecting mediator confirmation request with $requestId, mediator $mediatorGroupRecipient, topology at $requestIdTs due to wrong recipients (expected $expectedRecipients, actual $wrongRecipients)",
-          ),
-        )
-      } yield {
-        val sentResult = sut.verdictSender.sentResults.loneElement
-        inside(sentResult.verdict.value) { case MediatorReject(status, isMalformed) =>
-          status.code shouldBe Code.INVALID_ARGUMENT.value()
-          status.message shouldBe s"An error occurred. Please contact the operator and inquire about the request <no-correlation-id> with tid <no-tid>"
-          isMalformed shouldBe true
-        }
-      }
     }
 
     "correct series of mediator events" in {
@@ -869,7 +839,7 @@ class ConfirmationRequestAndResponseProcessorTest
             requestIdTs.plusSeconds(60),
             decisionTime,
             NonNegativeFiniteDuration.tryOfMinutes(5),
-            addRecipients(informeeMessage),
+            informeeMessage,
             List(
               OpenEnvelope(
                 rootHashMessage,
@@ -978,7 +948,11 @@ class ConfirmationRequestAndResponseProcessorTest
                     ),
                     signatory -> ConsortiumVotingState(),
                   ),
-                  Seq(signatoryQuorum),
+                  Seq(
+                    signatoryQuorum,
+                    // the new confirming party quorum is `empty`
+                    Quorum.empty,
+                  ),
                   Nil,
                 ),
               view10Position ->
@@ -1155,7 +1129,7 @@ class ConfirmationRequestAndResponseProcessorTest
             requestIdTs.plusSeconds(60),
             requestIdTs.plusSeconds(120),
             NonNegativeFiniteDuration.tryOfHours(1),
-            addRecipients(informeeMessage),
+            informeeMessage,
             List(
               OpenEnvelope(
                 rootHashMessage,
@@ -1256,7 +1230,7 @@ class ConfirmationRequestAndResponseProcessorTest
             requestIdTs.plus(confirmationResponseTimeout.unwrap),
             requestIdTs.plusSeconds(120),
             NonNegativeFiniteDuration.tryOfHours(1),
-            addRecipients(informeeMessage),
+            informeeMessage,
             List(
               OpenEnvelope(
                 rootHashMessage,
@@ -1316,7 +1290,7 @@ class ConfirmationRequestAndResponseProcessorTest
               ts.plusSeconds(60),
               ts.plusSeconds(120),
               NonNegativeFiniteDuration.tryOfHours(1),
-              addRecipients(mediatorRequest),
+              mediatorRequest,
               List(
                 OpenEnvelope(
                   rootHashMessage,
@@ -1373,7 +1347,7 @@ class ConfirmationRequestAndResponseProcessorTest
               requestIdTs.plusSeconds(20),
               decisionTime,
               NonNegativeFiniteDuration.tryOfHours(1),
-              addRecipients(request),
+              request,
               rootHashMessages,
               batchAlsoContainsTopologyTransaction = false,
             )
@@ -1412,7 +1386,7 @@ class ConfirmationRequestAndResponseProcessorTest
             ts.plusSeconds(60),
             ts.plusSeconds(120),
             NonNegativeFiniteDuration.tryOfHours(1),
-            addRecipients(mediatorRequest),
+            mediatorRequest,
             List(
               OpenEnvelope(
                 rootHashMessage,
@@ -1444,11 +1418,12 @@ class ConfirmationRequestAndResponseProcessorTest
               Some(requestId.unwrap),
               Recipients.cc(mediatorGroupRecipient),
             )
-            .failOnShutdown("Unexpected shutdown."),
-          _.shouldBeCantonError(
-            MediatorError.InvalidMessage,
-            _ shouldBe show"Received a confirmation response at ${ts.immediateSuccessor} by $participant with an unknown request id $requestId. Discarding response...",
-          ),
+            .failOnShutdown("Unexpected shutdown."), {
+            _.shouldBeCantonError(
+              MediatorError.InvalidMessage,
+              _ shouldBe show"Received a confirmation response at ${ts.immediateSuccessor} by $participant with an unknown request id $requestId. Discarding response...",
+            )
+          },
         )
       } yield {
         succeed
@@ -1461,7 +1436,7 @@ class ConfirmationRequestAndResponseProcessorTest
       val requestIdTs = CantonTimestamp.Epoch
       val requestId = RequestId(requestIdTs)
 
-      def checkWrongTimestampOfSigningKeyError(logEntry: LogEntry): Assertion =
+      def checkWrongTimestampOfSigningKeyError(logEntry: LogEntry): Assertion = {
         logEntry.shouldBeCantonError(
           MediatorError.MalformedMessage,
           message =>
@@ -1469,6 +1444,7 @@ class ConfirmationRequestAndResponseProcessorTest
               "Discarding confirmation response because the topology timestamp is not set to the request id"
             ) and include(s"$requestId")),
         )
+      }
 
       val ts1 = CantonTimestamp.Epoch.plusMillis(1L)
       for {

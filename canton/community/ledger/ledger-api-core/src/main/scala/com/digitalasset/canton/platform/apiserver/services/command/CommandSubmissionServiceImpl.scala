@@ -7,10 +7,12 @@ import com.daml.error.ContextualizedErrorLogger
 import com.daml.error.ErrorCode.LoggedApiException
 import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.timer.Delayed
+import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.domain.{Commands as ApiCommands, SubmissionId}
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
 import com.digitalasset.canton.ledger.api.util.TimeProvider
+import com.digitalasset.canton.ledger.api.validation.CommandsValidator
 import com.digitalasset.canton.ledger.configuration.LedgerTimeModel
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
@@ -50,12 +52,14 @@ private[apiserver] object CommandSubmissionServiceImpl {
 
   def createApiService(
       writeService: state.WriteService,
+      commandsValidator: CommandsValidator,
       timeProvider: TimeProvider,
       timeProviderType: TimeProviderType,
       seedService: SeedService,
       commandExecutor: CommandExecutor,
       checkOverloaded: TraceContext => Option[state.SubmissionResult],
       metrics: LedgerApiServerMetrics,
+      telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       executionContext: ExecutionContext,
@@ -103,7 +107,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
             case ApiCommand.Create(templateRef, _) =>
               s"create ${templateRef.qName}"
             case ApiCommand.Exercise(templateRef, _, choiceId, _) =>
-              s"exercise @${templateRef.qName} $choiceId"
+              s"exercise @${templateRef.qName} ${choiceId}"
             case ApiCommand.ExerciseByKey(templateRef, _, choiceId, _) =>
               s"exerciseByKey @${templateRef.qName} $choiceId"
             case ApiCommand.CreateAndExercise(templateRef, _, choiceId, _) =>
@@ -164,7 +168,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
   )(implicit
       loggingContext: LoggingContextWithTrace,
       errorLoggingContext: ContextualizedErrorLogger,
-  ): Future[state.SubmissionResult] =
+  ): Future[state.SubmissionResult] = {
     checkOverloaded(loggingContext.traceContext) match {
       case Some(submissionResult) => Future.successful(submissionResult)
       case None =>
@@ -178,6 +182,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
           )
         } yield submissionResult
     }
+  }
 
   private def submitTransactionWithDelay(
       transactionInfo: CommandExecutionResult

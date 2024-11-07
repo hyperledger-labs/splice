@@ -22,7 +22,7 @@ sealed abstract class HmacAlgorithm(val name: String, val hashAlgorithm: HashAlg
 
   def toProtoEnum: v30.HmacAlgorithm
 
-  override protected def pretty: Pretty[HmacAlgorithm] = prettyOfString(_.name)
+  override def pretty: Pretty[HmacAlgorithm] = prettyOfString(_.name)
 }
 
 object HmacAlgorithm {
@@ -59,7 +59,7 @@ final case class Hmac private (private val hmac: ByteString, private val algorit
   def toProtoV30: v30.Hmac =
     v30.Hmac(algorithm = algorithm.toProtoEnum, hmac = hmac)
 
-  override protected def pretty: Pretty[Hmac] = {
+  override def pretty: Pretty[Hmac] = {
     implicit val ps: Pretty[String] = PrettyInstances.prettyString
     PrettyUtil.prettyInfix[Hmac](_.algorithm.name, ":", _.hmac)
   }
@@ -75,12 +75,13 @@ object Hmac {
   private[crypto] def create(
       hmac: ByteString,
       algorithm: HmacAlgorithm,
-  ): Either[HmacError, Hmac] =
+  ): Either[HmacError, Hmac] = {
     Either.cond(
       hmac.size() == algorithm.hashAlgorithm.length,
       new Hmac(hmac, algorithm),
       InvalidHmacLength(hmac.size(), algorithm.hashAlgorithm.length),
     )
+  }
 
   def fromProtoV30(hmacP: v30.Hmac): ParsingResult[Hmac] =
     for {
@@ -122,7 +123,7 @@ final case class HmacSecret private (private val secret: ByteString) extends Pre
   private[crypto] def unwrap: ByteString = secret
 
   // intentionally removing the value from toString to avoid printing secret in logs
-  override protected def pretty: Pretty[HmacSecret] =
+  override def pretty: Pretty[HmacSecret] =
     prettyOfString(secret => s"HmacSecret(length: ${secret.length})")
 
   val length: Int = secret.size()
@@ -180,34 +181,30 @@ sealed trait HmacError extends Product with Serializable with PrettyPrinting
 object HmacError {
   final case class UnknownHmacAlgorithm(algorithm: HmacAlgorithm, cause: Exception)
       extends HmacError {
-    override protected def pretty: Pretty[UnknownHmacAlgorithm] = prettyOfClass(
+    override def pretty: Pretty[UnknownHmacAlgorithm] = prettyOfClass(
       param("algorithm", _.algorithm.name.unquoted),
       param("cause", _.cause),
     )
   }
   case object EmptyHmacSecret extends HmacError {
-    override protected def pretty: Pretty[EmptyHmacSecret.type] =
-      prettyOfObject[EmptyHmacSecret.type]
+    override def pretty: Pretty[EmptyHmacSecret.type] = prettyOfObject[EmptyHmacSecret.type]
   }
   final case class InvalidHmacSecret(cause: Exception) extends HmacError {
-    override protected def pretty: Pretty[InvalidHmacSecret] = prettyOfClass(unnamedParam(_.cause))
+    override def pretty: Pretty[InvalidHmacSecret] = prettyOfClass(unnamedParam(_.cause))
   }
   final case class FailedToComputeHmac(cause: Exception) extends HmacError {
-    override protected def pretty: Pretty[FailedToComputeHmac] = prettyOfClass(
-      unnamedParam(_.cause)
-    )
+    override def pretty: Pretty[FailedToComputeHmac] = prettyOfClass(unnamedParam(_.cause))
   }
   final case class InvalidHmacLength(inputLength: Int, expectedLength: Long) extends HmacError {
-    override protected def pretty: Pretty[InvalidHmacLength] = prettyOfClass(
+    override def pretty: Pretty[InvalidHmacLength] = prettyOfClass(
       param("inputLength", _.inputLength),
       param("expectedLength", _.expectedLength),
     )
   }
   case object MissingHmacSecret extends HmacError {
-    override protected def pretty: Pretty[MissingHmacSecret.type] =
-      prettyOfObject[MissingHmacSecret.type]
+    override def pretty: Pretty[MissingHmacSecret.type] = prettyOfObject[MissingHmacSecret.type]
   }
   final case class HmacPrivateStoreError(error: CryptoPrivateStoreError) extends HmacError {
-    override protected def pretty: Pretty[HmacPrivateStoreError] = prettyOfParam(_.error)
+    override def pretty: Pretty[HmacPrivateStoreError] = prettyOfParam(_.error)
   }
 }

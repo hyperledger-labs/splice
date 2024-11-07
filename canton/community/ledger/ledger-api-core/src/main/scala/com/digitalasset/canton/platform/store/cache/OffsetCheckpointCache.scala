@@ -3,10 +3,7 @@
 
 package com.digitalasset.canton.platform.store.cache
 
-import com.daml.ledger.api.v2.offset_checkpoint as v2
-import com.daml.ledger.api.v2.offset_checkpoint.DomainTime
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.util.TimestampConversion.fromInstant
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.daml.lf.data.Time.Timestamp
 
@@ -23,13 +20,4 @@ class OffsetCheckpointCache {
 
 }
 
-final case class OffsetCheckpoint(offset: Offset, domainTimes: Map[DomainId, Timestamp]) {
-  lazy val toApi: v2.OffsetCheckpoint =
-    v2.OffsetCheckpoint(
-      offset = offset.toLong,
-      domainTimes = domainTimes.map { case (domain, t) =>
-        DomainTime(domain.toProtoPrimitive, Some(fromInstant(t.toInstant)))
-      }.toSeq,
-    )
-
-}
+final case class OffsetCheckpoint(offset: Offset, domainTimes: Map[DomainId, Timestamp])

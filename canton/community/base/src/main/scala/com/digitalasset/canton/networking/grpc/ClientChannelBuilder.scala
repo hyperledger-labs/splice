@@ -4,24 +4,21 @@
 package com.digitalasset.canton.networking.grpc
 
 import com.daml.nonempty.NonEmpty
-import com.daml.tls.TlsVersion.TlsVersion
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.TlsServerConfig.logTlsProtocolsAndCipherSuites
 import com.digitalasset.canton.config.{ClientConfig, KeepAliveClientConfig, TlsClientConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.tracing.TraceContextGrpc
 import com.digitalasset.canton.tracing.TracingConfig.Propagation
+import com.digitalasset.canton.tracing.{NoTracing, TraceContextGrpc}
 import com.digitalasset.canton.util.ResourceUtil.withResource
 import com.google.protobuf.ByteString
 import io.grpc.ManagedChannel
 import io.grpc.netty.{GrpcSslContexts, NettyChannelBuilder}
-import io.netty.handler.ssl.{SslContext, SslContextBuilder}
+import io.netty.handler.ssl.SslContext
 
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Executor, TimeUnit}
-import scala.jdk.CollectionConverters.*
 
 /** Construct a GRPC channel to be used by a client within canton. */
 trait ClientChannelBuilder {
@@ -83,7 +80,8 @@ trait ClientChannelBuilderFactory extends (NamedLoggerFactory => ClientChannelBu
   */
 class CommunityClientChannelBuilder(protected val loggerFactory: NamedLoggerFactory)
     extends ClientChannelBuilder
-    with NamedLogging {
+    with NamedLogging
+    with NoTracing {
 
   /** Create the initial netty channel builder before customizing settings */
   override protected def createNettyChannelBuilder(
@@ -93,7 +91,7 @@ class CommunityClientChannelBuilder(protected val loggerFactory: NamedLoggerFact
 
     // warn that community does not support more than one domain connection if we've been passed multiple
     if (endpoints.size > 1) {
-      noTracingLogger.warn(
+      logger.warn(
         s"Canton Community does not support using many connections for a domain. Defaulting to first: $singleHost"
       )
     }
@@ -116,7 +114,7 @@ object ClientChannelBuilder {
   private[canton] def setFactory(factory: ClientChannelBuilderFactory): Unit =
     factoryRef.set(factory)
 
-  private def sslContextBuilder(tls: TlsClientConfig): SslContextBuilder = {
+  def sslContext(tls: TlsClientConfig): SslContext = {
     val builder = GrpcSslContexts
       .forClient()
     val trustBuilder = tls.trustCollectionFile.fold(builder)(trustCollection =>
@@ -124,30 +122,13 @@ object ClientChannelBuilder {
     )
     tls.clientCert
       .fold(trustBuilder)(cc => trustBuilder.keyManager(cc.certChainFile, cc.privateKeyFile))
-  }
-
-  def sslContext(
-      tls: TlsClientConfig,
-      logTlsProtocolAndCipherSuites: Boolean = false,
-  ): SslContext = {
-    val sslContext = sslContextBuilder(tls).build()
-    if (logTlsProtocolAndCipherSuites)
-      logTlsProtocolsAndCipherSuites(sslContext, isServer = false)
-    sslContext
-  }
-
-  def sslContext(
-      tls: TlsClientConfig,
-      enabledProtocols: Seq[TlsVersion],
-  ): SslContext =
-    sslContextBuilder(tls)
-      .protocols(enabledProtocols.map(_.version).asJava)
       .build()
+  }
 
   def configureKeepAlive(
       keepAlive: Option[KeepAliveClientConfig],
       builder: NettyChannelBuilder,
-  ): NettyChannelBuilder =
+  ): NettyChannelBuilder = {
     keepAlive.fold(builder) { opt =>
       val time = opt.time.unwrap
       val timeout = opt.timeout.unwrap
@@ -155,6 +136,7 @@ object ClientChannelBuilder {
         .keepAliveTime(time.toMillis, TimeUnit.MILLISECONDS)
         .keepAliveTimeout(timeout.toMillis, TimeUnit.MILLISECONDS)
     }
+  }
 
   /** Simple channel construction for test and console clients.
     * `maxInboundMessageSize` is 2GB; so don't use this to connect to an untrusted server.

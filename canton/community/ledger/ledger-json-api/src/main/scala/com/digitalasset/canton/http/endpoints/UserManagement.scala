@@ -9,7 +9,8 @@ import com.digitalasset.canton.http.EndpointsCompanion.*
 import com.digitalasset.canton.http.Endpoints.ET
 import com.digitalasset.canton.http.EndpointsCompanion.CreateFromUserToken.userIdFromToken
 import com.digitalasset.canton.http.util.FutureUtil.either
-import com.daml.jwt.{Jwt, StandardJWTPayload}
+import com.daml.jwt.domain.Jwt
+import com.digitalasset.canton.ledger.api.auth.StandardJWTPayload
 import scalaz.std.scalaFuture.*
 import scalaz.syntax.traverse.*
 import scalaz.{-\/, EitherT, Monad, \/, \/-}
@@ -58,7 +59,7 @@ final class UserManagement(
         )
       } yield (username, primaryParty, rights)
     for {
-      info <- EitherT.either(input.leftMap(InvalidUserInput.apply)): ET[
+      info <- EitherT.either(input.leftMap(InvalidUserInput)): ET[
         (UserId, Option[Ref.Party], List[UserRight])
       ]
       (username, primaryParty, initialRights) = info
@@ -105,7 +106,7 @@ final class UserManagement(
       userId <- parseUserId(grantUserRightsRequest.userId)
       rights <- either(
         domain.UserRights.toLedgerUserRights(grantUserRightsRequest.rights)
-      ).leftMap(InvalidUserInput.apply): ET[List[UserRight]]
+      ).leftMap(InvalidUserInput): ET[List[UserRight]]
       grantedUserRights <- EitherT.rightT(
         userManagementClient.grantUserRights(
           userId = userId,
@@ -126,7 +127,7 @@ final class UserManagement(
       userId <- parseUserId(revokeUserRightsRequest.userId)
       rights <- either(
         domain.UserRights.toLedgerUserRights(revokeUserRightsRequest.rights)
-      ).leftMap(InvalidUserInput.apply): ET[List[UserRight]]
+      ).leftMap(InvalidUserInput): ET[List[UserRight]]
       revokedUserRights <- EitherT.rightT(
         userManagementClient.revokeUserRights(
           userId = userId,
@@ -193,17 +194,17 @@ final class UserManagement(
     }
   }
 
-  private def getUserIdFromToken(jwt: Jwt): ET[UserId] =
+  private def getUserIdFromToken(jwt: Jwt)(implicit traceContext: TraceContext): ET[UserId] =
     decodeAndParseUserIdFromToken(jwt, decodeJwt).leftMap(identity[Error])
 }
 
- object UserManagement {
+object UserManagement {
   private def parseUserId(rawUserId: String)(implicit
       ec: ExecutionContext
   ): ET[UserId] = {
-    import scalaz.syntax.std.either._
+    import scalaz.syntax.std.either.*
     either(
-      UserId.fromString(rawUserId).disjunction.leftMap(InvalidUserInput.apply)
+      UserId.fromString(rawUserId).disjunction.leftMap(InvalidUserInput)
     )
   }
 

@@ -30,6 +30,8 @@ import pureconfig.{ConfigReader, ConfigWriter}
 import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 
+@nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
+@nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 private[reference] abstract class BaseReferenceSequencerDriverFactory
     extends SequencerDriverFactory {
 
@@ -55,7 +57,6 @@ private[reference] abstract class BaseReferenceSequencerDriverFactory
 
   import pureconfig.generic.semiauto.*
 
-  @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
   protected lazy implicit final val batchAggregatorConfigReader
       : ConfigReader[BatchAggregatorConfig] = {
     implicit val batching: ConfigReader[BatchAggregatorConfig.Batching] =
@@ -78,7 +79,6 @@ private[reference] abstract class BaseReferenceSequencerDriverFactory
       : ConfigReader[QueryCostMonitoringConfig] =
     deriveReader[QueryCostMonitoringConfig]
 
-  @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
   protected lazy implicit final val batchAggregatorConfigWriter
       : ConfigWriter[BatchAggregatorConfig] = {
     implicit val batching: ConfigWriter[BatchAggregatorConfig.Batching] =

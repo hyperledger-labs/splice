@@ -33,7 +33,7 @@ object EventCostCalculator {
       recipients: NonEmpty[Seq[Recipient]],
   ) extends PrettyPrinting {
 
-    override protected def pretty: Pretty[EnvelopeCostDetails] = prettyOfClass(
+    override def pretty: Pretty[EnvelopeCostDetails] = prettyOfClass(
       param("write cost", _.writeCost),
       param("read cost", _.readCost),
       param("final cost", _.finalCost),
@@ -54,7 +54,7 @@ object EventCostCalculator {
       eventCost: NonNegativeLong,
   ) extends PrettyPrinting {
 
-    override protected def pretty: Pretty[EventCostDetails] = prettyOfClass(
+    override def pretty: Pretty[EventCostDetails] = prettyOfClass(
       param("cost multiplier", _.costMultiplier),
       param("group to members size", _.groupToMembersSize),
       param("envelopes cost details", _.envelopes),
@@ -71,10 +71,10 @@ class EventCostCalculator(override val loggerFactory: NamedLoggerFactory) extend
       costMultiplier: PositiveInt,
       groupToMembers: Map[GroupRecipient, Set[Member]],
       protocolVersion: ProtocolVersion,
-  )(implicit traceContext: TraceContext): EventCostDetails =
+  )(implicit traceContext: TraceContext): EventCostDetails = {
     // If changing the cost computation, make sure to tie it to a protocol version
     // For now there's only one version of cost computation
-    if (protocolVersion >= ProtocolVersion.v32) {
+    if (protocolVersion >= ProtocolVersion.v31) {
       val envelopeCosts = event.envelopes.map(computeEnvelopeCost(costMultiplier, groupToMembers))
       val eventCost = NonNegativeLong.tryCreate(envelopeCosts.map(_.finalCost).sum)
       EventCostDetails(
@@ -88,6 +88,7 @@ class EventCostCalculator(override val loggerFactory: NamedLoggerFactory) extend
         s"Traffic control is not supported for protocol version $protocolVersion"
       )
     }
+  }
 
   @VisibleForTesting
   protected def payloadSize(envelope: ClosedEnvelope): Int = envelope.bytes.size()

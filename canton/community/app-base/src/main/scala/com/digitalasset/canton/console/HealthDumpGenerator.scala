@@ -4,15 +4,20 @@
 package com.digitalasset.canton.console
 
 import better.files.File
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.admin.api.client.data.{CantonStatus, NodeStatus}
+import com.digitalasset.canton.admin.api.client.commands.StatusAdminCommands
+import com.digitalasset.canton.admin.api.client.data.CantonStatus
 import com.digitalasset.canton.config.LocalNodeConfig
 import com.digitalasset.canton.console.CommandErrors.CommandError
 import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.health.admin.{data, v30}
 import com.digitalasset.canton.metrics.MetricsSnapshot
+import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.ReleaseVersion
 import io.circe.Encoder
 import io.circe.syntax.*
+
+import scala.annotation.nowarn
 
 /** Generates a health dump zip file containing information about the current Canton process
   * This is the core of the implementation of the HealthDump gRPC endpoint.
@@ -21,33 +26,35 @@ trait HealthDumpGenerator[Status <: CantonStatus] {
   def status(): Status
   def environment: Environment
   def grpcAdminCommandRunner: GrpcAdminCommandRunner
-
   protected implicit val statusEncoder: Encoder[Status]
 
   private def getStatusForNode[S <: NodeStatus.Status](
       nodeName: String,
       nodeConfig: LocalNodeConfig,
-      nodeStatusCommand: GrpcAdminCommand[?, ?, NodeStatus[S]],
-  ): NodeStatus[S] =
+      deserializer: v30.StatusResponse.Status => ParsingResult[S],
+  ): NodeStatus[S] = {
     grpcAdminCommandRunner
       .runCommand(
         nodeName,
-        nodeStatusCommand,
+        new StatusAdminCommands.GetStatus[S](deserializer),
         nodeConfig.clientAdminApi,
         None,
       ) match {
       case CommandSuccessful(value) => value
-      case err: CommandError => NodeStatus.Failure(err.cause)
+      case err: CommandError => data.NodeStatus.Failure(err.cause)
     }
+  }
 
   protected def statusMap[S <: NodeStatus.Status](
       nodes: Map[String, LocalNodeConfig],
-      nodeStatusCommand: GrpcAdminCommand[?, ?, NodeStatus[S]],
-  ): Map[String, () => NodeStatus[S]] =
+      deserializer: v30.StatusResponse.Status => ParsingResult[S],
+  ): Map[String, () => NodeStatus[S]] = {
     nodes.map { case (nodeName, nodeConfig) =>
-      nodeName -> (() => getStatusForNode[S](nodeName, nodeConfig, nodeStatusCommand))
+      nodeName -> (() => getStatusForNode[S](nodeName, nodeConfig, deserializer))
     }
+  }
 
+  @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
   def generateHealthDump(
       outputFile: File,
       extraFilesToZip: Seq[File] = Seq.empty,

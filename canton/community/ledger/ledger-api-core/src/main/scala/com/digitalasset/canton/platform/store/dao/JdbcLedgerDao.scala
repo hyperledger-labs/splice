@@ -34,10 +34,10 @@ import com.digitalasset.canton.platform.store.utils.QueueBasedConcurrencyLimiter
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.{RequestCounter, SequencerCounter}
+import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.daml.lf.data.{Bytes, Ref}
 import com.digitalasset.daml.lf.engine.Engine
-import com.digitalasset.daml.lf.transaction.CommittedTransaction
+import com.digitalasset.daml.lf.transaction.{BlindingInfo, CommittedTransaction}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
@@ -166,7 +166,7 @@ private class JdbcLedgerDao(
       endInclusive: Offset,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Source[(Offset, PartyLedgerEntry), NotUsed] =
+  ): Source[(Offset, PartyLedgerEntry), NotUsed] = {
     paginatingAsyncStream.streamFromLimitOffsetPagination(PageSize) { queryOffset =>
       withEnrichedLoggingContext("queryOffset" -> queryOffset: LoggingEntry) {
         implicit loggingContext =>
@@ -180,6 +180,7 @@ private class JdbcLedgerDao(
           )
       }
     }
+  }
 
   override def storeRejection(
       completionInfo: Option[state.CompletionInfo],
@@ -281,7 +282,7 @@ private class JdbcLedgerDao(
   override def prune(
       pruneUpToInclusive: Offset,
       pruneAllDivulgedContracts: Boolean,
-      incompleteReassignmentOffsets: Vector[Offset],
+      incompletReassignmentOffsets: Vector[Offset],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Unit] = {
     val allDivulgencePruningParticle =
       if (pruneAllDivulgedContracts) " (including all divulged contracts)" else ""
@@ -294,7 +295,7 @@ private class JdbcLedgerDao(
         readStorageBackend.eventStorageBackend.pruneEvents(
           pruneUpToInclusive,
           pruneAllDivulgedContracts,
-          incompleteReassignmentOffsets,
+          incompletReassignmentOffsets,
         )(
           conn,
           loggingContext.traceContext,
@@ -465,10 +466,11 @@ private class JdbcLedgerDao(
   override def storeTransaction(
       completionInfo: Option[state.CompletionInfo],
       workflowId: Option[WorkflowId],
-      updateId: UpdateId,
+      transactionId: TransactionId,
       ledgerEffectiveTime: Timestamp,
       offset: Offset,
       transaction: CommittedTransaction,
+      blindingInfoO: Option[BlindingInfo],
       hostedWitnesses: List[Party],
       recordTime: Timestamp,
   )(implicit
@@ -494,31 +496,13 @@ private class JdbcLedgerDao(
                   optByKeyNodes = None, // not used for DbDto generation
                 ),
                 transaction = transaction,
-                updateId = updateId,
+                transactionId = transactionId,
                 recordTime = recordTime,
+                blindingInfoO = blindingInfoO,
                 hostedWitnesses = hostedWitnesses,
-                contractMetadata = new Map[ContractId, Bytes] {
-                  override def removed(key: ContractId): Map[ContractId, Bytes] = this
-
-                  override def updated[V1 >: Bytes](
-                      key: ContractId,
-                      value: V1,
-                  ): Map[ContractId, V1] = this
-
-                  override def get(key: ContractId): Option[Bytes] = Some(Bytes.Empty)
-
-                  override def iterator: Iterator[(ContractId, Bytes)] = Iterator.empty
-                }, // only for tests
+                contractMetadata = Map.empty,
                 domainId = DomainId.tryFromString("invalid::deadbeef"),
-                domainIndex = Some(
-                  DomainIndex.of(
-                    RequestIndex(
-                      RequestCounter(1),
-                      Some(SequencerCounter(1)),
-                      CantonTimestamp.ofEpochMicro(recordTime.micros),
-                    )
-                  )
-                ),
+                domainIndex = None,
               )
             )
           ),
@@ -532,10 +516,11 @@ private class JdbcLedgerDao(
       from: Timestamp,
       to: Option[Timestamp],
       applicationId: Option[ApplicationId],
-  )(implicit loggingContext: LoggingContextWithTrace): Future[ReportData] =
+  )(implicit loggingContext: LoggingContextWithTrace): Future[ReportData] = {
     dbDispatcher.executeSql(metrics.index.db.lookupConfiguration)(
       readStorageBackend.meteringStorageBackend.reportData(from, to, applicationId)
     )
+  }
 }
 
 private[platform] object JdbcLedgerDao {
@@ -544,8 +529,8 @@ private[platform] object JdbcLedgerDao {
     def submissionId(id: String): LoggingEntry =
       "submissionId" -> id
 
-    def updateId(id: UpdateId): LoggingEntry =
-      "updateId" -> id
+    def transactionId(id: TransactionId): LoggingEntry =
+      "transactionId" -> id
   }
 
   def read(

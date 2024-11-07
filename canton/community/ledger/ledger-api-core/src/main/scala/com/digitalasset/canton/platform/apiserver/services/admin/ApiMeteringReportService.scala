@@ -4,8 +4,8 @@
 package com.digitalasset.canton.platform.apiserver.services.admin
 
 import com.daml.error.ContextualizedErrorLogger
-import com.daml.ledger.api.v2.admin.metering_report_service.*
 import com.daml.ledger.api.v2.admin.metering_report_service.MeteringReportServiceGrpc.MeteringReportService
+import com.daml.ledger.api.v2.admin.metering_report_service.*
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
@@ -60,7 +60,7 @@ private[apiserver] final class ApiMeteringReportService(
       request: GetMeteringReportRequest
   )(implicit
       errorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, (Timestamp, Option[Timestamp], Option[ApplicationId])] =
+  ): Either[StatusRuntimeException, (Timestamp, Option[Timestamp], Option[ApplicationId])] = {
     (for {
       protoFrom <- request.from.toRight("from date must be specified")
       from <- toTimestamp(protoFrom)
@@ -72,6 +72,7 @@ private[apiserver] final class ApiMeteringReportService(
           Ref.ApplicationId.fromString(t).map(Some.apply)
         )
     } yield (from, to, applicationId)).left.map(ValidationErrors.invalidArgument)
+  }
 
   private def generateReport(
       request: GetMeteringReportRequest,
@@ -81,10 +82,11 @@ private[apiserver] final class ApiMeteringReportService(
       reportData: ReportData,
   )(implicit
       errorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, GetMeteringReportResponse] =
+  ): Either[StatusRuntimeException, GetMeteringReportResponse] = {
     generator.generate(request, from, to, applicationId, reportData, clock()).left.map { e =>
       AdminServiceErrors.InternallyInvalidKey.Reject(e).asGrpcError
     }
+  }
 
   override def getMeteringReport(
       request: GetMeteringReportRequest
@@ -111,11 +113,13 @@ private[apiserver] final class ApiMeteringReportService(
 
 private[apiserver] object ApiMeteringReportService {
 
-  private def toOption(protoString: String): Option[String] =
+  private def toOption(protoString: String): Option[String] = {
     if (protoString.nonEmpty) Some(protoString) else None
+  }
 
-  def toProtoTimestamp(ts: Timestamp): ProtoTimestamp =
-    ts.toInstant.pipe(i => ProtoTimestamp.of(i.getEpochSecond, i.getNano))
+  def toProtoTimestamp(ts: Timestamp): ProtoTimestamp = {
+    ts.toInstant.pipe { i => ProtoTimestamp.of(i.getEpochSecond, i.getNano) }
+  }
 
   def toTimestamp(ts: ProtoTimestamp): Either[String, Timestamp] = {
     val utcTs =

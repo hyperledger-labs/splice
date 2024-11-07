@@ -3,11 +3,14 @@
 
 package com.digitalasset.canton.util
 
+import cats.syntax.either.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 
 import scala.concurrent.Future
 
 object EitherUtil {
+
+  def unit[A]: Either[A, Unit] = ().asRight[A]
 
   implicit class RichEither[L, R](val either: Either[L, R]) extends AnyVal {
 
@@ -48,4 +51,9 @@ object EitherUtil {
     def collectLeft: Iterable[L] = eithers.collect { case Left(value) => value }
     def collectRight: Iterable[R] = eithers.collect { case Right(value) => value }
   }
+
+  /** If `condition` is satisfied, return  `Right(())`, otherwise, return `Left(fail)`.
+    */
+  def condUnitE[L](condition: Boolean, fail: => L): Either[L, Unit] =
+    Either.cond(condition, (), fail)
 }

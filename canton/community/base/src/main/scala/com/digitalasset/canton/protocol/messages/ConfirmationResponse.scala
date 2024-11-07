@@ -126,7 +126,7 @@ case class ConfirmationResponse private (
       getCryptographicEvidence
     )
 
-  override protected def pretty: Pretty[this.type] =
+  override def pretty: Pretty[this.type] =
     prettyOfClass(
       param("sender", _.sender),
       param("localVerdict", _.localVerdict),
@@ -144,7 +144,7 @@ object ConfirmationResponse
   override val name: String = "ConfirmationResponse"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ConfirmationResponse)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.ConfirmationResponse)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -262,9 +262,7 @@ object ConfirmationResponse
         .required("ConfirmationResponse.local_verdict", localVerdictPO)
         .flatMap(LocalVerdict.fromProtoV30)
       rootHash <- RootHash.fromProtoPrimitive(rootHashP)
-      confirmingParties <- confirmingPartiesP.traverse(
-        ProtoConverter.parseLfPartyId(_, "confirming_parties")
-      )
+      confirmingParties <- confirmingPartiesP.traverse(ProtoConverter.parseLfPartyId)
       domainId <- DomainId.fromProtoPrimitive(domainIdP, "domain_id")
       viewPositionO = viewPositionPO.map(ViewPosition.fromProtoV30)
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))

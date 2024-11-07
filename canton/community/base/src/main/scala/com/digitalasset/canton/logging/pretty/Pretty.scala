@@ -56,13 +56,14 @@ object Pretty extends ShowUtil with PrettyUtil with PrettyInstances {
 
     /** Yields a readable string representation based on a configurable [[pprint.PPrinter]].
       */
-    final def toPrettyString(pprinter: PPrinter = DefaultPprinter): String =
+    final def toPrettyString(pprinter: PPrinter = DefaultPprinter): String = {
       try {
         pprinter.copy(additionalHandlers = { case p: Tree => p })(toTree).toString
       } catch {
         case err: IllegalArgumentException =>
           ErrorUtil.messageWithStacktrace(err)
       }
+    }
 
     /** The tree representation of `value`.
       */

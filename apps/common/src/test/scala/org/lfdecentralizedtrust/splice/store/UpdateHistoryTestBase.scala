@@ -37,7 +37,7 @@ abstract class UpdateHistoryTestBase
   protected def create(
       domain: DomainId,
       contractId: String,
-      offset: Long,
+      offset: String,
       party: PartyId,
       store: UpdateHistory,
       txEffectiveAt: CantonTimestamp,
@@ -61,7 +61,7 @@ abstract class UpdateHistoryTestBase
       domainTo: DomainId,
       domainFrom: DomainId,
       contractId: String,
-      offset: Long,
+      offset: String,
       party: PartyId,
       counter: Long,
       reassignmentId: String,
@@ -90,7 +90,7 @@ abstract class UpdateHistoryTestBase
       domainFrom: DomainId,
       domainTo: DomainId,
       contractId: String,
-      offset: Long,
+      offset: String,
       party: PartyId,
       counter: Long,
       reassignmentId: String,
@@ -118,7 +118,7 @@ abstract class UpdateHistoryTestBase
   protected def createMulti(
       domain: DomainId,
       contractId: String,
-      offset: Long,
+      offset: String,
       party: PartyId,
       stores: Seq[UpdateHistory],
       txEffectiveAt: CantonTimestamp,
@@ -140,7 +140,7 @@ abstract class UpdateHistoryTestBase
 
   protected def validOffset(i: Int) = {
     assert(i > 0)
-    i.toLong
+    "%08d".format(i)
   }
 
   protected def time(i: Int): CantonTimestamp =

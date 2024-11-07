@@ -15,7 +15,6 @@ import com.digitalasset.canton.participant.sync.SyncServiceError.DomainRegistryE
 import com.digitalasset.canton.participant.topology.TopologyComponentFactory
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.client.RichSequencerClient
-import com.digitalasset.canton.sequencing.client.channel.SequencerChannelClient
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.tracing.TraceContext
@@ -40,7 +39,7 @@ object DomainRegistryError extends DomainRegistryErrorGroup {
 
   def fromSequencerInfoLoaderError(
       error: SequencerInfoLoaderError
-  )(implicit loggingContext: ErrorLoggingContext): DomainRegistryError =
+  )(implicit loggingContext: ErrorLoggingContext): DomainRegistryError = {
     error match {
       case SequencerInfoLoaderError.DeserializationFailure(cause) =>
         DomainRegistryError.DomainRegistryInternalError.DeserializationFailure(cause)
@@ -63,6 +62,7 @@ object DomainRegistryError extends DomainRegistryErrorGroup {
       case SequencerInfoLoaderError.InconsistentConnectivity(cause) =>
         DomainRegistryError.ConnectionErrors.FailedToConnectToSequencers.Error(cause)
     }
+  }
 
   object ConnectionErrors extends ErrorGroup() {
 
@@ -90,7 +90,7 @@ object DomainRegistryError extends DomainRegistryErrorGroup {
         extends ErrorCode(id = "DOMAIN_IS_NOT_AVAILABLE", ErrorCategory.TransientServerFailure) {
       final case class Error(alias: DomainAlias, reason: String)(implicit
           val loggingContext: ErrorLoggingContext
-      ) extends CantonError.Impl(cause = s"Cannot connect to domain $alias")
+      ) extends CantonError.Impl(cause = s"Cannot connect to domain ${alias}")
           with DomainRegistryError
     }
 
@@ -190,7 +190,7 @@ object DomainRegistryError extends DomainRegistryErrorGroup {
         ) {
       final case class Error(reason: String)(implicit val loggingContext: ErrorLoggingContext)
           extends CantonError.Impl(
-            cause = s"Can not auto-issue a domain-trust certificate on this node: $reason"
+            cause = s"Can not auto-issue a domain-trust certificate on this node: ${reason}"
           )
           with DomainRegistryError {}
     }
@@ -373,9 +373,6 @@ trait DomainHandle extends AutoCloseable {
 
   /** Client to the domain's sequencer. */
   def sequencerClient: RichSequencerClient
-
-  /** Client to the sequencer channel client. */
-  def sequencerChannelClientO: Option[SequencerChannelClient]
 
   def staticParameters: StaticDomainParameters
 

@@ -9,6 +9,7 @@ import com.daml.metrics.api.MetricName
 
 abstract class DatabaseMetricsFactory(prefix: MetricName, factory: LabeledMetricsFactory) {
 
-  protected def createDbMetrics(name: String): DatabaseMetrics =
+  protected def createDbMetrics(name: String): DatabaseMetrics = {
     new DatabaseMetrics(prefix :+ name, factory)
+  }
 }

@@ -23,7 +23,8 @@ object UpdatePath {
     parsedPathsResult
   }
 
-  private[update] def parseSingle(rawPath: String): Result[UpdatePath] =
+  private[update] def parseSingle(rawPath: String): Result[UpdatePath] = {
     Right(UpdatePath(rawPath.split('.').toList))
+  }
 
 }

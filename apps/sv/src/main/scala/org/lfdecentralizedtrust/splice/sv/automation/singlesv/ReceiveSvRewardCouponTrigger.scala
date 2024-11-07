@@ -105,8 +105,7 @@ class ReceiveSvRewardCouponTrigger(
         participantAdminConnection.listVettedPackages(pId, dsoRules.domain)
       }
     } yield {
-      val vettedPackagesPackageIds =
-        vettedPackages.flatMap(_.flatMap(_.item.packages.map(_.packageId)))
+      val vettedPackagesPackageIds = vettedPackages.flatMap(_.flatMap(_.item.packageIds))
       approvedVettedPackages.diff(vettedPackagesPackageIds).isEmpty
     }
   }

@@ -3,96 +3,107 @@
 
 package com.digitalasset.canton.tracing
 
-import cats.~>
+import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.concurrent.DirectExecutionContext
-import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.util.FutureUtil
 import com.github.blemale.scaffeine.{AsyncLoadingCache, Scaffeine}
 
 import scala.concurrent.{ExecutionContext, Future}
 
+private[tracing] final case class TracedKey[K](key: K)(val traceContext: TraceContext)
+
 object TracedScaffeine {
-  def buildTracedAsyncFuture[K, V](
+  def buildTracedAsyncFuture[K1, V1](
       cache: Scaffeine[Any, Any],
-      loader: TraceContext => K => Future[V],
-      allLoader: Option[TraceContext => Iterable[K] => Future[Map[K, V]]] = None,
+      loader: TraceContext => K1 => Future[V1],
+      allLoader: Option[TraceContext => Iterable[K1] => Future[Map[K1, V1]]] = None,
   )(
       tracedLogger: TracedLogger
-  )(implicit ec: ExecutionContext): TracedAsyncLoadingCache[Future, K, V] =
-    new TracedAsyncLoadingCache[Future, K, V](
-      cache.buildAsyncFuture[Traced[K], V](
-        loader = tracedKey => loader(tracedKey.traceContext)(tracedKey.unwrap),
-        allLoader = allLoader.map { tracedFunction => (tracedKeys: Iterable[Traced[K]]) =>
+  )(implicit ec: ExecutionContext): TracedAsyncLoadingCache[K1, V1] = {
+
+    new TracedAsyncLoadingCache[K1, V1](
+      cache.buildAsyncFuture[TracedKey[K1], V1](
+        loader = tracedKey => loader(tracedKey.traceContext)(tracedKey.key),
+        allLoader = allLoader.map { tracedFunction => (tracedKeys: Iterable[TracedKey[K1]]) =>
           {
             val traceContext = tracedKeys.headOption
               .map(_.traceContext)
               .getOrElse(TraceContext.empty)
-            val keys = tracedKeys.map(_.unwrap)
+            val keys = tracedKeys.map(_.key)
             tracedFunction(traceContext)(keys)
-              .map(_.map { case (key, value) => Traced(key)(traceContext) -> value })
+              .map(_.map { case (key, value) => TracedKey(key)(traceContext) -> value })
           }
         },
-      ),
-      tracedLogger,
-      // The Caffeine cache's getAll method wraps exceptions from the loader in a `CompletionException`.
-      // We should strip it here.
-      FutureUtil.unwrapCompletionExceptionK,
-    )
+      )
+    )(tracedLogger)
 
-  def buildTracedAsyncFutureUS[K, V](
+  }
+
+  def buildTracedAsyncFutureUS[K1, V1](
       cache: Scaffeine[Any, Any],
-      loader: TraceContext => K => FutureUnlessShutdown[V],
-      allLoader: Option[TraceContext => Iterable[K] => FutureUnlessShutdown[Map[K, V]]] = None,
+      loader: TraceContext => K1 => FutureUnlessShutdown[V1],
+      allLoader: Option[TraceContext => Iterable[K1] => FutureUnlessShutdown[Map[K1, V1]]] = None,
   )(
       tracedLogger: TracedLogger
-  )(implicit ec: ExecutionContext): TracedAsyncLoadingCache[FutureUnlessShutdown, K, V] =
-    new TracedAsyncLoadingCache[FutureUnlessShutdown, K, V](
-      cache.buildAsyncFuture[Traced[K], V](
-        loader = _.withTraceContext(loader)
-          .failOnShutdownToAbortException("TracedAsyncLoadingCache-loader"),
-        allLoader = allLoader.map { tracedFunction => (tracedKeys: Iterable[Traced[K]]) =>
+  )(implicit ec: ExecutionContext): TracedAsyncLoadingCache[K1, V1] = {
+
+    new TracedAsyncLoadingCache[K1, V1](
+      cache.buildAsyncFuture[TracedKey[K1], V1](
+        loader = tracedKey =>
+          loader(tracedKey.traceContext)(tracedKey.key)
+            .failOnShutdownToAbortException("TracedAsyncLoadingCache-loader"),
+        allLoader = allLoader.map { tracedFunction => (tracedKeys: Iterable[TracedKey[K1]]) =>
           {
-            val traceContext = TraceContext.ofBatch(tracedKeys)(tracedLogger)
-            val keys = tracedKeys.map(_.unwrap)
+            val traceContext = tracedKeys.headOption
+              .map(_.traceContext)
+              .getOrElse(TraceContext.empty)
+            val keys = tracedKeys.map(_.key)
             tracedFunction(traceContext)(keys)
-              .map(_.map { case (key, value) => Traced(key)(traceContext) -> value })
+              .map(_.map { case (key, value) => TracedKey(key)(traceContext) -> value })
           }.failOnShutdownToAbortException("TracedAsyncLoadingCache-allLoader")
         },
-      ),
-      tracedLogger,
-      // The Caffeine cache's getAll method wraps exceptions from the loader in a `CompletionException`.
-      // We should strip it here.
-      FutureUnlessShutdown.recoverFromAbortExceptionK.compose(FutureUtil.unwrapCompletionExceptionK),
-    )
+      )
+    )(tracedLogger)
 
+  }
 }
 
-class TracedAsyncLoadingCache[F[_], K, V] private[tracing] (
-    underlying: AsyncLoadingCache[Traced[K], V],
-    tracedLogger: TracedLogger,
-    postProcess: Future ~> F,
-) {
+class TracedAsyncLoadingCache[K, V](
+    underlying: AsyncLoadingCache[TracedKey[K], V]
+)(tracedLogger: TracedLogger) {
   implicit private[this] val ec: ExecutionContext = DirectExecutionContext(tracedLogger)
 
-  /** @see com.github.blemale.scaffeine.AsyncLoadingCache.get
-    */
-  def get(key: K)(implicit traceContext: TraceContext): F[V] =
-    postProcess(underlying.get(Traced(key)(traceContext)))
+  /*
+   * See com.github.blemale.scaffeine.AsyncLoadingCache.get
+   * If shutting down the future returned will be failed with a AbortedDueToShutdownException
+   */
+  def get(key: K)(implicit traceContext: TraceContext): Future[V] =
+    underlying.get(TracedKey(key)(traceContext))
 
-  /** @see com.github.blemale.scaffeine.AsyncLoadingCache.getAll
-    */
-  def getAll(keys: Iterable[K])(implicit traceContext: TraceContext): F[Map[K, V]] =
-    postProcess(
-      underlying
-        .getAll(keys.map(Traced(_)(traceContext)))
-        .map(_.map { case (tracedKey, value) => tracedKey.unwrap -> value })(ec)
-    )
+  // Remove those mappings for which the predicate p returns true
+  def clear(filter: (K, V) => Boolean): Unit = {
+    discard(underlying.synchronous().asMap().filterInPlace((t, v) => !filter(t.key, v)))
+  }
 
-  /** Remove those mappings for which the predicate `filter` returns true */
-  def clear(filter: (K, V) => Boolean): Unit =
-    underlying.synchronous().asMap().filterInPlace((t, v) => !filter(t.unwrap, v)).discard
+  def getUS(key: K)(implicit traceContext: TraceContext): FutureUnlessShutdown[V] =
+    FutureUnlessShutdown.transformAbortedF(get(key))
+
+  /*
+   * See com.github.blemale.scaffeine.AsyncLoadingCache.getAll
+   * If shutting down the future returned will be failed with a AbortedDueToShutdownException wrapped inside
+   * a java.util.concurrent.CompletionException
+   */
+  def getAll(keys: Iterable[K])(implicit traceContext: TraceContext): Future[Map[K, V]] =
+    underlying
+      .getAll(keys.map(TracedKey(_)(traceContext)))
+      .map(_.map { case (tracedKey, value) => tracedKey.key -> value })(ec)
+
+  def getAllUS(
+      keys: Iterable[K]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[K, V]] = {
+    FutureUnlessShutdown.transformAbortedF(getAll(keys))
+  }
 
   override def toString = s"TracedAsyncLoadingCache($underlying)"
 }

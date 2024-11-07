@@ -49,6 +49,7 @@ trait NavigatorModelAliases[Cid] {
 
   /** A user-defined Daml-LF type (generic form). Can be a record or variant. */
   type DamlLfDefDataType = typesig.DefDataType.FWT
+  val DamlLfDefDataType = typesig.DefDataType
 
   type DamlLfTypeLookup = DamlLfIdentifier => Option[DamlLfDefDataType]
 
@@ -65,7 +66,13 @@ trait NavigatorModelAliases[Cid] {
   val DamlLfEnum = typesig.Enum
 
   type ApiValue = V
+  type ApiRecordField = (Option[DamlLfRef.Name], ApiValue)
   type ApiRecord = V.ValueRecord
+  type ApiVariant = V.ValueVariant
+  type ApiList = V.ValueList
+  type ApiOptional = V.ValueOptional
+  type ApiMap = V.ValueTextMap
+  type ApiGenMap = V.ValueGenMap
 }
 
 object NavigatorModelAliases extends NavigatorModelAliases[String]

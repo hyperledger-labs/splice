@@ -58,8 +58,6 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
         - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
-        - name: SPLICE_APP_UI_POLL_INTERVAL
-          value: {{ .Values.uiPollInterval | quote }}
         ports:
         - containerPort: 80
           name: http

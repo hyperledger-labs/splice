@@ -4,8 +4,8 @@
 package com.digitalasset.canton.health
 
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.MetricName
 import com.daml.metrics.grpc.GrpcServerMetrics
-import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.lifecycle.Lifecycle.toCloseableServer
@@ -32,13 +32,13 @@ class GrpcHealthServer(
   private val server = CantonServerBuilder
     .forConfig(
       config,
-      None,
+      MetricName.Daml :+ "health",
+      metrics,
       executor,
       loggerFactory,
       apiConfig,
       tracingConfig,
       grpcMetrics,
-      NoOpTelemetry,
     )
     .addService(ProtoReflectionService.newInstance(), withLogging = false)
     .addService(healthManager.getHealthService.bindService())
@@ -47,11 +47,12 @@ class GrpcHealthServer(
 
   private val closeable = toCloseableServer(server, logger, "HealthServer")
 
-  private def setStatus(serviceName: String, status: ServingStatus): Unit =
+  private def setStatus(serviceName: String, status: ServingStatus): Unit = {
     healthManager.setStatus(
       serviceName,
       status,
     )
+  }
 
   override def onClosed(): Unit = {
     healthManager.enterTerminalState()

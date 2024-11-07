@@ -3,12 +3,10 @@
 
 package com.digitalasset.canton.domain.sequencing.sequencer
 
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.{CachingConfigs, DefaultProcessingTimeouts}
+import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer as CantonSequencer
-import com.digitalasset.canton.domain.sequencing.sequencer.store.SequencerStore
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.MemoryStorage
@@ -16,7 +14,7 @@ import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.*
 import org.apache.pekko.stream.Materializer
 
-// TODO(#16087) Re-enabled when Database sequencer is revived
+// TODO(#18423) reenable this test once DB sequencer works with implicit member registration
 abstract class DatabaseSequencerApiTest extends SequencerApiTest {
 
   def createSequencer(
@@ -35,32 +33,19 @@ abstract class DatabaseSequencerApiTest extends SequencerApiTest {
     // problems when we Await on the AsyncClosable for done while scheduled watermarks are
     // still being processed (that then causes a deadlock as the completed signal can never be
     // passed downstream)
-    val dbConfig = TestDatabaseSequencerConfig()
-    val storage = new MemoryStorage(loggerFactory, timeouts)
-    val sequencerStore = SequencerStore(
-      storage,
-      testedProtocolVersion,
-      maxBufferedEventsSize = NonNegativeInt.tryCreate(1000),
-      timeouts = timeouts,
-      loggerFactory = loggerFactory,
-      sequencerMember = sequencerId,
-      blockSequencerMode = false,
-      cachingConfigs = CachingConfigs(),
-    )
     DatabaseSequencer.single(
-      dbConfig,
+      TestDatabaseSequencerConfig(),
       None,
       DefaultProcessingTimeouts.testing,
-      storage,
-      sequencerStore,
+      new MemoryStorage(loggerFactory, timeouts),
       clock,
       domainId,
       sequencerId,
       testedProtocolVersion,
       crypto,
-      CachingConfigs(),
       metrics,
       loggerFactory,
+      unifiedSequencer = testedUseUnifiedSequencer,
       runtimeReady = FutureUnlessShutdown.unit,
     )(executorService, tracer, materializer)
   }

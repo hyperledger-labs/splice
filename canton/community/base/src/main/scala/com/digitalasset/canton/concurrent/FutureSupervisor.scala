@@ -33,7 +33,8 @@ trait FutureSupervisor {
       warnAfter: Duration = 10.seconds,
       logLevel: Level = Level.WARN,
   )(fut: Future[T])(implicit
-      errorLoggingContext: ErrorLoggingContext
+      errorLoggingContext: ErrorLoggingContext,
+      executionContext: ExecutionContext,
   ): Future[T]
   def supervisedUS[T](
       description: => String,
@@ -42,7 +43,8 @@ trait FutureSupervisor {
   )(
       fut: FutureUnlessShutdown[T]
   )(implicit
-      errorLoggingContext: ErrorLoggingContext
+      errorLoggingContext: ErrorLoggingContext,
+      executionContext: ExecutionContext,
   ): FutureUnlessShutdown[T] = FutureUnlessShutdown(
     supervised(description, warnAfter, logLevel)(fut.unwrap)
   )
@@ -55,8 +57,11 @@ object FutureSupervisor {
         description: => String,
         warnAfter: Duration,
         logLevel: Level = Level.WARN,
-    )(fut: Future[T])(implicit
-        errorLoggingContext: ErrorLoggingContext
+    )(
+        fut: Future[T]
+    )(implicit
+        errorLoggingContext: ErrorLoggingContext,
+        executionContext: ExecutionContext,
     ): Future[T] = fut
   }
 
@@ -100,10 +105,11 @@ object FutureSupervisor {
         level: Level,
         elc: ErrorLoggingContext,
         exception: Option[Throwable] = None,
-    ): Unit =
+    ): Unit = {
       exception
         .map(LoggerUtil.logThrowableAtLevel(level, message, _)(elc))
         .getOrElse(LoggerUtil.logAtLevel(level, message)(elc))
+    }
 
     private def checkSlow(): Unit = {
       val now = System.nanoTime()
@@ -121,12 +127,11 @@ object FutureSupervisor {
         warnAfter: Duration = defaultWarningInterval.duration,
         logLevel: Level = Level.WARN,
     )(fut: Future[T])(implicit
-        errorLoggingContext: ErrorLoggingContext
-    ): Future[T] =
-      // If the future has already completed, there's no point in supervising it in the first place
-      if (fut.isCompleted) fut
-      else {
-        val itm = ScheduledFuture(
+        errorLoggingContext: ErrorLoggingContext,
+        executionContext: ExecutionContext,
+    ): Future[T] = {
+      val itm =
+        ScheduledFuture(
           fut,
           () => description,
           startNanos = System.nanoTime(),
@@ -134,29 +139,24 @@ object FutureSupervisor {
           errorLoggingContext,
           logLevel,
         )
-        scheduled.updateAndGet(x => x.filterNot(_.fut.isCompleted) :+ itm)
-
-        // Use the direct execution context so that the supervision follow-up steps doesn't affect task-based scheduling
-        // because the follow-up is run on the future itself.
-        implicit val directExecutionContext: ExecutionContext =
-          new DirectExecutionContext(errorLoggingContext.noTracingLogger)
-        fut.thereafter {
-          case Success(_) =>
-            val time = elapsed(itm)
-            if (time > warnAfter) {
-              errorLoggingContext.info(
-                s"$description succeed successfully but slow after $time"
-              )
-            }
-          case Failure(exception) =>
-            log(
-              s"$description failed with exception after ${elapsed(itm)}",
-              logLevel,
-              errorLoggingContext,
-              Some(exception),
+      scheduled.updateAndGet(x => x.filterNot(_.fut.isCompleted) :+ itm)
+      fut.thereafter {
+        case Failure(exception) =>
+          log(
+            s"$description failed with exception after ${elapsed(itm)}",
+            logLevel,
+            errorLoggingContext,
+            Some(exception),
+          )
+        case Success(_) =>
+          val time = elapsed(itm)
+          if (time > warnAfter) {
+            errorLoggingContext.info(
+              s"${description} succeed successfully but slow after $time"
             )
-        }
+          }
       }
+    }
 
     private def elapsed(item: ScheduledFuture): Duration = {
       val dur = Duration.fromNanos(System.nanoTime() - item.startNanos)

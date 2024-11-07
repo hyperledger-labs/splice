@@ -22,7 +22,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   ServerEnforcedTimeout,
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
-import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -118,7 +118,7 @@ abstract class AppConnection(
   )(implicit traceContext: TraceContext): Future[Result] = {
     val dso =
       cmd
-        .createServiceInternal(channel.channel)
+        .createService(channel.channel)
         .withInterceptors(
           new ApiClientRequestLogger(
             loggerFactory,
@@ -149,11 +149,11 @@ abstract class AppConnection(
     }
 
     for {
-      req <- toFuture(cmd.createRequestInternal())
+      req <- toFuture(cmd.createRequest())
       response <- TraceContextGrpc.withGrpcContext(traceContext)(
-        cmd.submitRequestInternal(withDeadline, req)
+        cmd.submitRequest(withDeadline, req)
       )
-      result <- toFuture(cmd.handleResponseInternal(response))
+      result <- toFuture(cmd.handleResponse(response))
     } yield result
   }
 

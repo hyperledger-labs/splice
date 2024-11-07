@@ -1156,9 +1156,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
         val goodMember = ParticipantId("good", namespace)
         val badMember = MediatorId(UniqueIdentifier.tryCreate("bad", namespace))
-        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, dummyDomain, n.toLong))
-        val badContracts = (4 to 6).map(n => memberTraffic(badMember, dummyDomain, n.toLong)) ++
-          (7 to 9).map(n => memberTraffic(goodMember, dummy2Domain, n.toLong))
+        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, n.toLong))
+        val badContracts = (4 to 6).map(n => memberTraffic(badMember, n.toLong))
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(
@@ -1182,9 +1181,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
         val goodMember = ParticipantId("good", namespace)
         val badMember = MediatorId(UniqueIdentifier.tryCreate("bad", namespace))
-        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, dummyDomain, n.toLong))
-        val badContracts = (4 to 6).map(n => memberTraffic(badMember, dummyDomain, n.toLong)) ++
-          (7 to 9).map(n => memberTraffic(goodMember, dummy2Domain, n.toLong))
+        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, n.toLong))
+        val badContracts = (4 to 6).map(n => memberTraffic(badMember, n.toLong))
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(
@@ -1224,44 +1222,6 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       }
     }
 
-    "listExpiredTransferPreapprovals" should {
-
-      "return all expired transfer pre-approvals" in {
-        val expired = (1 to 3).map(n =>
-          transferPreapproval(
-            userParty(n),
-            providerParty(n),
-            time(0),
-            expiresAt = time(n.toLong),
-          )
-        )
-        val notExpired =
-          (4 to 6).map(n =>
-            transferPreapproval(
-              userParty(n),
-              providerParty(n),
-              time(0),
-              expiresAt = time(n.toLong),
-            )
-          )
-        for {
-          store <- mkStore()
-          _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          result <- store.listExpiredTransferPreapprovals(
-            time(4),
-            PageLimit.tryCreate(100),
-          )(
-            traceContext
-          )
-        } yield {
-          val contracts = result.map(_.contract)
-          contracts should contain theSameElementsAs expired
-        }
-      }
-
-    }
   }
 
   lazy val addUser667Action = new ARC_DsoRules(
@@ -1336,7 +1296,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
     )
     contract(
-      Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID,
+      Confirmation.TEMPLATE_ID,
       new Confirmation.ContractId(validContractId(n)),
       template,
     )
@@ -1371,7 +1331,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+      DsoRules.TEMPLATE_ID,
       new DsoRules.ContractId(validContractId(1)),
       template,
     )
@@ -1386,11 +1346,11 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def memberTraffic(member: Member, domainId: DomainId, totalPurchased: Long) = {
+  private def memberTraffic(member: Member, totalPurchased: Long) = {
     val template = new MemberTraffic(
       dsoParty.toProtoPrimitive,
       member.toProtoPrimitive,
-      domainId.toProtoPrimitive,
+      dummyDomain.toProtoPrimitive,
       domainMigrationId,
       totalPurchased,
       1,
@@ -1399,7 +1359,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID,
+      MemberTraffic.TEMPLATE_ID,
       new MemberTraffic.ContractId(nextCid()),
       template,
     )
@@ -1415,7 +1375,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
+      ElectionRequest.TEMPLATE_ID,
       new ElectionRequest.ContractId(nextCid()),
       template,
     )
@@ -1436,7 +1396,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID,
+      AnsEntry.TEMPLATE_ID,
       new AnsEntry.ContractId(nextCid()),
       template,
     )
@@ -1453,7 +1413,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID,
+      AnsEntryContext.TEMPLATE_ID,
       new AnsEntryContext.ContractId(validContractId(n, "cc")),
       template,
     )
@@ -1464,7 +1424,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       nextPaymentDueAt: Instant,
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
+    val templateId = SubscriptionIdleState.TEMPLATE_ID
     val template = new SubscriptionIdleState(
       new Subscription.ContractId(validContractId(n, "aa")),
       new SubscriptionData(
@@ -1507,7 +1467,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      SvOnboardingRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
+      SvOnboardingRequest.TEMPLATE_ID,
       new SvOnboardingRequest.ContractId(nextCid()),
       template,
     )
@@ -1530,7 +1490,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      SvOnboardingConfirmed.TEMPLATE_ID_WITH_PACKAGE_ID,
+      SvOnboardingConfirmed.TEMPLATE_ID,
       new SvOnboardingConfirmed.ContractId(nextCid()),
       template,
     )
@@ -1600,7 +1560,7 @@ class DbSvDsoStoreTest
         )
         _ <- dummyDomain.exercise(
           contract = dsoRules(),
-          interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
+          interfaceId = Some(DsoRules.TEMPLATE_ID),
           choiceName = DsoRulesCloseVoteRequest.choice.name,
           mkCloseVoteRequest(
             voteRequestContract1.contractId
@@ -1621,7 +1581,7 @@ class DbSvDsoStoreTest
         )
         _ <- dummyDomain.exercise(
           contract = dsoRules(),
-          interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
+          interfaceId = Some(DsoRules.TEMPLATE_ID),
           choiceName = DsoRulesCloseVoteRequest.choice.name,
           mkCloseVoteRequest(
             voteRequestContract2.contractId

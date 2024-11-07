@@ -8,15 +8,20 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
-import com.digitalasset.canton.domain.block.data.SequencerBlockStore
+import com.digitalasset.canton.domain.block.data.{BlockEphemeralState, SequencerBlockStore}
 import com.digitalasset.canton.domain.block.{BlockSequencerStateManager, UninitializedBlockHeight}
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
-import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.domain.sequencing.sequencer.DatabaseSequencerConfig.TestingInterceptor
 import com.digitalasset.canton.domain.sequencing.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
   SequencerRateLimitManager,
   SequencerTrafficConfig,
+}
+import com.digitalasset.canton.domain.sequencing.sequencer.{
+  DatabaseSequencerFactory,
+  Sequencer,
+  SequencerHealthConfig,
+  SequencerInitialState,
 }
 import com.digitalasset.canton.domain.sequencing.traffic.store.{
   TrafficConsumedStore,
@@ -45,7 +50,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 abstract class BlockSequencerFactory(
     health: Option[SequencerHealthConfig],
-    blockSequencerConfig: BlockSequencerConfig,
     storage: Storage,
     protocolVersion: ProtocolVersion,
     sequencerId: SequencerId,
@@ -54,23 +58,20 @@ abstract class BlockSequencerFactory(
     testingInterceptor: Option[TestingInterceptor],
     metrics: SequencerMetrics,
 )(implicit ec: ExecutionContext)
-    extends DatabaseSequencerFactory(
-      blockSequencerConfig.toDatabaseSequencerConfig,
-      storage,
-      nodeParameters.cachingConfigs,
-      nodeParameters.processingTimeouts,
-      protocolVersion,
-      sequencerId,
-      blockSequencerMode = true,
-    )
+    extends DatabaseSequencerFactory(storage, nodeParameters.processingTimeouts, protocolVersion)
     with NamedLogging {
 
   private val store = SequencerBlockStore(
     storage,
     protocolVersion,
-    sequencerStore,
     nodeParameters.processingTimeouts,
+    nodeParameters.enableAdditionalConsistencyChecks,
+    // Block sequencer invariant checks will fail in unified sequencer mode
+    checkedInvariant = Option.when(
+      nodeParameters.enableAdditionalConsistencyChecks && !nodeParameters.useUnifiedSequencer
+    )(sequencerId),
     loggerFactory,
+    unifiedSequencer = nodeParameters.useUnifiedSequencer,
   )
 
   private val trafficPurchasedStore = TrafficPurchasedStore(
@@ -106,7 +107,6 @@ abstract class BlockSequencerFactory(
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
       initialBlockHeight: Option[Long],
-      sequencerSnapshot: Option[SequencerSnapshot],
       domainLoggerFactory: NamedLoggerFactory,
       runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
@@ -119,19 +119,20 @@ abstract class BlockSequencerFactory(
       snapshot: SequencerInitialState,
       sequencerId: SequencerId,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Unit] = {
-    logger.debug(s"Storing sequencers initial state: $snapshot")
+    val initialBlockState = BlockEphemeralState.fromSequencerInitialState(snapshot)
+    logger.debug(s"Storing sequencers initial state: $initialBlockState")
     for {
       _ <- super[DatabaseSequencerFactory].initialize(
         snapshot,
         sequencerId,
       ) // Members are stored in the DBS
       _ <- EitherT.right(
-        store.setInitialState(snapshot, snapshot.initialTopologyEffectiveTimestamp)
+        store.setInitialState(initialBlockState, snapshot.initialTopologyEffectiveTimestamp)
       )
       _ <- EitherT.right(
         snapshot.snapshot.trafficPurchased.parTraverse_(trafficPurchasedStore.store)
       )
-      _ <- EitherT.right(trafficConsumedStore.store(snapshot.snapshot.trafficConsumed))
+      _ <- EitherT.right(snapshot.snapshot.trafficConsumed.parTraverse_(trafficConsumedStore.store))
       _ = logger.debug(
         s"from snapshot: ticking traffic purchased entry manager with ${snapshot.latestSequencerEventTimestamp}"
       )
@@ -149,7 +150,7 @@ abstract class BlockSequencerFactory(
       domainSyncCryptoApi: DomainSyncCryptoClient,
       protocolVersion: ProtocolVersion,
       trafficConfig: SequencerTrafficConfig,
-  ): SequencerRateLimitManager =
+  ): SequencerRateLimitManager = {
     new EnterpriseSequencerRateLimitManager(
       trafficPurchasedManager,
       trafficConsumedStore,
@@ -161,6 +162,7 @@ abstract class BlockSequencerFactory(
       trafficConfig,
       eventCostCalculator = new EventCostCalculator(loggerFactory),
     )
+  }
 
   override final def create(
       domainId: DomainId,
@@ -171,8 +173,8 @@ abstract class BlockSequencerFactory(
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
       runtimeReady: FutureUnlessShutdown[Unit],
-      sequencerSnapshot: Option[SequencerSnapshot] = None,
   )(implicit
+      ec: ExecutionContext,
       traceContext: TraceContext,
       tracer: trace.Tracer,
       actorMaterializer: Materializer,
@@ -215,18 +217,24 @@ abstract class BlockSequencerFactory(
 
     val domainLoggerFactory = loggerFactory.append("domainId", domainId.toString)
 
-    val stateManager = BlockSequencerStateManager(
+    val stateManagerF = BlockSequencerStateManager(
       protocolVersion,
       domainId,
       sequencerId,
       store,
-      trafficConsumedStore,
       nodeParameters.enableAdditionalConsistencyChecks,
       nodeParameters.processingTimeouts,
       domainLoggerFactory,
+      nodeParameters.useUnifiedSequencer,
     )
 
-    balanceManager.initialize.map { _ =>
+    for {
+      _ <- balanceManager.initialize
+      stateManager <- stateManagerF
+    } yield {
+      logger.info(
+        s"Creating block sequencer with unified mode set to: ${nodeParameters.useUnifiedSequencer}"
+      )
       val sequencer = createBlockSequencer(
         name,
         domainId,
@@ -243,7 +251,6 @@ abstract class BlockSequencerFactory(
         rateLimitManager,
         orderingTimeFixMode,
         initialBlockHeight,
-        sequencerSnapshot,
         domainLoggerFactory,
         runtimeReady,
       )
@@ -253,8 +260,9 @@ abstract class BlockSequencerFactory(
     }
   }
 
-  override def onClosed(): Unit =
+  override def onClosed(): Unit = {
     Lifecycle.close(store)(logger)
+  }
 }
 
 object BlockSequencerFactory {

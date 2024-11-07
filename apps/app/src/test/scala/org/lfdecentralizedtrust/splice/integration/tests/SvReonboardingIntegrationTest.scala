@@ -28,11 +28,11 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 }
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.config.MigrateValidatorPartyConfig
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.health.admin.data.{NodeStatus, WaitingForId}
 
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.*

@@ -5,11 +5,8 @@ package com.digitalasset.canton.crypto.store
 
 import cats.data.EitherT
 import cats.syntax.functor.*
-import cats.syntax.parallel.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.crypto.KeyPurpose.{Encryption, Signing}
-import com.digitalasset.canton.crypto.SigningKeyUsage.nonEmptyIntersection
 import com.digitalasset.canton.crypto.store.db.StoredPrivateKey
 import com.digitalasset.canton.crypto.{
   EncryptionPrivateKey,
@@ -17,7 +14,6 @@ import com.digitalasset.canton.crypto.{
   KeyName,
   KeyPurpose,
   PrivateKey,
-  SigningKeyUsage,
   SigningPrivateKey,
 }
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -46,7 +42,7 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
 
   // Cached values for keys and secret
   protected val signingKeyMap: TrieMap[Fingerprint, SigningPrivateKeyWithName] = TrieMap.empty
-  private val decryptionKeyMap: TrieMap[Fingerprint, EncryptionPrivateKeyWithName] = TrieMap.empty
+  protected val decryptionKeyMap: TrieMap[Fingerprint, EncryptionPrivateKeyWithName] = TrieMap.empty
 
   // Write methods that the underlying store has to implement.
   private[crypto] def writePrivateKey(
@@ -79,12 +75,13 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
 
   def storePrivateKey(key: PrivateKey, name: Option[KeyName])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit] = {
     (key: @unchecked) match {
       case signingPrivateKey: SigningPrivateKey => storeSigningKey(signingPrivateKey, name)
       case encryptionPrivateKey: EncryptionPrivateKey =>
         storeDecryptionKey(encryptionPrivateKey, name)
     }
+  }
 
   def exportPrivateKey(keyId: Fingerprint)(implicit
       traceContext: TraceContext
@@ -187,17 +184,6 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
         }
     } yield ()
 
-  def filterSigningKeys(
-      signingKeyIds: Seq[Fingerprint],
-      filterUsage: NonEmpty[Set[SigningKeyUsage]],
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Seq[Fingerprint]] =
-    for {
-      signingKeys <- signingKeyIds.parTraverse(signingKey(_)).map(_.flatten)
-      filteredSigningKeys = signingKeys.filter(key => nonEmptyIntersection(key.usage, filterUsage))
-    } yield filteredSigningKeys.map(_.id)
-
   def existsSigningKey(signingKeyId: Fingerprint)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Boolean] =
@@ -205,7 +191,7 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
 
   private[crypto] def decryptionKey(encryptionKeyId: Fingerprint)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[EncryptionPrivateKey]] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[EncryptionPrivateKey]] = {
     retrieveAndUpdateCache(
       decryptionKeyMap,
       keyFingerprint =>
@@ -215,6 +201,7 @@ trait CryptoPrivateStoreExtended extends CryptoPrivateStore { this: NamedLogging
           (privateKey, name) => EncryptionPrivateKeyWithName(privateKey, name),
         )(keyFingerprint),
     )(encryptionKeyId)
+  }
 
   private[crypto] def storeDecryptionKey(
       key: EncryptionPrivateKey,

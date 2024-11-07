@@ -6,6 +6,7 @@ syntax = "proto3";
 package com.digitalasset.canton.admin.domain.v30;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 import "scalapb/scalapb.proto";
 
 message SequencerConnection {
@@ -20,7 +21,7 @@ message SequencerConnection {
     repeated string connections = 1;
     // Should the connection use TLS?
     bool transportSecurity = 2;
-    optional bytes customTrustCertificates = 3;
+    google.protobuf.BytesValue customTrustCertificates = 3;
   }
 }
 

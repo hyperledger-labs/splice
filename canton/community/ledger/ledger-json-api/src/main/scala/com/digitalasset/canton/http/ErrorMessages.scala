@@ -3,6 +3,8 @@
 
 package com.digitalasset.canton.http
 
+import scalaz.syntax.tag.*
+
 object ErrorMessages {
   def cannotResolveTemplateId(t: domain.ContractTypeId[_]): String =
     s"Cannot resolve template ID, given: ${t.toString}"
@@ -12,4 +14,11 @@ object ErrorMessages {
 
   def cannotResolveTemplateId(a: domain.ContractLocator[_]): String =
     s"Cannot resolve templateId, given: $a"
+
+  def cannotResolvePayloadType(t: domain.ContractTypeId[_]): String =
+    s"Cannot resolve payload type, given: ${t.toString}"
+
+  def cannotResolveChoiceArgType(t: domain.ContractTypeId[_], c: domain.Choice): String =
+    s"Cannot resolve choice argument type, given: ${t.toString}, ${c.unwrap}"
+
 }

@@ -4,14 +4,11 @@
 package com.digitalasset.canton.platform.store.backend.common
 
 import anorm.RowParser
-import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
-  Entry,
-  RawArchivedEvent,
-  RawCreatedEvent,
-  RawFlatEvent,
-}
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.backend.common.SimpleSqlExtensions.*
+import com.digitalasset.canton.platform.store.dao.events.Raw
+import com.digitalasset.canton.platform.store.dao.events.Raw.FlatEvent
 import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.daml.lf.data.Ref.Party
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -19,7 +16,10 @@ import com.digitalasset.daml.lf.value.Value.ContractId
 import java.sql.Connection
 import scala.annotation.tailrec
 
-class EventReaderQueries(stringInterning: StringInterning) {
+class EventReaderQueries(
+    queryStrategy: QueryStrategy,
+    stringInterning: StringInterning,
+) {
   import EventStorageBackendTemplate.*
 
   type EventSequentialId = Long
@@ -32,7 +32,7 @@ class EventReaderQueries(stringInterning: StringInterning) {
       endEventSequentialId: EventSequentialId,
   )(
       connection: Connection
-  ): Vector[Entry[RawFlatEvent]] = {
+  ): Vector[EventStorageBackend.Entry[Raw.FlatEvent]] = {
 
     val witnessesColumn = "flat_event_witnesses"
 
@@ -40,12 +40,12 @@ class EventReaderQueries(stringInterning: StringInterning) {
       SelectTable(
         tableName = "lapi_events_create",
         selectColumns =
-          s"$selectColumnsForFlatTransactionsCreate, ${QueryStrategy.constBooleanSelect(false)} as exercise_consuming",
+          s"$selectColumnsForFlatTransactionsCreate, ${queryStrategy.constBooleanSelect(false)} as exercise_consuming",
       ),
       SelectTable(
         tableName = "lapi_events_consuming_exercise",
         selectColumns =
-          s"$selectColumnsForFlatTransactionsExercise, ${QueryStrategy.constBooleanSelect(true)} as exercise_consuming",
+          s"$selectColumnsForFlatTransactionsExercise, ${queryStrategy.constBooleanSelect(true)} as exercise_consuming",
       ),
     )
 
@@ -93,12 +93,12 @@ class EventReaderQueries(stringInterning: StringInterning) {
       maxIterations: Int,
   )(
       conn: Connection
-  ): (Option[Entry[RawCreatedEvent]], Option[EventSequentialId]) = {
+  ): (Option[EventStorageBackend.Entry[FlatEvent.Created]], Option[EventSequentialId]) = {
 
     @tailrec def go(
         endExclusiveSeqId: EventSequentialId,
         iterations: Int,
-    ): (Option[Entry[RawCreatedEvent]], Option[EventSequentialId]) = {
+    ): (Option[EventStorageBackend.Entry[FlatEvent.Created]], Option[EventSequentialId]) = {
       val query =
         SQL"""
         WITH max_event AS (
@@ -107,16 +107,16 @@ class EventReaderQueries(stringInterning: StringInterning) {
             WHERE c.create_key_hash = $keyHash
             AND c.event_sequential_id < $endExclusiveSeqId)
         SELECT  #$selectColumnsForFlatTransactionsCreate,
-                #${QueryStrategy.constBooleanSelect(false)} exercise_consuming,
+                #${queryStrategy.constBooleanSelect(false)} exercise_consuming,
                 flat_event_witnesses event_witnesses,
                 command_id
         FROM max_event
         JOIN lapi_events_create c on c.event_sequential_id = max_event.sequential_id
       """
-      query.as(createdEventParser(Some(intRequestingParties), stringInterning).singleOpt)(
+      query.as(createdFlatEventParser(Some(intRequestingParties), stringInterning).singleOpt)(
         conn
       ) match {
-        case Some(c) if c.event.witnessParties.exists(extRequestingParties) =>
+        case Some(c) if c.event.stakeholders.exists(extRequestingParties) =>
           (Some(c), Some(c.eventSequentialId))
         case Some(c) if iterations >= maxIterations => (None, Some(c.eventSequentialId))
         case Some(c) => go(c.eventSequentialId, iterations + 1)
@@ -128,17 +128,17 @@ class EventReaderQueries(stringInterning: StringInterning) {
 
   private def selectArchivedEvent(contractId: String, intRequestingParties: Set[Int])(
       conn: Connection
-  ): Option[Entry[RawArchivedEvent]] = {
+  ): Option[EventStorageBackend.Entry[FlatEvent.Archived]] = {
     val query =
       SQL"""
           SELECT  #$selectColumnsForFlatTransactionsExercise,
-                  #${QueryStrategy.constBooleanSelect(true)} exercise_consuming,
+                  #${queryStrategy.constBooleanSelect(true)} exercise_consuming,
                   flat_event_witnesses event_witnesses,
                   command_id
           FROM lapi_events_consuming_exercise
           WHERE contract_id = $contractId
         """
-    query.as(archivedEventParser(Some(intRequestingParties), stringInterning).singleOpt)(conn)
+    query.as(archivedFlatEventParser(Some(intRequestingParties), stringInterning).singleOpt)(conn)
   }
 
   def fetchNextKeyEvents(
@@ -148,7 +148,7 @@ class EventReaderQueries(stringInterning: StringInterning) {
       maxIterations: Int,
   )(
       conn: Connection
-  ): (Option[RawCreatedEvent], Option[RawArchivedEvent], Option[EventSequentialId]) = {
+  ): (Option[Raw.FlatEvent.Created], Option[Raw.FlatEvent.Archived], Option[EventSequentialId]) = {
 
     val intRequestingParties =
       requestingParties.iterator.map(stringInterning.party.tryInternalize).flatMap(_.iterator).toSet
@@ -160,15 +160,16 @@ class EventReaderQueries(stringInterning: StringInterning) {
       endExclusiveSeqId,
       maxIterations,
     )(conn)
-    val archivedEvent =
-      createEvent.flatMap(c => selectArchivedEvent(c.event.contractId, intRequestingParties)(conn))
+    val archivedEvent = createEvent.flatMap(c =>
+      selectArchivedEvent(c.event.partial.contractId, intRequestingParties)(conn)
+    )
 
     (createEvent.map(_.event), archivedEvent.map(_.event), continuationToken)
   }
 
   private def eventParser(
       requestingParties: Set[Party]
-  ): RowParser[Entry[RawFlatEvent]] =
+  ): RowParser[EventStorageBackend.Entry[Raw.FlatEvent]] =
     rawFlatEventParser(
       Some(
         requestingParties.iterator

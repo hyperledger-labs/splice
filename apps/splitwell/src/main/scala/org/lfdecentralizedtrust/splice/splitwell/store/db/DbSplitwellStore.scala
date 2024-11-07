@@ -87,7 +87,7 @@ class DbSplitwellStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.SplitwellInstall.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.SplitwellInstall.TEMPLATE_ID
               )} and assigned_domain = $domainId
               and install_user = ${user}""",
             orderLimit = sql"limit 1",
@@ -120,7 +120,7 @@ class DbSplitwellStore(
             storeId,
             domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.Group.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.Group.TEMPLATE_ID
               )} and group_owner = ${owner} and group_id = ${lengthLimited(id.unpack)}""",
             orderLimit = sql"limit 1",
           ).headOption,
@@ -151,7 +151,7 @@ class DbSplitwellStore(
               domainMigrationId,
               where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                  splitwellCodegen.Group.TEMPLATE_ID_WITH_PACKAGE_ID
+                  splitwellCodegen.Group.COMPANION.TEMPLATE_ID
                 )}
               """,
             ),
@@ -179,7 +179,7 @@ class DbSplitwellStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.GroupInvite.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.GroupInvite.COMPANION.TEMPLATE_ID
               )} and group_owner = ${owner}
               """,
           ),
@@ -208,7 +208,7 @@ class DbSplitwellStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.AcceptedGroupInvite.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.AcceptedGroupInvite.COMPANION.TEMPLATE_ID
               )} and group_owner = ${owner}
               and group_id = ${lengthLimited(groupKey(owner, groupId).id.unpack)}
               """,
@@ -237,7 +237,7 @@ class DbSplitwellStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.BalanceUpdate.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.BalanceUpdate.COMPANION.TEMPLATE_ID
               )} and group_id = ${lengthLimited(key.id.unpack)}
               """,
             orderLimit = sql"""order by event_number desc""",
@@ -309,7 +309,7 @@ class DbSplitwellStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.SplitwellInstall.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.SplitwellInstall.COMPANION.TEMPLATE_ID
               )} and install_user = ${user}
               and assigned_domain is not null
               """,
@@ -339,7 +339,7 @@ class DbSplitwellStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.SplitwellRules.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.SplitwellRules.COMPANION.TEMPLATE_ID
               )} and assigned_domain is not null
               """,
           ),
@@ -370,7 +370,7 @@ class DbSplitwellStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.SplitwellRules.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.SplitwellRules.COMPANION.TEMPLATE_ID
               )} and assigned_domain = $domainId
               """,
           ).headOption,
@@ -477,7 +477,7 @@ class DbSplitwellStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                splitwellCodegen.TransferInProgress.TEMPLATE_ID_WITH_PACKAGE_ID
+                splitwellCodegen.TransferInProgress.COMPANION.TEMPLATE_ID
               )} and payment_request_contract_id = ${paymentRequest}
               and assigned_domain is not null
               """,

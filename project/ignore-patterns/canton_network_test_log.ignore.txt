@@ -98,7 +98,4 @@ Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
 # TODO(#13301) Handle in-flight contracts without logging warnings
 Cannot read contract.*AssignedContract, it is in flight.*SoftDomainMigrationTopologySetupIntegrationTest
 
-# TODO(#13301) This is BftScanConnection.refreshAction failing to fetch the scan list while the DsoRules contract is in flight
-SoftDomainMigrationTopologySetupIntegrationTest.*The global domain global-domain-new.* is not present in the scans response.*getPeerScansFromStore
-
 # Make sure to have a trailing newline

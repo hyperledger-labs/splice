@@ -8,7 +8,6 @@ import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.SelectFromTxLogTabl
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.DomainId
 import slick.jdbc.canton.SQLActionBuilder
@@ -58,12 +57,12 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
       : GetResult[TxLogQueries.SelectFromTxLogTableResultWithOffset] = { (pp: PositionedResult) =>
     val storeIdFromTxLogRow = pp.<<[Option[Int]]
     TxLogQueries.SelectFromTxLogTableResultWithOffset(
-      ApiOffset.assertFromStringToLong(pp.<<[String]),
+      pp.<<,
       storeIdFromTxLogRow.map { storeId =>
         SelectFromTxLogTableResult(
           storeId,
           pp.<<,
-          ApiOffset.assertFromStringToLong(pp.<<[String]),
+          pp.<<,
           pp.<<,
           pp.<<,
           pp.<<,
@@ -86,7 +85,7 @@ object TxLogQueries {
   case class SelectFromTxLogTableResult(
       storeId: Int,
       entryNumber: Long,
-      offset: Long,
+      offset: String,
       domainId: DomainId,
       entryType: String3,
       entryData: String,
@@ -100,7 +99,7 @@ object TxLogQueries {
           (
             <<[Int],
             <<[Long],
-            ApiOffset.assertFromStringToLong(<<[String]),
+            <<[String],
             <<[DomainId],
             <<[String3],
             <<[String],
@@ -118,7 +117,7 @@ object TxLogQueries {
   }
 
   case class SelectFromTxLogTableResultWithOffset(
-      offset: Long,
+      offset: String,
       row: Option[SelectFromTxLogTableResult],
   )
 

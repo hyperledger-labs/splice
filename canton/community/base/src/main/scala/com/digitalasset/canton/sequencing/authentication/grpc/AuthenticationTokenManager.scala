@@ -12,13 +12,13 @@ import com.digitalasset.canton.lifecycle.{
   PromiseUnlessShutdown,
   UnlessShutdown,
 }
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.authentication.{
   AuthenticationToken,
   AuthenticationTokenManagerConfig,
 }
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import io.grpc.Status
 
@@ -46,7 +46,7 @@ class AuthenticationTokenManager(
     config: AuthenticationTokenManagerConfig,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
-)(implicit executionContext: ExecutionContext)
+)(implicit executionContext: ExecutionContext, traceContext: TraceContext)
     extends NamedLogging {
 
   sealed trait State
@@ -63,12 +63,10 @@ class AuthenticationTokenManager(
     * If there is no token it will cause a token refresh to start and be completed once obtained.
     * If there is a refresh already in progress it will be completed with this refresh.
     */
-  def getToken(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Status, AuthenticationToken] =
+  def getToken: EitherT[FutureUnlessShutdown, Status, AuthenticationToken] =
     refreshToken(refreshWhenHaveToken = false)
 
-  /** Invalidate the current token if it matches the provided value.
+  /** Invalid the current token if it matches the provided value.
     * Although unlikely, the token must be provided here in case a response terminates after a new token has already been generated.
     */
   def invalidateToken(invalidToken: AuthenticationToken): Unit = {
@@ -80,14 +78,12 @@ class AuthenticationTokenManager(
 
   private def refreshToken(
       refreshWhenHaveToken: Boolean
-  )(implicit
-      traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Status, AuthenticationToken] = {
     val refreshTokenPromise =
       new PromiseUnlessShutdown[Either[Status, AuthenticationTokenWithExpiry]](
         "refreshToken",
         FutureSupervisor.Noop,
-      )
+      )(ecl = ErrorLoggingContext.fromTracedLogger(logger), ec = executionContext)
     val refreshingState = Refreshing(EitherT(refreshTokenPromise.futureUS))
 
     state.getAndUpdate {
@@ -109,17 +105,17 @@ class AuthenticationTokenManager(
 
   private def createRefreshTokenFuture(
       promise: PromiseUnlessShutdown[Either[Status, AuthenticationTokenWithExpiry]]
-  )(implicit
-      traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Status, AuthenticationToken] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     logger.debug("Refreshing authentication token")
 
     val currentRefresh = promise.futureUS
-    def completeRefresh(result: State): Unit =
+    def completeRefresh(result: State): Unit = {
       state.updateAndGet {
         case Refreshing(pending) if pending.value == currentRefresh => result
         case other => other
       }.discard
+    }
 
     // asynchronously update the state once completed, one way or another
     val currentRefreshTransformed = currentRefresh.thereafter {
@@ -133,8 +129,9 @@ class AuthenticationTokenManager(
                 ex.getMessage.contains("Channel shutdown invoked") =>
             logger.info("Token refresh aborted due to shutdown", ex)
           case ex: io.grpc.StatusRuntimeException =>
-            def collectCause(ex: Throwable): Seq[String] =
+            def collectCause(ex: Throwable): Seq[String] = {
               Seq(ex.getMessage) ++ Option(ex.getCause).toList.flatMap(collectCause)
+            }
             val causes = collectCause(ex).mkString(", ")
             logger.warn(s"Token refresh failed with ${ex.getStatus} / $causes")
           case _ => logger.warn("Token refresh failed", exception)
@@ -161,7 +158,7 @@ class AuthenticationTokenManager(
     EitherT(currentRefreshTransformed).map(_.token)
   }
 
-  private def scheduleRefreshBefore(expiresAt: CantonTimestamp): Unit =
+  private def scheduleRefreshBefore(expiresAt: CantonTimestamp): Unit = {
     if (!isClosed) {
       clock
         .scheduleAt(
@@ -170,13 +167,10 @@ class AuthenticationTokenManager(
         )
         .discard
     }
+  }
 
-  private def backgroundRefreshToken(_now: CantonTimestamp): Unit =
-    if (!isClosed) {
-      // Create a fresh trace context for each refresh to avoid long-lasting trace IDs from other contexts
-      TraceContext.withNewTraceContext { implicit traceContext =>
-        refreshToken(refreshWhenHaveToken = true).discard
-      }
-    }
+  private def backgroundRefreshToken(_now: CantonTimestamp): Unit = if (!isClosed) {
+    refreshToken(refreshWhenHaveToken = true).discard
+  }
 
 }

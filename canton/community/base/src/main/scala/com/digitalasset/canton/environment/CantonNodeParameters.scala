@@ -32,6 +32,7 @@ object CantonNodeParameters {
     def nonStandardConfig: Boolean
     def dbMigrateAndStart: Boolean
     def exitOnFatalFailures: Boolean
+    def useUnifiedSequencer: Boolean
     def watchdog: Option[WatchdogConfig]
   }
   object General {
@@ -49,6 +50,7 @@ object CantonNodeParameters {
         override val nonStandardConfig: Boolean,
         override val dbMigrateAndStart: Boolean,
         override val exitOnFatalFailures: Boolean,
+        override val useUnifiedSequencer: Boolean,
         override val watchdog: Option[WatchdogConfig],
     ) extends CantonNodeParameters.General
   }
@@ -85,6 +87,7 @@ trait HasGeneralCantonNodeParameters extends CantonNodeParameters.General {
   override def nonStandardConfig: Boolean = general.nonStandardConfig
   override def dbMigrateAndStart: Boolean = general.dbMigrateAndStart
   override def exitOnFatalFailures: Boolean = general.exitOnFatalFailures
+  override def useUnifiedSequencer: Boolean = general.useUnifiedSequencer
   override def watchdog: Option[WatchdogConfig] = general.watchdog
 }
 

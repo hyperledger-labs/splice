@@ -25,7 +25,7 @@ trait MediatorDomainConfigurationStoreTest {
       val store = mkStore
 
       for {
-        config <- store.fetchConfiguration
+        config <- valueOrFail(store.fetchConfiguration)("fetchConfiguration")
       } yield config shouldBe None
     }.failOnShutdown("Unexpected shutdown.")
 
@@ -33,7 +33,7 @@ trait MediatorDomainConfigurationStoreTest {
       val store = mkStore
       val connection = GrpcSequencerConnection(
         NonEmpty(Seq, Endpoint("sequencer", Port.tryCreate(100))),
-        transportSecurity = true,
+        true,
         None,
         SequencerAlias.Default,
       )
@@ -44,8 +44,8 @@ trait MediatorDomainConfigurationStoreTest {
       )
 
       for {
-        _ <- store.saveConfiguration(originalConfig)
-        persistedConfig <- store.fetchConfiguration.map(_.value)
+        _ <- valueOrFail(store.saveConfiguration(originalConfig))("saveConfiguration")
+        persistedConfig <- valueOrFail(store.fetchConfiguration)("fetchConfiguration").map(_.value)
       } yield persistedConfig shouldBe originalConfig
     }.failOnShutdown("Unexpected shutdown.")
 
@@ -58,7 +58,7 @@ trait MediatorDomainConfigurationStoreTest {
           Endpoint("sequencer", Port.tryCreate(200)),
           Endpoint("sequencer", Port.tryCreate(300)),
         ),
-        transportSecurity = true,
+        true,
         None,
         SequencerAlias.Default,
       )
@@ -75,11 +75,13 @@ trait MediatorDomainConfigurationStoreTest {
         )
 
       for {
-        _ <- store.saveConfiguration(originalConfig)
-        persistedConfig1 <- store.fetchConfiguration.map(_.value)
+        _ <- valueOrFail(store.saveConfiguration(originalConfig))("save original config")
+        persistedConfig1 <- valueOrFail(store.fetchConfiguration)("fetch original config")
+          .map(_.value)
         _ = persistedConfig1 shouldBe originalConfig
-        _ <- store.saveConfiguration(updatedConfig)
-        persistedConfig2 <- store.fetchConfiguration.map(_.value)
+        _ <- valueOrFail(store.saveConfiguration(updatedConfig))("save updated config")
+        persistedConfig2 <- valueOrFail(store.fetchConfiguration)("fetch updated config")
+          .map(_.value)
       } yield persistedConfig2 shouldBe updatedConfig
 
     }.failOnShutdown("Unexpected shutdown.")

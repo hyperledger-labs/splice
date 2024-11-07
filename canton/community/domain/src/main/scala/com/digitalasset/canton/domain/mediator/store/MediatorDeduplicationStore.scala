@@ -202,7 +202,7 @@ private[mediator] object MediatorDeduplicationStore {
       requestTime: CantonTimestamp,
       expireAfter: CantonTimestamp,
   ) extends PrettyPrinting {
-    override protected def pretty: Pretty[DeduplicationData] =
+    override def pretty: Pretty[DeduplicationData] =
       prettyOfClass(
         param("uuid", _.uuid),
         param("requestTime", _.requestTime),
@@ -273,7 +273,7 @@ private[mediator] class DbMediatorDeduplicationStore(
   )(implicit
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[Unit] =
+  ): FutureUnlessShutdown[Unit] = {
     for {
       _ <- storage.updateUnlessShutdown_(
         sqlu"""delete from mediator_deduplication_store
@@ -290,6 +290,7 @@ private[mediator] class DbMediatorDeduplicationStore(
     } yield {
       activeUuids.foreach(storeInMemory)
     }
+  }
 
   override protected def persist(data: DeduplicationData)(implicit
       traceContext: TraceContext,

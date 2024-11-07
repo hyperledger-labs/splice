@@ -37,8 +37,9 @@ class MockTimeRequestSubmitter extends TimeProofRequestSubmitter {
 
   val fetchResult = Promise[TimeProof]()
 
-  override def fetchTimeProof()(implicit traceContext: TraceContext): Unit =
+  override def fetchTimeProof()(implicit traceContext: TraceContext): Unit = {
     hasRequestedRef.set(true)
+  }
 
   override def handleTimeProof(proof: TimeProof): Unit = ()
 

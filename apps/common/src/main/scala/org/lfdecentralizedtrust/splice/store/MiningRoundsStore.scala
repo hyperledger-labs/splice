@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.store
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, SpliceUtil, Contract}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -58,29 +57,12 @@ trait MiningRoundsStore extends AppStore {
       )
     )
 
-  /** Return the active open mining round contract with the highest
-    * round number. Note that the round may not yet be usable as
-    * the `opensAt` time may not yet have been reached.
-    */
   final def lookupLatestActiveOpenMiningRound()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[MiningRoundsStore.OpenMiningRound[AssignedContract]]] =
     lookupOpenMiningRoundTriple().map(_.map { triple =>
       AssignedContract(triple.newest, triple.domain)
-    })
-
-  /** Return the active open mining round contract with the highest
-    * round number whose opensAt time has been reached.
-    */
-  final def lookupLatestUsableOpenMiningRound(asOf: CantonTimestamp)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[MiningRoundsStore.OpenMiningRound[AssignedContract]]] =
-    lookupOpenMiningRoundTriple().map(_.flatMap { triple =>
-      Seq(triple.newest, triple.middle, triple.oldest)
-        .find(r => CantonTimestamp.assertFromInstant(r.payload.opensAt) < asOf)
-        .map(c => AssignedContract(c, triple.domain))
     })
 
   /** get the latest active open mining round contract, which should always be present after bootstrapping. */
@@ -92,18 +74,6 @@ trait MiningRoundsStore extends AppStore {
       _.getOrElse(
         throw Status.NOT_FOUND
           .withDescription("No active OpenMiningRound contract")
-          .asRuntimeException()
-      )
-    )
-
-  def getLatestUsableOpenMiningRound(asOf: CantonTimestamp)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[MiningRoundsStore.OpenMiningRound[AssignedContract]] =
-    lookupLatestUsableOpenMiningRound(asOf).map(
-      _.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(s"No usable OpenMiningRound contract at $asOf")
           .asRuntimeException()
       )
     )

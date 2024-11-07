@@ -12,8 +12,8 @@ import React from 'react';
 import { Box } from '@mui/material';
 import { GlobalStyles } from '@mui/system';
 
-import { AmuletConfig, USD } from '../../daml.js/splice-amulet-0.1.6/lib/Splice/AmuletConfig';
-import { DsoRulesConfig } from '../../daml.js/splice-dso-governance-0.1.9/lib/Splice/DsoRules';
+import { AmuletConfig, USD } from '../../daml.js/splice-amulet-0.1.5/lib/Splice/AmuletConfig';
+import { DsoRulesConfig } from '../../daml.js/splice-dso-governance-0.1.8/lib/Splice/DsoRules';
 
 const jsondiffpatchInstance = jsondiffpatch.create({
   arrays: {

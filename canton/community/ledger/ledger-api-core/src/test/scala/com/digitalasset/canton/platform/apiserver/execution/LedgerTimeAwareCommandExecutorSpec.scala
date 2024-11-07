@@ -12,12 +12,11 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.LedgerTime
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.daml.lf.command.ApiCommands as LfCommands
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageName, PackageVersion}
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.daml.lf.transaction.TransactionVersion
 import com.digitalasset.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -72,8 +71,7 @@ class LedgerTimeAwareCommandExecutorSpec
       stakeholders = Set.empty,
       keyOpt = None,
       // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
-      version = LanguageVersion.v2_dev,
-      domainIdO = Some(DomainId.tryFromString("x::domainId")),
+      version = TransactionVersion.maxVersion,
     )
   )
 
@@ -90,7 +88,6 @@ class LedgerTimeAwareCommandExecutorSpec
         Ref.ApplicationId.assertFromString("foobar"),
         Ref.CommandId.assertFromString("foobar"),
         DeduplicationDuration(Duration.ofMinutes(1)),
-        None,
         None,
       ),
       None,
@@ -150,7 +147,6 @@ class LedgerTimeAwareCommandExecutorSpec
         commandsReference = "",
       ),
       ImmArray.empty,
-      domainId = None,
     )
 
     val instance = new LedgerTimeAwareCommandExecutor(
@@ -170,7 +166,6 @@ class LedgerTimeAwareCommandExecutorSpec
             Ref.ApplicationId.assertFromString("foobar"),
             Ref.CommandId.assertFromString("foobar"),
             DeduplicationDuration(Duration.ofMinutes(1)),
-            None,
             None,
           ),
           None,

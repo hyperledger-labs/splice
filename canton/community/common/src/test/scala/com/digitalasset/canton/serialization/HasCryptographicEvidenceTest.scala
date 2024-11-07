@@ -115,7 +115,7 @@ object MemoizedEvidenceSUT
   val name: String = "MemoizedEvidenceSUT"
 
   val supportedProtoVersions: MemoizedEvidenceSUT.SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> UnsupportedProtoCodec(ProtocolVersion.v32)
+    ProtoVersion(30) -> UnsupportedProtoCodec(ProtocolVersion.v31)
   )
 
   private val defaultProtocolVersionRepresentative = protocolVersionRepresentativeFor(
@@ -176,17 +176,14 @@ final case class MemoizedEvidenceWithFailureSUT private (b: Byte)(
     }
 }
 
-private object MemoizedEvidenceWithFailureSUT {
+object MemoizedEvidenceWithFailureSUT {
   def apply(b: Byte)(fail: Boolean): MemoizedEvidenceWithFailureSUT =
     new MemoizedEvidenceWithFailureSUT(b)(fail, None)
-
-  def apply(i: Int)(fail: Boolean): MemoizedEvidenceWithFailureSUT =
-    new MemoizedEvidenceWithFailureSUT(i.toByte)(fail, None)
 
   def fromByteString(bytes: ByteString): MemoizedEvidenceWithFailureSUT = {
     if (bytes.size() != 2)
       throw new IllegalArgumentException(s"Only two bytes expected, got: ${bytes.toString}")
 
-    new MemoizedEvidenceWithFailureSUT(bytes.byteAt(1))(fail = false, Some(bytes))
+    new MemoizedEvidenceWithFailureSUT(bytes.byteAt(1))(false, Some(bytes))
   }
 }

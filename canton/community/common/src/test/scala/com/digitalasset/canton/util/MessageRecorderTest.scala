@@ -11,7 +11,7 @@ import java.nio.file.Path
 
 class MessageRecorderTest extends BaseTestWordSpec with HasTempDirectory {
 
-  val testData: Seq[Data] = (0 until 3) map Data.apply
+  val testData: Seq[Data] = (0 until 3) map Data
 
   val recordFile: Path = tempDirectory.resolve("recorded-test-data")
 
@@ -30,7 +30,7 @@ class MessageRecorderTest extends BaseTestWordSpec with HasTempDirectory {
     }
 
     "catch type errors" in {
-      a[ClassCastException] shouldBe thrownBy(MessageRecorder.load[Data2](recordFile, logger))
+      a[ClassCastException] shouldBe thrownBy { MessageRecorder.load[Data2](recordFile, logger) }
     }
   }
 }

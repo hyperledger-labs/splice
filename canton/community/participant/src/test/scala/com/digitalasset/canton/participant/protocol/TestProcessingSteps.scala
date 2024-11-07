@@ -15,10 +15,9 @@ import com.digitalasset.canton.crypto.{
   Signature,
   TestHash,
 }
-import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewPosition.MerkleSeqIndex
+import com.digitalasset.canton.data.*
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.Update
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
@@ -36,12 +35,13 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ActivenessSet,
 }
 import com.digitalasset.canton.participant.store.{
-  ReassignmentLookup,
   SyncDomainEphemeralState,
   SyncDomainEphemeralStateLookup,
+  TransferLookup,
 }
-import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.participant.sync.TimestampedEvent
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessageError.SyncCryptoDecryptError
+import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{
   DynamicDomainParametersWithValidity,
   RootHash,
@@ -49,10 +49,10 @@ import com.digitalasset.canton.protocol.{
   v30,
 }
 import com.digitalasset.canton.sequencing.protocol.*
-import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
+import com.digitalasset.canton.store.SessionKeyStore
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.{DefaultTestIdentities, DomainId, Member, ParticipantId}
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HasToByteString
 import com.digitalasset.canton.{BaseTest, LfPartyId, RequestCounter, SequencerCounter}
 import com.google.protobuf.ByteString
@@ -160,7 +160,7 @@ class TestProcessingSteps(
   override def decryptViews(
       batch: NonEmpty[Seq[OpenEnvelope[EncryptedViewMessage[TestViewType]]]],
       snapshot: DomainSnapshotSyncCryptoApi,
-      sessionKeyStore: ConfirmationRequestSessionKeyStore,
+      sessionKeyStore: SessionKeyStore,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TestProcessingError, DecryptedViews] = {
@@ -228,7 +228,7 @@ class TestProcessingSteps(
 
   override def constructPendingDataAndResponse(
       parsedRequest: ParsedRequestType,
-      reassignmentLookup: ReassignmentLookup,
+      transferLookup: TransferLookup,
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       engineController: EngineController,
   )(implicit
@@ -273,12 +273,12 @@ class TestProcessingSteps(
       rootHash: RootHash,
       freshOwnTimelyTx: Boolean,
       error: TransactionError,
-  )(implicit traceContext: TraceContext): (Option[Traced[Update]], Option[PendingSubmissionId]) =
+  )(implicit traceContext: TraceContext): (Option[TimestampedEvent], Option[PendingSubmissionId]) =
     (None, None)
 
   override def createRejectionEvent(rejectionArgs: Unit)(implicit
       traceContext: TraceContext
-  ): Either[TestProcessingError, Option[Traced[Update]]] =
+  ): Either[TestProcessingError, Option[TimestampedEvent]] =
     Right(None)
 
   override def getCommitSetAndContractsToBeStoredAndEvent(
@@ -309,10 +309,6 @@ class TestProcessingSteps(
       traceContext: TraceContext
   ): EitherT[Future, TestProcessingError, Unit] =
     EitherT.rightT(())
-
-  override def handleTimeout(parsedRequest: TestParsedRequest)(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TestProcessingError, Unit] = EitherT.pure(())
 }
 
 object TestProcessingSteps {
@@ -328,7 +324,7 @@ object TestProcessingSteps {
       with HasToByteString {
 
     def toBeSigned: Option[RootHash] = None
-    override protected def pretty: Pretty[TestViewTree] = adHocPrettyInstance
+    override def pretty: Pretty[TestViewTree] = adHocPrettyInstance
 
     override def toByteString: ByteString =
       throw new UnsupportedOperationException("TestViewTree cannot be serialized")

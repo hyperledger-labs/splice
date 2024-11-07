@@ -8,7 +8,6 @@ import cats.implicits.toFunctorFilterOps
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.crypto.{DomainSyncCryptoClient, SyncCryptoError}
@@ -20,7 +19,7 @@ import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult, SequencerClientSend}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{MediatorId, ParticipantId}
+import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
@@ -153,7 +152,6 @@ private[mediator] class DefaultVerdictSender(
     }
 
     val sendET = if (sendVerdict) {
-      implicit val metricsContext: MetricsContext = MetricsContext("type" -> "send-verdict")
       // the result of send request will be logged within the returned future however any error is effectively
       // discarded. Any error logged by the eventual callback will most likely occur after the returned future has
       // completed.
@@ -189,14 +187,15 @@ private[mediator] class DefaultVerdictSender(
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, Batch[DefaultOpenEnvelope]] =
     for {
       snapshot <- EitherT.right(crypto.awaitSnapshotUS(requestId.unwrap))
-      informeesMap <- EitherT
+      result <- EitherT
         .right(
-          informeesByParticipant(
+          informeesByParticipantAndWithGroupAddressing(
             request.allInformees.toList,
             snapshot.ipsSnapshot,
           )
         )
         .mapK(FutureUnlessShutdown.outcomeK)
+      (informeesMap, informeesWithGroupAddressing) = result
       envelopes <- {
         val result = ConfirmationResultMessage.create(
           crypto.domainId,
@@ -207,10 +206,12 @@ private[mediator] class DefaultVerdictSender(
           if (request.informeesArePublic) request.allInformees else Set.empty,
           protocolVersion,
         )
-        val recipientSeq = informeesMap.keys.toSeq.map(MemberRecipient.apply)
+        val recipientSeq =
+          informeesMap.keys.toSeq.map(MemberRecipient) ++ informeesWithGroupAddressing.toSeq
+            .map(p => ParticipantsOfParty(PartyId.tryFromLfParty(p)))
         val recipients =
           NonEmpty
-            .from(recipientSeq.map((r: Recipient) => NonEmpty(Set, r).toSet))
+            .from(recipientSeq.map { (r: Recipient) => NonEmpty(Set, r).toSet })
             .map(Recipients.recipientGroups)
             .getOrElse(
               // Should never happen as the topology (same snapshot) is checked in
@@ -225,22 +226,27 @@ private[mediator] class DefaultVerdictSender(
 
     } yield Batch(envelopes, protocolVersion)
 
-  private def informeesByParticipant(
+  private def informeesByParticipantAndWithGroupAddressing(
       informees: List[LfPartyId],
       topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
-  ): Future[Map[ParticipantId, Set[LfPartyId]]] =
+  ): Future[(Map[ParticipantId, Set[LfPartyId]], Set[LfPartyId])] =
     for {
+      partiesWithGroupAddressing <- topologySnapshot.partiesWithGroupAddressing(informees)
       participantsByParty <- topologySnapshot.activeParticipantsOfParties(informees)
     } yield {
-      participantsByParty
+      val byParticipant = participantsByParty
         .foldLeft(Map.empty[ParticipantId, Set[LfPartyId]]) { case (acc, (party, participants)) =>
           participants.foldLeft(acc) { case (acc, participant) =>
             val parties = acc.getOrElse(participant, Set.empty) + party
             acc.updated(participant, parties)
           }
         }
+        .filter(
+          _._2.intersect(partiesWithGroupAddressing).isEmpty
+        ) // remove participants that are already addressed by some group address
+      (byParticipant, partiesWithGroupAddressing)
     }
 
   private def shouldSendVerdict(
@@ -312,6 +318,7 @@ private[mediator] class DefaultVerdictSender(
           val recipients = rhms
             .flatMap(_.recipients.allRecipients.collect[Recipient] {
               case p @ MemberRecipient(_: ParticipantId) => p
+              case participantsOfParty: ParticipantsOfParty => participantsOfParty
             })
             .toSet
 

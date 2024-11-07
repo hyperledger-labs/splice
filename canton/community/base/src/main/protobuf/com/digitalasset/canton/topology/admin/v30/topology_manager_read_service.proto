@@ -10,6 +10,7 @@ import "com/digitalasset/canton/protocol/v30/topology.proto";
 import "com/digitalasset/canton/topology/admin/v30/topology_ext.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 
 service TopologyManagerReadService {
   rpc ListNamespaceDelegation(ListNamespaceDelegationRequest) returns (ListNamespaceDelegationResponse);
@@ -17,7 +18,6 @@ service TopologyManagerReadService {
   rpc ListIdentifierDelegation(ListIdentifierDelegationRequest) returns (ListIdentifierDelegationResponse);
 
   rpc ListOwnerToKeyMapping(ListOwnerToKeyMappingRequest) returns (ListOwnerToKeyMappingResponse);
-  rpc ListPartyToKeyMapping(ListPartyToKeyMappingRequest) returns (ListPartyToKeyMappingResponse);
 
   rpc ListDomainTrustCertificate(ListDomainTrustCertificateRequest) returns (ListDomainTrustCertificateResponse);
   rpc ListParticipantDomainPermission(ListParticipantDomainPermissionRequest) returns (ListParticipantDomainPermissionResponse);
@@ -25,6 +25,7 @@ service TopologyManagerReadService {
   rpc ListVettedPackages(ListVettedPackagesRequest) returns (ListVettedPackagesResponse);
 
   rpc ListPartyToParticipant(ListPartyToParticipantRequest) returns (ListPartyToParticipantResponse);
+  rpc ListAuthorityOf(ListAuthorityOfRequest) returns (ListAuthorityOfResponse);
 
   rpc ListDomainParametersState(ListDomainParametersStateRequest) returns (ListDomainParametersStateResponse);
   rpc ListMediatorDomainState(ListMediatorDomainStateRequest) returns (ListMediatorDomainStateResponse);
@@ -61,7 +62,7 @@ message BaseQuery {
     TimeRange range = 7;
   }
   string filter_signed_key = 8;
-  optional int32 protocol_version = 9;
+  google.protobuf.Int32Value protocol_version = 9;
 }
 
 message Store {
@@ -143,19 +144,6 @@ message ListOwnerToKeyMappingResponse {
   repeated Result results = 1;
 }
 
-message ListPartyToKeyMappingRequest {
-  BaseQuery base_query = 1;
-  string filter_party = 2;
-}
-
-message ListPartyToKeyMappingResponse {
-  message Result {
-    BaseResult context = 1;
-    com.digitalasset.canton.protocol.v30.PartyToKeyMapping item = 2;
-  }
-  repeated Result results = 1;
-}
-
 message ListDomainTrustCertificateRequest {
   BaseQuery base_query = 1;
   string filter_uid = 2;
@@ -217,6 +205,19 @@ message ListPartyToParticipantResponse {
   message Result {
     BaseResult context = 1;
     com.digitalasset.canton.protocol.v30.PartyToParticipant item = 2;
+  }
+  repeated Result results = 2;
+}
+
+message ListAuthorityOfRequest {
+  BaseQuery base_query = 1;
+  string filter_party = 2;
+}
+
+message ListAuthorityOfResponse {
+  message Result {
+    BaseResult context = 1;
+    com.digitalasset.canton.protocol.v30.AuthorityOf item = 2;
   }
   repeated Result results = 2;
 }

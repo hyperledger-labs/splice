@@ -21,7 +21,7 @@ import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
+import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import com.digitalasset.canton.util.{DelayUtil, EitherTUtil, FutureUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
 
@@ -56,15 +56,16 @@ class QueueBasedDomainOutbox(
 
   protected def findPendingTransactions()(implicit
       traceContext: TraceContext
-  ): Future[Seq[GenericSignedTopologyTransaction]] =
+  ): Future[Seq[GenericSignedTopologyTransaction]] = {
     Future.successful(
       domainOutboxQueue
         .dequeue(broadcastBatchSize)
     )
+  }
 
   override protected def onClosed(): Unit = {
-    val closeables = maybeObserverCloseable.toList ++ List(handle)
-    Lifecycle.close(closeables*)(logger)
+    maybeObserverCloseable.foreach(_.close())
+    Lifecycle.close(handle)(logger)
     super.onClosed()
   }
 
@@ -77,7 +78,7 @@ class QueueBasedDomainOutbox(
 
   def awaitIdle(
       timeout: Duration
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] = {
     // first, we wait until the idle future is idle again
     // this is the case when we've updated the queue state such that
     // there are no more topology transactions to read
@@ -95,6 +96,7 @@ class QueueBasedDomainOutbox(
           awaitTransactionObserved(last, timeout)
         }
       }
+  }
 
   private val isRunning = new AtomicBoolean(false)
   private val initialized = new AtomicBoolean(false)
@@ -137,23 +139,25 @@ class QueueBasedDomainOutbox(
 
   def startup()(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Unit] =
+  ): EitherT[FutureUnlessShutdown, String, Unit] = {
     performUnlessClosingEitherUSF(functionFullName) {
       if (hasUnsentTransactions) ensureIdleFutureIsSet()
       logger.debug(
-        s"Resuming dispatching, pending=$hasUnsentTransactions"
+        s"Resuming dispatching, pending=${hasUnsentTransactions}"
       )
       // run initial flush
       flush(initialize = true)
     }
+  }
 
-  protected def kickOffFlush(): Unit =
+  protected def kickOffFlush(): Unit = {
     // It's fine to ignore shutdown because we do not await the future anyway.
     if (initialized.get()) {
       TraceContext.withNewTraceContext(implicit tc =>
         EitherTUtil.doNotAwait(flush().onShutdown(Either.unit), "domain outbox flusher")
       )
     }
+  }
 
   protected def flush(initialize: Boolean = false)(implicit
       traceContext: TraceContext
@@ -165,21 +169,21 @@ class QueueBasedDomainOutbox(
       }
       // if anything has been pushed in the meantime, we need to kick off a new flush
       logger.debug(
-        s"Marked flush as done. Current queue size: $queueSize. IsClosing: $isClosing"
+        s"Marked flush as done. Current queue size: ${queueSize}. IsClosing: ${isClosing}"
       )
       if (hasUnsentTransactions && !isClosing) {
         if (delayRetry) {
           val delay = 10.seconds
-          logger.debug(s"Kick off a new delayed flush in $delay")
+          logger.debug(s"Kick off a new delayed flush in ${delay}")
           DelayUtil
             .delay(functionFullName, delay, this)
             .map { _ =>
               if (!isClosing) {
-                logger.debug(s"About to kick off a delayed flush scheduled $delay ago")
+                logger.debug(s"About to kick off a delayed flush scheduled ${delay} ago")
                 kickOffFlush()
               } else {
                 logger.debug(
-                  s"Queue-based outbox is now closing. Ignoring delayed flushed schedule $delay ago"
+                  s"Queue-based outbox is now closing. Ignoring delayed flushed schedule ${delay} ago"
                 )
               }
             }
@@ -195,7 +199,7 @@ class QueueBasedDomainOutbox(
       ensureIdleFutureIsSet()
     }
 
-    logger.debug(s"Invoked flush with queue size $queueSize")
+    logger.debug(s"Invoked flush with queue size ${queueSize}")
 
     if (isClosing) {
       logger.debug("Flush invoked in spite of closing")
@@ -302,7 +306,7 @@ class QueueBasedDomainOutbox(
           {
             if (logger.underlying.isDebugEnabled()) {
               logger.debug(
-                s"Attempting to push ${transactions.size} topology transactions to $domain, specifically: $transactions"
+                s"Attempting to push ${transactions.size} topology transactions to $domain, specifically: ${transactions}"
               )
             }
             FutureUtil.logOnFailureUnlessShutdown(
@@ -310,7 +314,7 @@ class QueueBasedDomainOutbox(
               s"Pushing topology transactions to $domain",
             )
           },
-          AllExceptionRetryPolicy,
+          AllExnRetryable,
         )
         .map { responses =>
           if (responses.length != transactions.length) {

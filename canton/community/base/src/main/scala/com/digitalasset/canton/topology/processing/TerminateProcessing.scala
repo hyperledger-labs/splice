@@ -6,7 +6,7 @@ package com.digitalasset.canton.topology.processing
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 /** An implementation of this trait allows to schedule code to be executed at the end of the
   * processing of a batch of topology transactions.
@@ -20,7 +20,7 @@ trait TerminateProcessing {
       sc: SequencerCounter,
       sequencedTime: SequencedTime,
       effectiveTime: EffectiveTime,
-  )(implicit traceContext: TraceContext, executionContext: ExecutionContext): Future[Unit]
+  )(implicit traceContext: TraceContext): Future[Unit]
 }
 
 object TerminateProcessing {
@@ -34,7 +34,6 @@ object TerminateProcessing {
         sc: SequencerCounter,
         sequencedTime: SequencedTime,
         effectiveTime: EffectiveTime,
-    )(implicit traceContext: TraceContext, executionContext: ExecutionContext): Future[Unit] =
-      Future.unit
+    )(implicit traceContext: TraceContext): Future[Unit] = Future.unit
   }
 }

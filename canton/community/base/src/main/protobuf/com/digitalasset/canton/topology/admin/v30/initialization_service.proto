@@ -6,6 +6,7 @@ syntax = "proto3";
 package com.digitalasset.canton.topology.admin.v30;
 
 import "com/digitalasset/canton/topology/admin/v30/topology_ext.proto";
+import "google/protobuf/timestamp.proto";
 
 /**
  * The node identity initialization service
@@ -61,5 +62,5 @@ message GetIdRequest {}
 message CurrentTimeRequest {}
 
 message CurrentTimeResponse {
-  int64 current_time = 1;
+  google.protobuf.Timestamp current_time = 1;
 }

@@ -5,7 +5,6 @@ package com.daml.ledger.javaapi.data.codegen;
 
 import com.daml.ledger.javaapi.data.CreatedEvent;
 import com.daml.ledger.javaapi.data.Identifier;
-import com.daml.ledger.javaapi.data.PackageVersion;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -24,28 +23,8 @@ import java.util.stream.Collectors;
  *     templates, and the view type for interfaces.
  */
 public abstract class ContractTypeCompanion<Ct, Id, ContractType, Data> {
-
-  public static class Package {
-    public final String id;
-    public final String name;
-    public final PackageVersion version;
-
-    public Package(String id, String name, PackageVersion version) {
-      this.id = id;
-      this.name = name;
-      this.version = version;
-    }
-  }
-
-  public final Package PACKAGE;
-  public final String PACKAGE_ID;
-  public final String PACKAGE_NAME;
-  public final PackageVersion PACKAGE_VERSION;
-
   /** The full template ID of the template or interface that defined this companion. */
   public final Identifier TEMPLATE_ID;
-
-  public final Identifier TEMPLATE_ID_WITH_PACKAGE_ID;
 
   final String TEMPLATE_CLASS_NAME;
 
@@ -72,25 +51,15 @@ public abstract class ContractTypeCompanion<Ct, Id, ContractType, Data> {
    * @hidden
    */
   protected ContractTypeCompanion(
-      Package packageInfo,
       Identifier templateId,
       String templateClassName,
       Function<String, Id> newContractId,
       List<Choice<ContractType, ?, ?>> choices) {
-    PACKAGE = packageInfo;
-    PACKAGE_ID = packageInfo.id;
-    PACKAGE_NAME = packageInfo.name;
-    PACKAGE_VERSION = packageInfo.version;
     TEMPLATE_ID = templateId;
     TEMPLATE_CLASS_NAME = templateClassName;
-    TEMPLATE_ID_WITH_PACKAGE_ID = getTemplateIdWithPackageId();
     this.newContractId = newContractId;
     this.choices =
         choices.stream().collect(Collectors.toMap(choice -> choice.name, Function.identity()));
-  }
-
-  public Identifier getTemplateIdWithPackageId() {
-    return new Identifier(PACKAGE.id, TEMPLATE_ID.getModuleName(), TEMPLATE_ID.getEntityName());
   }
 
   /**

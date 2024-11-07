@@ -11,14 +11,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   AmuletExpireSummary,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferResult
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequest,
   DsoRules_CloseVoteRequestResult,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.transfercommandresult.{
-  TransferCommandResultFailure,
-  TransferCommandResultSuccess,
 }
 import splice.wallet.subscriptions as sws
 import org.lfdecentralizedtrust.splice.codegen.java.splice.fees.ExpiringAmount
@@ -30,7 +25,6 @@ import org.lfdecentralizedtrust.splice.util.{Codec, ExerciseNode}
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.dollarsToCC
 import org.lfdecentralizedtrust.splice.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -76,12 +70,6 @@ class ScanTxLogParser(
             )
           case AmuletRules_BuyMemberTraffic(node) =>
             State.fromBuyMemberTraffic(exercised, domainId, node)
-          case AmuletRules_CreateExternalPartySetupProposal(node) =>
-            State.fromCreateExternalPartySetupProposal(exercised, domainId, node)
-          case AmuletRules_CreateTransferPreapproval(node) =>
-            State.fromCreateTransferPreapproval(exercised, domainId, node)
-          case TransferPreapproval_Renew(node) =>
-            State.fromRenewTransferPreapproval(exercised, domainId, node)
           case AmuletExpire(node) =>
             State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
           case LockedAmuletExpireAmulet(node) =>
@@ -114,14 +102,6 @@ class ScanTxLogParser(
             )
           case DsoRulesCloseVoteRequest(node) =>
             State.fromCloseVoteRequest(exercised.getEventId, node)
-          case ExternalPartyAmuletRules_CreateTransferCommand(node) =>
-            State.fromCreateTransferCommand(exercised.getEventId, node)
-          case TransferCommand_Send(node) =>
-            State.fromTransferCommand_Send(exercised, node)
-          case TransferCommand_Withdraw(node) =>
-            State.fromTransferCommand_Withdraw(exercised, node)
-          case TransferCommand_Expire(node) =>
-            State.fromTransferCommand_Expire(exercised, node)
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -161,7 +141,7 @@ class ScanTxLogParser(
     ret
   }
 
-  override def error(offset: Long, eventId: String, domainId: DomainId): Option[TxLogEntry] =
+  override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
     Some(
       ErrorTxLogEntry(
         eventId = eventId
@@ -249,7 +229,7 @@ object ScanTxLogParser {
       val activityEntry: TransactionTxLogEntry = activityType match {
         case TransactionType.Tap =>
           TapTxLogEntry(
-            offset = ApiOffset.fromLong(tx.getOffset),
+            offset = tx.getOffset,
             eventId = event.getEventId,
             domainId = domainId,
             date = Some(tx.getEffectiveAt),
@@ -260,7 +240,7 @@ object ScanTxLogParser {
           )
         case TransactionType.Mint =>
           MintTxLogEntry(
-            offset = ApiOffset.fromLong(tx.getOffset),
+            offset = tx.getOffset,
             eventId = event.getEventId,
             domainId = domainId,
             date = Some(tx.getEffectiveAt),
@@ -411,7 +391,7 @@ object ScanTxLogParser {
       val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
 
       new TransferTxLogEntry(
-        offset = ApiOffset.fromLong(tx.getOffset),
+        offset = tx.getOffset,
         eventId = event.getEventId,
         domainId = domainId,
         date = Some(tx.getEffectiveAt),
@@ -517,115 +497,6 @@ object ScanTxLogParser {
         .appended(rewardEntries)
         // append the balance change entry from burning the transferred amulet
         .appended(balanceChangeEntry)
-    }
-
-    def fromCreateExternalPartySetupProposal(
-        event: ExercisedEvent,
-        domainId: DomainId,
-        node: ExerciseNode[
-          AmuletRules_CreateExternalPartySetupProposal.Arg,
-          AmuletRules_CreateExternalPartySetupProposal.Res,
-        ],
-    ): State = {
-      val validatorParty = Codec
-        .decode(Codec.Party)(node.result.value.validator)
-        .getOrElse(
-          throw Status.INTERNAL
-            .withDescription(
-              s"Cannot decode party ID ${node.argument.value.validator}"
-            )
-            .asRuntimeException()
-        )
-      val transferResult = node.result.value.transferResult
-      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
-    }
-
-    def fromCreateTransferPreapproval(
-        event: ExercisedEvent,
-        domainId: DomainId,
-        node: ExerciseNode[
-          AmuletRules_CreateTransferPreapproval.Arg,
-          AmuletRules_CreateTransferPreapproval.Res,
-        ],
-    ): State = {
-      val validatorParty = Codec
-        .decode(Codec.Party)(node.argument.value.provider)
-        .getOrElse(
-          throw Status.INTERNAL
-            .withDescription(
-              s"Cannot decode party ID ${node.argument.value.provider}"
-            )
-            .asRuntimeException()
-        )
-      val transferResult = node.result.value.transferResult
-      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
-    }
-
-    def fromRenewTransferPreapproval(
-        event: ExercisedEvent,
-        domainId: DomainId,
-        node: ExerciseNode[
-          TransferPreapproval_Renew.Arg,
-          TransferPreapproval_Renew.Res,
-        ],
-    ): State = {
-      val validatorParty = Codec
-        .decode(Codec.Party)(node.result.value.provider)
-        .getOrElse(
-          throw Status.INTERNAL
-            .withDescription(
-              s"Cannot decode party ID ${node.result.value.provider}"
-            )
-            .asRuntimeException()
-        )
-      val transferResult = node.result.value.transferResult
-      fromTransferPreapprovalPurchase(event, domainId, validatorParty, transferResult)
-    }
-
-    private def fromTransferPreapprovalPurchase(
-        event: ExercisedEvent,
-        domainId: DomainId,
-        validatorParty: PartyId,
-        transferResult: TransferResult,
-    ) = {
-      val round = transferResult.round
-      val balanceChangeEntry = State(
-        BalanceChangeTxLogEntry(
-          eventId = event.getEventId,
-          domainId = domainId,
-          round = round.number,
-          changeToInitialAmountAsOfRoundZero = transferResult.summary.balanceChanges.values.asScala
-            .map(bc => BigDecimal(bc.changeToInitialAmountAsOfRoundZero))
-            .sum,
-          changeToHoldingFeesRate = transferResult.summary.balanceChanges.values.asScala
-            .map(bc => BigDecimal(bc.changeToHoldingFeesRate))
-            .sum,
-          partyBalanceChanges = transferResult.summary.balanceChanges.asScala.map {
-            case (party, bc) if party == validatorParty.toProtoPrimitive =>
-              validatorParty -> PartyBalanceChange(
-                bc.changeToInitialAmountAsOfRoundZero,
-                bc.changeToHoldingFeesRate,
-              )
-            case (party, bc) =>
-              throw Status.INTERNAL
-                .withDescription(
-                  s"Balance change of $bc for non-validator party $party detected as part of CreateTransferPreapproval"
-                )
-                .asRuntimeException()
-          }.toMap,
-        )
-      )
-
-      val rewardEntries = rewardsEntriesFromTransferSummary(
-        validatorParty,
-        transferResult.summary,
-        event,
-        round.number,
-        domainId,
-        Some(event.getEventId),
-      )
-
-      balanceChangeEntry.appended(rewardEntries)
     }
 
     def fromCollectEntryPayment(
@@ -743,86 +614,6 @@ object ScanTxLogParser {
           VoteRequestTxLogEntry(
             eventId,
             result = Some(node.result.value),
-          )
-        )
-      )
-    }
-
-    def fromCreateTransferCommand(
-        eventId: String,
-        node: ExerciseNode[
-          ExternalPartyAmuletRules_CreateTransferCommand.Arg,
-          ExternalPartyAmuletRules_CreateTransferCommand.Res,
-        ],
-    ): State = {
-      State(
-        immutable.Queue(
-          TransferCommandTxLogEntry(
-            eventId,
-            contractId = Codec.encodeContractId(node.result.value.transferCommandCid),
-            sender = PartyId.tryFromProtoPrimitive(node.argument.value.sender),
-            nonce = node.argument.value.nonce,
-            status = TransferCommandTxLogEntry.Status.Created(TransferCommandCreated()),
-          )
-        )
-      )
-    }
-
-    def fromTransferCommand_Send(
-        exercised: ExercisedEvent,
-        node: ExerciseNode[TransferCommand_Send.Arg, TransferCommand_Send.Res],
-    ): State = {
-      State(
-        immutable.Queue(
-          TransferCommandTxLogEntry(
-            eventId = exercised.getEventId,
-            contractId = exercised.getContractId,
-            sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
-            nonce = node.result.value.nonce,
-            status = node.result.value.result match {
-              case failure: TransferCommandResultFailure =>
-                TransferCommandTxLogEntry.Status.Failed(
-                  TransferCommandFailed(failure.reason.toString)
-                )
-              case _: TransferCommandResultSuccess =>
-                TransferCommandTxLogEntry.Status.Sent(TransferCommandSent())
-              case e =>
-                sys.error(s"TransferCommandResult must be either failure or success but got: $e")
-            },
-          )
-        )
-      )
-    }
-
-    def fromTransferCommand_Withdraw(
-        exercised: ExercisedEvent,
-        node: ExerciseNode[TransferCommand_Withdraw.Arg, TransferCommand_Withdraw.Res],
-    ): State = {
-      State(
-        immutable.Queue(
-          TransferCommandTxLogEntry(
-            eventId = exercised.getEventId,
-            contractId = exercised.getContractId,
-            sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
-            nonce = node.result.value.nonce,
-            status = TransferCommandTxLogEntry.Status.Withdrawn(TransferCommandWithdrawn()),
-          )
-        )
-      )
-    }
-
-    def fromTransferCommand_Expire(
-        exercised: ExercisedEvent,
-        node: ExerciseNode[TransferCommand_Expire.Arg, TransferCommand_Expire.Res],
-    ): State = {
-      State(
-        immutable.Queue(
-          TransferCommandTxLogEntry(
-            eventId = exercised.getEventId,
-            contractId = exercised.getContractId,
-            sender = PartyId.tryFromProtoPrimitive(node.result.value.sender),
-            nonce = node.result.value.nonce,
-            status = TransferCommandTxLogEntry.Status.Expired(TransferCommandExpired()),
           )
         )
       )

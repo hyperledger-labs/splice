@@ -4,7 +4,7 @@
 package com.digitalasset.canton.topology.store
 
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{PositiveInt, PositiveLong}
 import com.digitalasset.canton.crypto.{Fingerprint, SignatureCheckError}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -21,7 +21,7 @@ sealed trait TopologyTransactionRejection extends PrettyPrinting with Product wi
 
   def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError
 
-  override protected def pretty: Pretty[this.type] = prettyOfString(_ => asString)
+  override def pretty: Pretty[this.type] = prettyOfString(_ => asString)
 }
 object TopologyTransactionRejection {
 
@@ -36,7 +36,7 @@ object TopologyTransactionRejection {
   case object NotAuthorized extends TopologyTransactionRejection {
     override def asString: String = "Not authorized"
 
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) =
       TopologyManagerError.UnauthorizedTransaction.Failure(asString)
   }
 
@@ -53,10 +53,11 @@ object TopologyTransactionRejection {
       loginAfter: Option[CantonTimestamp],
   ) extends TopologyTransactionRejection {
     override def asString: String =
-      s"Participant $participant onboarding rejected as restrictions $restriction are in place."
+      s"Participant ${participant} onboarding rejected as restrictions ${restriction} are in place."
 
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) =
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) = {
       TopologyManagerError.ParticipantOnboardingRefused.Reject(participant, restriction)
+    }
   }
 
   final case class NoCorrespondingActiveTxToRevoke(mapping: TopologyMapping)
@@ -69,59 +70,70 @@ object TopologyTransactionRejection {
 
   final case class InvalidTopologyMapping(err: String) extends TopologyTransactionRejection {
     override def asString: String = s"Invalid mapping: $err"
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) =
       TopologyManagerError.InvalidTopologyMapping.Reject(err)
-  }
-
-  final case class RemoveMustNotChangeMapping(actual: TopologyMapping, expected: TopologyMapping)
-      extends TopologyTransactionRejection {
-    override def asString: String = "Remove operation must not change the mapping to remove."
-
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-      TopologyManagerError.RemoveMustNotChangeMapping.Reject(actual, expected)
   }
 
   final case class SignatureCheckFailed(err: SignatureCheckError)
       extends TopologyTransactionRejection {
     override def asString: String = err.toString
-    override protected def pretty: Pretty[SignatureCheckFailed] = prettyOfClass(param("err", _.err))
+    override def pretty: Pretty[SignatureCheckFailed] = prettyOfClass(param("err", _.err))
 
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) =
       TopologyManagerError.InvalidSignatureError.Failure(err)
   }
-  final case class InvalidDomain(domain: DomainId) extends TopologyTransactionRejection {
-    override def asString: String = show"Invalid domain $domain"
-    override protected def pretty: Pretty[InvalidDomain] = prettyOfClass(param("domain", _.domain))
+  final case class WrongDomain(wrong: DomainId) extends TopologyTransactionRejection {
+    override def asString: String = show"Wrong domain $wrong"
+    override def pretty: Pretty[WrongDomain] = prettyOfClass(param("wrong", _.wrong))
 
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-      TopologyManagerError.InvalidDomain.Failure(domain)
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) =
+      TopologyManagerError.WrongDomain.Failure(wrong)
   }
   final case class Duplicate(old: CantonTimestamp) extends TopologyTransactionRejection {
-    override def asString: String = show"Duplicate transaction from $old"
-    override protected def pretty: Pretty[Duplicate] = prettyOfClass(param("old", _.old))
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+    override def asString: String = show"Duplicate transaction from ${old}"
+    override def pretty: Pretty[Duplicate] = prettyOfClass(param("old", _.old))
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) =
       TopologyManagerError.DuplicateTransaction.ExistsAt(old)
   }
   final case class SerialMismatch(expected: PositiveInt, actual: PositiveInt)
       extends TopologyTransactionRejection {
     override def asString: String =
       show"The given serial $actual does not match the expected serial $expected"
-    override protected def pretty: Pretty[SerialMismatch] =
+    override def pretty: Pretty[SerialMismatch] =
       prettyOfClass(param("expected", _.expected), param("actual", _.actual))
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) =
       TopologyManagerError.SerialMismatch.Failure(expected, actual)
   }
   final case class Other(str: String) extends TopologyTransactionRejection {
     override def asString: String = str
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext) =
       TopologyManagerError.InternalError.Other(str)
+  }
+
+  final case class ExtraTrafficLimitTooLow(
+      member: Member,
+      actual: PositiveLong,
+      expectedMinimum: PositiveLong,
+  ) extends TopologyTransactionRejection {
+    override def asString: String =
+      s"Extra traffic limit for $member should be at least $expectedMinimum, but was $actual."
+
+    override def pretty: Pretty[ExtraTrafficLimitTooLow] =
+      prettyOfClass(
+        param("member", _.member),
+        param("actual", _.actual),
+        param("expectedMinimum", _.expectedMinimum),
+      )
+
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+      TopologyManagerError.InvalidTrafficLimit.TrafficLimitTooLow(member, actual, expectedMinimum)
   }
 
   final case class InsufficientKeys(members: Seq[Member]) extends TopologyTransactionRejection {
     override def asString: String =
       s"Members ${members.sorted.mkString(", ")} are missing a signing key or an encryption key or both."
 
-    override protected def pretty: Pretty[InsufficientKeys] = prettyOfClass(
+    override def pretty: Pretty[InsufficientKeys] = prettyOfClass(
       param("members", _.members)
     )
 
@@ -132,9 +144,7 @@ object TopologyTransactionRejection {
   final case class UnknownMembers(members: Seq[Member]) extends TopologyTransactionRejection {
     override def asString: String = s"Members ${members.toSeq.sorted.mkString(", ")} are unknown."
 
-    override protected def pretty: Pretty[UnknownMembers] = prettyOfClass(
-      param("members", _.members)
-    )
+    override def pretty: Pretty[UnknownMembers] = prettyOfClass(param("members", _.members))
 
     override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
       TopologyManagerError.UnknownMembers.Failure(members)
@@ -146,13 +156,32 @@ object TopologyTransactionRejection {
       s"Cannot remove domain trust certificate for $participantId because it still hosts parties ${parties
           .mkString(",")}"
 
-    override protected def pretty: Pretty[ParticipantStillHostsParties] =
+    override def pretty: Pretty[ParticipantStillHostsParties] =
       prettyOfClass(param("participantId", _.participantId), param("parties", _.parties))
 
     override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
       TopologyManagerError.IllegalRemovalOfDomainTrustCertificate.ParticipantStillHostsParties(
         participantId,
         parties,
+      )
+  }
+
+  final case class PartyExceedsHostingLimit(
+      partyId: PartyId,
+      limit: Int,
+      numParticipants: Int,
+  ) extends TopologyTransactionRejection {
+    override def asString: String =
+      s"Party $partyId exceeds hosting limit of $limit with desired number of $numParticipants hosting participants."
+
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+      TopologyManagerError.PartyExceedsHostingLimit.Reject(partyId, limit, numParticipants)
+
+    override def pretty: Pretty[PartyExceedsHostingLimit.this.type] =
+      prettyOfClass(
+        param("partyId", _.partyId),
+        param("limit", _.limit),
+        param("number of hosting participants", _.numParticipants),
       )
   }
 
@@ -187,58 +216,34 @@ object TopologyTransactionRejection {
     override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
       TopologyManagerError.NamespaceAlreadyInUse.Reject(namespace)
 
-    override protected def pretty: Pretty[NamespaceAlreadyInUse.this.type] = prettyOfClass(
+    override def pretty: Pretty[NamespaceAlreadyInUse.this.type] = prettyOfClass(
       param("namespace", _.namespace)
     )
   }
 
-  final case class PartyIdConflictWithAdminParty(partyId: PartyId)
-      extends TopologyTransactionRejection {
+  final case class PartyIdIsAdminParty(partyId: PartyId) extends TopologyTransactionRejection {
     override def asString: String =
       s"The partyId $partyId is the same as an already existing admin party."
 
     override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-      TopologyManagerError.PartyIdConflictWithAdminParty.Reject(partyId)
+      TopologyManagerError.PartyIdIsAdminParty.Reject(partyId)
 
-    override protected def pretty: Pretty[PartyIdConflictWithAdminParty.this.type] = prettyOfClass(
+    override def pretty: Pretty[PartyIdIsAdminParty.this.type] = prettyOfClass(
       param("partyId", _.partyId)
     )
   }
 
-  final case class ParticipantIdConflictWithPartyId(participantId: ParticipantId, partyId: PartyId)
+  final case class ParticipantIdClashesWithPartyId(participantId: ParticipantId, partyId: PartyId)
       extends TopologyTransactionRejection {
-    override def asString: String =
-      s"Tried to onboard participant $participantId while party $partyId with the same UID already exists."
+    override def asString: String = ???
 
     override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-      TopologyManagerError.ParticipantIdConflictWithPartyId.Reject(participantId, partyId)
+      TopologyManagerError.ParticipantIdClashesWithPartyId.Reject(participantId, partyId)
 
-    override protected def pretty: Pretty[ParticipantIdConflictWithPartyId.this.type] =
+    override def pretty: Pretty[ParticipantIdClashesWithPartyId.this.type] =
       prettyOfClass(
         param("participantId", _.participantId),
         param("partyId", _.partyId),
       )
-  }
-
-  final case class MediatorsAlreadyInOtherGroups(
-      group: NonNegativeInt,
-      mediators: Map[MediatorId, NonNegativeInt],
-  ) extends TopologyTransactionRejection {
-    override def asString: String =
-      s"Tried to add mediators to group $group, but they are already assigned to other groups: ${mediators.toSeq
-          .sortBy(_._1.toProtoPrimitive)
-          .mkString(", ")}"
-
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-      TopologyManagerError.MediatorsAlreadyInOtherGroups.Reject(group, mediators)
-  }
-
-  final case class MembersCannotRejoinDomain(members: Seq[Member])
-      extends TopologyTransactionRejection {
-    override def asString: String =
-      s"Member ${members.sorted} tried to rejoin a domain from which they had previously left."
-
-    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-      TopologyManagerError.MemberCannotRejoinDomain.Reject(members)
   }
 }

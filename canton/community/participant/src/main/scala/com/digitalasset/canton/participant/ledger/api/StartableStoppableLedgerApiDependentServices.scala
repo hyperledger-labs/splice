@@ -5,23 +5,14 @@ package com.digitalasset.canton.participant.ledger.api
 
 import cats.Eval
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.digitalasset.canton.admin.participant.v30.{
-  PackageServiceGrpc,
-  PartyManagementServiceGrpc,
-  PingServiceGrpc,
-}
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.admin.participant.v30.{PackageServiceGrpc, PingServiceGrpc}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, CantonMutableHandlerRegistry}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.grpc.{
-  GrpcPackageService,
-  GrpcPartyManagementService,
-  GrpcPingService,
-}
+import com.digitalasset.canton.participant.admin.grpc.{GrpcPackageService, GrpcPingService}
 import com.digitalasset.canton.participant.admin.{AdminWorkflowServices, PackageService}
 import com.digitalasset.canton.participant.config.LocalParticipantConfig
 import com.digitalasset.canton.participant.sync.CantonSyncService
@@ -66,19 +57,10 @@ class StartableStoppableLedgerApiDependentServices(
   private type PackageServiceGrpc = ServerServiceDefinition
   private type PingServiceGrpc = ServerServiceDefinition
   private type ApiInfoServiceGrpc = ServerServiceDefinition
-  private type MaybePartyManagementGrpc = Option[ServerServiceDefinition]
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile private var servicesRef =
-    Option.empty[
-      (
-          AdminWorkflowServices,
-          PackageServiceGrpc,
-          PingServiceGrpc,
-          ApiInfoServiceGrpc,
-          MaybePartyManagementGrpc,
-      )
-    ]
+    Option.empty[(AdminWorkflowServices, PackageServiceGrpc, PingServiceGrpc, ApiInfoServiceGrpc)]
 
   // Start on initialization if pertaining to an active participant replica.
   if (syncService.isActive()) start()(TraceContext.empty)
@@ -102,7 +84,7 @@ class StartableStoppableLedgerApiDependentServices(
                 testingConfig,
                 packageService,
                 syncService,
-                participantId,
+                participantId.adminParty,
                 adminToken,
                 futureSupervisor,
                 loggerFactory,
@@ -139,27 +121,8 @@ class StartableStoppableLedgerApiDependentServices(
                   )
                 )
 
-            // Conditionally bind the party management grpc service
-            val (partyManagementGrpc, _) = adminWorkflowServices.partyManagementO.map {
-              case (_, partyReplicationCoordinator) =>
-                registry
-                  .addService(
-                    PartyManagementServiceGrpc.bindService(
-                      new GrpcPartyManagementService(partyReplicationCoordinator, loggerFactory),
-                      ec,
-                    )
-                  )
-            }.unzip
-
-            servicesRef = Some(
-              (
-                adminWorkflowServices,
-                packageServiceGrpc,
-                pingServiceGrpc,
-                apiInfoServiceGrpc,
-                partyManagementGrpc,
-              )
-            )
+            servicesRef =
+              Some((adminWorkflowServices, packageServiceGrpc, pingServiceGrpc, apiInfoServiceGrpc))
         }
       }
     }
@@ -169,20 +132,13 @@ class StartableStoppableLedgerApiDependentServices(
       synchronized {
         servicesRef match {
           case Some(
-                (
-                  adminWorkflowServices,
-                  packageServiceGrpc,
-                  pingGrpcService,
-                  apiInfoServiceGrpc,
-                  partyManagementGrpc,
-                )
+                (adminWorkflowServices, packageServiceGrpc, pingGrpcService, apiInfiServiceGrpc)
               ) =>
             logger.debug("Stopping Ledger API-dependent Canton services")(TraceContext.empty)
             servicesRef = None
             registry.removeServiceU(pingGrpcService)
             registry.removeServiceU(packageServiceGrpc)
-            registry.removeServiceU(apiInfoServiceGrpc)
-            partyManagementGrpc.foreach(registry.removeServiceU)
+            registry.removeServiceU(apiInfiServiceGrpc)
             adminWorkflowServices.close()
           case None =>
             logger.debug("Ledger API-dependent Canton services already stopped")(TraceContext.empty)

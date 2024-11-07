@@ -90,8 +90,9 @@ object SetCover {
 
     def sizeOnLastPrioQueueInsert: Int = sizeOnLastPrioQueueInsertVar
 
-    def updateSizeCache(): Unit =
+    def updateSizeCache(): Unit = {
       sizeOnLastPrioQueueInsertVar = uncovered.size
+    }
   }
   private object PrioQueueEntry {
     private val orderingSetAndUncoveredAny: Ordering[PrioQueueEntry[Any, Any]] =

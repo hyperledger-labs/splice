@@ -23,7 +23,10 @@ import com.digitalasset.canton.platform.store.entries.PartyLedgerEntry
 
 import java.sql.Connection
 
-class PartyStorageBackendTemplate(ledgerEndCache: LedgerEndCache) extends PartyStorageBackend {
+class PartyStorageBackendTemplate(
+    queryStrategy: QueryStrategy,
+    ledgerEndCache: LedgerEndCache,
+) extends PartyStorageBackend {
 
   private val partyEntryParser: RowParser[(Offset, PartyLedgerEntry)] = {
     import com.digitalasset.canton.platform.store.backend.Conversions.bigDecimalColumnToBoolean
@@ -78,9 +81,9 @@ class PartyStorageBackendTemplate(ledgerEndCache: LedgerEndCache) extends PartyS
       endInclusive: Offset,
       pageSize: Int,
       queryOffset: Long,
-  )(connection: Connection): Vector[(Offset, PartyLedgerEntry)] =
+  )(connection: Connection): Vector[(Offset, PartyLedgerEntry)] = {
     SQL"""select * from lapi_party_entries
-      where ${QueryStrategy.offsetIsBetween(
+      where ${queryStrategy.offsetIsBetween(
         nonNullableColumn = "ledger_offset",
         startExclusive = startExclusive,
         endInclusive = endInclusive,
@@ -90,6 +93,7 @@ class PartyStorageBackendTemplate(ledgerEndCache: LedgerEndCache) extends PartyS
       fetch next $pageSize rows only
       """
       .asVectorOf(partyEntryParser)(connection)
+  }
 
   private val partyDetailsParser: RowParser[IndexerPartyDetails] = {
     import com.digitalasset.canton.platform.store.backend.Conversions.bigDecimalColumnToBoolean
@@ -114,11 +118,11 @@ class PartyStorageBackendTemplate(ledgerEndCache: LedgerEndCache) extends PartyS
     SQL"""
         SELECT
           party,
-          #${QueryStrategy.lastByProxyAggregateFuction(
+          #${queryStrategy.lastByProxyAggregateFuction(
         "display_name",
         "ledger_offset",
       )} display_name,
-          #${QueryStrategy.booleanOrAggregationFunction}(is_local) is_local
+          #${queryStrategy.booleanOrAggregationFunction}(is_local) is_local
         FROM lapi_party_entries
         WHERE
           ledger_offset <= $ledgerEndOffset AND

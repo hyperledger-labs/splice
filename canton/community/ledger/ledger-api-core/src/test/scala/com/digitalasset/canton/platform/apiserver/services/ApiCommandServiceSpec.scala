@@ -6,8 +6,8 @@ package com.digitalasset.canton.platform.apiserver.services
 import com.daml.ledger.api.v2.command_service.{
   SubmitAndWaitForTransactionResponse,
   SubmitAndWaitForTransactionTreeResponse,
+  SubmitAndWaitForUpdateIdResponse,
   SubmitAndWaitRequest,
-  SubmitAndWaitResponse,
 }
 import com.daml.ledger.api.v2.commands.{Command, CreateCommand}
 import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
@@ -21,6 +21,7 @@ import com.digitalasset.canton.ledger.api.validation.{
 }
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.daml.lf.data.Ref
+import com.google.protobuf.empty.Empty
 import org.mockito.captor.ArgCaptor
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
 import org.scalatest.matchers.should.Matchers
@@ -62,6 +63,9 @@ class ApiCommandServiceSpec
       for {
         _ <- grpcCommandService.submitAndWait(aSubmitAndWaitRequestWithNoSubmissionId)
         _ <- grpcCommandService.submitAndWaitForTransaction(aSubmitAndWaitRequestWithNoSubmissionId)
+        _ <- grpcCommandService.submitAndWaitForUpdateId(
+          aSubmitAndWaitRequestWithNoSubmissionId
+        )
         _ <- grpcCommandService.submitAndWaitForTransactionTree(
           aSubmitAndWaitRequestWithNoSubmissionId
         )
@@ -81,10 +85,14 @@ class ApiCommandServiceSpec
           any[LoggingContextWithTrace]
         )
         requestCaptorSubmitAndWait.value shouldBe expectedSubmitAndWaitRequest("2")
-        verify(mockCommandService).submitAndWaitForTransactionTree(
+        verify(mockCommandService).submitAndWaitForUpdateId(
           requestCaptorSubmitAndWait.capture
         )(any[LoggingContextWithTrace])
         requestCaptorSubmitAndWait.value shouldBe expectedSubmitAndWaitRequest("3")
+        verify(mockCommandService).submitAndWaitForTransactionTree(
+          requestCaptorSubmitAndWait.capture
+        )(any[LoggingContextWithTrace])
+        requestCaptorSubmitAndWait.value shouldBe expectedSubmitAndWaitRequest("4")
         succeed
       }
     }
@@ -109,6 +117,7 @@ class ApiCommandServiceSpec
       for {
         _ <- grpcCommandService.submitAndWait(submissionWithDisclosedContracts)
         _ <- grpcCommandService.submitAndWaitForTransaction(submissionWithDisclosedContracts)
+        _ <- grpcCommandService.submitAndWaitForUpdateId(submissionWithDisclosedContracts)
         _ <- grpcCommandService.submitAndWaitForTransactionTree(submissionWithDisclosedContracts)
       } yield {
         succeed
@@ -150,13 +159,19 @@ object ApiCommandServiceSpec {
     when(
       mockCommandService.submitAndWait(any[SubmitAndWaitRequest])(any[LoggingContextWithTrace])
     )
-      .thenReturn(Future.successful(SubmitAndWaitResponse.defaultInstance))
+      .thenReturn(Future.successful(Empty.defaultInstance))
     when(
       mockCommandService.submitAndWaitForTransaction(any[SubmitAndWaitRequest])(
         any[LoggingContextWithTrace]
       )
     )
       .thenReturn(Future.successful(SubmitAndWaitForTransactionResponse.defaultInstance))
+    when(
+      mockCommandService.submitAndWaitForUpdateId(any[SubmitAndWaitRequest])(
+        any[LoggingContextWithTrace]
+      )
+    )
+      .thenReturn(Future.successful(SubmitAndWaitForUpdateIdResponse.defaultInstance))
     when(
       mockCommandService.submitAndWaitForTransactionTree(any[SubmitAndWaitRequest])(
         any[LoggingContextWithTrace]
