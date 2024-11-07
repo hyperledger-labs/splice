@@ -127,11 +127,12 @@ class IterableUtilTest extends AnyWordSpec with BaseTest {
   }
 
   @tailrec
-  private def isPrime(i: Int): Boolean =
+  private def isPrime(i: Int): Boolean = {
     if (i == Integer.MIN_VALUE) false
     else if (i < 0) isPrime(-i)
     else if (i < 2) false
     else (2 to Math.sqrt(i.toDouble).toInt).forall(d => i % d != 0)
+  }
 }
 
 object IterableUtilTest {

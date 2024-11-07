@@ -5,7 +5,6 @@ package com.digitalasset.canton.crypto.store
 
 import cats.data.EitherT
 import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.*
@@ -61,20 +60,6 @@ trait CryptoPrivateStore extends AutoCloseable {
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Boolean]
 
-  /** Filter signing keys by checking if their usage intersects with the provided 'filterUsage' set.
-    * This ensures that only keys with one or more matching usages are retained.
-    *
-    * @param signingKeyIds the fingerprint of the keys to filter
-    * @param filterUsage the key usages to filter for
-    * @return
-    */
-  def filterSigningKeys(
-      signingKeyIds: Seq[Fingerprint],
-      filterUsage: NonEmpty[Set[SigningKeyUsage]],
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Seq[Fingerprint]]
-
   def existsSigningKey(signingKeyId: Fingerprint)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Boolean]
@@ -101,7 +86,6 @@ trait CryptoPrivateStore extends AutoCloseable {
 }
 
 object CryptoPrivateStore {
-
   trait CryptoPrivateStoreFactory {
     def create(
         storage: Storage,
@@ -157,34 +141,30 @@ object CryptoPrivateStoreError extends CantonErrorGroups.CommandErrorGroup {
   }
 
   final case class FailedToGetWrapperKeyId(reason: String) extends CryptoPrivateStoreError {
-    override protected def pretty: Pretty[FailedToGetWrapperKeyId] = prettyOfClass(
+    override def pretty: Pretty[FailedToGetWrapperKeyId] = prettyOfClass(
       unnamedParam(_.reason.unquoted)
     )
   }
 
   final case class FailedToReadKey(keyId: Fingerprint, reason: String)
       extends CryptoPrivateStoreError {
-    override protected def pretty: Pretty[FailedToReadKey] = prettyOfClass(
-      unnamedParam(_.reason.unquoted)
-    )
+    override def pretty: Pretty[FailedToReadKey] = prettyOfClass(unnamedParam(_.reason.unquoted))
   }
 
   final case class InvariantViolation(keyId: Fingerprint, reason: String)
       extends CryptoPrivateStoreError {
-    override protected def pretty: Pretty[InvariantViolation] = prettyOfClass(
-      unnamedParam(_.reason.unquoted)
-    )
+    override def pretty: Pretty[InvariantViolation] = prettyOfClass(unnamedParam(_.reason.unquoted))
   }
 
   final case class FailedToInsertKey(keyId: Fingerprint, reason: String)
       extends CryptoPrivateStoreError {
-    override protected def pretty: Pretty[FailedToInsertKey] =
+    override def pretty: Pretty[FailedToInsertKey] =
       prettyOfClass(param("keyId", _.keyId), param("reason", _.reason.unquoted))
   }
 
   final case class KeyAlreadyExists(keyId: Fingerprint, existingKeyName: Option[String])
       extends CryptoPrivateStoreError {
-    override protected def pretty: Pretty[KeyAlreadyExists] =
+    override def pretty: Pretty[KeyAlreadyExists] =
       prettyOfClass(
         param("keyId", _.keyId),
         param("existingKeyName", _.existingKeyName.getOrElse("").unquoted),
@@ -193,18 +173,18 @@ object CryptoPrivateStoreError extends CantonErrorGroups.CommandErrorGroup {
 
   final case class FailedToDeleteKey(keyId: Fingerprint, reason: String)
       extends CryptoPrivateStoreError {
-    override protected def pretty: Pretty[FailedToDeleteKey] =
+    override def pretty: Pretty[FailedToDeleteKey] =
       prettyOfClass(param("keyId", _.keyId), param("reason", _.reason.unquoted))
   }
 
   final case class EncryptedPrivateStoreError(reason: String) extends CryptoPrivateStoreError {
-    override protected def pretty: Pretty[EncryptedPrivateStoreError] = prettyOfClass(
+    override def pretty: Pretty[EncryptedPrivateStoreError] = prettyOfClass(
       unnamedParam(_.reason.unquoted)
     )
   }
 
   final case class WrapperKeyAlreadyInUse(reason: String) extends CryptoPrivateStoreError {
-    override protected def pretty: Pretty[WrapperKeyAlreadyInUse] = prettyOfClass(
+    override def pretty: Pretty[WrapperKeyAlreadyInUse] = prettyOfClass(
       unnamedParam(_.reason.unquoted)
     )
   }

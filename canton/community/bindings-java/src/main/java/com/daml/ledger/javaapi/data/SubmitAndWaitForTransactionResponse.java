@@ -12,8 +12,12 @@ public final class SubmitAndWaitForTransactionResponse {
 
   @NonNull private final Transaction transaction;
 
-  private SubmitAndWaitForTransactionResponse(@NonNull Transaction transaction) {
+  @NonNull private final String completionOffset;
+
+  private SubmitAndWaitForTransactionResponse(
+      @NonNull Transaction transaction, @NonNull String completionOffset) {
     this.transaction = transaction;
+    this.completionOffset = completionOffset;
   }
 
   @NonNull
@@ -22,26 +26,33 @@ public final class SubmitAndWaitForTransactionResponse {
   }
 
   @NonNull
-  public Long getCompletionOffset() {
-    return transaction.getOffset();
+  public String getCompletionOffset() {
+    return completionOffset;
   }
 
   public static SubmitAndWaitForTransactionResponse fromProto(
       CommandServiceOuterClass.SubmitAndWaitForTransactionResponse response) {
     return new SubmitAndWaitForTransactionResponse(
-        Transaction.fromProto(response.getTransaction()));
+        Transaction.fromProto(response.getTransaction()), response.getCompletionOffset());
   }
 
   public CommandServiceOuterClass.SubmitAndWaitForTransactionResponse toProto() {
     return CommandServiceOuterClass.SubmitAndWaitForTransactionResponse.newBuilder()
         .setTransaction(transaction.toProto())
+        .setCompletionOffset(completionOffset)
         .build();
   }
 
   @Override
   public String toString() {
 
-    return "SubmitAndWaitForTransactionResponse{" + "transaction=" + transaction + '}';
+    return "SubmitAndWaitForTransactionResponse{"
+        + "transaction="
+        + transaction
+        + ", completionOffset='"
+        + completionOffset
+        + '\''
+        + '}';
   }
 
   @Override
@@ -49,11 +60,12 @@ public final class SubmitAndWaitForTransactionResponse {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     SubmitAndWaitForTransactionResponse that = (SubmitAndWaitForTransactionResponse) o;
-    return Objects.equals(transaction, that.transaction);
+    return Objects.equals(transaction, that.transaction)
+        && Objects.equals(completionOffset, that.completionOffset);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(transaction);
+    return Objects.hash(transaction, completionOffset);
   }
 }

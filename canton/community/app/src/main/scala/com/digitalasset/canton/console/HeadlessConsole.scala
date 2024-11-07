@@ -6,8 +6,8 @@ package com.digitalasset.canton.console
 import ammonite.Main
 import ammonite.interp.Interpreter
 import ammonite.runtime.Frame
-import ammonite.util.*
 import ammonite.util.Res.{Exception, Failing, Failure, Success}
+import ammonite.util.*
 import cats.syntax.either.*
 import com.digitalasset.canton.console.HeadlessConsole.{
   HeadlessConsoleError,
@@ -85,8 +85,9 @@ class HeadlessConsole(
     )
   } yield ()
 
-  override def close(): Unit =
+  override def close(): Unit = {
     lock.release()
+  }
 }
 
 /** Creates an interpreter but with matching bindings to the InteractiveConsole for running scripts non-interactively
@@ -195,7 +196,7 @@ object HeadlessConsole extends NoTracing {
   ): Either[HeadlessConsoleError, Unit] =
     result match {
       case Success(_) =>
-        Either.unit
+        Right(())
       case failing: Failing => Left(convertAmmoniteError(failing, logger))
       case unexpected =>
         logger.error("Unexpected result from ammonite: {}", unexpected)
@@ -223,24 +224,21 @@ object HeadlessConsole extends NoTracing {
       options.verboseOutput,
     )
     val frame = Frame.createInitial()
-    val interpreterParameters = Interpreter.Parameters(
+
+    new Interpreter(
+      compilerBuilder = ammonite.compiler.CompilerBuilder,
+      parser = ammonite.compiler.Parsers,
       printer = printer,
       storage = options.storageBackend,
       wd = options.wd,
       colors = colorsRef,
       verboseOutput = options.verboseOutput,
-      initialClassLoader = null,
-      alreadyLoadedDependencies = options.alreadyLoadedDependencies,
-    )
-
-    new Interpreter(
-      compilerBuilder = ammonite.compiler.CompilerBuilder(),
-      parser = () => ammonite.compiler.Parsers,
       getFrame = () => frame,
       createFrame = () => sys.error("Session loading / saving is not supported"),
+      initialClassLoader = null,
       replCodeWrapper = options.replCodeWrapper,
       scriptCodeWrapper = options.scriptCodeWrapper,
-      parameters = interpreterParameters,
+      alreadyLoadedDependencies = options.alreadyLoadedDependencies,
     )
   }
 
@@ -253,8 +251,9 @@ object HeadlessConsole extends NoTracing {
              | .value0
              | .bindings($idx)
              | .value
-             | .asInstanceOf[${b.typeName.value}]
+             | .asInstanceOf[${b.typeTag.tpe}]
       """.stripMargin
       }
       .mkString(System.lineSeparator)
+
 }

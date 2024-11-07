@@ -3,22 +3,20 @@
 
 package com.digitalasset.canton.participant.store
 
-import cats.Eval
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.PackageDependencyResolver
-import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
+import com.digitalasset.canton.participant.store.EventLogId.DomainEventLogId
 import com.digitalasset.canton.participant.store.db.DbSyncDomainPersistentState
 import com.digitalasset.canton.participant.store.memory.InMemorySyncDomainPersistentState
-import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.store.*
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.DomainStore
 import com.digitalasset.canton.topology.{DomainOutboxQueue, DomainTopologyManager, ParticipantId}
+import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
@@ -29,13 +27,15 @@ trait SyncDomainPersistentState extends NamedLogging with AutoCloseable {
 
   /** The crypto operations used on the domain */
   def pureCryptoApi: CryptoPureApi
-  def indexedDomain: IndexedDomain
-  def staticDomainParameters: StaticDomainParameters
+  def domainId: IndexedDomain
+  def protocolVersion: ProtocolVersion
   def enableAdditionalConsistencyChecks: Boolean
+  def eventLog: SingleDimensionEventLog[DomainEventLogId]
   def contractStore: ContractStore
-  def reassignmentStore: ReassignmentStore
+  def transferStore: TransferStore
   def activeContractStore: ActiveContractStore
   def sequencedEventStore: SequencedEventStore
+  def sequencerCounterTrackerStore: SequencerCounterTrackerStore
   def sendTrackerStore: SendTrackerStore
   def requestJournalStore: RequestJournalStore
   def acsCommitmentStore: AcsCommitmentStore
@@ -46,7 +46,6 @@ trait SyncDomainPersistentState extends NamedLogging with AutoCloseable {
   def topologyStore: TopologyStore[DomainStore]
   def topologyManager: DomainTopologyManager
   def domainOutboxQueue: DomainOutboxQueue
-  def acsInspection: AcsInspection
 }
 
 object SyncDomainPersistentState {
@@ -55,13 +54,11 @@ object SyncDomainPersistentState {
       participantId: ParticipantId,
       storage: Storage,
       domainId: IndexedDomain,
-      staticDomainParameters: StaticDomainParameters,
+      protocolVersion: ProtocolVersion,
       clock: Clock,
       crypto: Crypto,
       parameters: ParticipantNodeParameters,
       indexedStringStore: IndexedStringStore,
-      packageDependencyResolver: PackageDependencyResolver,
-      ledgerApiStore: Eval[LedgerApiStore],
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit ec: ExecutionContext): SyncDomainPersistentState = {
@@ -73,12 +70,10 @@ object SyncDomainPersistentState {
           clock,
           crypto,
           domainId,
-          staticDomainParameters,
+          protocolVersion,
           parameters.enableAdditionalConsistencyChecks,
           indexedStringStore,
           exitOnFatalFailures = parameters.exitOnFatalFailures,
-          packageDependencyResolver,
-          ledgerApiStore,
           domainLoggerFactory,
           parameters.processingTimeouts,
           futureSupervisor,
@@ -87,14 +82,12 @@ object SyncDomainPersistentState {
         new DbSyncDomainPersistentState(
           participantId,
           domainId,
-          staticDomainParameters,
+          protocolVersion,
           clock,
           db,
           crypto,
           parameters,
           indexedStringStore,
-          packageDependencyResolver,
-          ledgerApiStore,
           domainLoggerFactory,
           futureSupervisor,
         )

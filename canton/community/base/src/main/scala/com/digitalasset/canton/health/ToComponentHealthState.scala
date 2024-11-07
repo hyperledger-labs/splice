@@ -6,5 +6,8 @@ package com.digitalasset.canton.health
 /** Interface that provides conversion from a State type to [[ComponentHealthState]]
   */
 trait ToComponentHealthState {
+
+  /** Convert a state to [[ComponentHealthState]]
+    */
   def toComponentHealthState: ComponentHealthState
 }

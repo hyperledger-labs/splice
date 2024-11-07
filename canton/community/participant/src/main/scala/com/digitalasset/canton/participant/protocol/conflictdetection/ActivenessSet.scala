@@ -4,20 +4,20 @@
 package com.digitalasset.canton.participant.protocol.conflictdetection
 
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.protocol.{LfContractId, TransferId}
 import com.digitalasset.canton.util.SetsUtil.requireDisjoint
 
-/** Defines the contracts and reassignments for conflict detection.
-  * Reassignments are not locked because the reassigned contracts are already being locked.
+/** Defines the contracts and transfers for conflict detection.
+  * Transfers are not locked because the transferred contracts are already being locked.
   */
 final case class ActivenessSet(
     contracts: ActivenessCheck[LfContractId],
-    reassignmentIds: Set[ReassignmentId],
+    transferIds: Set[TransferId],
 ) extends PrettyPrinting {
 
-  override protected def pretty: Pretty[ActivenessSet] = prettyOfClass(
+  override def pretty: Pretty[ActivenessSet] = prettyOfClass(
     param("contracts", _.contracts),
-    paramIfNonEmpty("reassignmentIds", _.reassignmentIds),
+    paramIfNonEmpty("transferIds", _.transferIds),
   )
 }
 
@@ -64,7 +64,7 @@ private[participant] final case class ActivenessCheck[Key] private (
 
   val lockOnly: Set[Key] = lock -- checkFresh -- checkFree -- checkActive
 
-  override protected def pretty: Pretty[ActivenessCheck.this.type] = prettyOfClass(
+  override def pretty: Pretty[ActivenessCheck.this.type] = prettyOfClass(
     paramIfNonEmpty("fresh", _.checkFresh),
     paramIfNonEmpty("free", _.checkFree),
     paramIfNonEmpty("active", _.checkActive),

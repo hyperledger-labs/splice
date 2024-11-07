@@ -5,16 +5,15 @@ package com.digitalasset.canton.store.db
 
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.pruning.{PruningPhase, PruningStatus}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.store.{IndexedDomain, IndexedString, PrunableByTime}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.jdbc.SetParameter
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
-/** Mixin for a db store that stores the latest point in time when
+/** Mixin for an db store that stores the latest point in time when
   * pruning has started or finished.
   *
   * The pruning method of the store must use [[advancePruningTimestamp]] to signal the start end completion
@@ -36,7 +35,7 @@ trait DbPrunableByTime extends PrunableByTime {
     */
   protected[this] def pruning_status_table: String
 
-  protected[this] def partitionColumn: String = "domain_idx"
+  protected[this] def partitionColumn: String = "domain_id"
 
   protected[this] def partitionKey: IndexedDomain
 
@@ -46,17 +45,17 @@ trait DbPrunableByTime extends PrunableByTime {
 
   override def pruningStatus(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[PruningStatus]] = {
+  ): Future[Option[PruningStatus]] = {
     val query = sql"""
         select phase, ts, succeeded from #$pruning_status_table
         where #$partitionColumn = $partitionKey
         """.as[PruningStatus].headOption
-    storage.queryUnlessShutdown(query, functionFullName)
+    storage.query(query, functionFullName)
   }
 
   protected[canton] def advancePruningTimestamp(phase: PruningPhase, timestamp: CantonTimestamp)(
       implicit traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] = {
+  ): Future[Unit] = {
 
     val query = (storage.profile, phase) match {
       case (_: DbStorage.Profile.Postgres, PruningPhase.Completed) =>
@@ -86,6 +85,24 @@ trait DbPrunableByTime extends PrunableByTime {
             update set phase = CAST($phase as pruning_phase), ts = $timestamp
             where pruning_status.ts < $timestamp
           """
+      case (_: DbStorage.Profile.Oracle, PruningPhase.Started) =>
+        sqlu"""
+          merge into #$pruning_status_table pruning_status
+          using (
+            select
+              $partitionKey partitionKey,
+              $phase phase,
+              $timestamp timestamp
+              from
+                dual
+          ) val
+          on (pruning_status.#$partitionColumn = val.partitionKey)
+            when matched then
+                update set pruning_status.phase = val.phase, pruning_status.ts = val.timestamp
+                where pruning_status.ts < val.timestamp
+            when not matched then
+              insert (#$partitionColumn, phase, ts) values (val.partitionKey, val.phase, val.timestamp)
+          """
     }
 
     logger.debug(
@@ -93,7 +110,7 @@ trait DbPrunableByTime extends PrunableByTime {
     )
 
     for {
-      rowCount <- storage.updateUnlessShutdown(query, "pruning status upsert")
+      rowCount <- storage.update(query, "pruning status upsert")
       _ <-
         if (logger.underlying.isDebugEnabled && rowCount != 1 && phase == PruningPhase.Started) {
           pruningStatus.map {
@@ -103,7 +120,7 @@ trait DbPrunableByTime extends PrunableByTime {
               )
             case _ =>
           }
-        } else FutureUnlessShutdown.pure(())
+        } else Future.successful(())
     } yield {
       logger.debug(
         s"Finished setting phase of $pruning_status_table to \"${phase.kind}\" and timestamp to $timestamp"
@@ -112,12 +129,12 @@ trait DbPrunableByTime extends PrunableByTime {
   }
 }
 
-/** Specialized [[DbPrunableByTime]] that uses the domain as discriminator */
+/** Specialized [[DbPrunableByTime]] that uses the [[com.digitalasset.canton.topology.DomainId]] as discriminator */
 trait DbPrunableByTimeDomain extends DbPrunableByTime {
   this: DbStore =>
 
-  protected[this] def indexedDomain: IndexedDomain
+  protected[this] def domainId: IndexedDomain
 
-  override protected[this] def partitionKey: IndexedDomain = indexedDomain
+  override protected[this] def partitionKey: IndexedDomain = domainId
 
 }

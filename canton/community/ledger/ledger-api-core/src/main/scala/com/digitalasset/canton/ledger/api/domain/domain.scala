@@ -7,11 +7,16 @@ import com.daml.logging.entries.{LoggingValue, ToLoggingValue}
 import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.daml.lf.command.ApiCommands as LfCommands
+import com.digitalasset.daml.lf.command.{
+  ApiCommands as LfCommands,
+  DisclosedContract as LfDisclosedContract,
+}
+import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.logging.*
-import com.digitalasset.daml.lf.data.{ImmArray, Ref}
-import com.digitalasset.daml.lf.transaction.FatContractInstance
+import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref}
+import com.digitalasset.daml.lf.transaction.TransactionVersion
+import com.digitalasset.daml.lf.value.Value as Lf
 import scalaz.@@
 import scalaz.syntax.tag.*
 
@@ -23,7 +28,7 @@ final case class TransactionFilter(
 )
 
 final case class InterfaceFilter(
-    interfaceTypeRef: Ref.TypeConRef,
+    interfaceId: Ref.Identifier,
     includeView: Boolean,
     includeCreatedEventBlob: Boolean,
 )
@@ -62,15 +67,29 @@ object CumulativeFilter {
 
 }
 
-object types {
-  type ParticipantOffset = Ref.HexString
-}
+sealed abstract class ParticipantOffset extends Product with Serializable
 
 object ParticipantOffset {
-  val ParticipantBegin: types.ParticipantOffset = Ref.HexString.assertFromString("")
 
-  def fromString(str: String): types.ParticipantOffset =
-    Ref.HexString.assertFromString(str)
+  final case class Absolute(value: Ref.LedgerString) extends ParticipantOffset
+
+  case object ParticipantBegin extends ParticipantOffset
+
+  case object ParticipantEnd extends ParticipantOffset
+
+  implicit val `Absolute Ordering`: Ordering[ParticipantOffset.Absolute] =
+    Ordering.by[ParticipantOffset.Absolute, String](_.value)
+
+  implicit val `ParticipantOffset to LoggingValue`: ToLoggingValue[ParticipantOffset] = value =>
+    LoggingValue.OfString(value match {
+      case ParticipantOffset.Absolute(absolute) => absolute
+      case ParticipantOffset.ParticipantBegin => "%begin%"
+      case ParticipantOffset.ParticipantEnd => "%end%"
+    })
+
+  def fromString(str: String): ParticipantOffset =
+    if (str.isEmpty) ParticipantBegin
+    else Absolute(Ref.LedgerString.assertFromString(str))
 }
 
 final case class Commands(
@@ -84,13 +103,13 @@ final case class Commands(
     deduplicationPeriod: DeduplicationPeriod,
     commands: LfCommands,
     disclosedContracts: ImmArray[DisclosedContract],
-    domainId: Option[DomainId],
+    domainId: Option[DomainId] = None,
     packagePreferenceSet: Set[Ref.PackageId] = Set.empty,
     // Used to indicate the package map against which package resolution was performed.
     packageMap: Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)] = Map.empty,
 ) extends PrettyPrinting {
 
-  override protected def pretty: Pretty[Commands] = {
+  override def pretty: Pretty[Commands] = {
     import com.digitalasset.canton.logging.pretty.PrettyInstances.*
     prettyOfClass(
       param("commandId", _.commandId.unwrap),
@@ -106,6 +125,30 @@ final case class Commands(
       indicateOmittedFields,
     )
   }
+}
+
+final case class DisclosedContract(
+    templateId: Ref.TypeConName,
+    packageName: Ref.PackageName,
+    packageVersion: Option[Ref.PackageVersion],
+    contractId: Lf.ContractId,
+    argument: Value,
+    createdAt: Timestamp,
+    keyHash: Option[crypto.Hash],
+    signatories: Set[Ref.Party],
+    stakeholders: Set[Ref.Party],
+    keyMaintainers: Option[Set[Ref.Party]],
+    keyValue: Option[Value],
+    driverMetadata: Bytes,
+    transactionVersion: TransactionVersion,
+) {
+  def toLf: LfDisclosedContract =
+    LfDisclosedContract(
+      templateId,
+      contractId,
+      argument,
+      keyHash,
+    )
 }
 
 object Commands {
@@ -125,21 +168,6 @@ object Commands {
       "readAs" -> commands.readAs,
       "submittedAt" -> commands.submittedAt,
       "deduplicationPeriod" -> commands.deduplicationPeriod,
-    )
-  }
-}
-
-final case class DisclosedContract(
-    fatContractInstance: FatContractInstance,
-    domainIdO: Option[DomainId],
-) extends PrettyPrinting {
-  override protected def pretty: Pretty[DisclosedContract] = {
-    import com.digitalasset.canton.logging.pretty.PrettyInstances.*
-    prettyOfClass(
-      param("contractId", _.fatContractInstance.contractId),
-      param("templateId", _.fatContractInstance.templateId),
-      paramIfDefined("domainId", _.domainIdO),
-      indicateOmittedFields,
     )
   }
 }

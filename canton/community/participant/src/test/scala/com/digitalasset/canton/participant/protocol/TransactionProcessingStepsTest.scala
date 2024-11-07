@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.syntax.either.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
@@ -45,10 +44,10 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
       override def verifyMetadata(
           contract: SerializableContract,
           metadata: ContractMetadata,
-      ): Either[String, Unit] = Either.unit
+      ): Either[String, Unit] = Right(())
     },
     new AuthenticationValidator(),
-    new AuthorizationValidator(participantId, true),
+    new AuthorizationValidator(participantId),
     new InternalConsistencyChecker(
       defaultStaticDomainParameters.protocolVersion,
       loggerFactory,
@@ -66,7 +65,7 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
 
     "provided with valid input contracts" should {
       "succeed" in {
-        val testInstance = buildTestInstance(c1 -> Either.unit, c2 -> Either.unit)
+        val testInstance = buildTestInstance(c1 -> Right(()), c2 -> Right(()))
 
         val result = testInstance.authenticateInputContractsInternal(inputContracts)
         result.value.map(_ shouldBe Right[TransactionProcessorError, Unit](()))
@@ -76,7 +75,7 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
     "provided with contracts failing authentication" must {
       "convert failure and raise alarm" in {
         val testInstance =
-          buildTestInstance(c1 -> Either.unit, c2 -> Left("some authentication failure"))
+          buildTestInstance(c1 -> Right(()), c2 -> Left("some authentication failure"))
 
         val (expectedLog, expectedResult) = {
           val expectedLog: LogEntry => Assertion =

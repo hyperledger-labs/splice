@@ -5,8 +5,7 @@ package com.digitalasset.canton.protocol.messages
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.SigningKeyUsage
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.TestDomainParameters
 import com.digitalasset.canton.serialization.HasCryptographicEvidenceTest
@@ -25,24 +24,23 @@ class TopologyTransactionTest extends AnyWordSpec with BaseTest with HasCryptogr
   private val crypto =
     TestingTopology(sequencerGroup =
       SequencerGroup(
-        active = Seq(SequencerId(domainId.uid)),
+        active = NonEmpty.mk(Seq, SequencerId(domainId.uid)),
         passive = Seq.empty,
         threshold = PositiveInt.one,
       )
     ).build(loggerFactory).forOwnerAndDomain(sequencerId, domainId)
   private val publicKey =
     crypto.currentSnapshotApproximation.ipsSnapshot
-      .signingKeys(sequencerId, SigningKeyUsage.All)
+      .signingKey(sequencerId)
       .futureValue
-      // for this test it does not really matter what public signing key we use
-      .lastOption
-      .getOrElse(sys.error("no keys"))
+      .getOrElse(sys.error("no key"))
   private val defaultDynamicDomainParameters = TestDomainParameters.defaultDynamic
 
   private def mk[T <: TopologyMapping](
       mapping: T
-  ): TopologyTransaction[TopologyChangeOp.Replace, T] =
+  ): TopologyTransaction[TopologyChangeOp.Replace, T] = {
     TopologyTransaction(TopologyChangeOp.Replace, PositiveInt.one, mapping, testedProtocolVersion)
+  }
 
   private val deserialize: ByteString => TopologyTransaction[TopologyChangeOp, TopologyMapping] =
     bytes =>
@@ -85,8 +83,8 @@ class TopologyTransactionTest extends AnyWordSpec with BaseTest with HasCryptogr
     }
 
     "key to owner mappings" should {
-      val k1 = mk(OwnerToKeyMapping(sequencerId, NonEmpty(Seq, publicKey)))
-      val k2 = mk(OwnerToKeyMapping(sequencerId, NonEmpty(Seq, publicKey)))
+      val k1 = mk(OwnerToKeyMapping(sequencerId, None, NonEmpty(Seq, publicKey)))
+      val k2 = mk(OwnerToKeyMapping(sequencerId, None, NonEmpty(Seq, publicKey)))
       runTest(k1, k2)
     }
 
@@ -95,8 +93,10 @@ class TopologyTransactionTest extends AnyWordSpec with BaseTest with HasCryptogr
         mk(
           PartyToParticipant.tryCreate(
             PartyId(uid),
+            None,
             PositiveInt.one,
             Seq(HostingParticipant(ParticipantId(uid2), ParticipantPermission.Observation)),
+            groupAddressing = false,
           )
         )
 
@@ -104,11 +104,13 @@ class TopologyTransactionTest extends AnyWordSpec with BaseTest with HasCryptogr
         mk(
           PartyToParticipant.tryCreate(
             PartyId(uid),
+            Some(domainId),
             PositiveInt.two,
             Seq(
               HostingParticipant(ParticipantId(uid2), ParticipantPermission.Confirmation),
               HostingParticipant(ParticipantId(uid), ParticipantPermission.Submission),
             ),
+            groupAddressing = true,
           )
         )
 
@@ -130,7 +132,7 @@ class TopologyTransactionTest extends AnyWordSpec with BaseTest with HasCryptogr
           domainId,
           ParticipantId(uid),
           ParticipantPermission.Observation,
-          limits = Some(ParticipantDomainLimits(NonNegativeInt.tryCreate(13))),
+          limits = Some(ParticipantDomainLimits(13, 37, 42)),
           loginAfter = Some(CantonTimestamp.MinValue.plusSeconds(17)),
         )
       )

@@ -4,7 +4,6 @@
 package com.digitalasset.canton.domain.sequencing.sequencer.block
 
 import cats.data.EitherT
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.block.{
   RawLedgerBlock,
   SequencerDriver,
@@ -12,8 +11,6 @@ import com.digitalasset.canton.domain.block.{
 }
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer.SignedOrderingRequest
 import com.digitalasset.canton.domain.sequencing.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
-import com.digitalasset.canton.domain.sequencing.sequencer.errors.SequencerError
-import com.digitalasset.canton.sequencer.admin.v30
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.ServerServiceDefinition
@@ -57,9 +54,4 @@ class DriverBlockOrderer(
     driver.close()
 
   override def adminServices: Seq[ServerServiceDefinition] = driver.adminServices
-
-  override def sequencerSnapshotAdditionalInfo(
-      timestamp: CantonTimestamp
-  ): EitherT[Future, SequencerError, Option[v30.BftSequencerSnapshotAdditionalInfo]] =
-    EitherT.rightT(None)
 }

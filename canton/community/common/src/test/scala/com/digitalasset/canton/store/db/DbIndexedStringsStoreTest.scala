@@ -24,8 +24,12 @@ trait DbIndexedStringsStoreTest
 
   override def cleanDb(storage: DbStorage): Future[Unit] = {
     import storage.api.*
-    val query =
-      sqlu"truncate table common_static_strings restart identity"
+    val query = storage.profile match {
+      case _: DbStorage.Profile.Postgres | _: DbStorage.Profile.H2 =>
+        sqlu"truncate table common_static_strings restart identity"
+      case _: DbStorage.Profile.Oracle =>
+        sqlu"truncate table common_static_strings"
+    }
     storage.update(
       DBIO.seq(query),
       functionFullName,
@@ -80,7 +84,7 @@ trait DbIndexedStringsStoreTest
       val store = mk()
       val uidsF = Future.sequence(
         (1 to 500)
-          .map(x => DomainId.tryFromString(s"id$x::stinkynamespace"))
+          .map(x => DomainId.tryFromString(s"id${x}::stinkynamespace"))
           .map(x =>
             d2idx(store, x).flatMap { idx =>
               idx2d(store, idx).map(res => (x, idx, res))

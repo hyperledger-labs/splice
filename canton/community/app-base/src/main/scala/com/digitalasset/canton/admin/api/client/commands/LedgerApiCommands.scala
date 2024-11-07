@@ -12,8 +12,8 @@ import com.daml.ledger.api.v2.admin.command_inspection_service.{
   GetCommandStatusRequest,
   GetCommandStatusResponse,
 }
-import com.daml.ledger.api.v2.admin.identity_provider_config_service.*
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub
+import com.daml.ledger.api.v2.admin.identity_provider_config_service.*
 import com.daml.ledger.api.v2.admin.metering_report_service.MeteringReportServiceGrpc.MeteringReportServiceStub
 import com.daml.ledger.api.v2.admin.metering_report_service.{
   GetMeteringReportRequest,
@@ -21,12 +21,12 @@ import com.daml.ledger.api.v2.admin.metering_report_service.{
   MeteringReportServiceGrpc,
 }
 import com.daml.ledger.api.v2.admin.object_meta.ObjectMeta
-import com.daml.ledger.api.v2.admin.package_management_service.*
 import com.daml.ledger.api.v2.admin.package_management_service.PackageManagementServiceGrpc.PackageManagementServiceStub
-import com.daml.ledger.api.v2.admin.participant_pruning_service.*
+import com.daml.ledger.api.v2.admin.package_management_service.*
 import com.daml.ledger.api.v2.admin.participant_pruning_service.ParticipantPruningServiceGrpc.ParticipantPruningServiceStub
-import com.daml.ledger.api.v2.admin.party_management_service.*
+import com.daml.ledger.api.v2.admin.participant_pruning_service.*
 import com.daml.ledger.api.v2.admin.party_management_service.PartyManagementServiceGrpc.PartyManagementServiceStub
+import com.daml.ledger.api.v2.admin.party_management_service.*
 import com.daml.ledger.api.v2.admin.user_management_service.UserManagementServiceGrpc.UserManagementServiceStub
 import com.daml.ledger.api.v2.admin.user_management_service.{
   CreateUserRequest,
@@ -51,6 +51,7 @@ import com.daml.ledger.api.v2.admin.user_management_service.{
   User,
   UserManagementServiceGrpc,
 }
+import com.daml.ledger.api.v2.checkpoint.Checkpoint
 import com.daml.ledger.api.v2.command_completion_service.CommandCompletionServiceGrpc.CommandCompletionServiceStub
 import com.daml.ledger.api.v2.command_completion_service.{
   CommandCompletionServiceGrpc,
@@ -81,17 +82,7 @@ import com.daml.ledger.api.v2.event_query_service.{
   GetEventsByContractIdRequest,
   GetEventsByContractIdResponse,
 }
-import com.daml.ledger.api.v2.interactive_submission_data.PreparedTransaction
-import com.daml.ledger.api.v2.interactive_submission_service.InteractiveSubmissionServiceGrpc.InteractiveSubmissionServiceStub
-import com.daml.ledger.api.v2.interactive_submission_service.{
-  ExecuteSubmissionRequest,
-  ExecuteSubmissionResponse,
-  InteractiveSubmissionServiceGrpc,
-  PartySignatures,
-  PrepareSubmissionRequest,
-  PrepareSubmissionResponse,
-  SinglePartySignatures,
-}
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.reassignment.{AssignedEvent, Reassignment, UnassignedEvent}
 import com.daml.ledger.api.v2.reassignment_command.{
   AssignCommand,
@@ -145,7 +136,6 @@ import com.digitalasset.canton.admin.api.client.data.{
   UserRights,
 }
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, JwksUrl}
@@ -158,7 +148,7 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.BinaryFileUtil
-import com.digitalasset.canton.{LfPackageId, LfPartyId}
+import com.digitalasset.canton.{LfPackageId, LfPartyId, config}
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.*
@@ -188,7 +178,7 @@ object LedgerApiCommands {
         annotations: Map[String, String],
         identityProviderId: String,
     ) extends BaseCommand[AllocatePartyRequest, AllocatePartyResponse, PartyDetails] {
-      override protected def createRequest(): Either[String, AllocatePartyRequest] =
+      override def createRequest(): Either[String, AllocatePartyRequest] =
         Right(
           AllocatePartyRequest(
             partyIdHint = partyIdHint,
@@ -197,14 +187,12 @@ object LedgerApiCommands {
             identityProviderId = identityProviderId,
           )
         )
-      override protected def submitRequest(
+      override def submitRequest(
           service: PartyManagementServiceStub,
           request: AllocatePartyRequest,
       ): Future[AllocatePartyResponse] =
         service.allocateParty(request)
-      override protected def handleResponse(
-          response: AllocatePartyResponse
-      ): Either[String, PartyDetails] =
+      override def handleResponse(response: AllocatePartyResponse): Either[String, PartyDetails] =
         response.partyDetails.toRight("Party could not be created")
     }
 
@@ -215,13 +203,13 @@ object LedgerApiCommands {
         identityProviderId: String,
     ) extends BaseCommand[UpdatePartyDetailsRequest, UpdatePartyDetailsResponse, PartyDetails] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: PartyManagementServiceStub,
           request: UpdatePartyDetailsRequest,
       ): Future[UpdatePartyDetailsResponse] =
         service.updatePartyDetails(request)
 
-      override protected def createRequest(): Either[String, UpdatePartyDetailsRequest] = {
+      override def createRequest(): Either[String, UpdatePartyDetailsRequest] = {
         val metadata = ObjectMeta(
           annotations = annotationsUpdate.getOrElse(Map.empty),
           resourceVersion = resourceVersionO.getOrElse(""),
@@ -241,7 +229,7 @@ object LedgerApiCommands {
         Right(req)
       }
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: UpdatePartyDetailsResponse
       ): Either[String, PartyDetails] =
         response.partyDetails.toRight("Failed to update the party details")
@@ -252,18 +240,18 @@ object LedgerApiCommands {
         extends BaseCommand[ListKnownPartiesRequest, ListKnownPartiesResponse, Seq[
           PartyDetails
         ]] {
-      override protected def createRequest(): Either[String, ListKnownPartiesRequest] =
+      override def createRequest(): Either[String, ListKnownPartiesRequest] =
         Right(
           ListKnownPartiesRequest(
             identityProviderId = identityProviderId
           )
         )
-      override protected def submitRequest(
+      override def submitRequest(
           service: PartyManagementServiceStub,
           request: ListKnownPartiesRequest,
       ): Future[ListKnownPartiesResponse] =
         service.listKnownParties(request)
-      override protected def handleResponse(
+      override def handleResponse(
           response: ListKnownPartiesResponse
       ): Either[String, Seq[PartyDetails]] =
         Right(response.partyDetails)
@@ -272,7 +260,7 @@ object LedgerApiCommands {
     final case class GetParty(party: PartyId, identityProviderId: String)
         extends BaseCommand[GetPartiesRequest, GetPartiesResponse, PartyDetails] {
 
-      override protected def createRequest(): Either[String, GetPartiesRequest] =
+      override def createRequest(): Either[String, GetPartiesRequest] =
         Right(
           GetPartiesRequest(
             parties = Seq(party.toProtoPrimitive),
@@ -280,15 +268,16 @@ object LedgerApiCommands {
           )
         )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: PartyManagementServiceStub,
           request: GetPartiesRequest,
       ): Future[GetPartiesResponse] = service.getParties(request)
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: GetPartiesResponse
-      ): Either[String, PartyDetails] =
+      ): Either[String, PartyDetails] = {
         response.partyDetails.headOption.toRight("PARTY_NOT_FOUND")
+      }
     }
 
     final case class UpdateIdp(
@@ -301,24 +290,23 @@ object LedgerApiCommands {
           Unit,
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: PartyManagementServiceStub,
           request: UpdatePartyIdentityProviderIdRequest,
       ): Future[UpdatePartyIdentityProviderIdResponse] =
         service.updatePartyIdentityProviderId(request)
 
-      override protected def createRequest(): Either[String, UpdatePartyIdentityProviderIdRequest] =
-        Right(
-          UpdatePartyIdentityProviderIdRequest(
-            party = party.toProtoPrimitive,
-            sourceIdentityProviderId = sourceIdentityProviderId,
-            targetIdentityProviderId = targetIdentityProviderId,
-          )
+      override def createRequest(): Either[String, UpdatePartyIdentityProviderIdRequest] = Right(
+        UpdatePartyIdentityProviderIdRequest(
+          party = party.toProtoPrimitive,
+          sourceIdentityProviderId = sourceIdentityProviderId,
+          targetIdentityProviderId = targetIdentityProviderId,
         )
+      )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: UpdatePartyIdentityProviderIdResponse
-      ): Either[String, Unit] = Either.unit
+      ): Either[String, Unit] = Right(())
 
     }
   }
@@ -334,17 +322,17 @@ object LedgerApiCommands {
     final case class UploadDarFile(darPath: String)
         extends BaseCommand[UploadDarFileRequest, UploadDarFileResponse, Unit] {
 
-      override protected def createRequest(): Either[String, UploadDarFileRequest] =
+      override def createRequest(): Either[String, UploadDarFileRequest] =
         for {
           bytes <- BinaryFileUtil.readByteStringFromFile(darPath)
         } yield UploadDarFileRequest(bytes)
-      override protected def submitRequest(
+      override def submitRequest(
           service: PackageManagementServiceStub,
           request: UploadDarFileRequest,
       ): Future[UploadDarFileResponse] =
         service.uploadDarFile(request)
-      override protected def handleResponse(response: UploadDarFileResponse): Either[String, Unit] =
-        Either.unit
+      override def handleResponse(response: UploadDarFileResponse): Either[String, Unit] =
+        Right(())
 
       // package upload time might take long if it is a big package
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
@@ -354,19 +342,18 @@ object LedgerApiCommands {
     final case class ValidateDarFile(darPath: String)
         extends BaseCommand[ValidateDarFileRequest, ValidateDarFileResponse, Unit] {
 
-      override protected def createRequest(): Either[String, ValidateDarFileRequest] =
+      override def createRequest(): Either[String, ValidateDarFileRequest] =
         for {
           bytes <- BinaryFileUtil.readByteStringFromFile(darPath)
         } yield ValidateDarFileRequest(bytes)
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: PackageManagementServiceStub,
           request: ValidateDarFileRequest,
       ): Future[ValidateDarFileResponse] =
         service.validateDarFile(request)
-      override protected def handleResponse(
-          response: ValidateDarFileResponse
-      ): Either[String, Unit] = Either.unit
+      override def handleResponse(response: ValidateDarFileResponse): Either[String, Unit] =
+        Right(())
 
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
     }
@@ -376,17 +363,17 @@ object LedgerApiCommands {
           PackageDetails
         ]] {
 
-      override protected def createRequest(): Either[String, ListKnownPackagesRequest] = Right(
+      override def createRequest(): Either[String, ListKnownPackagesRequest] = Right(
         ListKnownPackagesRequest()
       )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: PackageManagementServiceStub,
           request: ListKnownPackagesRequest,
       ): Future[ListKnownPackagesResponse] =
         service.listKnownPackages(request)
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: ListKnownPackagesResponse
       ): Either[String, Seq[PackageDetails]] =
         Right(response.packageDetails.take(limit.value))
@@ -404,19 +391,20 @@ object LedgerApiCommands {
 
     final case class GetCommandStatus(commandIdPrefix: String, state: CommandState, limit: Int)
         extends BaseCommand[GetCommandStatusRequest, GetCommandStatusResponse, Seq[CommandStatus]] {
-      override protected def createRequest(): Either[String, GetCommandStatusRequest] = Right(
+      override def createRequest(): Either[String, GetCommandStatusRequest] = Right(
         GetCommandStatusRequest(commandIdPrefix = commandIdPrefix, state = state, limit = limit)
       )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: CommandInspectionServiceStub,
           request: GetCommandStatusRequest,
       ): Future[GetCommandStatusResponse] = service.getCommandStatus(request)
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: GetCommandStatusResponse
-      ): Either[String, Seq[CommandStatus]] =
+      ): Either[String, Seq[CommandStatus]] = {
         response.commandStatus.traverse(CommandStatus.fromProto).leftMap(_.message)
+      }
     }
   }
 
@@ -431,28 +419,30 @@ object LedgerApiCommands {
 
     }
 
-    final case class Prune(pruneUpTo: Long) extends BaseCommand[PruneRequest, PruneResponse, Unit] {
+    final case class Prune(pruneUpTo: ParticipantOffset)
+        extends BaseCommand[PruneRequest, PruneResponse, Unit] {
 
       override def timeoutType: TimeoutType =
         DefaultUnboundedTimeout // pruning can take a very long time
 
-      override protected def createRequest(): Either[String, PruneRequest] =
-        Right(
-          PruneRequest(
-            pruneUpTo,
-            // canton always prunes divulged contracts both in the ledger api index-db and in canton stores
-            pruneAllDivulgedContracts = true,
+      override def createRequest(): Either[String, PruneRequest] =
+        pruneUpTo.value.absolute
+          .toRight("The pruneUpTo ledger offset needs to be absolute")
+          .map(
+            PruneRequest(
+              _,
+              // canton always prunes divulged contracts both in the ledger api index-db and in canton stores
+              pruneAllDivulgedContracts = true,
+            )
           )
-        )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: ParticipantPruningServiceStub,
           request: PruneRequest,
       ): Future[PruneResponse] =
         service.prune(request)
 
-      override protected def handleResponse(response: PruneResponse): Either[String, Unit] =
-        Either.unit
+      override def handleResponse(response: PruneResponse): Either[String, Unit] = Right(())
     }
   }
 
@@ -468,19 +458,16 @@ object LedgerApiCommands {
       def actAs: Set[LfPartyId]
       def readAs: Set[LfPartyId]
       def participantAdmin: Boolean
-      def identityProviderAdmin: Boolean
       def readAsAnyParty: Boolean
 
-      protected def getRights: Seq[UserRight] =
+      protected def getRights: Seq[UserRight] = {
         actAs.toSeq.map(x => UserRight().withCanActAs(UserRight.CanActAs(x))) ++
           readAs.toSeq.map(x => UserRight().withCanReadAs(UserRight.CanReadAs(x))) ++
           (if (participantAdmin) Seq(UserRight().withParticipantAdmin(UserRight.ParticipantAdmin()))
            else Seq()) ++
-          (if (identityProviderAdmin)
-             Seq(UserRight().withIdentityProviderAdmin(UserRight.IdentityProviderAdmin()))
-           else Seq()) ++
           (if (readAsAnyParty) Seq(UserRight().withCanReadAsAnyParty(UserRight.CanReadAsAnyParty()))
            else Seq())
+      }
     }
 
     final case class Create(
@@ -489,7 +476,6 @@ object LedgerApiCommands {
         primaryParty: Option[LfPartyId],
         readAs: Set[LfPartyId],
         participantAdmin: Boolean,
-        identityProviderAdmin: Boolean,
         isDeactivated: Boolean,
         annotations: Map[String, String],
         identityProviderId: String,
@@ -497,13 +483,13 @@ object LedgerApiCommands {
     ) extends BaseCommand[CreateUserRequest, CreateUserResponse, LedgerApiUser]
         with HasRights {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: UserManagementServiceStub,
           request: CreateUserRequest,
       ): Future[CreateUserResponse] =
         service.createUser(request)
 
-      override protected def createRequest(): Either[String, CreateUserRequest] = Right(
+      override def createRequest(): Either[String, CreateUserRequest] = Right(
         CreateUserRequest(
           user = Some(
             User(
@@ -518,9 +504,7 @@ object LedgerApiCommands {
         )
       )
 
-      override protected def handleResponse(
-          response: CreateUserResponse
-      ): Either[String, LedgerApiUser] =
+      override def handleResponse(response: CreateUserResponse): Either[String, LedgerApiUser] =
         ProtoConverter
           .parseRequired(LedgerApiUser.fromProtoV0, "user", response.user)
           .leftMap(_.toString)
@@ -536,13 +520,13 @@ object LedgerApiCommands {
         identityProviderId: String,
     ) extends BaseCommand[UpdateUserRequest, UpdateUserResponse, LedgerApiUser] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: UserManagementServiceStub,
           request: UpdateUserRequest,
       ): Future[UpdateUserResponse] =
         service.updateUser(request)
 
-      override protected def createRequest(): Either[String, UpdateUserRequest] = {
+      override def createRequest(): Either[String, UpdateUserRequest] = {
         val user = User(
           id = id,
           primaryParty = primaryPartyUpdate.fold("")(_.fold("")(_.toProtoPrimitive)),
@@ -568,9 +552,7 @@ object LedgerApiCommands {
         )
       }
 
-      override protected def handleResponse(
-          response: UpdateUserResponse
-      ): Either[String, LedgerApiUser] =
+      override def handleResponse(response: UpdateUserResponse): Either[String, LedgerApiUser] =
         ProtoConverter
           .parseRequired(LedgerApiUser.fromProtoV0, "user", response.user)
           .leftMap(_.toString)
@@ -582,22 +564,20 @@ object LedgerApiCommands {
         identityProviderId: String,
     ) extends BaseCommand[GetUserRequest, GetUserResponse, LedgerApiUser] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: UserManagementServiceStub,
           request: GetUserRequest,
       ): Future[GetUserResponse] =
         service.getUser(request)
 
-      override protected def createRequest(): Either[String, GetUserRequest] = Right(
+      override def createRequest(): Either[String, GetUserRequest] = Right(
         GetUserRequest(
           userId = id,
           identityProviderId = identityProviderId,
         )
       )
 
-      override protected def handleResponse(
-          response: GetUserResponse
-      ): Either[String, LedgerApiUser] =
+      override def handleResponse(response: GetUserResponse): Either[String, LedgerApiUser] =
         ProtoConverter
           .parseRequired(LedgerApiUser.fromProtoV0, "user", response.user)
           .leftMap(_.toString)
@@ -609,21 +589,20 @@ object LedgerApiCommands {
         identityProviderId: String,
     ) extends BaseCommand[DeleteUserRequest, DeleteUserResponse, Unit] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: UserManagementServiceStub,
           request: DeleteUserRequest,
       ): Future[DeleteUserResponse] =
         service.deleteUser(request)
 
-      override protected def createRequest(): Either[String, DeleteUserRequest] = Right(
+      override def createRequest(): Either[String, DeleteUserRequest] = Right(
         DeleteUserRequest(
           userId = id,
           identityProviderId = identityProviderId,
         )
       )
 
-      override protected def handleResponse(response: DeleteUserResponse): Either[String, Unit] =
-        Either.unit
+      override def handleResponse(response: DeleteUserResponse): Either[String, Unit] = Right(())
 
     }
 
@@ -637,24 +616,23 @@ object LedgerApiCommands {
           Unit,
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: UserManagementServiceStub,
           request: UpdateUserIdentityProviderIdRequest,
       ): Future[UpdateUserIdentityProviderIdResponse] =
         service.updateUserIdentityProviderId(request)
 
-      override protected def createRequest(): Either[String, UpdateUserIdentityProviderIdRequest] =
-        Right(
-          UpdateUserIdentityProviderIdRequest(
-            userId = id,
-            sourceIdentityProviderId = sourceIdentityProviderId,
-            targetIdentityProviderId = targetIdentityProviderId,
-          )
+      override def createRequest(): Either[String, UpdateUserIdentityProviderIdRequest] = Right(
+        UpdateUserIdentityProviderIdRequest(
+          userId = id,
+          sourceIdentityProviderId = sourceIdentityProviderId,
+          targetIdentityProviderId = targetIdentityProviderId,
         )
+      )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: UpdateUserIdentityProviderIdResponse
-      ): Either[String, Unit] = Either.unit
+      ): Either[String, Unit] = Right(())
 
     }
 
@@ -665,13 +643,13 @@ object LedgerApiCommands {
         identityProviderId: String,
     ) extends BaseCommand[ListUsersRequest, ListUsersResponse, ListLedgerApiUsersResult] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: UserManagementServiceStub,
           request: ListUsersRequest,
       ): Future[ListUsersResponse] =
         service.listUsers(request)
 
-      override protected def createRequest(): Either[String, ListUsersRequest] = Right(
+      override def createRequest(): Either[String, ListUsersRequest] = Right(
         ListUsersRequest(
           pageToken = pageToken,
           pageSize = pageSize,
@@ -679,7 +657,7 @@ object LedgerApiCommands {
         )
       )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: ListUsersResponse
       ): Either[String, ListLedgerApiUsersResult] =
         ListLedgerApiUsersResult.fromProtoV0(response, filterUser).leftMap(_.toString)
@@ -692,19 +670,18 @@ object LedgerApiCommands {
           actAs: Set[LfPartyId],
           readAs: Set[LfPartyId],
           participantAdmin: Boolean,
-          identityProviderAdmin: Boolean,
           identityProviderId: String,
           readAsAnyParty: Boolean,
       ) extends BaseCommand[GrantUserRightsRequest, GrantUserRightsResponse, UserRights]
           with HasRights {
 
-        override protected def submitRequest(
+        override def submitRequest(
             service: UserManagementServiceStub,
             request: GrantUserRightsRequest,
         ): Future[GrantUserRightsResponse] =
           service.grantUserRights(request)
 
-        override protected def createRequest(): Either[String, GrantUserRightsRequest] = Right(
+        override def createRequest(): Either[String, GrantUserRightsRequest] = Right(
           GrantUserRightsRequest(
             userId = id,
             rights = getRights,
@@ -712,9 +689,7 @@ object LedgerApiCommands {
           )
         )
 
-        override protected def handleResponse(
-            response: GrantUserRightsResponse
-        ): Either[String, UserRights] =
+        override def handleResponse(response: GrantUserRightsResponse): Either[String, UserRights] =
           UserRights.fromProtoV0(response.newlyGrantedRights).leftMap(_.toString)
 
       }
@@ -724,19 +699,18 @@ object LedgerApiCommands {
           actAs: Set[LfPartyId],
           readAs: Set[LfPartyId],
           participantAdmin: Boolean,
-          identityProviderAdmin: Boolean,
           identityProviderId: String,
           readAsAnyParty: Boolean,
       ) extends BaseCommand[RevokeUserRightsRequest, RevokeUserRightsResponse, UserRights]
           with HasRights {
 
-        override protected def submitRequest(
+        override def submitRequest(
             service: UserManagementServiceStub,
             request: RevokeUserRightsRequest,
         ): Future[RevokeUserRightsResponse] =
           service.revokeUserRights(request)
 
-        override protected def createRequest(): Either[String, RevokeUserRightsRequest] = Right(
+        override def createRequest(): Either[String, RevokeUserRightsRequest] = Right(
           RevokeUserRightsRequest(
             userId = id,
             rights = getRights,
@@ -744,7 +718,7 @@ object LedgerApiCommands {
           )
         )
 
-        override protected def handleResponse(
+        override def handleResponse(
             response: RevokeUserRightsResponse
         ): Either[String, UserRights] =
           UserRights.fromProtoV0(response.newlyRevokedRights).leftMap(_.toString)
@@ -754,19 +728,17 @@ object LedgerApiCommands {
       final case class List(id: String, identityProviderId: String)
           extends BaseCommand[ListUserRightsRequest, ListUserRightsResponse, UserRights] {
 
-        override protected def submitRequest(
+        override def submitRequest(
             service: UserManagementServiceStub,
             request: ListUserRightsRequest,
         ): Future[ListUserRightsResponse] =
           service.listUserRights(request)
 
-        override protected def createRequest(): Either[String, ListUserRightsRequest] = Right(
+        override def createRequest(): Either[String, ListUserRightsRequest] = Right(
           ListUserRightsRequest(userId = id, identityProviderId = identityProviderId)
         )
 
-        override protected def handleResponse(
-            response: ListUserRightsResponse
-        ): Either[String, UserRights] =
+        override def handleResponse(response: ListUserRightsResponse): Either[String, UserRights] =
           UserRights.fromProtoV0(response.rights).leftMap(_.toString)
 
       }
@@ -795,13 +767,13 @@ object LedgerApiCommands {
           IdentityProviderConfig,
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: IdentityProviderConfigServiceStub,
           request: CreateIdentityProviderConfigRequest,
       ): Future[CreateIdentityProviderConfigResponse] =
         service.createIdentityProviderConfig(request)
 
-      override protected def createRequest(): Either[String, CreateIdentityProviderConfigRequest] =
+      override def createRequest(): Either[String, CreateIdentityProviderConfigRequest] =
         Right(
           CreateIdentityProviderConfigRequest(
             Some(
@@ -816,7 +788,7 @@ object LedgerApiCommands {
           )
         )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: CreateIdentityProviderConfigResponse
       ): Either[String, IdentityProviderConfig] =
         response.identityProviderConfig.toRight("config could not be created")
@@ -831,13 +803,13 @@ object LedgerApiCommands {
           IdentityProviderConfig,
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: IdentityProviderConfigServiceStub,
           request: UpdateIdentityProviderConfigRequest,
       ): Future[UpdateIdentityProviderConfigResponse] =
         service.updateIdentityProviderConfig(request)
 
-      override protected def createRequest(): Either[String, UpdateIdentityProviderConfigRequest] =
+      override def createRequest(): Either[String, UpdateIdentityProviderConfigRequest] =
         Right(
           UpdateIdentityProviderConfigRequest(
             identityProviderConfig =
@@ -846,7 +818,7 @@ object LedgerApiCommands {
           )
         )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: UpdateIdentityProviderConfigResponse
       ): Either[String, IdentityProviderConfig] =
         response.identityProviderConfig.toRight("config could not be updated")
@@ -859,23 +831,23 @@ object LedgerApiCommands {
           Unit,
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: IdentityProviderConfigServiceStub,
           request: DeleteIdentityProviderConfigRequest,
       ): Future[DeleteIdentityProviderConfigResponse] =
         service.deleteIdentityProviderConfig(request)
 
-      override protected def createRequest(): Either[String, DeleteIdentityProviderConfigRequest] =
+      override def createRequest(): Either[String, DeleteIdentityProviderConfigRequest] =
         Right(
           DeleteIdentityProviderConfigRequest(identityProviderId =
             identityProviderId.toRequestString
           )
         )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: DeleteIdentityProviderConfigResponse
       ): Either[String, Unit] =
-        Either.unit
+        Right(())
     }
 
     final case class Get(identityProviderId: IdentityProviderId)
@@ -885,18 +857,18 @@ object LedgerApiCommands {
           IdentityProviderConfig,
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: IdentityProviderConfigServiceStub,
           request: GetIdentityProviderConfigRequest,
       ): Future[GetIdentityProviderConfigResponse] =
         service.getIdentityProviderConfig(request)
 
-      override protected def createRequest(): Either[String, GetIdentityProviderConfigRequest] =
+      override def createRequest(): Either[String, GetIdentityProviderConfigRequest] =
         Right(
           GetIdentityProviderConfigRequest(identityProviderId.toRequestString)
         )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: GetIdentityProviderConfigResponse
       ): Either[String, IdentityProviderConfig] =
         Right(response.getIdentityProviderConfig)
@@ -909,18 +881,18 @@ object LedgerApiCommands {
           Seq[IdentityProviderConfig],
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: IdentityProviderConfigServiceStub,
           request: ListIdentityProviderConfigsRequest,
       ): Future[ListIdentityProviderConfigsResponse] =
         service.listIdentityProviderConfigs(request)
 
-      override protected def createRequest(): Either[String, ListIdentityProviderConfigsRequest] =
+      override def createRequest(): Either[String, ListIdentityProviderConfigsRequest] =
         Right(
           ListIdentityProviderConfigsRequest()
         )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: ListIdentityProviderConfigsResponse
       ): Either[String, Seq[IdentityProviderConfig]] =
         Right(response.identityProviderConfigs)
@@ -946,13 +918,13 @@ object LedgerApiCommands {
           String,
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: MeteringReportServiceStub,
           request: GetMeteringReportRequest,
       ): Future[GetMeteringReportResponse] =
         service.getMeteringReport(request)
 
-      override protected def createRequest(): Either[String, GetMeteringReportRequest] =
+      override def createRequest(): Either[String, GetMeteringReportRequest] =
         Right(
           GetMeteringReportRequest(
             from = Some(from.toProtoTimestamp),
@@ -961,7 +933,7 @@ object LedgerApiCommands {
           )
         )
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: GetMeteringReportResponse
       ): Either[String, String] =
         LedgerMeteringReport.fromProtoV0(response).leftMap(_.toString)
@@ -984,7 +956,7 @@ object LedgerApiCommands {
 
     implicit def loggingContext: ErrorLoggingContext
 
-    override protected def submitRequest(
+    override def submitRequest(
         service: this.Svc,
         request: Req,
     ): Future[AutoCloseable] = {
@@ -994,10 +966,9 @@ object LedgerApiCommands {
       Future.successful(context)
     }
 
-    override protected def handleResponse(response: AutoCloseable): Either[String, AutoCloseable] =
-      Right(
-        response
-      )
+    override def handleResponse(response: AutoCloseable): Either[String, AutoCloseable] = Right(
+      response
+    )
   }
 
   object UpdateService {
@@ -1007,18 +978,15 @@ object LedgerApiCommands {
     }
     sealed trait UpdateWrapper {
       def updateId: String
-      def isUnassignment: Boolean
       def createEvent: Option[CreatedEvent] =
         this match {
           case UpdateService.TransactionWrapper(t) => t.events.headOption.map(_.getCreated)
           case u: UpdateService.AssignedWrapper => u.assignedEvent.createdEvent
           case _: UpdateService.UnassignedWrapper => None
         }
-
-      def domainId: String
     }
     object UpdateWrapper {
-      def isUnassignedWrapper(wrapper: UpdateWrapper): Boolean = wrapper match {
+      def isUnassigedWrapper(wrapper: UpdateWrapper): Boolean = wrapper match {
         case UnassignedWrapper(_, _) => true
         case _ => false
       }
@@ -1029,14 +997,13 @@ object LedgerApiCommands {
     }
     final case class TransactionWrapper(transaction: Transaction) extends UpdateWrapper {
       override def updateId: String = transaction.updateId
-      override def isUnassignment: Boolean = false
-
-      override def domainId: String = transaction.domainId
     }
     sealed trait ReassignmentWrapper extends UpdateTreeWrapper with UpdateWrapper {
       def reassignment: Reassignment
       def unassignId: String = reassignment.getUnassignedEvent.unassignId
-      def offset: Long = reassignment.offset
+      def offset: ParticipantOffset = ParticipantOffset(
+        ParticipantOffset.Value.Absolute(reassignment.offset)
+      )
     }
     object ReassignmentWrapper {
       def apply(reassignment: Reassignment): ReassignmentWrapper = {
@@ -1056,17 +1023,10 @@ object LedgerApiCommands {
     final case class AssignedWrapper(reassignment: Reassignment, assignedEvent: AssignedEvent)
         extends ReassignmentWrapper {
       override def updateId: String = reassignment.updateId
-      override def isUnassignment: Boolean = false
-
-      override def domainId: String = assignedEvent.target
     }
     final case class UnassignedWrapper(reassignment: Reassignment, unassignedEvent: UnassignedEvent)
         extends ReassignmentWrapper {
       override def updateId: String = reassignment.updateId
-      override def isUnassignment: Boolean = true
-
-      override def domainId: String = unassignedEvent.source
-
     }
 
     trait BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
@@ -1080,17 +1040,17 @@ object LedgerApiCommands {
         extends BaseCommand[GetUpdatesRequest, AutoCloseable, AutoCloseable]
         with SubscribeBase[GetUpdatesRequest, Resp, Res] {
 
-      def beginExclusive: Long
+      def beginExclusive: ParticipantOffset
 
-      def endInclusive: Option[Long]
+      def endInclusive: Option[ParticipantOffset]
 
       def filter: TransactionFilter
 
       def verbose: Boolean
 
-      override protected def createRequest(): Either[String, GetUpdatesRequest] = Right {
+      override def createRequest(): Either[String, GetUpdatesRequest] = Right {
         GetUpdatesRequest(
-          beginExclusive = beginExclusive,
+          beginExclusive = Some(beginExclusive),
           endInclusive = endInclusive,
           verbose = verbose,
           filter = Some(filter),
@@ -1100,8 +1060,8 @@ object LedgerApiCommands {
 
     final case class SubscribeTrees(
         override val observer: StreamObserver[UpdateTreeWrapper],
-        override val beginExclusive: Long,
-        override val endInclusive: Option[Long],
+        override val beginExclusive: ParticipantOffset,
+        override val endInclusive: Option[ParticipantOffset],
         override val filter: TransactionFilter,
         override val verbose: Boolean,
     )(override implicit val loggingContext: ErrorLoggingContext)
@@ -1117,14 +1077,14 @@ object LedgerApiCommands {
           response: GetUpdateTreesResponse
       ): IterableOnce[UpdateTreeWrapper] =
         response.update.transactionTree
-          .map[UpdateTreeWrapper](TransactionTreeWrapper.apply)
+          .map[UpdateTreeWrapper](TransactionTreeWrapper)
           .orElse(response.update.reassignment.map(ReassignmentWrapper(_)))
     }
 
     final case class SubscribeFlat(
         override val observer: StreamObserver[UpdateWrapper],
-        override val beginExclusive: Long,
-        override val endInclusive: Option[Long],
+        override val beginExclusive: ParticipantOffset,
+        override val endInclusive: Option[ParticipantOffset],
         override val filter: TransactionFilter,
         override val verbose: Boolean,
     )(override implicit val loggingContext: ErrorLoggingContext)
@@ -1138,7 +1098,7 @@ object LedgerApiCommands {
 
       override def extractResults(response: GetUpdatesResponse): IterableOnce[UpdateWrapper] =
         response.update.transaction
-          .map[UpdateWrapper](TransactionWrapper.apply)
+          .map[UpdateWrapper](TransactionWrapper)
           .orElse(response.update.reassignment.map(ReassignmentWrapper(_)))
     }
 
@@ -1148,17 +1108,17 @@ object LedgerApiCommands {
           TransactionTree
         ]]
         with PrettyPrinting {
-      override protected def createRequest(): Either[String, GetTransactionByIdRequest] = Right {
+      override def createRequest(): Either[String, GetTransactionByIdRequest] = Right {
         GetTransactionByIdRequest(
           updateId = id,
           requestingParties = parties.toSeq,
         )
       }
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: UpdateServiceStub,
           request: GetTransactionByIdRequest,
-      ): Future[GetTransactionTreeResponse] =
+      ): Future[GetTransactionTreeResponse] = {
         // The Ledger API will throw an error if it can't find a transaction by ID.
         // However, as Canton is distributed, a transaction ID might show up later, so we don't treat this as
         // an error and change it to a None
@@ -1166,13 +1126,14 @@ object LedgerApiCommands {
           case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
             GetTransactionTreeResponse(None)
         }
+      }
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: GetTransactionTreeResponse
       ): Either[String, Option[TransactionTree]] =
         Right(response.transaction)
 
-      override protected def pretty: Pretty[GetTransactionById] =
+      override def pretty: Pretty[GetTransactionById] =
         prettyOfClass(
           param("id", _.id.unquoted),
           param("parties", _.parties),
@@ -1211,7 +1172,7 @@ object LedgerApiCommands {
           )
         case DeduplicationPeriod.DeduplicationOffset(offset) =>
           Commands.DeduplicationPeriod.DeduplicationOffset(
-            offset.toLong
+            offset.toHexString
           )
       },
       minLedgerTimeAbs = minLedgerTimeAbs.map(ProtoConverter.InstantConverter.toProtoPrimitive),
@@ -1221,7 +1182,7 @@ object LedgerApiCommands {
       packageIdSelectionPreference = packageIdSelectionPreference.map(_.toString),
     )
 
-    override protected def pretty: Pretty[this.type] =
+    override def pretty: Pretty[this.type] =
       prettyOfClass(
         param("actAs", _.actAs),
         param("readAs", _.readAs),
@@ -1256,22 +1217,18 @@ object LedgerApiCommands {
         override val packageIdSelectionPreference: Seq[LfPackageId],
     ) extends SubmitCommand
         with BaseCommand[SubmitRequest, SubmitResponse, Unit] {
-      override protected def createRequest(): Either[String, SubmitRequest] =
-        try {
-          Right(SubmitRequest(commands = Some(mkCommand)))
-        } catch {
-          case t: Throwable =>
-            Left(t.getMessage)
-        }
+      override def createRequest(): Either[String, SubmitRequest] = Right(
+        SubmitRequest(commands = Some(mkCommand))
+      )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: CommandSubmissionServiceStub,
           request: SubmitRequest,
-      ): Future[SubmitResponse] =
+      ): Future[SubmitResponse] = {
         service.submit(request)
+      }
 
-      override protected def handleResponse(response: SubmitResponse): Either[String, Unit] =
-        Either.unit
+      override def handleResponse(response: SubmitResponse): Either[String, Unit] = Right(())
     }
 
     final case class SubmitAssignCommand(
@@ -1284,7 +1241,7 @@ object LedgerApiCommands {
         source: DomainId,
         target: DomainId,
     ) extends BaseCommand[SubmitReassignmentRequest, SubmitReassignmentResponse, Unit] {
-      override protected def createRequest(): Either[String, SubmitReassignmentRequest] = Right(
+      override def createRequest(): Either[String, SubmitReassignmentRequest] = Right(
         SubmitReassignmentRequest(
           Some(
             ReassignmentCommand(
@@ -1305,16 +1262,15 @@ object LedgerApiCommands {
         )
       )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: CommandSubmissionServiceStub,
           request: SubmitReassignmentRequest,
-      ): Future[SubmitReassignmentResponse] =
+      ): Future[SubmitReassignmentResponse] = {
         service.submitReassignment(request)
+      }
 
-      override protected def handleResponse(
-          response: SubmitReassignmentResponse
-      ): Either[String, Unit] =
-        Either.unit
+      override def handleResponse(response: SubmitReassignmentResponse): Either[String, Unit] =
+        Right(())
     }
 
     final case class SubmitUnassignCommand(
@@ -1327,7 +1283,7 @@ object LedgerApiCommands {
         source: DomainId,
         target: DomainId,
     ) extends BaseCommand[SubmitReassignmentRequest, SubmitReassignmentResponse, Unit] {
-      override protected def createRequest(): Either[String, SubmitReassignmentRequest] = Right(
+      override def createRequest(): Either[String, SubmitReassignmentRequest] = Right(
         SubmitReassignmentRequest(
           Some(
             ReassignmentCommand(
@@ -1348,140 +1304,16 @@ object LedgerApiCommands {
         )
       )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: CommandSubmissionServiceStub,
           request: SubmitReassignmentRequest,
-      ): Future[SubmitReassignmentResponse] =
+      ): Future[SubmitReassignmentResponse] = {
         service.submitReassignment(request)
-
-      override protected def handleResponse(
-          response: SubmitReassignmentResponse
-      ): Either[String, Unit] =
-        Either.unit
-    }
-  }
-
-  object InteractiveSubmissionService {
-    trait BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = InteractiveSubmissionServiceStub
-      override def createService(channel: ManagedChannel): InteractiveSubmissionServiceStub =
-        InteractiveSubmissionServiceGrpc.stub(channel)
-    }
-
-    final case class PrepareCommand(
-        actAs: Seq[LfPartyId],
-        readAs: Seq[LfPartyId],
-        commands: Seq[Command],
-        commandId: String,
-        minLedgerTimeAbs: Option[Instant],
-        disclosedContracts: Seq[DisclosedContract],
-        domainId: Option[DomainId],
-        applicationId: String,
-        packageIdSelectionPreference: Seq[LfPackageId],
-    ) extends BaseCommand[
-          PrepareSubmissionRequest,
-          PrepareSubmissionResponse,
-          PrepareSubmissionResponse,
-        ] {
-
-      override protected def createRequest(): Either[String, PrepareSubmissionRequest] =
-        Right(
-          PrepareSubmissionRequest(
-            applicationId = applicationId,
-            commandId = commandId,
-            commands = commands,
-            minLedgerTimeAbs =
-              minLedgerTimeAbs.map(ProtoConverter.InstantConverter.toProtoPrimitive),
-            actAs = actAs,
-            readAs = readAs,
-            disclosedContracts = disclosedContracts,
-            domainId = domainId.map(_.toProtoPrimitive).getOrElse(""),
-            packageIdSelectionPreference = packageIdSelectionPreference,
-          )
-        )
-
-      override protected def submitRequest(
-          service: InteractiveSubmissionServiceStub,
-          request: PrepareSubmissionRequest,
-      ): Future[PrepareSubmissionResponse] =
-        service.prepareSubmission(request)
-
-      override protected def handleResponse(
-          response: PrepareSubmissionResponse
-      ): Either[String, PrepareSubmissionResponse] =
-        Right(response)
-
-      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
-
-    }
-
-    final case class ExecuteCommand(
-        preparedTransaction: PreparedTransaction,
-        transactionSignatures: Map[PartyId, Seq[Signature]],
-        submissionId: String,
-        applicationId: String,
-        workflowId: String,
-        deduplicationPeriod: Option[DeduplicationPeriod],
-    ) extends BaseCommand[
-          ExecuteSubmissionRequest,
-          ExecuteSubmissionResponse,
-          ExecuteSubmissionResponse,
-        ] {
-
-      import com.digitalasset.canton.crypto.LedgerApiCryptoConversions.*
-      import io.scalaland.chimney.dsl.*
-      import com.daml.ledger.api.v2.interactive_submission_service as iss
-
-      private def makePartySignatures: PartySignatures = PartySignatures(
-        transactionSignatures.map { case (party, signatures) =>
-          SinglePartySignatures(
-            party = party.toProtoPrimitive,
-            signatures = signatures.map(_.toProtoV30.transformInto[iss.Signature]),
-          )
-        }.toSeq
-      )
-
-      private[commands] def serializeDeduplicationPeriod(
-          deduplicationPeriod: Option[DeduplicationPeriod]
-      ) = deduplicationPeriod.fold(
-        ExecuteSubmissionRequest.DeduplicationPeriod.Empty: ExecuteSubmissionRequest.DeduplicationPeriod
-      ) {
-        case DeduplicationPeriod.DeduplicationDuration(duration) =>
-          ExecuteSubmissionRequest.DeduplicationPeriod.DeduplicationDuration(
-            ProtoConverter.DurationConverter.toProtoPrimitive(duration)
-          )
-        case DeduplicationPeriod.DeduplicationOffset(offset) =>
-          ExecuteSubmissionRequest.DeduplicationPeriod.DeduplicationOffset(
-            offset.toLong
-          )
       }
 
-      override protected def createRequest(): Either[String, ExecuteSubmissionRequest] =
-        Right(
-          ExecuteSubmissionRequest(
-            preparedTransaction = Some(preparedTransaction),
-            partySignatures = Some(makePartySignatures),
-            submissionId = submissionId,
-            applicationId = applicationId,
-            workflowId = workflowId,
-            deduplicationPeriod = serializeDeduplicationPeriod(deduplicationPeriod),
-          )
-        )
-
-      override protected def submitRequest(
-          service: InteractiveSubmissionServiceStub,
-          request: ExecuteSubmissionRequest,
-      ): Future[ExecuteSubmissionResponse] =
-        service.executeSubmission(request)
-
-      override protected def handleResponse(
-          response: ExecuteSubmissionResponse
-      ): Either[String, ExecuteSubmissionResponse] =
-        Right(response)
-
-      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+      override def handleResponse(response: SubmitReassignmentResponse): Either[String, Unit] =
+        Right(())
     }
-
   }
 
   object CommandService {
@@ -1511,21 +1343,16 @@ object LedgerApiCommands {
           TransactionTree,
         ] {
 
-      override protected def createRequest(): Either[String, SubmitAndWaitRequest] =
-        try {
-          Right(SubmitAndWaitRequest(commands = Some(mkCommand)))
-        } catch {
-          case t: Throwable =>
-            Left(t.getMessage)
-        }
+      override def createRequest(): Either[String, SubmitAndWaitRequest] =
+        Right(SubmitAndWaitRequest(commands = Some(mkCommand)))
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: CommandServiceStub,
           request: SubmitAndWaitRequest,
       ): Future[SubmitAndWaitForTransactionTreeResponse] =
         service.submitAndWaitForTransactionTree(request)
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: SubmitAndWaitForTransactionTreeResponse
       ): Either[String, TransactionTree] =
         response.transaction.toRight("Received response without any transaction tree")
@@ -1550,21 +1377,16 @@ object LedgerApiCommands {
     ) extends SubmitCommand
         with BaseCommand[SubmitAndWaitRequest, SubmitAndWaitForTransactionResponse, Transaction] {
 
-      override protected def createRequest(): Either[String, SubmitAndWaitRequest] =
-        try {
-          Right(SubmitAndWaitRequest(commands = Some(mkCommand)))
-        } catch {
-          case t: Throwable =>
-            Left(t.getMessage)
-        }
+      override def createRequest(): Either[String, SubmitAndWaitRequest] =
+        Right(SubmitAndWaitRequest(commands = Some(mkCommand)))
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: CommandServiceStub,
           request: SubmitAndWaitRequest,
       ): Future[SubmitAndWaitForTransactionResponse] =
         service.submitAndWaitForTransaction(request)
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: SubmitAndWaitForTransactionResponse
       ): Either[String, Transaction] =
         response.transaction.toRight("Received response without any transaction")
@@ -1583,21 +1405,21 @@ object LedgerApiCommands {
     }
 
     final case class LedgerEnd()
-        extends BaseCommand[GetLedgerEndRequest, GetLedgerEndResponse, Long] {
+        extends BaseCommand[GetLedgerEndRequest, GetLedgerEndResponse, ParticipantOffset] {
 
-      override protected def createRequest(): Either[String, GetLedgerEndRequest] =
+      override def createRequest(): Either[String, GetLedgerEndRequest] =
         Right(GetLedgerEndRequest())
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: StateServiceStub,
           request: GetLedgerEndRequest,
       ): Future[GetLedgerEndResponse] =
         service.getLedgerEnd(request)
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: GetLedgerEndResponse
-      ): Either[String, Long] =
-        Right(response.offset)
+      ): Either[String, ParticipantOffset] =
+        response.offset.toRight("Empty LedgerEndResponse received without offset")
     }
 
     final case class GetConnectedDomains(partyId: LfPartyId)
@@ -1607,16 +1429,16 @@ object LedgerApiCommands {
           GetConnectedDomainsResponse,
         ] {
 
-      override protected def createRequest(): Either[String, GetConnectedDomainsRequest] =
+      override def createRequest(): Either[String, GetConnectedDomainsRequest] =
         Right(GetConnectedDomainsRequest(partyId.toString))
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: StateServiceStub,
           request: GetConnectedDomainsRequest,
       ): Future[GetConnectedDomainsResponse] =
         service.getConnectedDomains(request)
 
-      override protected def handleResponse(
+      override def handleResponse(
           response: GetConnectedDomainsResponse
       ): Either[String, GetConnectedDomainsResponse] =
         Right(response)
@@ -1627,7 +1449,7 @@ object LedgerApiCommands {
         parties: Set[LfPartyId],
         limit: PositiveInt,
         templateFilter: Seq[TemplateId] = Seq.empty,
-        activeAtOffset: Long,
+        activeAtOffset: String = "",
         verbose: Boolean = true,
         timeout: FiniteDuration,
         includeCreatedEventBlob: Boolean = false,
@@ -1639,7 +1461,7 @@ object LedgerApiCommands {
           GetActiveContractsResponse,
         ] {
 
-      override protected def createRequest(): Either[String, GetActiveContractsRequest] = {
+      override def createRequest(): Either[String, GetActiveContractsRequest] = {
         val filter =
           if (templateFilter.nonEmpty) {
             Filters(
@@ -1677,6 +1499,12 @@ object LedgerApiCommands {
     }
   }
 
+  final case class CompletionWrapper(
+      completion: Completion,
+      checkpoint: Checkpoint,
+      domainId: DomainId,
+  )
+
   object CommandCompletionService {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
       override type Svc = CommandCompletionServiceStub
@@ -1687,35 +1515,46 @@ object LedgerApiCommands {
 
     final case class CompletionRequest(
         partyId: LfPartyId,
-        beginOffsetExclusive: Long,
+        beginOffset: String,
         expectedCompletions: Int,
         timeout: java.time.Duration,
         applicationId: String,
-    )(filter: Completion => Boolean, scheduler: ScheduledExecutorService)
+    )(filter: CompletionWrapper => Boolean, scheduler: ScheduledExecutorService)
         extends BaseCommand[
           CompletionStreamRequest,
-          Seq[Completion],
-          Seq[Completion],
+          Seq[CompletionWrapper],
+          Seq[CompletionWrapper],
         ] {
 
-      override protected def createRequest(): Either[String, CompletionStreamRequest] =
+      override def createRequest(): Either[String, CompletionStreamRequest] =
         Right(
           CompletionStreamRequest(
             applicationId = applicationId,
             parties = Seq(partyId),
-            beginExclusive = beginOffsetExclusive,
+            beginExclusive = beginOffset,
           )
         )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: CommandCompletionServiceStub,
           request: CompletionStreamRequest,
-      ): Future[Seq[Completion]] = {
+      ): Future[Seq[CompletionWrapper]] = {
         import scala.jdk.DurationConverters.*
         GrpcAdminCommand
-          .streamedResponse[CompletionStreamRequest, CompletionStreamResponse, Completion](
+          .streamedResponse[CompletionStreamRequest, CompletionStreamResponse, CompletionWrapper](
             service.completionStream,
-            response => response.completionResponse.completion.toList.filter(filter),
+            response =>
+              List(
+                CompletionWrapper(
+                  completion = response.completion.getOrElse(
+                    throw new IllegalStateException("Completion should be present.")
+                  ),
+                  checkpoint = response.checkpoint.getOrElse(
+                    throw new IllegalStateException("Checkpoint should be present.")
+                  ),
+                  domainId = DomainId.tryFromString(response.domainId),
+                )
+              ).filter(filter),
             request,
             expectedCompletions,
             timeout.toScala,
@@ -1723,25 +1562,77 @@ object LedgerApiCommands {
           )
       }
 
-      override protected def handleResponse(
-          response: Seq[Completion]
-      ): Either[String, Seq[Completion]] =
+      override def handleResponse(
+          response: Seq[CompletionWrapper]
+      ): Either[String, Seq[CompletionWrapper]] =
+        Right(response)
+
+      override def timeoutType: TimeoutType = ServerEnforcedTimeout
+    }
+
+    final case class CompletionCheckpointRequest(
+        partyId: LfPartyId,
+        beginExclusive: String,
+        expectedCompletions: Int,
+        timeout: config.NonNegativeDuration,
+        applicationId: String,
+    )(filter: Completion => Boolean, scheduler: ScheduledExecutorService)
+        extends BaseCommand[CompletionStreamRequest, Seq[(Completion, Option[Checkpoint])], Seq[
+          (Completion, Option[Checkpoint])
+        ]] {
+
+      override def createRequest(): Either[String, CompletionStreamRequest] =
+        Right(
+          CompletionStreamRequest(
+            applicationId = applicationId,
+            parties = Seq(partyId),
+            beginExclusive = beginExclusive,
+          )
+        )
+
+      override def submitRequest(
+          service: CommandCompletionServiceStub,
+          request: CompletionStreamRequest,
+      ): Future[Seq[(Completion, Option[Checkpoint])]] = {
+        def extract(response: CompletionStreamResponse): Seq[(Completion, Option[Checkpoint])] = {
+          val checkpoint = response.checkpoint
+
+          response.completion.filter(filter).map(_ -> checkpoint).toList
+        }
+
+        GrpcAdminCommand.streamedResponse[
+          CompletionStreamRequest,
+          CompletionStreamResponse,
+          (Completion, Option[Checkpoint]),
+        ](
+          service.completionStream,
+          extract,
+          request,
+          expectedCompletions,
+          timeout.asFiniteApproximation,
+          scheduler,
+        )
+      }
+
+      override def handleResponse(
+          response: Seq[(Completion, Option[Checkpoint])]
+      ): Either[String, Seq[(Completion, Option[Checkpoint])]] =
         Right(response)
 
       override def timeoutType: TimeoutType = ServerEnforcedTimeout
     }
 
     final case class Subscribe(
-        observer: StreamObserver[Completion],
+        observer: StreamObserver[CompletionWrapper],
         parties: Seq[String],
-        offset: Long,
+        offset: String,
         applicationId: String,
     )(implicit loggingContext: ErrorLoggingContext)
         extends BaseCommand[CompletionStreamRequest, AutoCloseable, AutoCloseable] {
       // The subscription should never be cut short because of a gRPC timeout
       override def timeoutType: TimeoutType = ServerEnforcedTimeout
 
-      override protected def createRequest(): Either[String, CompletionStreamRequest] = Right {
+      override def createRequest(): Either[String, CompletionStreamRequest] = Right {
         CompletionStreamRequest(
           applicationId = applicationId,
           parties = parties,
@@ -1749,22 +1640,31 @@ object LedgerApiCommands {
         )
       }
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: CommandCompletionServiceStub,
           request: CompletionStreamRequest,
       ): Future[AutoCloseable] = {
-        val rawObserver = new ForwardingStreamObserver[CompletionStreamResponse, Completion](
+        val rawObserver = new ForwardingStreamObserver[CompletionStreamResponse, CompletionWrapper](
           observer,
-          response => response.completionResponse.completion.toList,
+          response =>
+            List(
+              CompletionWrapper(
+                completion = response.completion.getOrElse(
+                  throw new IllegalStateException("Completion should be present.")
+                ),
+                checkpoint = response.checkpoint.getOrElse(
+                  throw new IllegalStateException("Checkpoint should be present.")
+                ),
+                domainId = DomainId.tryFromString(response.domainId),
+              )
+            ),
         )
         val context = Context.current().withCancellation()
         context.run(() => service.completionStream(request, rawObserver))
         Future.successful(context)
       }
 
-      override protected def handleResponse(
-          response: AutoCloseable
-      ): Either[String, AutoCloseable] = Right(
+      override def handleResponse(response: AutoCloseable): Either[String, AutoCloseable] = Right(
         response
       )
     }
@@ -1785,21 +1685,20 @@ object LedgerApiCommands {
           CantonTimestamp,
         ] {
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: TimeServiceStub,
           request: GetTimeRequest,
-      ): Future[GetTimeResponse] =
+      ): Future[GetTimeResponse] = {
         service.getTime(request)
+      }
 
       /** Create the request from configured options
         */
-      override protected def createRequest(): Either[String, GetTimeRequest] = Right(
-        GetTimeRequest()
-      )
+      override def createRequest(): Either[String, GetTimeRequest] = Right(GetTimeRequest())
 
       /** Handle the response the service has provided
         */
-      override protected def handleResponse(
+      override def handleResponse(
           response: GetTimeResponse
       ): Either[String, CantonTimestamp] =
         for {
@@ -1815,13 +1714,10 @@ object LedgerApiCommands {
           Unit,
         ] {
 
-      override protected def submitRequest(
-          service: TimeServiceStub,
-          request: SetTimeRequest,
-      ): Future[Empty] =
+      override def submitRequest(service: TimeServiceStub, request: SetTimeRequest): Future[Empty] =
         service.setTime(request)
 
-      override protected def createRequest(): Either[String, SetTimeRequest] =
+      override def createRequest(): Either[String, SetTimeRequest] =
         Right(
           SetTimeRequest(
             currentTime = Some(currentTime.toProtoTimestamp),
@@ -1831,7 +1727,7 @@ object LedgerApiCommands {
 
       /** Handle the response the service has provided
         */
-      override protected def handleResponse(response: Empty): Either[String, Unit] = Either.unit
+      override def handleResponse(response: Empty): Either[String, Unit] = Right(())
 
     }
 
@@ -1845,7 +1741,7 @@ object LedgerApiCommands {
       override def createService(channel: ManagedChannel): EventQueryServiceStub =
         EventQueryServiceGrpc.stub(channel)
 
-      override protected def handleResponse(response: Res): Either[String, Res] = Right(response)
+      override def handleResponse(response: Res): Either[String, Res] = Right(response)
     }
 
     final case class GetEventsByContractId(
@@ -1856,14 +1752,14 @@ object LedgerApiCommands {
           GetEventsByContractIdResponse,
         ] {
 
-      override protected def createRequest(): Either[String, GetEventsByContractIdRequest] = Right(
+      override def createRequest(): Either[String, GetEventsByContractIdRequest] = Right(
         GetEventsByContractIdRequest(
           contractId = contractId,
           requestingParties = requestingParties,
         )
       )
 
-      override protected def submitRequest(
+      override def submitRequest(
           service: EventQueryServiceStub,
           request: GetEventsByContractIdRequest,
       ): Future[GetEventsByContractIdResponse] = service.getEventsByContractId(request)

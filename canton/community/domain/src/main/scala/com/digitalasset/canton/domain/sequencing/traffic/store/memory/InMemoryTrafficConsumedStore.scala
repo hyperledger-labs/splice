@@ -28,29 +28,29 @@ class InMemoryTrafficConsumedStore(override protected val loggerFactory: NamedLo
   private val initTimestamp: AtomicReference[Option[CantonTimestamp]] = new AtomicReference(None)
   // Clearing the table can prevent memory leaks
   override def close(): Unit = trafficConsumedMap.clear()
-  override def store(trafficUpdates: Seq[TrafficConsumed])(implicit
+  override def store(trafficConsumed: TrafficConsumed)(implicit
       traceContext: TraceContext
   ): Future[Unit] = Future.successful {
-    trafficUpdates.foreach { trafficConsumed =>
-      logger.debug(s"Storing traffic balance $trafficConsumed")
-      this.trafficConsumedMap
-        .updateWith(trafficConsumed.member) {
-          case Some(old) => Some(old.incl(trafficConsumed))
-          case None => Some(NonEmpty.mk(SortedSet, trafficConsumed))
-        }
-        .discard
-    }
+    logger.debug(s"Storing traffic balance $trafficConsumed")
+    this.trafficConsumedMap
+      .updateWith(trafficConsumed.member) {
+        case Some(old) => Some(old.incl(trafficConsumed))
+        case None => Some(NonEmpty.mk(SortedSet, trafficConsumed))
+      }
+      .discard
   }
 
   override def lookup(
       member: Member
-  )(implicit traceContext: TraceContext): Future[Seq[TrafficConsumed]] =
+  )(implicit traceContext: TraceContext): Future[Seq[TrafficConsumed]] = {
     Future.successful(this.trafficConsumedMap.get(member).toList.flatten)
+  }
 
   override def lookupLast(member: Member)(implicit
       traceContext: TraceContext
-  ): Future[Option[TrafficConsumed]] =
+  ): Future[Option[TrafficConsumed]] = {
     Future.successful(this.trafficConsumedMap.get(member).toList.flatten.lastOption)
+  }
 
   override def lookupLatestBeforeInclusive(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext

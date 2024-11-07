@@ -16,7 +16,6 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.config.TransactionTreeStreamsConfig
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
-import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{Entry, RawTreeEvent}
 import com.digitalasset.canton.platform.store.backend.common.{
   EventIdSourceForInformees,
   EventPayloadSourceForTreeTx,
@@ -34,7 +33,7 @@ import com.digitalasset.canton.platform.store.utils.{
   QueueBasedConcurrencyLimiter,
   Telemetry,
 }
-import com.digitalasset.canton.platform.{Party, TemplatePartiesFilter}
+import com.digitalasset.canton.platform.{ApiOffset, Party, TemplatePartiesFilter}
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
@@ -64,7 +63,7 @@ class TransactionsTreeStreamReader(
   private val dbMetrics = metrics.index.db
 
   private val orderBySequentialEventId =
-    Ordering.by[Entry[RawTreeEvent], Long](_.eventSequentialId)
+    Ordering.by[EventStorageBackend.Entry[Raw.TreeEvent], Long](_.eventSequentialId)
 
   private val paginatingAsyncStream = new PaginatingAsyncStream(loggerFactory)
 
@@ -152,7 +151,7 @@ class TransactionsTreeStreamReader(
         target: EventIdSourceForInformees,
         maxParallelIdQueriesLimiter: QueueBasedConcurrencyLimiter,
         metric: DatabaseMetrics,
-    ): Source[Long, NotUsed] =
+    ): Source[Long, NotUsed] = {
       paginatingAsyncStream.streamIdsFromSeekPagination(
         idPageSizing = idPageSizing,
         idPageBufferSize = maxPagesPerIdPagesBuffer,
@@ -175,13 +174,14 @@ class TransactionsTreeStreamReader(
           }
         }
       )
+    }
 
     def fetchPayloads(
         ids: Source[Iterable[Long], NotUsed],
         target: EventPayloadSourceForTreeTx,
         maxParallelPayloadQueries: Int,
         metric: DatabaseMetrics,
-    ): Source[Entry[RawTreeEvent], NotUsed] = {
+    ): Source[EventStorageBackend.Entry[Raw.TreeEvent], NotUsed] = {
       // Pekko requires for this buffer's size to be a power of two.
       val inputBufferSize = Utils.largestSmallerOrEqualPowerOfTwo(maxParallelPayloadQueries)
       ids.async
@@ -194,9 +194,9 @@ class TransactionsTreeStreamReader(
                   minOffsetExclusive = queryRange.startExclusiveOffset,
                   maxOffsetInclusive = queryRange.endInclusiveOffset,
                   errorPruning = (prunedOffset: Offset) =>
-                    s"Transactions request from ${queryRange.startExclusiveOffset.toLong} to ${queryRange.endInclusiveOffset.toLong} precedes pruned offset ${prunedOffset.toLong}",
+                    s"Transactions request from ${queryRange.startExclusiveOffset.toHexString} to ${queryRange.endInclusiveOffset.toHexString} precedes pruned offset ${prunedOffset.toHexString}",
                   errorLedgerEnd = (ledgerEndOffset: Offset) =>
-                    s"Transactions request from ${queryRange.startExclusiveOffset.toLong} to ${queryRange.endInclusiveOffset.toLong} is beyond ledger end offset ${ledgerEndOffset.toLong}",
+                    s"Transactions request from ${queryRange.startExclusiveOffset.toHexString} to ${queryRange.endInclusiveOffset.toHexString} is beyond ledger end offset ${ledgerEndOffset.toHexString}",
                 ) {
                   eventStorageBackend.transactionStreamingQueries.fetchEventPayloadsTree(
                     target = target
@@ -291,7 +291,7 @@ class TransactionsTreeStreamReader(
       .mergeSorted(payloadsCreate)(orderBySequentialEventId)
       .mergeSorted(payloadsNonConsuming)(orderBySequentialEventId)
     val sourceOfTreeTransactions = TransactionsReader
-      .groupContiguous(allSortedPayloads)(by = _.updateId)
+      .groupContiguous(allSortedPayloads)(by = _.transactionId)
       .mapAsync(transactionsProcessingParallelism)(rawEvents =>
         deserializationQueriesLimiter.execute(
           deserializeLfValues(rawEvents, eventProjectionProperties)
@@ -299,7 +299,7 @@ class TransactionsTreeStreamReader(
       )
       .mapConcat { events =>
         val responses = TransactionConversions.toGetTransactionTreesResponse(events)
-        responses.map { case (offset, response) => Offset.fromLong(offset) -> response }
+        responses.map { case (offset, response) => ApiOffset.assertFromString(offset) -> response }
       }
 
     reassignmentStreamReader
@@ -337,23 +337,24 @@ class TransactionsTreeStreamReader(
   private def mergeSortAndBatch(
       maxOutputBatchSize: Int,
       maxOutputBatchCount: Int,
-  )(sourcesOfIds: Vector[Source[Long, NotUsed]]): Source[Iterable[Long], NotUsed] =
+  )(sourcesOfIds: Vector[Source[Long, NotUsed]]): Source[Iterable[Long], NotUsed] = {
     EventIdsUtils
       .sortAndDeduplicateIds(sourcesOfIds)
       .batchN(
         maxBatchSize = maxOutputBatchSize,
         maxBatchCount = maxOutputBatchCount,
       )
+  }
 
   private def deserializeLfValues(
-      rawEvents: Vector[Entry[RawTreeEvent]],
+      rawEvents: Vector[EventStorageBackend.Entry[Raw.TreeEvent]],
       eventProjectionProperties: EventProjectionProperties,
-  )(implicit lc: LoggingContextWithTrace): Future[Vector[Entry[TreeEvent]]] =
+  )(implicit lc: LoggingContextWithTrace): Future[Vector[EventStorageBackend.Entry[TreeEvent]]] = {
     Timed.future(
-      future = Future.traverse(rawEvents)(
-        TransactionsReader.deserializeTreeEvent(eventProjectionProperties, lfValueTranslation)
-      ),
+      future =
+        Future.traverse(rawEvents)(deserializeEntry(eventProjectionProperties, lfValueTranslation)),
       timer = dbMetrics.treeTxStream.translationTimer,
     )
+  }
 
 }

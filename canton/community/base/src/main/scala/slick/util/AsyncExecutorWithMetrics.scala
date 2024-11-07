@@ -10,7 +10,7 @@ import com.digitalasset.canton.metrics.DbQueueMetrics
 import com.digitalasset.canton.time.PositiveFiniteDuration
 import com.digitalasset.canton.util.{LoggerUtil, MonadUtil}
 import com.typesafe.scalalogging.Logger
-import slick.util.AsyncExecutor.{PrioritizedRunnable, WithConnection}
+import slick.util.AsyncExecutor.{PrioritizedRunnable, Priority, WithConnection}
 
 import java.lang.management.ManagementFactory
 import java.util
@@ -28,6 +28,7 @@ import scala.util.control.NonFatal
     "org.wartremover.warts.Null",
     "org.wartremover.warts.IsInstanceOf",
     "org.wartremover.warts.AsInstanceOf",
+    "org.wartremover.warts.StringPlusAny",
     "org.wartremover.warts.Var",
   )
 )
@@ -66,7 +67,7 @@ class AsyncExecutorWithMetrics(
     )
   }
 
-  lazy val executionContext: ExecutionContextExecutor = {
+  lazy val executionContext = {
     if (!state.compareAndSet(0, 1))
       throw new IllegalStateException(
         "Cannot initialize ExecutionContext; AsyncExecutor already shut down"
@@ -120,7 +121,7 @@ class AsyncExecutorWithMetrics(
         //
         // We have maxThreads == minThreads == maxConnections as the only working configuration
 
-        (new ManagedArrayBlockingQueue(maxConnections, n)).asInstanceOf[BlockingQueue[Runnable]]
+        new ManagedArrayBlockingQueue(maxConnections, n).asInstanceOf[BlockingQueue[Runnable]]
     }
 
     // canton change begin
@@ -129,7 +130,7 @@ class AsyncExecutorWithMetrics(
       /** count / total time */
       private val cost = new AtomicReference[Map[String, (Long, Long)]](Map())
       private val lastReport = new AtomicReference(CantonTimestamp.now())
-      def track(trace: String, runningTime: Long): Unit =
+      def track(trace: String, runningTime: Long): Unit = {
         if (logger.underlying.isInfoEnabled) {
           logQueryCost.foreach { case QueryCostMonitoringConfig(frequency, resetOnOutput, _) =>
             val updated = cost.updateAndGet { tmp =>
@@ -159,6 +160,7 @@ class AsyncExecutorWithMetrics(
             }
           }
         }
+      }
     }
 
     val running = new ConcurrentLinkedQueue[QueryInfo]()
@@ -243,8 +245,9 @@ class AsyncExecutorWithMetrics(
         }
       }
 
-      def reportAsSlow(): Unit =
+      def reportAsSlow(): Unit = {
         reportedAsSlow.set(true)
+      }
 
       def isDone: Boolean = done.get()
 
@@ -262,7 +265,7 @@ class AsyncExecutorWithMetrics(
         }
         if (reportedAsSlow.get()) {
           logger.warn(
-            s"Slow database query $callsite finished after ${TimeUnit.NANOSECONDS.toMillis(tm - started)} ms"
+            s"Slow database query ${callsite} finished after ${TimeUnit.NANOSECONDS.toMillis(tm - started)} ms"
           )
         }
         cleanupAndAlert(tm)
@@ -293,11 +296,9 @@ class AsyncExecutorWithMetrics(
         */
       override def beforeExecute(t: Thread, r: Runnable): Unit = {
         (r, queue) match {
-          case (pr: PrioritizedRunnable, q: BlockingQueue[Runnable])
-              if pr.priority() != WithConnection =>
-            if (q.isInstanceOf[ManagedArrayBlockingQueue]) {
-              q.asInstanceOf[ManagedArrayBlockingQueue].attemptPrepare(pr).discard
-            }
+          case (pr: PrioritizedRunnable, q: ManagedArrayBlockingQueue[Runnable])
+              if pr.priority != WithConnection =>
+            q.increaseInUseCount(pr)
           case _ =>
         }
         // canton change begin
@@ -356,14 +357,13 @@ class AsyncExecutorWithMetrics(
 
       /** If the runnable/task has released the Jdbc connection we decrease the counter again
         */
-      override def afterExecute(r: Runnable, t: Throwable): Unit =
+      override def afterExecute(r: Runnable, t: Throwable): Unit = {
         try {
           super.afterExecute(r, t)
           (r, queue) match {
-            case (pr: PrioritizedRunnable, q: BlockingQueue[Runnable]) if pr.connectionReleased =>
-              if (q.isInstanceOf[ManagedArrayBlockingQueue]) {
-                q.asInstanceOf[ManagedArrayBlockingQueue].attemptCleanUp(pr).discard
-              }
+            case (pr: PrioritizedRunnable, q: ManagedArrayBlockingQueue[Runnable])
+                if pr.connectionReleased =>
+              q.decreaseInUseCount()
             case _ =>
           }
           // canton change begin
@@ -371,6 +371,7 @@ class AsyncExecutorWithMetrics(
           stats.remove(r).foreach(_.completed())
           // canton change end
         }
+      }
       // canton change begin
       override def shutdownNow(): util.List[Runnable] = {
         backgroundChecker.foreach(_.cancel(true))
@@ -410,28 +411,16 @@ class AsyncExecutorWithMetrics(
       override def reportFailure(t: Throwable): Unit =
         logger.error("Async executor failed with exception", t)
 
-      override def execute(command: Runnable): Unit =
+      override def execute(command: Runnable): Unit = {
         if (command.isInstanceOf[PrioritizedRunnable]) {
           executor.execute(command)
         } else {
-          /*
-            Slick 3.5.2 implements this else-branch as:
-            ```
-              executor.execute(new PrioritizedRunnable {
-                override def priority(): Priority = WithConnection
-                override def run(): Unit = command.run()
-              })
-            ```
-            Because `PrioritizedRunnable` is a sealed trait in the library, we
-            use the `apply` method of its companion object instead.
-           */
-          executor.execute(
-            PrioritizedRunnable(
-              priority = WithConnection,
-              _ => command.run(),
-            )
-          )
+          executor.execute(new PrioritizedRunnable {
+            override val priority: Priority = WithConnection
+            override def run(): Unit = command.run()
+          })
         }
+      }
     }
   }
 

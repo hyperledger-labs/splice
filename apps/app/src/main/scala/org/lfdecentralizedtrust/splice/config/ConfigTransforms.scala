@@ -197,7 +197,8 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
-      enableScanHistoryBackfilling,
+      // Backfilling will never be enabled on 0.2, no need to run integration tests with it
+      // enableScanHistoryBackfilling,
     )
   }
 

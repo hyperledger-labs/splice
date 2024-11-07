@@ -14,7 +14,10 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.error.{CommonErrors, LedgerApiErrors}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker.SubmissionKey
+import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker.{
+  SubmissionKey,
+  Submitters,
+}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
@@ -32,7 +35,11 @@ trait SubmissionTracker extends AutoCloseable {
       traceContext: TraceContext,
   ): Future[CompletionResponse]
 
-  def onCompletion(completionStreamResponse: CompletionStreamResponse): Unit
+  /** [[com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse.completion]] do not have `act_as` populated,
+    * hence submitters are propagated separately.
+    * TODO(#12658): Use only the completion response once completions.act_as is populated.
+    */
+  def onCompletion(completionResult: (CompletionStreamResponse, Submitters)): Unit
 }
 
 object SubmissionTracker {
@@ -104,12 +111,14 @@ object SubmissionTracker {
         }(errorLogger)
       }(errorLogger)
 
-    override def onCompletion(completionStreamResponse: CompletionStreamResponse): Unit =
-      completionStreamResponse.completionResponse.completion.foreach { completion =>
-        attemptFinish(SubmissionKey.fromCompletion(completion))(
-          CompletionResponse.fromCompletion(_, completion)
+    override def onCompletion(completionResult: (CompletionStreamResponse, Submitters)): Unit = {
+      val (completionStreamResponse, submitters) = completionResult
+      completionStreamResponse.completion.foreach { completion =>
+        attemptFinish(SubmissionKey.fromCompletion(completion, submitters))(
+          CompletionResponse.fromCompletion(_, completion, completionStreamResponse.checkpoint)
         )
       }
+    }
 
     override def close(): Unit =
       pending.values.foreach(p => p._2.tryComplete(CompletionResponse.closing(p._1)).discard)
@@ -208,12 +217,15 @@ object SubmissionTracker {
   )
 
   object SubmissionKey {
-    def fromCompletion(completion: com.daml.ledger.api.v2.completion.Completion): SubmissionKey =
+    def fromCompletion(
+        completion: com.daml.ledger.api.v2.completion.Completion,
+        submitters: Submitters,
+    ): SubmissionKey =
       SubmissionKey(
         commandId = completion.commandId,
         submissionId = completion.submissionId,
         applicationId = completion.applicationId,
-        parties = completion.actAs.toSet,
+        parties = submitters,
       )
   }
 }

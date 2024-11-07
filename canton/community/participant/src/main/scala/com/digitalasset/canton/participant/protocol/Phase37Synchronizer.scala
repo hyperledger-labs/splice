@@ -7,7 +7,6 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.{CantonTimestamp, ConcurrentHMap}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -26,7 +25,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.common.annotations.VisibleForTesting
 
-import scala.concurrent.{ExecutionContext, blocking}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Success}
 
 /** Synchronizes the request processing of phases 3 and 7.
@@ -86,16 +85,14 @@ class Phase37Synchronizer(
 
     blocking(synchronized {
       val requestRelation: RequestRelation[requestType.PendingRequestData] = RequestRelation(
-        promise.futureUS
-          .transform {
-            case Success(Outcome(None)) | Success(AbortedDueToShutdown) =>
-              logger.debug(s"Removing request $requestId from pending requests.")
-              blocking(synchronized {
-                pendingRequests.remove_(ts)
-              })
-              Success(Outcome(None))
-            case other => other
-          }
+        promise.future
+          .map(_.onShutdown(None).orElse {
+            logger.debug(s"Removing request $requestId from pending requests.")
+            blocking(synchronized {
+              pendingRequests.remove_(ts)
+            })
+            None
+          })
       )
 
       pendingRequests
@@ -123,8 +120,8 @@ class Phase37Synchronizer(
   @SuppressWarnings(Array("com.digitalasset.canton.SynchronizedFuture"))
   def awaitConfirmed(requestType: RequestType)(
       requestId: RequestId,
-      filter: ReplayDataOr[requestType.PendingRequestData] => FutureUnlessShutdown[Boolean] =
-        (_: ReplayDataOr[requestType.PendingRequestData]) => FutureUnlessShutdown.pure(true),
+      filter: ReplayDataOr[requestType.PendingRequestData] => Future[Boolean] =
+        (_: ReplayDataOr[requestType.PendingRequestData]) => Future.successful(true),
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
@@ -149,34 +146,29 @@ class Phase37Synchronizer(
                 (1) another call to awaitConfirmed has already received and successfully validated the data
                 (2) the request was marked as a timeout
              */
-            case Success(Outcome(None)) =>
+            case Success(None) =>
               promise.outcome(RequestOutcome.AlreadyServedOrTimeout)
-              FutureUnlessShutdown.pure(None)
-            case Success(Outcome(Some(pData))) =>
+              Future.successful(None)
+            case Success(Some(pData)) =>
               filter(pData).transform {
-                case Success(Outcome(true)) =>
+                case Success(true) =>
                   // we need a synchronized block here to avoid conflicts with the outer replace in awaitConfirmed
                   blocking(synchronized {
                     // the entry is removed when the first awaitConfirmed with a satisfied predicate is there
                     pendingRequests.remove_(ts)
                   })
                   promise.outcome(RequestOutcome.Success(pData))
-                  Success(Outcome(None))
-                case Success(Outcome(false)) =>
+                  Success(None)
+                case Success(false) =>
                   promise.outcome(RequestOutcome.Invalid)
-                  Success(Outcome(Some(pData)))
+                  Success(Some(pData))
                 case Failure(exception) =>
                   promise.tryFailure(exception).discard[Boolean]
                   Failure(exception)
-                case Success(AbortedDueToShutdown) =>
-                  promise.shutdown()
-                  Success(AbortedDueToShutdown)
               }
-            case Success(AbortedDueToShutdown) =>
-              FutureUnlessShutdown.abortedDueToShutdown
             case Failure(exception) =>
               promise.tryFailure(exception).discard[Boolean]
-              FutureUnlessShutdown.failed(exception)
+              Future.failed(exception)
           }
           pendingRequests.replace_[ts.type, RequestRelation[requestType.PendingRequestData]](
             ts,
@@ -232,18 +224,21 @@ object Phase37Synchronizer {
     *                                 Subsequently, future calls to awaitConfirmed will 'flatMap'/chain on this future.
     */
   private final case class RequestRelation[+T <: PendingRequestData](
-      pendingRequestDataFuture: FutureUnlessShutdown[Option[ReplayDataOr[T]]]
+      pendingRequestDataFuture: Future[Option[ReplayDataOr[T]]]
   )
 
   final class PendingRequestDataHandle[T <: PendingRequestData](
       private val handle: PromiseUnlessShutdown[Option[ReplayDataOr[T]]]
   ) {
-    def complete(pendingData: Option[ReplayDataOr[T]]): Unit =
+    def complete(pendingData: Option[ReplayDataOr[T]]): Unit = {
       handle.outcome(pendingData)
-    def failed(exception: Throwable): Unit =
+    }
+    def failed(exception: Throwable): Unit = {
       handle.tryFailure(exception).discard
-    def shutdown(): Unit =
+    }
+    def shutdown(): Unit = {
       handle.shutdown()
+    }
   }
 
   /** Final outcome of a request outputted by awaitConfirmed.

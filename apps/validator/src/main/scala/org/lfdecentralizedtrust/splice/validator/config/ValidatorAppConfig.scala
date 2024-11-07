@@ -12,7 +12,6 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.config.{
   AutoAcceptTransfersConfig,
-  TransferPreapprovalConfig,
   TreasuryConfig,
   WalletSweepConfig,
 }
@@ -181,7 +180,6 @@ case class ValidatorAppBackendConfig(
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     participantIdentitiesBackup: Option[PeriodicBackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
-    transferPreapproval: TransferPreapprovalConfig = TransferPreapprovalConfig(),
     // Migrate the validator party from an existing participant with the same namespace.
     migrateValidatorParty: Option[MigrateValidatorPartyConfig] = None,
     svValidator: Boolean = false,

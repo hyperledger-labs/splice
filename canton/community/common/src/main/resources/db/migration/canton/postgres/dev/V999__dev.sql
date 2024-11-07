@@ -3,4 +3,4 @@
 
 -- This is a dummy column we are adding in order to test that adding dev version migrations
 -- works properly. DO NOT MOVE THIS TO STABLE
-alter table common_node_id add column test_column int not null default 0;
+ALTER TABLE common_node_id ADD COLUMN test_column INT NOT NULL DEFAULT 0;

@@ -7,21 +7,20 @@ import com.daml.ledger.api.v2.UpdateServiceOuterClass;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.Objects;
-import java.util.Optional;
 
 public final class GetUpdatesRequest {
 
-  @NonNull private final Long beginExclusive;
+  @NonNull private final ParticipantOffset beginExclusive;
 
-  @NonNull private final Optional<Long> endInclusive;
+  @NonNull private final ParticipantOffset endInclusive;
 
   @NonNull private final TransactionFilter transactionFilter;
 
   private final boolean verbose;
 
   public GetUpdatesRequest(
-      @NonNull Long beginExclusive,
-      @NonNull Optional<Long> endInclusive,
+      @NonNull ParticipantOffset beginExclusive,
+      @NonNull ParticipantOffset endInclusive,
       @NonNull TransactionFilter transactionFilter,
       boolean verbose) {
     this.beginExclusive = beginExclusive;
@@ -34,30 +33,28 @@ public final class GetUpdatesRequest {
     TransactionFilter filters = TransactionFilter.fromProto(request.getFilter());
     boolean verbose = request.getVerbose();
     return new GetUpdatesRequest(
-        request.getBeginExclusive(),
-        request.hasEndInclusive() ? Optional.of(request.getEndInclusive()) : Optional.empty(),
+        ParticipantOffset.fromProto(request.getBeginExclusive()),
+        ParticipantOffset.fromProto(request.getEndInclusive()),
         filters,
         verbose);
   }
 
   public UpdateServiceOuterClass.GetUpdatesRequest toProto() {
-    UpdateServiceOuterClass.GetUpdatesRequest.Builder builder =
-        UpdateServiceOuterClass.GetUpdatesRequest.newBuilder()
-            .setBeginExclusive(beginExclusive)
-            .setFilter(this.transactionFilter.toProto())
-            .setVerbose(this.verbose);
-
-    endInclusive.ifPresent(builder::setEndInclusive);
-    return builder.build();
+    return UpdateServiceOuterClass.GetUpdatesRequest.newBuilder()
+        .setBeginExclusive(beginExclusive.toProto())
+        .setEndInclusive(endInclusive.toProto())
+        .setFilter(this.transactionFilter.toProto())
+        .setVerbose(this.verbose)
+        .build();
   }
 
   @NonNull
-  public Long getBeginExclusive() {
+  public ParticipantOffset getBeginExclusive() {
     return beginExclusive;
   }
 
   @NonNull
-  public Optional<Long> getEndInclusive() {
+  public ParticipantOffset getEndInclusive() {
     return endInclusive;
   }
 

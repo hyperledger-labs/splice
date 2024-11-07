@@ -5,6 +5,7 @@ package com.digitalasset.canton.platform.apiserver.services.command
 
 import com.daml.error.ContextualizedErrorLogger
 import com.daml.grpc.RpcProtoExtractors
+import com.daml.ledger.api.v2.checkpoint.Checkpoint
 import com.daml.ledger.api.v2.command_service.{CommandServiceGrpc, SubmitAndWaitRequest}
 import com.daml.ledger.api.v2.command_submission_service.{SubmitRequest, SubmitResponse}
 import com.daml.ledger.api.v2.commands.{Command, Commands, CreateCommand}
@@ -70,14 +71,14 @@ class CommandServiceImplSpec
         )
       ).use { stub =>
         val request = SubmitAndWaitRequest.of(Some(commands))
-        stub.submitAndWait(request).map { response =>
+        stub.submitAndWaitForUpdateId(request).map { response =>
           verify(submissionTracker).track(
             eqTo(expectedSubmissionKey),
             eqTo(config.NonNegativeFiniteDuration.ofSeconds(1000L)),
             any[TraceContext => Future[Any]],
           )(any[ContextualizedErrorLogger], any[TraceContext])
           response.updateId should be("transaction ID")
-          response.completionOffset shouldBe offset
+          response.completionOffset shouldBe "offset"
         }
       }
     }
@@ -104,7 +105,7 @@ class CommandServiceImplSpec
         val request = SubmitAndWaitRequest.of(Some(commands))
         stub
           .withDeadline(Deadline.after(3600L, TimeUnit.SECONDS, deadlineTicker))
-          .submitAndWait(request)
+          .submitAndWaitForUpdateId(request)
           .map { response =>
             verify(submissionTracker).track(
               eqTo(expectedSubmissionKey),
@@ -133,9 +134,9 @@ class CommandServiceImplSpec
         .withDeadline(Deadline.after(0L, TimeUnit.NANOSECONDS), scheduledExecutor())
 
       deadline
-        .call { () =>
+        .call(() => {
           service
-            .submitAndWait(
+            .submitAndWaitForUpdateId(
               SubmitAndWaitRequest.of(Some(commands.copy(submissionId = submissionId)))
             )(
               LoggingContextWithTrace.ForTesting
@@ -152,8 +153,8 @@ class CommandServiceImplSpec
                 status.getMessage should fullyMatch regex s"REQUEST_DEADLINE_EXCEEDED\\(3,submissi\\)\\: The gRPC deadline for request with commandId=$commandId and submissionId=$submissionId has expired by .* The request will not be processed further\\."
               })
             }
-        }
-        .thereafter(_ => deadline.close())
+        })
+        .thereafter { _ => deadline.close() }
     }
 
     "time out if the tracker times out" in withTestContext { testContext =>
@@ -191,7 +192,7 @@ class CommandServiceImplSpec
         service: CommandServiceImpl
       ).use { stub =>
         val request = SubmitAndWaitRequest.of(Some(commands))
-        stub.submitAndWait(request).failed.map {
+        stub.submitAndWaitForUpdateId(request).failed.map {
           case RpcProtoExtractors.Exception(RpcProtoExtractors.Status(Code.DEADLINE_EXCEEDED)) =>
             succeed
           case unexpected => fail(s"Unexpected exception", unexpected)
@@ -220,7 +221,10 @@ class CommandServiceImplSpec
 
   private class TestContext {
     val trackerCompletionResponse = tracking.CompletionResponse(
-      completion = completion
+      completion = completion,
+      checkpoint = Some(
+        Checkpoint(offset = "offset")
+      ),
     )
     val commands = someCommands()
     val submissionTracker = mock[SubmissionTracker]
@@ -303,13 +307,10 @@ object CommandServiceImplSpec {
     )
   )
 
-  val offset: Long = 12345678L
-
   val completion = Completion(
     commandId = "command ID",
     status = Some(OkStatus),
     updateId = "transaction ID",
-    offset = offset,
   )
 
   val expectedSubmissionKey = SubmissionKey(

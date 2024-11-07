@@ -219,12 +219,9 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
         T <: Template,
     ](companion: Contract.Companion.Template[TCid, T])(payload: T): TCid = {
       val (created, _) = actAndCheck(
-        s"create sample ${companion.getTemplateIdWithPackageId.getEntityName}",
+        s"create sample ${companion.TEMPLATE_ID.getEntityName}",
         exerciseDso(payload.create()),
-      )(
-        s"ensure ${companion.getTemplateIdWithPackageId.getEntityName} is there",
-        _ => nonEmptyOnSv1(companion),
-      )
+      )(s"ensure ${companion.TEMPLATE_ID.getEntityName} is there", _ => nonEmptyOnSv1(companion))
       companion.toContractId(new ContractId(created.contractId.contractId))
     }
 
@@ -646,7 +643,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     def allContractsMigrated(rows: (FilterableCompanion, PartyId)*) = {
       val companions = Table[JIdentifier, FilterableCompanion, PartyId](
         ("template", "companion", "querying party"),
-        rows.map { case (c, p) => (c.getTemplateIdWithPackageId, c, p) }*
+        rows.map { case (c, p) => (c.TEMPLATE_ID, c, p) }*
       )
       eventually() {
         tForEvery(companions) { (_, companion, queryingParty) =>
@@ -690,7 +687,6 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
           filterNot Set(
             spw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
             splice.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
-            splice.amuletrules.TransferPreapproval.COMPANION,
           )
           map (c(_)): _*
       )
@@ -711,9 +707,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       val sv1ValidatorParty = sv1ValidatorBackend.getValidatorPartyId()
       import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore.templatesMovedByMyAutomation as templatesMovedByValidatorAutomation
       allContractsMigrated(
-        (templatesMovedByValidatorAutomation(true) filterNot Set(
-          splice.amuletrules.ExternalPartySetupProposal.COMPANION
-        )) map (c(_, sv1ValidatorParty)): _*
+        templatesMovedByValidatorAutomation(true) map (c(_, sv1ValidatorParty)): _*
       )
     }
 
@@ -725,7 +719,6 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
             spw.subscriptions.SubscriptionInitialPayment.COMPANION,
             spw.subscriptions.SubscriptionIdleState.COMPANION,
             spw.subscriptions.SubscriptionPayment.COMPANION,
-            spw.transferpreapproval.TransferPreapprovalProposal.COMPANION,
           )
           map (c(_, sv1WalletUser)): _*
       )

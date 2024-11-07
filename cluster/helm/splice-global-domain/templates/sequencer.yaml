@@ -21,7 +21,7 @@ spec:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
         app: {{ .Release.Name }}-sequencer
-        splice-component: sequencer
+        cn-component: sequencer
         {{- with $.Values.metrics.migration }}
         active_migration: {{ .active | quote }}
         migration_id: {{ .id | quote }}
@@ -33,7 +33,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
                 matchExpressions:
-                  - key: splice-component
+                  - key: cn-component
                     operator: In
                     values:
                       - sequencer

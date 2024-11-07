@@ -7,10 +7,9 @@ import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.AbortedDueToShutdownException
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.PackageUnknownTo
-import com.digitalasset.canton.protocol.LfLanguageVersion
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -28,21 +27,15 @@ object UsableDomain {
       protocolVersion: ProtocolVersion,
       snapshot: TopologySnapshot,
       requiredPackagesByParty: Map[LfPartyId, Set[LfPackageId]],
-      transactionVersion: LfLanguageVersion,
-      ledgerTime: CantonTimestamp,
+      transactionVersion: TransactionVersion,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): EitherT[Future, DomainNotUsedReason, Unit] = {
 
     val packageVetted: EitherT[Future, UnknownPackage, Unit] =
-      checkPackagesVetted(
-        domainId,
-        snapshot,
-        requiredPackagesByParty,
-        ledgerTime,
-      )
-        .failOnShutdownToAbortException("Usable domain checking")
+      resolveParticipantsAndCheckPackagesVetted(domainId, snapshot, requiredPackagesByParty)
+        .failOnShutdownTo(AbortedDueToShutdownException("Usable domain checking"))
     val partiesConnected: EitherT[Future, MissingActiveParticipant, Unit] =
       checkConnectedParties(domainId, snapshot, requiredPackagesByParty.keySet)
     val compatibleProtocolVersion: EitherT[Future, UnsupportedMinimumProtocolVersion, Unit] =
@@ -70,16 +63,19 @@ object UsableDomain {
       .allHaveActiveParticipants(parties)
       .leftMap(MissingActiveParticipant(domainId, _))
 
-  private def unknownPackages(snapshot: TopologySnapshot, ledgerTime: CantonTimestamp)(
+  private def unknownPackages(snapshot: TopologySnapshot)(
       participantIdAndRequiredPackages: (ParticipantId, Set[LfPackageId])
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): FutureUnlessShutdown[List[PackageUnknownTo]] = {
     val (participantId, required) = participantIdAndRequiredPackages
-    snapshot
-      .findUnvettedPackagesOrDependencies(participantId, required, ledgerTime)
-      .map(notVetted => notVetted.map(PackageUnknownTo(_, participantId)).toList)
+    snapshot.findUnvettedPackagesOrDependencies(participantId, required).value.map {
+      case Right(notVetted) =>
+        notVetted.view.map(PackageUnknownTo(_, participantId)).toList
+      case Left(missingPackageId) =>
+        List(PackageUnknownTo(missingPackageId, participantId))
+    }
   }
 
   private def resolveParticipants(
@@ -89,13 +85,13 @@ object UsableDomain {
       ec: ExecutionContext,
       tc: TraceContext,
   ): EitherT[Future, Nothing, Map[ParticipantId, Set[LfPackageId]]] = EitherT.right(
-    snapshot.activeParticipantsOfParties(requiredPackagesByParty.keySet.toSeq).map {
+    snapshot.activeParticipantsOfPartiesWithAttributes(requiredPackagesByParty.keySet.toSeq).map {
       partyToParticipants =>
         requiredPackagesByParty.toList.foldLeft(Map.empty[ParticipantId, Set[LfPackageId]]) {
           case (acc, (party, packages)) =>
-            val participants = partyToParticipants.getOrElse(party, Set.empty)
+            val participants = partyToParticipants.getOrElse(party, Map.empty)
             // add the required packages for this party to the set of required packages of this participant
-            participants.foldLeft(acc) { case (res, participantId) =>
+            participants.foldLeft(acc) { case (res, (participantId, _)) =>
               res.updated(participantId, res.getOrElse(participantId, Set()).union(packages))
             }
         }
@@ -123,11 +119,10 @@ object UsableDomain {
     * The participant receives a projection for the parties it hosts. Hence, the packages
     * needed for these parties will be sufficient to re-interpret the whole projection.
     */
-  def checkPackagesVetted(
+  def resolveParticipantsAndCheckPackagesVetted(
       domainId: DomainId,
       snapshot: TopologySnapshot,
       requiredPackagesByParty: Map[LfPartyId, Set[LfPackageId]],
-      ledgerTime: CantonTimestamp,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -135,13 +130,12 @@ object UsableDomain {
     resolveParticipants(snapshot, requiredPackagesByParty)
       .mapK(FutureUnlessShutdown.outcomeK)
       .flatMap(
-        checkPackagesVetted(domainId, snapshot, ledgerTime, _)
+        checkPackagesVetted(domainId, snapshot, _)
       )
 
   private def checkPackagesVetted(
       domainId: DomainId,
       snapshot: TopologySnapshot,
-      ledgerTime: CantonTimestamp,
       requiredPackages: Map[ParticipantId, Set[LfPackageId]],
   )(implicit
       ec: ExecutionContext,
@@ -149,7 +143,7 @@ object UsableDomain {
   ): EitherT[FutureUnlessShutdown, UnknownPackage, Unit] =
     EitherT(
       requiredPackages.toList
-        .parFlatTraverse(unknownPackages(snapshot, ledgerTime))
+        .parFlatTraverse(unknownPackages(snapshot))
         .map(NonEmpty.from(_).toLeft(()))
     ).leftMap(unknownTo => UnknownPackage(domainId, unknownTo))
 
@@ -198,7 +192,7 @@ object UsableDomain {
       domainId: DomainId,
       currentPV: ProtocolVersion,
       requiredPV: ProtocolVersion,
-      lfVersion: LfLanguageVersion,
+      lfVersion: TransactionVersion,
   ) extends DomainNotUsedReason {
 
     override def toString: String =

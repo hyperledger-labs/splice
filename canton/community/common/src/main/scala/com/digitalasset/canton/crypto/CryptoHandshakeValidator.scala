@@ -41,23 +41,17 @@ object CryptoHandshakeValidator {
   def validate(parameters: StaticDomainParameters, config: CryptoConfig): Either[String, Unit] =
     for {
       _ <- validateScheme(
-        parameters.requiredSigningSpecs.algorithms,
-        selectSchemes(config.signing.algorithms, config.provider.signingAlgorithms)
-          .map(cs => CryptoScheme(cs.default, cs.allowed)),
-      )
-      _ <- validateScheme(
-        parameters.requiredSigningSpecs.keys,
-        selectSchemes(config.signing.keys, config.provider.signingKeys)
-          .map(cs => CryptoScheme(cs.default, cs.allowed)),
+        parameters.requiredSigningKeySchemes,
+        selectSchemes(config.signing, config.provider.signing),
       )
       _ <- validateScheme(
         parameters.requiredEncryptionSpecs.algorithms,
-        selectSchemes(config.encryption.algorithms, config.provider.encryptionAlgorithms)
+        selectSchemes(config.encryptionAlgorithms, config.provider.encryptionAlgorithms)
           .map(cs => CryptoScheme(cs.default, cs.allowed)),
       )
       _ <- validateScheme(
         parameters.requiredEncryptionSpecs.keys,
-        selectSchemes(config.encryption.keys, config.provider.encryptionKeys)
+        selectSchemes(config.encryptionKeys, config.provider.encryptionKeys)
           .map(cs => CryptoScheme(cs.default, cs.allowed)),
       )
       _ <- validateScheme(

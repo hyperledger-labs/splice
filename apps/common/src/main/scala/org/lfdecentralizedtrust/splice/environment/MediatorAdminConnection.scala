@@ -5,13 +5,12 @@ package org.lfdecentralizedtrust.splice.environment
 
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import com.digitalasset.canton.admin.api.client.commands.{
-  GrpcAdminCommand,
-  MediatorAdministrationCommands,
-  MediatorAdminCommands,
+  EnterpriseMediatorAdministrationCommands,
+  StatusAdminCommands,
 }
-import com.digitalasset.canton.admin.api.client.data.{MediatorStatus, NodeStatus}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.health.admin.data.{MediatorNodeStatus, NodeStatus}
 import com.digitalasset.canton.sequencing.{
   SequencerConnection,
   SequencerConnections,
@@ -44,10 +43,10 @@ class MediatorAdminConnection(
 
   override val serviceName = "Canton Mediator Admin API"
 
-  override protected type Status = MediatorStatus
+  override protected type Status = MediatorNodeStatus
 
-  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[MediatorStatus]] =
-    MediatorAdminCommands.Health.MediatorStatusCommand()
+  override protected def getStatusRequest: StatusAdminCommands.GetStatus[MediatorNodeStatus] =
+    new StatusAdminCommands.GetStatus(MediatorNodeStatus.fromProtoV30)
 
   def getMediatorId(implicit traceContext: TraceContext): Future[MediatorId] =
     getId().map(MediatorId(_))
@@ -57,7 +56,7 @@ class MediatorAdminConnection(
       sequencerConnection: SequencerConnection,
   )(implicit traceContext: TraceContext): Future[Unit] =
     runCmd(
-      MediatorAdministrationCommands.Initialize(
+      EnterpriseMediatorAdministrationCommands.Initialize(
         domainId,
         SequencerConnections.single(sequencerConnection),
         // TODO(#10985) Consider enabling this.

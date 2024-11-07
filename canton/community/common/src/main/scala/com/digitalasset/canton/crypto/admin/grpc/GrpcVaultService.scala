@@ -49,11 +49,9 @@ class GrpcVaultService(
     pool
       .filter(entry =>
         filters.forall { filter =>
-          entry.publicKey.fingerprint.unwrap.startsWith(filter.fingerprint) && entry.name
-            .map(_.unwrap)
-            .getOrElse("")
-            .contains(filter.name) && filter.purpose
-            .forall(_ == entry.publicKey.purpose.toProtoEnum)
+          entry.publicKey.fingerprint.unwrap.startsWith(filter.fingerprint)
+          && entry.name.map(_.unwrap).getOrElse("").contains(filter.name)
+          && filter.purpose.forall(_ == entry.publicKey.purpose.toProtoEnum)
         }
       )
       .toSeq
@@ -140,29 +138,20 @@ class GrpcVaultService(
       .failOnShutdownTo(AbortedDueToShutdown.Error().asGrpcError)
   }
 
-  /** Generates a new signing key. If there is an empty usage in the request (i.e. and old key request),
-    * it defaults to all.
-    */
   override def generateSigningKey(
       request: v30.GenerateSigningKeyRequest
   ): Future[v30.GenerateSigningKeyResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     for {
       scheme <-
-        if (request.keySpec.isSigningKeySpecUnspecified)
-          Future.successful(crypto.privateCrypto.defaultSigningKeySpec)
+        if (request.keyScheme.isSigningKeySchemeUnspecified)
+          Future.successful(crypto.privateCrypto.defaultSigningKeyScheme)
         else
           Future(
-            SigningKeySpec
-              .fromProtoEnum("key_spec", request.keySpec)
+            SigningKeyScheme
+              .fromProtoEnum("key_scheme", request.keyScheme)
               .valueOr(err => throw ProtoDeserializationFailure.WrapNoLogging(err).asGrpcError)
           )
-      usage <- Future(
-        // for commands, we should not default to All; instead, the request should fail because usage is now a mandatory parameter.
-        SigningKeyUsage
-          .fromProtoListWithoutDefault(request.usage)
-          .valueOr(err => throw ProtoDeserializationFailure.WrapNoLogging(err).asGrpcError)
-      )
       name <- Future(
         KeyName
           .fromProtoPrimitive(request.name)
@@ -170,7 +159,7 @@ class GrpcVaultService(
       )
       key <- CantonGrpcUtil.mapErrNewEUS(
         crypto
-          .generateSigningKey(scheme, usage, name.emptyStringAsNone)
+          .generateSigningKey(scheme, name.emptyStringAsNone)
           .leftMap(err => SigningKeyGenerationError.ErrorCode.Wrap(err))
       )
     } yield v30.GenerateSigningKeyResponse(publicKey = Some(key.toProtoV30))
@@ -374,7 +363,7 @@ class GrpcVaultService(
           )
         )
         _ <- crypto.cryptoPublicStore.storePublicKey(keyPair.publicKey, validatedName)
-        _ = logger.info(s"Uploading key $validatedName")
+        _ = logger.info(s"Uploading key ${validatedName}")
         _ <- cryptoPrivateStore
           .storePrivateKey(keyPair.privateKey, validatedName)
           .valueOr(err => throw CryptoPrivateStoreError.ErrorCode.Wrap(err).asGrpcError)

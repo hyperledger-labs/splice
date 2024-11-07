@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.domain.sequencing.authentication.grpc
 
+import cats.data.EitherT
 import cats.implicits.*
-import com.digitalasset.canton.auth.AsyncForwardingListener
 import com.digitalasset.canton.domain.sequencing.authentication.grpc.SequencerAuthenticationServerInterceptor.VerifyTokenError
 import com.digitalasset.canton.domain.sequencing.authentication.{
   MemberAuthenticationService,
@@ -14,16 +14,22 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.authentication.AuthenticationToken
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.{
   AuthenticationError,
+  PassiveSequencer,
   TokenVerificationException,
 }
 import com.digitalasset.canton.sequencing.authentication.grpc.Constant
 import com.digitalasset.canton.topology.{DomainId, Member, UniqueIdentifier}
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.*
+
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 class SequencerAuthenticationServerInterceptor(
     tokenValidator: MemberAuthenticationService,
     val loggerFactory: NamedLoggerFactory,
-) extends ServerInterceptor
+)(implicit ec: ExecutionContext)
+    extends ServerInterceptor
     with NamedLogging {
 
   override def interceptCall[ReqT, RespT](
@@ -46,48 +52,58 @@ class SequencerAuthenticationServerInterceptor(
           // any original context values
           val originalContext = Context.current()
 
-          try {
-            val listenerE = for {
-              member <- Member
-                .fromProtoPrimitive(memberId, "memberId")
-                .leftMap(err => s"Failed to deserialize member id: $err")
-                .leftMap(VerifyTokenError.GeneralError.apply)
-              intendedDomainId <- UniqueIdentifier
-                .fromProtoPrimitive_(intendedDomain)
-                .map(DomainId(_))
-                .leftMap(err => VerifyTokenError.GeneralError(err.message))
-              storedTokenO <-
-                for {
-                  token <- tokenO
-                    .toRight[VerifyTokenError](
-                      VerifyTokenError.GeneralError("Authentication headers are missing for token")
-                    )
-                  storedToken <- verifyToken(member, intendedDomainId, token)
-                } yield Some(storedToken)
-            } yield {
-              val contextWithAuthorizedMember = originalContext
-                .withValue(IdentityContextHelper.storedAuthenticationTokenContextKey, storedTokenO)
-                .withValue(IdentityContextHelper.storedMemberContextKey, Some(member))
-              Contexts.interceptCall(contextWithAuthorizedMember, serverCall, headers, next)
-            }
-
-            listenerE match {
-              case Right(listener) =>
-                setNextListener(listener)
-              case Left(err) =>
-                logger.debug(s"Authentication token verification failed: $err")
-                setNextListener(
-                  failVerification(
-                    s"Verification failed for member $memberId: ${err.message}",
-                    serverCall,
-                    headers,
-                    err.errorCode,
+          val listenerET = for {
+            member <- Member
+              .fromProtoPrimitive(memberId, "memberId")
+              .leftMap(err => s"Failed to deserialize member id: $err")
+              .leftMap(VerifyTokenError.GeneralError)
+              .toEitherT[Future]
+            intendedDomainId <- UniqueIdentifier
+              .fromProtoPrimitive_(intendedDomain)
+              .map(DomainId(_))
+              .leftMap(err => VerifyTokenError.GeneralError(err.message))
+              .toEitherT[Future]
+            storedTokenO <-
+              for {
+                token <- tokenO
+                  .toRight[VerifyTokenError](
+                    VerifyTokenError.GeneralError("Authentication headers are missing for token")
                   )
+                  .toEitherT[Future]
+                storedToken <- verifyToken(member, intendedDomainId, token)
+              } yield Some(storedToken)
+          } yield {
+            val contextWithAuthorizedMember = originalContext
+              .withValue(IdentityContextHelper.storedAuthenticationTokenContextKey, storedTokenO)
+              .withValue(IdentityContextHelper.storedMemberContextKey, Some(member))
+            Contexts.interceptCall(contextWithAuthorizedMember, serverCall, headers, next)
+          }
+
+          listenerET.value.onComplete {
+            case Success(Right(listener)) =>
+              setNextListener(listener)
+            case Success(Left(VerifyTokenError.AuthError(PassiveSequencer))) =>
+              logger.debug("Authentication not possible with passive sequencer.")
+              setNextListener(
+                failVerification(
+                  s"Verification failed for member $memberId: ${PassiveSequencer.reason}",
+                  serverCall,
+                  headers,
+                  Some(PassiveSequencer.code),
+                  Status.UNAVAILABLE,
                 )
-            }
-          } catch {
-            // To be on the safe side, in case `verifyToken` throws an exception
-            case ex: Throwable =>
+              )
+            case Success(Left(err)) =>
+              logger.debug(s"Authentication token verification failed: $err")
+              setNextListener(
+                failVerification(
+                  s"Verification failed for member $memberId: ${err.message}",
+                  serverCall,
+                  headers,
+                  err.errorCode,
+                )
+              )
+            case Failure(ex) =>
               logger.warn(s"Authentication token verification caused an unexpected exception", ex)
               setNextListener(
                 failVerification(
@@ -97,7 +113,6 @@ class SequencerAuthenticationServerInterceptor(
                   Some(TokenVerificationException(memberId).code),
                 )
               )
-
           }
         }
       }
@@ -108,10 +123,12 @@ class SequencerAuthenticationServerInterceptor(
       member: Member,
       intendedDomain: DomainId,
       token: AuthenticationToken,
-  ): Either[VerifyTokenError, StoredAuthenticationToken] =
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, VerifyTokenError, StoredAuthenticationToken] =
     tokenValidator
       .validateToken(intendedDomain, member, token)
-      .leftMap[VerifyTokenError](VerifyTokenError.AuthError.apply)
+      .leftMap[VerifyTokenError](VerifyTokenError.AuthError)
 
   private def failVerification[ReqT, RespT](
       msg: String,

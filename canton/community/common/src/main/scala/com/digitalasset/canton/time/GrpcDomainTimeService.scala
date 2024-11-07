@@ -14,7 +14,7 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.time.admin.v30
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
-import com.digitalasset.canton.util.EitherTUtil
+import com.digitalasset.canton.util.{EitherTUtil, EitherUtil}
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -138,7 +138,7 @@ object GrpcDomainTimeService {
   def forParticipant(
       timeTrackerLookup: DomainId => Option[DomainTimeTracker],
       loggerFactory: NamedLoggerFactory,
-  )(implicit executionContext: ExecutionContext): GrpcDomainTimeService =
+  )(implicit executionContext: ExecutionContext): GrpcDomainTimeService = {
     new GrpcDomainTimeService(
       domainIdO =>
         for {
@@ -151,23 +151,24 @@ object GrpcDomainTimeService {
         } yield timeTracker,
       loggerFactory,
     )
+  }
 
   /** Domain entities have a constant domain id so always have the same time tracker and cannot fetch another */
   def forDomainEntity(
       domainId: DomainId,
       timeTracker: DomainTimeTracker,
       loggerFactory: NamedLoggerFactory,
-  )(implicit executionContext: ExecutionContext): GrpcDomainTimeService =
+  )(implicit executionContext: ExecutionContext): GrpcDomainTimeService = {
     new GrpcDomainTimeService(
       // allow none or the actual domainId to return the time tracker
       domainIdO =>
         for {
-          _ <- Either.cond(
+          _ <- EitherUtil.condUnitE(
             domainIdO.forall(_ == domainId),
-            (),
             "Provided domain id does not match running domain",
           )
         } yield timeTracker,
       loggerFactory,
     )
+  }
 }

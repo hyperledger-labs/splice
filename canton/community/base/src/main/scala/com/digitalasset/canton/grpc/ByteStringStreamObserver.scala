@@ -54,8 +54,9 @@ class ByteStringStreamObserverWithContext[T, Context](
     }
   }
 
-  override def onError(t: Throwable): Unit =
+  override def onError(t: Throwable): Unit = {
     requestComplete.tryFailure(t).discard
+  }
 
   override def onCompleted(): Unit = {
     val finalByteString = byteBuffer.get()

@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.store
 
+import cats.Eval
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, SessionKeyCacheConfig}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -11,10 +12,9 @@ import com.digitalasset.canton.health.{
   CloseableHealthComponent,
   ComponentHealthState,
 }
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, CloseContext, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
-import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
 import com.digitalasset.canton.participant.protocol.*
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
@@ -23,10 +23,10 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.{
   RequestTracker,
   RequestTrackerLookup,
 }
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.PendingReassignmentSubmission
 import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker.InFlightSubmissionTrackerDomainState
 import com.digitalasset.canton.participant.protocol.submission.{WatermarkLookup, WatermarkTracker}
-import com.digitalasset.canton.participant.store.memory.ReassignmentCache
+import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.PendingTransferSubmission
+import com.digitalasset.canton.participant.store.memory.TransferCache
 import com.digitalasset.canton.participant.sync.TimelyRejectNotifier
 import com.digitalasset.canton.protocol.RootHash
 import com.digitalasset.canton.store.SessionKeyStore
@@ -45,7 +45,7 @@ class SyncDomainEphemeralState(
     participantId: ParticipantId,
     participantNodeEphemeralState: ParticipantNodeEphemeralState,
     persistentState: SyncDomainPersistentState,
-    val ledgerApiIndexer: LedgerApiIndexer,
+    multiDomainEventLog: Eval[MultiDomainEventLog],
     val startingPoints: ProcessingStartingPoints,
     createTimeTracker: () => DomainTimeTracker,
     metrics: SyncDomainMetrics,
@@ -55,7 +55,7 @@ class SyncDomainEphemeralState(
     val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
     clock: Clock,
-)(implicit executionContext: ExecutionContext)
+)(implicit executionContext: ExecutionContext, closeContext: CloseContext)
     extends SyncDomainEphemeralStateLookup
     with NamedLogging
     with CloseableHealthComponent
@@ -66,11 +66,11 @@ class SyncDomainEphemeralState(
   override def closingState: ComponentHealthState =
     ComponentHealthState.failed("Disconnected from domain")
 
-  // Key is the root hash of the reassignment tree
-  val pendingUnassignmentSubmissions: TrieMap[RootHash, PendingReassignmentSubmission] =
-    TrieMap.empty[RootHash, PendingReassignmentSubmission]
-  val pendingAssignmentSubmissions: TrieMap[RootHash, PendingReassignmentSubmission] =
-    TrieMap.empty[RootHash, PendingReassignmentSubmission]
+  // Key is the root hash of the transfer tree
+  val pendingTransferOutSubmissions: TrieMap[RootHash, PendingTransferSubmission] =
+    TrieMap.empty[RootHash, PendingTransferSubmission]
+  val pendingTransferInSubmissions: TrieMap[RootHash, PendingTransferSubmission] =
+    TrieMap.empty[RootHash, PendingTransferSubmission]
 
   val sessionKeyStore: SessionKeyStore = SessionKeyStore(sessionKeyCacheConfig)
 
@@ -90,13 +90,13 @@ class SyncDomainEphemeralState(
 
   val contractStore: ContractStore = persistentState.contractStore
 
-  val reassignmentCache =
-    new ReassignmentCache(persistentState.reassignmentStore, loggerFactory)
+  val transferCache =
+    new TransferCache(persistentState.transferStore, loggerFactory)
 
   val requestTracker: RequestTracker = {
     val conflictDetector = new ConflictDetector(
       persistentState.activeContractStore,
-      reassignmentCache,
+      transferCache,
       loggerFactory,
       persistentState.enableAdditionalConsistencyChecks,
       executionContext,
@@ -118,19 +118,14 @@ class SyncDomainEphemeralState(
     )
   }
 
-  val timelyRejectNotifier: TimelyRejectNotifier = TimelyRejectNotifier(
-    participantNodeEphemeralState,
-    persistentState.indexedDomain.domainId,
-    startingPoints.processing.prenextTimestamp,
-    loggerFactory,
-  )
-
-  val recordOrderPublisher: RecordOrderPublisher =
+  val recordOrderPublisher: RecordOrderPublisher = {
+    import TraceContext.Implicits.Empty.emptyTraceContext
     new RecordOrderPublisher(
-      persistentState.indexedDomain.domainId,
+      persistentState.domainId.item,
       startingPoints.processing.nextSequencerCounter,
       startingPoints.processing.prenextTimestamp,
-      ledgerApiIndexer,
+      persistentState.eventLog,
+      multiDomainEventLog,
       participantNodeEphemeralState.inFlightSubmissionTracker,
       metrics.recordOrderPublisher,
       exitOnFatalFailures = exitOnFatalFailures,
@@ -139,8 +134,8 @@ class SyncDomainEphemeralState(
       futureSupervisor,
       persistentState.activeContractStore,
       clock,
-      timelyRejectNotifier.notifyAsync,
     )
+  }
 
   val phase37Synchronizer =
     new Phase37Synchronizer(
@@ -150,7 +145,7 @@ class SyncDomainEphemeralState(
     )
 
   val observedTimestampTracker = new WatermarkTracker[CantonTimestamp](
-    startingPoints.processing.prenextTimestamp,
+    startingPoints.rewoundSequencerCounterPrehead.fold(CantonTimestamp.MinValue)(_.timestamp),
     loggerFactory,
     futureSupervisor,
   )
@@ -160,7 +155,7 @@ class SyncDomainEphemeralState(
   val timeTracker: DomainTimeTracker = createTimeTracker()
 
   val submissionTracker: SubmissionTracker =
-    SubmissionTracker(persistentState.staticDomainParameters.protocolVersion)(
+    SubmissionTracker(persistentState.protocolVersion)(
       participantId,
       persistentState.submissionTrackerStore,
       futureSupervisor,
@@ -172,15 +167,29 @@ class SyncDomainEphemeralState(
     resolveUnhealthy()
 
   lazy val inFlightSubmissionTrackerDomainState: InFlightSubmissionTrackerDomainState =
-    InFlightSubmissionTrackerDomainState.fromSyncDomainState(this)
+    InFlightSubmissionTrackerDomainState.fromSyncDomainState(persistentState, this)
 
-  override def onClosed(): Unit =
+  val timelyRejectNotifier: TimelyRejectNotifier = TimelyRejectNotifier(
+    participantNodeEphemeralState,
+    persistentState.domainId.item,
+    startingPoints.rewoundSequencerCounterPrehead.map(_.timestamp),
+    loggerFactory,
+  )
+
+  override def onClosed(): Unit = {
+    import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.*
     Lifecycle.close(
       requestTracker,
       recordOrderPublisher,
       submissionTracker,
       phase37Synchronizer,
+      AsyncCloseable(
+        "request-journal-flush",
+        requestJournal.flush(),
+        timeouts.shutdownProcessing,
+      ),
     )(logger)
+  }
 
 }
 
@@ -195,7 +204,7 @@ trait SyncDomainEphemeralStateLookup {
 
   def contractLookup: ContractLookup = contractStore
 
-  def reassignmentLookup: ReassignmentLookup = reassignmentCache
+  def transferLookup: TransferLookup = transferCache
 
   def tracker: RequestTrackerLookup = requestTracker
   def observedTimestampLookup: WatermarkLookup[CantonTimestamp] = observedTimestampTracker

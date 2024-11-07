@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.domain.grpc
 
+import cats.Eval
 import cats.instances.future.*
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -16,7 +17,10 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.domain.*
 import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
-import com.digitalasset.canton.participant.store.SyncDomainPersistentState
+import com.digitalasset.canton.participant.store.{
+  ParticipantSettingsLookup,
+  SyncDomainPersistentState,
+}
 import com.digitalasset.canton.participant.sync.SyncDomainPersistentStateManager
 import com.digitalasset.canton.participant.topology.{
   LedgerServerPartyNotifier,
@@ -24,7 +28,6 @@ import com.digitalasset.canton.participant.topology.{
   TopologyComponentFactory,
 }
 import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.sequencing.client.channel.SequencerChannelClient
 import com.digitalasset.canton.sequencing.client.{
   RecordingConfig,
   ReplayConfig,
@@ -52,6 +55,7 @@ import scala.concurrent.ExecutionContextExecutor
 class GrpcDomainRegistry(
     val participantId: ParticipantId,
     syncDomainPersistentStateManager: SyncDomainPersistentStateManager,
+    participantSettings: Eval[ParticipantSettingsLookup],
     topologyDispatcher: ParticipantTopologyDispatcher,
     cryptoApiProvider: SyncCryptoApiProvider,
     cryptoConfig: CryptoConfig,
@@ -85,7 +89,6 @@ class GrpcDomainRegistry(
       override val domainAlias: DomainAlias,
       override val staticParameters: StaticDomainParameters,
       sequencer: RichSequencerClient,
-      override val sequencerChannelClientO: Option[SequencerChannelClient],
       override val topologyClient: DomainTopologyClientWithInit,
       override val topologyFactory: TopologyComponentFactory,
       override val domainPersistentState: SyncDomainPersistentState,
@@ -105,7 +108,6 @@ class GrpcDomainRegistry(
           topologyDispatcher.domainDisconnected(domainAlias),
         ),
         SyncCloseable("sequencerClient", sequencerClient.close()),
-        SyncCloseable("sequencerChannelClient", sequencerChannelClientO.foreach(_.close())),
       )
     }
   }
@@ -126,8 +128,14 @@ class GrpcDomainRegistry(
           config.domainId,
           sequencerConnections,
           SequencerConnectionValidation.Active, // only validate active sequencers (not all endpoints)
-        )(traceContext, CloseContext(this))
+        )(
+          traceContext,
+          CloseContext(this),
+        )
         .leftMap(DomainRegistryError.fromSequencerInfoLoaderError)
+        .mapK(
+          FutureUnlessShutdown.outcomeK
+        )
 
       _ <- CryptoHandshakeValidator
         .validate(info.staticDomainParameters, cryptoConfig)
@@ -161,7 +169,6 @@ class GrpcDomainRegistry(
       domainHandle.alias,
       domainHandle.staticParameters,
       domainHandle.sequencer,
-      domainHandle.channelSequencerClientO,
       domainHandle.topologyClient,
       domainHandle.topologyFactory,
       domainHandle.domainPersistentState,

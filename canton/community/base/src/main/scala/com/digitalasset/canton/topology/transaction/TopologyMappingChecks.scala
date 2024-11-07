@@ -6,37 +6,34 @@ package com.digitalasset.canton.topology.transaction
 import cats.data.EitherT
 import cats.instances.future.*
 import cats.instances.order.*
-import cats.syntax.either.*
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import cats.syntax.semigroup.*
 import com.digitalasset.canton.crypto.KeyPurpose
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{DynamicDomainParameters, OnboardingRestriction}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.EffectiveTime
-import com.digitalasset.canton.topology.store.*
+import com.digitalasset.canton.topology.store.StoredTopologyTransactions.PositiveStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TopologyTransactionRejection.{
   InvalidTopologyMapping,
   NamespaceAlreadyInUse,
 }
+import com.digitalasset.canton.topology.store.{
+  TopologyStore,
+  TopologyStoreId,
+  TopologyTransactionRejection,
+}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.TopologyMapping.{Code, MappingHash}
-import com.digitalasset.canton.topology.transaction.TopologyMappingChecks.PendingChangesLookup
+import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
-import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.{ExecutionContext, Future}
-
-object TopologyMappingChecks {
-  type PendingChangesLookup = Map[MappingHash, GenericSignedTopologyTransaction]
-}
 
 trait TopologyMappingChecks {
   def checkTransaction(
       effective: EffectiveTime,
       toValidate: GenericSignedTopologyTransaction,
       inStore: Option[GenericSignedTopologyTransaction],
-      pendingChanges: PendingChangesLookup,
   )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit]
 }
 
@@ -45,7 +42,6 @@ object NoopTopologyMappingChecks extends TopologyMappingChecks {
       effective: EffectiveTime,
       toValidate: GenericSignedTopologyTransaction,
       inStore: Option[GenericSignedTopologyTransaction],
-      pendingChanges: PendingChangesLookup,
   )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] =
     EitherTUtil.unit
 }
@@ -62,40 +58,22 @@ class ValidatingTopologyMappingChecks(
       effective: EffectiveTime,
       toValidate: GenericSignedTopologyTransaction,
       inStore: Option[GenericSignedTopologyTransaction],
-      pendingChangesLookup: PendingChangesLookup,
   )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
     val checkFirstIsNotRemove = EitherTUtil
       .condUnitET(
         !(toValidate.operation == TopologyChangeOp.Remove && inStore.isEmpty),
         TopologyTransactionRejection.NoCorrespondingActiveTxToRevoke(toValidate.mapping),
       )
-    val checkRemoveDoesNotChangeMapping = EitherT.fromEither[Future](
-      inStore
-        .collect {
-          case expected
-              if toValidate.operation == TopologyChangeOp.Remove && toValidate.mapping != expected.mapping =>
-            TopologyTransactionRejection
-              .RemoveMustNotChangeMapping(toValidate.mapping, expected.mapping)
-        }
-        .toLeft(())
-    )
 
     lazy val checkOpt = (toValidate.mapping.code, inStore.map(_.mapping.code)) match {
       case (Code.DomainTrustCertificate, None | Some(Code.DomainTrustCertificate)) =>
         val checkReplace = toValidate
           .select[TopologyChangeOp.Replace, DomainTrustCertificate]
-          .map(
-            checkDomainTrustCertificateReplace(
-              effective,
-              _,
-              inStore.flatMap(_.selectMapping[DomainTrustCertificate]),
-              pendingChangesLookup,
-            )
-          )
+          .map(checkDomainTrustCertificateReplace(effective, _))
 
         val checkRemove = toValidate
           .select[TopologyChangeOp.Remove, DomainTrustCertificate]
-          .map(checkDomainTrustCertificateRemove(effective, _, pendingChangesLookup))
+          .map(checkDomainTrustCertificateRemove(effective, _))
 
         checkReplace.orElse(checkRemove)
 
@@ -107,7 +85,6 @@ class ValidatingTopologyMappingChecks(
               effective,
               _,
               inStore.flatMap(_.select[TopologyChangeOp.Replace, PartyToParticipant]),
-              pendingChangesLookup,
             )
           )
 
@@ -122,7 +99,6 @@ class ValidatingTopologyMappingChecks(
             checkOwnerToKeyMappingRemove(
               effective,
               _,
-              pendingChangesLookup,
             )
           )
 
@@ -136,9 +112,9 @@ class ValidatingTopologyMappingChecks(
               effective,
               _,
               inStore.flatMap(_.select[TopologyChangeOp.Replace, MediatorDomainState]),
-              pendingChangesLookup,
             )
           )
+
       case (Code.SequencerDomainState, None | Some(Code.SequencerDomainState)) =>
         toValidate
           .select[TopologyChangeOp.Replace, SequencerDomainState]
@@ -147,9 +123,13 @@ class ValidatingTopologyMappingChecks(
               effective,
               _,
               inStore.flatMap(_.select[TopologyChangeOp.Replace, SequencerDomainState]),
-              pendingChangesLookup,
             )
           )
+
+      case (Code.AuthorityOf, None | Some(Code.AuthorityOf)) =>
+        toValidate
+          .select[TopologyChangeOp.Replace, AuthorityOf]
+          .map(checkAuthorityOf(effective, _))
 
       case (
             Code.DecentralizedNamespaceDefinition,
@@ -162,7 +142,6 @@ class ValidatingTopologyMappingChecks(
               effective,
               _,
               inStore.flatMap(_.select[TopologyChangeOp, DecentralizedNamespaceDefinition]),
-              pendingChangesLookup,
             )
           )
 
@@ -172,73 +151,23 @@ class ValidatingTopologyMappingChecks(
           ) =>
         toValidate
           .select[TopologyChangeOp.Replace, NamespaceDelegation]
-          .map(checkNamespaceDelegationReplace(effective, _, pendingChangesLookup))
-
-      case (Code.DomainParametersState, None | Some(Code.DomainParametersState)) =>
-        toValidate
-          .select[TopologyChangeOp.Remove, DomainParametersState]
-          .map(_ =>
-            EitherT.leftT[Future, Unit](
-              TopologyTransactionRejection
-                .Other(
-                  "Removal of DomainParameterState is not supported. Use Replace instead."
-                ): TopologyTransactionRejection
-            )
-          )
+          .map(checkNamespaceDelegationReplace(effective, _))
 
       case _otherwise => None
     }
 
-    for {
-      _ <- checkFirstIsNotRemove
-      _ <- checkRemoveDoesNotChangeMapping
-      _ <- checkOpt.getOrElse(EitherTUtil.unit)
-    } yield ()
-
+    checkFirstIsNotRemove
+      .flatMap(_ => checkOpt.getOrElse(EitherTUtil.unit))
   }
 
-  private def loadHistoryFromStore(
-      effectiveTime: EffectiveTime,
-      code: Code,
-      pendingChangesLookup: PendingChangesLookup,
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, TopologyTransactionRejection, Seq[GenericSignedTopologyTransaction]] =
-    EitherT.right[TopologyTransactionRejection](
-      store
-        .inspect(
-          proposals = false,
-          // effective time has exclusive semantics, but TimeQuery.Range.until has always had inclusive semantics.
-          // therefore, we take the immediatePredecessor here
-          timeQuery =
-            TimeQuery.Range(from = None, until = Some(effectiveTime.value.immediatePredecessor)),
-          asOfExclusiveO = None,
-          op = None,
-          types = Seq(code),
-          idFilter = None,
-          namespaceFilter = None,
-        )
-        .map { storedTxs =>
-          val pending = pendingChangesLookup.values
-            .filter(pendingTx =>
-              !pendingTx.isProposal && pendingTx.transaction.mapping.code == code
-            )
-          (storedTxs.result.map(_.transaction) ++ pending)
-        }
-    )
-
-  @VisibleForTesting
-  private[transaction] def loadFromStore(
+  private def loadFromStore(
       effective: EffectiveTime,
-      codes: Set[Code],
-      pendingChangesLookup: PendingChangesLookup,
+      code: Code,
       filterUid: Option[Seq[UniqueIdentifier]] = None,
       filterNamespace: Option[Seq[Namespace]] = None,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TopologyTransactionRejection, Seq[
-    SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]
-  ]] =
+  ): EitherT[Future, TopologyTransactionRejection, PositiveStoredTopologyTransactions] =
     EitherT
       .right[TopologyTransactionRejection](
         store
@@ -246,45 +175,19 @@ class ValidatingTopologyMappingChecks(
             effective.value,
             asOfInclusive = false,
             isProposal = false,
-            types = codes.toSeq,
+            types = Seq(code),
             filterUid = filterUid,
             filterNamespace = filterNamespace,
           )
-          .map { storedTxs =>
-            val latestStored = storedTxs.collectLatestByUniqueKey.signedTransactions
-
-            // we need to proactively lookup the pending changes that match the filter,
-            // because there might be a pending transaction that isn't in the store yet (eg. serial=1)
-            val pendingChangesMatchingFilter =
-              pendingChangesLookup.values.filter { tx =>
-                // proposals shouldn't end up in PendingChangesLookup, but better to emulate what the store filter does
-                !tx.isProposal &&
-                codes.contains(tx.mapping.code) &&
-                filterNamespace.forall(_.exists(_ == tx.mapping.namespace)) &&
-                filterUid.forall(uids => tx.mapping.maybeUid.exists(uids.contains(_)))
-              }
-
-            TopologyTransactions
-              .collectLatestByUniqueKey(
-                Seq.empty[GenericSignedTopologyTransaction] ++
-                  latestStored.result ++ pendingChangesMatchingFilter
-              )
-              .flatMap(_.selectOp[TopologyChangeOp.Replace])
-          }
       )
 
   private def ensureParticipantDoesNotHostParties(
       effective: EffectiveTime,
       participantId: ParticipantId,
-      pendingChangesLookup: PendingChangesLookup,
-  )(implicit traceContext: TraceContext) =
+  )(implicit traceContext: TraceContext) = {
     for {
-      storedPartyToParticipantMappings <- loadFromStore(
-        effective,
-        Set(Code.PartyToParticipant),
-        pendingChangesLookup,
-      )
-      participantHostsParties = storedPartyToParticipantMappings.view
+      storedPartyToParticipantMappings <- loadFromStore(effective, PartyToParticipant.code, None)
+      participantHostsParties = storedPartyToParticipantMappings.result.view
         .flatMap(_.selectMapping[PartyToParticipant])
         .collect {
           case tx if tx.mapping.participants.exists(_.participantId == participantId) =>
@@ -300,62 +203,59 @@ class ValidatingTopologyMappingChecks(
       )
     } yield ()
 
+  }
+
   private def checkDomainTrustCertificateRemove(
       effective: EffectiveTime,
       toValidate: SignedTopologyTransaction[TopologyChangeOp, DomainTrustCertificate],
-      pendingChangesLookup: PendingChangesLookup,
-  )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] =
+  )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
     /* Checks that the DTC is not being removed if the participant still hosts a party.
      * This check is potentially quite expensive: we have to fetch all party to participant mappings, because
      * we cannot index by the hosting participants.
      */
-    ensureParticipantDoesNotHostParties(
-      effective,
-      toValidate.mapping.participantId,
-      pendingChangesLookup,
-    )
+    ensureParticipantDoesNotHostParties(effective, toValidate.mapping.participantId)
+  }
 
   private def loadDomainParameters(
-      effective: EffectiveTime,
-      pendingChangesLookup: PendingChangesLookup,
+      effective: EffectiveTime
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TopologyTransactionRejection, DynamicDomainParameters] =
-    loadFromStore(effective, Set(Code.DomainParametersState), pendingChangesLookup).subflatMap {
-      domainParamCandidates =>
-        val params = domainParamCandidates.view
-          .flatMap(_.selectMapping[DomainParametersState])
-          .map(_.mapping.parameters)
-          .toList
-        params match {
-          case Nil =>
-            logger.error(
-              "Can not determine domain parameters."
-            )
-            Left(TopologyTransactionRejection.MissingDomainParameters(effective))
-          case param :: Nil => Right(param)
-          case param :: rest =>
-            logger.error(
-              s"Multiple domain parameters at $effective ${rest.size + 1}. Using first one: $param."
-            )
-            Right(param)
-        }
+  ): EitherT[Future, TopologyTransactionRejection, DynamicDomainParameters] = {
+    loadFromStore(effective, DomainParametersState.code).subflatMap { domainParamCandidates =>
+      val params = domainParamCandidates.result.view
+        .flatMap(_.selectMapping[DomainParametersState])
+        .map(_.mapping.parameters)
+        .toList
+      params match {
+        case Nil =>
+          logger.error(
+            "Can not determine domain parameters."
+          )
+          Left(TopologyTransactionRejection.MissingDomainParameters(effective))
+        case param :: Nil => Right(param)
+        case param :: rest =>
+          logger.error(
+            s"Multiple domain parameters at $effective ${rest.size + 1}. Using first one: $param."
+          )
+          Right(param)
+      }
     }
+
+  }
 
   private def checkDomainTrustCertificateReplace(
       effective: EffectiveTime,
-      toValidate: SignedTopologyTransaction[TopologyChangeOp.Replace, DomainTrustCertificate],
-      inStore: Option[SignedTopologyTransaction[TopologyChangeOp, DomainTrustCertificate]],
-      pendingChangesLookup: PendingChangesLookup,
+      toValidate: SignedTopologyTransaction[TopologyChangeOp, DomainTrustCertificate],
   )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
     // Checks if the participant is allowed to submit its domain trust certificate
     val participantId = toValidate.mapping.participantId
 
     def loadOnboardingRestriction()
-        : EitherT[Future, TopologyTransactionRejection, OnboardingRestriction] =
-      loadDomainParameters(effective, pendingChangesLookup).map(_.onboardingRestriction)
+        : EitherT[Future, TopologyTransactionRejection, OnboardingRestriction] = {
+      loadDomainParameters(effective).map(_.onboardingRestriction)
+    }
 
-    def checkDomainIsNotLocked(restriction: OnboardingRestriction) =
+    def checkDomainIsNotLocked(restriction: OnboardingRestriction) = {
       EitherTUtil.condUnitET(
         restriction.isOpen, {
           logger.info(
@@ -369,10 +269,11 @@ class ValidatingTopologyMappingChecks(
             )
         },
       )
+    }
 
     def checkParticipantIsNotRestricted(
         restrictions: OnboardingRestriction
-    ): EitherT[Future, TopologyTransactionRejection, Unit] =
+    ): EitherT[Future, TopologyTransactionRejection, Unit] = {
       // using the flags to check for restrictions instead of == UnrestrictedOpen to be more
       // future proof in case we will add additional restrictions in the future and would miss a case,
       // because there is no exhaustiveness check without full pattern matching
@@ -383,11 +284,10 @@ class ValidatingTopologyMappingChecks(
         // Only participants with explicit permission may join the domain
         loadFromStore(
           effective,
-          Set(Code.ParticipantDomainPermission),
-          pendingChangesLookup,
+          ParticipantDomainPermission.code,
           filterUid = Some(Seq(toValidate.mapping.participantId.uid)),
         ).subflatMap { storedPermissions =>
-          val isAllowlisted = storedPermissions.view
+          val isAllowlisted = storedPermissions.result.view
             .flatMap(_.selectMapping[ParticipantDomainPermission])
             .collectFirst {
               case x if x.mapping.domainId == toValidate.mapping.domainId =>
@@ -407,7 +307,7 @@ class ValidatingTopologyMappingChecks(
               logger.info(
                 s"Accepting onboarding of ${toValidate.mapping.participantId} as it is allow listed"
               )
-              Either.unit
+              Right(())
             case None =>
               logger.info(
                 s"Rejecting onboarding of ${toValidate.mapping.participantId} as it is not allow listed as of ${effective.value}"
@@ -424,38 +324,29 @@ class ValidatingTopologyMappingChecks(
             .OnboardingRestrictionInPlace(participantId, restrictions, None)
         )
       }
+    }
 
     def checkPartyIdDoesntExist() = for {
       ptps <- loadFromStore(
         effective,
-        Set(Code.PartyToParticipant),
-        pendingChangesLookup,
+        PartyToParticipant.code,
         filterUid = Some(Seq(participantId.uid)),
       )
-      conflictingPartyIdO = ptps
-        .flatMap(_.selectMapping[PartyToParticipant])
+      conflictingPartyIdO = ptps.collectLatestByUniqueKey
+        .collectOfMapping[PartyToParticipant]
+        .result
         .headOption
-        .map(_.mapping)
+        .map(_.mapping.partyId)
       _ <- conflictingPartyIdO match {
-        case Some(ptp) =>
-          isExplicitAdminPartyAllocation(
-            ptp,
-            TopologyTransactionRejection.ParticipantIdConflictWithPartyId(
-              participantId,
-              ptp.partyId,
-            ),
+        case Some(partyId) =>
+          EitherT.leftT[Future, Unit][TopologyTransactionRejection](
+            TopologyTransactionRejection.ParticipantIdClashesWithPartyId(participantId, partyId)
           )
         case None => EitherTUtil.unit[TopologyTransactionRejection]
       }
     } yield ()
 
-    def checkParticipantDoesNotRejoin() = EitherTUtil.condUnitET(
-      inStore.forall(_.operation != TopologyChangeOp.Remove),
-      TopologyTransactionRejection.MembersCannotRejoinDomain(Seq(toValidate.mapping.participantId)),
-    )
-
     for {
-      _ <- checkParticipantDoesNotRejoin()
       _ <- checkPartyIdDoesntExist()
       restriction <- loadOnboardingRestriction()
       _ <- checkDomainIsNotLocked(restriction)
@@ -473,7 +364,6 @@ class ValidatingTopologyMappingChecks(
       effective: EffectiveTime,
       toValidate: SignedTopologyTransaction[TopologyChangeOp.Replace, PartyToParticipant],
       inStore: Option[SignedTopologyTransaction[TopologyChangeOp.Replace, PartyToParticipant]],
-      pendingChangesLookup: PendingChangesLookup,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TopologyTransactionRejection, Unit] = {
@@ -482,30 +372,32 @@ class ValidatingTopologyMappingChecks(
       val newParticipants = mapping.participants.map(_.participantId).toSet --
         inStore.toList.flatMap(_.mapping.participants.map(_.participantId))
       for {
-        participantTransactions <- loadFromStore(
-          effective,
-          Set(Code.DomainTrustCertificate, Code.OwnerToKeyMapping),
-          pendingChangesLookup,
-          filterUid = Some(newParticipants.toSeq.map(_.uid) :+ mapping.partyId.uid),
+        participantTransactions <- EitherT.right[TopologyTransactionRejection](
+          store
+            .findPositiveTransactions(
+              effective.value,
+              asOfInclusive = false,
+              isProposal = false,
+              types = Seq(DomainTrustCertificate.code, OwnerToKeyMapping.code),
+              filterUid = Some(newParticipants.toSeq.map(_.uid) :+ mapping.partyId.uid),
+              filterNamespace = None,
+            )
         )
 
-        // if we found a DTC with the same uid as the partyId,
-        // check that the PTP is an explicit admin party allocation, otherwise reject the PTP
+        // check that the PTP doesn't try to allocate a party that is the same as an already existing admin party
         foundAdminPartyWithSameUID = participantTransactions
-          .flatMap(_.selectMapping[DomainTrustCertificate])
-          .exists(_.mapping.participantId.uid == mapping.partyId.uid)
-        _ <- EitherTUtil.ifThenET(foundAdminPartyWithSameUID)(
-          isExplicitAdminPartyAllocation(
-            mapping,
-            TopologyTransactionRejection.PartyIdConflictWithAdminParty(
-              mapping.partyId
-            ),
-          )
+          .collectOfMapping[DomainTrustCertificate]
+          .result
+          .find(_.mapping.participantId.uid == mapping.partyId.uid)
+        _ <- EitherTUtil.condUnitET[Future](
+          foundAdminPartyWithSameUID.isEmpty,
+          TopologyTransactionRejection.PartyIdIsAdminParty(mapping.partyId),
         )
 
         // check that all participants are known on the domain
         missingParticipantCertificates = newParticipants -- participantTransactions
-          .flatMap(_.selectMapping[DomainTrustCertificate])
+          .collectOfMapping[DomainTrustCertificate]
+          .result
           .map(_.mapping.participantId)
 
         _ <- EitherTUtil.condUnitET[Future][TopologyTransactionRejection](
@@ -516,7 +408,8 @@ class ValidatingTopologyMappingChecks(
         // check that all known participants have keys registered
         participantsWithInsufficientKeys =
           newParticipants -- participantTransactions
-            .flatMap(_.selectMapping[OwnerToKeyMapping])
+            .collectOfMapping[OwnerToKeyMapping]
+            .result
             .view
             .filter { tx =>
               val keyPurposes = tx.mapping.keys.map(_.purpose).toSet
@@ -535,8 +428,45 @@ class ValidatingTopologyMappingChecks(
       }
     }
 
+    def checkHostingLimits(effective: EffectiveTime) = for {
+      hostingLimitsCandidates <- loadFromStore(
+        effective,
+        code = PartyHostingLimits.code,
+        filterUid = Some(Seq(toValidate.mapping.partyId.uid)),
+      )
+      hostingLimits = hostingLimitsCandidates.result.view
+        .flatMap(_.selectMapping[PartyHostingLimits])
+        .map(_.mapping.quota)
+        .toList
+      partyHostingLimit = hostingLimits match {
+        case Nil => // No hosting limits found. This is expected if no restrictions are in place
+          None
+        case quota :: Nil => Some(quota)
+        case multiple @ quota :: _ =>
+          logger.error(
+            s"Multiple PartyHostingLimits at $effective ${multiple.size}. Using first one with quota $quota."
+          )
+          Some(quota)
+      }
+      // TODO(#14050) load default party hosting limits from dynamic domain parameters in case the party
+      //              doesn't have a specific PartyHostingLimits mapping issued by the domain.
+      _ <- partyHostingLimit match {
+        case Some(limit) =>
+          EitherTUtil.condUnitET[Future][TopologyTransactionRejection](
+            toValidate.mapping.participants.size <= limit,
+            TopologyTransactionRejection.PartyExceedsHostingLimit(
+              toValidate.mapping.partyId,
+              limit,
+              toValidate.mapping.participants.size,
+            ),
+          )
+        case None => EitherTUtil.unit[TopologyTransactionRejection]
+      }
+    } yield ()
+
     for {
       _ <- checkParticipants()
+      _ <- checkHostingLimits(effective)
     } yield ()
 
   }
@@ -575,94 +505,107 @@ class ValidatingTopologyMappingChecks(
   private def checkOwnerToKeyMappingRemove(
       effective: EffectiveTime,
       toValidate: SignedTopologyTransaction[TopologyChangeOp.Remove, OwnerToKeyMapping],
-      pendingChangesLookup: PendingChangesLookup,
-  )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] =
+  )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
     toValidate.mapping.member match {
       case participantId: ParticipantId =>
-        ensureParticipantDoesNotHostParties(effective, participantId, pendingChangesLookup)
+        ensureParticipantDoesNotHostParties(effective, participantId)
       case _ => EitherTUtil.unit
     }
+  }
+
+  private def checkMissingNsdAndOtkMappings(
+      effectiveTime: EffectiveTime,
+      members: Set[Member],
+  )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
+
+    val otks = loadFromStore(
+      effectiveTime,
+      OwnerToKeyMapping.code,
+      filterUid = Some(members.toSeq.map(_.uid)),
+    )
+
+    val nsds = loadFromStore(
+      effectiveTime,
+      NamespaceDelegation.code,
+      filterNamespace = Some(members.toSeq.map(_.namespace)),
+    )
+
+    for {
+      otks <- otks
+      nsds <- nsds
+
+      membersWithOTK = otks.result.flatMap(
+        _.selectMapping[OwnerToKeyMapping].map(_.mapping.member)
+      )
+      missingOTK = members -- membersWithOTK
+
+      rootCertificates = nsds.result
+        .flatMap(_.selectMapping[NamespaceDelegation].filter(_.mapping.isRootDelegation))
+        .map(_.mapping.namespace)
+        .toSet
+      missingNSD = members.filter(med => !rootCertificates.contains(med.namespace))
+      otk = missingOTK.map(_ -> Seq(OwnerToKeyMapping.code)).toMap
+      nsd = missingNSD.map(_ -> Seq(NamespaceDelegation.code)).toMap
+      missingMappings = otk.combine(nsd)
+      _ <- EitherTUtil.condUnitET[Future][TopologyTransactionRejection](
+        missingOTK.isEmpty && missingNSD.isEmpty,
+        TopologyTransactionRejection.MissingMappings(
+          missingMappings.view.mapValues(_.sortBy(_.dbInt)).toMap
+        ),
+      )
+    } yield {}
+  }
 
   private def checkMediatorDomainStateReplace(
       effectiveTime: EffectiveTime,
       toValidate: SignedTopologyTransaction[TopologyChangeOp.Replace, MediatorDomainState],
       inStore: Option[SignedTopologyTransaction[TopologyChangeOp.Replace, MediatorDomainState]],
-      pendingChangesLookup: PendingChangesLookup,
   )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
     val newMediators = (toValidate.mapping.allMediatorsInGroup.toSet -- inStore.toList.flatMap(
       _.mapping.allMediatorsInGroup
     )).map(identity[Member])
-
-    def checkMediatorNotAlreadyAssignedToOtherGroup() =
-      for {
-        result <- loadFromStore(effectiveTime, Set(Code.MediatorDomainState), pendingChangesLookup)
-        mediatorsAlreadyAssignedToGroups = result
-          .flatMap(_.selectMapping[MediatorDomainState])
-          .flatMap(tx =>
-            tx.mapping.allMediatorsInGroup.collect {
-              case med if newMediators.contains(med) => med -> tx.mapping.group
-            }
-          )
-          .toMap
-        _ <- EitherTUtil.condUnitET[Future](
-          mediatorsAlreadyAssignedToGroups.isEmpty,
-          TopologyTransactionRejection.MediatorsAlreadyInOtherGroups(
-            toValidate.mapping.group,
-            mediatorsAlreadyAssignedToGroups,
-          ): TopologyTransactionRejection,
-        )
-      } yield ()
-
-    def checkMediatorsDontRejoin(): EitherT[Future, TopologyTransactionRejection, Unit] =
-      loadHistoryFromStore(effectiveTime, code = Code.MediatorDomainState, pendingChangesLookup)
-        .flatMap { mdsHistory =>
-          val allMediatorsPreviouslyOnDomain = mdsHistory.view
-            .flatMap(_.selectMapping[MediatorDomainState])
-            .flatMap(_.mapping.allMediatorsInGroup)
-            .toSet[Member]
-          val rejoiningMediators = newMediators.intersect(allMediatorsPreviouslyOnDomain)
-          EitherTUtil.condUnitET(
-            rejoiningMediators.isEmpty,
-            TopologyTransactionRejection.MembersCannotRejoinDomain(rejoiningMediators.toSeq),
-          )
-        }
-
-    for {
-      _ <- checkMediatorNotAlreadyAssignedToOtherGroup()
-      _ <- checkMediatorsDontRejoin()
-    } yield ()
+    checkMissingNsdAndOtkMappings(effectiveTime, newMediators)
   }
 
   private def checkSequencerDomainStateReplace(
       effectiveTime: EffectiveTime,
       toValidate: SignedTopologyTransaction[TopologyChangeOp.Replace, SequencerDomainState],
       inStore: Option[SignedTopologyTransaction[TopologyChangeOp.Replace, SequencerDomainState]],
-      pendingChangesLookup: PendingChangesLookup,
   )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
     val newSequencers = (toValidate.mapping.allSequencers.toSet -- inStore.toList.flatMap(
       _.mapping.allSequencers
     )).map(identity[Member])
 
-    def checkSequencersDontRejoin(): EitherT[Future, TopologyTransactionRejection, Unit] =
-      loadHistoryFromStore(
-        effectiveTime,
-        code = Code.SequencerDomainState,
-        pendingChangesLookup,
-      )
-        .flatMap { sdsHistory =>
-          val allSequencersPreviouslyOnDomain = sdsHistory.view
-            .flatMap(_.selectMapping[SequencerDomainState])
-            .flatMap(_.mapping.allSequencers)
-            .toSet[Member]
-          val rejoiningSequencers = newSequencers.intersect(allSequencersPreviouslyOnDomain)
-          EitherTUtil.condUnitET(
-            rejoiningSequencers.isEmpty,
-            TopologyTransactionRejection
-              .MembersCannotRejoinDomain(rejoiningSequencers.toSeq),
-          )
-        }
+    checkMissingNsdAndOtkMappings(effectiveTime, newSequencers)
+  }
 
-    checkSequencersDontRejoin()
+  private def checkAuthorityOf(
+      effectiveTime: EffectiveTime,
+      toValidate: SignedTopologyTransaction[TopologyChangeOp.Replace, AuthorityOf],
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, TopologyTransactionRejection, Unit] = {
+    def checkPartiesAreKnown(): EitherT[Future, TopologyTransactionRejection, Unit] = {
+      val allPartiesToLoad = toValidate.mapping.partyId +: toValidate.mapping.parties
+      loadFromStore(
+        effectiveTime,
+        Code.PartyToParticipant,
+        filterUid = Some(allPartiesToLoad.map(_.uid)),
+      ).flatMap { partyMappings =>
+        val knownParties = partyMappings.result
+          .flatMap(_.selectMapping[PartyToParticipant])
+          .map(_.mapping.partyId)
+
+        val missingParties = allPartiesToLoad.toSet -- knownParties
+
+        EitherTUtil.condUnitET(
+          missingParties.isEmpty,
+          TopologyTransactionRejection.UnknownParties(missingParties.toSeq.sorted),
+        )
+      }
+    }
+
+    checkPartiesAreKnown()
   }
 
   private def checkDecentralizedNamespaceDefinitionReplace(
@@ -675,7 +618,6 @@ class ValidatingTopologyMappingChecks(
         TopologyChangeOp,
         DecentralizedNamespaceDefinition,
       ]],
-      pendingChangesLookup: PendingChangesLookup,
   )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
 
     def checkDecentralizedNamespaceDerivedFromOwners()
@@ -693,50 +635,25 @@ class ValidatingTopologyMappingChecks(
         EitherTUtil.unit
       }
 
-    def checkNoClashWithNamespaceDelegations()(implicit
+    def checkNoClashWithNamespaceDelegations(effective: EffectiveTime)(implicit
         traceContext: TraceContext
-    ): EitherT[Future, TopologyTransactionRejection, Unit] =
+    ): EitherT[Future, TopologyTransactionRejection, Unit] = {
       loadFromStore(
         effective,
-        Set(Code.NamespaceDelegation),
-        pendingChangesLookup,
+        Code.NamespaceDelegation,
         filterUid = None,
         filterNamespace = Some(Seq(toValidate.mapping.namespace)),
       ).flatMap { namespaceDelegations =>
         EitherTUtil.condUnitET(
-          namespaceDelegations.isEmpty,
+          namespaceDelegations.result.isEmpty,
           NamespaceAlreadyInUse(toValidate.mapping.namespace),
         )
       }
-
-    def checkOwnersAreNormalNamespaces()(implicit
-        traceContext: TraceContext
-    ): EitherT[Future, TopologyTransactionRejection, Unit] =
-      loadFromStore(
-        effective,
-        Set(Code.NamespaceDelegation),
-        pendingChangesLookup,
-        filterUid = None,
-        filterNamespace = Some(toValidate.mapping.owners.toSeq),
-      ).flatMap { namespaceDelegations =>
-        val foundNSDs = namespaceDelegations
-          .filter(NamespaceDelegation.isRootCertificate)
-          .map(_.mapping.namespace)
-          .toSet
-        val missingNSDs = toValidate.mapping.owners -- foundNSDs
-
-        EitherTUtil.condUnitET(
-          missingNSDs.isEmpty,
-          InvalidTopologyMapping(
-            s"No root certificate found for ${missingNSDs.toSeq.sorted.mkString(", ")}"
-          ),
-        )
-      }
+    }
 
     for {
       _ <- checkDecentralizedNamespaceDerivedFromOwners()
-      _ <- checkNoClashWithNamespaceDelegations()
-      _ <- checkOwnersAreNormalNamespaces()
+      _ <- checkNoClashWithNamespaceDelegations(effective)
     } yield ()
   }
 
@@ -746,62 +663,24 @@ class ValidatingTopologyMappingChecks(
         TopologyChangeOp.Replace,
         NamespaceDelegation,
       ],
-      pendingChangesLookup: PendingChangesLookup,
   )(implicit traceContext: TraceContext): EitherT[Future, TopologyTransactionRejection, Unit] = {
     def checkNoClashWithDecentralizedNamespaces()(implicit
         traceContext: TraceContext
-    ): EitherT[Future, TopologyTransactionRejection, Unit] =
+    ): EitherT[Future, TopologyTransactionRejection, Unit] = {
       loadFromStore(
         effective,
-        Set(Code.DecentralizedNamespaceDefinition),
-        pendingChangesLookup,
+        Code.DecentralizedNamespaceDefinition,
         filterUid = None,
         filterNamespace = Some(Seq(toValidate.mapping.namespace)),
       ).flatMap { dns =>
-        val foundDecentralizedNamespaceWithSameNamespace = dns.nonEmpty
+        val foundDecentralizedNamespaceWithSameNamespace = dns.result.nonEmpty
         EitherTUtil.condUnitET(
           !foundDecentralizedNamespaceWithSameNamespace,
           NamespaceAlreadyInUse(toValidate.mapping.namespace),
         )
       }
+    }
 
     checkNoClashWithDecentralizedNamespaces()
   }
-
-  /** Checks whether the given PTP is considered an explicit admin party allocation. This is true if all following conditions are met:
-    * <ul>
-    *   <li>threshold == 1</li>
-    *   <li>there is only a single hosting participant<li>
-    *     <ul>
-    *       <li>with Submission permission</li>
-    *       <li>participantId.adminParty == partyId</li>
-    *     </ul>
-    *   </li>
-    * </ul
-    */
-  private def isExplicitAdminPartyAllocation(
-      ptp: PartyToParticipant,
-      rejection: => TopologyTransactionRejection,
-  ): EitherT[Future, TopologyTransactionRejection, Unit] = {
-    // check that the PTP doesn't try to allocate a party that is the same as an already existing admin party.
-    // we allow an explicit allocation of an admin like party though on the same participant
-    val singleHostingParticipant =
-      ptp.participants.sizeCompare(1) == 0
-
-    val partyIsAdminParty =
-      ptp.participants.forall(participant =>
-        participant.participantId.adminParty == ptp.partyId &&
-          participant.permission == ParticipantPermission.Submission
-      )
-
-    // technically we don't need to check for threshold == 1, because we already require that there is only a single participant
-    // and the threshold may not exceed the number of participants. this is checked in PartyToParticipant.create
-    val threshold1 = ptp.threshold == PositiveInt.one
-
-    EitherTUtil.condUnitET[Future](
-      singleHostingParticipant && partyIsAdminParty && threshold1,
-      rejection,
-    )
-  }
-
 }

@@ -44,7 +44,7 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
     final case class Reject(operation: String, identityProviderId: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"$operation failed for unknown identity provider id=\"$identityProviderId\""
+          cause = s"${operation} failed for unknown identity provider id=\"${identityProviderId}\""
         ) {
       override def resources: Seq[(ErrorResource, String)] = Seq(
         ErrorResource.IdentityProviderConfig -> identityProviderId
@@ -64,7 +64,7 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
     final case class Reject(operation: String, issuer: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"$operation failed for unknown identity provider issuer=\"$issuer\""
+          cause = s"${operation} failed for unknown identity provider issuer=\"${issuer}\""
         )
   }
 
@@ -82,7 +82,8 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
     final case class Reject(operation: String, identityProviderId: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"$operation failed, as identity provider \"$identityProviderId\" already exists"
+          cause =
+            s"${operation} failed, as identity provider \"${identityProviderId}\" already exists"
         ) {
       override def resources: Seq[(ErrorResource, String)] = Seq(
         ErrorResource.IdentityProviderConfig -> identityProviderId
@@ -104,7 +105,8 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
     final case class Reject(operation: String, issuer: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"$operation failed, as identity provider with issuer \"$issuer\" already exists"
+          cause =
+            s"${operation} failed, as identity provider with issuer \"${issuer}\" already exists"
         ) {
       override def resources: Seq[(ErrorResource, String)] = Seq(
         ErrorResource.IdentityProviderConfig -> issuer
@@ -128,7 +130,7 @@ object IdentityProviderConfigServiceErrors extends IdentityProviderConfigService
     final case class Reject(operation: String)(implicit
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"$operation failed."
+          cause = s"${operation} failed."
         ) {}
   }
 }

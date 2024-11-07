@@ -53,7 +53,7 @@ class GrpcSequencerInitializationService(
 
   override def initializeSequencerFromGenesisState(
       responseObserver: StreamObserver[InitializeSequencerFromGenesisStateResponse]
-  ): StreamObserver[InitializeSequencerFromGenesisStateRequest] =
+  ): StreamObserver[InitializeSequencerFromGenesisStateRequest] = {
     GrpcStreamingUtils.streamFromClient(
       _.topologySnapshot,
       _.domainParameters,
@@ -61,6 +61,7 @@ class GrpcSequencerInitializationService(
         initializeSequencerFromGenesisState(topologySnapshot, domainParams),
       responseObserver,
     )
+  }
 
   private def initializeSequencerFromGenesisState(
       topologySnapshot: ByteString,
@@ -84,6 +85,7 @@ class GrpcSequencerInitializationService(
           )
           .leftMap(ProtoDeserializationFailure.Wrap(_))
       )
+      // TODO(i17940): Remove this when we have a method to distinguish between initialization during an upgrade and initialization during the bootstrap of a domain
       // reset effective time and sequenced time if we are initializing the sequencer from the beginning
       genesisState: StoredTopologyTransactions[TopologyChangeOp, TopologyMapping] =
         StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](
@@ -99,49 +101,15 @@ class GrpcSequencerInitializationService(
           )
         )
 
-      // check that the snapshot is consistent with respect to effective proposals and effective fully authorized transactions
+      // check that there is at most 1 effective transaction per unique key
       multipleEffectivePerUniqueKey = genesisState.result
         .groupBy(_.transaction.mapping.uniqueKey)
+        .view
         // only retain effective transactions
-        .values
-        .toSeq
-        .flatMap { topoTxs =>
-          val (proposals, fullyAuthorized) =
-            topoTxs.filter(tx => tx.validUntil.isEmpty).partition(_.transaction.isProposal)
-
-          val maxFullyAuthorizedSerialO = fullyAuthorized.view.map(_.serial).maxOption
-
-          val allProposalsLessThanOrEqualMaxSerial = {
-            val unexpectedEffectiveProposals = maxFullyAuthorizedSerialO.toList.flatMap {
-              maxFullyAuthorizedSerial => proposals.filter(_.serial <= maxFullyAuthorizedSerial)
-            }
-            if (unexpectedEffectiveProposals.nonEmpty) {
-              Seq(
-                "effective proposals with serial less than or equal to the highest fully authorized transaction" -> unexpectedEffectiveProposals
-              )
-            } else Seq.empty
-          }
-
-          val multipleEffectiveProposalsWithDifferentSerials =
-            if (proposals.map(_.serial).distinct.sizeIs > 1) {
-              Seq("muliple effective proposals with different serials" -> proposals)
-            } else Seq.empty
-
-          val multipleEffectiveProposalsForSameTransactionHash =
-            proposals
-              .groupBy(_.hash)
-              .filter(_._2.sizeIs > 1)
-              .values
-              .map(
-                "multiple effective proposals for the same transaction hash" -> _
-              )
-
-          val multipleFullyAuthorized = if (fullyAuthorized.sizeIs > 1) {
-            Seq("concurrently effective transactions with the same unique key" -> fullyAuthorized)
-          } else Seq.empty
-
-          multipleFullyAuthorized ++ multipleEffectiveProposalsForSameTransactionHash ++ allProposalsLessThanOrEqualMaxSerial ++ multipleEffectiveProposalsWithDifferentSerials
-        }
+        .mapValues(_.filter(_.validUntil.isEmpty))
+        // only retain unique keys for which there is more than 1 effective transaction
+        .filter(_._2.size > 1)
+        .toMap
 
       _ <- EitherTUtil.condUnitET[Future](
         multipleEffectivePerUniqueKey.isEmpty,
@@ -165,7 +133,7 @@ class GrpcSequencerInitializationService(
 
   override def initializeSequencerFromOnboardingState(
       responseObserver: StreamObserver[InitializeSequencerFromOnboardingStateResponse]
-  ): StreamObserver[InitializeSequencerFromOnboardingStateRequest] =
+  ): StreamObserver[InitializeSequencerFromOnboardingStateRequest] = {
     GrpcStreamingUtils.streamFromClient(
       _.onboardingState,
       _ => (),
@@ -173,6 +141,7 @@ class GrpcSequencerInitializationService(
         initializeSequencerFromOnboardingState(onboardingState),
       responseObserver,
     )
+  }
 
   private def initializeSequencerFromOnboardingState(onboardingState: ByteString) = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext

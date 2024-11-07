@@ -17,7 +17,7 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
       .simpleTopology1Sv(this.getClass.getSimpleName)
 
   override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
-    ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
+    ValidatorLicense.TEMPLATE_ID
   )
 
   "Duplicated validator licenses for the same validator get merged" in { implicit env =>

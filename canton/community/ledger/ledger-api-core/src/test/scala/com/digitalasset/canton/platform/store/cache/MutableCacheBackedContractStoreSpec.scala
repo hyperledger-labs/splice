@@ -54,8 +54,9 @@ class MutableCacheBackedContractStoreSpec
         globalKey = None,
         stakeholders = Set.empty,
         eventOffset = Offset.beforeBegin,
+        eventSequentialId = 1L,
       )
-      val event2 = event1
+      val event2 = event1.copy(eventSequentialId = 2L)
       val updateBatch = NonEmptyVector.of(event1, event2)
 
       contractStore.contractStateCaches.push(updateBatch)
@@ -273,15 +274,15 @@ class MutableCacheBackedContractStoreSpec
 
 @nowarn("msg=match may not be exhaustive")
 object MutableCacheBackedContractStoreSpec {
-  private val offset0 = Offset.fromLong(1L)
-  private val offset1 = Offset.fromLong(2L)
-  private val offset2 = Offset.fromLong(3L)
-  private val offset3 = Offset.fromLong(4L)
+  private val offset0 = offset(0L)
+  private val offset1 = offset(1L)
+  private val offset2 = offset(2L)
+  private val offset3 = offset(3L)
 
   private val Seq(alice, bob, charlie) = Seq("alice", "bob", "charlie").map(party)
   private val (
     Seq(cId_1, cId_2, cId_3, cId_4, cId_5, cId_6, cId_7),
-    Seq(contract1, contract2, contract3, contract4, _, contract6, _),
+    Seq(contract1, contract2, contract3, contract4, _, contract6, contract7),
     Seq(t1, t2, t3, t4, _, t6, _),
   ) =
     (1 to 7).map { id =>
@@ -293,7 +294,7 @@ object MutableCacheBackedContractStoreSpec {
   private val exStakeholders = Set(bob)
   private val exSignatories = Set(alice)
   private val exMaintainers = Some(Set(bob))
-  private val exDriverMetadata = "meta".getBytes
+  private val exDriverMetadata = Some("meta".getBytes)
 
   private def contractStore(
       cachesSize: Long,
@@ -328,7 +329,7 @@ object MutableCacheBackedContractStoreSpec {
 
     override def lookupContractState(contractId: ContractId, validAt: Offset)(implicit
         loggingContext: LoggingContextWithTrace
-    ): Future[Option[LedgerDaoContractsReader.ContractState]] =
+    ): Future[Option[LedgerDaoContractsReader.ContractState]] = {
       (contractId, validAt) match {
         case (`cId_1`, `offset0`) => activeContract(contract1, Set(alice), t1)
         case (`cId_1`, validAt) if validAt > offset0 => archivedContract(Set(alice))
@@ -344,6 +345,7 @@ object MutableCacheBackedContractStoreSpec {
           result
         case _ => Future.successful(Option.empty)
       }
+    }
   }
 
   private def activeContract(
@@ -353,7 +355,7 @@ object MutableCacheBackedContractStoreSpec {
       signatories: Set[Party] = exSignatories,
       globalKey: Option[GlobalKey] = Some(someKey),
       maintainers: Option[Set[Party]] = exMaintainers,
-      driverMetadata: Array[Byte] = exDriverMetadata,
+      driverMetadata: Option[Array[Byte]] = exDriverMetadata,
   ): Future[Option[LedgerDaoContractsReader.ActiveContract]] =
     Future.successful(
       Some(
@@ -398,4 +400,6 @@ object MutableCacheBackedContractStoreSpec {
       ValueText(desc),
       Ref.PackageName.assertFromString("pkg-name"),
     )
+
+  private def offset(idx: Long) = Offset.fromByteArray(BigInt(idx).toByteArray)
 }

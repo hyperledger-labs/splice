@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.ledger.localstore
 
-import cats.syntax.either.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{IdentityProviderConfig, IdentityProviderId}
@@ -71,7 +70,7 @@ class InMemoryIdentityProviderConfigStore(
       currentState <- checkIdExists(id)
       _ <- update.issuerUpdate
         .map(checkIssuerDoNotExists(_, update.identityProviderId))
-        .getOrElse(Either.unit)
+        .getOrElse(Right(()))
     } yield {
       val updatedValue = currentState
         .copy(isDeactivated = update.isDeactivatedUpdate.getOrElse(currentState.isDeactivated))
@@ -114,12 +113,13 @@ class InMemoryIdentityProviderConfigStore(
       IdentityProviderConfigExists(id),
     )
 
-  private def tooManyIdentityProviderConfigs(): Result[Unit] =
+  private def tooManyIdentityProviderConfigs(): Result[Unit] = {
     Either.cond(
       state.size + 1 <= maxIdentityProviderConfigs,
       (),
       TooManyIdentityProviderConfigs(),
     )
+  }
 
   private def checkIdExists(id: IdentityProviderId.Id): Result[IdentityProviderConfig] =
     state.get(id).toRight(IdentityProviderConfigNotFound(id))

@@ -33,8 +33,7 @@ trait DbTest
 
   /** Flag to define the migration mode for the schemas */
   def migrationMode: MigrationMode =
-    // TODO(i15561): Revert back to `== ProtocolVersion.dev` once v30 is a stable Daml 3 protocol version
-    if (BaseTest.testedProtocolVersion >= ProtocolVersion.v32) MigrationMode.DevVersion
+    if (BaseTest.testedProtocolVersion == ProtocolVersion.dev) MigrationMode.DevVersion
     else MigrationMode.Standard
 
   protected def mkDbConfig(basicConfig: DbBasicConfig): DbConfig
@@ -61,7 +60,7 @@ trait DbTest
     super.beforeAll()
   }
 
-  override def afterAll(): Unit =
+  override def afterAll(): Unit = {
     try {
       // Non-standard order.
       // First delete test data.
@@ -79,15 +78,17 @@ trait DbTest
         e.printStackTrace()
         throw e
     }
+  }
 
   override def beforeEach(): Unit = {
     cleanup()
     super.beforeEach()
   }
 
-  private def cleanup(): Unit =
+  private def cleanup(): Unit = {
     // Use the underlying storage for clean-up operations, so we don't run clean-ups twice
     Await.result(cleanDb(storage.underlying), 10.seconds)
+  }
 }
 
 /** Run db test against h2 */
@@ -105,9 +106,6 @@ trait PostgresTest extends DbTest { this: Suite =>
   override protected def mkDbConfig(basicConfig: DbBasicConfig): Postgres =
     basicConfig.toPostgresDbConfig
 
-  override protected def createSetup(): DbStorageSetup = {
-    // postgres has limit of 63 chars for the db name
-    val dbName = this.getClass.getSimpleName.replaceAll("[^a-zA-Z0-9]", "").toLowerCase.take(63)
-    DbStorageSetup.postgres(loggerFactory, migrationMode, mkDbConfig, useDbNameO = Some(dbName))
-  }
+  override protected def createSetup(): DbStorageSetup =
+    DbStorageSetup.postgres(loggerFactory, migrationMode, mkDbConfig)
 }

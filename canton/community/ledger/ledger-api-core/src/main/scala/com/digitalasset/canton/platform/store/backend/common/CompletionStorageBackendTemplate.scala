@@ -20,7 +20,7 @@ import com.digitalasset.canton.platform.store.backend.Conversions.{
 }
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.interning.StringInterning
-import com.digitalasset.canton.platform.{ApiOffset, ApplicationId, Party}
+import com.digitalasset.canton.platform.{ApplicationId, Party}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -31,10 +31,12 @@ import java.sql.Connection
 import java.util.UUID
 
 class CompletionStorageBackendTemplate(
+    queryStrategy: QueryStrategy,
     stringInterning: StringInterning,
     val loggerFactory: NamedLoggerFactory,
 ) extends CompletionStorageBackend
     with NamedLogging {
+  import com.digitalasset.canton.platform.store.backend.Conversions.ArrayColumnToIntArray.*
 
   override def commandCompletions(
       startExclusive: Offset,
@@ -57,7 +59,7 @@ class CompletionStorageBackendTemplate(
           completion_offset,
           record_time,
           command_id,
-          update_id,
+          transaction_id,
           rejection_status_code,
           rejection_status_message,
           rejection_status_details,
@@ -72,7 +74,7 @@ class CompletionStorageBackendTemplate(
         FROM
           lapi_command_completions
         WHERE
-          ${QueryStrategy.offsetIsBetween(
+          ${queryStrategy.offsetIsBetween(
           nonNullableColumn = "completion_offset",
           startExclusive = startExclusive,
           endInclusive = endInclusive,
@@ -80,7 +82,7 @@ class CompletionStorageBackendTemplate(
           application_id = $applicationId
         ORDER BY completion_offset ASC
         ${QueryStrategy.limitClause(Some(limit))}"""
-        .asVectorOf(completionParser(internedParties))(connection)
+        .asVectorOf(completionParser)(connection)
       rows.collect {
         case (submitters, response) if submitters.exists(internedParties) => response
       }
@@ -89,7 +91,7 @@ class CompletionStorageBackendTemplate(
 
   private val sharedColumns: RowParser[
     Array[Int] ~ Offset ~ Timestamp ~ String ~ String ~ Option[String] ~ Int ~ TraceContext
-  ] =
+  ] = {
     array[Int]("submitters") ~
       offset("completion_offset") ~
       timestampFromMicros("record_time") ~
@@ -98,11 +100,12 @@ class CompletionStorageBackendTemplate(
       str("submission_id").? ~
       int("domain_id") ~
       traceContextOption("trace_context")(noTracingLogger)
+  }
 
   private val acceptedCommandSharedColumns: RowParser[
     Array[Int] ~ Offset ~ Timestamp ~ String ~ String ~ Option[String] ~ Int ~ TraceContext ~ String
   ] =
-    sharedColumns ~ str("update_id")
+    sharedColumns ~ str("transaction_id")
 
   private val deduplicationOffsetColumn: RowParser[Option[String]] =
     str("deduplication_offset").?
@@ -113,27 +116,21 @@ class CompletionStorageBackendTemplate(
   private val deduplicationStartColumn: RowParser[Option[Timestamp]] =
     timestampFromMicros("deduplication_start").?
 
-  private def acceptedCommandParser(
-      internedParties: Set[Int]
-  ): RowParser[(Array[Int], CompletionStreamResponse)] =
+  private val acceptedCommandParser: RowParser[(Array[Int], CompletionStreamResponse)] =
     acceptedCommandSharedColumns ~
       deduplicationOffsetColumn ~
       deduplicationDurationSecondsColumn ~ deduplicationDurationNanosColumn ~
       deduplicationStartColumn map {
-        case submitters ~ offset ~ recordTime ~ commandId ~ applicationId ~ submissionId ~ internedDomainId ~ traceContext ~ updateId ~
+        case submitters ~ offset ~ recordTime ~ commandId ~ applicationId ~ submissionId ~ internedDomainId ~ traceContext ~ transactionId ~
             deduplicationOffset ~ deduplicationDurationSeconds ~ deduplicationDurationNanos ~ _ =>
           submitters -> CompletionFromTransaction.acceptedCompletion(
-            submitters = submitters.iterator
-              .filter(internedParties)
-              .map(stringInterning.party.unsafe.externalize)
-              .toSet,
             recordTime = recordTime,
             offset = offset,
             commandId = commandId,
-            updateId = updateId,
+            transactionId = transactionId,
             applicationId = applicationId,
             optSubmissionId = submissionId,
-            optDeduplicationOffset = deduplicationOffset.map(ApiOffset.assertFromStringToLong),
+            optDeduplicationOffset = deduplicationOffset,
             optDeduplicationDurationSeconds = deduplicationDurationSeconds,
             optDeduplicationDurationNanos = deduplicationDurationNanos,
             domainId = stringInterning.domainId.unsafe.externalize(internedDomainId),
@@ -146,9 +143,7 @@ class CompletionStorageBackendTemplate(
   private val rejectionStatusDetailsColumn: RowParser[Option[Array[Byte]]] =
     byteArray("rejection_status_details").?
 
-  private def rejectedCommandParser(
-      internedParties: Set[Int]
-  ): RowParser[(Array[Int], CompletionStreamResponse)] =
+  private val rejectedCommandParser: RowParser[(Array[Int], CompletionStreamResponse)] =
     sharedColumns ~
       deduplicationOffsetColumn ~
       deduplicationDurationSecondsColumn ~ deduplicationDurationNanosColumn ~
@@ -162,17 +157,13 @@ class CompletionStorageBackendTemplate(
           val status =
             buildStatusProto(rejectionStatusCode, rejectionStatusMessage, rejectionStatusDetails)
           submitters -> CompletionFromTransaction.rejectedCompletion(
-            submitters = submitters.iterator
-              .filter(internedParties)
-              .map(stringInterning.party.unsafe.externalize)
-              .toSet,
             recordTime = recordTime,
             offset = offset,
             commandId = commandId,
             status = status,
             applicationId = applicationId,
             optSubmissionId = submissionId,
-            optDeduplicationOffset = deduplicationOffset.map(ApiOffset.assertFromStringToLong),
+            optDeduplicationOffset = deduplicationOffset,
             optDeduplicationDurationSeconds = deduplicationDurationSeconds,
             optDeduplicationDurationNanos = deduplicationDurationNanos,
             domainId = stringInterning.domainId.unsafe.externalize(internedDomainId),
@@ -180,10 +171,8 @@ class CompletionStorageBackendTemplate(
           )
       }
 
-  private def completionParser(
-      internedParties: Set[Int]
-  ): RowParser[(Array[Int], CompletionStreamResponse)] =
-    acceptedCommandParser(internedParties) | rejectedCommandParser(internedParties)
+  private val completionParser: RowParser[(Array[Int], CompletionStreamResponse)] =
+    acceptedCommandParser | rejectedCommandParser
 
   private val postPublishDataParser: RowParser[Option[PostPublishData]] =
     int("domain_id") ~
@@ -196,11 +185,11 @@ class CompletionStorageBackendTemplate(
       offset("completion_offset") ~
       long("publication_time") ~
       str("submission_id").? ~
-      str("update_id").? ~
+      str("transaction_id").? ~
       traceContextOption("trace_context")(noTracingLogger) ~
       bool("is_transaction") map {
         case internedDomainId ~ messageUuidString ~ requestSequencerCounterLong ~ recordTimeMicros ~ applicationId ~
-            commandId ~ submitters ~ offset ~ publicationTimeMicros ~ submissionId ~ updateIdOpt ~ traceContext ~ true =>
+            commandId ~ submitters ~ offset ~ publicationTimeMicros ~ submissionId ~ transactionIdOpt ~ traceContext ~ true =>
           // note: we only collect completions for transactions here for acceptance and transactions and reassignments for rejection (is_transaction will be true in rejection reassignment case as well)
           Some(
             PostPublishData(
@@ -227,7 +216,7 @@ class CompletionStorageBackendTemplate(
               offset = offset,
               publicationTime = CantonTimestamp.ofEpochMicro(publicationTimeMicros),
               submissionId = submissionId.map(Ref.SubmissionId.assertFromString),
-              accepted = updateIdOpt.isDefined,
+              accepted = transactionIdOpt.isDefined,
               traceContext = traceContext,
             )
           )
@@ -255,11 +244,12 @@ class CompletionStorageBackendTemplate(
 
   override def pruneCompletions(
       pruneUpToInclusive: Offset
-  )(connection: Connection, traceContext: TraceContext): Unit =
+  )(connection: Connection, traceContext: TraceContext): Unit = {
     pruneWithLogging(queryDescription = "Command completions pruning") {
       import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
       SQL"delete from lapi_command_completions where completion_offset <= $pruneUpToInclusive"
     }(connection, traceContext)
+  }
 
   private def pruneWithLogging(queryDescription: String)(query: SimpleSql[Row])(
       connection: Connection,
@@ -289,13 +279,13 @@ class CompletionStorageBackendTemplate(
         completion_offset,
         publication_time,
         submission_id,
-        update_id,
+        transaction_id,
         trace_context,
         is_transaction
       FROM
         lapi_command_completions
       WHERE
-        ${QueryStrategy.offsetIsBetween(
+        ${queryStrategy.offsetIsBetween(
         nonNullableColumn = "completion_offset",
         startExclusive = startExclusive,
         endInclusive = endInclusive,

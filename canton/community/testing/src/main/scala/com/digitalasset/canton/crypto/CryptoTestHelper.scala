@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.crypto
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.serialization.DefaultDeserializationError
 import com.digitalasset.canton.version.{HasVersionedToByteString, ProtocolVersion}
@@ -18,7 +17,7 @@ trait CryptoTestHelper extends BaseTest with HasExecutionContext {
     *
     * @param crypto determines the algorithms used for signing, hashing, and encryption, used
     *               on the client side for serialization.
-    * @param encryptionKeySpec the encryption key specification for the new key.
+    * @param scheme the encryption scheme for the new key.
     * @return an encryption public key
     */
   protected def getEncryptionPublicKey(
@@ -44,29 +43,27 @@ trait CryptoTestHelper extends BaseTest with HasExecutionContext {
     *
     * @param crypto    determines the algorithms used for signing, hashing, and encryption, used
     *                  on the client side for serialization.
-    * @param usage     what the key must be used for
-    * @param keySpec   the signing key specification for the new key.
+    * @param scheme    the signing scheme for the new key.
     * @return a signing public key
     */
   protected def getSigningPublicKey(
       crypto: Crypto,
-      usage: NonEmpty[Set[SigningKeyUsage]],
-      keySpec: SigningKeySpec,
-  ): FutureUnlessShutdown[SigningPublicKey] =
+      scheme: SigningKeyScheme,
+  ): FutureUnlessShutdown[SigningPublicKey] = {
     crypto
-      .generateSigningKey(keySpec, usage)
+      .generateSigningKey(scheme)
       .valueOrFail("generate signing key")
+  }
 
   /** Helper method to get two different signing public keys.
     */
   protected def getTwoSigningPublicKeys(
       crypto: Crypto,
-      usage: NonEmpty[Set[SigningKeyUsage]],
-      keySpec: SigningKeySpec,
+      scheme: SigningKeyScheme,
   ): FutureUnlessShutdown[(SigningPublicKey, SigningPublicKey)] =
     for {
-      pubKey1 <- getSigningPublicKey(crypto, usage, keySpec)
-      pubKey2 <- getSigningPublicKey(crypto, usage, keySpec)
+      pubKey1 <- getSigningPublicKey(crypto, scheme)
+      pubKey2 <- getSigningPublicKey(crypto, scheme)
     } yield (pubKey1, pubKey2)
 
 }

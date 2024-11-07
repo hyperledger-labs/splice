@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_AnsEntryContext,
   ARC_DsoRules,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
 import org.lfdecentralizedtrust.splice.scan.store.{
   AppRewardTxLogEntry,
   BalanceChangeTxLogEntry,
@@ -28,7 +27,6 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   TxLogEntry,
   ValidatorRewardTxLogEntry,
   VoteRequestTxLogEntry,
-  TransferCommandTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.{Accepted, StoreErrors, VoteRequestOutcome}
 import org.lfdecentralizedtrust.splice.store.db.{
@@ -38,7 +36,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   TxLogRowData,
 }
 import org.lfdecentralizedtrust.splice.util.Contract
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{Member, PartyId}
 import com.digitalasset.canton.data.CantonTimestamp
 import io.circe.Json
 
@@ -55,16 +53,12 @@ object ScanTables extends AcsTables {
       ansEntryName: Option[String] = None,
       ansEntryOwner: Option[PartyId] = None,
       memberTrafficMember: Option[Member] = None,
-      memberTrafficDomain: Option[DomainId] = None,
       totalTrafficPurchased: Option[Long] = None,
       validatorLicenseRoundsCollected: Option[Long] = None,
       svParty: Option[PartyId] = None,
       voteActionRequiringConfirmation: Option[Json] = None,
       voteRequesterName: Option[String] = None,
       voteRequestTrackingCid: Option[VoteRequest.ContractId] = None,
-      transferPreapprovalReceiver: Option[PartyId] = None,
-      transferPreapprovalValidFrom: Option[Timestamp] = None,
-      walletParty: Option[PartyId] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "round" -> round,
@@ -75,16 +69,12 @@ object ScanTables extends AcsTables {
       "ans_entry_name" -> ansEntryName.map(lengthLimited),
       "ans_entry_owner" -> ansEntryOwner,
       "member_traffic_member" -> memberTrafficMember,
-      "member_traffic_domain" -> memberTrafficDomain,
       "total_traffic_purchased" -> totalTrafficPurchased,
       "validator_license_rounds_collected" -> validatorLicenseRoundsCollected,
       "sv_party" -> svParty,
       "vote_action_requiring_confirmation" -> voteActionRequiringConfirmation,
       "vote_requester_name" -> voteRequesterName.map(lengthLimited),
       "vote_request_tracking_cid" -> voteRequestTrackingCid,
-      "transfer_preapproval_receiver" -> transferPreapprovalReceiver,
-      "transfer_preapproval_valid_from" -> transferPreapprovalValidFrom,
-      "wallet_party" -> walletParty,
     )
   }
 
@@ -103,9 +93,6 @@ object ScanTables extends AcsTables {
       voteAccepted: Option[Boolean] = None,
       voteRequesterName: Option[String] = None,
       voteEffectiveAt: Option[String] = None,
-      transferCommandContractId: Option[TransferCommand.ContractId] = None,
-      transferCommandSender: Option[PartyId] = None,
-      transferCommandNonce: Option[Long] = None,
   ) extends TxLogRowData {
 
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
@@ -123,9 +110,6 @@ object ScanTables extends AcsTables {
       "vote_accepted" -> voteAccepted,
       "vote_requester_name" -> voteRequesterName.map(lengthLimited),
       "vote_effective_at" -> voteEffectiveAt.map(lengthLimited),
-      "transfer_command_contract_id" -> transferCommandContractId,
-      "transfer_command_sender" -> transferCommandSender,
-      "transfer_command_nonce" -> transferCommandNonce,
     )
   }
 
@@ -215,21 +199,6 @@ object ScanTables extends AcsTables {
               case Some(effectiveAt) => Some(effectiveAt.toString)
               case None => None
             },
-          )
-        case entry: TransferCommandTxLogEntry =>
-          ScanTxLogRowData(
-            entry = entry,
-            transferCommandContractId = Some(
-              new TransferCommand.ContractId(
-                entry.contractId
-              )
-            ),
-            transferCommandSender = Some(
-              entry.sender
-            ),
-            transferCommandNonce = Some(
-              entry.nonce
-            ),
           )
         case _ =>
           throw txEncodingFailed()

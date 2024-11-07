@@ -22,9 +22,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransferTransacti
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
-import com.digitalasset.canton.topology.transaction.VettedPackage
-import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
@@ -252,7 +250,7 @@ class SvTimeBasedRewardCouponIntegrationTest
         )
         .filter(_.data.beneficiary.contains(party))
 
-    val latestAmuletPackageId = DarResources.amulet_current.packageId
+    val latestAmuletDarHash = DarResources.amulet_current.darHash.toHexString
     val aliceParticipantId =
       aliceValidatorBackend.appState.participantAdminConnection.getParticipantId().futureValue
 
@@ -263,20 +261,23 @@ class SvTimeBasedRewardCouponIntegrationTest
     }
 
     actAndCheck(
-      s"Unvet the latest amulet package on Alice's participant with package id: $latestAmuletPackageId",
-      aliceValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
-        aliceParticipantId,
-        removes = Seq(PackageId.assertFromString(latestAmuletPackageId)),
-        force =
-          ForceFlags(ForceFlag.AllowUnvetPackage, ForceFlag.AllowUnvetPackageWithActiveContracts),
-      ),
+      "Unvet the latest amulet package on Alice's participant with hash: " + latestAmuletDarHash,
+      aliceValidatorBackend.appState.participantAdminConnection
+        .unVetDar(
+          latestAmuletDarHash
+        )
+        .futureValue,
     )(
-      "Alice's participant has unvetted the latest amulet package",
+      "Alice's participant unvetted the latest package with hash: " + latestAmuletDarHash,
       _ => {
-        aliceValidatorBackend.appState.participantAdminConnection
-          .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
-          .futureValue
-          .flatMap(_.item.packages.map(_.packageId)) should not contain latestAmuletPackageId
+        DarResources
+          .getDarResources(
+            aliceValidatorBackend.appState.participantAdminConnection
+              .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
+              .futureValue
+              .flatMap(_.item.packageIds)
+          )
+          .map(_.darHash.toHexString) should not contain latestAmuletDarHash
       },
     )
 
@@ -313,19 +314,24 @@ class SvTimeBasedRewardCouponIntegrationTest
     )
 
     actAndCheck(
-      s"Vet back the latest amulet package on Alice's participant with package id: $latestAmuletPackageId", {
-        aliceValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
-          aliceParticipantId,
-          adds = Seq(VettedPackage(PackageId.assertFromString(latestAmuletPackageId), None, None)),
-        )
+      "Vet back the latest amulet package on Alice's participant with hash: " + latestAmuletDarHash, {
+        aliceValidatorBackend.appState.participantAdminConnection
+          .vetDar(latestAmuletDarHash)
+          .futureValue
       },
     )(
-      "Alice's participant has vetted the latest amulet package",
+      "Alice's participant vetted the latest package with hash: " + latestAmuletDarHash,
       _ => {
-        aliceValidatorBackend.appState.participantAdminConnection
-          .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
-          .futureValue
-          .flatMap(_.item.packages.map(_.packageId)) should contain(latestAmuletPackageId)
+        DarResources
+          .getDarResources(
+            aliceValidatorBackend.appState.participantAdminConnection
+              .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
+              .futureValue
+              .flatMap(_.item.packageIds)
+          )
+          .map(_.darHash.toHexString) should contain(
+          latestAmuletDarHash
+        )
       },
     )
 

@@ -39,15 +39,12 @@ lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
 lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
-lazy val `canton-daml-jwt` = BuildCommon.`canton-daml-jwt`
-lazy val `canton-daml-grpc-utils` = BuildCommon.`canton-daml-grpc-utils`
 lazy val `canton-daml-tls` = BuildCommon.`canton-daml-tls`
 lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
 lazy val `canton-bindings-java` = BuildCommon.`canton-bindings-java`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
-lazy val `canton-transcode` = BuildCommon.`canton-transcode`
 
 lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extension`
 
@@ -357,7 +354,7 @@ lazy val `splice-wallet-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`splice-amulet-daml` / Compile / damlBuild).value ++ (`splice-wallet-payments-daml` / Compile / damlBuild).value ++ (`splice-amulet-name-service-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-amulet-daml` / Compile / damlBuild).value ++ (`splice-wallet-payments-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -1438,17 +1435,11 @@ printTests := {
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
   def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
-  // These are tests that are particularly resource intensive and need larger runners.
-  // Usually that is because they need to spin up an additional Canton instance within the test.
   def isResourceIntensiveTest(name: String): Boolean =
     name.contains("SvReonboardingIntegration") ||
-      name.contains("DecentralizedSynchronizerMigrationIntegrationTest") ||
-      name.contains("BootstrapPackageConfigIntegrationTest") ||
-      name.contains("SvOffboardingIntegrationTest")
+      name.contains("DecentralizedSynchronizerMigrationIntegrationTest")
   def isDockerBasedTest(name: String): Boolean =
     name contains "DockerCompose"
-  def isRecordTimeToleranceTest(name: String): Boolean =
-    name contains "RecordTimeToleranceTimeBasedIntegrationTest"
 
   val allTestNames =
     definedTests
@@ -1548,11 +1539,6 @@ printTests := {
       "tests with wall clock time",
       "test-full-class-names.log",
       (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t),
-    ),
-    (
-      "tests to check record time tolerance",
-      "test-full-class-names-record-time-tolerance.log",
-      (t: String) => isRecordTimeToleranceTest(t),
     ),
     (
       "tests with simulated time",

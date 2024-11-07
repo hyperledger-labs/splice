@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.http.json
 
-import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.HexString
 import com.digitalasset.daml.lf.value.Value.ContractId
 import com.daml.nonempty.NonEmpty
 import com.daml.struct.spray.StructJsonFormat
@@ -91,7 +91,7 @@ object JsonProtocol extends JsonProtocolLow {
             case e: IllegalArgumentException => Left(e.getMessage)
           }
       } yield ByteString copyFrom arr
-    }(bytes => bytesToStrTotal(bytes.toByteArray))
+    } { bytes => bytesToStrTotal(bytes.toByteArray) }
 
   implicit val Base64Format: JsonFormat[domain.Base64] = {
     import java.util.Base64.{getDecoder, getEncoder}
@@ -181,25 +181,25 @@ object JsonProtocol extends JsonProtocolLow {
     jsonFormat3(domain.PartyDetails.apply)
 
   implicit val CreateUserRequest: JsonFormat[domain.CreateUserRequest] =
-    jsonFormat3(domain.CreateUserRequest.apply)
+    jsonFormat3(domain.CreateUserRequest)
 
   implicit val ListUserRightsRequest: JsonFormat[domain.ListUserRightsRequest] =
-    jsonFormat1(domain.ListUserRightsRequest.apply)
+    jsonFormat1(domain.ListUserRightsRequest)
 
   implicit val GrantUserRightsRequest: JsonFormat[domain.GrantUserRightsRequest] =
-    jsonFormat2(domain.GrantUserRightsRequest.apply)
+    jsonFormat2(domain.GrantUserRightsRequest)
 
   implicit val RevokeUserRightsRequest: JsonFormat[domain.RevokeUserRightsRequest] =
-    jsonFormat2(domain.RevokeUserRightsRequest.apply)
+    jsonFormat2(domain.RevokeUserRightsRequest)
 
   implicit val GetUserRequest: JsonFormat[domain.GetUserRequest] =
-    jsonFormat1(domain.GetUserRequest.apply)
+    jsonFormat1(domain.GetUserRequest)
 
   implicit val DeleteUserRequest: JsonFormat[domain.DeleteUserRequest] =
-    jsonFormat1(domain.DeleteUserRequest.apply)
+    jsonFormat1(domain.DeleteUserRequest)
 
   implicit val AllocatePartyRequest: JsonFormat[domain.AllocatePartyRequest] =
-    jsonFormat2(domain.AllocatePartyRequest.apply)
+    jsonFormat2(domain.AllocatePartyRequest)
 
   object LfValueCodec
       extends ApiCodecCompressed(
@@ -207,36 +207,68 @@ object JsonProtocol extends JsonProtocolLow {
         encodeInt64AsString = true,
       )
 
-  implicit def TemplateIdRequiredPkgIdFormat[CtId[T] <: domain.ContractTypeId[T]](implicit
-      CtId: domain.ContractTypeId.Like[CtId]
-  ): RootJsonFormat[CtId[Ref.PackageId]] = new TemplateIdFormat(CtId, Ref.PackageId.fromString)
+  // DB *must not* use stringly ints or decimals; see ValuePredicate Range comments
+  object LfValueDatabaseCodec
+      extends ApiCodecCompressed(
+        encodeDecimalAsString = false,
+        encodeInt64AsString = false,
+      ) {
+    def asLfValueCodec(jv: JsValue): JsValue = jv match {
+      case JsObject(fields) => JsObject(fields transform ((_, v) => asLfValueCodec(v)))
+      case JsArray(elements) => JsArray(elements map asLfValueCodec)
+      case JsNull | _: JsString | _: JsBoolean => jv
+      case JsNumber(value) =>
+        // diverges slightly from ApiCodecCompressed: integers of numeric type
+        // will not have a ".0" included in their string representation.  We can't
+        // tell the difference here between an int64 and a numeric
+        JsString(value.bigDecimal.stripTrailingZeros.toPlainString)
+    }
+  }
 
   implicit def TemplateIdRequiredPkgFormat[CtId[T] <: domain.ContractTypeId[T]](implicit
       CtId: domain.ContractTypeId.Like[CtId]
-  ): RootJsonFormat[CtId[Ref.PackageRef]] = new TemplateIdFormat(CtId, Ref.PackageRef.fromString)
+  ): RootJsonFormat[CtId[String]] =
+    new RootJsonFormat[CtId[String]] {
+      override def write(a: CtId[String]) =
+        JsString(s"${a.packageId: String}:${a.moduleName: String}:${a.entityName: String}")
 
-  class TemplateIdFormat[P, CtId[T] <: domain.ContractTypeId[T]](
-      CtId: domain.ContractTypeId.Like[CtId],
-      readPkg: (String => Either[String, P]),
-  ) extends RootJsonFormat[CtId[P]] {
-    override def write(a: CtId[P]) =
-      JsString(s"${a.packageId.toString: String}:${a.moduleName: String}:${a.entityName: String}")
+      override def read(json: JsValue) = json match {
+        case JsString(str) =>
+          str.split(':') match {
+            case Array(p, m, e) => CtId(p, m, e)
+            case _ => error(json)
+          }
+        case _ => error(json)
+      }
 
-    override def read(json: JsValue) = json match {
-      case JsString(str) =>
-        str.split(':') match {
-          case Array(p, m, e) =>
-            readPkg(p) match {
-              case Left(reason) => error(json, reason)
-              case Right(pkgRef) => CtId(pkgRef, m, e)
-            }
-          case _ => error(json, "did not have two ':' chars")
-        }
-      case _ => error(json, "not JsString")
+      private def error(json: JsValue): Nothing =
+        deserializationError(s"Expected JsString(<packageId>:<module>:<entity>), got: $json")
     }
 
-    private def error(json: JsValue, reason: String): Nothing =
-      deserializationError(s"Expected JsString(<packageId>:<module>:<entity>), got: $json. $reason")
+  implicit def TemplateIdOptionalPkgFormat[CtId[T] <: domain.ContractTypeId[T]](implicit
+      CtId: domain.ContractTypeId.Like[CtId]
+  ): RootJsonFormat[CtId[Option[String]]] = {
+    import CtId.OptionalPkg as IdO
+    new RootJsonFormat[IdO] {
+
+      override def write(a: IdO): JsValue = a.packageId match {
+        case Some(p) => JsString(s"${p: String}:${a.moduleName: String}:${a.entityName: String}")
+        case None => JsString(s"${a.moduleName: String}:${a.entityName: String}")
+      }
+
+      override def read(json: JsValue): IdO = json match {
+        case JsString(str) =>
+          str.split(':') match {
+            case Array(p, m, e) => CtId(Some(p), m, e)
+            case Array(m, e) => CtId(None, m, e)
+            case _ => error(json)
+          }
+        case _ => error(json)
+      }
+
+      private def error(json: JsValue): Nothing =
+        deserializationError(s"Expected JsString([<packageId>:]<module>:<entity>), got: $json")
+    }
   }
 
   private[this] def decodeContractRef(
@@ -245,9 +277,9 @@ object JsonProtocol extends JsonProtocolLow {
   ): domain.InputContractRef[JsValue] =
     (fields get "templateId", fields get "key", fields get "contractId") match {
       case (Some(templateId), Some(key), None) =>
-        -\/((templateId.convertTo[domain.ContractTypeId.Template.RequiredPkg], key))
+        -\/((templateId.convertTo[domain.ContractTypeId.Template.OptionalPkg], key))
       case (otid, None, Some(contractId)) =>
-        val a = otid map (_.convertTo[domain.ContractTypeId.RequiredPkg])
+        val a = otid map (_.convertTo[domain.ContractTypeId.OptionalPkg])
         val b = contractId.convertTo[domain.ContractId]
         \/-((a, b))
       case (None, Some(_), None) =>
@@ -260,7 +292,7 @@ object JsonProtocol extends JsonProtocolLow {
     jsonFormat2(domain.EnrichedContractKey.apply[JsValue])
 
   implicit val EnrichedContractIdFormat: RootJsonFormat[domain.EnrichedContractId] =
-    jsonFormat2(domain.EnrichedContractId.apply)
+    jsonFormat2(domain.EnrichedContractId)
 
   private[this] val contractIdAtOffsetKey = "contractIdAtOffset"
 
@@ -351,14 +383,14 @@ object JsonProtocol extends JsonProtocolLow {
 
   implicit val ActiveContractFormat
       : RootJsonFormat[domain.ActiveContract.ResolvedCtTyId[JsValue]] = {
-    implicit val `ctid resolved fmt`: JsonFormat[domain.ContractTypeId.ResolvedPkgId] =
+    implicit val `ctid resolved fmt`: JsonFormat[domain.ContractTypeId.Resolved] =
       jsonFormatFromReaderWriter(
-        TemplateIdRequiredPkgIdFormat[domain.ContractTypeId.Template],
+        TemplateIdRequiredPkgFormat[domain.ContractTypeId.Template],
         // we only write (below) in main, but read ^ in tests.  For ^, getting
         // the proper contract type ID right doesn't matter
-        TemplateIdRequiredPkgIdFormat[domain.ContractTypeId],
+        TemplateIdRequiredPkgFormat[domain.ContractTypeId],
       )
-    jsonFormat6(domain.ActiveContract.apply[ContractTypeId.ResolvedPkgId, JsValue])
+    jsonFormat6(domain.ActiveContract.apply[ContractTypeId.Resolved, JsValue])
   }
 
   implicit val ArchivedContractFormat: RootJsonFormat[domain.ArchivedContract] =
@@ -406,12 +438,13 @@ object JsonProtocol extends JsonProtocolLow {
     }
   }
 
-  implicit val GetActiveContractsRequestFormat: RootJsonReader[domain.GetActiveContractsRequest] =
-    requestJsonReaderPlusOne(ReadersKey)(domain.GetActiveContractsRequest.apply)
+  implicit val GetActiveContractsRequestFormat: RootJsonReader[domain.GetActiveContractsRequest] = {
+    requestJsonReaderPlusOne(ReadersKey)(domain.GetActiveContractsRequest)
+  }
 
   implicit val SearchForeverQueryFormat: RootJsonReader[domain.SearchForeverQuery] = {
     val OffsetKey = "offset"
-    requestJsonReaderPlusOne(OffsetKey)(domain.SearchForeverQuery.apply)
+    requestJsonReaderPlusOne(OffsetKey)(domain.SearchForeverQuery)
   }
 
   implicit val SearchForeverRequestFormat: RootJsonReader[domain.SearchForeverRequest] = {
@@ -438,11 +471,8 @@ object JsonProtocol extends JsonProtocolLow {
     }
   }
 
-  implicit val hexStringFormat: JsonFormat[Ref.HexString] =
-    xemapStringJsonFormat(Ref.HexString.fromString)(identity)
-
-  implicit val PackageIdFormat: JsonFormat[Ref.PackageId] =
-    xemapStringJsonFormat(Ref.PackageId.fromString)(identity)
+  implicit val hexStringFormat: JsonFormat[HexString] =
+    xemapStringJsonFormat(HexString.fromString)(identity)
 
   implicit val deduplicationPeriodOffset: JsonFormat[DeduplicationPeriod.Offset] = jsonFormat1(
     DeduplicationPeriod.Offset.apply
@@ -475,7 +505,7 @@ object JsonProtocol extends JsonProtocolLow {
   implicit val WorkflowIdFormat: JsonFormat[domain.WorkflowId] = taggedJsonFormat
 
   implicit def CommandMetaFormat[TmplId: JsonFormat]: JsonFormat[domain.CommandMeta[TmplId]] =
-    jsonFormat9(domain.CommandMeta.apply[TmplId])
+    jsonFormat8(domain.CommandMeta.apply[TmplId])
 
   // exposed for testing
   private[json] implicit val CommandMetaNoDisclosedFormat
@@ -490,24 +520,24 @@ object JsonProtocol extends JsonProtocolLow {
       override def read(json: JsValue): Option[List[NeverDC]] = None
       override def readSome(value: JsValue): Some[List[NeverDC]] = Some(List.empty)
     }
-    jsonFormat9(domain.CommandMeta.apply)
+    jsonFormat8(domain.CommandMeta.apply)
   }
 
   implicit val CreateCommandFormat: RootJsonFormat[
-    domain.CreateCommand[JsValue, domain.ContractTypeId.Template.RequiredPkg]
+    domain.CreateCommand[JsValue, domain.ContractTypeId.Template.OptionalPkg]
   ] =
     jsonFormat3(
-      domain.CreateCommand[JsValue, domain.ContractTypeId.Template.RequiredPkg]
+      domain.CreateCommand[JsValue, domain.ContractTypeId.Template.OptionalPkg]
     )
 
   implicit val ExerciseCommandFormat: RootJsonFormat[
-    domain.ExerciseCommand.RequiredPkg[JsValue, domain.ContractLocator[JsValue]]
+    domain.ExerciseCommand.OptionalPkg[JsValue, domain.ContractLocator[JsValue]]
   ] =
     new RootJsonFormat[
-      domain.ExerciseCommand.RequiredPkg[JsValue, domain.ContractLocator[JsValue]]
+      domain.ExerciseCommand.OptionalPkg[JsValue, domain.ContractLocator[JsValue]]
     ] {
       override def write(
-          obj: domain.ExerciseCommand.RequiredPkg[JsValue, domain.ContractLocator[JsValue]]
+          obj: domain.ExerciseCommand.OptionalPkg[JsValue, domain.ContractLocator[JsValue]]
       ): JsValue = {
 
         val reference: JsObject =
@@ -526,12 +556,12 @@ object JsonProtocol extends JsonProtocolLow {
 
       override def read(
           json: JsValue
-      ): domain.ExerciseCommand.RequiredPkg[JsValue, domain.ContractLocator[JsValue]] = {
+      ): domain.ExerciseCommand.OptionalPkg[JsValue, domain.ContractLocator[JsValue]] = {
         val reference = ContractLocatorFormat.read(json)
         val choice = fromField[domain.Choice](json, "choice")
         val argument = fromField[JsValue](json, "argument")
         val meta =
-          fromField[Option[domain.CommandMeta[ContractTypeId.Template.RequiredPkg]]](
+          fromField[Option[domain.CommandMeta[ContractTypeId.Template.OptionalPkg]]](
             json,
             "meta",
           )
@@ -541,7 +571,7 @@ object JsonProtocol extends JsonProtocolLow {
           choice = choice,
           argument = argument,
           choiceInterfaceId =
-            fromField[Option[domain.ContractTypeId.RequiredPkg]](json, "choiceInterfaceId"),
+            fromField[Option[domain.ContractTypeId.OptionalPkg]](json, "choiceInterfaceId"),
           meta = meta,
         )
       }
@@ -551,16 +581,16 @@ object JsonProtocol extends JsonProtocolLow {
     domain.CreateAndExerciseCommand[
       JsValue,
       JsValue,
-      domain.ContractTypeId.Template.RequiredPkg,
-      domain.ContractTypeId.RequiredPkg,
+      domain.ContractTypeId.Template.OptionalPkg,
+      domain.ContractTypeId.OptionalPkg,
     ]
   ] =
     jsonFormat6(
       domain.CreateAndExerciseCommand[
         JsValue,
         JsValue,
-        domain.ContractTypeId.Template.RequiredPkg,
-        domain.ContractTypeId.RequiredPkg,
+        domain.ContractTypeId.Template.OptionalPkg,
+        domain.ContractTypeId.OptionalPkg,
       ]
     )
 
@@ -603,24 +633,24 @@ object JsonProtocol extends JsonProtocolLow {
     }
 
   implicit val AsyncWarningsWrapperFormat: RootJsonFormat[domain.AsyncWarningsWrapper] =
-    jsonFormat1(domain.AsyncWarningsWrapper.apply)
+    jsonFormat1(domain.AsyncWarningsWrapper)
 
   implicit val UnknownTemplateIdsFormat: RootJsonFormat[domain.UnknownTemplateIds] = jsonFormat1(
-    domain.UnknownTemplateIds.apply
+    domain.UnknownTemplateIds
   )
 
   implicit val UnknownPartiesFormat: RootJsonFormat[domain.UnknownParties] = jsonFormat1(
-    domain.UnknownParties.apply
+    domain.UnknownParties
   )
 
   implicit def OkResponseFormat[R: JsonFormat]: RootJsonFormat[domain.OkResponse[R]] =
     jsonFormat3(domain.OkResponse[R])
 
   implicit val ResourceInfoDetailFormat: RootJsonFormat[domain.ResourceInfoDetail] = jsonFormat2(
-    domain.ResourceInfoDetail.apply
+    domain.ResourceInfoDetail
   )
   implicit val ErrorInfoDetailFormat: RootJsonFormat[domain.ErrorInfoDetail] = jsonFormat2(
-    domain.ErrorInfoDetail.apply
+    domain.ErrorInfoDetail
   )
 
   implicit val durationFormat: JsonFormat[domain.RetryInfoDetailDuration] =
@@ -636,10 +666,10 @@ object JsonProtocol extends JsonProtocolLow {
     )
 
   implicit val RetryInfoDetailFormat: RootJsonFormat[domain.RetryInfoDetail] =
-    jsonFormat1(domain.RetryInfoDetail.apply)
+    jsonFormat1(domain.RetryInfoDetail)
 
   implicit val RequestInfoDetailFormat: RootJsonFormat[domain.RequestInfoDetail] = jsonFormat1(
-    domain.RequestInfoDetail.apply
+    domain.RequestInfoDetail
   )
 
   implicit val ErrorDetailsFormat: JsonFormat[domain.ErrorDetail] = {
@@ -668,10 +698,10 @@ object JsonProtocol extends JsonProtocolLow {
   }
 
   implicit val LedgerApiErrorFormat: RootJsonFormat[domain.LedgerApiError] =
-    jsonFormat3(domain.LedgerApiError.apply)
+    jsonFormat3(domain.LedgerApiError)
 
   implicit val ErrorResponseFormat: RootJsonFormat[domain.ErrorResponse] =
-    jsonFormat4(domain.ErrorResponse.apply)
+    jsonFormat4(domain.ErrorResponse)
 
   implicit val StructFormat: RootJsonFormat[Struct] = StructJsonFormat
 

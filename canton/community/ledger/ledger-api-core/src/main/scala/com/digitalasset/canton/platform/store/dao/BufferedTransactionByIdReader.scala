@@ -35,25 +35,25 @@ class BufferedTransactionByIdReader[API_RESPONSE](
     * with fallback to a persistence fetch if the transaction is not anymore in the buffer
     * (i.e. it was evicted)
     *
-    * @param updateId The transaction id.
+    * @param transactionId The transaction id.
     * @param requestingParties Parties requesting the transaction lookup
     * @param loggingContext The logging context
     * @return A future wrapping the API response if found.
     */
-  def fetch(updateId: String, requestingParties: Set[Party])(implicit
+  def fetch(transactionId: String, requestingParties: Set[Party])(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Option[API_RESPONSE]] =
-    inMemoryFanoutBuffer.lookup(updateId) match {
+    inMemoryFanoutBuffer.lookup(transactionId) match {
       case Some(value) => toApiResponse(value, requestingParties, loggingContext)
       case None =>
-        fetchFromPersistence(updateId, requestingParties, loggingContext)
+        fetchFromPersistence(transactionId, requestingParties, loggingContext)
     }
 }
 
 object BufferedTransactionByIdReader {
   trait FetchTransactionByIdFromPersistence[API_RESPONSE] {
     def apply(
-        updateId: String,
+        transactionId: String,
         requestingParties: Set[Party],
         loggingContext: LoggingContextWithTrace,
     ): Future[Option[API_RESPONSE]]

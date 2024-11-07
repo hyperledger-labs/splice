@@ -25,9 +25,7 @@ sealed trait SendAsyncError extends PrettyPrinting {
   private[protocol] def toResponseProtoV30: v30.SendAsyncVersionedResponse.Error =
     v30.SendAsyncVersionedResponse.Error(toProtoV30)
 
-  override protected def pretty: Pretty[SendAsyncError] = prettyOfClass(
-    unnamedParam(_.message.unquoted)
-  )
+  override def pretty: Pretty[SendAsyncError] = prettyOfClass(unnamedParam(_.message.unquoted))
 
   def category: ErrorCategory
 

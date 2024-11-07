@@ -10,11 +10,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
-  TransferPreapproval,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
-  ExternalPartyAmuletRules,
-  TransferCommandCounter,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
@@ -106,15 +101,6 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "Returns the ExternalPartyAmuletRules."
-  )
-  def getExternalPartyAmuletRules()
-      : ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules] =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetExternalPartyAmuletRules(None))
-    }
-
-  @Help.Summary(
     "Returns the AnsRules."
   )
   def getAnsRules(): ContractWithState[AnsRules.ContractId, AnsRules] =
@@ -153,31 +139,6 @@ abstract class ScanAppReference(
             ConsoleCommandResult.fromEither(optContract.toRight(s"Entry with name $name not found"))
           )
       }
-
-  @Help.Summary("Lookup a TransferPreapproval by the receiver party")
-  def lookupTransferPreapprovalByParty(
-      party: PartyId
-  ): Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]] =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.LookupTransferPreapprovalByParty(party))
-    }
-
-  @Help.Summary("Lookup a TransferCommandCounter by the receiver party")
-  def lookupTransferCommandCounterByParty(
-      party: PartyId
-  ): Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]] =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.LookupTransferCommandCounterByParty(party))
-    }
-
-  @Help.Summary("Lookup the status of a TransferCommand")
-  def lookupTransferCommandStatus(
-      sender: PartyId,
-      nonce: Long,
-  ): Option[definitions.LookupTransferCommandStatusResponse] =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.LookupTransferCommandStatus(sender, nonce))
-    }
 
   @Help.Summary(
     "Get the (cached) amulet config effective now. Note that changes to the config might take some time to propagate due to the client-side caching."

@@ -165,6 +165,19 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
     param("templateId", _.getTemplateId),
   )
 
+  implicit def prettyJavaParticipantOffset: Pretty[javaapi.data.ParticipantOffset] = {
+    case _: javaapi.data.ParticipantOffset.ParticipantBegin =>
+      Tree.Literal("ParticipantOffsetBegin")
+    case _: javaapi.data.ParticipantOffset.ParticipantEnd =>
+      Tree.Literal("ParticipantOffsetEnd")
+    case absolute: javaapi.data.ParticipantOffset.Absolute =>
+      prettyNode[javaapi.data.ParticipantOffset.Absolute](
+        "ParticipantOffsetAbsolute",
+        param("offset", _.getOffset.unquoted),
+      ).treeOf(absolute)
+    case offset => sys.error(s"Invalid java offset: $offset")
+  }
+
   implicit def prettyUri: Pretty[Uri] =
     prettyOfString(_.toString)
 }

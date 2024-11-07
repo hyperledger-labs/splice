@@ -7,10 +7,11 @@ import com.daml.error.ErrorCategory
 
 object ErrorCategoryInventoryDocsGenerator {
 
-  def genText(): String =
+  def genText(): String = {
     collectErrorCodesAsReStructuredTextSubsections().mkString("\n\n\n")
+  }
 
-  private def collectErrorCodesAsReStructuredTextSubsections(): Seq[String] =
+  private def collectErrorCodesAsReStructuredTextSubsections(): Seq[String] = {
     ErrorCategory.all.map { errorCategory =>
       val annotations = ErrorCodeDocumentationGenerator.getErrorCategoryItem(errorCategory)
 
@@ -22,19 +23,20 @@ object ErrorCategoryInventoryDocsGenerator {
       val resolution: String = annotations.resolution.getOrElse("").replace("\n", " ")
       val retryStrategy: String = annotations.retryStrategy.getOrElse("").replace("\n", " ")
 
-      s"""$name
+      s"""${name}
          |${"=" * 120}
-         |    **Category id**: $categoryId
+         |    **Category id**: ${categoryId}
          |
-         |    **gRPC status code**: $grpcCode
+         |    **gRPC status code**: ${grpcCode}
          |
-         |    **Default log level**: $logLevel
+         |    **Default log level**: ${logLevel}
          |
-         |    **Description**: $description
+         |    **Description**: ${description}
          |
-         |    **Resolution**: $resolution
+         |    **Resolution**: ${resolution}
          |
-         |    **Retry strategy**: $retryStrategy""".stripMargin
+         |    **Retry strategy**: ${retryStrategy}""".stripMargin
     }
+  }
 
 }

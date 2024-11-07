@@ -23,10 +23,10 @@ import com.digitalasset.canton.topology.client.{
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.*
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
-import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.{Remove, Replace}
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.GenericTopologyTransaction
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{
@@ -142,7 +142,7 @@ class StoreBasedDomainOutboxTest
         batches += transactions
         val finalResult = transactions.map(_ => responses.next())
         for {
-          _ <- MonadUtil.sequentialTraverse(transactions) { x =>
+          _ <- MonadUtil.sequentialTraverse(transactions)(x => {
             logger.debug(s"Processing $x")
             val ts = CantonTimestamp.now()
             if (finalResult.forall(_ == State.Accepted))
@@ -171,7 +171,7 @@ class StoreBasedDomainOutboxTest
                     .onShutdown(())
                 )
             else Future.unit
-          }
+          })
           _ = if (buffer.length >= expect.get()) {
             promise.get().success(batches.toSeq)
           }
@@ -461,7 +461,7 @@ class StoreBasedDomainOutboxTest
       }
       loggerFactory.assertLogs(
         action,
-        _.warningMessage should include("failed the following topology transactions"),
+        _.errorMessage should include("failed the following topology transactions"),
       )
     }
 

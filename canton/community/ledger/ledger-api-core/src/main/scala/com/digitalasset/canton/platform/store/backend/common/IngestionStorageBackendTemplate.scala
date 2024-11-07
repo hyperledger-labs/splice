@@ -15,7 +15,8 @@ import com.digitalasset.canton.platform.store.interning.StringInterning
 import java.sql.Connection
 
 private[backend] class IngestionStorageBackendTemplate(
-    schema: Schema[DbDto]
+    queryStrategy: QueryStrategy,
+    schema: Schema[DbDto],
 ) extends IngestionStorageBackend[AppendOnlySchema.Batch] {
 
   override def deletePartiallyIngestedData(
@@ -26,18 +27,16 @@ private[backend] class IngestionStorageBackendTemplate(
     val lastEventSequentialId = ledgerEnd.lastEventSeqId
 
     List(
-      SQL"DELETE FROM lapi_command_completions WHERE ${QueryStrategy
+      SQL"DELETE FROM lapi_command_completions WHERE ${queryStrategy
           .offsetIsGreater("completion_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_events_create WHERE ${QueryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_events_consuming_exercise WHERE ${QueryStrategy
+      SQL"DELETE FROM lapi_events_create WHERE ${queryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
+      SQL"DELETE FROM lapi_events_consuming_exercise WHERE ${queryStrategy
           .offsetIsGreater("event_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_events_non_consuming_exercise WHERE ${QueryStrategy
+      SQL"DELETE FROM lapi_events_non_consuming_exercise WHERE ${queryStrategy
           .offsetIsGreater("event_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_events_unassign WHERE ${QueryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_events_assign WHERE ${QueryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_party_entries WHERE ${QueryStrategy.offsetIsGreater("ledger_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_events_party_to_participant WHERE ${QueryStrategy
-          .offsetIsGreater("event_offset", ledgerOffset)}",
+      SQL"DELETE FROM lapi_events_unassign WHERE ${queryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
+      SQL"DELETE FROM lapi_events_assign WHERE ${queryStrategy.offsetIsGreater("event_offset", ledgerOffset)}",
+      SQL"DELETE FROM lapi_party_entries WHERE ${queryStrategy.offsetIsGreater("ledger_offset", ledgerOffset)}",
       SQL"DELETE FROM lapi_string_interning WHERE internal_id > $lastStringInterningId",
       SQL"DELETE FROM lapi_pe_create_id_filter_stakeholder WHERE event_sequential_id > $lastEventSequentialId",
       SQL"DELETE FROM lapi_pe_create_id_filter_non_stakeholder_informee WHERE event_sequential_id > $lastEventSequentialId",
@@ -46,14 +45,14 @@ private[backend] class IngestionStorageBackendTemplate(
       SQL"DELETE FROM lapi_pe_non_consuming_id_filter_informee WHERE event_sequential_id > $lastEventSequentialId",
       SQL"DELETE FROM lapi_pe_unassign_id_filter_stakeholder WHERE event_sequential_id > $lastEventSequentialId",
       SQL"DELETE FROM lapi_pe_assign_id_filter_stakeholder WHERE event_sequential_id > $lastEventSequentialId",
-      SQL"DELETE FROM lapi_transaction_meta WHERE ${QueryStrategy
+      SQL"DELETE FROM lapi_transaction_meta WHERE ${queryStrategy
           .offsetIsGreater("event_offset", ledgerOffset)}",
-      SQL"DELETE FROM lapi_transaction_metering WHERE ${QueryStrategy
+      SQL"DELETE FROM lapi_transaction_metering WHERE ${queryStrategy
           .offsetIsGreater("ledger_offset", ledgerOffset)}",
-      // As reassignment global offsets are persisted before the ledger end, they might change after indexer recovery, so in the cleanup
+      // As transfer global offsets are persisted before the ledger end, they might change after indexer recovery, so in the cleanup
       // phase here we make sure that all the persisted global offsets are revoked which are after the ledger end.
-      SQL"UPDATE par_reassignments SET unassignment_global_offset = null WHERE unassignment_global_offset > ${ledgerOffset.toLong}",
-      SQL"UPDATE par_reassignments SET assignment_global_offset = null WHERE assignment_global_offset > ${ledgerOffset.toLong}",
+      SQL"UPDATE par_transfers SET transfer_out_global_offset = null WHERE transfer_out_global_offset > ${ledgerOffset.toLong}",
+      SQL"UPDATE par_transfers SET transfer_in_global_offset = null WHERE transfer_in_global_offset > ${ledgerOffset.toLong}",
     ).map(_.execute()(connection)).discard
   }
 

@@ -35,7 +35,6 @@ object DefaultParticipantStateValues {
       commandId.unwrap,
       deduplicationPeriod,
       submissionId,
-      externallySignedSubmission = None,
     )
 
   def completionInfo(

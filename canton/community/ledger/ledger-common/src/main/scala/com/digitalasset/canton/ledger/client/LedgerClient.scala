@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.ledger.client
 
-import com.daml.grpc.AuthCallCredentials.authorizingStub
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc
 import com.daml.ledger.api.v2.admin.metering_report_service.MeteringReportServiceGrpc
@@ -18,7 +17,7 @@ import com.daml.ledger.api.v2.state_service.StateServiceGrpc
 import com.daml.ledger.api.v2.trace_context.TraceContext as LedgerApiTraceContext
 import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc
 import com.daml.ledger.api.v2.version_service.VersionServiceGrpc
-import com.digitalasset.canton.ledger.client.LedgerClient.stubWithTracing
+import com.digitalasset.canton.ledger.client.LedgerCallCredentials.authenticatingStub
 import com.digitalasset.canton.ledger.client.configuration.{
   LedgerClientChannelConfiguration,
   LedgerClientConfiguration,
@@ -51,26 +50,28 @@ final class LedgerClient private (
 )(implicit ec: ExecutionContext, esf: ExecutionSequencerFactory)
     extends Closeable {
 
-  lazy val commandService = new CommandServiceClient(
-    LedgerClient.stub(CommandServiceGrpcV2.stub(channel), config.token)
-  )
-  lazy val eventQueryService = new EventQueryServiceClient(
-    LedgerClient.stub(EventQueryServiceGrpc.stub(channel), config.token)
-  )
-  lazy val packageService = new PackageClient(
-    LedgerClient.stub(PackageServiceGrpcV2.stub(channel), config.token)
-  )
+  object v2 {
+    lazy val commandService = new CommandServiceClient(
+      LedgerClient.stub(CommandServiceGrpcV2.stub(channel), config.token)
+    )
+    lazy val eventQueryService = new EventQueryServiceClient(
+      LedgerClient.stub(EventQueryServiceGrpc.stub(channel), config.token)
+    )
+    lazy val packageService = new PackageClient(
+      LedgerClient.stub(PackageServiceGrpcV2.stub(channel), config.token)
+    )
 
-  lazy val stateService = new StateServiceClient(
-    LedgerClient.stub(StateServiceGrpc.stub(channel), config.token)
-  )
+    lazy val stateService = new StateServiceClient(
+      LedgerClient.stub(StateServiceGrpc.stub(channel), config.token)
+    )
 
-  lazy val updateService = new UpdateServiceClient(
-    LedgerClient.stub(UpdateServiceGrpc.stub(channel), config.token)
-  )
+    lazy val updateService = new UpdateServiceClient(
+      LedgerClient.stub(UpdateServiceGrpc.stub(channel), config.token)
+    )
 
-  lazy val versionClient: VersionClient =
-    new VersionClient(LedgerClient.stub(VersionServiceGrpc.stub(channel), config.token))
+    lazy val versionClient: VersionClient =
+      new VersionClient(LedgerClient.stub(VersionServiceGrpc.stub(channel), config.token))
+  }
 
   lazy val identityProviderConfigClient: IdentityProviderConfigClient =
     new IdentityProviderConfigClient(
@@ -103,11 +104,6 @@ final class LedgerClient private (
     )
 
   override def close(): Unit = GrpcChannel.close(channel)
-
-  def serviceClient[A <: AbstractStub[A]](stub: Channel => A, token: Option[String])(implicit
-      traceContext: TraceContext
-  ): A =
-    stubWithTracing(stub(channel), token)
 }
 
 object LedgerClient {
@@ -137,14 +133,14 @@ object LedgerClient {
 
   private[client] def stub[A <: AbstractStub[A]](stub: A, token: Option[String]): A =
     token.fold(stub)(
-      authorizingStub(stub, _).withInterceptors(TraceContextGrpc.clientInterceptor)
+      authenticatingStub(stub, _).withInterceptors(TraceContextGrpc.clientInterceptor)
     )
 
   private[client] def stubWithTracing[A <: AbstractStub[A]](stub: A, token: Option[String])(implicit
       traceContext: TraceContext
   ): A =
     token
-      .fold(stub)(authorizingStub(stub, _))
+      .fold(stub)(authenticatingStub(stub, _))
       .withInterceptors(TraceContextGrpc.clientInterceptor)
       .withOption(TraceContextGrpc.TraceContextCallOptionKey, traceContext)
 
@@ -196,12 +192,13 @@ object LedgerClient {
       ec: ExecutionContext,
       esf: ExecutionSequencerFactory,
       traceContext: TraceContext,
-  ): Future[LedgerClient] =
+  ): Future[LedgerClient] = {
     LedgerClient(
       GrpcChannel.withShutdownHook(builder),
       configuration,
       loggerFactory,
     )
+  }
 
   /** Extract a trace context from a transaction and represent it as our TraceContext */
   def traceContextFromLedgerApi(traceContext: Option[LedgerApiTraceContext]): TraceContext =

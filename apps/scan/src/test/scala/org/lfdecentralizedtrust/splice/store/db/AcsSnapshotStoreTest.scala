@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpd
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreErrors, StoreTest, UpdateHistory}
-import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
+import org.lfdecentralizedtrust.splice.util.{Contract, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
@@ -598,7 +598,7 @@ class AcsSnapshotStoreTest
               timestamp1,
               3L,
               Map(
-                wantedParty1 -> HoldingsSummary(
+                wantedParty1 -> AcsSnapshotStore.HoldingsSummary(
                   totalUnlockedCoin = 10 * 3,
                   totalLockedCoin = 30 * 3,
                   totalCoinHoldings = 10 * 3 + 30 * 3,
@@ -607,7 +607,7 @@ class AcsSnapshotStoreTest
                   accumulatedHoldingFeesTotal = 1.0 * 2 + 1.0 * 1 + 0.5 * 2 + 0.5 * 1,
                   totalAvailableCoin = (10 * 3) - (1.0 * 2 + 1.0 * 1),
                 ),
-                wantedParty2 -> HoldingsSummary(
+                wantedParty2 -> AcsSnapshotStore.HoldingsSummary(
                   totalUnlockedCoin = 20 * 3,
                   totalLockedCoin = 40 * 3,
                   totalCoinHoldings = 20 * 3 + 40 * 3,
@@ -625,7 +625,7 @@ class AcsSnapshotStoreTest
               timestamp1,
               10L,
               Map(
-                wantedParty1 -> HoldingsSummary(
+                wantedParty1 -> AcsSnapshotStore.HoldingsSummary(
                   totalUnlockedCoin = 10 * 3,
                   totalLockedCoin = 30 * 3,
                   totalCoinHoldings = 10 * 3 + 30 * 3,
@@ -635,7 +635,7 @@ class AcsSnapshotStoreTest
                     1.0 * 9 + 1.0 * 8 + 1.0 * 7 + 0.5 * 9 + 0.5 * 8 + 0.5 * 7,
                   totalAvailableCoin = (10 * 3) - (1.0 * 9 + 1.0 * 8 + 1.0 * 7),
                 ),
-                wantedParty2 -> HoldingsSummary(
+                wantedParty2 -> AcsSnapshotStore.HoldingsSummary(
                   totalUnlockedCoin = 20 * 3,
                   totalLockedCoin = 40 * 3,
                   totalCoinHoldings = 20 * 3 + 40 * 3,
@@ -654,7 +654,7 @@ class AcsSnapshotStoreTest
               timestamp1,
               100L,
               Map(
-                wantedParty1 -> HoldingsSummary(
+                wantedParty1 -> AcsSnapshotStore.HoldingsSummary(
                   totalUnlockedCoin = 10 * 3,
                   totalLockedCoin = 30 * 3,
                   totalCoinHoldings = 10 * 3 + 30 * 3,
@@ -663,7 +663,7 @@ class AcsSnapshotStoreTest
                   accumulatedHoldingFeesTotal = 10 * 3 + 30 * 3,
                   totalAvailableCoin = 0,
                 ),
-                wantedParty2 -> HoldingsSummary(
+                wantedParty2 -> AcsSnapshotStore.HoldingsSummary(
                   totalUnlockedCoin = 20 * 3,
                   totalLockedCoin = 40 * 3,
                   totalCoinHoldings = 20 * 3 + 40 * 3,

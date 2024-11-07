@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { sameContracts } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { AcceptedGroupInvite, Group } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
@@ -16,6 +16,7 @@ export const useAcceptedInvites = (
   const groupId = group.payload.id.unpack;
 
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['acceptedInvites', groupId, party],
     queryFn: async () => {
       const invites = (await splitwellClient.listAcceptedGroupInvites(party, groupId))

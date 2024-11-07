@@ -48,12 +48,13 @@ final case class Batch[+Env <: Envelope[?]] private (envelopes: List[Env])(
     e.recipients.allRecipients
   }.toSet
 
-  lazy val allMediatorRecipients: Set[Recipient] =
+  lazy val allMediatorRecipients: Set[Recipient] = {
     allRecipients.collect {
       case r @ MemberRecipient(_: MediatorId) => r
       case r: MediatorGroupRecipient => r
       case AllMembersOfDomain => AllMembersOfDomain
     }
+  }
 
   private[protocol] def toProtoV30: v30.CompressedBatch = {
     val batch = v30.Batch(envelopes = envelopes.map(_.closeEnvelope.toProtoV30))
@@ -77,9 +78,7 @@ final case class Batch[+Env <: Envelope[?]] private (envelopes: List[Env])(
   ): F[Batch[Env2]] =
     F.map(envelopes.traverse(f))(Batch(_)(representativeProtocolVersion))
 
-  override protected def pretty: Pretty[Batch[Envelope[?]]] = prettyOfClass(
-    unnamedParam(_.envelopes)
-  )
+  override def pretty: Pretty[Batch[Envelope[?]]] = prettyOfClass(unnamedParam(_.envelopes))
 }
 
 object Batch extends HasProtocolVersionedCompanion2[Batch[Envelope[?]], Batch[ClosedEnvelope]] {
@@ -87,7 +86,7 @@ object Batch extends HasProtocolVersionedCompanion2[Batch[Envelope[?]], Batch[Cl
 
   override val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> VersionedProtoConverter(
-      ProtocolVersion.v32
+      ProtocolVersion.v31
     )(v30.CompressedBatch)(
       supportedProtoVersion(_)(
         // TODO(i10428) Prevent zip bombing when decompressing the request
@@ -137,7 +136,7 @@ object Batch extends HasProtocolVersionedCompanion2[Batch[Envelope[?]], Batch[Cl
       algorithm: v30.CompressedBatch.CompressionAlgorithm,
       compressed: ByteString,
       maxRequestSize: Option[NonNegativeInt],
-  ): ParsingResult[ByteString] =
+  ): ParsingResult[ByteString] = {
     algorithm match {
       case v30.CompressedBatch.CompressionAlgorithm.COMPRESSION_ALGORITHM_UNSPECIFIED =>
         Right(compressed)
@@ -147,6 +146,7 @@ object Batch extends HasProtocolVersionedCompanion2[Batch[Envelope[?]], Batch[Cl
           .leftMap(_.toProtoDeserializationError)
       case _ => Left(FieldNotSet("CompressedBatch.Algorithm"))
     }
+  }
 
   /** Constructs a batch with no envelopes */
   def empty[Env <: Envelope[_]](protocolVersion: ProtocolVersion): Batch[Env] =

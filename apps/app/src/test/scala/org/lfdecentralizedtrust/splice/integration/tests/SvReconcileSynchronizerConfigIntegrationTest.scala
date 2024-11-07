@@ -49,7 +49,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
       amuletConfig,
       amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount + 1,
       new RelTime(
-        amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1000_000
+        amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
       ),
       amuletConfig.decentralizedSynchronizer.fees.readVsWriteScalingFactor + 1,
     )
@@ -101,7 +101,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
         config.baseRateTrafficLimits.burstAmount shouldBe
           amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount + 1
         config.baseRateTrafficLimits.burstWindow shouldBe new RelTime(
-          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1000_000
+          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
         )
         config.readVsWriteScalingFactor shouldBe amuletConfig.decentralizedSynchronizer.fees.readVsWriteScalingFactor + 1
       },
@@ -117,7 +117,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
         trafficControlParameters.maxBaseTrafficAmount.value shouldBe
           amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount + 1
         trafficControlParameters.maxBaseTrafficAccumulationDuration.underlying.toMicros shouldBe
-          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1000_000
+          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
         trafficControlParameters.readVsWriteScalingFactor.value.toLong shouldBe
           amuletConfig.decentralizedSynchronizer.fees.readVsWriteScalingFactor + 1
       }
@@ -147,7 +147,6 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     ),
     amuletConfig.tickDuration,
     amuletConfig.packageConfig,
-    java.util.Optional.empty(),
   )
 
 }

@@ -20,8 +20,8 @@ import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFa
   TransactionTreeConversionError,
 }
 import com.digitalasset.canton.participant.store.ContractLookup
-import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.{WithSuffixes, WithoutSuffixes}
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
@@ -109,14 +109,14 @@ object TransactionTreeFactory {
   /** Indicates that a contract instance could not be looked up by an instance of [[SerializableContractOfId]]. */
   final case class ContractLookupError(id: LfContractId, message: String)
       extends TransactionTreeConversionError {
-    override protected def pretty: Pretty[ContractLookupError] = prettyOfClass(
+    override def pretty: Pretty[ContractLookupError] = prettyOfClass(
       param("id", _.id),
       param("message", _.message.unquoted),
     )
   }
 
   final case class SubmitterMetadataError(message: String) extends TransactionTreeConversionError {
-    override protected def pretty: Pretty[SubmitterMetadataError] = prettyOfClass(
+    override def pretty: Pretty[SubmitterMetadataError] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
@@ -124,41 +124,40 @@ object TransactionTreeFactory {
   // TODO(i3013) Remove this error
   final case class ViewParticipantDataError(message: String)
       extends TransactionTreeConversionError {
-    override protected def pretty: Pretty[ViewParticipantDataError] = prettyOfClass(
+    override def pretty: Pretty[ViewParticipantDataError] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
 
   final case class MissingContractKeyLookupError(key: LfGlobalKey)
       extends TransactionTreeConversionError {
-    override protected def pretty: Pretty[MissingContractKeyLookupError] =
+    override def pretty: Pretty[MissingContractKeyLookupError] =
       prettyOfClass(unnamedParam(_.key))
   }
 
   final case class ContractKeyResolutionError(error: KeyInputError)
       extends TransactionTreeConversionError {
-    override protected def pretty: Pretty[ContractKeyResolutionError] =
+    override def pretty: Pretty[ContractKeyResolutionError] =
       prettyOfClass(unnamedParam(_.error))
   }
 
   /** Indicates that too few salts have been supplied for creating a view */
   case object TooFewSalts extends TransactionTreeConversionError {
-    override protected def pretty: Pretty[TooFewSalts.type] = prettyOfObject[TooFewSalts.type]
+    override def pretty: Pretty[TooFewSalts.type] = prettyOfObject[TooFewSalts.type]
   }
   type TooFewSalts = TooFewSalts.type
 
   final case class UnknownPackageError(unknownTo: Seq[PackageUnknownTo])
       extends TransactionTreeConversionError {
-    override protected def pretty: Pretty[UnknownPackageError] =
+    override def pretty: Pretty[UnknownPackageError] =
       prettyOfString(err => show"Some packages are not known to all informees.\n${err.unknownTo}")
   }
 
   final case class ConflictingPackagePreferenceError(
       conflicts: Map[LfPackageName, Set[LfPackageId]]
   ) extends TransactionTreeConversionError {
-    override protected def pretty: Pretty[ConflictingPackagePreferenceError] = prettyOfString {
-      err =>
-        show"Detected conflicting package-ids for the same package name\n${err.conflicts}"
+    override def pretty: Pretty[ConflictingPackagePreferenceError] = prettyOfString { err =>
+      show"Detected conflicting package-ids for the same package name\n${err.conflicts}"
     }
   }
 
@@ -166,7 +165,7 @@ object TransactionTreeFactory {
       packageId: LfPackageId,
       participantId: ParticipantId,
   ) extends PrettyPrinting {
-    override protected def pretty: Pretty[PackageUnknownTo] = prettyOfString { put =>
+    override def pretty: Pretty[PackageUnknownTo] = prettyOfString { put =>
       show"Participant $participantId has not vetted ${put.packageId}"
     }
   }

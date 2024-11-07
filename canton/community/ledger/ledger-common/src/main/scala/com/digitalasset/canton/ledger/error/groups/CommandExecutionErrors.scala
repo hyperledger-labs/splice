@@ -21,7 +21,6 @@ import com.digitalasset.daml.lf.engine.Error as LfError
 import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
 import com.digitalasset.daml.lf.language.{Ast, LanguageVersion}
 import com.digitalasset.daml.lf.transaction.{GlobalKey, TransactionVersion}
-import com.digitalasset.daml.lf.value.Value.ContractId
 import com.digitalasset.daml.lf.value.{Value, ValueCoder}
 import com.digitalasset.daml.lf.{VersionRange, language}
 import com.google.common.io.BaseEncoding
@@ -33,10 +32,11 @@ import scala.concurrent.duration.DurationInt
   "Errors raised during the command execution phase of the command submission evaluation."
 )
 object CommandExecutionErrors extends CommandExecutionErrorGroup {
-  def encodeValue(v: Value): Either[ValueCoder.EncodeError, String] =
+  def encodeValue(v: Value): Either[ValueCoder.EncodeError, String] = {
     ValueCoder
       .encodeValue(valueVersion = TransactionVersion.VDev, v0 = v)
       .map(bs => BaseEncoding.base64().encode(bs.toByteArray))
+  }
 
   def withEncodedValue(
       v: Value
@@ -50,24 +50,6 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
       },
       f,
     )
-
-  @Explanation(
-    """This error occurs if the participant fails to serialize a prepared a transaction via the interactive submission service.
-      |"""
-  )
-  @Resolution("Inspect error details and report the error.")
-  object SubmissionPreparationSerializationError
-      extends ErrorCode(
-        id = "FAILED_TO_SERIALIZE_PREPARED_TRANSACTION",
-        ErrorCategory.InvalidIndependentOfSystemState,
-      ) {
-
-    final case class Reject(reason: String)(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlErrorWithDefiniteAnswer(
-          cause = s"The participant failed to serialize the prepared transaction: $reason"
-        )
-  }
 
   @Explanation(
     """This error occurs if the participant fails to determine the max ledger time of the used
@@ -86,7 +68,7 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
         loggingContext: ContextualizedErrorLogger
     ) extends DamlErrorWithDefiniteAnswer(
           cause =
-            s"The participant failed to determine the max ledger time for this command: $reason"
+            s"The participant failed to determine the max ledger time for this command: ${reason}"
         )
   }
 
@@ -128,49 +110,6 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
         ErrorCategoryRetry(duration = 60.seconds)
       )
     }
-  }
-
-  @Explanation(
-    """This error occurs if some of the disclosed contracts attached to the command submission that were also used in command interpretation have specified mismatching domain-ids.
-      |This can happen if the domain-ids of the disclosed contracts are out of sync OR if the originating contracts are assigned to different domains."""
-  )
-  @Resolution(
-    "Retry the submission with an up-to-date set of attached disclosed contracts or re-create a command submission that only uses disclosed contracts residing on the same domain."
-  )
-  object DisclosedContractsDomainIdMismatch
-      extends ErrorCode(
-        id = "DISCLOSED_CONTRACTS_DOMAIN_ID_MISMATCH",
-        ErrorCategory.InvalidIndependentOfSystemState,
-      ) {
-    final case class Reject(mismatchingContractIdToDomainIds: Map[ContractId, String])(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlErrorWithDefiniteAnswer(
-          cause =
-            s"Some disclosed contracts that were used during command interpretation have mismatching domain-ids: $mismatchingContractIdToDomainIds"
-        )
-  }
-
-  @Explanation(
-    """This error occurs when the domain-id provided in the command submission mismatches the domain-id specified in one of the disclosed contracts used in command interpretation."""
-  )
-  @Resolution(
-    "Retry the submission with all disclosed contracts residing on the target submission domain."
-  )
-  object PrescribedDomainIdMismatch
-      extends ErrorCode(
-        id = "PRESCRIBED_DOMAIN_ID_MISMATCH",
-        ErrorCategory.InvalidIndependentOfSystemState,
-      ) {
-    final case class Reject(
-        usedDisclosedContractsSpecifyingADomainId: Set[ContractId],
-        disclosedContractsDomainId: String,
-        prescribedDomainId: String,
-    )(implicit
-        loggingContext: ContextualizedErrorLogger
-    ) extends DamlErrorWithDefiniteAnswer(
-          cause =
-            s"The target domain=$prescribedDomainId specified in the command submission mismatches the domain-id=$disclosedContractsDomainId of some attached disclosed contracts that have been used in the submission (used-disclosed-contract-ids=$usedDisclosedContractsSpecifyingADomainId)"
-        )
   }
 
   @Explanation("Command execution errors raised due to invalid packages.")

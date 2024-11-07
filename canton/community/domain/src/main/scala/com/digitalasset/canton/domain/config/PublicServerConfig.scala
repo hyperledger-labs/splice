@@ -3,9 +3,8 @@
 
 package com.digitalasset.canton.domain.config
 
-import com.daml.jwt.JwtTimestampLeeway
-import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, NonNegativeInt, Port}
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import io.netty.handler.ssl.SslContext
 
@@ -17,12 +16,6 @@ import io.netty.handler.ssl.SslContext
 trait PublicServerConfig extends ServerConfig {
 
   def tls: Option[TlsBaseServerConfig]
-
-  override def authServices: Seq[AuthServiceConfig] = Seq.empty
-
-  override def jwtTimestampLeeway: Option[JwtTimestampLeeway] = None
-
-  override def adminToken: Option[String] = None
 
   /** Expiration interval for a nonce that is generated for an
     * authentication challenge. as an authentication request is

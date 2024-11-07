@@ -70,5 +70,6 @@ trait HasCycleUtils[E <: Environment, TCE <: TestConsoleEnvironment[E]] {
     val cycle = new M.Cycle(id, partyId.toProtoPrimitive).create.commands.loneElement
     participant.ledger_api.javaapi.commands
       .submit(Seq(partyId), Seq(cycle), commandId = commandId)
+
   }
 }

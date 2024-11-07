@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.store.dao.events
 
-import com.daml.ledger.api.v2.event as apiEvent
 import com.daml.ledger.api.v2.reassignment.{
   AssignedEvent as ApiAssignedEvent,
   Reassignment as ApiReassignment,
@@ -20,6 +19,7 @@ import com.daml.ledger.api.v2.update_service.{
   GetUpdateTreesResponse,
   GetUpdatesResponse,
 }
+import com.daml.ledger.api.v2.event as apiEvent
 import com.digitalasset.canton.ledger.api.util.{LfEngineToApi, TimestampConversion}
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.store.ScalaPbStreamingOptimizations.*
@@ -30,7 +30,7 @@ import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate.{
   ExercisedEvent,
 }
 import com.digitalasset.canton.platform.store.utils.EventOps.TreeEventOps
-import com.digitalasset.canton.platform.{TemplatePartiesFilter, Value}
+import com.digitalasset.canton.platform.{ApiOffset, TemplatePartiesFilter, Value}
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext, Traced}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{Identifier, Party}
@@ -177,12 +177,12 @@ private[events] object TransactionLogUpdatesConversions {
           )
           .map(flatEvents =>
             FlatTransaction(
-              updateId = transactionAccepted.updateId,
+              updateId = transactionAccepted.transactionId,
               commandId = transactionAccepted.commandId,
               workflowId = transactionAccepted.workflowId,
               effectiveAt = Some(TimestampConversion.fromLf(transactionAccepted.effectiveAt)),
               events = flatEvents,
-              offset = transactionAccepted.offset.toLong,
+              offset = ApiOffset.toApiString(transactionAccepted.offset),
               domainId = transactionAccepted.domainId,
               traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
               recordTime = Some(TimestampConversion.fromLf(transactionAccepted.recordTime)),
@@ -381,11 +381,11 @@ private[events] object TransactionLogUpdatesConversions {
             val rootEventIds = visible.filterNot(children)
 
             TransactionTree(
-              updateId = transactionAccepted.updateId,
+              updateId = transactionAccepted.transactionId,
               commandId = getCommandId(transactionAccepted.events, requestingParties),
               workflowId = transactionAccepted.workflowId,
               effectiveAt = Some(TimestampConversion.fromLf(transactionAccepted.effectiveAt)),
-              offset = transactionAccepted.offset.toLong,
+              offset = ApiOffset.toApiString(transactionAccepted.offset),
               eventsById = eventsById,
               rootEventIds = rootEventIds,
               domainId = transactionAccepted.domainId,
@@ -517,26 +517,30 @@ private[events] object TransactionLogUpdatesConversions {
       executionContext: ExecutionContext,
   ): Future[apiEvent.CreatedEvent] = {
 
-    def getFatContractInstance: Right[Nothing, FatContractInstance] =
-      Right(
-        FatContractInstance.fromCreateNode(
-          Node.Create(
-            coid = createdEvent.contractId,
-            templateId = createdEvent.templateId,
-            packageName = createdEvent.packageName,
-            packageVersion = createdEvent.packageVersion,
-            arg = createdEvent.createArgument.unversioned,
-            signatories = createdEvent.createSignatories,
-            stakeholders = createdEvent.createSignatories ++ createdEvent.createObservers,
-            keyOpt = createdEvent.createKey.flatMap(k =>
-              createdEvent.createKeyMaintainers.map(GlobalKeyWithMaintainers(k, _))
-            ),
-            version = createdEvent.createArgument.version,
-          ),
-          createTime = createdEvent.ledgerEffectiveTime,
-          cantonData = createdEvent.driverMetadata,
+    def getFatContractInstance: Option[Right[Nothing, FatContractInstance]] =
+      createdEvent.driverMetadata
+        .filter(_.nonEmpty)
+        .map(driverMetadataBytes =>
+          Right(
+            FatContractInstance.fromCreateNode(
+              Node.Create(
+                coid = createdEvent.contractId,
+                templateId = createdEvent.templateId,
+                packageName = createdEvent.packageName,
+                packageVersion = createdEvent.packageVersion,
+                arg = createdEvent.createArgument.unversioned,
+                signatories = createdEvent.createSignatories,
+                stakeholders = createdEvent.createSignatories ++ createdEvent.createObservers,
+                keyOpt = createdEvent.createKey.flatMap(k =>
+                  createdEvent.createKeyMaintainers.map(GlobalKeyWithMaintainers(k, _))
+                ),
+                version = createdEvent.createArgument.version,
+              ),
+              createTime = createdEvent.ledgerEffectiveTime,
+              cantonData = driverMetadataBytes,
+            )
+          )
         )
-      )
 
     val createdEventWitnesses = createdWitnesses(createdEvent)
     val witnesses = requestingPartiesO
@@ -635,13 +639,13 @@ private[events] object TransactionLogUpdatesConversions {
     }).map(event =>
       ApiReassignment(
         updateId = reassignmentAccepted.updateId,
-        commandId = reassignmentAccepted.completionStreamResponse
-          .flatMap(_.completionResponse.completion)
-          .filter(completion => stringRequestingParties.fold(true)(completion.actAs.exists))
+        commandId = reassignmentAccepted.completionDetails
+          .filter(details => stringRequestingParties.fold(true)(details.submitters.exists))
+          .flatMap(_.completionStreamResponse.completion)
           .map(_.commandId)
           .getOrElse(""),
         workflowId = reassignmentAccepted.workflowId,
-        offset = reassignmentAccepted.offset.toLong,
+        offset = ApiOffset.toApiString(reassignmentAccepted.offset),
         event = event,
         traceContext = SerializableTraceContext(traceContext).toDamlProtoOpt,
         recordTime = Some(TimestampConversion.fromLf(reassignmentAccepted.recordTime)),

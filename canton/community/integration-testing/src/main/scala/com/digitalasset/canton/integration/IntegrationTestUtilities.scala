@@ -111,7 +111,7 @@ object IntegrationTestUtilities {
     require(interval >= Duration.Zero)
     val deadline = timeout.fromNow
 
-    @tailrec def pollTestCode(): T =
+    @tailrec def pollTestCode(): T = {
       if (deadline.hasTimeLeft()) {
         try {
           testCode
@@ -123,6 +123,7 @@ object IntegrationTestUtilities {
       } else {
         testCode
       }
+    }
     pollTestCode()
   }
 

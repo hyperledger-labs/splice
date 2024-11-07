@@ -25,7 +25,7 @@ import com.digitalasset.canton.platform.store.entries.PartyLedgerEntry
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.daml.lf.transaction.CommittedTransaction
+import com.digitalasset.daml.lf.transaction.{BlindingInfo, CommittedTransaction}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -40,7 +40,7 @@ private[platform] trait LedgerDaoTransactionsReader {
   )(implicit loggingContext: LoggingContextWithTrace): Source[(Offset, GetUpdatesResponse), NotUsed]
 
   def lookupFlatTransactionById(
-      updateId: UpdateId,
+      transactionId: TransactionId,
       requestingParties: Set[Party],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]]
 
@@ -54,7 +54,7 @@ private[platform] trait LedgerDaoTransactionsReader {
   ): Source[(Offset, GetUpdateTreesResponse), NotUsed]
 
   def lookupTransactionTreeById(
-      updateId: UpdateId,
+      transactionId: TransactionId,
       requestingParties: Set[Party],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionTreeResponse]]
 
@@ -203,10 +203,11 @@ private[platform] trait LedgerWriteDao extends ReportsHealth {
   def storeTransaction(
       completionInfo: Option[state.CompletionInfo],
       workflowId: Option[WorkflowId],
-      updateId: UpdateId,
+      transactionId: TransactionId,
       ledgerEffectiveTime: Timestamp,
       offset: Offset,
       transaction: CommittedTransaction,
+      blindingInfo: Option[BlindingInfo],
       hostedWitnesses: List[Party],
       recordTime: Timestamp,
   )(implicit

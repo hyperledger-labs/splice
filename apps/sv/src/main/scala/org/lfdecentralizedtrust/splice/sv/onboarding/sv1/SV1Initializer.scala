@@ -62,12 +62,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
   TrafficControlParameters,
 }
-import com.digitalasset.canton.time.{
-  Clock,
-  NonNegativeFiniteDuration,
-  PositiveFiniteDuration,
-  PositiveSeconds,
-}
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
@@ -342,8 +337,8 @@ class SV1Initializer(
       sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount,
       sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor,
       // have to convert canton.config.NonNegativeDuration to canton.time.NonNegativeDuration
-      PositiveFiniteDuration.tryOfSeconds(
-        sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toSeconds
+      NonNegativeFiniteDuration.tryOfMillis(
+        sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toMillis
       ),
     )
   }
@@ -367,7 +362,7 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v32)
+        val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v31)
         val values = initialValues.tryUpdate(
           // TODO(#6055) Consider increasing topology change delay again
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
@@ -375,10 +370,6 @@ class SV1Initializer(
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
           acsCommitmentsCatchUpConfigParameter = Some(SvUtil.defaultAcsCommitmentsCatchUpConfig),
-          submissionTimeRecordTimeTolerance =
-            NonNegativeFiniteDuration.fromConfig(config.submissionTimeRecordTimeTolerance),
-          mediatorDeduplicationTimeout =
-            NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
         )
         val svKeyFingerprint = participantId.uid.namespace.fingerprint
         for {
@@ -568,7 +559,6 @@ class SV1Initializer(
                   sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
                   sv1Config.initialPackageConfig.toPackageConfig,
                   sv1Config.initialHoldingFee,
-                  sv1Config.initialTransferPreapprovalFee,
                 )
                 for {
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(

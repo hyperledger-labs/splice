@@ -240,8 +240,6 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        config.submissionTimeRecordTimeTolerance,
-        config.mediatorDeduplicationTimeout,
       )
     )
   }
@@ -389,21 +387,6 @@ class SvDsoAutomationService(
         dsoStore,
       )
     )
-    registerTrigger(
-      new TransferCommandCounterTrigger(
-        triggerContext,
-        dsoStore,
-        connection,
-      )
-    )
-
-    registerTrigger(
-      new ExternalPartyAmuletRulesTrigger(
-        triggerContext,
-        dsoStore,
-        connection,
-      )
-    )
 
     config.scan.foreach { scan =>
       registerTrigger(
@@ -544,7 +527,5 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReportSvStatusMetricsExportTrigger],
       aTrigger[ReportValidatorLicenseMetricsExportTrigger],
       aTrigger[ReconcileDynamicDomainParametersTrigger],
-      aTrigger[TransferCommandCounterTrigger],
-      aTrigger[ExternalPartyAmuletRulesTrigger],
     )
 }

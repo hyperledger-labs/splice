@@ -5,8 +5,11 @@ package com.digitalasset.canton.platform.store.dao
 
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
-import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{GlobalKeyWithMaintainers, Versioned}
+import com.digitalasset.daml.lf.transaction.{
+  GlobalKeyWithMaintainers,
+  TransactionVersion,
+  Versioned,
+}
 import com.digitalasset.daml.lf.value.Value.{ContractInstance, ValueText}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -43,7 +46,7 @@ private[dao] trait JdbcLedgerDaoContractsSpec extends LoneElement with Inside wi
 
   it should "be able to persist and load contracts with package-version populated dependent on transaction version" in {
     def testCreatePackageVersionLookup(
-        testedTransactionVersion: LanguageVersion,
+        testedTransactionVersion: TransactionVersion,
         expectedPackageVersion: Option[PackageVersion],
     ): Future[Assertion] = for {
       (offset, tx) <- store(
@@ -85,14 +88,14 @@ private[dao] trait JdbcLedgerDaoContractsSpec extends LoneElement with Inside wi
     for {
       // TODO(#19494): Remove once TransactionVersion V31 becomes minimum supoported
       _ <- testCreatePackageVersionLookup(
-        testedTransactionVersion = LanguageVersion.AllV2.min,
+        testedTransactionVersion = TransactionVersion.minVersion,
         expectedPackageVersion =
-          // Package version is set only for contracts created in LF > 2.1
-          Option.when(LanguageVersion.AllV2.min > LanguageVersion.v2_dev)(somePackageVersion),
+          // Package version is set only for contracts created in transaction version > 31 (language version > 2.1)
+          Option.when(TransactionVersion.minVersion > TransactionVersion.V31)(somePackageVersion),
       )
       _ <- testCreatePackageVersionLookup(
         // TODO(#19494): Replace with minVersion
-        testedTransactionVersion = LanguageVersion.v2_dev,
+        testedTransactionVersion = TransactionVersion.maxVersion,
         expectedPackageVersion = Some(somePackageVersion),
       )
     } yield succeed

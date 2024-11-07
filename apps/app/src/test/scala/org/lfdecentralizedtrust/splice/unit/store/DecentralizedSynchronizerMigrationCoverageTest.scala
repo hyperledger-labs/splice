@@ -1,8 +1,8 @@
 package org.lfdecentralizedtrust.splice
 package unit.store
 
+import store.MultiDomainAcsStore.ContractFilter
 import com.daml.ledger.javaapi.data.codegen.ContractTypeCompanion
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import com.digitalasset.canton.topology.PartyId
@@ -27,8 +27,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
 
   filtersAndMoveLists.foreach { case (label, filtered, rawHandled) =>
     s"${label.getClass.getSimpleName}" should {
-      val handled =
-        rawHandled.view.map(t => PackageQualifiedName(t.getTemplateIdWithPackageId)).toSet
+      val handled = rawHandled.view.map(t => PackageQualifiedName(t.TEMPLATE_ID)).toSet
 
       "handle every listened-to contract type not handled elsewhere" in {
         filtered.templateIds should contain allElementsOf handled
@@ -55,7 +54,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
         .flatMap { case (id, _, handled) =>
           handled.view.map(id -> _)
         }
-        .groupMap(_._2.getTemplateIdWithPackageId)(_._1.getClass.getSimpleName)
+        .groupMap(_._2.TEMPLATE_ID)(_._1.getClass.getSimpleName)
         .filter(_._2.sizeIs > 1)
       overlappingAutomationStoresById shouldBe empty
     }
@@ -63,7 +62,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
 
   "knownNotHandled" should {
     val allHandled = filtersAndMoveLists.view
-      .flatMap(_._3.map(i => PackageQualifiedName(i.getTemplateIdWithPackageId)))
+      .flatMap(_._3.map(i => PackageQualifiedName(i.TEMPLATE_ID)))
       .toSet
 
     "not list any handled contracts" in {
@@ -100,7 +99,7 @@ class DecentralizedSynchronizerMigrationCoverageTest
 
 object DecentralizedSynchronizerMigrationCoverageTest {
   import scan.store.ScanStore
-  import sv.store.{SvDsoStore, SvStore, SvSvStore}
+  import sv.store.{SvStore, SvSvStore, SvDsoStore}
   import validator.store.ValidatorStore
   import wallet.store.UserWalletStore
 
@@ -156,11 +155,8 @@ object DecentralizedSynchronizerMigrationCoverageTest {
 
   private val knownNotHandled = {
     import codegen.java.splice.decentralizedsynchronizer
-    import codegen.java.splice.externalpartyamuletrules
-    import codegen.java.splice.wallet.{
-      buytrafficrequest as trafficRequestCodegen,
-      topupstate as topUpCodegen,
-    }
+    import codegen.java.splice.wallet.topupstate as topUpCodegen
+    import codegen.java.splice.wallet.buytrafficrequest as trafficRequestCodegen
     Seq(
       decentralizedsynchronizer.MemberTraffic.COMPANION ->
         reason("tied to a specific domainId, never migrated", ScanStore, SvDsoStore),
@@ -168,14 +164,8 @@ object DecentralizedSynchronizerMigrationCoverageTest {
         reason("tied to a specific domainId, never migrated", ValidatorStore),
       trafficRequestCodegen.BuyTrafficRequest.COMPANION ->
         reason("tied to a specific domainId, never migrated", UserWalletStore),
-      externalpartyamuletrules.TransferCommand.COMPANION ->
-        reason("#15158", SvDsoStore, ValidatorStore),
-      externalpartyamuletrules.TransferCommandCounter.COMPANION ->
-        reason("#15158", ScanStore, SvDsoStore),
-      externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION ->
-        reason("#15158", ScanStore, SvDsoStore),
     ).view.map { case (c, reason) =>
-      (PackageQualifiedName(c.getTemplateIdWithPackageId), reason)
+      (PackageQualifiedName(c.TEMPLATE_ID), reason)
     }.toMap
   }
 

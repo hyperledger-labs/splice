@@ -151,8 +151,9 @@ object GrpcError {
       }
   }
 
-  private def lastCause(throwable: Throwable): Throwable =
+  private def lastCause(throwable: Throwable): Throwable = {
     Option(throwable.getCause).fold(throwable)(lastCause)
+  }
 
   /** The server or the service was unavailable.
     * The server has not processed the request.

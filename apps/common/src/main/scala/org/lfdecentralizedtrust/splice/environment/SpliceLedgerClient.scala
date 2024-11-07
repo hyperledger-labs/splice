@@ -103,7 +103,7 @@ class SpliceLedgerClient(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,
       packageIdResolver: PackageIdResolver,
-      completionOffsetCallback: Long => Future[Unit] = _ => Future.unit,
+      completionOffsetCallback: String => Future[Unit] = _ => Future.unit,
   ): SpliceLedgerConnection =
     new SpliceLedgerConnection(
       this.client,

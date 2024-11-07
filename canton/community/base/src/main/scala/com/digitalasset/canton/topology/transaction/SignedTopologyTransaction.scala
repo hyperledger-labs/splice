@@ -79,10 +79,11 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def selectMapping[TargetMapping <: TopologyMapping: ClassTag]
-      : Option[SignedTopologyTransaction[Op, TargetMapping]] =
+      : Option[SignedTopologyTransaction[Op, TargetMapping]] = {
     transaction
       .selectMapping[TargetMapping]
       .map(_ => this.asInstanceOf[SignedTopologyTransaction[Op, TargetMapping]])
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def selectOp[TargetOp <: TopologyChangeOp: ClassTag]
@@ -92,8 +93,9 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
       .map(_ => this.asInstanceOf[SignedTopologyTransaction[TargetOp, M]])
 
   def select[TargetOp <: TopologyChangeOp: ClassTag, TargetMapping <: TopologyMapping: ClassTag]
-      : Option[SignedTopologyTransaction[TargetOp, TargetMapping]] =
+      : Option[SignedTopologyTransaction[TargetOp, TargetMapping]] = {
     selectMapping[TargetMapping].flatMap(_.selectOp[TargetOp])
+  }
 
   def toProtoV30: v30.SignedTopologyTransaction =
     v30.SignedTopologyTransaction(
@@ -102,7 +104,7 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
       proposal = isProposal,
     )
 
-  override protected def pretty: Pretty[SignedTopologyTransaction.this.type] =
+  override def pretty: Pretty[SignedTopologyTransaction.this.type] =
     prettyOfClass(
       unnamedParam(_.transaction),
       param("signatures", _.signatures.map(_.signedBy)),
@@ -138,7 +140,7 @@ object SignedTopologyTransaction
     SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(
       v30.SignedTopologyTransaction
     )(
       supportedProtoVersion(_)(fromProtoV30),

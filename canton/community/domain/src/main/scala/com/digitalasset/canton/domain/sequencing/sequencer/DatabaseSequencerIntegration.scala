@@ -5,19 +5,16 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 
 import cats.data.EitherT
 import cats.syntax.parallel.*
-import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.sequencing.protocol.SendAsyncError
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import com.digitalasset.canton.util.retry.NoExceptionRetryPolicy
+import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable
 import com.digitalasset.canton.util.{MonadUtil, retry}
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
+import scala.concurrent.{ExecutionContext, Future}
 
 /** This trait defines the interface for BlockSequencer's BlockUpdateGenerator to use on DatabaseSequencer
   * in order to accept submissions and serve events from it
@@ -26,14 +23,14 @@ trait SequencerIntegration {
   def blockSequencerAcknowledge(acknowledgements: Map[Member, CantonTimestamp])(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[Unit]
+  ): Future[Unit]
 
   def blockSequencerWrites(
       orderedOutcomes: Seq[SubmissionOutcome]
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): EitherT[FutureUnlessShutdown, String, Unit]
+  ): EitherT[Future, String, Unit]
 }
 
 object SequencerIntegration {
@@ -41,28 +38,27 @@ object SequencerIntegration {
     override def blockSequencerAcknowledge(acknowledgements: Map[Member, CantonTimestamp])(implicit
         executionContext: ExecutionContext,
         traceContext: TraceContext,
-    ): FutureUnlessShutdown[Unit] = FutureUnlessShutdown.unit
+    ): Future[Unit] = Future.unit
 
     override def blockSequencerWrites(
         orderedOutcomes: Seq[SubmissionOutcome]
     )(implicit
         executionContext: ExecutionContext,
         traceContext: TraceContext,
-    ): EitherT[FutureUnlessShutdown, String, Unit] =
-      EitherT.pure[FutureUnlessShutdown, String](())
+    ): EitherT[Future, String, Unit] =
+      EitherT.pure[Future, String](())
   }
 }
 
 trait DatabaseSequencerIntegration extends SequencerIntegration {
   this: DatabaseSequencer =>
 
-  private implicit val retryConditionIfOverloaded
-      : retry.Success[UnlessShutdown[Either[SendAsyncError, Unit]]] =
+  private implicit val retryConditionIfOverloaded: retry.Success[Either[SendAsyncError, Unit]] =
     new retry.Success({
       // We only retry overloaded as other possible error here:
       // * Unavailable - indicates a programming bug and should not happen during normal operation
       // * ShuttingDown - should not be retried as the sequencer is shutting down
-      case Outcome(Left(SendAsyncError.Overloaded(_))) => false
+      case Left(SendAsyncError.Overloaded(_)) => false
       case _ => true
     })
   private val retryWithBackoff = retry.Backoff(
@@ -79,35 +75,31 @@ trait DatabaseSequencerIntegration extends SequencerIntegration {
   override def blockSequencerAcknowledge(acknowledgements: Map[Member, CantonTimestamp])(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[Unit] =
+  ): Future[Unit] =
     // TODO(#18394): Batch acknowledgements?
-    performUnlessClosingF(functionFullName)(acknowledgements.toSeq.parTraverse_ {
-      case (member, timestamp) =>
-        this.writeAcknowledgementInternal(member, timestamp)
-    })
+    acknowledgements.toSeq.parTraverse_ { case (member, timestamp) =>
+      this.writeAcknowledgementInternal(member, timestamp)
+    }
 
   override def blockSequencerWrites(
       orderedOutcomes: Seq[SubmissionOutcome]
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): EitherT[FutureUnlessShutdown, String, Unit] =
+  ): EitherT[Future, String, Unit] =
+    // TODO(#18394): Implement batch db write for BS sequencer writes, align with DBS batching
     MonadUtil
       .sequentialTraverse_(orderedOutcomes) {
         case _: SubmissionOutcome.Discard.type =>
-          EitherT.pure[FutureUnlessShutdown, String](())
+          EitherT.pure[Future, String](())
         case outcome: DeliverableSubmissionOutcome =>
           EitherT(
-            FutureUnlessShutdown(
-              retryWithBackoff(
-                this
-                  .blockSequencerWriteInternal(outcome)(outcome.submissionTraceContext)
-                  .value
-                  .unwrap,
-                NoExceptionRetryPolicy,
-              )
+            retryWithBackoff(
+              this
+                .blockSequencerWriteInternal(outcome)(outcome.submissionTraceContext)
+                .value,
+              NoExnRetryable,
             )
-          )
-            .leftMap(_.toString)
+          ).leftMap(_.toString)
       }
 }

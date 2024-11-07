@@ -132,7 +132,7 @@ class SequencerAggregator(
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[Either[SequencerAggregatorError, Boolean]] =
+  ): FutureUnlessShutdown[Either[SequencerAggregatorError, Boolean]] = {
     if (!expectedSequencers.contains(sequencerId)) {
       FutureUnlessShutdown(
         ErrorUtil.internalErrorAsync(
@@ -164,6 +164,7 @@ class SequencerAggregator(
           logger.error("Error while combining and merging event", t)
           FutureUnlessShutdown.failed(t)
       }
+  }
 
   private def pushDownstreamIfConsensusIsReached(
       nextMinimumTimestamp: CantonTimestamp,
@@ -191,6 +192,8 @@ class SequencerAggregator(
   private def updatedSequencerMessageData(
       sequencerId: SequencerId,
       message: OrdinarySerializedEvent,
+  )(implicit
+      ec: ExecutionContext
   ): SequencerMessageData = {
     implicit val traceContext = message.traceContext
     val promise = new PromiseUnlessShutdown[Either[SequencerAggregatorError, SequencerId]](
@@ -237,7 +240,7 @@ object SequencerAggregator {
   object SequencerAggregatorError {
     final case class NotTheSameContentHash(hashes: NonEmpty[Set[Hash]])
         extends SequencerAggregatorError {
-      override protected def pretty: Pretty[NotTheSameContentHash] =
+      override def pretty: Pretty[NotTheSameContentHash] =
         prettyOfClass(param("hashes", _.hashes))
     }
   }
@@ -245,7 +248,7 @@ object SequencerAggregator {
   def aggregateHealthResult(
       healthResult: Map[SequencerId, ComponentHealthState],
       threshold: PositiveInt,
-  ): ComponentHealthState =
+  ): ComponentHealthState = {
     NonEmpty.from(healthResult) match {
       case None => ComponentHealthState.NotInitializedState
       case Some(healthResultNE) if healthResult.sizeIs == 1 && threshold == PositiveInt.one =>
@@ -265,7 +268,7 @@ object SequencerAggregator {
             healthyCount: Int,
             failed: Seq[SequencerId],
             degraded: Seq[SequencerId],
-        ): ComponentHealthState =
+        ): ComponentHealthState = {
           if (healthyCount >= threshold.value) ComponentHealthState.Ok()
           else if (!iter.hasNext) {
             val failureMsg = Option.when(failed.nonEmpty)(
@@ -284,7 +287,9 @@ object SequencerAggregator {
             else if (state.isFailed) go(healthyCount, sequencerId +: failed, degraded)
             else go(healthyCount, failed, sequencerId +: degraded)
           }
+        }
 
         go(0, Seq.empty, Seq.empty)
     }
+  }
 }

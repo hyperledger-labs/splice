@@ -79,7 +79,7 @@ final case class QueryValidRangeImpl(
         throw RequestValidationErrors.ParticipantPrunedDataAccessed
           .Reject(
             cause = errorPruning(pruningOffsetUpToInclusive),
-            earliestOffset = pruningOffsetUpToInclusive.toLong,
+            earliestOffset = pruningOffsetUpToInclusive.toHexString,
           )(
             ErrorLoggingContext(logger, loggingContext)
           )
@@ -90,7 +90,7 @@ final case class QueryValidRangeImpl(
       throw RequestValidationErrors.ParticipantDataAccessedAfterLedgerEnd
         .Reject(
           cause = errorLedgerEnd(params.ledgerEnd),
-          latestOffset = params.ledgerEnd.toLong,
+          latestOffset = params.ledgerEnd.toHexString,
         )(
           ErrorLoggingContext(logger, loggingContext)
         )

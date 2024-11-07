@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { DsoInfo } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { useScanClient } from 'common-frontend/scan-api';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
@@ -12,6 +12,7 @@ import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
   const scanClient = useScanClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['getDsoInfo', DsoRules, AmuletRules],
     queryFn: async () => {
       const resp = await scanClient.getDsoInfo();

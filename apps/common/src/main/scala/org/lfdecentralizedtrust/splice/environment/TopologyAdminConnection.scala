@@ -37,10 +37,10 @@ import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
   Fingerprint,
   PublicKey,
-  SigningKeyUsage,
   SigningPublicKey,
 }
-import com.digitalasset.canton.crypto.SigningKeySpec.EcCurve25519
+import com.digitalasset.canton.crypto.SigningKeyScheme.Ed25519
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
@@ -123,6 +123,8 @@ abstract class TopologyAdminConnection(
         }
     }
 
+  def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[NodeStatus.Status]]
+
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean]
 
   /*
@@ -164,28 +166,6 @@ abstract class TopologyAdminConnection(
         ),
         filterParty,
         filterParticipant,
-      )
-    ).map(_.map(r => TopologyResult(r.context, r.item)))
-  }
-
-  def listPartyToKey(
-      operation: Option[TopologyChangeOp] = None,
-      filterStore: TopologyStoreId,
-      filterParty: Option[PartyId] = None,
-      timeQuery: TimeQuery = TimeQuery.HeadState,
-      proposals: TopologyTransactionType = AuthorizedState,
-  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToKeyMapping]]] = {
-    runCmd(
-      TopologyAdminCommands.Read.ListPartyToKeyMapping(
-        BaseQuery(
-          filterStore = filterStore.filterName,
-          proposals = proposals.proposals,
-          timeQuery,
-          operation,
-          filterSigningKey = proposals.signingKey.getOrElse(""),
-          protocolVersion = None,
-        ),
-        filterParty.fold("")(_.toProtoPrimitive),
       )
     ).map(_.map(r => TopologyResult(r.context, r.item)))
   }
@@ -380,7 +360,7 @@ abstract class TopologyAdminConnection(
   def ensureInitialOwnerToKeyMapping(
       member: Member,
       keys: NonEmpty[Seq[PublicKey]],
-      signedBy: Seq[Fingerprint],
+      signedBy: Fingerprint,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider.ensureThatB(
@@ -397,7 +377,7 @@ abstract class TopologyAdminConnection(
   private def proposeInitialOwnerToKeyMapping(
       member: Member,
       keys: NonEmpty[Seq[PublicKey]],
-      signedBy: Seq[Fingerprint],
+      signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransaction[TopologyChangeOp, OwnerToKeyMapping]] =
@@ -405,13 +385,12 @@ abstract class TopologyAdminConnection(
       TopologyStoreId.AuthorizedStore,
       OwnerToKeyMapping(
         member,
+        domain = None,
         keys = keys,
       ),
       signedBy = signedBy,
       serial = PositiveInt.one,
       isProposal = false,
-      change = TopologyChangeOp.Replace,
-      forceChanges = ForceFlags.none,
     )
 
   private def listOwnerToKeyMapping(member: Member)(implicit
@@ -517,36 +496,15 @@ abstract class TopologyAdminConnection(
       serial: PositiveInt,
       isProposal: Boolean,
       change: TopologyChangeOp = TopologyChangeOp.Replace,
-      forceChanges: ForceFlags = ForceFlags.none,
-  )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
-    proposeMapping(
-      store,
-      mapping,
-      Seq(signedBy),
-      serial,
-      isProposal,
-      change,
-      forceChanges,
-    )
-
-  def proposeMapping[M <: TopologyMapping: ClassTag](
-      store: TopologyStoreId,
-      mapping: M,
-      signedBy: Seq[Fingerprint],
-      serial: PositiveInt,
-      isProposal: Boolean,
-      change: TopologyChangeOp,
-      forceChanges: ForceFlags,
   )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
     runCmd(
       TopologyAdminCommands.Write.Propose(
         mapping = mapping,
-        signedBy = signedBy,
+        signedBy = Seq(signedBy),
         store = store.filterName,
         serial = Some(serial),
         mustFullyAuthorize = !isProposal,
         change = change,
-        forceChanges = forceChanges,
       )
     )
 
@@ -563,36 +521,6 @@ abstract class TopologyAdminConnection(
       signedBy,
       serial,
       isProposal,
-    )
-
-  private def proposeMapping[M <: TopologyMapping: ClassTag](
-      store: TopologyStoreId,
-      mapping: Either[String, M],
-      signedBy: Fingerprint,
-      serial: PositiveInt,
-      isProposal: Boolean,
-      forceChanges: ForceFlags,
-  )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
-    proposeMapping(
-      store,
-      mapping.valueOr(err => throw new IllegalArgumentException(s"Invalid topology mapping: $err")),
-      signedBy,
-      serial,
-      isProposal,
-      forceChanges = forceChanges,
-    )
-
-  /** Prepare a transaction for external signing.
-    */
-  def generateTransactions(
-      proposals: Seq[TopologyAdminCommands.Write.GenerateTransactions.Proposal]
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]]] =
-    runCmd(
-      TopologyAdminCommands.Write.GenerateTransactions(
-        proposals
-      )
     )
 
   /** Version of [[ensureTopologyMapping]] that also handles proposals:
@@ -647,7 +575,6 @@ abstract class TopologyAdminConnection(
       isProposal: Boolean = false,
       recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
         RecreateOnAuthorizedStateChange.Recreate,
-      forceChanges: ForceFlags = ForceFlags.none,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
     withSpan("establish_topology_mapping") { implicit traceContext => _ =>
       logger.info(s"Ensuring that $description")
@@ -672,7 +599,6 @@ abstract class TopologyAdminConnection(
                     signedBy,
                     serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
                     isProposal = isProposal,
-                    forceChanges = forceChanges,
                   )
                 }
                 .flatMap { _ =>
@@ -745,6 +671,7 @@ abstract class TopologyAdminConnection(
       partyId: PartyId,
       participants: Seq[ParticipantId],
       signedBy: Fingerprint,
+      domainId: Option[DomainId] = None,
       isProposal: Boolean = false,
   )(implicit
       traceContext: TraceContext
@@ -759,8 +686,10 @@ abstract class TopologyAdminConnection(
       store,
       PartyToParticipant.tryCreate(
         partyId,
+        domainId,
         Thresholds.partyToParticipantThreshold(hostingParticipants),
         hostingParticipants,
+        groupAddressing = false,
       ),
       signedBy = signedBy,
       serial = PositiveInt.one,
@@ -846,6 +775,8 @@ abstract class TopologyAdminConnection(
         Right(
           PartyToParticipant.tryCreate(
             previous.partyId,
+            previous.domainId,
+            groupAddressing = previous.groupAddressing,
             participants = newHostingParticipants,
             threshold = Thresholds
               .partyToParticipantThreshold(newHostingParticipants),
@@ -922,6 +853,8 @@ abstract class TopologyAdminConnection(
         Right(
           PartyToParticipant.tryCreate(
             previous.partyId,
+            previous.domainId,
+            groupAddressing = previous.groupAddressing,
             participants = newHostingParticipants,
             threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
           )
@@ -964,6 +897,8 @@ abstract class TopologyAdminConnection(
             val newHostingParticipants = promoteParticipantToSubmitter(previous.participants)
             PartyToParticipant.tryCreate(
               previous.partyId,
+              previous.domainId,
+              groupAddressing = previous.groupAddressing,
               participants = newHostingParticipants,
               threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
             )
@@ -1336,7 +1271,6 @@ abstract class TopologyAdminConnection(
       domainId: DomainId,
       parametersBuilder: DynamicDomainParameters => DynamicDomainParameters,
       signedBy: Fingerprint,
-      forceChanges: ForceFlags = ForceFlags.none,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[DomainParametersState]] =
@@ -1356,7 +1290,6 @@ abstract class TopologyAdminConnection(
       signedBy = signedBy,
       retryFor = RetryFor.ClientCalls,
       isProposal = true,
-      forceChanges = forceChanges,
     )
 
   def getDomainParametersState(
@@ -1474,6 +1407,17 @@ abstract class TopologyAdminConnection(
     runCmd(TopologyAdminCommands.Init.InitId(id.uid.toProtoPrimitive))
   }
 
+  def sign(transactions: Seq[GenericSignedTopologyTransaction], signedBy: Fingerprint)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[GenericSignedTopologyTransaction]] = {
+    runCmd(
+      TopologyAdminCommands.Write.SignTransactions(
+        transactions = transactions,
+        signedBy = Seq(signedBy),
+      )
+    )
+  }
+
   def identity()(implicit
       traceContext: TraceContext
   ): Future[NodeIdentity]
@@ -1490,10 +1434,10 @@ abstract class TopologyAdminConnection(
     runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest, password = None))
   }
 
-  def generateKeyPair(name: String, usage: NonEmpty[Set[SigningKeyUsage]])(implicit
+  def generateKeyPair(name: String)(implicit
       traceContext: TraceContext
   ): Future[SigningPublicKey] = {
-    runCmd(VaultAdminCommands.GenerateSigningKey(name, usage, Some(EcCurve25519)))
+    runCmd(VaultAdminCommands.GenerateSigningKey(name, Some(Ed25519)))
   }
 
   def generateEncryptionKeyPair(name: String)(implicit

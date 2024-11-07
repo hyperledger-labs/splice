@@ -4,21 +4,23 @@
 package com.digitalasset.canton.admin.api.client.data
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.NonEmptyUtil.instances.*
-import com.digitalasset.canton.admin.api.client.data.crypto.{
-  CryptoKeyFormat,
-  HashAlgorithm,
-  RequiredEncryptionSpecs,
-  RequiredSigningSpecs,
-  SymmetricKeyScheme,
-}
+import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{
   CommunityCryptoConfig,
   CryptoConfig,
   NonNegativeFiniteDuration,
   PositiveDurationSeconds,
+}
+import com.digitalasset.canton.crypto.{
+  CryptoKeyFormat,
+  EncryptionAlgorithmSpec,
+  EncryptionKeySpec,
+  HashAlgorithm,
+  RequiredEncryptionSpecs,
+  SigningKeyScheme,
+  SymmetricKeyScheme,
 }
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
@@ -39,25 +41,40 @@ import com.digitalasset.canton.time.{
 }
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.version.{ProtoVersion, ProtocolVersion}
-import com.digitalasset.canton.{ProtoDeserializationError, config, crypto as DomainCrypto}
+import com.digitalasset.canton.{config, crypto as DomainCrypto}
 import com.google.common.annotations.VisibleForTesting
 import io.scalaland.chimney.dsl.*
 
 import scala.Ordering.Implicits.*
 
 final case class StaticDomainParameters(
-    requiredSigningSpecs: RequiredSigningSpecs,
+    requiredSigningKeySchemes: Set[SigningKeyScheme],
     requiredEncryptionSpecs: RequiredEncryptionSpecs,
-    requiredSymmetricKeySchemes: NonEmpty[Set[SymmetricKeyScheme]],
-    requiredHashAlgorithms: NonEmpty[Set[HashAlgorithm]],
-    requiredCryptoKeyFormats: NonEmpty[Set[CryptoKeyFormat]],
+    requiredSymmetricKeySchemes: Set[SymmetricKeyScheme],
+    requiredHashAlgorithms: Set[HashAlgorithm],
+    requiredCryptoKeyFormats: Set[CryptoKeyFormat],
     protocolVersion: ProtocolVersion,
 ) {
   def writeToFile(outputFile: String): Unit =
     BinaryFileUtil.writeByteStringToFile(outputFile, toInternal.toByteString)
 
   private[canton] def toInternal: StaticDomainParametersInternal =
-    this.transformInto[StaticDomainParametersInternal]
+    StaticDomainParametersInternal(
+      requiredSigningKeySchemes = NonEmptyUtil.fromUnsafe(
+        requiredSigningKeySchemes.map(_.transformInto[DomainCrypto.SigningKeyScheme])
+      ),
+      requiredEncryptionSpecs = requiredEncryptionSpecs,
+      requiredSymmetricKeySchemes = NonEmptyUtil.fromUnsafe(
+        requiredSymmetricKeySchemes.map(_.transformInto[DomainCrypto.SymmetricKeyScheme])
+      ),
+      requiredHashAlgorithms = NonEmptyUtil.fromUnsafe(
+        requiredHashAlgorithms.map(_.transformInto[DomainCrypto.HashAlgorithm])
+      ),
+      requiredCryptoKeyFormats = NonEmptyUtil.fromUnsafe(
+        requiredCryptoKeyFormats.map(_.transformInto[DomainCrypto.CryptoKeyFormat])
+      ),
+      protocolVersion = protocolVersion,
+    )
 }
 
 object StaticDomainParameters {
@@ -97,7 +114,18 @@ object StaticDomainParameters {
   def apply(
       domain: StaticDomainParametersInternal
   ): StaticDomainParameters =
-    domain.transformInto[StaticDomainParameters]
+    StaticDomainParameters(
+      requiredSigningKeySchemes =
+        domain.requiredSigningKeySchemes.forgetNE.map(_.transformInto[SigningKeyScheme]),
+      requiredEncryptionSpecs = domain.requiredEncryptionSpecs,
+      requiredSymmetricKeySchemes =
+        domain.requiredSymmetricKeySchemes.forgetNE.map(_.transformInto[SymmetricKeyScheme]),
+      requiredHashAlgorithms =
+        domain.requiredHashAlgorithms.forgetNE.map(_.transformInto[HashAlgorithm]),
+      requiredCryptoKeyFormats =
+        domain.requiredCryptoKeyFormats.forgetNE.map(_.transformInto[CryptoKeyFormat]),
+      protocolVersion = domain.protocolVersion,
+    )
 
   def tryReadFromFile(inputFile: String): StaticDomainParameters = {
     val staticDomainParametersInternal = StaticDomainParametersInternal
@@ -122,8 +150,8 @@ object StaticDomainParameters {
       domainParametersP: v30.StaticDomainParameters
   ): ParsingResult[StaticDomainParameters] = {
     val v30.StaticDomainParameters(
-      requiredSigningSpecsOP,
-      requiredEncryptionSpecsOP,
+      requiredSigningKeySchemesP,
+      requiredEncryptionSpecsP,
       requiredSymmetricKeySchemesP,
       requiredHashAlgorithmsP,
       requiredCryptoKeyFormatsP,
@@ -131,63 +159,48 @@ object StaticDomainParameters {
     ) = domainParametersP
 
     for {
-      requiredSigningSpecsP <- requiredSigningSpecsOP.toRight(
-        ProtoDeserializationError.FieldNotSet(
-          "required_signing_specs"
-        )
+      requiredSigningKeySchemes <- requiredKeySchemes(
+        "requiredSigningKeySchemes",
+        requiredSigningKeySchemesP,
+        SigningKeyScheme.fromProtoEnum,
       )
-      requiredSigningAlgorithmSpecs <- requiredKeySchemes(
-        "required_signing_algorithm_specs",
-        requiredSigningSpecsP.algorithms,
-        DomainCrypto.SigningAlgorithmSpec.fromProtoEnum,
-      )
-      requiredSigningKeySpecs <- requiredKeySchemes(
-        "required_signing_key_specs",
-        requiredSigningSpecsP.keys,
-        DomainCrypto.SigningKeySpec.fromProtoEnum,
-      )
-      requiredEncryptionSpecsP <- requiredEncryptionSpecsOP.toRight(
-        ProtoDeserializationError.FieldNotSet(
-          "required_encryption_specs"
-        )
+      requiredEncryptionSpecsP <- requiredEncryptionSpecsP.toRight(
+        FieldNotSet("requiredEncryptionSpecs")
       )
       requiredEncryptionAlgorithmSpecs <- requiredKeySchemes(
-        "required_encryption_algorithm_specs",
+        "requiredEncryptionAlgorithmSpecs",
         requiredEncryptionSpecsP.algorithms,
-        DomainCrypto.EncryptionAlgorithmSpec.fromProtoEnum,
+        EncryptionAlgorithmSpec.fromProtoEnum,
       )
       requiredEncryptionKeySpecs <- requiredKeySchemes(
-        "required_encryption_key_specs",
+        "requiredEncryptionKeySpecs",
         requiredEncryptionSpecsP.keys,
-        DomainCrypto.EncryptionKeySpec.fromProtoEnum,
+        EncryptionKeySpec.fromProtoEnum,
       )
       requiredSymmetricKeySchemes <- requiredKeySchemes(
-        "required_symmetric_key_schemes",
+        "requiredSymmetricKeySchemes",
         requiredSymmetricKeySchemesP,
-        DomainCrypto.SymmetricKeyScheme.fromProtoEnum,
+        SymmetricKeyScheme.fromProtoEnum,
       )
       requiredHashAlgorithms <- requiredKeySchemes(
-        "required_hash_algorithms",
+        "requiredHashAlgorithms",
         requiredHashAlgorithmsP,
-        DomainCrypto.HashAlgorithm.fromProtoEnum,
+        HashAlgorithm.fromProtoEnum,
       )
       requiredCryptoKeyFormats <- requiredKeySchemes(
-        "required_crypto_key_formats",
+        "requiredCryptoKeyFormats",
         requiredCryptoKeyFormatsP,
-        DomainCrypto.CryptoKeyFormat.fromProtoEnum,
+        CryptoKeyFormat.fromProtoEnum,
       )
       // Data in the console is not really validated, so we allow for deleted
       protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP, allowDeleted = true)
     } yield StaticDomainParameters(
-      StaticDomainParametersInternal(
-        DomainCrypto.RequiredSigningSpecs(requiredSigningAlgorithmSpecs, requiredSigningKeySpecs),
-        DomainCrypto
-          .RequiredEncryptionSpecs(requiredEncryptionAlgorithmSpecs, requiredEncryptionKeySpecs),
-        requiredSymmetricKeySchemes,
-        requiredHashAlgorithms,
-        requiredCryptoKeyFormats,
-        protocolVersion,
-      )
+      requiredSigningKeySchemes,
+      RequiredEncryptionSpecs(requiredEncryptionAlgorithmSpecs, requiredEncryptionKeySpecs),
+      requiredSymmetricKeySchemes,
+      requiredHashAlgorithms,
+      requiredCryptoKeyFormats,
+      protocolVersion,
     )
   }
 }
@@ -196,48 +209,43 @@ object StaticDomainParameters {
 final case class DynamicDomainParameters(
     confirmationResponseTimeout: NonNegativeFiniteDuration,
     mediatorReactionTimeout: NonNegativeFiniteDuration,
-    assignmentExclusivityTimeout: NonNegativeFiniteDuration,
+    transferExclusivityTimeout: NonNegativeFiniteDuration,
     topologyChangeDelay: NonNegativeFiniteDuration,
     ledgerTimeRecordTimeTolerance: NonNegativeFiniteDuration,
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration,
     reconciliationInterval: PositiveDurationSeconds,
+    confirmationRequestsMaxRate: NonNegativeInt,
     maxRequestSize: NonNegativeInt,
     sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration,
     trafficControlParameters: Option[TrafficControlParameters],
     onboardingRestriction: OnboardingRestriction,
     acsCommitmentsCatchUpConfig: Option[AcsCommitmentsCatchUpConfig],
-    participantDomainLimits: ParticipantDomainLimits,
-    submissionTimeRecordTimeTolerance: NonNegativeFiniteDuration,
 ) {
 
   def decisionTimeout: config.NonNegativeFiniteDuration =
     confirmationResponseTimeout + mediatorReactionTimeout
 
-  @inline def confirmationRequestsMaxRate: NonNegativeInt =
-    participantDomainLimits.confirmationRequestsMaxRate
-
-  if (submissionTimeRecordTimeTolerance * 2 > mediatorDeduplicationTimeout)
+  if (ledgerTimeRecordTimeTolerance * 2 > mediatorDeduplicationTimeout)
     throw new InvalidDynamicDomainParameters(
-      s"The submissionTimeRecordTimeTolerance ($submissionTimeRecordTimeTolerance) must be at most half of the " +
+      s"The ledgerTimeRecordTimeTolerance ($ledgerTimeRecordTimeTolerance) must be at most half of the " +
         s"mediatorDeduplicationTimeout ($mediatorDeduplicationTimeout)."
     )
 
   // https://docs.google.com/document/d/1tpPbzv2s6bjbekVGBn6X5VZuw0oOTHek5c30CBo4UkI/edit#bookmark=id.1dzc6dxxlpca
-  // Originally the validation was done on ledgerTimeRecordTimeTolerance, but was moved to submissionTimeRecordTimeTolerance
-  // instead when the parameter was introduced
-  def compatibleWithNewSubmissionTimeRecordTimeTolerance(
-      newSubmissionTimeRecordTimeTolerance: NonNegativeFiniteDuration
-  ): Boolean =
-    // If false, a new request may receive the same submission time as a previous request and the previous
+  private[canton] def compatibleWithNewLedgerTimeRecordTimeTolerance(
+      newLedgerTimeRecordTimeTolerance: NonNegativeFiniteDuration
+  ): Boolean = {
+    // If false, a new request may receive the same ledger time as a previous request and the previous
     // request may be evicted too early from the mediator's deduplication store.
     // Thus, an attacker may assign the same UUID to both requests.
     // See i9028 for a detailed design. (This is the second clause of item 2 of Lemma 2).
-    submissionTimeRecordTimeTolerance + newSubmissionTimeRecordTimeTolerance <= mediatorDeduplicationTimeout
+    ledgerTimeRecordTimeTolerance + newLedgerTimeRecordTimeTolerance <= mediatorDeduplicationTimeout
+  }
 
   def update(
       confirmationResponseTimeout: NonNegativeFiniteDuration = confirmationResponseTimeout,
       mediatorReactionTimeout: NonNegativeFiniteDuration = mediatorReactionTimeout,
-      assignmentExclusivityTimeout: NonNegativeFiniteDuration = assignmentExclusivityTimeout,
+      transferExclusivityTimeout: NonNegativeFiniteDuration = transferExclusivityTimeout,
       topologyChangeDelay: NonNegativeFiniteDuration = topologyChangeDelay,
       ledgerTimeRecordTimeTolerance: NonNegativeFiniteDuration = ledgerTimeRecordTimeTolerance,
       mediatorDeduplicationTimeout: NonNegativeFiniteDuration = mediatorDeduplicationTimeout,
@@ -248,25 +256,21 @@ final case class DynamicDomainParameters(
         sequencerAggregateSubmissionTimeout,
       trafficControlParameters: Option[TrafficControlParameters] = trafficControlParameters,
       onboardingRestriction: OnboardingRestriction = onboardingRestriction,
-      acsCommitmentsCatchUpConfig: Option[AcsCommitmentsCatchUpConfig] =
-        acsCommitmentsCatchUpConfig,
-      submissionTimeRecordTimeTolerance: NonNegativeFiniteDuration =
-        submissionTimeRecordTimeTolerance,
+      acsCommitmentsCatchUpConfig: Option[AcsCommitmentsCatchUpConfig] = acsCommitmentsCatchUpConfig,
   ): DynamicDomainParameters = this.copy(
     confirmationResponseTimeout = confirmationResponseTimeout,
     mediatorReactionTimeout = mediatorReactionTimeout,
-    assignmentExclusivityTimeout = assignmentExclusivityTimeout,
+    transferExclusivityTimeout = transferExclusivityTimeout,
     topologyChangeDelay = topologyChangeDelay,
     ledgerTimeRecordTimeTolerance = ledgerTimeRecordTimeTolerance,
     mediatorDeduplicationTimeout = mediatorDeduplicationTimeout,
     reconciliationInterval = reconciliationInterval,
+    confirmationRequestsMaxRate = confirmationRequestsMaxRate,
     maxRequestSize = maxRequestSize,
     sequencerAggregateSubmissionTimeout = sequencerAggregateSubmissionTimeout,
     trafficControlParameters = trafficControlParameters,
     onboardingRestriction = onboardingRestriction,
     acsCommitmentsCatchUpConfig = acsCommitmentsCatchUpConfig,
-    participantDomainLimits = ParticipantDomainLimits(confirmationRequestsMaxRate),
-    submissionTimeRecordTimeTolerance = submissionTimeRecordTimeTolerance,
   )
 
   private[canton] def toInternal: Either[String, DynamicDomainParametersInternal] =
@@ -279,23 +283,21 @@ final case class DynamicDomainParameters(
             InternalNonNegativeFiniteDuration.fromConfig(confirmationResponseTimeout),
           mediatorReactionTimeout =
             InternalNonNegativeFiniteDuration.fromConfig(mediatorReactionTimeout),
-          assignmentExclusivityTimeout =
-            InternalNonNegativeFiniteDuration.fromConfig(assignmentExclusivityTimeout),
+          transferExclusivityTimeout =
+            InternalNonNegativeFiniteDuration.fromConfig(transferExclusivityTimeout),
           topologyChangeDelay = InternalNonNegativeFiniteDuration.fromConfig(topologyChangeDelay),
           ledgerTimeRecordTimeTolerance =
             InternalNonNegativeFiniteDuration.fromConfig(ledgerTimeRecordTimeTolerance),
           mediatorDeduplicationTimeout =
             InternalNonNegativeFiniteDuration.fromConfig(mediatorDeduplicationTimeout),
           reconciliationInterval = PositiveSeconds.fromConfig(reconciliationInterval),
+          confirmationRequestsMaxRate = confirmationRequestsMaxRate,
           maxRequestSize = MaxRequestSize(maxRequestSize),
           sequencerAggregateSubmissionTimeout =
             InternalNonNegativeFiniteDuration.fromConfig(sequencerAggregateSubmissionTimeout),
           trafficControlParameters = trafficControlParameters.map(_.toInternal),
           onboardingRestriction = onboardingRestriction,
           acsCommitmentsCatchUpConfigParameter = acsCommitmentsCatchUpConfig,
-          participantDomainLimits = participantDomainLimits.toInternal,
-          submissionTimeRecordTimeTolerance =
-            InternalNonNegativeFiniteDuration.fromConfig(submissionTimeRecordTimeTolerance),
         )(rpv)
       }
 }
