@@ -26,20 +26,8 @@ Currently:
 
 As part of creating a new CN release:
 1. A PR will be auto-created against the [decentralized-canton-sync](https://github.com/digital-asset/decentralized-canton-sync) repo,
-   please review and approve it, so that the released snapshot will be dumped to that repo. Note that it will create a release-line
+   please review and merge it, so that the released snapshot will be dumped to that repo. Note that it will create a release-line
    branch in `decentralized-canton-sync`, mirroring that of the internal repo.
-2. Once merged, check out the newly created release branch in
-   [decentralized-canton-sync](https://github.com/digital-asset/decentralized-canton-sync) repo
-   and the latest main in [splice](https://github.com/hyperledger-labs/splice) repo.
-3. Run in the public `decentralized-canton-sync` repo:
-   `scripts/update.sh <CN_REPO_ROOT> <SPLICE_REPO_ROOT>`
-4. Review and commit the Daml changes in the `splice` repo. Notes:
-   - Please make sure only the Daml changes have been copied to Splice, the rest of the
-     code has not yet been contributed to Splice, and should not be accidentally committed there.
-   - In Splice, you will need to commit
-     with `git commit -s` for your commit to be signed off in order to be able
-     to merge it to Splice (unfortunately, there does not seem to be a git
-     config to make that the default).
-   - You may also need to create the PR from a fork of the Splice repo.
-     At the moment, only Itai has write permissions to Splice, so please ping him
-     to merge.
+2. Similarly, a PR will be auto-created against the [splice](https://github.com/hyperledger-labs/splice) repo,
+   please review and merge it as well. If you don't have permissions to merge PRs to the splice repo, ping someone how does.
+   Currently, this is Itai, Ray, or Moritz.
