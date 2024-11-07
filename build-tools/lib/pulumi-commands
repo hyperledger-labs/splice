@@ -538,7 +538,7 @@ function subcmd_pulumi_preview_canton() {
 }
 
 ###
-subcommand_whitelist[pulumi_down_canton]="Preview the changes for the sv-canton migrations"
+subcommand_whitelist[pulumi_down_canton]="Down the sv-canton migrations"
 
 function subcmd_pulumi_down_canton() {
   _info "Resetting sv-canton stacks"

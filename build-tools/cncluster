@@ -1984,13 +1984,29 @@ function subcmd_dump_identities() {
 subcommand_whitelist[vote_for_migration]="Creates a vote request to migrate to a new migration id and has all SVs vote in favour"
 function subcmd_vote_for_migration() {
   if [ "$#" -lt 1 ]; then
-    echo "Usage: $0 <migration_id>"
+    echo "Usage: $0 vote_for_migration <migration_id>"
     exit 1
   fi
 
   _cluster_must_exist
 
   "$REPO_ROOT/cluster/scripts/vote-for-migration.sh" "$1"
+}
+
+###
+subcommand_whitelist[shutdown_cloudsql_instances]="Deactivates all running CloudSQL instances for the specified migration ID"
+function subcmd_shutdown_cloudsql_instances() {
+  if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 shutdown_cloudsql_instances <migration_id>"
+    exit 1
+  fi
+
+  instances=$(gcloud sql instances list --format="value(name)" --filter="labels.cluster=${GCP_CLUSTER_BASENAME} AND labels.migration_id=$1 AND settings.activationPolicy=always")
+  for instance in ${instances}
+  do
+    echo "Shutting down $instance"
+    gcloud sql instances patch "${instance}" --activation-policy=never --async
+  done
 }
 
 ################################

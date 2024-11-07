@@ -199,7 +199,7 @@ function _pulumi_automation_run_cancel() {
 # (and if we're not careful, it will catch it twice). Signaling pulumi twice is like hitting
 # ctrl-c twice, thus telling pulumi to exit immediately and not cleanup after itself, thus
 # ending with locked and/or polluted stacks.
-# Similarly, in CCI's run_bash_command_in_nix, we signal the whole process group, which is equivalend
+# Similarly, in CCI's run_bash_command_in_nix, we signal the whole process group, which is equivalent
 # to hitting ctrl-c in the terminal.
 # We solve this by running pulumi in a separate process group (using `set -m`), and killing it
 # using /bin/kill, which signals only the process and not its whole process group.
