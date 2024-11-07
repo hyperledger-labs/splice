@@ -322,7 +322,6 @@ object ExampleTransactionFactory {
   val malformedLfTransaction: LfVersionedTransaction = transaction(Seq(0))
 
   // Helper methods for contract ids and transaction ids
-
   def transactionId(index: Int): TransactionId = TransactionId(
     TestHash.digest(s"transactionId$index")
   )

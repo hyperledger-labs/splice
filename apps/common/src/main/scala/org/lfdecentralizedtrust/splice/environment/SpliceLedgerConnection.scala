@@ -1001,7 +1001,7 @@ class SpliceLedgerConnection(
       disclosedContracts: DisclosedContracts,
   )(implicit
       traceContext: TraceContext
-  ): Future[lapi.interactive_submission_service.PrepareSubmissionResponse] = {
+  ): Future[lapi.interactive.interactive_submission_service.PrepareSubmissionResponse] = {
     client.prepareSubmission(
       domainId = domainId.map(_.toProtoPrimitive),
       applicationId = applicationId,
@@ -1019,7 +1019,7 @@ class SpliceLedgerConnection(
     */
   def executeSubmissionAndWait(
       submitter: PartyId,
-      preparedTransaction: lapi.interactive_submission_data.PreparedTransaction,
+      preparedTransaction: lapi.interactive.interactive_submission_service.PreparedTransaction,
       partySignatures: Map[PartyId, LedgerClient.Signature],
       waitForOffset: Boolean,
   )(implicit traceContext: TraceContext): Future[String] = {

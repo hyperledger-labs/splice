@@ -17,7 +17,7 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
   GetPartiesRequest,
   PartyManagementServiceGrpc,
 }
-import com.daml.ledger.api.v2.interactive_submission_service.InteractiveSubmissionServiceGrpc
+import com.daml.ledger.api.v2.interactive.interactive_submission_service.InteractiveSubmissionServiceGrpc
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
 import com.daml.ledger.javaapi.data.{Command, CreateUserResponse, ListUserRightsResponse, User}
@@ -274,11 +274,11 @@ private[environment] class LedgerClient(
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[lapi.interactive_submission_service.PrepareSubmissionResponse] = {
+  ): Future[lapi.interactive.interactive_submission_service.PrepareSubmissionResponse] = {
     for {
       stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
       result <- stub.prepareSubmission(
-        lapi.interactive_submission_service.PrepareSubmissionRequest(
+        lapi.interactive.interactive_submission_service.PrepareSubmissionRequest(
           commands = commands.map(c => lapi.commands.Command.fromJavaProto(c.toProtoCommand)),
           disclosedContracts = disclosedContracts.toLedgerApiDisclosedContracts.map(
             lapi.commands.DisclosedContract.fromJavaProto(_)
@@ -294,36 +294,39 @@ private[environment] class LedgerClient(
   }
 
   def executeSubmission(
-      preparedTransaction: interactive_submission_data.PreparedTransaction,
+      preparedTransaction: interactive.interactive_submission_service.PreparedTransaction,
       partySignatures: Map[PartyId, LedgerClient.Signature],
       applicationId: String,
       submissionId: String,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[lapi.interactive_submission_service.ExecuteSubmissionResponse] =
+  ): Future[lapi.interactive.interactive_submission_service.ExecuteSubmissionResponse] =
     for {
       stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
       result <- stub.executeSubmission(
-        lapi.interactive_submission_service.ExecuteSubmissionRequest(
+        lapi.interactive.interactive_submission_service.ExecuteSubmissionRequest(
           preparedTransaction = Some(preparedTransaction),
-          partySignatures =
-            Some(lapi.interactive_submission_service.PartySignatures(partySignatures.toList.map {
-              case (party, signature) =>
-                lapi.interactive_submission_service.SinglePartySignatures(
+          partySignatures = Some(
+            lapi.interactive.interactive_submission_service
+              .PartySignatures(partySignatures.toList.map { case (party, signature) =>
+                lapi.interactive.interactive_submission_service.SinglePartySignatures(
                   party.toProtoPrimitive,
                   Seq(
-                    lapi.interactive_submission_service.Signature(
-                      lapi.interactive_submission_service.SignatureFormat.SIGNATURE_FORMAT_RAW,
+                    lapi.interactive.interactive_submission_service.Signature(
+                      lapi.interactive.interactive_submission_service.SignatureFormat.SIGNATURE_FORMAT_RAW,
                       signature.signature,
                       signature.signedBy.toProtoPrimitive,
-                      lapi.interactive_submission_service.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519,
+                      lapi.interactive.interactive_submission_service.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519,
                     )
                   ),
                 )
-            })),
+              })
+          ),
           applicationId = applicationId,
           submissionId = submissionId,
+          hashingSchemeVersion =
+            lapi.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V1,
         )
       )
     } yield result

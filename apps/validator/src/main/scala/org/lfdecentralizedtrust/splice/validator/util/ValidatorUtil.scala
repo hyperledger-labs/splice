@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.validator.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v2.interactive_submission_data
+import com.daml.ledger.api.v2.interactive.interactive_submission_service.PreparedTransaction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install as walletCodegen
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
@@ -351,7 +351,7 @@ private[validator] object ValidatorUtil {
     for {
       updateId <- connection.executeSubmissionAndWait(
         senderParty,
-        interactive_submission_data.PreparedTransaction.parseFrom(
+        PreparedTransaction.parseFrom(
           Base64.getDecoder.decode(submission.transaction)
         ),
         Map(

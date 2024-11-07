@@ -443,7 +443,10 @@ lazy val `apps-common` =
     .enablePlugins(BuildInfoPlugin)
     .settings(
       libraryDependencies ++= Seq(
-        google_cloud_storage,
+        google_cloud_storage excludeAll (ExclusionRule("io.opentelemetry"), ExclusionRule(
+          "com.google.api.grpc",
+          "proto-google-common-protos",
+        )),
         kubernetes_client,
         Dependencies.daml_lf_validation,
         scalatestScalacheck % Test,
@@ -1360,7 +1363,6 @@ lazy val `apps-app` =
       libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test",
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.12.1" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
-      libraryDependencies += google_cloud_storage,
       libraryDependencies += auth0,
       libraryDependencies += kubernetes_client,
       // Force SBT to use the right version of opentelemetry libs.

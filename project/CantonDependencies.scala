@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.2.0-snapshot.20241025.13383.0.va5eb2291"
+  val version: String = "3.2.0-snapshot.20241031.13398.0.vf95d2607"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -24,12 +24,12 @@ object CantonDependencies {
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
   lazy val apispec_version = "0.7.2"
-  lazy val pekko_version = "1.0.1"
-  lazy val pekko_http_version = "1.0.0"
+  lazy val pekko_version = "1.1.2"
+  lazy val pekko_http_version = "1.1.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
-  lazy val grpc_version = "1.60.0"
+  lazy val grpc_version = "1.67.1"
   lazy val logback_version = "1.4.5"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
@@ -48,7 +48,7 @@ object CantonDependencies {
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
 
-  lazy val netty_version = "4.1.108.Final"
+  lazy val netty_version = "4.1.110.Final"
 
   lazy val reflections = "org.reflections" % "reflections" % "0.10.2"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
@@ -134,10 +134,10 @@ object CantonDependencies {
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
   // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
   // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
-  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.61.Final"
+  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.65.Final"
   lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
-  lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.0.1"
+  lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.41.0"
 
   lazy val scopt = "com.github.scopt" %% "scopt" % "4.0.0"
 
@@ -195,7 +195,7 @@ object CantonDependencies {
   lazy val circe_generic = "io.circe" %% "circe-generic" % circe_version
   lazy val circe_generic_extras = "io.circe" %% "circe-generic-extras" % circe_version
 
-  lazy val guava = "com.google.guava" % "guava" % "31.1-jre"
+  lazy val guava = "com.google.guava" % "guava" % "33.3.0-jre"
   lazy val tink = "com.google.crypto.tink" % "tink" % "1.12.0" excludeAll (
     ExclusionRule(organization = "com.google.guava", name = "guava-jdk5"),
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
@@ -280,9 +280,8 @@ object CantonDependencies {
   lazy val junit_platform_runner = "org.junit.platform" % "junit-platform-runner" % "1.9.2"
   lazy val jupiter_interface = "net.aichler" % "jupiter-interface" % "0.9.0"
 
-  lazy val google_protobuf_java = "com.google.protobuf" % "protobuf-java" % "3.25.0"
+  lazy val google_protobuf_java = "com.google.protobuf" % "protobuf-java" % "3.25.5"
   lazy val protobuf_version = google_protobuf_java.revision
-  // To override 3.19.2 from the daml repo's maven_install_2.13.json
   lazy val google_protobuf_java_util =
     "com.google.protobuf" % "protobuf-java-util" % protobuf_version
 }
