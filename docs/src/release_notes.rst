@@ -8,7 +8,7 @@
 Release Notes
 =============
 
-Upcoming
+0.2.8
 --------
 
 * SV App
