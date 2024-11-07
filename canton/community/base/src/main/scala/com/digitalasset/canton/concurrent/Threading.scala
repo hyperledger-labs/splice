@@ -14,7 +14,7 @@ import com.typesafe.scalalogging.Logger
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Predicate
-import scala.concurrent.{ExecutionContextExecutor, blocking}
+import scala.concurrent.{ExecutionContext, blocking}
 
 /** Factories and utilities for dealing with threading.
   */
@@ -246,7 +246,7 @@ object Threading {
     }
   }
 
-  def directExecutionContext(logger: Logger): ExecutionContextExecutor = DirectExecutionContext(
+  def directExecutionContext(logger: Logger): ExecutionContext = DirectExecutionContext(
     logger
   )
 
@@ -322,5 +322,5 @@ object Threading {
   val threadingProps = List(numThreadsProp, minThreadsProp, maxThreadsProp)
 
   @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
-  def sleep(millis: Long, nanos: Int = 0): Unit = blocking(Thread.sleep(millis, nanos))
+  def sleep(millis: Long, nanos: Int = 0): Unit = blocking { Thread.sleep(millis, nanos) }
 }

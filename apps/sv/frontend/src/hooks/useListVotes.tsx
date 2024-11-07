@@ -3,7 +3,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 // TODO(#7675) - do we need this model?
 import { SvVote } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import * as damlTypes from '@daml/types';
 import { Vote, VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
@@ -20,6 +20,7 @@ function getVoteStatus(votes: damlTypes.Map<string, Vote>): Vote[] {
 export const useListVotes = (contractIds: ContractId<VoteRequest>[]): UseQueryResult<SvVote[]> => {
   const { listVoteRequestsByTrackingCid } = useSvAdminClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listVoteRequestsByTrackingCid', contractIds],
     queryFn: async () => {
       if (contractIds.length === 0) {

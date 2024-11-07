@@ -18,22 +18,22 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.conflictdetection.LockableStates.LockableStatesCheckHandle
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker.{
   InvalidCommitSet,
-  ReassignmentsStoreError,
   RequestTrackerStoreError,
+  TransferStoreError,
 }
 import com.digitalasset.canton.participant.store.ActiveContractStore
 import com.digitalasset.canton.participant.store.ActiveContractStore.*
-import com.digitalasset.canton.participant.store.ReassignmentStore.{
-  ReassignmentCompleted,
-  UnknownReassignmentId,
+import com.digitalasset.canton.participant.store.TransferStore.{
+  TransferCompleted,
+  UnknownTransferId,
 }
-import com.digitalasset.canton.participant.store.memory.ReassignmentCache
+import com.digitalasset.canton.participant.store.memory.TransferCache
 import com.digitalasset.canton.participant.util.TimeOfChange
-import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.protocol.{LfContractId, TransferId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{CheckedT, ErrorUtil, MonadUtil, SimpleExecutionQueue}
-import com.digitalasset.canton.{ReassignmentCounter, RequestCounter}
+import com.digitalasset.canton.{RequestCounter, TransferCounter}
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
@@ -45,7 +45,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * A request is in-flight from the call to [[ConflictDetector.registerActivenessSet]] until the corresponding call to
   * [[ConflictDetector.finalizeRequest]] has written the updates to the ACS.
   *
-  * The [[ConflictDetector]] also checks that assignments refer to active reassignments and atomically completes them
+  * The [[ConflictDetector]] also checks that transfer-ins refer to active transfers and atomically completes them
   * during finalization.
   *
   * @param checkedInvariant Defines whether all methods should check the class invariant when they are called.
@@ -56,7 +56,7 @@ import scala.concurrent.{ExecutionContext, Future}
 // so that we are always aware of when a context switch may happen.
 private[participant] class ConflictDetector(
     private val acs: ActiveContractStore,
-    private val reassignmentCache: ReassignmentCache,
+    private val transferCache: TransferCache,
     protected override val loggerFactory: NamedLoggerFactory,
     private val checkedInvariant: Boolean,
     private val executionContext: ExecutionContext,
@@ -99,9 +99,9 @@ private[participant] class ConflictDetector(
   /** Contains the [[com.digitalasset.canton.RequestCounter]]s of all requests
     * that have completed their activeness check using [[checkActivenessAndLock]]
     * and have not yet been finalized using [[finalizeRequest]].
-    * The [[LockedStates]] contains the locked contracts, keys, and the checked reassignments.
+    * The [[LockedStates]] contains the locked contracts, keys, and the checked transfers.
     */
-  private[this] val reassignmentsAndLockedStates: mutable.Map[RequestCounter, LockedStates] =
+  private[this] val transfersAndLockedStates: mutable.Map[RequestCounter, LockedStates] =
     new mutable.HashMap()
 
   /** Contains the [[PendingEvictions]] for each request that has been finalized in-memory
@@ -116,7 +116,7 @@ private[participant] class ConflictDetector(
   private[this] val directExecutionContext: DirectExecutionContext =
     DirectExecutionContext(noTracingLogger)
 
-  private[this] val initialReassignmentCounter = ReassignmentCounter.Genesis
+  private[this] val initialTransferCounter = TransferCounter.Genesis
 
   /** Registers a pending activeness set.
     * This marks all contracts and keys in the `activenessSet` with a pending activeness check.
@@ -170,7 +170,7 @@ private[participant] class ConflictDetector(
       traceContext: TraceContext
   ): Either[IllegalConflictDetectionStateException, PrefetchHandle] =
     Either.cond(
-      !(pendingActivenessChecks.contains(rc) || reassignmentsAndLockedStates.contains(rc) ||
+      !(pendingActivenessChecks.contains(rc) || transfersAndLockedStates.contains(rc) ||
         pendingEvictions.contains(rc)), {
         logger.trace(withRC(rc, "Registering pending activeness check"))
 
@@ -181,9 +181,9 @@ private[participant] class ConflictDetector(
           contractHandle.availableF.void
         }
 
-        // Do not prefetch reassignments. Might be worth implementing at some time.
+        // Do not prefetch transfers. Might be worth implementing at some time.
         val pending = new PendingActivenessCheck(
-          activenessSet.reassignmentIds,
+          activenessSet.transferIds,
           contractHandle,
           statesReady,
         )
@@ -236,7 +236,7 @@ private[participant] class ConflictDetector(
     * <ul>
     *   <li>Perform the [[ActivenessCheck]]s for contracts and keys in the [[ActivenessSet]].</li>
     *   <li>Lock the contracts and keys according to the [[ActivenessSet]]</li>
-    *   <li>Check that the assignments from the [[ActivenessSet]] are active</li>
+    *   <li>Check that the transfer-ins from the [[ActivenessSet]] are active</li>
     * </ul>
     *
     * Must not be called concurrently with itself or [[finalizeRequest]].
@@ -252,35 +252,36 @@ private[participant] class ConflictDetector(
     */
   def checkActivenessAndLock(
       rc: RequestCounter
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ActivenessResult] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ActivenessResult] = {
     runSequentially(s"activeness check for request $rc") {
       checkActivenessAndLockUnguarded(rc)
     }.map(_.valueOr(ErrorUtil.internalError))(executionContext)
       .flatMap { case (contractsResult, pending) =>
-        // Checking reassignment IDs need not be done within the sequential execution context
+        // Checking transfer IDs need not be done within the sequential execution context
         // because the TaskScheduler ensures that this task completes before new tasks are scheduled.
 
         implicit val ec: ExecutionContext = executionContext
-        val inactiveReassignments = Set.newBuilder[ReassignmentId]
-        def checkReassignment(reassignmentId: ReassignmentId): Future[Unit] = {
-          logger.trace(withRC(rc, s"Checking that reassignment $reassignmentId is active."))
-          reassignmentCache.lookup(reassignmentId).value.map {
+        val inactiveTransfers = Set.newBuilder[TransferId]
+        def checkTransfer(transferId: TransferId): Future[Unit] = {
+          logger.trace(withRC(rc, s"Checking that transfer $transferId is active."))
+          transferCache.lookup(transferId).value.map {
             case Right(_) =>
-            case Left(UnknownReassignmentId(_)) | Left(ReassignmentCompleted(_, _)) =>
-              val _ = inactiveReassignments += reassignmentId
+            case Left(UnknownTransferId(_)) | Left(TransferCompleted(_, _)) =>
+              val _ = inactiveTransfers += transferId
           }
         }
 
         FutureUnlessShutdown.outcomeF {
           for {
-            _ <- MonadUtil.sequentialTraverse_(pending.reassignmentIds)(checkReassignment)
+            _ <- MonadUtil.sequentialTraverse_(pending.transferIds)(checkTransfer)
             _ <- sequentiallyCheckInvariant()
           } yield ActivenessResult(
             contracts = contractsResult,
-            inactiveReassignments = inactiveReassignments.result(),
+            inactiveTransfers = inactiveTransfers.result(),
           )
         }
       }(executionContext)
+  }
 
   private def checkActivenessAndLockUnguarded(
       rc: RequestCounter
@@ -304,8 +305,8 @@ private[participant] class ConflictDetector(
           )
 
         val (lockedContracts, contractsResult) = contractStates.checkAndLock(pending.contracts)
-        val lockedStates = LockedStates(pending.reassignmentIds, lockedContracts)
-        reassignmentsAndLockedStates.put(rc, lockedStates).discard
+        val lockedStates = LockedStates(pending.transferIds, lockedContracts)
+        transfersAndLockedStates.put(rc, lockedStates).discard
 
         checkInvariant()
         Right((contractsResult, pending))
@@ -322,10 +323,10 @@ private[participant] class ConflictDetector(
     * <ul>
     *   <li>Contracts in `commitSet.`[[CommitSet.archivals archivals]] are archived.</li>
     *   <li>Contracts in `commitSet.`[[CommitSet.creations creations]] are created.</li>
-    *   <li>Contracts in `commitSet.`[[CommitSet.unassignments unassignments]] are reassigned away to the given target domain.</li>
-    *   <li>Contracts in `commitSet.`[[CommitSet.assignments assignments]] become active with the given source domain</li>
+    *   <li>Contracts in `commitSet.`[[CommitSet.transferOuts transferOuts]] are transferred away to the given target domain.</li>
+    *   <li>Contracts in `commitSet.`[[CommitSet.transferIns transferIns]] become active with the given source domain</li>
     *   <li>All contracts and keys locked by the [[ActivenessSet]] are unlocked.</li>
-    *   <li>Reassignments in [[ActivenessSet.reassignmentIds]] are completed if they are in `commitSet.`[[CommitSet.assignments assignments]].</li>
+    *   <li>Transfers in [[ActivenessSet.transferIds]] are completed if they are in `commitSet.`[[CommitSet.transferIns transferIns]].</li>
     * </ul>
     * and writes the updates from `commitSet` to the [[com.digitalasset.canton.participant.store.ActiveContractStore]].
     * If no exception is thrown, the request is no longer in-flight.
@@ -337,7 +338,7 @@ private[participant] class ConflictDetector(
     * @param commitSet The contracts and keys to be modified
     *                  The commit set may only contain contracts and keys that have been locked in
     *                  the corresponding activeness check.
-    *                  The reassignment IDs in [[CommitSet.assignments]] need not have been checked for activeness though.
+    *                  The transfer IDs in [[CommitSet.transferIns]] need not have been checked for activeness though.
     * @return The outer future completes when the conflict detector's internal state has been updated.
     *         The inner future completes when the updates have been persisted.
     *         [[com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker.RequestTrackerStoreError]]s
@@ -348,7 +349,7 @@ private[participant] class ConflictDetector(
     *         In particular if invariant checking is enabled and the invariant is violated.
     *         This exception is not recoverable.</li>
     *         <li>[[RequestTracker$.InvalidCommitSet]] if the `commitSet` violates its precondition.
-    *         For the contract, key, and reassignment state management, this case is treated like passing [[CommitSet.empty]].</li>
+    *         For the contract, key, and transfer state management, this case is treated like passing [[CommitSet.empty]].</li>
     *         <li>[[java.lang.IllegalArgumentException]] if the request is not in-flight.</li>
     *         </ul>
     */
@@ -363,18 +364,18 @@ private[participant] class ConflictDetector(
 
       logger.trace(withRC(rc, "Updating contract and key states in the conflict detector"))
 
-      val locked @ LockedStates(checkedReassignments, lockedContracts) =
-        reassignmentsAndLockedStates
+      val locked @ LockedStates(checkedTransfers, lockedContracts) =
+        transfersAndLockedStates
           .remove(rc)
           .getOrElse(throw new IllegalArgumentException(s"Request $rc is not in-flight."))
 
-      val CommitSet(archivals, creations, unassignments, assignments) = commitSet
+      val CommitSet(archivals, creations, transferOuts, transferIns) = commitSet
 
       val unlockedChanges = Seq(
         UnlockedChanges(creations.keySet -- lockedContracts, "Creations"),
-        UnlockedChanges(assignments.keySet -- lockedContracts, "Assignments"),
+        UnlockedChanges(transferIns.keySet -- lockedContracts, "Transfer-ins"),
         UnlockedChanges(archivals.keySet -- lockedContracts, "Archivals"),
-        UnlockedChanges(unassignments.keySet -- lockedContracts, "Unassignments"),
+        UnlockedChanges(transferOuts.keySet -- lockedContracts, "Transfer-outs"),
       )
       def nonEmpty(unlockedChanges: UnlockedChanges): Boolean = {
         implicit val pretty: Pretty[unlockedChanges.T] = unlockedChanges.pretty
@@ -397,30 +398,30 @@ private[participant] class ConflictDetector(
         val pendingContractWrites = new mutable.ArrayDeque[LfContractId]
 
         lockedContracts.foreach { coid =>
-          val isActivation = creations.contains(coid) || assignments.contains(coid)
-          val unassignmentO = unassignments.get(coid)
-          val isDeactivation = unassignmentO.isDefined || archivals.contains(coid)
+          val isActivation = creations.contains(coid) || transferIns.contains(coid)
+          val transferOutO = transferOuts.get(coid).map(_.unwrap)
+          val isDeactivation = transferOutO.isDefined || archivals.contains(coid)
           if (isDeactivation) {
             if (isActivation) {
               logger.trace(withRC(rc, s"Activating and deactivating transient contract $coid."))
             } else {
               logger.trace(withRC(rc, s"Deactivating contract $coid."))
             }
-            val newStatus = unassignmentO.fold[Status](Archived) { unassignment =>
-              ReassignedAway(
-                unassignment.targetDomainId,
-                unassignment.reassignmentCounter,
+            val newStatus = transferOutO.fold[Status](Archived) { transferOut =>
+              TransferredAway(
+                transferOut.targetDomainId,
+                transferOut.transferCounter,
               )
             }
             contractStates.setStatusPendingWrite(coid, newStatus, toc)
             pendingContractWrites += coid
           } else if (isActivation) {
-            val reassignmentCounter = assignments.get(coid) match {
-              case Some(value) => value.reassignmentCounter
+            val transferCounter = transferIns.get(coid) match {
+              case Some(value) => value.unwrap.transferCounter
               case None =>
                 creations
                   .get(coid)
-                  .map(_.reassignmentCounter)
+                  .map(_.unwrap.transferCounter)
                   .getOrElse(
                     ErrorUtil.internalError(
                       new IllegalStateException(
@@ -433,7 +434,7 @@ private[participant] class ConflictDetector(
             logger.trace(withRC(rc, s"Activating contract $coid."))
             contractStates.setStatusPendingWrite(
               coid,
-              Active(reassignmentCounter),
+              Active(transferCounter),
               toc,
             )
             pendingContractWrites += coid
@@ -442,19 +443,19 @@ private[participant] class ConflictDetector(
           }
         }
 
-        /* Complete only those reassignments that have been checked for activeness in Phase 3
-         * Non-reassigning participants will not check for reassignments being active,
-         * but nevertheless record that the contract was assigned from a certain domain.
+        /* Complete only those transfers that have been checked for activeness in Phase 3
+         * Non-transferring participants will not check for transfers being active,
+         * but nevertheless record that the contract was transferred in from a certain domain.
          */
-        val reassignmentsToComplete =
-          assignments.values.filter(t => checkedReassignments.contains(t.reassignmentId))
+        val transfersToComplete =
+          transferIns.values.filter(t => checkedTransfers.contains(t.unwrap.transferId))
 
-        // Synchronously complete all reassignments in the ReassignmentCache.
+        // Synchronously complete all transfers in the TransferCache.
         // (Use a List rather than a Stream to ensure synchronicity!)
-        // Writes to the ReassignmentStore are still asynchronous.
-        val pendingReassignmentWrites =
-          reassignmentsToComplete.toList.map(t =>
-            reassignmentCache.completeReassignment(t.reassignmentId, toc)
+        // Writes to the TransferStore are still asynchronous.
+        val pendingTransferWrites =
+          transfersToComplete.toList.map(t =>
+            transferCache.completeTransfer(t.unwrap.transferId, toc)
           )
 
         pendingEvictions
@@ -468,38 +469,36 @@ private[participant] class ConflictDetector(
         // All in-memory states have been updated. Persist the changes asynchronously.
         val storeFuture = {
           implicit val ec: ExecutionContext = executionContext
-          /* We write archivals, creations, and reassignments to the ACS even if we haven't found the contracts in the
+          /* We write archivals, creations, and transfers to the ACS even if we haven't found the contracts in the
            * contract status map such that the right data makes it to the ACS, which is a journal rather than a snapshot.
            */
           logger.trace(withRC(rc, s"About to write commit set to the conflict detection stores"))
           val archivalWrites = acs.archiveContracts(archivals.keySet.to(LazyList), toc)
           val creationWrites = acs.markContractsCreated(
-            creations.keySet.map(cid => cid -> initialReassignmentCounter).to(LazyList),
+            creations.keySet.map(cid => cid -> initialTransferCounter).to(LazyList),
             toc,
           )
-          val unassignmentWrites =
-            acs.unassignContracts(
-              unassignments
-                .map { case (coid, unassignmentCommit) =>
-                  val CommitSet.UnassignmentCommit(targetDomain, _, reassignmentCounter) =
-                    unassignmentCommit
-                  (coid, targetDomain, reassignmentCounter, toc)
+          val transferOutWrites =
+            acs.transferOutContracts(
+              transferOuts
+                .map { case (coid, wrapped) =>
+                  val CommitSet.TransferOutCommit(targetDomain, _, transferCounter) = wrapped.unwrap
+                  (coid, targetDomain, transferCounter, toc)
                 }
                 .to(LazyList)
             )
 
-          val assignmentWrites =
-            acs.assignContracts(
-              assignments
-                .map { case (coid, assignmentCommit) =>
-                  val CommitSet
-                    .AssignmentCommit(reassignmentId, _contractMetadata, reassignmentCounter) =
-                    assignmentCommit
-                  (coid, reassignmentId.sourceDomain, reassignmentCounter, toc)
+          val transferInWrites =
+            acs.transferInContracts(
+              transferIns
+                .map { case (coid, wrapped) =>
+                  val CommitSet.TransferInCommit(transferId, _contractMetadata, transferCounter) =
+                    wrapped.unwrap
+                  (coid, transferId.sourceDomain, transferCounter, toc)
                 }
                 .to(LazyList)
             )
-          val reassignmentCompletions = pendingReassignmentWrites.sequence_
+          val transferCompletions = pendingTransferWrites.sequence_
 
           // Collect the results from the above futures run in parallel.
           // A for comprehension does not work due to the explicit type parameters.
@@ -507,18 +506,18 @@ private[participant] class ConflictDetector(
           val acsFuture =
             monad.flatMap(archivalWrites)(_ =>
               monad.flatMap(creationWrites)(_ =>
-                monad.flatMap(unassignmentWrites)(_ => assignmentWrites)
+                monad.flatMap(transferOutWrites)(_ => transferInWrites)
               )
             )
 
           logger.debug(withRC(rc, "Wait for conflict detection store updates to complete"))
           List(
             acsFuture.toEitherTWithNonaborts
-              .leftMap(_.map(RequestTracker.AcsError.apply))
+              .leftMap(_.map(RequestTracker.AcsError))
               .value
               .map(_.toValidated),
-            reassignmentCompletions.toEitherTWithNonaborts
-              .leftMap(_.map(ReassignmentsStoreError.apply))
+            transferCompletions.toEitherTWithNonaborts
+              .leftMap(_.map(TransferStoreError))
               .value
               .map(_.toValidated),
           ).sequence
@@ -585,7 +584,7 @@ private[participant] class ConflictDetector(
       description: String
   )(x: => A)(implicit traceContext: TraceContext): FutureUnlessShutdown[A] = {
     implicit val ec: ExecutionContext = executionContext
-    executionQueue.execute(Future(x), description)
+    executionQueue.execute(Future { x }, description)
   }
 
   /** Checks the class invariant if invariant checking is enabled.
@@ -627,10 +626,10 @@ private[participant] class ConflictDetector(
 
     assertDisjoint(
       pendingActivenessChecks.keySet -> "pendingActivenessChecks",
-      reassignmentsAndLockedStates.keySet -> "reassignmentsAndLockedStates",
+      transfersAndLockedStates.keySet -> "transfersAndLockedStates",
     )
     assertDisjoint(
-      reassignmentsAndLockedStates.keySet -> "reassignmentsAndLockedStates",
+      transfersAndLockedStates.keySet -> "transfersAndLockedStates",
       pendingEvictions.keySet -> "pendingEvictions",
     )
     assertDisjoint(
@@ -638,11 +637,7 @@ private[participant] class ConflictDetector(
       pendingEvictions.keySet -> "pendingEvictions",
     )
 
-    contractStates.invariant(
-      pendingActivenessChecks,
-      reassignmentsAndLockedStates,
-      pendingEvictions,
-    )(
+    contractStates.invariant(pendingActivenessChecks, transfersAndLockedStates, pendingEvictions)(
       _.contracts.affected,
       _.contracts,
       _.pendingContracts,
@@ -677,28 +672,28 @@ private[conflictdetection] object ConflictDetector {
 
   /** Stores the handles from the registration of the activeness check until it actually is carried out.
     *
-    * @param reassignmentIds The reassignment ids from the activeness set
+    * @param transferIds The transfer ids from the activeness set
     * @param contracts The handle for contracts
     * @param statesReady The future that completes when all from [[PrefetchHandle.statesReady]]
     */
   private final class PendingActivenessCheck private[ConflictDetector] (
-      val reassignmentIds: Set[ReassignmentId],
+      val transferIds: Set[TransferId],
       val contracts: LockableStatesCheckHandle[LfContractId, ActiveContractStore.Status],
       val statesReady: Future[Unit],
   )
 
   /** Stores the state that must be passed from the activeness check to the finalization.
     *
-    * @param reassignments The reassignments whose activeness was checked
+    * @param transfers The transfers whose activeness was checked
     * @param contracts The contracts that have been locked
     */
   final case class LockedStates(
-      reassignments: Set[ReassignmentId],
+      transfers: Set[TransferId],
       contracts: Seq[LfContractId],
   ) extends PrettyPrinting {
 
-    override protected def pretty: Pretty[LockedStates] = prettyOfClass(
-      paramIfNonEmpty("reassignments", _.reassignments),
+    override def pretty: Pretty[LockedStates] = prettyOfClass(
+      paramIfNonEmpty("transfers", _.transfers),
       paramIfNonEmpty("contracts", _.contracts),
     )
   }

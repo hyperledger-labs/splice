@@ -160,7 +160,7 @@ abstract class MultiDomainAcsStoreTest[
       paymentRequest: AppPaymentRequest.ContractId,
   ) =
     contract(
-      identifier = TransferInProgress.TEMPLATE_ID_WITH_PACKAGE_ID,
+      identifier = TransferInProgress.TEMPLATE_ID,
       contractId = new TransferInProgress.ContractId(s"#$i"),
       payload = new TransferInProgress(
         new Group(
@@ -326,12 +326,12 @@ abstract class MultiDomainAcsStoreTest[
     "signals offsets as ingestion progresses" in {
       implicit val store = mkStore()
 
-      val acsOffset = 10L
-      val tx1Offset = 12L
+      val acsOffset = "010"
+      val tx1Offset = "012"
 
-      val signal_010 = store.signalWhenIngestedOrShutdown(10L)
-      val signal_011 = store.signalWhenIngestedOrShutdown(11L)
-      val signal_012 = store.signalWhenIngestedOrShutdown(12L)
+      val signal_010 = store.signalWhenIngestedOrShutdown("010")
+      val signal_011 = store.signalWhenIngestedOrShutdown("011")
+      val signal_012 = store.signalWhenIngestedOrShutdown("012")
 
       def notCompleted(futures: Future[Unit]*) =
         forAll(futures)(_.isCompleted shouldBe false)
@@ -350,7 +350,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- signal_011
         _ <- signal_012
         // We can still register signals for already ingested offsets
-        _ <- store.signalWhenIngestedOrShutdown(10L)
+        _ <- store.signalWhenIngestedOrShutdown("010")
       } yield succeed
     }
 
@@ -719,7 +719,7 @@ abstract class MultiDomainAcsStoreTest[
         results <- store.listContracts(AppRewardCoupon.COMPANION)
         _ = results should have size 4
         _ = forExactly(2, results) { c =>
-          c.contract.identifier.getPackageId shouldBe AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID.getPackageId
+          c.contract.identifier.getPackageId shouldBe AppRewardCoupon.TEMPLATE_ID.getPackageId
         }
         _ = forExactly(2, results) { c =>
           c.contract.identifier.getPackageId shouldBe upgradedPackageId

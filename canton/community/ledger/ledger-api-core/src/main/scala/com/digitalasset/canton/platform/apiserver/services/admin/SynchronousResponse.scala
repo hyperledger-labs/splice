@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.platform.apiserver.services.admin
 
-import com.digitalasset.canton.ledger.api.domain.types.ParticipantOffset
+import com.digitalasset.canton.ledger.api.domain.ParticipantOffset
 import com.digitalasset.canton.ledger.error.CommonErrors
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.SubmissionResult
@@ -43,19 +43,20 @@ class SynchronousResponse[Input, Entry, AcceptedEntry](
   def submitAndWait(
       submissionId: Ref.SubmissionId,
       input: Input,
-      ledgerEndBeforeRequest: ParticipantOffset,
+      ledgerEndBeforeRequest: Option[ParticipantOffset.Absolute],
       timeToLive: FiniteDuration,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[AcceptedEntry] =
+  ): Future[AcceptedEntry] = {
     for {
       submissionResult <- strategy.submit(submissionId, input)
       entry <- toResult(submissionId, ledgerEndBeforeRequest, submissionResult, timeToLive)
     } yield entry
+  }
 
   private def toResult(
       submissionId: Ref.SubmissionId,
-      ledgerEndBeforeRequest: ParticipantOffset,
+      ledgerEndBeforeRequest: Option[ParticipantOffset.Absolute],
       submissionResult: SubmissionResult,
       timeToLive: FiniteDuration,
   )(implicit loggingContext: LoggingContextWithTrace) = submissionResult match {
@@ -67,13 +68,14 @@ class SynchronousResponse[Input, Entry, AcceptedEntry](
 
   private def acknowledged(
       submissionId: Ref.SubmissionId,
-      ledgerEndBeforeRequest: ParticipantOffset,
+      ledgerEndBeforeRequest: Option[ParticipantOffset.Absolute],
       timeToLive: FiniteDuration,
   )(implicit loggingContext: LoggingContextWithTrace) = {
     val isAccepted = new Accepted(strategy.accept(submissionId))
     val isRejected = new Rejected(strategy.reject(submissionId))
-    val contextualizedErrorLogger =
+    val contextualizedErrorLogger = {
       ErrorLoggingContext(logger, loggingContext.toPropertiesMap, loggingContext.traceContext)
+    }
     strategy
       .entries(ledgerEndBeforeRequest)
       .via(shutdownKillSwitch.flow)
@@ -131,7 +133,7 @@ object SynchronousResponse {
     ): Future[state.SubmissionResult]
 
     /** Opens a stream of entries from before the submission. */
-    def entries(offset: ParticipantOffset)(implicit
+    def entries(offset: Option[ParticipantOffset.Absolute])(implicit
         loggingContext: LoggingContextWithTrace
     ): Source[Entry, ?]
 

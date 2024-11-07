@@ -40,9 +40,10 @@ final class DependenciesHealthService(
 
   override protected def prettyState: Pretty[ServingStatus] = Pretty[ServingStatus]
 
-  override protected def combineDependentStates: ServingStatus =
+  override protected def combineDependentStates: ServingStatus = {
     if (criticalDependencies.forall(!_.isFailed)) ServingStatus.SERVING
     else ServingStatus.NOT_SERVING
+  }
 
   override protected def initialHealthState: ServingStatus =
     if (criticalDependencies.isEmpty) ServingStatus.SERVING else ServingStatus.NOT_SERVING

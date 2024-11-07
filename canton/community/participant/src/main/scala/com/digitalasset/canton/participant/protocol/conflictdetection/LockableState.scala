@@ -34,7 +34,7 @@ private[conflictdetection] trait LockableState[Status <: PrettyPrinting] extends
 
   def hasPendingWrites: Boolean = !PendingWriteCounter.isEmpty(pendingWrites)
 
-  override protected def pretty: Pretty[LockableState.this.type] = prettyOfClass(
+  override def pretty: Pretty[LockableState.this.type] = prettyOfClass(
     unnamedParamIfDefined(_.versionedState),
     param("pending activeness checks", _.pendingActivenessChecks.toString.unquoted),
     param("locks", _.lock.toString.unquoted),
@@ -116,6 +116,8 @@ private[conflictdetection] object LockableState {
 
   type PendingWriteCounter = counters.PendingWriteCounter
   val PendingWriteCounter: counters.PendingWriteCounter.type = counters.PendingWriteCounter
+
+  private[this] def uintToString(i: Int): String = (i.toLong & 0xffffffffL).toString
 }
 
 private[conflictdetection] final case class ImmutableLockableState[Status <: PrettyPrinting](
@@ -225,15 +227,17 @@ private[conflictdetection] class MutableLockableState[Status <: PrettyPrinting](
     *
     * Does not complete a pending activeness check.
     */
-  def provideFetchedState(fetchedState: Option[StateChange[Status]]): Unit =
+  def provideFetchedState(fetchedState: Option[StateChange[Status]]): Unit = {
     updateStateIfNew(fetchedState)
+  }
 
   /** Completes one pending activeness check.
     *
     * @throws IllegalConflictDetectionStateException if all pending activeness checks have already been completed.
     */
-  def completeActivenessCheck(): Unit =
+  def completeActivenessCheck(): Unit = {
     pendingActivenessChecksVar = PendingActivenessCheckCounter.release(pendingActivenessChecksVar)
+  }
 
   /** Obtains one lock on the status and returns whether the lock was free before.
     *
@@ -249,8 +253,9 @@ private[conflictdetection] class MutableLockableState[Status <: PrettyPrinting](
     *
     * @throws IllegalConflictDetectionStateException if no lock is held.
     */
-  def unlock(): Unit =
+  def unlock(): Unit = {
     lockVar = LockCounter.release(lockVar)
+  }
 
   /** Set a new state for the contract with the update of the persistent store pending.
     *
@@ -266,8 +271,9 @@ private[conflictdetection] class MutableLockableState[Status <: PrettyPrinting](
     *
     * @throws IllegalConflictDetectionStateException if there are no pending writes.
     */
-  def signalWrite(): Unit =
+  def signalWrite(): Unit = {
     pendingWritesVar = PendingWriteCounter.release(pendingWritesVar)
+  }
 
   def snapshot: ImmutableLockableState[Status] =
     ImmutableLockableState[Status](
@@ -277,7 +283,7 @@ private[conflictdetection] class MutableLockableState[Status <: PrettyPrinting](
       pendingWritesVar,
     )
 
-  private[this] def updateStateIfNew(newState: Option[StateChange[Status]]): Unit =
+  private[this] def updateStateIfNew(newState: Option[StateChange[Status]]): Unit = {
     // No need for a compare and swap because there is only a single writer.
     internalVersionedState.get match {
       case Left(promise) =>
@@ -287,4 +293,5 @@ private[conflictdetection] class MutableLockableState[Status <: PrettyPrinting](
       case Right(Some(StateChange(_oldStatus, oldToc))) =>
         if (newState.exists(_.asOf >= oldToc)) internalVersionedState.lazySet(Right(newState))
     }
+  }
 }

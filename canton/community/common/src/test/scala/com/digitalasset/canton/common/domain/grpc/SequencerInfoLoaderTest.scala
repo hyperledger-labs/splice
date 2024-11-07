@@ -11,8 +11,6 @@ import com.digitalasset.canton.common.domain.grpc.SequencerInfoLoader.{
 }
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
-import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
-import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -34,7 +32,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.scalatest.Assertion
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 
 class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext {
 
@@ -174,7 +172,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
         args: List[
           (SequencerAlias, Endpoint, Either[SequencerInfoLoaderError, DomainClientBootstrapInfo])
         ]
-    ): Either[SequencerInfoLoaderError, SequencerInfoLoader.SequencerAggregatedInfo] =
+    ): Either[SequencerInfoLoaderError, SequencerInfoLoader.SequencerAggregatedInfo] = {
       SequencerInfoLoader.aggregateBootstrapInfo(
         logger,
         sequencerTrustThreshold = PositiveInt.tryCreate(2),
@@ -182,6 +180,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
         SequencerConnectionValidation.All,
         None,
       )(mapArgs(args))
+    }
 
     "accept if everything is fine" in {
       aggregate(
@@ -215,7 +214,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
     val sequencerInfoLoader = new SequencerInfoLoader(
       ProcessingTimeout(),
       TracingConfig.Propagation.Disabled,
-      clientProtocolVersions = ProtocolVersionCompatibility.supportedProtocols(
+      clientProtocolVersions = ProtocolVersionCompatibility.supportedProtocolsParticipant(
         includeAlphaVersions = true,
         includeBetaVersions = true,
         release = ReleaseVersion.current,
@@ -235,8 +234,10 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           scs,
           parallelism = NonNegativeInt.tryCreate(3),
           maybeThreshold = None,
-        )(loadSequencerInfoFactory(Map(2 -> nonValidResultF(scs(1)))))
-        .futureValueUS
+        )(
+          loadSequencerInfoFactory(Map(2 -> nonValidResultF(scs(1))))
+        )
+        .futureValue
       res.size shouldBe scs.size
       val (valid, invalid) = splitValidAndInvalid(res)
       valid shouldBe (1 to 10).filterNot(_ == 2)
@@ -256,8 +257,10 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           scs,
           parallelism = NonNegativeInt.tryCreate(3),
           maybeThreshold = Some(threshold),
-        )(loadSequencerInfoFactory(invalidSequencerConnections))
-        .futureValueUS
+        )(
+          loadSequencerInfoFactory(invalidSequencerConnections)
+        )
+        .futureValue
       val (valid, _) = splitValidAndInvalid(res)
       valid.intersect(Seq(2, 3)) shouldBe Seq.empty
       // note that we can't say anything about invalid due to raciness, e.g.
@@ -274,9 +277,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
     "not get stuck on hung sequencers" in {
       val threshold = PositiveInt.tryCreate(5)
       val delayedPromises =
-        Seq(1, 3, 4)
-          .map(_ -> Promise[UnlessShutdown[LoadSequencerEndpointInformationResult]]())
-          .toMap
+        Seq(1, 3, 4).map(_ -> Promise[LoadSequencerEndpointInformationResult]()).toMap
       val scs = sequencerConnections(10)
       val res = sequencerInfoLoader
         .loadSequencerEndpointsParallel(
@@ -284,23 +285,21 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           scs,
           parallelism = NonNegativeInt.tryCreate(4),
           maybeThreshold = Some(threshold),
-        )(loadSequencerInfoFactory(delayedPromises.map { case (k, v) =>
-          k -> FutureUnlessShutdown(v.future)
-        }))
-        .futureValueUS
+        )(loadSequencerInfoFactory(delayedPromises.map { case (k, v) => k -> v.future }))
+        .futureValue
       val (valid, invalid) = splitValidAndInvalid(res)
       valid.intersect(Seq(1, 3, 4)) shouldBe Seq.empty
       invalid shouldBe Seq.empty
       res.size shouldBe threshold.unwrap
       assertBetween("hung sequencers result size", res.size, threshold.unwrap, toleranceForRaciness)
       logger.info("Before exiting test, complete futures")
-      delayedPromises.foreach { case (i, p) => p.success(Outcome(validResult(scs(i - 1)))) }
+      delayedPromises.foreach { case (i, p) => p.success(validResult(scs(i - 1))) }
     }
 
     "return early in case of a failed Future" in {
       val scs = sequencerConnections(10)
       val invalidSequencerConnections = Map(
-        5 -> FutureUnlessShutdown.failed(new RuntimeException("booh"))
+        5 -> Future.failed(new RuntimeException("booh"))
       )
       loggerFactory
         .assertThrowsAndLogsAsync[RuntimeException](
@@ -310,8 +309,9 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
               scs,
               parallelism = NonNegativeInt.tryCreate(3),
               maybeThreshold = None,
-            )(loadSequencerInfoFactory(invalidSequencerConnections))
-            .failOnShutdown,
+            )(
+              loadSequencerInfoFactory(invalidSequencerConnections)
+            ),
           assertion = _.getMessage should include("booh"),
           _.errorMessage should include(
             "Exception loading sequencer Sequencer 'sequencer5' info in domain Domain 'domain1'"
@@ -330,18 +330,18 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
               NonEmpty.mk(Seq, endpoint1),
               transportSecurity = false,
               None,
-              SequencerAlias.tryCreate(s"sequencer$i"),
+              SequencerAlias.tryCreate(s"sequencer${i}"),
             )
           )
       )
       .getOrElse(throw new IllegalArgumentException("n must be positive"))
 
   private def loadSequencerInfoFactory(
-      m: Map[Int, FutureUnlessShutdown[LoadSequencerEndpointInformationResult]] = Map.empty
-  ): SequencerConnection => FutureUnlessShutdown[LoadSequencerEndpointInformationResult] = sc =>
+      m: Map[Int, Future[LoadSequencerEndpointInformationResult]] = Map.empty
+  ): SequencerConnection => Future[LoadSequencerEndpointInformationResult] = sc =>
     m.getOrElse(
       sc.sequencerAlias.unwrap.drop("sequencer".length).toInt,
-      FutureUnlessShutdown.pure(validResult(sc)),
+      Future.successful(validResult(sc)),
     )
 
   private def validResult(sc: SequencerConnection): LoadSequencerEndpointInformationResult =
@@ -353,8 +353,8 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
 
   private def nonValidResultF(
       sc: SequencerConnection
-  ): FutureUnlessShutdown[LoadSequencerEndpointInformationResult] =
-    FutureUnlessShutdown.pure(
+  ): Future[LoadSequencerEndpointInformationResult] =
+    Future.successful(
       LoadSequencerEndpointInformationResult
         .NotValid(sc, SequencerInfoLoaderError.InvalidState("booh"))
     )

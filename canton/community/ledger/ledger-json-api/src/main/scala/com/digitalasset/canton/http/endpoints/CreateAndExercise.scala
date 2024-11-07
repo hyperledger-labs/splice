@@ -17,7 +17,7 @@ import com.digitalasset.canton.http.json.*
 import com.digitalasset.canton.http.util.FutureUtil.{either, eitherT}
 import com.digitalasset.canton.http.util.Logging.{InstanceUUID, RequestID}
 import com.digitalasset.canton.http.util.JwtParties.*
-import com.daml.jwt.Jwt
+import com.daml.jwt.domain.Jwt
 import com.daml.ledger.api.v2 as lav2
 import lav2.value.{Record as ApiRecord, Value as ApiValue}
 import scalaz.std.scalaFuture.*
@@ -53,7 +53,7 @@ private[http] final class CreateAndExercise(
           cmd <-
             decoder
               .decodeCreateCommand(reqBody, jwt)
-              .liftErr(InvalidUserInput.apply): ET[
+              .liftErr(InvalidUserInput): ET[
               CreateCommand[ApiRecord, Template.RequiredPkg]
             ]
           _ <- EitherT.pure(parseAndDecodeTimer.stop())
@@ -72,56 +72,58 @@ private[http] final class CreateAndExercise(
       ec: ExecutionContext,
       metrics: HttpApiMetrics,
   ): ET[domain.SyncResponse[JsValue]] =
-    handleCommand(req) { (jwt, jwtPayload, reqBody, parseAndDecodeTimer) => _ => implicit lc =>
-      for {
-        cmd <-
-          decoder
-            .decodeExerciseCommand(reqBody, jwt)
-            .liftErr(InvalidUserInput.apply): ET[
-            domain.ExerciseCommand.RequiredPkg[LfValue, domain.ContractLocator[LfValue]]
-          ]
-        _ <- EitherT.pure(parseAndDecodeTimer.stop())
-        resolvedRef <- resolveReference(jwt, jwtPayload, cmd.meta, cmd.reference)
+    handleCommand(req) {
+      (jwt, jwtPayload, reqBody, parseAndDecodeTimer) => implicit tc => implicit lc =>
+        for {
+          cmd <-
+            decoder
+              .decodeExerciseCommand(reqBody, jwt)
+              .liftErr(InvalidUserInput): ET[
+              domain.ExerciseCommand.RequiredPkg[LfValue, domain.ContractLocator[LfValue]]
+            ]
+          _ <- EitherT.pure(parseAndDecodeTimer.stop())
+          resolvedRef <- resolveReference(jwt, jwtPayload, cmd.meta, cmd.reference)
 
-        apiArg <- either(lfValueToApiValue(cmd.argument)): ET[ApiValue]
+          apiArg <- either(lfValueToApiValue(cmd.argument)): ET[ApiValue]
 
-        resolvedCmd = cmd.copy(argument = apiArg, reference = resolvedRef, meta = cmd.meta)
+          resolvedCmd = cmd.copy(argument = apiArg, reference = resolvedRef, meta = cmd.meta)
 
-        resp <- eitherT(
-          Timed.future(
-            metrics.commandSubmissionLedgerTimer,
-            handleFutureEitherFailure(
-              commandService.exercise(jwt, jwtPayload, resolvedCmd)
-            ),
-          )
-        ): ET[domain.ExerciseResponse[ApiValue]]
+          resp <- eitherT(
+            Timed.future(
+              metrics.commandSubmissionLedgerTimer,
+              handleFutureEitherFailure(
+                commandService.exercise(jwt, jwtPayload, resolvedCmd)
+              ),
+            )
+          ): ET[domain.ExerciseResponse[ApiValue]]
 
-      } yield resp
+        } yield resp
     }
 
   def createAndExercise(req: HttpRequest)(implicit
       lc: LoggingContextOf[InstanceUUID with RequestID],
       metrics: HttpApiMetrics,
   ): ET[domain.SyncResponse[JsValue]] =
-    handleCommand(req) { (jwt, jwtPayload, reqBody, parseAndDecodeTimer) => _ => implicit lc =>
-      for {
-        cmd <-
-          decoder
-            .decodeCreateAndExerciseCommand(reqBody, jwt)
-            .liftErr(InvalidUserInput.apply): ET[
-            domain.CreateAndExerciseCommand.LAVResolved
-          ]
-        _ <- EitherT.pure(parseAndDecodeTimer.stop())
+    handleCommand(req) {
+      (jwt, jwtPayload, reqBody, parseAndDecodeTimer) => implicit tc => implicit lc =>
+        for {
+          cmd <-
+            decoder
+              .decodeCreateAndExerciseCommand(reqBody, jwt)
+              .liftErr(InvalidUserInput): ET[
+              domain.CreateAndExerciseCommand.LAVResolved
+            ]
+          _ <- EitherT.pure(parseAndDecodeTimer.stop())
 
-        resp <- eitherT(
-          Timed.future(
-            metrics.commandSubmissionLedgerTimer,
-            handleFutureEitherFailure(
-              commandService.createAndExercise(jwt, jwtPayload, cmd)
-            ),
-          )
-        ): ET[domain.ExerciseResponse[ApiValue]]
-      } yield resp
+          resp <- eitherT(
+            Timed.future(
+              metrics.commandSubmissionLedgerTimer,
+              handleFutureEitherFailure(
+                commandService.createAndExercise(jwt, jwtPayload, cmd)
+              ),
+            )
+          ): ET[domain.ExerciseResponse[ApiValue]]
+        } yield resp
     }
 
   private def resolveReference(

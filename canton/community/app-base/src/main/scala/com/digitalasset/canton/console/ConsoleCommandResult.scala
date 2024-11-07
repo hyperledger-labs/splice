@@ -7,8 +7,8 @@ import cats.Monad
 import cats.syntax.alternative.*
 import com.daml.error.{ErrorCategory, ErrorCode}
 import com.digitalasset.canton.console.CommandErrors.{CommandError, GenericCommandError}
-import com.digitalasset.canton.error.*
 import com.digitalasset.canton.error.CantonErrorGroups.CommandErrorGroup
+import com.digitalasset.canton.error.*
 import com.digitalasset.canton.util.ErrorUtil
 import org.slf4j.event.Level
 
@@ -43,7 +43,7 @@ object ConsoleCommandResult {
           a: A
       )(f: A => ConsoleCommandResult[Either[A, B]]): ConsoleCommandResult[B] = {
         def go(ccr: ConsoleCommandResult[Either[A, B]]): ConsoleCommandResult[B] = ccr match {
-          case CommandSuccessful(Left(aa)) => go(f(aa))
+          case CommandSuccessful(Left(a)) => go(f(a))
           case CommandSuccessful(Right(b)) => CommandSuccessful(b)
           case err: CommandError => err
         }
@@ -162,7 +162,7 @@ object CommandErrors extends CommandErrorGroup {
         ErrorCategory.SystemInternalAssumptionViolated,
       ) {
     final case class Error(timeout: Duration)
-        extends CantonCommandError(s"Condition never became true after $timeout")
+        extends CantonCommandError(s"Condition never became true after ${timeout}")
   }
 
   object NodeNotStarted

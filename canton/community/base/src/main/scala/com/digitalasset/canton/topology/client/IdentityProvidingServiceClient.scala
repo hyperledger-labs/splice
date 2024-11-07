@@ -8,11 +8,9 @@ import cats.data.EitherT
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.HasFutureSupervision
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.SigningKeyUsage.nonEmptyIntersection
-import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningKeyUsage, SigningPublicKey}
+import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningPublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -25,10 +23,12 @@ import com.digitalasset.canton.protocol.{
 import com.digitalasset.canton.sequencing.TrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.time.DomainTimeTracker
-import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
-import com.digitalasset.canton.topology.client.PartyKeyTopologySnapshotClient.PartyAuthorizationInfo
-import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
+import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.{
+  AuthorityOfResponse,
+  PartyInfo,
+}
 import com.digitalasset.canton.topology.processing.{
   EffectiveTime,
   SequencedTime,
@@ -82,7 +82,7 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
     * we've sent the transaction. Therefore, this function will return the
     * best snapshot approximation known.
     *
-    * The snapshot returned by this method should be used when preparing a transaction or reassignment request (Phase 1).
+    * The snapshot returned by this method should be used when preparing a transaction or transfer request (Phase 1).
     * It must not be used when validating a request (Phase 2 - 7); instead, use one of the `snapshot` methods with the request timestamp.
     */
   def currentSnapshotApproximation(implicit traceContext: TraceContext): T
@@ -122,7 +122,7 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
     * Use this method if you are sure to be synchronized with the topology state updates.
     * The method will block & wait for an update, but emit a warning if it is not available
     *
-    * The snapshot returned by this method should be used for validating transaction and reassignment requests (Phase 2 - 7).
+    * The snapshot returned by this method should be used for validating transaction and transfer requests (Phase 2 - 7).
     * Use the request timestamp as parameter for this method.
     * Do not use a response or result timestamp, because all validation steps must use the same topology snapshot.
     */
@@ -133,7 +133,7 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
 
   /** Waits until a snapshot is available
     *
-    * The snapshot returned by this method should be used for validating transaction and reassignment requests (Phase 2 - 7).
+    * The snapshot returned by this method should be used for validating transaction and transfer requests (Phase 2 - 7).
     * Use the request timestamp as parameter for this method.
     * Do not use a response or result timestamp, because all validation steps must use the same topology snapshot.
     */
@@ -162,36 +162,34 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
     *
     * Fails with an exception if the state is not yet known.
     *
-    * The snapshot returned by this method should be used for validating transaction and reassignment requests (Phase 2 - 7).
+    * The snapshot returned by this method should be used for validating transaction and transfer requests (Phase 2 - 7).
     * Use the request timestamp as parameter for this method.
     * Do not use a response or result timestamp, because all validation steps must use the same topology snapshot.
     */
   def trySnapshot(timestamp: CantonTimestamp)(implicit traceContext: TraceContext): T
 
-  /** Returns an optional future which will complete when the effective timestamp has been observed
+  /** Returns an optional future which will complete when the timestamp has been observed
     *
-    * If the timestamp is already observed, returns None.
+    * If the timestamp is already observed, we return None.
+    *
+    * Note that this function allows to wait for effective time (true) and sequenced time (false).
+    * If we wait for effective time, we wait until the topology snapshot for that given
+    * point in time is known. As we future date topology transactions (to avoid bottlenecks),
+    * this might be before we actually observed a sequencing timestamp.
     */
   def awaitTimestamp(
-      timestamp: CantonTimestamp
+      timestamp: CantonTimestamp,
+      waitForEffectiveTime: Boolean,
   )(implicit traceContext: TraceContext): Option[Future[Unit]]
 
   def awaitTimestampUS(
-      timestamp: CantonTimestamp
+      timestamp: CantonTimestamp,
+      waitForEffectiveTime: Boolean,
   )(implicit traceContext: TraceContext): Option[FutureUnlessShutdown[Unit]]
 
-  /** Finds the topology transaction with maximum effective time whose effects would be visible,
-    * at earliest i.e. if delay is 0, in a topology snapshot at `effectiveTime`, and yields
-    * the sequenced and actual effective time of that topology transaction, if necessary after waiting
-    * to observe a timestamp at or after sequencing time `effectiveTime.immediatePredecessor`
-    * that the topology processor has fully processed.
-    */
-  def awaitMaxTimestampUS(sequencedTime: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]]
 }
 
-/** The client that provides the topology information on a per-domain basis
+/** The client that provides the topology information on a per domain basis
   */
 trait DomainTopologyClient extends TopologyClientApi[TopologySnapshot] with AutoCloseable {
   this: HasFutureSupervision =>
@@ -228,11 +226,11 @@ trait PartyTopologySnapshotClient {
       parties: Seq[LfPartyId]
   )(implicit traceContext: TraceContext): Future[Map[LfPartyId, Set[ParticipantId]]]
 
-  def activeParticipantsOfPartiesWithInfo(
+  def activeParticipantsOfPartiesWithAttributes(
       parties: Seq[LfPartyId]
   )(implicit
       traceContext: TraceContext
-  ): Future[Map[LfPartyId, PartyInfo]]
+  ): Future[Map[LfPartyId, Map[ParticipantId, ParticipantAttributes]]]
 
   /** Returns the set of active participants the given party is represented by as of the snapshot timestamp
     *
@@ -245,7 +243,7 @@ trait PartyTopologySnapshotClient {
   /** Returns Right if all parties have at least an active participant passing the check. Otherwise, all parties not passing are passed as Left */
   def allHaveActiveParticipants(
       parties: Set[LfPartyId],
-      check: ParticipantPermission => Boolean = _ => true,
+      check: (ParticipantPermission => Boolean) = _ => true,
   )(implicit traceContext: TraceContext): EitherT[Future, Set[LfPartyId], Unit]
 
   /** Returns the consortium thresholds (how many votes from different participants that host the consortium party
@@ -254,6 +252,13 @@ trait PartyTopologySnapshotClient {
   def consortiumThresholds(parties: Set[LfPartyId])(implicit
       traceContext: TraceContext
   ): Future[Map[LfPartyId, PositiveInt]]
+
+  /** Returns the Authority-Of delegations for consortium parties. Non-consortium parties delegate to themselves
+    * with threshold one
+    */
+  def authorityOf(parties: Set[LfPartyId])(implicit
+      traceContext: TraceContext
+  ): Future[AuthorityOfResponse]
 
   /** Returns true if there is at least one participant that satisfies the predicate */
   def isHostedByAtLeastOneParticipantF(
@@ -294,50 +299,45 @@ trait PartyTopologySnapshotClient {
       parties: List[LfPartyId]
   )(implicit traceContext: TraceContext): EitherT[Future, Set[LfPartyId], Set[ParticipantId]]
 
-  /** Returns a list of all known parties on this domain. */
+  def partiesWithGroupAddressing(
+      parties: Seq[LfPartyId]
+  )(implicit traceContext: TraceContext): Future[Set[LfPartyId]]
+
+  def activeParticipantsOfPartiesWithGroupAddressing(
+      parties: Seq[LfPartyId]
+  )(implicit traceContext: TraceContext): Future[Map[LfPartyId, Set[ParticipantId]]]
+
+  /** Returns a list of all known parties on this domain */
   def inspectKnownParties(
       filterParty: String,
       filterParticipant: String,
-  )(implicit traceContext: TraceContext): Future[Set[PartyId]]
+      limit: Int,
+  )(implicit traceContext: TraceContext): Future[
+    Set[PartyId]
+  ] // TODO(#14048): Decide on whether to standarize APIs on LfPartyId or PartyId and unify interfaces
+
 }
 
 object PartyTopologySnapshotClient {
+  final case class AuthorityOfDelegation(expected: Set[LfPartyId], threshold: PositiveInt)
+
+  def nonConsortiumPartyDelegation(partyId: LfPartyId): AuthorityOfDelegation =
+    AuthorityOfDelegation(Set(partyId), PositiveInt.one)
+
+  final case class AuthorityOfResponse(response: Map[LfPartyId, AuthorityOfDelegation])
+
   final case class PartyInfo(
+      groupAddressing: Boolean,
       threshold: PositiveInt, // > 1 for consortium parties
       participants: Map[ParticipantId, ParticipantAttributes],
   )
 
   object PartyInfo {
     def nonConsortiumPartyInfo(participants: Map[ParticipantId, ParticipantAttributes]): PartyInfo =
-      PartyInfo(threshold = PositiveInt.one, participants = participants)
+      PartyInfo(groupAddressing = false, threshold = PositiveInt.one, participants = participants)
 
     lazy val EmptyPartyInfo: PartyInfo = nonConsortiumPartyInfo(Map.empty)
   }
-}
-
-/** The subset of the topology client, providing the party related key information */
-trait PartyKeyTopologySnapshotClient {
-
-  this: BaseTopologySnapshotClient =>
-
-  /** returns authorization information for the party, including signing keys and threshold */
-  def partyAuthorization(party: PartyId)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[PartyAuthorizationInfo]]
-
-}
-
-object PartyKeyTopologySnapshotClient {
-
-  /** party key information
-    *
-    * @param threshold how many signatures we require to have for the given party to authorize a transaction
-    * @param signingKeys the valid signing keys for the given party
-    */
-  final case class PartyAuthorizationInfo(
-      threshold: PositiveInt,
-      signingKeys: NonEmpty[Seq[SigningPublicKey]],
-  )
 }
 
 /** The subset of the topology client, providing signing and encryption key information */
@@ -345,21 +345,19 @@ trait KeyTopologySnapshotClient {
 
   this: BaseTopologySnapshotClient =>
 
-  /** Retrieves the signing keys for a given owner, filtering them based on the provided usage set.
-    *
-    * @param owner The owner whose signing keys are being queried.
-    * @param filterUsage A non-empty set of usages to filter the signing keys by.
-    *              At least one usage from this set must match with the key's usage.
-    */
-  def signingKeys(
-      owner: Member,
-      filterUsage: NonEmpty[Set[SigningKeyUsage]],
-  )(implicit traceContext: TraceContext): Future[Seq[SigningPublicKey]]
+  /** returns newest signing public key */
+  def signingKey(owner: Member)(implicit
+      traceContext: TraceContext
+  ): Future[Option[SigningPublicKey]]
 
-  def signingKeys(
-      members: Seq[Member],
-      filterUsage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
-  )(implicit
+  /** returns all signing keys */
+  def signingKeys(owner: Member)(implicit traceContext: TraceContext): Future[Seq[SigningPublicKey]]
+
+  def signingKeysUS(owner: Member)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Seq[SigningPublicKey]]
+
+  def signingKeys(members: Seq[Member])(implicit
       traceContext: TraceContext
   ): Future[Map[Member, Seq[SigningPublicKey]]]
 
@@ -382,7 +380,7 @@ trait KeyTopologySnapshotClient {
       traceContext: TraceContext
   ): Future[Map[Member, Seq[EncryptionPublicKey]]]
 
-  /** Returns a list of all known keys on this domain */
+  /** Returns a list of all known parties on this domain */
   def inspectKeys(
       filterOwner: String,
       filterOwnerType: Option[MemberCode],
@@ -396,12 +394,7 @@ trait ParticipantTopologySnapshotClient {
 
   this: BaseTopologySnapshotClient =>
 
-  /** Checks whether the provided participant exists and is active.
-    * Active means:
-    * 1. The participant has a DomainTrustCertificate.
-    * 2. The domain is either unrestricted or there is a ParticipantDomainPermission for the participant.
-    * 3. The participant has an OwnerToKeyMapping with signing and encryption keys.
-    */
+  /** Checks whether the provided participant exists and is active */
   def isParticipantActive(participantId: ParticipantId)(implicit
       traceContext: TraceContext
   ): Future[Boolean]
@@ -419,16 +412,10 @@ trait ParticipantTopologySnapshotClient {
 
 /** The subset of the topology client providing mediator state information */
 trait MediatorDomainStateClient {
-  this: BaseTopologySnapshotClient & KeyTopologySnapshotClient =>
+  this: BaseTopologySnapshotClient =>
 
   def mediatorGroups()(implicit traceContext: TraceContext): Future[Seq[MediatorGroup]]
 
-  /** Returns true if
-    * <ul>
-    *   <li>the mediator is a member of a mediator group with num_active_sequencers >= threshold</li>
-    *   <li>the mediator has an OwnerToKeyMapping with at least 1 signing key</li>
-    * </ul>
-    */
   def isMediatorActive(mediatorId: MediatorId)(implicit
       traceContext: TraceContext
   ): Future[Boolean] =
@@ -468,20 +455,16 @@ trait MediatorDomainStateClient {
 
   def mediatorGroup(
       index: MediatorGroupIndex
-  )(implicit traceContext: TraceContext): Future[Option[MediatorGroup]] =
+  )(implicit traceContext: TraceContext): Future[Option[MediatorGroup]] = {
     mediatorGroups().map(_.find(_.index == index))
+  }
 }
 
 /** The subset of the topology client providing sequencer state information */
 trait SequencerDomainStateClient {
   this: BaseTopologySnapshotClient =>
 
-  /** The returned sequencer group contains all sequencers that
-    * <ul>
-    *   <li>are mentioned in the SequencerDomainState topology transaction and</li>
-    *   <li>have at least 1 signing key</li>
-    * </ul>
-    */
+  /** returns the sequencer group */
   def sequencerGroup()(implicit traceContext: TraceContext): Future[Option[SequencerGroup]]
 }
 
@@ -499,22 +482,7 @@ trait VettedPackagesSnapshotClient {
   def findUnvettedPackagesOrDependencies(
       participantId: ParticipantId,
       packages: Set[PackageId],
-      ledgerTime: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]]
-
-  /** Checks the vetting state for the given packages and returns the packages
-    * that have no entry in the participant's VettedPackages topology transactions.
-    * Note: this does not check the vetted packages for their validity period, but simply for their
-    * existence in the mapping.
-    *
-    * @param participantId the participant for which we want to check the package vettings
-    * @param packageIds the set of packages to check
-    * @return the packages that have no entry in the participant's VettedPackages mapping
-    */
-  def determinePackagesWithNoVettingEntry(
-      participantId: ParticipantId,
-      packageIds: Set[PackageId],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]]
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]]
 }
 
 trait DomainGovernanceSnapshotClient {
@@ -537,7 +505,7 @@ trait DomainGovernanceSnapshotClient {
       case Right(value) => value.parameters
       case Left(_) =>
         if (warnOnUsingDefault) {
-          logger.warn(s"Unexpectedly using default domain parameters at $timestamp")
+          logger.warn(s"Unexpectedly using default domain parameters at ${timestamp}")
         }
 
         DynamicDomainParameters.initialValues(
@@ -566,15 +534,10 @@ trait DomainGovernanceSnapshotClient {
 trait MembersTopologySnapshotClient {
   this: BaseTopologySnapshotClient =>
 
-  /** Convenience method to determin all members with `isMemberKnown`. */
   def allMembers()(implicit traceContext: TraceContext): Future[Set[Member]]
 
-  /** Determines if a member is known on the domain (through a DomainTrustCertificate, MediatorDomainState, or SequencerDomainState).
-    * Note that a "known" member is not necessarily authorized to use the domain.
-    */
   def isMemberKnown(member: Member)(implicit traceContext: TraceContext): Future[Boolean]
 
-  /** Convenience method to check `isMemberKnown` for several members. */
   def areMembersKnown(members: Set[Member])(implicit
       traceContext: TraceContext
   ): Future[Set[Member]]
@@ -593,8 +556,7 @@ trait TopologySnapshot
     with MediatorDomainStateClient
     with SequencerDomainStateClient
     with DomainGovernanceSnapshotClient
-    with MembersTopologySnapshotClient
-    with PartyKeyTopologySnapshotClient { this: BaseTopologySnapshotClient with NamedLogging => }
+    with MembersTopologySnapshotClient { this: BaseTopologySnapshotClient with NamedLogging => }
 
 // architecture-handbook-entry-end: IdentityProvidingServiceClient
 
@@ -627,29 +589,33 @@ trait DomainTopologyClientWithInit
   /** Overloaded snapshot returning derived type */
   override def snapshot(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[TopologySnapshotLoader] =
-    snapshotInternal(timestamp)(this.awaitTimestamp(_))
+  )(implicit traceContext: TraceContext): Future[TopologySnapshotLoader] = {
+    snapshotInternal(timestamp)((timestamp, waitForEffectiveTime) =>
+      this.awaitTimestamp(timestamp, waitForEffectiveTime)
+    )
+  }
 
   /** Overloaded snapshot returning derived type */
   override def snapshotUS(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] = {
     snapshotInternal[FutureUnlessShutdown](timestamp)(
-      this.awaitTimestampUS(_),
+      (timestamp, waitForEffectiveTime) => this.awaitTimestampUS(timestamp, waitForEffectiveTime),
       // Do not log a warning if we get a shutdown future
       logWarning = f => f != FutureUnlessShutdown.abortedDueToShutdown,
     )
+  }
 
   private def snapshotInternal[F[_]](
       timestamp: CantonTimestamp
   )(
-      awaitTimestampFn: CantonTimestamp => Option[F[Unit]],
+      awaitTimestampFn: (CantonTimestamp, Boolean) => Option[F[Unit]],
       logWarning: F[Unit] => Boolean = Function.const(true),
   )(implicit traceContext: TraceContext, monad: Monad[F]): F[TopologySnapshotLoader] = {
     // Keep current value, in case we need it in the log entry below
     val topoKnownUntilTs = topologyKnownUntilTimestamp
 
-    val syncF = awaitTimestampFn(timestamp) match {
+    val syncF = awaitTimestampFn(timestamp, true) match {
       case None => monad.unit
       // No need to log a warning if the future we get is due to a shutdown in progress
       case Some(fut) =>
@@ -670,14 +636,14 @@ trait DomainTopologyClientWithInit
   override def awaitSnapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): Future[TopologySnapshot] =
-    awaitTimestamp(timestamp)
+    awaitTimestamp(timestamp, waitForEffectiveTime = true)
       .getOrElse(Future.unit)
       .map(_ => trySnapshot(timestamp))
 
   override def awaitSnapshotUS(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[TopologySnapshot] =
-    awaitTimestampUS(timestamp)
+    awaitTimestampUS(timestamp, waitForEffectiveTime = true)
       .getOrElse(FutureUnlessShutdown.unit)
       .map(_ => trySnapshot(timestamp))
 
@@ -700,25 +666,20 @@ private[client] trait KeyTopologySnapshotClientLoader extends KeyTopologySnapsho
       traceContext: TraceContext
   ): Future[Map[Member, KeyCollection]]
 
-  override def signingKeys(
-      owner: Member,
-      filterUsage: NonEmpty[Set[SigningKeyUsage]],
-  )(implicit
+  override def signingKey(owner: Member)(implicit
       traceContext: TraceContext
-  ): Future[Seq[SigningPublicKey]] =
-    allKeys(owner).map(keys =>
-      keys.signingKeys.filter(key => nonEmptyIntersection(key.usage, filterUsage))
-    )
+  ): Future[Option[SigningPublicKey]] =
+    allKeys(owner).map(_.signingKeys.lastOption)
 
-  override def signingKeys(
-      members: Seq[Member],
-      filterUsage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
-  )(implicit
+  override def signingKeys(members: Seq[Member])(implicit
       traceContext: TraceContext
   ): Future[Map[Member, Seq[SigningPublicKey]]] =
-    allKeys(members).map(_.view.mapValues(_.signingKeys).toMap.map { case (member, keys) =>
-      member -> keys.filter(key => nonEmptyIntersection(key.usage, filterUsage))
-    })
+    allKeys(members).map(_.view.mapValues(_.signingKeys).toMap)
+
+  override def signingKeys(owner: Member)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[SigningPublicKey]] =
+    allKeys(owner).map(_.signingKeys)
 
   override def encryptionKey(owner: Member)(implicit
       traceContext: TraceContext
@@ -745,7 +706,7 @@ private[client] trait KeyTopologySnapshotClientLoader extends KeyTopologySnapsho
 /** An internal interface with a simpler lookup function which can be implemented efficiently with caching and reading from a store */
 private[client] trait ParticipantTopologySnapshotLoader extends ParticipantTopologySnapshotClient {
 
-  this: BaseTopologySnapshotClient & KeyTopologySnapshotClient =>
+  this: BaseTopologySnapshotClient =>
 
   override def isParticipantActive(participantId: ParticipantId)(implicit
       traceContext: TraceContext
@@ -765,10 +726,7 @@ private[client] trait ParticipantTopologySnapshotLoader extends ParticipantTopol
   ): Future[Option[ParticipantAttributes]] =
     loadParticipantStates(Seq(participantId)).map(_.get(participantId))
 
-  /** Loads the participant state for the given set of participant ids.
-    * The result covers only active participants, i.e., only participants with DomainTrustCertificates,
-    * ParticipantDomainPermission (if the domain is restricted), and signing and encryption keys.
-    */
+  /** abstract loading function used to load the participant state for the given set of participant-ids */
   def loadParticipantStates(
       participants: Seq[ParticipantId]
   )(implicit traceContext: TraceContext): Future[Map[ParticipantId, ParticipantAttributes]]
@@ -781,22 +739,21 @@ private[client] trait PartyTopologySnapshotBaseClient {
 
   override def allHaveActiveParticipants(
       parties: Set[LfPartyId],
-      check: ParticipantPermission => Boolean = _ => true,
+      check: (ParticipantPermission => Boolean) = _ => true,
   )(implicit traceContext: TraceContext): EitherT[Future, Set[LfPartyId], Unit] = {
-    val fetchedF = activeParticipantsOfPartiesWithInfo(parties.toSeq)
+    val fetchedF = activeParticipantsOfPartiesWithAttributes(parties.toSeq)
     EitherT(
       fetchedF
         .map { fetched =>
-          fetched.foldLeft(Set.empty[LfPartyId]) { case (acc, (party, partyInfo)) =>
-            if (
-              partyInfo.participants.exists { case (_, attributes) => check(attributes.permission) }
-            )
+          fetched.foldLeft(Set.empty[LfPartyId]) { case (acc, (party, relationships)) =>
+            if (relationships.exists { case (_, attributes) => check(attributes.permission) })
               acc
             else acc + party
           }
         }
         .map { res =>
-          Either.cond(res.isEmpty, (), res)
+          if (res.isEmpty) Right(())
+          else Left(res)
         }
     )
   }
@@ -805,9 +762,9 @@ private[client] trait PartyTopologySnapshotBaseClient {
       parties: Set[LfPartyId],
       check: (LfPartyId, ParticipantAttributes) => Boolean,
   )(implicit traceContext: TraceContext): Future[Set[LfPartyId]] =
-    activeParticipantsOfPartiesWithInfo(parties.toSeq).map(partiesWithInfo =>
+    activeParticipantsOfPartiesWithAttributes(parties.toSeq).map(partiesWithAttributes =>
       parties.filter(party =>
-        partiesWithInfo.get(party).map(_.participants).exists(_.values.exists(check(party, _)))
+        partiesWithAttributes.get(party).exists(_.values.exists(check(party, _)))
       )
     )
 
@@ -816,9 +773,9 @@ private[client] trait PartyTopologySnapshotBaseClient {
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Map[LfPartyId, ParticipantAttributes]] =
     // TODO(i4930) implement directly, must not return DISABLED
-    activeParticipantsOfPartiesWithInfo(partyIds.toSeq).map(
-      _.flatMap { case (party, partyInfo) =>
-        partyInfo.participants.get(participantId).map(party -> _)
+    activeParticipantsOfPartiesWithAttributes(partyIds.toSeq).map(
+      _.flatMap { case (party, participants) =>
+        participants.get(participantId).map(party -> _)
       }
     )
 
@@ -839,7 +796,7 @@ private[client] trait PartyTopologySnapshotBaseClient {
   )(implicit traceContext: TraceContext): Future[Set[LfPartyId]] =
     hostedOn(parties, participant)
       .map(partiesWithAttributes =>
-        parties.toSeq.mapFilter { party =>
+        parties.toSeq.mapFilter { case party =>
           partiesWithAttributes
             .get(party)
             .filter(_.permission.canConfirm)
@@ -851,14 +808,11 @@ private[client] trait PartyTopologySnapshotBaseClient {
       parties: List[LfPartyId]
   )(implicit traceContext: TraceContext): EitherT[Future, Set[LfPartyId], Set[ParticipantId]] =
     EitherT(for {
-      withActiveParticipants <- activeParticipantsOfPartiesWithInfo(parties)
+      withActiveParticipants <- activeParticipantsOfPartiesWithAttributes(parties)
       (noActive, allActive) = withActiveParticipants.foldLeft(
         Set.empty[LfPartyId] -> Set.empty[ParticipantId]
-      ) { case ((noActive, allActive), (p, partyInfo)) =>
-        (
-          if (partyInfo.participants.isEmpty) noActive + p else noActive,
-          allActive.union(partyInfo.participants.keySet),
-        )
+      ) { case ((noActive, allActive), (p, active)) =>
+        (if (active.isEmpty) noActive + p else noActive, allActive.union(active.keySet))
       }
     } yield Either.cond(noActive.isEmpty, allActive, noActive))
 }
@@ -887,10 +841,22 @@ private[client] trait PartyTopologySnapshotLoader
   )(implicit traceContext: TraceContext): Future[Map[LfPartyId, Set[ParticipantId]]] =
     loadAndMapPartyInfos(parties, _.participants.keySet)
 
-  final override def activeParticipantsOfPartiesWithInfo(
+  final override def activeParticipantsOfPartiesWithAttributes(
       parties: Seq[LfPartyId]
-  )(implicit traceContext: TraceContext): Future[Map[LfPartyId, PartyInfo]] =
-    loadAndMapPartyInfos(parties, identity)
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Map[LfPartyId, Map[ParticipantId, ParticipantAttributes]]] =
+    loadAndMapPartyInfos(parties, _.participants)
+
+  final override def partiesWithGroupAddressing(parties: Seq[LfPartyId])(implicit
+      traceContext: TraceContext
+  ): Future[Set[LfPartyId]] =
+    loadAndMapPartyInfos(parties, identity, _.groupAddressing).map(_.keySet)
+
+  final override def activeParticipantsOfPartiesWithGroupAddressing(
+      parties: Seq[LfPartyId]
+  )(implicit traceContext: TraceContext): Future[Map[LfPartyId, Set[ParticipantId]]] =
+    loadAndMapPartyInfos(parties, _.participants.keySet, _.groupAddressing)
 
   final override def consortiumThresholds(
       parties: Set[LfPartyId]
@@ -929,41 +895,33 @@ private[client] trait PartyTopologySnapshotLoader
   )(implicit traceContext: TraceContext): Future[Map[PartyId, PartyInfo]]
 }
 
-trait VettedPackagesLoader {
-  private[client] def loadVettedPackages(
-      participant: ParticipantId
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[PackageId, VettedPackage]]
-}
-
-trait VettedPackagesSnapshotLoader extends VettedPackagesSnapshotClient with VettedPackagesLoader {
+trait VettedPackagesSnapshotLoader extends VettedPackagesSnapshotClient {
   this: BaseTopologySnapshotClient & PartyTopologySnapshotLoader =>
 
-  private[client] def loadUnvettedPackagesOrDependenciesUsingLoader(
+  private[client] def loadUnvettedPackagesOrDependencies(
       participant: ParticipantId,
       packageId: PackageId,
-      ledgerTime: CantonTimestamp,
-      vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]]
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]]
 
-  override final def findUnvettedPackagesOrDependencies(
+  protected def findUnvettedPackagesOrDependenciesUsingLoader(
       participantId: ParticipantId,
       packages: Set[PackageId],
-      ledgerTime: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
+      loader: (ParticipantId, PackageId) => EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]],
+  ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
     packages.toList
-      .parTraverse(packageId =>
-        loadUnvettedPackagesOrDependenciesUsingLoader(participantId, packageId, ledgerTime, this)
-      )
+      .parTraverse(packageId => loader(participantId, packageId))
       .map(_.flatten.toSet)
 
-  override final def determinePackagesWithNoVettingEntry(
+  override def findUnvettedPackagesOrDependencies(
       participantId: ParticipantId,
-      packageIds: Set[PackageId],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
-    loadVettedPackages(participantId).map { vettedPackages =>
-      val vettedIds = vettedPackages.keySet
-      packageIds -- vettedIds
-    }
+      packages: Set[PackageId],
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    findUnvettedPackagesOrDependenciesUsingLoader(
+      participantId,
+      packages,
+      (pid, packId) => loadUnvettedPackagesOrDependencies(pid, packId),
+    )
+
 }
 
 trait DomainGovernanceSnapshotLoader extends DomainGovernanceSnapshotClient {

@@ -70,7 +70,7 @@ class InMemoryCryptoPrivateStore(
 
   private[crypto] def readPrivateKey(keyId: Fingerprint, purpose: KeyPurpose)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[StoredPrivateKey]] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[StoredPrivateKey]] = {
     purpose match {
       case Signing =>
         storedSigningKeyMap
@@ -89,6 +89,7 @@ class InMemoryCryptoPrivateStore(
             )
           )
     }
+  }
 
   private[crypto] def writePrivateKey(
       key: StoredPrivateKey

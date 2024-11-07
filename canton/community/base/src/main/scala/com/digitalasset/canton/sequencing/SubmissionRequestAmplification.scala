@@ -30,7 +30,7 @@ final case class SubmissionRequestAmplification(
       patience = Some(patience.toProtoPrimitive),
     )
 
-  override protected def pretty: Pretty[SubmissionRequestAmplification] = prettyOfClass(
+  override def pretty: Pretty[SubmissionRequestAmplification] = prettyOfClass(
     param("factor", _.factor),
     param("patience", _.patience),
   )

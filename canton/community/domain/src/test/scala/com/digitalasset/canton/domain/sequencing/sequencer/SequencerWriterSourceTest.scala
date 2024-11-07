@@ -6,11 +6,9 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 import cats.data.EitherT
 import cats.syntax.functor.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.SequencerError.PayloadToEventTimeBoundExceeded
 import com.digitalasset.canton.domain.sequencing.sequencer.store.*
 import com.digitalasset.canton.lifecycle.{
@@ -25,13 +23,7 @@ import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SimClock}
 import com.digitalasset.canton.topology.{Member, ParticipantId, SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil
-import com.digitalasset.canton.{
-  BaseTest,
-  HasExecutorService,
-  ProtocolVersionChecksAsyncWordSpec,
-  SequencerCounter,
-  config,
-}
+import com.digitalasset.canton.{BaseTest, HasExecutorService, config}
 import com.google.protobuf.ByteString
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
@@ -50,11 +42,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-class SequencerWriterSourceTest
-    extends AsyncWordSpec
-    with BaseTest
-    with HasExecutorService
-    with ProtocolVersionChecksAsyncWordSpec {
+class SequencerWriterSourceTest extends AsyncWordSpec with BaseTest with HasExecutorService {
 
   class MockEventSignaller extends EventSignaller {
     private val listenerRef =
@@ -91,11 +79,8 @@ class SequencerWriterSourceTest
     protected val logger: TracedLogger = SequencerWriterSourceTest.this.logger
     implicit val actorSystem: ActorSystem = ActorSystem()
     val instanceIndex: Int = 0
-    val testWriterConfig: SequencerWriterConfig =
-      SequencerWriterConfig
-        .LowLatency(
-          checkpointInterval = NonNegativeFiniteDuration.tryOfSeconds(1).toConfig
-        )
+    val testWriterConfig: SequencerWriterConfig.LowLatency =
+      SequencerWriterConfig.LowLatency()
     lazy val sequencerMember: Member = SequencerId(
       UniqueIdentifier.tryFromProtoPrimitive("sequencer::namespace")
     )
@@ -104,7 +89,7 @@ class SequencerWriterSourceTest
     ) extends InMemorySequencerStore(
           testedProtocolVersion,
           sequencerMember,
-          blockSequencerMode = true,
+          testedUseUnifiedSequencer,
           lFactory,
         )(
           ec
@@ -133,21 +118,19 @@ class SequencerWriterSourceTest
     // explicitly pass a real execution context so shutdowns don't deadlock while Await'ing completion of the done
     // future while still finishing up running tasks that require an execution context
     val (writer, doneF) = PekkoUtil.runSupervised(
-      logger.error("Writer flow failed", _),
-      SequencerWriterSource(
-        testWriterConfig,
-        totalNodeCount = PositiveInt.tryCreate(1),
-        keepAliveInterval,
-        writerStore,
-        clock,
-        eventSignaller,
-        loggerFactory,
-        testedProtocolVersion,
-        SequencerMetrics.noop(suiteName),
-        timeouts,
-        blockSequencerMode = true,
-      )(executorService, implicitly[TraceContext])
-        .toMat(Sink.ignore)(Keep.both),
+      logger.error("Writer flow failed", _), {
+        SequencerWriterSource(
+          testWriterConfig,
+          totalNodeCount = PositiveInt.tryCreate(1),
+          keepAliveInterval,
+          writerStore,
+          clock,
+          eventSignaller,
+          loggerFactory,
+          testedProtocolVersion,
+        )(executorService, implicitly[TraceContext])
+          .toMat(Sink.ignore)(Keep.both)
+      },
     )
 
     def completeFlow(): Future[Unit] = {
@@ -184,7 +167,6 @@ class SequencerWriterSourceTest
 
   private val alice = ParticipantId("alice")
   private val bob = ParticipantId("bob")
-  private val charlie = ParticipantId("charlie")
   private val messageId1 = MessageId.tryCreate("1")
   private val messageId2 = MessageId.tryCreate("2")
   private val nextPayload = new AtomicLong(1)
@@ -226,7 +208,7 @@ class SequencerWriterSourceTest
           _.shouldBeCantonErrorCode(PayloadToEventTimeBoundExceeded),
         )
         events <- store.readEvents(aliceId)
-      } yield events.events shouldBe empty
+      } yield events.payloads shouldBe empty
     }
   }
 
@@ -263,8 +245,8 @@ class SequencerWriterSourceTest
 
         events <- store.readEvents(aliceId)
       } yield {
-        events.events should have size 1
-        events.events.headOption.map(_.event).value should matchPattern {
+        events.payloads should have size 1
+        events.payloads.headOption.map(_.event).value should matchPattern {
           case DeliverStoreEvent(_, `messageId2`, _, _, _, _) =>
         }
       }
@@ -278,7 +260,7 @@ class SequencerWriterSourceTest
         invalidTopologyTimestamp: CantonTimestamp,
     )(implicit
         env: Env
-    ): Future[Seq[StoreEvent[?]]] = {
+    ): Future[Seq[StoreEvent[Payload]]] = {
       import env.*
 
       clock.advanceTo(nowish)
@@ -304,8 +286,8 @@ class SequencerWriterSourceTest
         _ <- completeFlow()
         events <- store.readEvents(aliceId)
       } yield {
-        events.events should have size 2
-        events.events.map(_.event)
+        events.payloads should have size 2
+        events.payloads.map(_.event)
       }
     }
 
@@ -313,7 +295,7 @@ class SequencerWriterSourceTest
       Since ordering of the events is not guaranteed, we sort them to ease
       the test.
      */
-    def sortByMessageId[P](events: Seq[StoreEvent[P]]): Seq[StoreEvent[P]] =
+    def sortByMessageId(events: Seq[StoreEvent[Payload]]): Seq[StoreEvent[Payload]] =
       events.sortBy(_.messageId.unwrap)
 
     "cause errors if way ahead of valid signing window" in withEnv() { implicit env =>
@@ -331,7 +313,7 @@ class SequencerWriterSourceTest
         )
         sortedEvents = sortByMessageId(events)
       } yield {
-        inside(sortedEvents.head) { case event: DeliverStoreEvent[_] =>
+        inside(sortedEvents.head) { case event: DeliverStoreEvent[Payload] =>
           event.messageId shouldBe messageId1
         }
 
@@ -374,7 +356,7 @@ class SequencerWriterSourceTest
         _ <- eventuallyF(10.seconds) {
           for {
             events <- env.store.readEvents(aliceId)
-            error = events.events.collectFirst {
+            error = events.payloads.collectFirst {
               case Sequenced(
                     _,
                     deliverError @ DeliverErrorStoreEvent(`aliceId`, _, _, _),
@@ -503,59 +485,5 @@ class SequencerWriterSourceTest
     check()
 
     resultP.future
-  }
-
-  "periodic checkpointing" should {
-    // TODO(#16087) ignore test for blockSequencerMode=false
-    "produce checkpoints" in withEnv() { implicit env =>
-      import env.*
-
-      for {
-        aliceId <- store.registerMember(alice, CantonTimestamp.Epoch)
-        _ <- store.registerMember(bob, CantonTimestamp.Epoch)
-        _ <- store.registerMember(charlie, CantonTimestamp.Epoch)
-        _ <- valueOrFail(
-          writer.send(
-            SubmissionRequest.tryCreate(
-              alice,
-              MessageId.tryCreate("test-deliver"),
-              batch = Batch.fromClosed(
-                testedProtocolVersion,
-                ClosedEnvelope.create(
-                  ByteString.EMPTY,
-                  Recipients.cc(bob),
-                  Seq.empty,
-                  testedProtocolVersion,
-                ),
-              ),
-              maxSequencingTime = CantonTimestamp.MaxValue,
-              topologyTimestamp = None,
-              aggregationRule = None,
-              submissionCost = None,
-              protocolVersion = testedProtocolVersion,
-            )
-          )
-        )("send")
-        eventTs <- eventuallyF(10.seconds) {
-          for {
-            events <- env.store.readEvents(aliceId)
-            _ = events.events should have size 1
-          } yield events.events.headOption.map(_.timestamp).valueOrFail("expected event to exist")
-        }
-        _ = (0 to 30).foreach { _ =>
-          Threading.sleep(100L) // wait for checkpoints to be generated
-          env.clock.advance(java.time.Duration.ofMillis(100))
-        }
-        checkpointingTs = clock.now
-        checkpoints <- store.checkpointsAtTimestamp(checkpointingTs)
-      } yield {
-        val expectedCheckpoints = Map(
-          alice -> CounterCheckpoint(SequencerCounter(0), checkpointingTs, None),
-          bob -> CounterCheckpoint(SequencerCounter(0), checkpointingTs, None),
-          charlie -> CounterCheckpoint(SequencerCounter(-1), checkpointingTs, None),
-        )
-        checkpoints should contain theSameElementsAs expectedCheckpoints
-      }
-    }
   }
 }

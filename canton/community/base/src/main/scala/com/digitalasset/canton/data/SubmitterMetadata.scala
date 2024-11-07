@@ -29,7 +29,6 @@ final case class SubmitterMetadata private (
     submissionId: Option[LedgerSubmissionId],
     dedupPeriod: DeduplicationPeriod,
     maxSequencingTime: CantonTimestamp,
-    externalAuthorization: Option[ExternalAuthorization],
 )(
     hashOps: HashOps,
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
@@ -45,7 +44,7 @@ final case class SubmitterMetadata private (
 
   override val hashPurpose: HashPurpose = HashPurpose.SubmitterMetadata
 
-  override protected def pretty: Pretty[SubmitterMetadata] = prettyOfClass(
+  override def pretty: Pretty[SubmitterMetadata] = prettyOfClass(
     param("act as", _.actAs),
     param("application id", _.applicationId),
     param("command id", _.commandId),
@@ -54,7 +53,6 @@ final case class SubmitterMetadata private (
     paramIfDefined("submission id", _.submissionId),
     param("deduplication period", _.dedupPeriod),
     param("max sequencing time", _.maxSequencingTime),
-    paramIfDefined("external authorization", _.externalAuthorization),
   )
 
   @transient override protected lazy val companionObj: SubmitterMetadata.type = SubmitterMetadata
@@ -68,7 +66,6 @@ final case class SubmitterMetadata private (
     submissionId = submissionId.getOrElse(""),
     dedupPeriod = Some(SerializableDeduplicationPeriod(dedupPeriod).toProtoV30),
     maxSequencingTime = maxSequencingTime.toProtoPrimitive,
-    externalAuthorization = externalAuthorization.map(_.toProtoV30),
   )
 }
 
@@ -79,8 +76,8 @@ object SubmitterMetadata
     ] {
   override val name: String = "SubmitterMetadata"
 
-  val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.SubmitterMetadata)(
+  val supportedProtoVersions = SupportedProtoVersions(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.SubmitterMetadata)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -95,7 +92,6 @@ object SubmitterMetadata
       submissionId: Option[LedgerSubmissionId],
       dedupPeriod: DeduplicationPeriod,
       maxSequencingTime: CantonTimestamp,
-      externalAuthorization: Option[ExternalAuthorization],
       hashOps: HashOps,
       protocolVersion: ProtocolVersion,
   ): SubmitterMetadata = SubmitterMetadata(
@@ -107,7 +103,6 @@ object SubmitterMetadata
     submissionId,
     dedupPeriod,
     maxSequencingTime,
-    externalAuthorization,
   )(hashOps, protocolVersionRepresentativeFor(protocolVersion), None)
 
   def fromSubmitterInfo(hashOps: HashOps)(
@@ -119,9 +114,8 @@ object SubmitterMetadata
       submittingParticipant: ParticipantId,
       salt: Salt,
       maxSequencingTime: CantonTimestamp,
-      externalAuthorization: Option[ExternalAuthorization],
       protocolVersion: ProtocolVersion,
-  ): Either[String, SubmitterMetadata] =
+  ): Either[String, SubmitterMetadata] = {
     NonEmpty.from(submitterActAs.toSet).toRight("The actAs set must not be empty.").map {
       actAsNes =>
         SubmitterMetadata(
@@ -133,11 +127,11 @@ object SubmitterMetadata
           submitterSubmissionId,
           submitterDeduplicationPeriod,
           maxSequencingTime,
-          externalAuthorization,
           hashOps,
           protocolVersion,
         )
     }
+  }
 
   private def fromProtoV30(hashOps: HashOps, metaDataP: v30.SubmitterMetadata)(
       bytes: ByteString
@@ -151,7 +145,6 @@ object SubmitterMetadata
       submissionIdP,
       dedupPeriodOP,
       maxSequencingTimeOP,
-      externalAuthorizationOP,
     ) = metaDataP
 
     for {
@@ -163,7 +156,7 @@ object SubmitterMetadata
         .map(ParticipantId(_))
       actAs <- actAsP.traverse(
         ProtoConverter
-          .parseLfPartyId(_, "act_as")
+          .parseLfPartyId(_)
           .leftMap(e => ProtoDeserializationError.ValueConversionError("actAs", e.message))
       )
       applicationId <- ApplicationId
@@ -197,9 +190,6 @@ object SubmitterMetadata
           ProtoDeserializationError.ValueConversionError("acsAs", "actAs set must not be empty.")
         )
       maxSequencingTime <- CantonTimestamp.fromProtoPrimitive(maxSequencingTimeOP)
-      externalAuthorizationO <- externalAuthorizationOP.traverse(
-        ExternalAuthorization.fromProtoV30
-      )
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield SubmitterMetadata(
       actAsNes,
@@ -210,7 +200,6 @@ object SubmitterMetadata
       submissionIdO,
       dedupPeriod,
       maxSequencingTime,
-      externalAuthorizationO,
     )(hashOps, rpv, Some(bytes))
   }
 }

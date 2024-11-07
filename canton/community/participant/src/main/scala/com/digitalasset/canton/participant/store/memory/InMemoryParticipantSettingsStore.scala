@@ -32,11 +32,12 @@ class InMemoryParticipantSettingsStore(override protected val loggerFactory: Nam
     )
   )
 
-  private def setIfEmpty[A](lens: Lens[Settings, Option[A]], newValue: A): Settings => Settings =
+  private def setIfEmpty[A](lens: Lens[Settings, Option[A]], newValue: A): Settings => Settings = {
     lens.modify {
       case None => Some(newValue)
       case alreadySet => alreadySet
     }
+  }
 
   private def updateCache(f: Settings => Settings): FutureUnlessShutdown[Unit] =
     FutureUnlessShutdown.pure {

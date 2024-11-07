@@ -39,7 +39,7 @@ class SvOnboardingAddlIntegrationTest
       )
 
   override lazy val updateHistoryIgnoredRootCreates = Seq(
-    amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
+    amuletCodegen.Amulet.TEMPLATE_ID
   )
 
   "SVs can onboard new SVs" in { implicit env =>
@@ -77,7 +77,7 @@ class SvOnboardingAddlIntegrationTest
 
     val (token, svOnboardingRequestCid) =
       clue("Checking that SV4's `SvOnboarding` contract was created correctly by SV1") {
-        eventually(40.seconds)(
+        eventually()(
           // The onboarding is requested by SV4 during SvApp init.
           inside(
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs

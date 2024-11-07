@@ -246,7 +246,7 @@ class ContractStoreBasedMaximumLedgerTimeServiceSpec
       Set.empty,
       None,
       None,
-      Array.empty,
+      None,
     ) // we do not care about the payload here
 
   private def testeeWithFixture(fixture: (ContractId, ContractState)*): MaximumLedgerTimeService = {

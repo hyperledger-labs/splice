@@ -30,8 +30,8 @@ import com.digitalasset.canton.protocol.{
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.serialization.BytestringWithCryptographicEvidence
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.{DomainTopologyClient, TopologySnapshot}
 import com.digitalasset.canton.topology.processing.{
   EffectiveTime,
@@ -97,6 +97,7 @@ class GrpcSequencerServiceTest
     val sequencerSubscriptionFactory = mock[DirectSequencerSubscriptionFactory]
     private val topologyClient = mock[DomainTopologyClient]
     private val mockTopologySnapshot = mock[TopologySnapshot]
+    private val mockDomainTopologyManager = mock[DomainTopologyManager]
     when(topologyClient.currentSnapshotApproximation(any[TraceContext]))
       .thenReturn(mockTopologySnapshot)
     when(
@@ -165,6 +166,7 @@ class GrpcSequencerServiceTest
         sequencerSubscriptionFactory,
         domainParamLookup,
         params,
+        mockDomainTopologyManager,
         topologyInitService,
         BaseTest.testedProtocolVersion,
         maxItemsInTopologyResponse = PositiveInt.tryCreate(maxItemsInTopologyBatch),
@@ -259,8 +261,9 @@ class GrpcSequencerServiceTest
 
     def send(request: SubmissionRequest)(implicit
         env: Environment
-    ): Future[ParsingResult[SendAsyncVersionedResponse]] =
+    ): Future[ParsingResult[SendAsyncVersionedResponse]] = {
       sendProto(signedSubmissionReq(request).toByteString)
+    }
 
     def sendAndCheckSucceed(request: SubmissionRequest)(implicit
         env: Environment
@@ -388,8 +391,9 @@ class GrpcSequencerServiceTest
     }
 
     "reject on confirmation rate excess" in { implicit env =>
-      def expectSuccess(): Future[Assertion] =
+      def expectSuccess(): Future[Assertion] = {
         sendAndCheckSucceed(defaultConfirmationRequest)
+      }
 
       def expectOneSuccessOneOverloaded(): Future[Assertion] = {
         val result1F = send(defaultConfirmationRequest)

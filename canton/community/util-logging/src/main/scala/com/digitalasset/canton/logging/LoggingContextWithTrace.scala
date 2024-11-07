@@ -37,13 +37,15 @@ object LoggingContextWithTrace {
 
   def apply(traceContext: TraceContext)(implicit
       loggingContext: LoggingContext
-  ): LoggingContextWithTrace =
+  ): LoggingContextWithTrace = {
     new LoggingContextWithTrace(loggingContext.entries, traceContext)
+  }
 
   def apply(loggerFactory: NamedLoggerFactory)(implicit
       traceContext: TraceContext
-  ): LoggingContextWithTrace =
+  ): LoggingContextWithTrace = {
     new LoggingContextWithTrace(createLoggingContext(loggerFactory)(identity).entries, traceContext)
+  }
 
   def apply(loggerFactory: NamedLoggerFactory, telemetry: Telemetry): LoggingContextWithTrace = {
     implicit val traceContext =
@@ -76,20 +78,22 @@ object LoggingContextWithTrace {
       telemetry: Telemetry
   )(entry: LoggingEntry, entries: LoggingEntry*)(
       f: LoggingContextWithTrace => A
-  )(implicit loggingContext: LoggingContext): A =
+  )(implicit loggingContext: LoggingContext): A = {
     LoggingContext.withEnrichedLoggingContext(entry, entries*) { implicit loggingContext =>
       f(LoggingContextWithTrace(telemetry)(loggingContext))
     }
+  }
 
   def withEnrichedLoggingContext[A](
       entry: LoggingEntry,
       entries: LoggingEntry*
   )(
       f: LoggingContextWithTrace => A
-  )(implicit loggingContextWithTrace: LoggingContextWithTrace): A =
+  )(implicit loggingContextWithTrace: LoggingContextWithTrace): A = {
     LoggingContext.withEnrichedLoggingContext(entry, entries*) { implicit loggingContext =>
       f(LoggingContextWithTrace(loggingContextWithTrace.traceContext)(loggingContext))
     }
+  }
 
   def enriched[A](
       entry: LoggingEntry,

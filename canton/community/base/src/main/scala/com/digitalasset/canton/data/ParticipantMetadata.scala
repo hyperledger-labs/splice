@@ -39,7 +39,7 @@ final case class ParticipantMetadata private (
 
   override val hashPurpose: HashPurpose = HashPurpose.ParticipantMetadata
 
-  override protected def pretty: Pretty[ParticipantMetadata] = prettyOfClass(
+  override def pretty: Pretty[ParticipantMetadata] = prettyOfClass(
     param("ledger time", _.ledgerTime),
     param("submission time", _.submissionTime),
     paramIfDefined("workflow id", _.workflowIdO),
@@ -62,7 +62,7 @@ object ParticipantMetadata
   override val name: String = "ParticipantMetadata"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.ParticipantMetadata)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.ParticipantMetadata)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )

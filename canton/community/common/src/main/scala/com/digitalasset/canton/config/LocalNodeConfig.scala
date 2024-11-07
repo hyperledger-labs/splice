@@ -31,6 +31,7 @@ trait LocalNodeParametersConfig {
 
   /** Various cache sizes */
   def caching: CachingConfigs
+  def useUnifiedSequencer: Boolean
   def alphaVersionSupport: Boolean
   def watchdog: Option[WatchdogConfig]
 }

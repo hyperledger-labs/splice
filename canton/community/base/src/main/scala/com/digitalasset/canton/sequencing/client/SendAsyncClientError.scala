@@ -32,15 +32,12 @@ object SendAsyncClientError extends SequencerErrorGroup {
 
   /** The [[SequencerClient]] decided that the request is invalid so did not attempt to send it to the sequencer */
   final case class RequestInvalid(message: String) extends SendAsyncClientError {
-    override protected def pretty: Pretty[RequestInvalid] = prettyOfClass(
-      unnamedParam(_.message.unquoted)
-    )
+    override def pretty: Pretty[RequestInvalid] = prettyOfClass(unnamedParam(_.message.unquoted))
   }
 
   /** A send with the supplied message id is already being tracked */
   case object DuplicateMessageId extends SendAsyncClientError {
-    override protected def pretty: Pretty[DuplicateMessageId.type] =
-      prettyOfObject[DuplicateMessageId.type]
+    override def pretty: Pretty[DuplicateMessageId.type] = prettyOfObject[DuplicateMessageId.type]
   }
 
   /** Errors that the client can get back from the sequencer synchronously */
@@ -48,13 +45,11 @@ object SendAsyncClientError extends SequencerErrorGroup {
 
   /** We were unable to make the request for a technical reason */
   final case class RequestFailed(message: String) extends SendAsyncClientResponseError {
-    override protected def pretty: Pretty[RequestFailed] = prettyOfClass(
-      unnamedParam(_.message.unquoted)
-    )
+    override def pretty: Pretty[RequestFailed] = prettyOfClass(unnamedParam(_.message.unquoted))
   }
 
   /** We were able to contact the server but the request was declined */
   final case class RequestRefused(error: SendAsyncError) extends SendAsyncClientResponseError {
-    override protected def pretty: Pretty[RequestRefused] = prettyOfClass(unnamedParam(_.error))
+    override def pretty: Pretty[RequestRefused] = prettyOfClass(unnamedParam(_.error))
   }
 }

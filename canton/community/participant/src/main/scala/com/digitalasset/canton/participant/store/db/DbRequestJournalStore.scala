@@ -4,10 +4,9 @@
 package com.digitalasset.canton.participant.store.db
 
 import cats.data.{EitherT, OptionT}
-import cats.syntax.either.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.RequireTypes.PositiveNumeric
 import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, Lifecycle}
@@ -35,8 +34,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Success, Try}
 
 class DbRequestJournalStore(
-    indexedDomain: IndexedDomain,
+    domainId: IndexedDomain,
     override protected val storage: DbStorage,
+    maxItemsInSqlInClause: PositiveNumeric[Int],
     insertBatchAggregatorConfig: BatchAggregatorConfig,
     replaceBatchAggregatorConfig: BatchAggregatorConfig,
     override protected val timeouts: ProcessingTimeout,
@@ -50,7 +50,7 @@ class DbRequestJournalStore(
 
   private[store] override val cleanPreheadStore: CursorPreheadStore[RequestCounterDiscriminator] =
     new DbCursorPreheadStore[RequestCounterDiscriminator](
-      indexedDomain,
+      domainId,
       storage,
       cursorTable = "par_head_clean_counters",
       timeouts,
@@ -96,7 +96,7 @@ class DbRequestJournalStore(
       ): DBIOAction[Array[Int], NoStream, Effect.All] = {
         def setData(pp: PositionedParameters)(item: RequestData): Unit = {
           val RequestData(rc, state, requestTimestamp, commitTime, repairContext) = item
-          pp >> indexedDomain
+          pp >> domainId
           pp >> rc
           pp >> state
           pp >> requestTimestamp
@@ -104,12 +104,26 @@ class DbRequestJournalStore(
           pp >> repairContext
         }
 
-        val query =
-          """insert into par_journal_requests(domain_idx, request_counter, request_state_index, request_timestamp, commit_time, repair_context)
-             values (?, ?, ?, ?, ?, ?)
-             on conflict do nothing"""
-        DbStorage.bulkOperation(query, items.map(_.value).toList, storage.profile)(setData)
+        storage.profile match {
+          case _: Profile.Postgres | _: Profile.H2 =>
+            val query = """insert into
+                 par_journal_requests(domain_id, request_counter, request_state_index, request_timestamp, commit_time, repair_context)
+               values (?, ?, ?, ?, ?, ?)
+               on conflict do nothing"""
+            DbStorage.bulkOperation(query, items.map(_.value).toList, storage.profile)(setData)
 
+          case _: Profile.Oracle =>
+            val query =
+              """merge /*+ INDEX (journal_requests pk_journal_requests) */
+                |into par_journal_requests
+                |using (select ? domain_id, ? request_counter from dual) input
+                |on (par_journal_requests.request_counter = input.request_counter and
+                |    par_journal_requests.domain_id = input.domain_id)
+                |when not matched then
+                |  insert (domain_id, request_counter, request_state_index, request_timestamp, commit_time, repair_context)
+                |  values (input.domain_id, input.request_counter, ?, ?, ?, ?)""".stripMargin
+            DbStorage.bulkOperation(query, items.map(_.value).toList, storage.profile)(setData)
+        }
       }
 
       private val success: Try[Unit] = Success(())
@@ -122,7 +136,7 @@ class DbRequestJournalStore(
 
       override protected def checkQuery(itemsToCheck: NonEmpty[Seq[ItemIdentifier]])(implicit
           batchTraceContext: TraceContext
-      ): ReadOnly[immutable.Iterable[CheckData]] =
+      ): immutable.Iterable[ReadOnly[immutable.Iterable[CheckData]]] =
         bulkQueryDbio(itemsToCheck)
 
       override protected def analyzeFoundData(item: RequestData, foundData: Option[RequestData])(
@@ -154,28 +168,25 @@ class DbRequestJournalStore(
   )(implicit traceContext: TraceContext): OptionT[Future, RequestData] = {
     val query =
       sql"""select request_counter, request_state_index, request_timestamp, commit_time, repair_context
-              from par_journal_requests where request_counter = $rc and domain_idx = $indexedDomain"""
+              from par_journal_requests where request_counter = $rc and domain_id = $domainId"""
         .as[RequestData]
     OptionT(storage.query(query.headOption, functionFullName))
   }
 
   private def bulkQueryDbio(
       rcs: NonEmpty[Seq[RequestCounter]]
-  ): DbAction.ReadOnly[immutable.Iterable[RequestData]] = {
-    import DbStorage.Implicits.BuilderChain.*
-    val query =
-      sql"""select request_counter, request_state_index, request_timestamp, commit_time, repair_context
-              from par_journal_requests where domain_idx = $indexedDomain and """ ++ DbStorage
-        .toInClause(
-          "request_counter",
-          rcs,
-        )
-    query.as[RequestData]
-  }
+  ): immutable.Iterable[DbAction.ReadOnly[immutable.Iterable[RequestData]]] =
+    DbStorage.toInClauses_("request_counter", rcs, maxItemsInSqlInClause).map { inClause =>
+      import DbStorage.Implicits.BuilderChain.*
+      val query =
+        sql"""select request_counter, request_state_index, request_timestamp, commit_time, repair_context
+              from par_journal_requests where domain_id = $domainId and """ ++ inClause
+      query.as[RequestData]
+    }
 
   override def firstRequestWithCommitTimeAfter(commitTimeExclusive: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[Option[RequestData]] =
+  ): Future[Option[RequestData]] = {
     storage.profile match {
       case _: Profile.Postgres =>
         for {
@@ -187,7 +198,7 @@ class DbRequestJournalStore(
                   with committed_after(request_counter) as (
                     select request_counter
                     from par_journal_requests
-                    where domain_idx = $indexedDomain and commit_time > $commitTimeExclusive)
+                    where domain_id = $domainId and commit_time > $commitTimeExclusive)
                   select min(request_counter) from committed_after;
               """.as[Option[RequestCounter]].headOption.map(_.flatten),
             functionFullName + ".committed_after",
@@ -198,22 +209,24 @@ class DbRequestJournalStore(
                 sql"""
                     select request_counter, request_state_index, request_timestamp, commit_time, repair_context
                     from par_journal_requests
-                    where domain_idx = $indexedDomain and request_counter = $rc
+                    where domain_id = $domainId and request_counter = $rc
                 """.as[RequestData].headOption,
                 functionFullName,
               )
           )
         } yield requestData
-      case _: Profile.H2 =>
+      case _: Profile.Oracle | _: Profile.H2 =>
         storage.query(
           sql"""
                 select request_counter, request_state_index, request_timestamp, commit_time, repair_context
-                from par_journal_requests where domain_idx = $indexedDomain and commit_time > $commitTimeExclusive
+                from par_journal_requests where domain_id = $domainId and commit_time > $commitTimeExclusive
                 order by request_counter #${storage.limit(1)}
             """.as[RequestData].headOption,
           functionFullName,
         )
     }
+
+  }
 
   override def replace(
       rc: RequestCounter,
@@ -256,21 +269,21 @@ class DbRequestJournalStore(
           batchTraceContext: TraceContext
       ): DBIOAction[Array[Int], NoStream, Effect.All] = {
         val updateQuery =
-          """update /*+ INDEX (journal_requests (request_counter, domain_idx)) */ par_journal_requests
+          """update /*+ INDEX (journal_requests (request_counter, domain_id)) */ par_journal_requests
              set request_state_index = ?, commit_time = coalesce (?, commit_time)
-             where domain_idx = ? and request_counter = ? and request_timestamp = ?"""
+             where domain_id = ? and request_counter = ? and request_timestamp = ?"""
         DbStorage.bulkOperation(updateQuery, items.map(_.value).toList, storage.profile) {
           pp => item =>
             val ReplaceRequest(rc, requestTimestamp, newState, commitTime) = item
             pp >> newState
             pp >> commitTime
-            pp >> indexedDomain
+            pp >> domainId
             pp >> rc
             pp >> requestTimestamp
         }
       }
 
-      private val success: Try[Result] = Success(Either.unit)
+      private val success: Try[Result] = Success(Right(()))
       override protected def onSuccessItemUpdate(item: Traced[ReplaceRequest]): Try[Result] =
         success
 
@@ -281,7 +294,7 @@ class DbRequestJournalStore(
 
       override protected def checkQuery(itemsToCheck: NonEmpty[Seq[RequestCounter]])(implicit
           batchTraceContext: TraceContext
-      ): ReadOnly[immutable.Iterable[RequestData]] = bulkQueryDbio(itemsToCheck)
+      ): immutable.Iterable[ReadOnly[immutable.Iterable[RequestData]]] = bulkQueryDbio(itemsToCheck)
 
       override protected def analyzeFoundData(item: ReplaceRequest, foundData: Option[RequestData])(
           implicit traceContext: TraceContext
@@ -297,7 +310,7 @@ class DbRequestJournalStore(
             } else if (data.state == newState && data.commitTime == commitTime)
               // `update` may under report the number of changed rows,
               // so we're fine if the new state is already there.
-              Success(Either.unit)
+              Success(Right(()))
             else {
               val ex = new ConcurrentModificationException(
                 s"Concurrent request journal modification for request $rc"
@@ -318,26 +331,18 @@ class DbRequestJournalStore(
 
   @VisibleForTesting
   private[store] override def pruneInternal(
-      beforeInclusive: CantonTimestamp
+      beforeAndIncluding: CantonTimestamp
   )(implicit traceContext: TraceContext): Future[Unit] =
     storage.update_(
       sqlu"""
-        delete from par_journal_requests where request_timestamp <= $beforeInclusive and domain_idx = $indexedDomain
-      """,
-      functionFullName,
-    )
-
-  override def purge()(implicit traceContext: TraceContext): Future[Unit] =
-    storage.update_(
-      sqlu"""
-        delete from par_journal_requests where domain_idx = $indexedDomain
-      """,
+    delete from par_journal_requests where request_timestamp <= $beforeAndIncluding and domain_id = $domainId
+  """,
       functionFullName,
     )
 
   override def size(start: CantonTimestamp, end: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
-  ): Future[Int] =
+  ): Future[Int] = {
     storage
       .query(
         {
@@ -345,19 +350,20 @@ class DbRequestJournalStore(
           val endFilter = end.fold(sql"")(ts => sql" and request_timestamp <= $ts")
           (sql"""
              select 1
-             from par_journal_requests where domain_idx = $indexedDomain and request_timestamp >= $start
+             from par_journal_requests where domain_id = $domainId and request_timestamp >= $start
             """ ++ endFilter).as[Int]
         },
         functionFullName,
       )
       .map(_.size)
+  }
 
   override def deleteSince(
       fromInclusive: RequestCounter
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val statement =
       sqlu"""
-        delete from par_journal_requests where domain_idx = $indexedDomain and request_counter >= $fromInclusive
+        delete from par_journal_requests where domain_id = $domainId and request_counter >= $fromInclusive
         """
     storage.update_(statement, functionFullName)
   }
@@ -368,36 +374,23 @@ class DbRequestJournalStore(
     val statement =
       sql"""
         select request_counter, request_state_index, request_timestamp, commit_time, repair_context
-        from par_journal_requests where domain_idx = $indexedDomain and request_counter >= $fromInclusive and repair_context is not null
+        from par_journal_requests where domain_id = $domainId and request_counter >= $fromInclusive and repair_context is not null
         order by request_counter
         """.as[RequestData]
     storage.query(statement, functionFullName)
   }
 
-  override def totalDirtyRequests()(implicit traceContext: TraceContext): Future[NonNegativeInt] = {
+  override def totalDirtyRequests()(implicit traceContext: TraceContext): Future[Int] = {
     val statement =
       sql"""
         select count(*)
-        from par_journal_requests where domain_idx = $indexedDomain and commit_time is null
+        from par_journal_requests where domain_id = $domainId and commit_time is null
         """.as[Int].head
-    storage.query(statement, functionFullName).map(NonNegativeInt.tryCreate)
+    storage.query(statement, functionFullName)
   }
 
   override def onClosed(): Unit = Lifecycle.close(cleanPreheadStore)(logger)
 
-  override def lastRequestCounterWithRequestTimestampBeforeOrAt(requestTimestamp: CantonTimestamp)(
-      implicit traceContext: TraceContext
-  ): Future[Option[RequestCounter]] =
-    storage.query(
-      sql"""
-        select request_counter
-        from par_journal_requests
-        where domain_idx = $indexedDomain and request_timestamp <= $requestTimestamp
-        order by (domain_idx, request_timestamp) desc
-        #${storage.limit(1)}
-        """.as[RequestCounter].headOption,
-      functionFullName,
-    )
 }
 
 object DbRequestJournalStore {
@@ -409,7 +402,7 @@ object DbRequestJournalStore {
       commitTime: Option[CantonTimestamp],
   ) extends PrettyPrinting {
 
-    override protected def pretty: Pretty[ReplaceRequest] = prettyOfClass(
+    override def pretty: Pretty[ReplaceRequest] = prettyOfClass(
       param("rc", _.rc),
       param("new state", _.newState),
       param("request timestamp", _.requestTimestamp),

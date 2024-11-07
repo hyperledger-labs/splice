@@ -69,7 +69,7 @@ class DbDomainConnectionConfigStore private[store] (
           sql"""select config, status from par_domain_connection_configs where domain_alias = $domainAlias"""
             .as[(DomainConnectionConfig, DomainConnectionConfigStore.Status)]
             .headOption
-            .map(_.map((StoredDomainConnectionConfig.apply _).tupled)),
+            .map(_.map(StoredDomainConnectionConfig.tupled)),
           functionFullName,
         )
         .map(_.toRight(MissingConfigForAlias(domainAlias)))
@@ -81,7 +81,7 @@ class DbDomainConnectionConfigStore private[store] (
     storage.query(
       sql"""select config, status from par_domain_connection_configs"""
         .as[(DomainConnectionConfig, DomainConnectionConfigStore.Status)]
-        .map(_.map((StoredDomainConnectionConfig.apply _).tupled)),
+        .map(_.map(StoredDomainConnectionConfig.tupled)),
       functionFullName,
     )
 
@@ -97,11 +97,18 @@ class DbDomainConnectionConfigStore private[store] (
 
     val domainAlias = config.domain
 
-    val insertAction: DbAction.WriteOnly[Int] =
-      sqlu"""insert
-             into par_domain_connection_configs(domain_alias, config, status)
-             values ($domainAlias, $config, $status)
-             on conflict do nothing"""
+    val insertAction: DbAction.WriteOnly[Int] = storage.profile match {
+      case _: DbStorage.Profile.Oracle =>
+        sqlu"""insert
+               /*+ IGNORE_ROW_ON_DUPKEY_INDEX ( PAR_DOMAIN_CONNECTION_CONFIGS ( domain_alias ) ) */
+               into par_domain_connection_configs(domain_alias, config, status)
+               values ($domainAlias, $config, $status)"""
+      case _ =>
+        sqlu"""insert
+               into par_domain_connection_configs(domain_alias, config, status)
+               values ($domainAlias, $config, $status)
+               on conflict do nothing"""
+    }
 
     for {
       nrRows <- EitherT.right(storage.update(insertAction, functionFullName))

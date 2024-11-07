@@ -8,8 +8,6 @@ import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.admin.v30
 
-import scala.annotation.nowarn
-
 /** A force flag is used to override specific safety checks in the topology manager.
   */
 sealed abstract class ForceFlag(val toProtoV30: v30.ForceFlag)
@@ -18,35 +16,10 @@ object ForceFlag {
 
   case object AlienMember extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALIEN_MEMBER)
 
-  /** Deprecated. Increasing LedgerTimeRecordTimeTolerance does not require a force flag from PV >= 32
-    * Instead increasing SubmissionTimeRecordTimeTolerance does
+  /** Required
     */
-  @deprecated(
-    message =
-      "LedgerTimeRecordTimeTolerance does not require a force flag anymore to be increased. Instead, SubmissionTimeRecordTimeTolerance does.",
-    since = "3.2",
-  )
   case object LedgerTimeRecordTimeToleranceIncrease
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_LEDGER_TIME_RECORD_TIME_TOLERANCE_INCREASE)
-
-  case object SubmissionTimeRecordTimeToleranceIncrease
-      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_SUBMISSION_TIME_RECORD_TIME_TOLERANCE_INCREASE)
-
-  case object AllowUnvetPackage extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVET_PACKAGE)
-
-  case object AllowUnvetPackageWithActiveContracts
-      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVET_PACKAGE_WITH_ACTIVE_CONTRACTS)
-
-  case object AllowUnknownPackage extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNKNOWN_PACKAGE)
-
-  case object AllowUnvettedDependencies
-      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVETTED_DEPENDENCIES)
-
-  case object DisablePartyWithActiveContracts
-      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_DISABLE_PARTY_WITH_ACTIVE_CONTRACTS)
-
-  case object AllowUnvalidatedSigningKeys
-      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVALIDATED_SIGNING_KEYS)
 
   /** This should only be used internally in situations where
     * <ul>
@@ -55,21 +28,8 @@ object ForceFlag {
     *   other choice, eg. when importing a topology snapshot.</li>
     * </ul>
     */
-  @nowarn("cat=deprecation")
-  // We need to keep LedgerTimeRecordTimeToleranceIncrease around to not break backwards compatibility
-  // But we deprecated it to avoid accidental usage in the codebase
   val all: Map[v30.ForceFlag, ForceFlag] =
-    Seq[ForceFlag](
-      AlienMember,
-      LedgerTimeRecordTimeToleranceIncrease,
-      AllowUnvetPackage,
-      AllowUnknownPackage,
-      AllowUnvettedDependencies,
-      DisablePartyWithActiveContracts,
-      AllowUnvalidatedSigningKeys,
-      AllowUnvetPackageWithActiveContracts,
-      SubmissionTimeRecordTimeToleranceIncrease,
-    )
+    Seq[ForceFlag](AlienMember, LedgerTimeRecordTimeToleranceIncrease)
       .map(ff => ff.toProtoV30 -> ff)
       .toMap
 

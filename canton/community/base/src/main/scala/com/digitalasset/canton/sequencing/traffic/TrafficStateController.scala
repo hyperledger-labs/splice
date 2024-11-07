@@ -10,6 +10,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.{SyncCryptoApi, SyncCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.TrafficConsumptionMetrics
@@ -21,8 +22,8 @@ import com.digitalasset.canton.sequencing.protocol.{
   SequencingSubmissionCost,
   TrafficState,
 }
+import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureUtil
 import com.digitalasset.canton.version.ProtocolVersion
@@ -42,7 +43,6 @@ class TrafficStateController(
     futureSupervisor: FutureSupervisor,
     timeouts: ProcessingTimeout,
     metrics: TrafficConsumptionMetrics,
-    domainId: DomainId,
 ) extends NamedLogging {
   private val currentTrafficPurchased =
     new AtomicReference[Option[TrafficPurchased]](initialTrafficState.toTrafficPurchased(member))
@@ -51,11 +51,6 @@ class TrafficStateController(
     initialTrafficState.toTrafficConsumed(member),
     loggerFactory,
     metrics,
-  )
-
-  private implicit val memberMetricsContext: MetricsContext = MetricsContext(
-    "member" -> member.toString,
-    "domain" -> domainId.toString,
   )
 
   def getTrafficConsumed: TrafficConsumed = trafficConsumedManager.getTrafficConsumed
@@ -96,11 +91,6 @@ class TrafficStateController(
         )
         Some(other)
     }
-    newState.foreach(state =>
-      metrics
-        .extraTrafficPurchased(memberMetricsContext)
-        .updateValue(state.extraTrafficPurchased.value)
-    )
     logger.debug(s"Updating traffic purchased entry $newState")
   }
 
@@ -110,54 +100,35 @@ class TrafficStateController(
   def tickStateAt(sequencingTimestamp: CantonTimestamp)(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
+      metricsContext: MetricsContext,
   ): Unit = FutureUtil.doNotAwaitUnlessShutdown(
-    for {
-      topology <- topologyClient.awaitSnapshotUS(sequencingTimestamp)
-      snapshot = topology.ipsSnapshot
-      trafficControlO <- snapshot.trafficControlParameters(protocolVersion)
-    } yield trafficControlO.foreach { params =>
-      val updated = trafficConsumedManager.updateAt(sequencingTimestamp, params, logger)
+    {
+      for {
+        topology <- topologyClient.awaitSnapshotUS(sequencingTimestamp)
+        snapshot = topology.ipsSnapshot
+        trafficControlO <- snapshot.trafficControlParameters(protocolVersion)
+      } yield trafficControlO.foreach { params =>
+        val updated = trafficConsumedManager.updateAt(sequencingTimestamp, params, logger)
 
-      if (updated.sequencingTimestamp != sequencingTimestamp)
-        logger.debug(
-          "Skipped traffic update because the current state is more recent than the sequenced event." +
-            s"Event timestamp: $sequencingTimestamp. Current state: $updated"
-        )
-      else
-        logger.debug(
-          s"Updated traffic state at timestamp: $sequencingTimestamp without consuming traffic. Current state: $updated"
-        )
+        if (updated.sequencingTimestamp != sequencingTimestamp)
+          logger.debug(
+            "Skipped traffic update because the current state is more recent than the sequenced event." +
+              s"Event timestamp: $sequencingTimestamp. Current state: $updated"
+          )
+        else
+          logger.debug(
+            s"Updated traffic state at timestamp: $sequencingTimestamp without consuming traffic. Current state: $updated"
+          )
+      }
     },
     s"Failed to update traffic consumed state at $sequencingTimestamp",
   )
 
-  def updateWithReceipt(
-      trafficReceipt: TrafficReceipt,
-      timestamp: CantonTimestamp,
-      deliverErrorReason: Option[String],
-      eventSpecificMetricsContext: MetricsContext,
-  ): Unit =
-    // Only update the event-specific traffic metrics if the state was updated (to avoid double reporting cost consumption)
-    // This is especially relevant during crash recovery if the member replays events from the sequencer subscription
-    if (trafficConsumedManager.updateWithReceipt(trafficReceipt, timestamp)) {
-      // For event specific metrics, we merge the member metrics context with the metrics context containing
-      // additional labels such as application ID and event type. It's possible we don't have such context
-      // during crash recovery though as this context is kept in the send tracker in memory cache, which is not persisted
-      val mergedEventSpecificMetricsContext =
-        memberMetricsContext.merge(eventSpecificMetricsContext)
-      deliverErrorReason match {
-        case Some(reason) =>
-          metrics.trafficCostOfNotDeliveredSequencedEvent.mark(trafficReceipt.consumedCost.value)(
-            mergedEventSpecificMetricsContext.withExtraLabels("reason" -> reason)
-          )
-          metrics.deliveredEventCounter.inc()(mergedEventSpecificMetricsContext)
-        case None =>
-          metrics.trafficCostOfDeliveredSequencedEvent.mark(trafficReceipt.consumedCost.value)(
-            mergedEventSpecificMetricsContext
-          )
-          metrics.rejectedEventCounter.inc()(mergedEventSpecificMetricsContext)
-      }
-    }
+  def updateWithReceipt(trafficReceipt: TrafficReceipt, timestamp: CantonTimestamp)(implicit
+      metricsContext: MetricsContext
+  ): Unit = {
+    trafficConsumedManager.updateWithReceipt(trafficReceipt, timestamp).discard
+  }
 
   /** Compute the cost of a batch of envelopes.
     * Does NOT debit the cost from the current traffic purchased.

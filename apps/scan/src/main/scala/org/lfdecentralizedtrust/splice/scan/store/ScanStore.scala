@@ -18,7 +18,6 @@ import org.lfdecentralizedtrust.splice.store.{
   VotesStore,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanStore,
@@ -123,13 +122,6 @@ trait ScanStore
       tc: TraceContext
   ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
     getAmuletRulesWithState().map(_.contract)
-
-  def getExternalPartyAmuletRules()(implicit
-      tc: TraceContext
-  ): Future[ContractWithState[
-    splice.externalpartyamuletrules.ExternalPartyAmuletRules.ContractId,
-    splice.externalpartyamuletrules.ExternalPartyAmuletRules,
-  ]]
 
   def getDecentralizedSynchronizerId()(implicit
       tc: TraceContext
@@ -239,24 +231,6 @@ trait ScanStore
     Option[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
-  def lookupTransferPreapprovalByParty(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    Option[ContractWithState[
-      splice.amuletrules.TransferPreapproval.ContractId,
-      splice.amuletrules.TransferPreapproval,
-    ]]
-  ]
-
-  def lookupTransferCommandCounterByParty(
-      partyId: PartyId
-  )(implicit tc: TraceContext): Future[
-    Option[ContractWithState[
-      splice.externalpartyamuletrules.TransferCommandCounter.ContractId,
-      splice.externalpartyamuletrules.TransferCommandCounter,
-    ]]
-  ]
-
   def listTransactions(
       pageEndEventId: Option[String],
       sortOrder: SortOrder,
@@ -272,13 +246,6 @@ trait ScanStore
   def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]]
-
-  def lookupLatestTransferCommandEvents(
-      sender: PartyId,
-      nonce: Long,
-  )(implicit
-      tc: TraceContext
-  ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]]
 }
 
 object ScanStore {
@@ -415,7 +382,6 @@ object ScanStore {
                 _ => None,
                 Some(_),
               ),
-            memberTrafficDomain = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
             totalTrafficPurchased = Some(contract.payload.totalPurchased),
           )
         },
@@ -446,29 +412,6 @@ object ScanStore {
             voteRequesterName = Some(contract.payload.requester),
             voteRequestTrackingCid =
               Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
-          )
-        },
-        mkFilter(splice.amuletrules.TransferPreapproval.COMPANION)(co => co.payload.dso == dso) {
-          contract =>
-            ScanAcsStoreRowData(
-              contract,
-              transferPreapprovalReceiver =
-                Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
-              transferPreapprovalValidFrom =
-                Some(Timestamp.assertFromInstant(contract.payload.validFrom)),
-            )
-        },
-        mkFilter(splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION)(co =>
-          co.payload.dso == dso
-        ) {
-          ScanAcsStoreRowData(_)
-        },
-        mkFilter(splice.externalpartyamuletrules.TransferCommandCounter.COMPANION)(co =>
-          co.payload.dso == dso
-        ) { contract =>
-          ScanAcsStoreRowData(
-            contract,
-            walletParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sender)),
           )
         },
       ),

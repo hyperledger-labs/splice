@@ -11,6 +11,7 @@ import com.digitalasset.canton.platform.store.backend.localstore.{
   PartyRecordStorageBackend,
   UserManagementStorageBackend,
 }
+import com.digitalasset.canton.platform.store.backend.oracle.OracleStorageBackendFactory
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresStorageBackendFactory
 import com.digitalasset.canton.platform.store.cache.LedgerEndCache
 import com.digitalasset.canton.platform.store.interning.StringInterning
@@ -64,6 +65,7 @@ object StorageBackendFactory {
     dbType match {
       case DbType.H2Database => H2StorageBackendFactory
       case DbType.Postgres => PostgresStorageBackendFactory(loggerFactory)
+      case DbType.Oracle => OracleStorageBackendFactory
     }
 }
 

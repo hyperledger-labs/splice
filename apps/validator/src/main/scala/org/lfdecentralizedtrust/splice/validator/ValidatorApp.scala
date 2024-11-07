@@ -68,7 +68,7 @@ import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
 import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.validator.util.{OAuth2Manager, ValidatorUtil}
-import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
+import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
   HttpExternalWalletHandler,
   HttpWalletHandler,
@@ -433,7 +433,6 @@ class ValidatorApp(
           retryProvider,
           logger,
           CommandPriority.High,
-          RetryFor.WaitingOnInitDependency,
         )
     } yield {
       logger.info(
@@ -718,49 +717,32 @@ class ValidatorApp(
         config.automation.topupTriggerPollingInterval_,
       )
       walletManagerOpt =
-        if (config.enableWallet) {
-          val externalPartyWalletManager = new ExternalPartyWalletManager(
-            ledgerClient,
-            store,
-            config.ledgerApiUser,
-            config.automation,
-            clock,
-            domainTimeAutomationService.domainTimeSync,
-            domainParamsAutomationService.domainUnpausedSync,
-            storage: Storage,
-            retryProvider,
-            scanConnection,
-            loggerFactory,
-            domainMigrationInfo,
-            participantId,
-            config.ingestFromParticipantBegin,
-            config.ingestUpdateHistoryFromParticipantBegin,
+        if (config.enableWallet)
+          Some(
+            new UserWalletManager(
+              ledgerClient,
+              store,
+              config.ledgerApiUser,
+              config.automation,
+              clock,
+              domainTimeAutomationService.domainTimeSync,
+              domainParamsAutomationService.domainUnpausedSync,
+              config.treasury,
+              storage: Storage,
+              retryProvider,
+              scanConnection,
+              loggerFactory,
+              domainMigrationInfo,
+              participantId,
+              config.ingestFromParticipantBegin,
+              config.ingestUpdateHistoryFromParticipantBegin,
+              validatorTopupConfig,
+              config.walletSweep,
+              config.autoAcceptTransfers,
+              config.supportsSoftDomainMigrationPoc,
+            )
           )
-          val walletManager = new UserWalletManager(
-            ledgerClient,
-            store,
-            config.ledgerApiUser,
-            externalPartyWalletManager,
-            config.automation,
-            clock,
-            domainTimeAutomationService.domainTimeSync,
-            domainParamsAutomationService.domainUnpausedSync,
-            config.treasury,
-            storage: Storage,
-            retryProvider,
-            scanConnection,
-            loggerFactory,
-            domainMigrationInfo,
-            participantId,
-            config.ingestFromParticipantBegin,
-            config.ingestUpdateHistoryFromParticipantBegin,
-            validatorTopupConfig,
-            config.walletSweep,
-            config.autoAcceptTransfers,
-            config.supportsSoftDomainMigrationPoc,
-          )
-          Some(walletManager)
-        } else {
+        else {
           logger.info("Not starting wallet as it's disabled")
           None
         }
@@ -770,7 +752,6 @@ class ValidatorApp(
         validatorTopupConfig,
         config.domains.global.buyExtraTraffic.grpcDeadline,
         config.appManager,
-        config.transferPreapproval,
         config.domains.global.url.isEmpty,
         config.prevetDuration,
         config.svValidator,
@@ -829,7 +810,6 @@ class ValidatorApp(
           retryProvider,
           logger,
           CommandPriority.High,
-          RetryFor.WaitingOnInitDependency,
         )
       }
       _ <- appInitStep(s"Ensure validator is onboarded") {
@@ -857,12 +837,9 @@ class ValidatorApp(
           participantIdentitiesStore,
           validatorUserName = config.ledgerApiUser,
           validatorWalletUserName = config.validatorWalletUser,
-          walletManagerOpt,
           getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
-          scanConnection = scanConnection,
           participantAdminConnection,
           config,
-          clock,
           retryProvider = retryProvider,
           loggerFactory,
         )
@@ -874,6 +851,7 @@ class ValidatorApp(
           loggerFactory,
           retryProvider,
           validatorTopupConfig,
+          clock,
         )
       )
 
@@ -1102,9 +1080,7 @@ object ValidatorApp {
         (Seq(
           participantAdminConnection,
           automation,
-        ) ++ walletManager.toList.flatMap { manager =>
-          Seq(manager, manager.externalPartyWalletManager)
-        } ++ Seq(
+        ) ++ walletManager.toList ++ Seq(
           store,
           storage,
           scanConnection,

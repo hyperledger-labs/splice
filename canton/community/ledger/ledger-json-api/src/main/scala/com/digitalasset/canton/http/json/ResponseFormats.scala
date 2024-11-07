@@ -11,14 +11,22 @@ import org.apache.pekko.util.ByteString
 import com.digitalasset.canton.fetchcontracts.util.PekkoStreamsUtils
 import scalaz.syntax.show.*
 import scalaz.{Show, \/}
+import spray.json.DefaultJsonProtocol.*
 import spray.json.*
 
 object ResponseFormats {
-  def resultJsObject[A: JsonWriter](a: A): JsObject =
-    resultJsObject(a.toJson)
+  def errorsJsObject(status: StatusCode, es: String*): JsObject = {
+    val errors = es.toJson
+    JsObject(statusField(status), ("errors", errors))
+  }
 
-  def resultJsObject(a: JsValue): JsObject =
+  def resultJsObject[A: JsonWriter](a: A): JsObject = {
+    resultJsObject(a.toJson)
+  }
+
+  def resultJsObject(a: JsValue): JsObject = {
     JsObject(statusField(StatusCodes.OK), ("result", a))
+  }
 
   def resultJsObject[E: Show](
       jsVals: Source[E \/ JsValue, NotUsed],
@@ -59,9 +67,10 @@ object ResponseFormats {
     Source.fromGraph(graph)
   }
 
-  private def formatOneElement(a: JsValue, index: Long): ByteString =
+  private def formatOneElement(a: JsValue, index: Long): ByteString = {
     if (index == 0L) ByteString(a.compactPrint)
     else ByteString("," + a.compactPrint)
+  }
 
   def statusField(status: StatusCode): (String, JsNumber) =
     ("status", JsNumber(status.intValue()))

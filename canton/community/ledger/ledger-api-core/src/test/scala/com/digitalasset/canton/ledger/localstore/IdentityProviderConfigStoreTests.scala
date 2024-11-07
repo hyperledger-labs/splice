@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.ledger.localstore
 
-import cats.syntax.either.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.api.domain.{
   IdentityProviderConfig,
@@ -116,7 +115,7 @@ trait IdentityProviderConfigStoreTests extends IdentityProviderConfigStoreSpecBa
           res3 <- tested.getIdentityProviderConfig(cfg.identityProviderId)
         } yield {
           res1 shouldBe Right(cfg)
-          res2 shouldBe Either.unit
+          res2 shouldBe Right(())
           res3 shouldBe Left(IdentityProviderConfigNotFound(cfg.identityProviderId))
         }
       }

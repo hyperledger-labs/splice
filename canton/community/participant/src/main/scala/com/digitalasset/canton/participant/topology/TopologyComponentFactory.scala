@@ -5,16 +5,12 @@ package com.digitalasset.canton.participant.topology
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, ProcessingTimeout}
-import com.digitalasset.canton.crypto.{Crypto, DomainCryptoPureApi}
+import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
-import com.digitalasset.canton.participant.protocol.{
-  ParticipantTopologyTerminateProcessing,
-  ParticipantTopologyTerminateProcessingTicker,
-}
+import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessingTicker
 import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
-import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.topology.client.*
@@ -40,35 +36,23 @@ class TopologyComponentFactory(
 ) {
 
   def createTopologyProcessorFactory(
-      staticDomainParameters: StaticDomainParameters,
       partyNotifier: LedgerServerPartyNotifier,
       missingKeysAlerter: MissingKeysAlerter,
       topologyClient: DomainTopologyClientWithInit,
       recordOrderPublisher: RecordOrderPublisher,
-      experimentalEnableTopologyEvents: Boolean,
   ): TopologyTransactionProcessor.Factory = new TopologyTransactionProcessor.Factory {
     override def create(
         acsCommitmentScheduleEffectiveTime: Traced[EffectiveTime] => Unit
     )(implicit executionContext: ExecutionContext): TopologyTransactionProcessor = {
 
-      val terminateTopologyProcessing =
-        if (experimentalEnableTopologyEvents) {
-          new ParticipantTopologyTerminateProcessing(
-            domainId,
-            recordOrderPublisher,
-            topologyStore,
-            loggerFactory,
-          )
-        } else {
-          new ParticipantTopologyTerminateProcessingTicker(
-            recordOrderPublisher,
-            loggerFactory,
-          )
-        }
+      val terminateTopologyProcessing = new ParticipantTopologyTerminateProcessingTicker(
+        recordOrderPublisher,
+        loggerFactory,
+      )
 
       val processor = new TopologyTransactionProcessor(
         domainId,
-        new DomainCryptoPureApi(staticDomainParameters, crypto.pureCrypto),
+        crypto.pureCrypto,
         topologyStore,
         acsCommitmentScheduleEffectiveTime,
         terminateTopologyProcessing,

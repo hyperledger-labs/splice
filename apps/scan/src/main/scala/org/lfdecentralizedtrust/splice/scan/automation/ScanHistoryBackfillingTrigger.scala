@@ -195,9 +195,7 @@ class ScanHistoryBackfillingTrigger(
                 store,
                 svName,
                 ledgerClient,
-                // When the network is starting up, the pool of SVs is changing fast
-                // Using a short refresh interval to quickly pick up new SVs
-                scansRefreshInterval = context.config.pollingInterval,
+                scansRefreshInterval = ScanAppClientConfig.DefaultScansRefreshInterval,
                 amuletRulesCacheTimeToLive = ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
                 upgradesConfig,
                 context.clock,

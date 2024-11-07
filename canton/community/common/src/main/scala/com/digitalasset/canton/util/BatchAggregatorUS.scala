@@ -160,7 +160,8 @@ class BatchAggregatorUSImpl[A, B](
         runSingleWithoutIncrement(item)
       } else { // add to the queue
         val promise = new PromiseUnlessShutdown[B]("run-batch", FutureSupervisor.Noop)(
-          ErrorLoggingContext.fromTracedLogger(processor.logger)
+          ErrorLoggingContext.fromTracedLogger(processor.logger),
+          ec,
         )
         queuedRequests.add((Traced(item), promise)).discard[Boolean]
         maybeRunQueuedQueries()
@@ -176,7 +177,7 @@ class BatchAggregatorUSImpl[A, B](
       ec: ExecutionContext,
       traceContext: TraceContext,
       callerCloseContext: CloseContext,
-  ): FutureUnlessShutdown[B] =
+  ): FutureUnlessShutdown[B] = {
     FutureUnlessShutdown.fromTry(Try(processor.executeSingle(item))).flatten.thereafter { result =>
       inFlight.decrementAndGet().discard[Int]
       maybeRunQueuedQueries()
@@ -185,6 +186,7 @@ class BatchAggregatorUSImpl[A, B](
         processor.logger.error(show"Failed to process ${processor.kind.unquoted} $item", _)
       }
     }
+  }
 
   /*
     If possible (i.e., if the number of in-flight items is not too big) and
@@ -274,13 +276,14 @@ class BatchAggregatorUSImpl[A, B](
   private def pollItemsFromQueue(): Seq[QueueType] = {
     val polledItems = new mutable.ArrayDeque[QueueType](maximumBatchSize)
 
-    @tailrec def go(remaining: Int): Unit =
+    @tailrec def go(remaining: Int): Unit = {
       Option(queuedRequests.poll()) match {
         case Some(queueItem) =>
           polledItems.addOne(queueItem)
           if (remaining > 0) go(remaining - 1)
         case None => ()
       }
+    }
 
     go(maximumBatchSize)
     polledItems.toSeq

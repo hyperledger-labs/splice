@@ -57,16 +57,16 @@ object TransactionFilterValidator {
   ): Either[StatusRuntimeException, domain.CumulativeFilter] = {
     val extractedFilters = filters.cumulative.map(_.identifierFilter)
     val empties = extractedFilters.filter(_.isEmpty)
-    lazy val templateFilters = extractedFilters.collect { case IdentifierFilter.TemplateFilter(f) =>
+    lazy val templateFilters = extractedFilters.collect({ case IdentifierFilter.TemplateFilter(f) =>
       f
-    }
-    lazy val interfaceFilters = extractedFilters.collect {
+    })
+    lazy val interfaceFilters = extractedFilters.collect({
       case IdentifierFilter.InterfaceFilter(f) =>
         f
-    }
-    lazy val wildcardFilters = extractedFilters.collect { case IdentifierFilter.WildcardFilter(f) =>
+    })
+    lazy val wildcardFilters = extractedFilters.collect({ case IdentifierFilter.WildcardFilter(f) =>
       f
-    }
+    })
 
     if (empties.size == extractedFilters.size)
       Right(domain.CumulativeFilter.templateWildcardFilter())
@@ -95,23 +95,24 @@ object TransactionFilterValidator {
   ): Either[StatusRuntimeException, domain.TemplateFilter] =
     for {
       templateId <- requirePresence(filter.templateId, "templateId")
-      typeConRef <- validateTypeConRef(templateId)
-    } yield domain.TemplateFilter(
-      templateTypeRef = typeConRef,
-      includeCreatedEventBlob = filter.includeCreatedEventBlob,
-    )
+      validatedIds <- validateIdentifierWithPackageUpgrading(
+        templateId,
+        filter.includeCreatedEventBlob,
+      )
+    } yield validatedIds
 
   private def validateInterfaceFilter(filter: InterfaceFilter)(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, domain.InterfaceFilter] =
+  ): Either[StatusRuntimeException, domain.InterfaceFilter] = {
     for {
       interfaceId <- requirePresence(filter.interfaceId, "interfaceId")
-      typeConRef <- validateTypeConRef(interfaceId)
+      validatedId <- validateIdentifier(interfaceId)
     } yield domain.InterfaceFilter(
-      interfaceTypeRef = typeConRef,
+      interfaceId = validatedId,
       includeView = filter.includeInterfaceView,
       includeCreatedEventBlob = filter.includeCreatedEventBlob,
     )
+  }
 
   private def validateNonEmptyFilters(
       templateFilters: Seq[TemplateFilter],
@@ -120,15 +121,15 @@ object TransactionFilterValidator {
   )(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
   ): Either[StatusRuntimeException, Unit] =
-    Either.cond(
-      !(templateFilters.isEmpty && interfaceFilters.isEmpty && wildcardFilters.isEmpty),
-      (),
-      RequestValidationErrors.InvalidArgument
-        .Reject(
-          "requests with empty template, interface and wildcard filters are not supported"
-        )
-        .asGrpcError,
-    )
+    if (templateFilters.isEmpty && interfaceFilters.isEmpty && wildcardFilters.isEmpty)
+      Left(
+        RequestValidationErrors.InvalidArgument
+          .Reject(
+            "requests with empty template, interface and wildcard filters are not supported"
+          )
+          .asGrpcError
+      )
+    else Right(())
 
   private def mergeWildcardFilters(
       filters: Seq[WildcardFilter]

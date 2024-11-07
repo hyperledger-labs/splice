@@ -56,7 +56,7 @@ class DefaultVerdictSenderTest
   private val mediatorGroupRecipient = MediatorGroupRecipient(MediatorGroupIndex.zero)
   private val mediatorGroup: MediatorGroup = MediatorGroup(
     index = mediatorGroupRecipient.group,
-    active = Seq(activeMediator1, activeMediator2),
+    active = NonEmpty.mk(Seq, activeMediator1, activeMediator2),
     passive = Seq(
       passiveMediator3
     ),
@@ -201,8 +201,8 @@ class DefaultVerdictSenderTest
     val initialDomainParameters = TestDomainParameters.defaultDynamic
 
     val domainSyncCryptoApi: DomainSyncCryptoClient =
-      if (testedProtocolVersion >= ProtocolVersion.v32) {
-        val topology = TestingTopology.from(
+      if (testedProtocolVersion >= ProtocolVersion.v31) {
+        val topology = TestingTopology(
           Set(domainId),
           Map(
             submitter -> Map(participant -> ParticipantPermission.Confirmation),
@@ -222,7 +222,7 @@ class DefaultVerdictSenderTest
 
         identityFactory.forOwnerAndDomain(mediatorId, domainId)
       } else {
-        val topology = TestingTopology.from(
+        val topology = TestingTopology(
           Set(domainId),
           Map(
             submitter -> Map(participant -> ParticipantPermission.Confirmation),
@@ -234,7 +234,7 @@ class DefaultVerdictSenderTest
           Set(
             MediatorGroup(
               MediatorGroupIndex.zero,
-              Seq(mediatorId),
+              NonEmpty.mk(Seq, mediatorId),
               Seq.empty,
               PositiveInt.one,
             )
@@ -265,7 +265,7 @@ class DefaultVerdictSenderTest
       loggerFactory,
     )
 
-    def sendApproval(): Future[Unit] =
+    def sendApproval(): Future[Unit] = {
       verdictSender
         .sendResult(
           requestId,
@@ -274,8 +274,9 @@ class DefaultVerdictSenderTest
           decisionTime,
         )
         .onShutdown(fail())
+    }
 
-    def sendReject(): Future[Unit] =
+    def sendReject(): Future[Unit] = {
       verdictSender
         .sendReject(
           requestId,
@@ -287,6 +288,7 @@ class DefaultVerdictSenderTest
           decisionTime,
         )
         .failOnShutdown
+    }
   }
 
 }

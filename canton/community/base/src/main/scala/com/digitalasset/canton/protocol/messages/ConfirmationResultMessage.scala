@@ -13,13 +13,12 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.version.*
-import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 
 /** Result message that the mediator sends to all informees of a request with its verdict.
   *
   * @param domainId the domain on which the request is running
-  * @param viewType determines which processor (transaction / reassignment) must process this message
+  * @param viewType determines which processor (transaction / transfer) must process this message
   * @param requestId unique identifier of the confirmation request
   * @param rootHash hash over the contents of the request
   * @param verdict the finalized verdict on the request
@@ -82,7 +81,6 @@ case class ConfirmationResultMessage private (
       getCryptographicEvidence
     )
 
-  @VisibleForTesting
   override def pretty: Pretty[ConfirmationResultMessage] =
     prettyOfClass(
       param("domainId", _.domainId),
@@ -101,7 +99,7 @@ object ConfirmationResultMessage
   override val name: String = "ConfirmationResultMessage"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(
       v30.ConfirmationResultMessage
     )(
       supportedProtoVersionMemoized(_)(fromProtoV30),
@@ -141,7 +139,7 @@ object ConfirmationResultMessage
       requestId <- RequestId.fromProtoPrimitive(requestIdP)
       rootHash <- RootHash.fromProtoPrimitive(rootHashP)
       verdict <- ProtoConverter.parseRequired(Verdict.fromProtoV30, "verdict", verdictPO)
-      informees <- informeesP.traverse(ProtoConverter.parseLfPartyId(_, "informees"))
+      informees <- informeesP.traverse(ProtoConverter.parseLfPartyId)
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield ConfirmationResultMessage(
       domainId,

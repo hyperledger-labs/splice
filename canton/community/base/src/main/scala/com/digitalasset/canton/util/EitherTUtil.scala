@@ -90,10 +90,11 @@ object EitherTUtil {
       errorHandler: Throwable => E,
   )(implicit
       executionContext: ExecutionContext
-  ): EitherT[FutureUnlessShutdown, E, A] =
+  ): EitherT[FutureUnlessShutdown, E, A] = {
     EitherT(futUnlSht.recover[Either[E, A]] { case NonFatal(x) =>
       UnlessShutdown.Outcome(errorHandler(x).asLeft[A])
     })
+  }
 
   /** Log `message` if `result` fails with an exception or results in a `Left` */
   def logOnError[E, R](result: EitherT[Future, E, R], message: String, level: Level = Level.ERROR)(
@@ -181,10 +182,11 @@ object EitherTUtil {
   ): FutureUnlessShutdown[R] =
     x.foldF(FutureUnlessShutdown.failed, FutureUnlessShutdown.pure)
 
-  def unit[A]: EitherT[Future, A, Unit] = EitherT(Future.successful(Either.unit))
+  def unit[A]: EitherT[Future, A, Unit] = EitherT(Future.successful(().asRight[A]))
 
-  def unitUS[A]: EitherT[FutureUnlessShutdown, A, Unit] =
-    EitherT(FutureUnlessShutdown.pure(Either.unit))
+  def unitUS[A]: EitherT[FutureUnlessShutdown, A, Unit] = EitherT(
+    FutureUnlessShutdown.pure(().asRight[A])
+  )
 
   object syntax {
     implicit class FunctorToEitherT[F[_]: Functor, T](f: F[T]) {

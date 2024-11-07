@@ -179,9 +179,11 @@ class ParticipantPartyMigrator(
               Right(
                 PartyToParticipant.tryCreate(
                   partyId = partyId,
+                  domainId = None,
                   threshold = PositiveInt.one,
                   participants =
                     Seq(HostingParticipant(participantId, ParticipantPermission.Submission)),
+                  groupAddressing = false,
                 )
               ),
             signedBy = participantId.uid.namespace.fingerprint,

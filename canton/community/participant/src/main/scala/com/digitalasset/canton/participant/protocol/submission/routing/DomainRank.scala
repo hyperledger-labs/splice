@@ -5,25 +5,21 @@ package com.digitalasset.canton.participant.protocol.submission.routing
 
 import cats.Order.*
 import cats.data.{Chain, EitherT}
-import cats.syntax.bifunctor.*
 import cats.syntax.parallel.*
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.protocol.ReassignmentSubmissionValidation
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.ReassignmentProcessorError
-import com.digitalasset.canton.participant.protocol.reassignment.{
-  ReassigningParticipantsComputation,
-  UnassignmentProcessorError,
+import com.digitalasset.canton.participant.protocol.CanSubmitTransfer
+import com.digitalasset.canton.participant.protocol.transfer.{
+  AdminPartiesAndParticipants,
+  TransferOutProcessorError,
 }
 import com.digitalasset.canton.participant.sync.TransactionRoutingError
-import com.digitalasset.canton.participant.sync.TransactionRoutingError.AutomaticReassignmentForTransactionFailure
+import com.digitalasset.canton.participant.sync.TransactionRoutingError.AutomaticTransferForTransactionFailure
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -39,105 +35,110 @@ private[routing] class DomainRankComputation(
   // Includes check that submitting party has a participant with submission rights on source and target domain
   def compute(
       contracts: Seq[ContractData],
-      targetDomain: Target[DomainId],
-      readers: Set[LfPartyId],
+      targetDomain: DomainId,
+      submitters: Set[LfPartyId],
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): EitherT[Future, TransactionRoutingError, DomainRank] = {
-    // (contract id, (reassignment submitter, target domain id))
-    type SingleReassignment = (LfContractId, (LfPartyId, DomainId))
+    // (contract id, (transfer submitter, target domain id))
+    type SingleTransfer = (LfContractId, (LfPartyId, DomainId))
 
     val targetSnapshotET =
       EitherT.fromEither[Future](snapshotProvider.getTopologySnapshotFor(targetDomain))
 
-    val reassignmentsET: EitherT[Future, TransactionRoutingError, Chain[SingleReassignment]] =
+    val transfers: EitherT[Future, TransactionRoutingError, Chain[SingleTransfer]] = {
       Chain.fromSeq(contracts).parFlatTraverse { c =>
         val contractDomain = c.domain
 
-        if (contractDomain == targetDomain.unwrap) EitherT.pure(Chain.empty)
+        if (contractDomain == targetDomain) EitherT.pure(Chain.empty)
         else {
           for {
             sourceSnapshot <- EitherT
               .fromEither[Future](snapshotProvider.getTopologySnapshotFor(contractDomain))
-              .map(Source(_))
             targetSnapshot <- targetSnapshotET
-            submitter <- findReaderThatCanReassignContract(
+            submitter <- findSubmitterThatCanTransferContract(
               sourceSnapshot = sourceSnapshot,
-              sourceDomainId = Source(contractDomain),
+              sourceDomainId = SourceDomainId(contractDomain),
               targetSnapshot = targetSnapshot,
-              targetDomainId = targetDomain,
-              contract = c,
-              readers = readers,
+              targetDomainId = TargetDomainId(targetDomain),
+              contractId = c.id,
+              contractStakeholders = c.stakeholders,
+              submitters = submitters,
             )
           } yield Chain(c.id -> (submitter, contractDomain))
         }
       }
+    }
 
-    reassignmentsET.map(reassignments =>
+    transfers.map(transfers =>
       DomainRank(
-        reassignments.toList.toMap,
-        priorityOfDomain(targetDomain.unwrap),
-        targetDomain.unwrap,
+        transfers.toList.toMap,
+        priorityOfDomain(targetDomain),
+        targetDomain,
       )
     )
   }
 
-  private def findReaderThatCanReassignContract(
-      sourceSnapshot: Source[TopologySnapshot],
-      sourceDomainId: Source[DomainId],
-      targetSnapshot: Target[TopologySnapshot],
-      targetDomainId: Target[DomainId],
-      contract: ContractData,
-      readers: Set[LfPartyId],
+  private def findSubmitterThatCanTransferContract(
+      sourceSnapshot: TopologySnapshot,
+      sourceDomainId: SourceDomainId,
+      targetSnapshot: TopologySnapshot,
+      targetDomainId: TargetDomainId,
+      contractId: LfContractId,
+      contractStakeholders: Set[LfPartyId],
+      submitters: Set[LfPartyId],
   )(implicit traceContext: TraceContext): EitherT[Future, TransactionRoutingError, LfPartyId] = {
     logger.debug(
-      s"Computing submitter that can submit reassignment of ${contract.id} with stakeholders ${contract.stakeholders} from $sourceDomainId to $targetDomainId. Candidates are: $readers"
+      s"Computing submitter that can submit transfer of $contractId with stakeholders $contractStakeholders from $sourceDomainId to $targetDomainId. Candidates are: $submitters"
     )
 
-    // Building the unassignment requests lets us check whether contract can be reassigned to target domain
+    // Building the transfer out requests lets us check whether contract can be transferred to target domain
     def go(
-        readers: List[LfPartyId],
+        submitters: List[LfPartyId],
         errAccum: List[String] = List.empty,
-    ): EitherT[Future, String, LfPartyId] =
-      readers match {
+    ): EitherT[Future, String, LfPartyId] = {
+      submitters match {
         case Nil =>
           EitherT.leftT(
-            show"Cannot reassign contract ${contract.id} from $sourceDomainId to $targetDomainId: ${errAccum
+            show"Cannot transfer contract $contractId from $sourceDomainId to $targetDomainId: ${errAccum
                 .mkString(",")}"
           )
-        case reader :: rest =>
+        case submitter :: rest =>
           val result =
             for {
-              _ <- ReassignmentSubmissionValidation.unassignment(
-                contract.id,
+              _ <- CanSubmitTransfer.transferOut(
+                contractId,
                 sourceSnapshot,
-                reader,
+                submitter,
                 participantId,
-                contract.stakeholders.all,
               )
-              _ <- new ReassigningParticipantsComputation(
-                stakeholders = contract.stakeholders,
+              adminParties <- AdminPartiesAndParticipants(
+                contractId,
+                submitter,
+                contractStakeholders,
                 sourceSnapshot,
                 targetSnapshot,
-              ).compute.mapK(FutureUnlessShutdown.outcomeK).leftWiden[ReassignmentProcessorError]
-            } yield ()
+                logger,
+              )
+            } yield adminParties
           result
-            .onShutdown(Left(UnassignmentProcessorError.AbortedDueToShutdownOut(contract.id)))
+            .onShutdown(Left(TransferOutProcessorError.AbortedDueToShutdownOut(contractId)))
             .biflatMap(
-              left => go(rest, errAccum :+ show"Read $reader cannot reassign: $left"),
-              _ => EitherT.rightT(reader),
+              left => go(rest, errAccum :+ show"Submitter $submitter cannot transfer: $left"),
+              _ => EitherT.rightT(submitter),
             )
       }
+    }
 
-    go(readers.intersect(contract.stakeholders.all).toList).leftMap(errors =>
-      AutomaticReassignmentForTransactionFailure.Failed(errors)
+    go(submitters.intersect(contractStakeholders).toList).leftMap(errors =>
+      AutomaticTransferForTransactionFailure.Failed(errors)
     )
   }
 }
 
 private[routing] final case class DomainRank(
-    reassignments: Map[LfContractId, (LfPartyId, DomainId)], // (cid, (submitter, current domain))
+    transfers: Map[LfContractId, (LfPartyId, DomainId)], // (cid, (submitter, current domain))
     priority: Int,
     domainId: DomainId, // domain for submission
 )
@@ -145,5 +146,5 @@ private[routing] final case class DomainRank(
 private[routing] object DomainRank {
   // The highest priority domain should be picked first, so negate the priority
   implicit val domainRanking: Ordering[DomainRank] =
-    Ordering.by(x => (-x.priority, x.reassignments.size, x.domainId))
+    Ordering.by(x => (-x.priority, x.transfers.size, x.domainId))
 }

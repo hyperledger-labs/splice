@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.history
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules as externalPartyAmuletRulesCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   OpenMiningRound,
@@ -72,24 +71,6 @@ object AmuletRules_BuyMemberTraffic
       template = splice.amuletrules.AmuletRules.COMPANION,
     )
 
-object AmuletRules_CreateExternalPartySetupProposal
-    extends ExerciseNodeCompanion.Mk(
-      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_CreateExternalPartySetupProposal,
-      template = splice.amuletrules.AmuletRules.COMPANION,
-    )
-
-object AmuletRules_CreateTransferPreapproval
-    extends ExerciseNodeCompanion.Mk(
-      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_CreateTransferPreapproval,
-      template = splice.amuletrules.AmuletRules.COMPANION,
-    )
-
-object TransferPreapproval_Renew
-    extends ExerciseNodeCompanion.Mk(
-      choice = splice.amuletrules.TransferPreapproval.CHOICE_TransferPreapproval_Renew,
-      template = splice.amuletrules.TransferPreapproval.COMPANION,
-    )
-
 object AnsRules_CollectInitialEntryPayment
     extends ExerciseNodeCompanion.Mk(
       choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectInitialEntryPayment,
@@ -102,37 +83,12 @@ object AnsRules_CollectEntryRenewalPayment
       template = ansCodegen.AnsRules.COMPANION,
     )
 
-object ExternalPartyAmuletRules_CreateTransferCommand
-    extends ExerciseNodeCompanion.Mk(
-      choice =
-        externalPartyAmuletRulesCodegen.ExternalPartyAmuletRules.CHOICE_ExternalPartyAmuletRules_CreateTransferCommand,
-      template = externalPartyAmuletRulesCodegen.ExternalPartyAmuletRules.COMPANION,
-    )
-
-object TransferCommand_Send
-    extends ExerciseNodeCompanion.Mk(
-      choice = externalPartyAmuletRulesCodegen.TransferCommand.CHOICE_TransferCommand_Send,
-      template = externalPartyAmuletRulesCodegen.TransferCommand.COMPANION,
-    )
-
-object TransferCommand_Withdraw
-    extends ExerciseNodeCompanion.Mk(
-      choice = externalPartyAmuletRulesCodegen.TransferCommand.CHOICE_TransferCommand_Withdraw,
-      template = externalPartyAmuletRulesCodegen.TransferCommand.COMPANION,
-    )
-
-object TransferCommand_Expire
-    extends ExerciseNodeCompanion.Mk(
-      choice = externalPartyAmuletRulesCodegen.TransferCommand.CHOICE_TransferCommand_Expire,
-      template = externalPartyAmuletRulesCodegen.TransferCommand.COMPANION,
-    )
-
 object AmuletArchive {
   // Matches on any consuming exercise on a amulet
   def unapply(event: ExercisedEvent): Option[ExercisedEvent] =
     if (
       QualifiedName(event.getTemplateId) == QualifiedName(
-        amuletCodegen.Amulet.COMPANION.getTemplateIdWithPackageId
+        amuletCodegen.Amulet.COMPANION.TEMPLATE_ID
       ) && event.isConsuming
     ) {
       Some(event)

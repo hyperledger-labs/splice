@@ -7,9 +7,9 @@ import com.daml.error.*
 import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors
 import com.digitalasset.daml.lf.archive.Error as LfArchiveError
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.engine.Error
-import com.digitalasset.daml.lf.language.Util
-import com.digitalasset.daml.lf.validation.{TypecheckUpgrades, UpgradeError}
+import com.digitalasset.daml.lf.validation.UpgradeError
 import com.digitalasset.daml.lf.{VersionRange, language, validation}
 
 import ParticipantErrorGroup.LedgerApiErrorGroup.PackageServiceErrorGroup
@@ -129,7 +129,7 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
             "detailMsg" -> detailMsg,
           ),
         )
-    final case class Error(missing: Set[Ref.PackageRef])(implicit
+    final case class Error(missing: Set[PackageId])(implicit
         val loggingContext: ContextualizedErrorLogger
     ) extends DamlError(
           cause = "Failed to resolve package ids locally.",
@@ -186,8 +186,8 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
         PackageServiceErrors.InternalError.Validation(nameOfFunc, msg)
       case Error.Package.Validation(validationError) =>
         ValidationError.Error(validationError)
-      case Error.Package.MissingPackage(packageRef, _) =>
-        PackageServiceErrors.InternalError.Error(Set(packageRef))
+      case Error.Package.MissingPackage(packageId, _) =>
+        PackageServiceErrors.InternalError.Error(Set(packageId))
       case Error.Package
             .AllowedLanguageVersion(packageId, languageVersion, allowedLanguageVersions) =>
         AllowedLanguageMismatchError(
@@ -267,41 +267,36 @@ object PackageServiceErrors extends PackageServiceErrorGroup {
           ErrorCategory.InvalidIndependentOfSystemState,
         ) {
       final case class Error(
-          oldPackage: Util.PkgIdWithNameAndVersion,
-          newPackage: Util.PkgIdWithNameAndVersion,
+          upgradingPackage: Ref.PackageId,
+          upgradedPackage: Ref.PackageId,
           upgradeError: UpgradeError,
-          phase: TypecheckUpgrades.UploadPhaseCheck,
       )(implicit
           val loggingContext: ContextualizedErrorLogger
-      ) extends DamlError(cause = phase match {
-            case TypecheckUpgrades.MaximalDarCheck =>
-              s"The uploaded DAR contains a package $newPackage, but upgrade checks indicate that new package $newPackage cannot be an upgrade of existing package $oldPackage. Reason: ${upgradeError.prettyInternal}"
-            case TypecheckUpgrades.MinimalDarCheck =>
-              s"The uploaded DAR contains a package $oldPackage, but upgrade checks indicate that existing package $newPackage cannot be an upgrade of new package $oldPackage. Reason: ${upgradeError.prettyInternal}"
-          })
+      ) extends DamlError(
+            cause =
+              s"The DAR contains a package which claims to upgrade another package, but basic checks indicate the package is not a valid upgrade. Upgrading package: ${upgradingPackage}; Upgraded package: ${upgradedPackage}; Reason: ${upgradeError.prettyInternal}"
+          )
     }
 
     @Explanation(
       """This error indicates that the Dar upload failed upgrade checks because a package with the same version and package name has been previously uploaded."""
     )
     @Resolution("Inspect the error message and contact support.")
-    @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
     object UpgradeVersion
         extends ErrorCode(
           id = "KNOWN_DAR_VERSION",
           ErrorCategory.InvalidIndependentOfSystemState,
         ) {
       final case class Error(
-          uploadedPackage: Util.PkgIdWithNameAndVersion,
+          uploadedPackageId: Ref.PackageId,
           existingPackage: Ref.PackageId,
           packageVersion: Ref.PackageVersion,
       )(implicit
           val loggingContext: ContextualizedErrorLogger
       ) extends DamlError(
-            cause =
-              s"Tried to upload package $uploadedPackage, but a different package $existingPackage with the same name and version has previously been uploaded.",
+            cause = "A DAR with the same version number has previously been uploaded.",
             extraContext = Map(
-              "uploadedPackageId" -> uploadedPackage,
+              "uploadedPackageId" -> uploadedPackageId,
               "existingPackage" -> existingPackage,
               "packageVersion" -> packageVersion.toString,
             ),

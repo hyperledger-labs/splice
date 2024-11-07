@@ -4,7 +4,6 @@
 package com.digitalasset.canton.participant.protocol.validation
 
 import cats.data.EitherT
-import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.data.*
@@ -23,8 +22,8 @@ import com.digitalasset.canton.participant.protocol.{
 import com.digitalasset.canton.participant.store.ContractLookupAndVerification
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.participant.util.DAMLe.{EngineError, HasReinterpret, PackageResolver}
-import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.store.PackageDependencyResolverUS
 import com.digitalasset.canton.tracing.TraceContext
@@ -89,7 +88,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       ledgerTime shouldEqual factory.ledgerTime
       submissionTime shouldEqual factory.submissionTime
 
-      val (_, (reinterpretedTx, metadata, keyResolver), _) =
+      val (_, (reinterpretedTx, metadata, keyResolver), _) = {
         // The code below assumes that for reinterpretedSubtransactions the combination
         // of command and root-seed wil be unique. In the examples used to date this is
         // the case. A limitation of this approach is that only one LookupByKey transaction
@@ -98,6 +97,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
           viewTree.viewParticipantData.rootAction.command == command &&
           md.seeds.get(tx.roots(0)) == rootSeed
         }.value
+      }
 
       EitherT.rightT((reinterpretedTx, metadata, keyResolver, usedPackages))
     }
@@ -133,7 +133,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       (viewTree, resolvers)
     })
 
-  val transactionTreeFactory: TransactionTreeFactoryImpl =
+  val transactionTreeFactory: TransactionTreeFactoryImpl = {
     TransactionTreeFactoryImpl(
       ExampleTransactionFactory.submittingParticipant,
       factory.domainId,
@@ -141,13 +141,14 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       factory.cryptoOps,
       loggerFactory,
     )
+  }
 
   object dummyAuthenticator extends SerializableContractAuthenticator {
-    override def authenticate(contract: SerializableContract): Either[String, Unit] = Either.unit
+    override def authenticate(contract: SerializableContract): Either[String, Unit] = Right(())
     override def verifyMetadata(
         contract: SerializableContract,
         metadata: ContractMetadata,
-    ): Either[String, Unit] = Either.unit
+    ): Either[String, Unit] = Right(())
   }
 
   def check(
@@ -174,7 +175,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
   val packageVersion: LfPackageVersion = LfPackageVersion.assertFromString("1.0.0")
   val packageMetadata: PackageMetadata = PackageMetadata(packageName, packageVersion, None)
   val genPackage: GenPackage[Expr] =
-    GenPackage(Map.empty, Set.empty, LanguageVersion.default, packageMetadata, true)
+    GenPackage(Map.empty, Set.empty, LanguageVersion.default, packageMetadata)
   val packageResolver: PackageResolver = _ => _ => Future.successful(Some(genPackage))
 
   def buildUnderTest(reinterpretCommand: HasReinterpret): ModelConformanceChecker =
@@ -457,8 +458,9 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
     import cats.syntax.either.*
     override def packageDependencies(packageId: PackageId)(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] =
+    ): EitherT[FutureUnlessShutdown, PackageId, Set[PackageId]] = {
       result.toEitherT
+    }
   }
 
 }

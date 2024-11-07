@@ -10,8 +10,7 @@ import com.digitalasset.canton.crypto.{
   EncryptionKeySpec,
   HashAlgorithm,
   PbkdfScheme,
-  SigningAlgorithmSpec,
-  SigningKeySpec,
+  SigningKeyScheme,
   SymmetricKeyScheme,
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -21,8 +20,7 @@ trait CryptoProvider extends PrettyPrinting {
 
   def name: String
 
-  def signingAlgorithms: CryptoProviderScheme[SigningAlgorithmSpec]
-  def signingKeys: CryptoProviderScheme[SigningKeySpec]
+  def signing: CryptoProviderScheme[SigningKeyScheme]
   def encryptionAlgorithms: CryptoProviderScheme[EncryptionAlgorithmSpec]
   def encryptionKeys: CryptoProviderScheme[EncryptionKeySpec]
   def symmetric: CryptoProviderScheme[SymmetricKeyScheme]
@@ -35,32 +33,21 @@ trait CryptoProvider extends PrettyPrinting {
       protocolVersion: ProtocolVersion
   ): NonEmpty[Set[CryptoKeyFormat]]
 
-  override protected def pretty: Pretty[CryptoProvider.this.type] = prettyOfString(_.name)
+  override def pretty: Pretty[CryptoProvider.this.type] = prettyOfString(_.name)
 }
 
 object CryptoProvider {
   trait JceCryptoProvider extends CryptoProvider {
     override def name: String = "JCE"
 
-    override def signingAlgorithms: CryptoProviderScheme[SigningAlgorithmSpec] =
+    override def signing: CryptoProviderScheme[SigningKeyScheme] =
       CryptoProviderScheme(
-        SigningAlgorithmSpec.Ed25519,
+        SigningKeyScheme.Ed25519,
         NonEmpty(
           Set,
-          SigningAlgorithmSpec.Ed25519,
-          SigningAlgorithmSpec.EcDsaSha256,
-          SigningAlgorithmSpec.EcDsaSha384,
-        ),
-      )
-
-    override def signingKeys: CryptoProviderScheme[SigningKeySpec] =
-      CryptoProviderScheme(
-        SigningKeySpec.EcCurve25519,
-        NonEmpty(
-          Set,
-          SigningKeySpec.EcCurve25519,
-          SigningKeySpec.EcP256,
-          SigningKeySpec.EcP384,
+          SigningKeyScheme.Ed25519,
+          SigningKeyScheme.EcDsaP256,
+          SigningKeyScheme.EcDsaP384,
         ),
       )
 

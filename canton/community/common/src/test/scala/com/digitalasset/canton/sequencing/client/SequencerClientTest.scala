@@ -6,11 +6,10 @@ package com.digitalasset.canton.sequencing.client
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
-import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.crypto.{
   DomainSyncCryptoClient,
@@ -77,18 +76,17 @@ import com.digitalasset.canton.store.{
   SequencerCounterTrackerStore,
 }
 import com.digitalasset.canton.time.{DomainTimeTracker, MockTimeRequestSubmitter, SimClock}
-import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.DefaultTestIdentities.{
   daSequencerId,
   domainId,
   participant1,
 }
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.{DomainTopologyClient, TopologySnapshot}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.version.{ProtocolVersion, RepresentativeProtocolVersion}
-import io.grpc.Status
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
@@ -119,8 +117,9 @@ class SequencerClientTest
       CantonTimestamp.Epoch,
       DefaultTestIdentities.domainId,
     )
-  private lazy val signedDeliver: OrdinarySerializedEvent =
+  private lazy val signedDeliver: OrdinarySerializedEvent = {
     OrdinarySequencedEvent(SequencerTestUtils.sign(deliver))(traceContext)
+  }
 
   private lazy val nextDeliver: Deliver[Nothing] = SequencerTestUtils.mockDeliver(
     43,
@@ -357,7 +356,7 @@ class SequencerClientTest
             ApplicationHandler.create("test-handler-throttling") { e =>
               val firstSc = e.value.head.counter
               val lastSc = e.value.last.counter
-              logger.debug(s"Processing batch of events $firstSc to $lastSc")
+              logger.debug(s"Processing batch of events ${firstSc} to ${lastSc}")
               HandlerResult.asynchronous(
                 FutureUnlessShutdown.outcomeF(Future {
                   blocking {
@@ -466,10 +465,12 @@ class SequencerClientTest
         val storedEventF = for {
           _ <- env.subscribeAfter(eventHandler = alwaysFailingHandler)
           _ <- loggerFactory.assertLogs(
-            for {
-              _ <- transport.subscriber.value.sendToHandler(signedDeliver)
-              _ <- client.flush()
-            } yield (),
+            {
+              for {
+                _ <- transport.subscriber.value.sendToHandler(signedDeliver)
+                _ <- client.flush()
+              } yield ()
+            },
             logEntry => {
               logEntry.errorMessage should be(
                 "Synchronous event processing failed for event batch with sequencer counters 42 to 42."
@@ -523,14 +524,16 @@ class SequencerClientTest
         val closeReasonF = for {
           _ <- env.subscribeAfter(CantonTimestamp.MinValue, handler)
           closeReason <- loggerFactory.assertLogs(
-            for {
-              _ <- transport.subscriber.value.sendToHandler(deliver)
-              // Send the next event so that the client notices that an error has occurred.
-              _ <- client.flush()
-              _ <- transport.subscriber.value.sendToHandler(nextDeliver)
-              // wait until the subscription is closed (will emit an error)
-              closeReason <- client.completion
-            } yield closeReason,
+            {
+              for {
+                _ <- transport.subscriber.value.sendToHandler(deliver)
+                // Send the next event so that the client notices that an error has occurred.
+                _ <- client.flush()
+                _ <- transport.subscriber.value.sendToHandler(nextDeliver)
+                // wait until the subscription is closed (will emit an error)
+                closeReason <- client.completion
+              } yield closeReason
+            },
             logEntry => {
               logEntry.errorMessage should be(
                 s"Synchronous event processing failed for event batch with sequencer counters ${deliver.counter} to ${deliver.counter}."
@@ -589,22 +592,24 @@ class SequencerClientTest
             eventHandler = ApplicationHandler.create("async-failure")(_ => asyncFailure)
           )
           closeReason <- loggerFactory.assertLogs(
-            for {
-              _ <- transport.subscriber.value.sendToHandler(deliver)
-              // Make sure that the asynchronous error has been noticed
-              // We intentionally do two flushes. The first captures `handleReceivedEventsUntilEmpty` completing.
-              // During this it may addToFlush a future for capturing `asyncSignalledF` however this may occur
-              // after we've called `flush` and therefore won't guarantee completing all processing.
-              // So our second flush will capture `asyncSignalledF` for sure.
-              _ <- client.flush()
-              _ <- client.flush()
-              // Send the next event so that the client notices that an error has occurred.
-              _ <- transport.subscriber.value.sendToHandler(nextDeliver)
-              _ <- client.flush()
-              // wait until client completed (will write an error)
-              closeReason <- client.completion
-              _ = client.close() // make sure that we can still close the sequencer client
-            } yield closeReason,
+            {
+              for {
+                _ <- transport.subscriber.value.sendToHandler(deliver)
+                // Make sure that the asynchronous error has been noticed
+                // We intentionally do two flushes. The first captures `handleReceivedEventsUntilEmpty` completing.
+                // During this it may addToFlush a future for capturing `asyncSignalledF` however this may occur
+                // after we've called `flush` and therefore won't guarantee completing all processing.
+                // So our second flush will capture `asyncSignalledF` for sure.
+                _ <- client.flush()
+                _ <- client.flush()
+                // Send the next event so that the client notices that an error has occurred.
+                _ <- transport.subscriber.value.sendToHandler(nextDeliver)
+                _ <- client.flush()
+                // wait until client completed (will write an error)
+                closeReason <- client.completion
+                _ = client.close() // make sure that we can still close the sequencer client
+              } yield closeReason
+            },
             logEntry => {
               logEntry.errorMessage should include(
                 s"Asynchronous event processing failed for event batch with sequencer counters ${deliver.counter} to ${deliver.counter}"
@@ -739,10 +744,12 @@ class SequencerClientTest
             timeTracker,
           )
           _ <- loggerFactory.assertLogs(
-            for {
-              _ <- transport.subscriber.value.sendToHandler(signedDeliver)
-              _ <- client.flushClean()
-            } yield (),
+            {
+              for {
+                _ <- transport.subscriber.value.sendToHandler(signedDeliver)
+                _ <- client.flushClean()
+              } yield ()
+            },
             logEntry => {
               logEntry.errorMessage should be(
                 "Synchronous event processing failed for event batch with sequencer counters 42 to 42."
@@ -974,22 +981,6 @@ class SequencerClientTest
         env.client.close()
       }
 
-      "have new transport be used for logout" in {
-        val secondTransport = MockTransport()
-
-        val env = RichEnvFactory.create()
-        val testF = for {
-          _ <- env.changeTransport(secondTransport)
-          _ <- env.logout().onShutdown(fail())
-        } yield {
-          env.transport.logoutCalled shouldBe false
-          secondTransport.logoutCalled shouldBe true
-        }
-
-        testF.futureValue
-        env.client.close()
-      }
-
       "have new transport be used for sends when there is subscription" in {
         val secondTransport = MockTransport()
 
@@ -1076,8 +1067,9 @@ class SequencerClientTest
     def subscription: MockSubscription[E]
     def sendToHandler(event: OrdinarySerializedEvent): Future[Unit]
 
-    def sendToHandler(event: SequencedEvent[ClosedEnvelope]): Future[Unit] =
+    def sendToHandler(event: SequencedEvent[ClosedEnvelope]): Future[Unit] = {
       sendToHandler(OrdinarySequencedEvent(SequencerTestUtils.sign(event))(traceContext))
+    }
   }
 
   private case class OldStyleSubscriber[E](
@@ -1102,7 +1094,7 @@ class SequencerClientTest
       private val queue: BoundedSourceQueue[OrdinarySerializedEvent],
       override val subscription: MockSubscription[E],
   ) extends Subscriber[E] {
-    override def sendToHandler(event: OrdinarySerializedEvent): Future[Unit] =
+    override def sendToHandler(event: OrdinarySerializedEvent): Future[Unit] = {
       queue.offer(event) match {
         case QueueOfferResult.Enqueued =>
           // TODO(#13789) This may need more synchronization
@@ -1113,6 +1105,7 @@ class SequencerClientTest
         case other =>
           fail(s"Could not enqueue event $event: $other")
       }
+    }
   }
 
   private case class Env[+Client <: SequencerClient](
@@ -1139,10 +1132,11 @@ class SequencerClientTest
 
     def changeTransport(
         newTransport: SequencerClientTransport & SequencerClientTransportPekko
-    )(implicit ev: Client <:< RichSequencerClient): Future[Unit] =
+    )(implicit ev: Client <:< RichSequencerClient): Future[Unit] = {
       changeTransport(
         SequencerTransports.default(daSequencerId, newTransport)
       )
+    }
 
     def changeTransport(sequencerTransports: SequencerTransports[?])(implicit
         ev: Client <:< RichSequencerClient
@@ -1154,12 +1148,8 @@ class SequencerClientTest
         messageId: MessageId = client.generateMessageId,
     )(implicit
         traceContext: TraceContext
-    ): EitherT[Future, SendAsyncClientError, Unit] = {
-      implicit val metricsContext: MetricsContext = MetricsContext.Empty
+    ): EitherT[Future, SendAsyncClientError, Unit] =
       client.sendAsync(batch, messageId = messageId).onShutdown(fail())
-    }
-
-    def logout(): EitherT[FutureUnlessShutdown, Status, Unit] = client.logout()
   }
 
   private class MockSubscription[E] extends SequencerSubscription[E] {
@@ -1185,17 +1175,6 @@ class SequencerClientTest
       extends SequencerClientTransport
       with SequencerClientTransportPekko
       with NamedLogging {
-
-    private val logoutCalledRef = new AtomicReference[Boolean](false)
-
-    override def logout()(implicit
-        traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, Status, Unit] = {
-      logoutCalledRef.set(true)
-      EitherT.pure(())
-    }
-
-    def logoutCalled: Boolean = logoutCalledRef.get()
 
     override protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
 
@@ -1474,7 +1453,6 @@ class SequencerClientTest
         futureSupervisor,
         timeouts,
         TrafficConsumptionMetrics.noop,
-        domainId,
       )
       val sendTracker =
         new SendTracker(
@@ -1503,7 +1481,7 @@ class SequencerClientTest
         sendTracker,
         CommonMockMetrics.sequencerClient,
         None,
-        replayEnabled = false,
+        false,
         topologyClient,
         LoggingConfig(),
         Some(trafficStateController),
@@ -1564,7 +1542,6 @@ class SequencerClientTest
         futureSupervisor,
         timeouts,
         TrafficConsumptionMetrics.noop,
-        domainId,
       )
       val sendTracker =
         new SendTracker(
@@ -1593,7 +1570,7 @@ class SequencerClientTest
         sendTracker,
         CommonMockMetrics.sequencerClient,
         None,
-        replayEnabled = false,
+        false,
         topologyClient,
         LoggingConfig(),
         Some(trafficStateController),

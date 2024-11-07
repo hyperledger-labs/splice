@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.http
 
-import com.daml.jwt.Jwt
+import com.daml.jwt.domain.Jwt
 import com.daml.logging.LoggingContextOf
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.pekkohttp.{MetricLabelsExtractor, WebSocketMetricsInterceptor}
@@ -156,7 +156,7 @@ class WebsocketEndpoints(
       .andThen { case (lcFhr, req) =>
         extendWithRequestIdLogCtx(implicit lc => {
           logger.trace(s"Incoming request on ${req.uri}, ${lc.makeString}")
-          lcFhr(lc) map Complete.apply
+          lcFhr(lc) map Complete
         })
       }
       .applyOrElse[HttpRequest, Future[RouteResult]](

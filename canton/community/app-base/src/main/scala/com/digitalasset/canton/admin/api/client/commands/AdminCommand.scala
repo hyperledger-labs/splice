@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.admin.api.client.commands
 
-import com.digitalasset.canton.GrpcServiceInvocationMethod
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultBoundedTimeout,
   TimeoutType,
@@ -22,16 +21,11 @@ trait AdminCommand[Req, Res, Result] {
 
   /** Create the request from configured options
     */
-  protected def createRequest(): Either[String, Req]
-
-  @inline final def createRequestInternal(): Either[String, Req] = createRequest()
+  def createRequest(): Either[String, Req]
 
   /** Handle the response the service has provided
     */
-  protected def handleResponse(response: Res): Either[String, Result]
-
-  @inline final def handleResponseInternal(response: Res): Either[String, Result] =
-    handleResponse(response)
+  def handleResponse(response: Res): Either[String, Result]
 
   /** Determines within which time frame the request should complete
     *
@@ -55,20 +49,11 @@ trait GrpcAdminCommand[Req, Res, Result] extends AdminCommand[Req, Res, Result] 
 
   /** Create the GRPC service to call
     */
-  protected def createService(channel: ManagedChannel): Svc
-
-  @inline def createServiceInternal(channel: ManagedChannel): Svc =
-    createService(channel)
+  def createService(channel: ManagedChannel): Svc
 
   /** Submit the created request to our service
     */
-  // This method is called only via `CantonGrpcUtil.sendGrpcRequest`.
-  // All implementations can therefore directly call the service stub's methods.
-  @GrpcServiceInvocationMethod
-  protected def submitRequest(service: Svc, request: Req): Future[Res]
-
-  @inline final def submitRequestInternal(service: Svc, request: Req): Future[Res] =
-    submitRequest(service, request)
+  def submitRequest(service: Svc, request: Req): Future[Res]
 
 }
 
@@ -124,16 +109,18 @@ object GrpcAdminCommand {
             })
           }
 
-          override def onError(t: Throwable): Unit =
+          override def onError(t: Throwable): Unit = {
             t match {
               case GrpcErrorStatus(status) if status.getCode == Status.CANCELLED.getCode =>
                 success()
               case _ =>
                 val _ = promise.tryFailure(t)
             }
+          }
 
-          override def onCompleted(): Unit =
+          override def onCompleted(): Unit = {
             success()
+          }
         },
       )
     )

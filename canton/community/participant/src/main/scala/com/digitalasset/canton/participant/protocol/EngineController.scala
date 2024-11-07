@@ -51,7 +51,7 @@ final case class EngineController(
 
   /** Return the engine abort status for this request. */
   def abortStatus: EngineAbortStatus = {
-    testHookFor(participantId.identifier.str).apply()
+    testHookFor(participantId.uid.identifier.str).apply()
 
     EngineAbortStatus(abortStatusRef.get)
   }
@@ -61,7 +61,7 @@ object EngineController {
   final case class EngineAbortStatus(reasonO: Option[String]) extends PrettyPrinting {
     def isAborted: Boolean = reasonO.nonEmpty
 
-    override protected def pretty: Pretty[EngineAbortStatus] = prettyOfClass(
+    override def pretty: Pretty[EngineAbortStatus] = prettyOfClass(
       paramIfTrue("not aborted", _.reasonO.isEmpty),
       paramIfDefined("aborted with reason", _.reasonO.map(_.unquoted)),
     )

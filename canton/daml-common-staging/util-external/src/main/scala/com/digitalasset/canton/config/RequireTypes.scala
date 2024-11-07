@@ -34,7 +34,7 @@ object RequireTypes {
     private[this] def apply(n: Int): Port =
       throw new UnsupportedOperationException("Use create or tryCreate methods")
 
-    def create(n: Int): Either[InvariantViolation, Port] =
+    def create(n: Int): Either[InvariantViolation, Port] = {
       Either.cond(
         n >= Port.minValidPort && n <= Port.maxValidPort,
         new Port(n) {},
@@ -42,11 +42,13 @@ object RequireTypes {
           s"Unable to create Port as value $n was given, but only values between ${Port.minValidPort} and ${Port.maxValidPort} are allowed."
         ),
       )
+    }
 
-    def tryCreate(n: Int): Port =
+    def tryCreate(n: Int): Port = {
       new Port(n) {}
+    }
 
-    lazy implicit val portReader: ConfigReader[Port] =
+    lazy implicit val portReader: ConfigReader[Port] = {
       ConfigReader.fromString[Port] { str =>
         def err(message: String) =
           CannotConvert(str, Port.getClass.getName, message)
@@ -56,6 +58,7 @@ object RequireTypes {
           .leftMap[FailureReason](error => err(error.getMessage))
           .flatMap(n => create(n).leftMap(_ => InvalidPort(n)))
       }
+    }
 
     implicit val portWriter: ConfigWriter[Port] = ConfigWriter.toString(x => x.unwrap.toString)
 
@@ -66,7 +69,7 @@ object RequireTypes {
 
     /** This instructs the server to automatically choose a free port.
       */
-    lazy val Dynamic: Port = Port.tryCreate(0)
+    lazy val Dynamic = Port.tryCreate(0)
   }
 
   sealed trait RefinedNumeric[T] extends Ordered[RefinedNumeric[T]] {
@@ -124,7 +127,7 @@ object RequireTypes {
 
     def create[T](
         t: T
-    )(implicit num: Numeric[T]): Either[InvariantViolation, NonNegativeNumeric[T]] =
+    )(implicit num: Numeric[T]): Either[InvariantViolation, NonNegativeNumeric[T]] = {
       Either.cond(
         num.compare(t, num.zero) >= 0,
         NonNegativeNumeric(t),
@@ -132,6 +135,7 @@ object RequireTypes {
           s"Received the negative $t as argument, but we require a non-negative value here."
         ),
       )
+    }
 
     implicit val readNonNegativeLong: GetResult[NonNegativeLong] = GetResult { r =>
       NonNegativeLong.tryCreate(r.nextLong())
@@ -160,7 +164,7 @@ object RequireTypes {
 
     implicit def nonNegativeNumericReader[T](implicit
         num: Numeric[T]
-    ): ConfigReader[NonNegativeNumeric[T]] =
+    ): ConfigReader[NonNegativeNumeric[T]] = {
       ConfigReader.fromString[NonNegativeNumeric[T]] { str =>
         def err(message: String) =
           CannotConvert(str, NonNegativeNumeric.getClass.getName, message)
@@ -170,6 +174,7 @@ object RequireTypes {
           .toRight[FailureReason](err("Cannot convert `str` to numeric"))
           .flatMap(n => Either.cond(num.compare(n, num.zero) >= 0, tryCreate(n), NegativeValue(n)))
       }
+    }
 
     implicit def nonNegativeNumericWriter[T]: ConfigWriter[NonNegativeNumeric[T]] =
       ConfigWriter.toString(x => x.unwrap.toString)
@@ -185,7 +190,6 @@ object RequireTypes {
   object NonNegativeInt {
     lazy val zero: NonNegativeInt = NonNegativeInt.tryCreate(0)
     lazy val one: NonNegativeInt = NonNegativeInt.tryCreate(1)
-    lazy val two: NonNegativeInt = NonNegativeInt.tryCreate(2)
     lazy val maxValue: NonNegativeInt = NonNegativeInt.tryCreate(Int.MaxValue)
 
     def create(n: Int): Either[InvariantViolation, NonNegativeInt] = NonNegativeNumeric.create(n)
@@ -220,9 +224,6 @@ object RequireTypes {
 
     def *(other: PositiveNumeric[T]): PositiveNumeric[T] =
       PositiveNumeric.tryCreate(value * other.value)
-
-    def max(other: PositiveNumeric[T]): PositiveNumeric[T] =
-      PositiveNumeric.tryCreate(num.max(value, other.value))
 
     def increment: PositiveNumeric[T] = PositiveNumeric.tryCreate(value + num.one)
     def decrement: NonNegativeNumeric[T] = NonNegativeNumeric.tryCreate(value - num.one)
@@ -268,7 +269,7 @@ object RequireTypes {
 
     def create[T](
         t: T
-    )(implicit num: Numeric[T]): Either[InvariantViolation, PositiveNumeric[T]] =
+    )(implicit num: Numeric[T]): Either[InvariantViolation, PositiveNumeric[T]] = {
       Either.cond(
         num.compare(t, num.zero) > 0,
         PositiveNumeric(t),
@@ -276,10 +277,11 @@ object RequireTypes {
           s"Received the non-positive $t as argument, but we require a positive value here."
         ),
       )
+    }
 
     implicit def positiveNumericReader[T](implicit
         num: Numeric[T]
-    ): ConfigReader[PositiveNumeric[T]] =
+    ): ConfigReader[PositiveNumeric[T]] = {
       ConfigReader.fromString[PositiveNumeric[T]] { str =>
         def err(message: String) =
           CannotConvert(str, PositiveNumeric.getClass.getName, message)
@@ -291,6 +293,7 @@ object RequireTypes {
             Either.cond(num.compare(n, num.zero) >= 0, tryCreate(n), NonPositiveValue(n))
           )
       }
+    }
 
     implicit def readPositiveDouble: GetResult[PositiveDouble] = GetResult { r =>
       PositiveNumeric.tryCreate(r.nextDouble())
@@ -337,7 +340,7 @@ object RequireTypes {
     private[this] def apply(file: File): ExistingFile =
       throw new UnsupportedOperationException("Use create or tryCreate methods")
 
-    def create(file: File): Either[InvariantViolation, ExistingFile] =
+    def create(file: File): Either[InvariantViolation, ExistingFile] = {
       Either.cond(
         file.exists,
         new ExistingFile(file) {},
@@ -345,14 +348,17 @@ object RequireTypes {
           s"The specified file $file does not exist/was not found. Please specify an existing file"
         ),
       )
+    }
 
-    def tryCreate(file: File): ExistingFile =
+    def tryCreate(file: File): ExistingFile = {
       new ExistingFile(file) {}
+    }
 
-    def tryCreate(path: String): ExistingFile =
+    def tryCreate(path: String): ExistingFile = {
       new ExistingFile(new File(path)) {}
+    }
 
-    lazy implicit val existingFileReader: ConfigReader[ExistingFile] =
+    lazy implicit val existingFileReader: ConfigReader[ExistingFile] = {
       ConfigReader.fromString[ExistingFile] { str =>
         def err(message: String) =
           CannotConvert(str, ExistingFile.getClass.getName, message)
@@ -362,6 +368,7 @@ object RequireTypes {
           .leftMap[FailureReason](error => err(error.getMessage))
           .flatMap(f => create(f).leftMap(_ => NonExistingFile(f)))
       }
+    }
 
     final case class NonExistingFile(file: File) extends FailureReason {
       override def description: String =

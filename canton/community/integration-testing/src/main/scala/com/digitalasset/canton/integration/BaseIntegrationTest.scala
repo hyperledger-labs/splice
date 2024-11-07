@@ -20,7 +20,6 @@ import org.scalatest.wordspec.FixtureAnyWordSpec
 import org.scalatest.{Assertion, ConfigMap, Outcome}
 
 import scala.collection.immutable
-import scala.jdk.CollectionConverters.*
 
 /** A highly opinionated base trait for writing integration tests interacting with a canton environment using console commands.
   * Tests must mixin a further [[EnvironmentSetup]] implementation to define when the canton environment is setup around the individual tests:
@@ -77,11 +76,12 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
   ): Assertion =
     loggerFactory.assertThrowsAndLogs[CommandFailure](
       within,
-      assertions.map { assertion => (entry: LogEntry) =>
-        assertion(entry)
-        entry.commandFailureMessage
-        succeed
-      }*
+      assertions
+        .map(assertion => { (entry: LogEntry) =>
+          assertion(entry)
+          entry.commandFailureMessage
+          succeed
+        })*
     )
 
   /** Version of [[com.digitalasset.canton.logging.SuppressingLogger.assertThrowsAndLogs]] that is specifically
@@ -95,11 +95,12 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
   ): Assertion =
     loggerFactory.assertThrowsAndLogsUnordered[CommandFailure](
       within,
-      assertions.map { assertion => (entry: LogEntry) =>
-        assertion(entry)
-        entry.commandFailureMessage
-        succeed
-      }*
+      assertions
+        .map(assertion => { (entry: LogEntry) =>
+          assertion(entry)
+          entry.commandFailureMessage
+          succeed
+        })*
     )
 
   /** Similar to [[com.digitalasset.canton.console.commands.ParticipantAdministration#ping]]
@@ -150,35 +151,4 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
       testOutcome
     }
   }
-
-  import com.daml.ledger.javaapi.data.{Command, CreateCommand, ExerciseCommand, Identifier}
-  implicit class EnrichedCommands(commands: java.util.List[Command]) {
-    def overridePackageId(packageIdOverride: String): java.util.List[Command] =
-      commands.asScala
-        .map {
-          case cmd: CreateCommand =>
-            new CreateCommand(
-              identifierWithPackageIdOverride(packageIdOverride, cmd.getTemplateId),
-              cmd.getCreateArguments,
-            ): Command
-          case cmd: ExerciseCommand =>
-            new ExerciseCommand(
-              identifierWithPackageIdOverride(packageIdOverride, cmd.getTemplateId),
-              cmd.getContractId,
-              cmd.getChoice,
-              cmd.getChoiceArgument,
-            )
-          case other => fail(s"Unexpected command $other")
-        }
-        .toList
-        .asJava
-
-    private def identifierWithPackageIdOverride(packageIdOverride: String, templateId: Identifier) =
-      new Identifier(
-        packageIdOverride,
-        templateId.getModuleName,
-        templateId.getEntityName,
-      )
-  }
-
 }

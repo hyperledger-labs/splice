@@ -3,8 +3,6 @@
 
 package com.digitalasset.canton.ledger.api.validation
 
-import cats.syntax.either.*
-
 import java.nio.charset.StandardCharsets
 import scala.util.matching.Regex
 
@@ -55,32 +53,35 @@ object ResourceAnnotationValidator {
           AnnotationsSizeExceededError,
         )
       _ <- validateAnnotationKeys(annotations)
-      _ <- if (allowEmptyValues) Either.unit else validateAnnotationsValues(annotations)
+      _ <- if (allowEmptyValues) Right(()) else validateAnnotationsValues(annotations)
     } yield ()
   }
 
   private def validateAnnotationsValues(
       annotations: Map[String, String]
-  ): Either[MetadataAnnotationsError, Unit] =
-    annotations.view.iterator.foldLeft(Either.unit[MetadataAnnotationsError]) {
+  ): Either[MetadataAnnotationsError, Unit] = {
+    annotations.view.iterator.foldLeft(Right(()): Either[MetadataAnnotationsError, Unit]) {
       case (acc, (key, value)) =>
         for {
           _ <- acc
           _ <- if (value.isEmpty) Left(EmptyAnnotationsValueError(key = key)) else Right(())
         } yield ()
     }
+  }
 
   private def validateAnnotationKeys(
       annotations: Map[String, String]
-  ): Either[MetadataAnnotationsError, Unit] =
-    annotations.keys.iterator.foldLeft(Either.unit[MetadataAnnotationsError]) { (acc, key) =>
-      for {
-        _ <- acc
-        _ <- isValidKey(key)
-      } yield ()
+  ): Either[MetadataAnnotationsError, Unit] = {
+    annotations.keys.iterator.foldLeft(Right(()): Either[MetadataAnnotationsError, Unit]) {
+      (acc, key) =>
+        for {
+          _ <- acc
+          _ <- isValidKey(key)
+        } yield ()
     }
+  }
 
-  private def isValidKey(key: String): Either[MetadataAnnotationsError, Unit] =
+  private def isValidKey(key: String): Either[MetadataAnnotationsError, Unit] = {
     key.split('/') match {
       case Array(name) => isValidKeyNameSegment(name)
       case Array(prefix, name) =>
@@ -95,10 +96,11 @@ object ResourceAnnotationValidator {
           )
         )
     }
+  }
 
   private def isValidKeyPrefixSegment(
       prefixSegment: String
-  ): Either[InvalidAnnotationsKeyError, Unit] =
+  ): Either[InvalidAnnotationsKeyError, Unit] = {
     if (prefixSegment.length > 253) {
       Left(
         InvalidAnnotationsKeyError(
@@ -106,18 +108,21 @@ object ResourceAnnotationValidator {
         )
       )
     } else {
-      Either.cond(
-        DnsSubdomainRegex.matches(prefixSegment),
-        (),
-        InvalidAnnotationsKeyError(
-          s"Key prefix segment '${shorten(prefixSegment)}' has invalid syntax"
-        ),
-      )
+      if (DnsSubdomainRegex.matches(prefixSegment)) {
+        Right(())
+      } else {
+        Left(
+          InvalidAnnotationsKeyError(
+            s"Key prefix segment '${shorten(prefixSegment)}' has invalid syntax"
+          )
+        )
+      }
     }
+  }
 
   private def isValidKeyNameSegment(
       nameSegment: String
-  ): Either[InvalidAnnotationsKeyError, Unit] =
+  ): Either[InvalidAnnotationsKeyError, Unit] = {
     if (nameSegment.length > 63) {
       Left(
         InvalidAnnotationsKeyError(
@@ -125,14 +130,17 @@ object ResourceAnnotationValidator {
         )
       )
     } else {
-      Either.cond(
-        KeySegmentRegex.matches(nameSegment),
-        (),
-        InvalidAnnotationsKeyError(
-          s"Key name segment '${shorten(nameSegment)}' has invalid syntax"
-        ),
-      )
+      if (KeySegmentRegex.matches(nameSegment)) {
+        Right(())
+      } else {
+        Left(
+          InvalidAnnotationsKeyError(
+            s"Key name segment '${shorten(nameSegment)}' has invalid syntax"
+          )
+        )
+      }
     }
+  }
 
   private def shorten(s: String): String =
     if (s.length > 53) { s.take(50) + "..." }

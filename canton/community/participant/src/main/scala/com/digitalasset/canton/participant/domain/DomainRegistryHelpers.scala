@@ -5,8 +5,8 @@ package com.digitalasset.canton.participant.domain
 
 import cats.data.EitherT
 import cats.instances.future.*
+import cats.syntax.bifunctor.*
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.*
 import com.digitalasset.canton.common.domain.SequencerConnectClient
@@ -30,10 +30,6 @@ import com.digitalasset.canton.participant.topology.{
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.SequencerConnection
 import com.digitalasset.canton.sequencing.client.*
-import com.digitalasset.canton.sequencing.client.channel.{
-  SequencerChannelClient,
-  SequencerChannelClientFactory,
-}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
@@ -103,7 +99,10 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
           EitherTUtil.unit.mapK(FutureUnlessShutdown.outcomeK)
         } else {
           topologyDispatcher
-            .trustDomain(domainId)
+            .trustDomain(
+              domainId,
+              sequencerAggregatedInfo.staticDomainParameters,
+            )
             .leftMap(
               DomainRegistryError.ConfigurationErrors.CanNotIssueDomainTrustCertificate.Error(_)
             )
@@ -138,7 +137,7 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
           )
       )
 
-      (sequencerClientFactory, sequencerChannelClientFactoryO) = {
+      sequencerClientFactory = {
         // apply optional domain specific overrides to the nodes general sequencer client config
         val sequencerClientConfig = participantNodeParameters.sequencerClient.copy(
           initialConnectionRetryDelay = config.initialRetryDelay
@@ -162,48 +161,32 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
           case _: ParticipantId => configO
           case _ => None
         }
-        (
-          SequencerClientFactory(
-            domainId,
-            domainCryptoApi,
-            cryptoApiProvider.crypto,
-            sequencerClientConfig,
-            participantNodeParameters.tracing.propagation,
-            testingConfig,
-            sequencerAggregatedInfo.staticDomainParameters,
-            participantNodeParameters.processingTimeouts,
-            clock,
-            topologyClient,
-            futureSupervisor,
-            ifParticipant(recordSequencerInteractions.get().map(updateMemberRecordingPath)),
-            ifParticipant(
-              replaySequencerConfig
-                .get()
-                .map(config =>
-                  config.copy(recordingConfig = updateMemberRecordingPath(config.recordingConfig))
-                )
-            ),
-            metrics(config.domain).sequencerClient,
-            participantNodeParameters.loggingConfig,
-            participantNodeParameters.exitOnFatalFailures,
-            domainLoggerFactory,
-            ProtocolVersionCompatibility.supportedProtocols(participantNodeParameters),
-            participantNodeParameters.protocolConfig.minimumProtocolVersion,
+        SequencerClientFactory(
+          domainId,
+          domainCryptoApi,
+          cryptoApiProvider.crypto,
+          sequencerClientConfig,
+          participantNodeParameters.tracing.propagation,
+          testingConfig,
+          sequencerAggregatedInfo.staticDomainParameters,
+          participantNodeParameters.processingTimeouts,
+          clock,
+          topologyClient,
+          futureSupervisor,
+          ifParticipant(recordSequencerInteractions.get().map(updateMemberRecordingPath)),
+          ifParticipant(
+            replaySequencerConfig
+              .get()
+              .map(config =>
+                config.copy(recordingConfig = updateMemberRecordingPath(config.recordingConfig))
+              )
           ),
-          Option.when(
-            participantNodeParameters.unsafeEnableOnlinePartyReplication
-          )(
-            new SequencerChannelClientFactory(
-              domainId,
-              cryptoApiProvider.crypto,
-              sequencerClientConfig,
-              participantNodeParameters.tracing.propagation,
-              participantNodeParameters.processingTimeouts,
-              clock,
-              domainLoggerFactory,
-              ProtocolVersionCompatibility.supportedProtocols(participantNodeParameters),
-            )
-          ),
+          metrics(config.domain).sequencerClient,
+          participantNodeParameters.loggingConfig,
+          participantNodeParameters.exitOnFatalFailures,
+          domainLoggerFactory,
+          ProtocolVersionCompatibility.supportedProtocolsParticipant(participantNodeParameters),
+          participantNodeParameters.protocolConfig.minimumProtocolVersion,
         )
       }
 
@@ -216,14 +199,14 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
         if (active) EitherT.pure[FutureUnlessShutdown, DomainRegistryError](())
         else {
           logger.debug(
-            s"Participant is not yet active on domain $domainId. Initialising topology"
+            s"Participant is not yet active on domain ${domainId}. Initialising topology"
           )
-          val client = sequencerConnectClient(config.domain, sequencerAggregatedInfo)
           for {
+            sequencerConnectClient <- sequencerConnectClient(sequencerAggregatedInfo)
             success <- topologyDispatcher.onboardToDomain(
               domainId,
               config.domain,
-              client,
+              sequencerConnectClient,
               sequencerAggregatedInfo.staticDomainParameters.protocolVersion,
             )
             _ <- EitherT.cond[FutureUnlessShutdown](
@@ -268,26 +251,11 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
         partyNotifier,
         sequencerAggregatedInfo.staticDomainParameters.protocolVersion,
       )
-
-      sequencerChannelClientO <- EitherT.fromEither[FutureUnlessShutdown](
-        sequencerChannelClientFactoryO.traverse { sequencerChannelClientFactory =>
-          sequencerChannelClientFactory
-            .create(
-              participantId,
-              sequencerAggregatedInfo.sequencerConnections,
-              sequencerAggregatedInfo.expectedSequencers,
-            )
-            .leftMap(
-              DomainRegistryError.DomainRegistryInternalError.InvalidState(_): DomainRegistryError
-            )
-        }
-      )
     } yield DomainHandle(
       domainId,
       config.domain,
       sequencerAggregatedInfo.staticDomainParameters,
       sequencerClient,
-      sequencerChannelClientO,
       topologyClient,
       topologyFactory,
       persistentState,
@@ -305,7 +273,8 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
   )(implicit
       ec: ExecutionContextExecutor,
       traceContext: TraceContext,
-  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Unit] =
+  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Unit] = {
+
     performUnlessClosingEitherU("check-for-domain-topology-initialization")(
       syncDomainPersistentStateManager.domainTopologyStateInitFor(
         domainId,
@@ -338,6 +307,7 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
             DomainRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(_)
           )
     }
+  }
 
   // if participant has provided domain id previously, compare and make sure the domain being
   // connected to is the one expected
@@ -345,7 +315,7 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
       loggingContext: ErrorLoggingContext
   ): Either[DomainIdMismatch.Error, Unit] =
     config.domainId match {
-      case None => Either.unit
+      case None => Right(())
       case Some(configuredDomainId) =>
         Either.cond(
           configuredDomainId == domainId,
@@ -356,23 +326,33 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
     }
 
   private def sequencerConnectClient(
-      domainAlias: DomainAlias,
-      sequencerAggregatedInfo: SequencerAggregatedInfo,
-  ): SequencerConnectClient = {
+      sequencerAggregatedInfo: SequencerAggregatedInfo
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, DomainRegistryError, SequencerConnectClient] = {
     // TODO(i12076): Currently it takes the first available connection
     //  here which is already checked for healthiness, but it should maybe check all of them - if they're healthy
     val sequencerConnection = sequencerAggregatedInfo.sequencerConnections.default
-    sequencerConnectClientBuilder(domainAlias, sequencerConnection)
+    sequencerConnectClientBuilder(sequencerConnection)
+      .leftMap(err =>
+        DomainRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(err.message)
+      )
+      .mapK(
+        FutureUnlessShutdown.outcomeK
+      )
+      .leftWiden[DomainRegistryError]
   }
 
   private def isActive(domainAlias: DomainAlias, sequencerAggregatedInfo: SequencerAggregatedInfo)(
       implicit traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] = {
-    val client = sequencerConnectClient(domainAlias, sequencerAggregatedInfo)
-    isActive(domainAlias, client, false).thereafter { _ =>
-      client.close()
-    }
-  }
+  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] =
+    sequencerConnectClient(sequencerAggregatedInfo)
+      .flatMap(client =>
+        isActive(domainAlias, client, false)
+          .thereafter { _ =>
+            client.close()
+          }
+      )
 
   private def waitForActive(
       domainAlias: DomainAlias,
@@ -380,19 +360,24 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, DomainRegistryError, Unit] = {
-    val client = sequencerConnectClient(domainAlias, sequencerAggregatedInfo)
-    isActive(domainAlias, client, true)
-      .subflatMap(isActive =>
-        Either.cond(
-          isActive,
-          (),
-          DomainRegistryError.ConnectionErrors.ParticipantIsNotActive
-            .Error(s"Participant $participantId is not active"): DomainRegistryError,
-        )
+    sequencerConnectClient(sequencerAggregatedInfo)
+      .flatMap(client =>
+        isActive(domainAlias, client, true)
+          .flatMap { isActive =>
+            EitherT
+              .cond[Future](
+                isActive,
+                (),
+                DomainRegistryError.ConnectionErrors.ParticipantIsNotActive
+                  .Error(s"Participant $participantId is not active"),
+              )
+              .leftWiden[DomainRegistryError]
+              .mapK(FutureUnlessShutdown.outcomeK)
+          }
+          .thereafter { _ =>
+            client.close()
+          }
       )
-      .thereafter { _ =>
-        client.close()
-      }
   }
 
   private def isActive(
@@ -401,15 +386,16 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
       waitForActive: Boolean = true,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] =
+  ): EitherT[FutureUnlessShutdown, DomainRegistryError, Boolean] = {
     client
-      .isActive(participantId, domainAlias, waitForActive = waitForActive)
+      .isActive(participantId, waitForActive = waitForActive)
       .leftMap(DomainRegistryHelpers.toDomainRegistryError(domainAlias))
+      .mapK(FutureUnlessShutdown.outcomeK)
+  }
 
   private def sequencerConnectClientBuilder: SequencerConnectClient.Builder = {
-    (domainAlias: DomainAlias, config: SequencerConnection) =>
+    (config: SequencerConnection) =>
       SequencerConnectClient(
-        domainAlias,
         config,
         participantNodeParameters.processingTimeouts,
         participantNodeParameters.tracing.propagation,
@@ -425,7 +411,6 @@ object DomainRegistryHelpers {
       alias: DomainAlias,
       staticParameters: StaticDomainParameters,
       sequencer: RichSequencerClient,
-      channelSequencerClientO: Option[SequencerChannelClient],
       topologyClient: DomainTopologyClientWithInit,
       topologyFactory: TopologyComponentFactory,
       domainPersistentState: SyncDomainPersistentState,

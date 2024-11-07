@@ -5,6 +5,14 @@ package com.digitalasset.canton.pureconfigutils
 
 import pureconfig.error.{CannotConvert, FailureReason}
 
+import java.nio.file.Path
+
+final case class HttpServerConfig(
+    address: String = com.digitalasset.canton.cliopts.Http.defaultAddress,
+    port: Option[Int] = None,
+    portFile: Option[Path] = None,
+)
+
 object SharedConfigReaders {
 
   def catchConvertError[A, B](f: String => Either[String, B])(implicit

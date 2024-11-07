@@ -67,7 +67,7 @@ class DsoTxLogParser(
     ret
   }
 
-  override def error(offset: Long, eventId: String, domainId: DomainId): Option[TxLogEntry] =
+  override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
     Some(
       ErrorTxLogEntry()
     )

@@ -17,7 +17,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
       .simpleTopology1Sv(this.getClass.getSimpleName)
 
   override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
-    SvRewardState.TEMPLATE_ID_WITH_PACKAGE_ID
+    SvRewardState.TEMPLATE_ID
   )
 
   "Multiple SvRewardStates for the same SV get merged" in { implicit env =>

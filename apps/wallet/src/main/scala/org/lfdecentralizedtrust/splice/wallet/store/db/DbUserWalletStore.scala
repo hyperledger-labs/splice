@@ -331,9 +331,9 @@ class DbUserWalletStore(
         filterStoreMigrationIds("ansEntry.", "ansEntryContext.", "sub.", "st.") ++
         sql" and " ++ subscriptionFilter(now) ++ sql"""
                and ansEntry.template_id_qualified_name =
-                     ${QualifiedName(ansCodegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID)}
+                     ${QualifiedName(ansCodegen.AnsEntry.TEMPLATE_ID)}
                and ansEntryContext.template_id_qualified_name =
-                     ${QualifiedName(ansCodegen.AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID)}
+                     ${QualifiedName(ansCodegen.AnsEntryContext.TEMPLATE_ID)}
                and ansEntry.create_arguments ->> 'name' = ansEntryContext.create_arguments ->> 'name'
                and ansEntryContext.create_arguments ->> 'reference' = sub.create_arguments ->> 'reference'
              order by ansEntry.event_number
@@ -424,9 +424,7 @@ class DbUserWalletStore(
         (sql"""select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("st.")},
                       #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("sub.")},
                       (case when st.template_id_qualified_name =
-                                   ${QualifiedName(
-            subsCodegen.SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
-          )}
+                                   ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID)}
                             then $idleStateFlag
                             else ${idleStateFlag + 1} end) which_state
               from #${WalletTables.acsTableName} st, #${WalletTables.acsTableName} sub
@@ -456,12 +454,12 @@ class DbUserWalletStore(
 
   private[this] def subscriptionFilter(now: CantonTimestamp) =
     sql"""((st.template_id_qualified_name =
-               ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID)}
+               ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID)}
             and st.contract_expires_at >= $now)
            or st.template_id_qualified_name =
-                ${QualifiedName(subsCodegen.SubscriptionPayment.TEMPLATE_ID_WITH_PACKAGE_ID)})
+                ${QualifiedName(subsCodegen.SubscriptionPayment.TEMPLATE_ID)})
       and sub.template_id_qualified_name =
-            ${QualifiedName(subsCodegen.Subscription.TEMPLATE_ID_WITH_PACKAGE_ID)}
+            ${QualifiedName(subsCodegen.Subscription.TEMPLATE_ID)}
       and (st.create_arguments ->> 'subscription') = sub.contract_id"""
 
   private[this] def filterStoreMigrationIds(acsPrefixes: String*) =

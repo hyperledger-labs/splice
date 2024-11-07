@@ -24,7 +24,9 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfTimestamp, ProtoDeserializationError}
 import com.google.protobuf.ByteString
 
-/** Trait that generalizes over the kind of events that could be observed from a [[com.digitalasset.canton.domain.sequencing.sequencer.block.BlockOrderer]].
+/** Trait that generalizes over the kind of events that could be observed in a blockchain integration.
+  *
+  * Used by Ethereum and Fabric.
   */
 sealed trait LedgerBlockEvent extends Product with Serializable
 
@@ -36,8 +38,7 @@ object LedgerBlockEvent extends HasLoggerName {
       originalPayloadSize: Int =
         0, // default is 0 for testing as this value is only used for metrics
   ) extends LedgerBlockEvent {
-    lazy val signedSubmissionRequest: SignedContent[SubmissionRequest] =
-      signedOrderingRequest.signedSubmissionRequest
+    lazy val signedSubmissionRequest = signedOrderingRequest.signedSubmissionRequest
   }
   final case class Acknowledgment(request: SignedContent[AcknowledgeRequest])
       extends LedgerBlockEvent
@@ -55,13 +56,14 @@ object LedgerBlockEvent extends HasLoggerName {
         } yield LedgerBlockEvent.Send(CantonTimestamp(timestamp), deserializedRequest, request.size)
       case RawBlockEvent.Acknowledgment(acknowledgement) =>
         deserializeSignedAcknowledgeRequest(protocolVersion)(acknowledgement).map(
-          LedgerBlockEvent.Acknowledgment.apply
+          LedgerBlockEvent.Acknowledgment
         )
     }
 
   def deserializeSignedOrderingRequest(
       protocolVersion: ProtocolVersion
-  )(submissionRequestBytes: ByteString): ParsingResult[SignedOrderingRequest] =
+  )(submissionRequestBytes: ByteString): ParsingResult[SignedOrderingRequest] = {
+
     // TODO(i10428) Prevent zip bombing when decompressing the request
     for {
       // This is the SignedContent signed by the submitting sequencer (so SignedContent[OrderingRequest[SignedContent[SubmissionRequest]]])
@@ -93,6 +95,7 @@ object LedgerBlockEvent extends HasLoggerName {
             )
         )
     } yield signedOrderingRequest
+  }
 
   private def deserializeSignedAcknowledgeRequest(protocolVersion: ProtocolVersion)(
       ackRequestBytes: ByteString
@@ -104,10 +107,4 @@ object LedgerBlockEvent extends HasLoggerName {
       )
 }
 
-/** @param tickTopologyAtLeastAt See [[RawLedgerBlock.tickTopologyAtMicrosFromEpoch]]
-  */
-final case class BlockEvents(
-    height: Long,
-    events: Seq[Traced[LedgerBlockEvent]],
-    tickTopologyAtLeastAt: Option[CantonTimestamp] = None,
-)
+final case class BlockEvents(height: Long, events: Seq[Traced[LedgerBlockEvent]])

@@ -63,7 +63,9 @@ object ResourceLimits {
     maxSubmissionBurstFactor = defaultMaxSubmissionBurstFactor,
   )
 
-  private lazy val defaultMaxSubmissionBurstFactor: PositiveNumeric[Double] =
-    PositiveNumeric.tryCreate(0.5)
+  def community: ResourceLimits =
+    ResourceLimits(Some(NonNegativeInt.tryCreate(100)), None, defaultMaxSubmissionBurstFactor)
+
+  private lazy val defaultMaxSubmissionBurstFactor = PositiveNumeric.tryCreate(0.5)
 
 }

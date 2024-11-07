@@ -12,7 +12,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, AnsFrontendTestUtil, WalletTestUtil}
 
 import java.io.File
-import scala.concurrent.duration.*
 import scala.util.Try
 
 class AppManagerFrontendIntegrationTest
@@ -94,10 +93,7 @@ class AppManagerFrontendIntegrationTest
         splitwell
           .findAllChildElements(className("approved-release-configuration"))
           .toSeq should have size 0
-        // This depends on the domain connection and DAR upload succeding. The DAR upload can be quite slow
-        // as it publishes each package vettnig transaction one serial at a time.
-        // See #15814 for more details.
-        actAndCheck(timeUntilSuccess = 40.seconds)(
+        actAndCheck(
           "approve release configuration",
           click on splitwell.childElement(className("approve-release-configuration-button")),
         )(

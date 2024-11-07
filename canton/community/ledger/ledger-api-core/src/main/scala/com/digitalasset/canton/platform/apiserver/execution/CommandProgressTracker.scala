@@ -33,7 +33,7 @@ final case class CommandStatus(
     requestStatistics: RequestStatistics,
     updates: CommandUpdates,
 ) extends PrettyPrinting {
-  def toProto: ApiCommandStatus =
+  def toProto: ApiCommandStatus = {
     ApiCommandStatus(
       started = Some(started.toProtoTimestamp),
       completed = completed.map(_.toProtoTimestamp),
@@ -43,6 +43,7 @@ final case class CommandStatus(
       requestStatistics = Some(requestStatistics),
       updates = Some(updates),
     )
+  }
 
   def decodedError: Option[DecodedCantonError] =
     completion.status.flatMap(s => DecodedCantonError.fromGrpcStatus(s).toOption)
@@ -61,8 +62,9 @@ final case class CommandStatus(
     param("lookedUpByKey", _.lookedUpByKey),
   )
 
-  private def nonEmptyUpdate(update: CommandUpdates): Boolean =
+  private def nonEmptyUpdate(update: CommandUpdates): Boolean = {
     update.created.nonEmpty || update.archived.nonEmpty || update.exercised > 0 || update.fetched > 0 || update.lookedUpByKey > 0
+  }
 
   override lazy val pretty: Pretty[CommandStatus] = prettyOfClass(
     param("commandId", _.completion.commandId.singleQuoted),
@@ -71,7 +73,7 @@ final case class CommandStatus(
     param("state", _.state.toString().singleQuoted),
     param("completion", _.completion.status),
     paramIfDefined(
-      "updateId",
+      "transactionId",
       x => Option.when(x.completion.updateId.nonEmpty)(x.completion.updateId.singleQuoted),
     ),
     paramIfDefined(
@@ -129,7 +131,7 @@ trait CommandResultHandle {
   def failedSync(err: StatusRuntimeException): Unit
   def internalErrorSync(err: Throwable): Unit
 
-  def extractFailure[T](f: Future[T])(implicit executionContext: ExecutionContext): Future[T] =
+  def extractFailure[T](f: Future[T])(implicit executionContext: ExecutionContext): Future[T] = {
     f.transform {
       case ff @ Failure(err: StatusRuntimeException) =>
         failedSync(err)
@@ -139,6 +141,7 @@ trait CommandResultHandle {
         ff
       case rr => rr
     }
+  }
 
   def recordEnvelopeSizes(batchSize: Int, numRecipients: Int, numEnvelopes: Int): Unit
 

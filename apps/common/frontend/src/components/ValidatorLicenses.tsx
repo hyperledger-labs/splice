@@ -10,7 +10,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 
-import { ValidatorLicense } from '@daml.js/splice-amulet-0.1.6/lib/Splice/ValidatorLicense';
+import { ValidatorLicense } from '@daml.js/splice-amulet-0.1.5/lib/Splice/ValidatorLicense';
 import { Party } from '@daml/types';
 
 export interface ValidatorLicensesPage {

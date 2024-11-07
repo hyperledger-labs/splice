@@ -3,15 +3,15 @@
 
 package com.digitalasset.canton.domain.sequencing.traffic.store
 
+import cats.syntax.parallel.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.traffic.TrafficConsumed
-import com.digitalasset.canton.topology.{Member, ParticipantId}
+import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.{BaseTest, ProtocolVersionChecksAsyncWordSpec}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AsyncWordSpec
-
-import scala.concurrent.Future
 
 trait TrafficConsumedStoreTest
     extends BeforeAndAfterAll
@@ -19,18 +19,9 @@ trait TrafficConsumedStoreTest
     with ProtocolVersionChecksAsyncWordSpec {
   this: AsyncWordSpec =>
 
-  def registerMemberInSequencerStore(member: Member): Future[Unit]
-
-  val alice = ParticipantId("alice")
-  val bob = ParticipantId("bob")
-
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    registerMemberInSequencerStore(alice).futureValue
-    registerMemberInSequencerStore(bob).futureValue
-  }
-
   def trafficConsumedStore(mk: () => TrafficConsumedStore): Unit = {
+    val alice = ParticipantId("alice")
+    val bob = ParticipantId("bob")
     val t0 = CantonTimestamp.Epoch
     val t1 = t0.plusSeconds(1)
     val t2 = t1.plusSeconds(1)
@@ -62,8 +53,8 @@ trait TrafficConsumedStoreTest
       "store and lookup traffic consumed at a specific timestamp" in {
         val store = mk()
         for {
-          _ <- store.store(Seq(consumedAlice1))
-          _ <- store.store(Seq(consumedBob1))
+          _ <- store.store(consumedAlice1)
+          _ <- store.store(consumedBob1)
           alice1 <- store.lookupAt(alice, t1)
           alice2 <- store.lookupAt(alice, t2)
           bob1 <- store.lookupAt(bob, t1)
@@ -77,8 +68,8 @@ trait TrafficConsumedStoreTest
       "store and lookup last entry for a member" in {
         val store = mk()
         for {
-          _ <- store.store(Seq(consumedAlice1))
-          _ <- store.store(Seq(consumedAlice2))
+          _ <- store.store(consumedAlice1)
+          _ <- store.store(consumedAlice2)
           alice1 <- store.lookupLast(alice)
         } yield {
           alice1 shouldBe Some(consumedAlice2)
@@ -88,8 +79,8 @@ trait TrafficConsumedStoreTest
       "store and lookup last entry for a member below a timestamp" in {
         val store = mk()
         for {
-          _ <- store.store(Seq(consumedAlice1))
-          _ <- store.store(Seq(consumedAlice2))
+          _ <- store.store(consumedAlice1)
+          _ <- store.store(consumedAlice2)
           alice1 <- store.lookupLatestBeforeInclusiveForMember(alice, t3)
         } yield {
           alice1 shouldBe Some(consumedAlice2)
@@ -99,12 +90,12 @@ trait TrafficConsumedStoreTest
       "store and lookup latest entries before timestamp for all members" in {
         val store = mk()
         for {
-          _ <- store.store(Seq(consumedAlice1))
-          _ <- store.store(Seq(consumedAlice2))
-          _ <- store.store(Seq(consumedAlice3))
-          _ <- store.store(Seq(consumedBob1))
-          _ <- store.store(Seq(consumedBob2))
-          _ <- store.store(Seq(consumedBob3))
+          _ <- store.store(consumedAlice1)
+          _ <- store.store(consumedAlice2)
+          _ <- store.store(consumedAlice3)
+          _ <- store.store(consumedBob1)
+          _ <- store.store(consumedBob2)
+          _ <- store.store(consumedBob3)
           res <- store.lookupLatestBeforeInclusive(t2)
         } yield {
           res should contain theSameElementsAs List(consumedAlice2, consumedBob2)
@@ -114,8 +105,8 @@ trait TrafficConsumedStoreTest
       "be idempotent if inserting the same consumed twice" in {
         val store = mk()
         for {
-          _ <- store.store(Seq(consumedAlice1))
-          _ <- store.store(Seq(consumedAlice1))
+          _ <- store.store(consumedAlice1)
+          _ <- store.store(consumedAlice1)
           alice1 <- store.lookupAt(alice, t1)
         } yield {
           alice1 shouldBe Some(consumedAlice1)
@@ -127,10 +118,10 @@ trait TrafficConsumedStoreTest
         // Between t2 and t3
         val t2point5 = t2.plusMillis(500)
         for {
-          _ <- store.store(Seq(consumedAlice1))
-          _ <- store.store(Seq(consumedBob1))
-          _ <- store.store(Seq(consumedAlice2))
-          _ <- store.store(Seq(consumedAlice3))
+          _ <- store.store(consumedAlice1)
+          _ <- store.store(consumedBob1)
+          _ <- store.store(consumedAlice2)
+          _ <- store.store(consumedAlice3)
           _ <- store.pruneBelowExclusive(t2point5)
           aliceConsumed <- store.lookup(alice)
           bobConsumed <- store.lookup(bob)
@@ -144,12 +135,12 @@ trait TrafficConsumedStoreTest
       "remove all balances below a given timestamp for which there is an update" in {
         val store = mk()
         for {
-          _ <- store.store(Seq(consumedAlice1))
-          _ <- store.store(Seq(consumedAlice2))
-          _ <- store.store(Seq(consumedAlice3))
-          _ <- store.store(Seq(consumedBob1))
-          _ <- store.store(Seq(consumedBob2))
-          _ <- store.store(Seq(consumedBob3))
+          _ <- store.store(consumedAlice1)
+          _ <- store.store(consumedAlice2)
+          _ <- store.store(consumedAlice3)
+          _ <- store.store(consumedBob1)
+          _ <- store.store(consumedBob2)
+          _ <- store.store(consumedBob3)
           _ <- store.pruneBelowExclusive(t2)
           aliceConsumed <- store.lookup(alice)
           bobConsumed <- store.lookup(bob)
@@ -162,12 +153,12 @@ trait TrafficConsumedStoreTest
       "keep the latest balance if they're all in the pruning window" in {
         val store = mk()
         for {
-          _ <- store.store(Seq(consumedAlice1))
-          _ <- store.store(Seq(consumedAlice2))
-          _ <- store.store(Seq(consumedAlice3))
-          _ <- store.store(Seq(consumedBob1))
-          _ <- store.store(Seq(consumedBob2))
-          _ <- store.store(Seq(consumedBob3))
+          _ <- store.store(consumedAlice1)
+          _ <- store.store(consumedAlice2)
+          _ <- store.store(consumedAlice3)
+          _ <- store.store(consumedBob1)
+          _ <- store.store(consumedBob2)
+          _ <- store.store(consumedBob3)
           _ <- store.pruneBelowExclusive(t3.plusSeconds(1))
           res <- store.lookupLatestBeforeInclusive(t3)
         } yield {
@@ -217,7 +208,7 @@ trait TrafficConsumedStoreTest
         val expectedConsumedAtT4 = Seq(aliceConsumed(1), bobConsumed(1))
 
         for {
-          _ <- store.store(aliceConsumed ++ bobConsumed)
+          _ <- (aliceConsumed ++ bobConsumed).parTraverse(store.store(_))
           consumedAtT0 <- store.lookupLatestBeforeInclusive(t0)
           consumedAtT1 <- store.lookupLatestBeforeInclusive(t1)
           consumedAtT2 <- store.lookupLatestBeforeInclusive(t2)

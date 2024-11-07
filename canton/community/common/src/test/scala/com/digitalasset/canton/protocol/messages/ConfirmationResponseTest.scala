@@ -40,10 +40,11 @@ class ConfirmationResponseTest extends AnyWordSpec with BaseTest with HasCryptog
     testedProtocolVersion,
   )
 
-  def fromByteString(bytes: ByteString): ConfirmationResponse =
+  def fromByteString(bytes: ByteString): ConfirmationResponse = {
     ConfirmationResponse
       .fromByteString(testedProtocolVersion)(bytes)
       .valueOr(err => fail(err.toString))
+  }
 
   "ConfirmationResponse" should {
     behave like hasCryptographicEvidenceSerialization(response1, response2)

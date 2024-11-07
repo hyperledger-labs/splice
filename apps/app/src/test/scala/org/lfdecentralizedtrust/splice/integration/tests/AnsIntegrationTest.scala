@@ -67,7 +67,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
   // created by the expiry test
   override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
-    codegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
+    codegen.AnsEntry.TEMPLATE_ID
   )
 
   "ans" should {

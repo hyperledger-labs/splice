@@ -9,8 +9,6 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 public class PackageVersion implements Comparable<PackageVersion> {
-  public static final PackageVersion ZERO = new PackageVersion(new int[] {0});
-
   private final int[] segments;
 
   /**

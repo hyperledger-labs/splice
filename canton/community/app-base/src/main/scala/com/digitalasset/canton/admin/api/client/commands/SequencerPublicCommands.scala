@@ -5,9 +5,9 @@ package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.either.*
 import com.digitalasset.canton.admin.api.client.data.StaticDomainParameters as ConsoleStaticDomainParameters
-import com.digitalasset.canton.domain.api.v30 as proto
 import com.digitalasset.canton.domain.api.v30.SequencerConnect.GetDomainParametersResponse.Parameters
 import com.digitalasset.canton.domain.api.v30.SequencerConnectServiceGrpc.SequencerConnectServiceStub
+import com.digitalasset.canton.domain.api.v30 as proto
 import com.digitalasset.canton.topology.DomainId
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
@@ -30,18 +30,20 @@ object SequencerPublicCommands {
         proto.SequencerConnect.GetDomainIdResponse,
         DomainId,
       ] {
-    override protected def createRequest(): Either[String, Empty] = Right(Empty())
+    override def createRequest(): Either[String, Empty] = Right(Empty())
 
-    override protected def submitRequest(
+    override def submitRequest(
         service: SequencerConnectServiceStub,
         request: Empty,
     ): Future[proto.SequencerConnect.GetDomainIdResponse] =
       service.getDomainId(proto.SequencerConnect.GetDomainIdRequest())
 
-    override protected def handleResponse(
+    override def handleResponse(
         response: proto.SequencerConnect.GetDomainIdResponse
-    ): Either[String, DomainId] =
+    ): Either[String, DomainId] = {
+
       DomainId.fromProtoPrimitive(response.domainId, "domain_id").leftMap(_.message)
+    }
   }
 
   final case object GetStaticDomainParameters
@@ -50,22 +52,24 @@ object SequencerPublicCommands {
         proto.SequencerConnect.GetDomainParametersResponse,
         ConsoleStaticDomainParameters,
       ] {
-    override protected def createRequest(): Either[String, Empty] = Right(Empty())
+    override def createRequest(): Either[String, Empty] = Right(Empty())
 
-    override protected def submitRequest(
+    override def submitRequest(
         service: SequencerConnectServiceStub,
         request: Empty,
     ): Future[proto.SequencerConnect.GetDomainParametersResponse] =
       service.getDomainParameters(proto.SequencerConnect.GetDomainParametersRequest())
 
-    override protected def handleResponse(
+    override def handleResponse(
         response: proto.SequencerConnect.GetDomainParametersResponse
-    ): Either[String, ConsoleStaticDomainParameters] =
+    ): Either[String, ConsoleStaticDomainParameters] = {
+
       response.parameters match {
         case Parameters.Empty => Left("Domain parameters should not be empty")
         case Parameters.ParametersV1(value) =>
           ConsoleStaticDomainParameters.fromProtoV30(value).leftMap(_.message)
       }
+    }
   }
 
 }

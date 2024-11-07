@@ -14,13 +14,14 @@ object DbDto {
 
   final case class EventCreate(
       event_offset: String,
-      update_id: String,
+      transaction_id: String,
       ledger_effective_time: Long,
       command_id: Option[String],
       workflow_id: Option[String],
       application_id: Option[String],
       submitters: Option[Set[String]],
       node_index: Int,
+      event_id: String,
       contract_id: String,
       template_id: String,
       package_name: String,
@@ -36,7 +37,7 @@ object DbDto {
       create_argument_compression: Option[Int],
       create_key_value_compression: Option[Int],
       event_sequential_id: Long,
-      driver_metadata: Array[Byte],
+      driver_metadata: Option[Array[Byte]],
       domain_id: String,
       trace_context: Array[Byte],
       record_time: Long,
@@ -45,19 +46,18 @@ object DbDto {
   final case class EventExercise(
       consuming: Boolean,
       event_offset: String,
-      update_id: String,
+      transaction_id: String,
       ledger_effective_time: Long,
       command_id: Option[String],
       workflow_id: Option[String],
       application_id: Option[String],
       submitters: Option[Set[String]],
       node_index: Int,
+      event_id: String,
       contract_id: String,
       template_id: String,
       package_name: String,
-      flat_event_witnesses: Set[
-        String
-      ], // only for consuming, for non-consuming exercise this field is omitted
+      flat_event_witnesses: Set[String],
       tree_event_witnesses: Set[String],
       create_key_value: Option[Array[Byte]],
       exercise_choice: String,
@@ -124,18 +124,6 @@ object DbDto {
       record_time: Long,
   ) extends DbDto
 
-  final case class EventPartyToParticipant(
-      event_sequential_id: Long,
-      event_offset: String,
-      update_id: String,
-      party_id: String,
-      participant_id: String,
-      participant_permission: Int,
-      domain_id: String,
-      record_time: Long,
-      trace_context: Array[Byte],
-  ) extends DbDto
-
   final case class PartyEntry(
       ledger_offset: String,
       recorded_at: Long,
@@ -154,7 +142,7 @@ object DbDto {
       application_id: String,
       submitters: Set[String],
       command_id: String,
-      update_id: Option[String],
+      transaction_id: Option[String],
       rejection_status_code: Option[Int],
       rejection_status_message: Option[String],
       rejection_status_details: Option[Array[Byte]],
@@ -220,7 +208,7 @@ object DbDto {
   ) extends DbDto
 
   final case class TransactionMeta(
-      update_id: String,
+      transaction_id: String,
       event_offset: String,
       publication_time: Long,
       record_time: Long,

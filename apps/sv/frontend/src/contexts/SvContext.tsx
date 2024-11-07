@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { useSvClient, DsoInfo } from 'common-frontend';
-import { Contract } from 'common-frontend-utils';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 import { SvNodeState } from '@daml.js/splice-dso-governance/lib/Splice/DSO/SvState';
@@ -13,6 +13,7 @@ import { useSvAdminClient } from './SvAdminServiceContext';
 export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
   const { getDsoInfo } = useSvClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['getDsoInfo', DsoRules, AmuletRules],
     queryFn: async () => {
       const resp = await getDsoInfo();
@@ -34,6 +35,7 @@ export const useElectionContext = ():
   | undefined => {
   const { getElectionRequest } = useSvAdminClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['getElectionRequest'],
     queryFn: async () => {
       const { ranking } = await getElectionRequest();

@@ -5,6 +5,8 @@ syntax = "proto3";
 
 package com.digitalasset.canton.admin.participant.v30;
 
+import "google/protobuf/wrappers.proto";
+
 /*
  * Service to retrieve information about the traffic state of the participant.
  */
@@ -34,5 +36,5 @@ message TrafficState {
   // Timestamp at which the state is valid
   int64 timestamp = 5;
   // Optional serial of the balance update that updated the extra traffic limit
-  optional uint32 serial = 6;
+  google.protobuf.UInt32Value serial = 6;
 }

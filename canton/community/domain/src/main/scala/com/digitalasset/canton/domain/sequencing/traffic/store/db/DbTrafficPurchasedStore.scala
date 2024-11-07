@@ -73,8 +73,9 @@ class DbTrafficPurchasedStore(
 
   override def store(
       trafficPurchased: TrafficPurchased
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     batchAggregator.run(trafficPurchased)
+  }
 
   override def lookup(
       member: Member

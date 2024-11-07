@@ -5,7 +5,6 @@ package com.digitalasset.canton.participant.pruning
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.DomainParameters
 import com.digitalasset.canton.protocol.messages.CommitmentPeriod
@@ -17,7 +16,7 @@ import com.google.common.annotations.VisibleForTesting
 
 import java.security.InvalidParameterException
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining.*
 
 class SortedReconciliationIntervalsProvider(
@@ -37,26 +36,24 @@ class SortedReconciliationIntervalsProvider(
 
   def approximateReconciliationIntervals(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[SortedReconciliationIntervals] = reconciliationIntervals(
+  ): Future[SortedReconciliationIntervals] = reconciliationIntervals(
     topologyClient.approximateTimestamp
   )
 
   private def getAll(validAt: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[DomainParameters.WithValidity[PositiveSeconds]]] = futureSupervisor
-    .supervisedUS(s"Querying for list of domain parameters changes valid at $validAt") {
-      topologyClient.awaitSnapshotUS(validAt)
+  ): Future[Seq[DomainParameters.WithValidity[PositiveSeconds]]] = futureSupervisor
+    .supervised(s"Querying for list of domain parameters changes valid at $validAt") {
+      topologyClient.awaitSnapshot(validAt)
     }
-    .flatMap(snapshot =>
-      FutureUnlessShutdown.outcomeF(snapshot.listDynamicDomainParametersChanges())
-    )
+    .flatMap(_.listDynamicDomainParametersChanges())
     .map(_.map(_.map(_.reconciliationInterval)))
 
   def reconciliationIntervals(
       validAt: CantonTimestamp
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[SortedReconciliationIntervals] =
+  ): Future[SortedReconciliationIntervals] =
     getAll(validAt)
       .map { reconciliationIntervals =>
         SortedReconciliationIntervals
@@ -73,12 +70,12 @@ class SortedReconciliationIntervalsProvider(
           }
       }
 
-  /** Succeeds if the given timestamp `ts` represents a reconciliation interval tick
+  /** Succeeds if the given timestamp `ts` represents a reconciliation interval tick,
     * otherwise throws an InvalidParameterException.
     */
   private def checkIsTick(
       ts: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       sortedReconciliationIntervals <- reconciliationIntervals(ts)
       isTick = sortedReconciliationIntervals.isAtTick(ts)
@@ -92,6 +89,7 @@ class SortedReconciliationIntervalsProvider(
           )
       }
     }
+  }
 
   /** Computes a list of commitment periods between `fromExclusive` to `toInclusive`.
     * The caller should ensure that `fromExclusive` and `toInclusive` represent valid reconciliation ticks.
@@ -101,13 +99,14 @@ class SortedReconciliationIntervalsProvider(
   private[pruning] def computeReconciliationIntervalsCovering(
       fromExclusive: CantonTimestamp,
       toInclusive: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[List[CommitmentPeriod]] =
+  )(implicit traceContext: TraceContext): Future[List[CommitmentPeriod]] = {
+
     for {
       _ <- checkIsTick(fromExclusive)
       _ <- checkIsTick(toInclusive)
       res <-
         if (fromExclusive.getEpochSecond >= toInclusive.getEpochSecond)
-          FutureUnlessShutdown.pure(List.empty[CommitmentPeriod])
+          Future.successful(List.empty[CommitmentPeriod])
         else
           for {
             sortedReconciliationIntervals <- reconciliationIntervals(toInclusive)
@@ -136,4 +135,5 @@ class SortedReconciliationIntervalsProvider(
             prevIntervals :+ lastInterval
           }
     } yield res
+  }
 }

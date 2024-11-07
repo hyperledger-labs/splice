@@ -13,12 +13,11 @@ import com.digitalasset.canton.participant.protocol.submission.{DomainsFilter, U
 import com.digitalasset.canton.participant.sync.TransactionRoutingError
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.RoutingInternalError
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.NoDomainForSubmission
-import com.digitalasset.canton.protocol.LfLanguageVersion
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.ReassignmentTag.Target
+import com.digitalasset.daml.lf.transaction.TransactionVersion
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,10 +32,10 @@ private[routing] class DomainSelectorFactory(
       transactionData: TransactionData
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionRoutingError, DomainSelector] =
+  ): EitherT[Future, TransactionRoutingError, DomainSelector] = {
     for {
       admissibleDomains <- admissibleDomains.forParties(
-        submitters = transactionData.actAs -- transactionData.signedExternally,
+        submitters = transactionData.submitters,
         informees = transactionData.informees,
       )
     } yield new DomainSelector(
@@ -47,6 +46,7 @@ private[routing] class DomainSelectorFactory(
       domainStateProvider,
       loggerFactory,
     )
+  }
 }
 
 /** Selects the best domain for routing.
@@ -71,10 +71,12 @@ private[routing] class DomainSelector(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
+  private val submitters = transactionData.submitters
+
   /** Choose the appropriate domain for a transaction.
     * The domain is chosen as follows:
     * 1. Domain whose id equals `transactionData.prescribedDomainO` (if non-empty)
-    * 2. The domain with the smaller number of reassignments on which all informees have active participants
+    * 2. The domain with the smaller number of transfers on which all informees have active participants
     */
   def forMultiDomain(implicit
       traceContext: TraceContext
@@ -87,15 +89,15 @@ private[routing] class DomainSelector(
           _ <- validatePrescribedDomain(prescribedDomain, transactionData.version)
           domainRank <- domainRankComputation.compute(
             contracts,
-            Target(prescribedDomain),
-            transactionData.readers,
+            prescribedDomain,
+            transactionData.submitters,
           )
         } yield domainRank
 
       case None =>
         for {
           admissibleDomains <- filterDomains(admissibleDomains)
-          domainRank <- pickDomainIdAndComputeReassignments(contracts, admissibleDomains)
+          domainRank <- pickDomainIdAndComputeTransfers(contracts, admissibleDomains)
         } yield domainRank
     }
   }
@@ -108,7 +110,7 @@ private[routing] class DomainSelector(
     */
   def forSingleDomain(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionRoutingError, DomainRank] =
+  ): EitherT[Future, TransactionRoutingError, DomainRank] = {
     for {
       inputContractsDomainIdO <- chooseDomainOfInputContracts
 
@@ -141,6 +143,7 @@ private[routing] class DomainSelector(
           }
       }
     } yield DomainRank(Map.empty, priorityOfDomain(domainId), domainId)
+  }
 
   private def filterDomains(
       admissibleDomains: NonEmpty[Set[DomainId]]
@@ -158,7 +161,6 @@ private[routing] class DomainSelector(
 
     val domainsFilter = DomainsFilter(
       submittedTransaction = transactionData.transaction,
-      transactionData.ledgerTime,
       domains = domainStates,
       loggerFactory = loggerFactory,
     )
@@ -186,7 +188,7 @@ private[routing] class DomainSelector(
 
   private def singleDomainValidatePrescribedDomain(
       domainId: DomainId,
-      transactionVersion: LfLanguageVersion,
+      transactionVersion: TransactionVersion,
       inputContractsDomainIdO: Option[DomainId],
   )(implicit traceContext: TraceContext): EitherT[Future, TransactionRoutingError, Unit] = {
     /*
@@ -219,9 +221,10 @@ private[routing] class DomainSelector(
     *
     * - List `domainsOfSubmittersAndInformees` contains `domainId`
     */
-  private def validatePrescribedDomain(domainId: DomainId, transactionVersion: LfLanguageVersion)(
+  private def validatePrescribedDomain(domainId: DomainId, transactionVersion: TransactionVersion)(
       implicit traceContext: TraceContext
-  ): EitherT[Future, TransactionRoutingError, Unit] =
+  ): EitherT[Future, TransactionRoutingError, Unit] = {
+
     for {
       domainState <- EitherT.fromEither[Future](
         domainStateProvider.getTopologySnapshotAndPVFor(domainId)
@@ -246,7 +249,6 @@ private[routing] class DomainSelector(
           snapshot = snapshot,
           requiredPackagesByParty = transactionData.requiredPackagesPerParty,
           transactionVersion = transactionVersion,
-          ledgerTime = transactionData.ledgerTime,
         )
         .leftMap[TransactionRoutingError] { err =>
           TransactionRoutingError.ConfigurationErrors.InvalidPrescribedDomainId
@@ -254,8 +256,9 @@ private[routing] class DomainSelector(
         }
 
     } yield ()
+  }
 
-  private def pickDomainIdAndComputeReassignments(
+  private def pickDomainIdAndComputeTransfers(
       contracts: Seq[ContractData],
       domains: NonEmpty[Set[DomainId]],
   )(implicit
@@ -265,27 +268,22 @@ private[routing] class DomainSelector(
       rankedDomains <- domains.forgetNE.toList
         .parTraverseFilter(targetDomain =>
           domainRankComputation
-            .compute(
-              contracts,
-              Target(targetDomain),
-              transactionData.readers,
-            )
+            .compute(contracts, targetDomain, submitters)
             .toOption
             .value
         )
       // Priority of domain
-      // Number of reassignments if we use this domain
-      // pick according to the least amount of reassignments
+      // Number of Transfers if we use this domain
+      // pick according to least amount of transfers
     } yield rankedDomains.minOption
       .toRight(
-        TransactionRoutingError.AutomaticReassignmentForTransactionFailure.Failed(
-          s"None of the following $domains is suitable for automatic reassignment."
+        TransactionRoutingError.AutomaticTransferForTransactionFailure.Failed(
+          s"None of the following $domains is suitable for automatic transfer."
         )
       )
 
     EitherT(rankedDomainOpt)
   }
-
   private def chooseDomainOfInputContracts
       : EitherT[Future, TransactionRoutingError, Option[DomainId]] = {
     val inputContractsDomainData = transactionData.inputContractsDomainData

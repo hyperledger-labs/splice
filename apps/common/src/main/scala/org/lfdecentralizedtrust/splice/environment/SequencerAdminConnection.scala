@@ -8,17 +8,18 @@ import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import com.digitalasset.canton.admin.api.client.commands.{
+  EnterpriseSequencerAdminCommands,
   SequencerAdminCommands,
+  StatusAdminCommands,
   TopologyAdminCommands,
 }
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SequencerStatus}
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
+import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.sequencing.protocol
@@ -57,10 +58,10 @@ class SequencerAdminConnection(
 
   override val serviceName = "Canton Sequencer Admin API"
 
-  override protected type Status = SequencerStatus
+  override protected type Status = SequencerNodeStatus
 
-  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[SequencerStatus]] =
-    SequencerAdminCommands.Health.SequencerStatusCommand()
+  override protected def getStatusRequest: StatusAdminCommands.GetStatus[SequencerNodeStatus] =
+    new StatusAdminCommands.GetStatus(SequencerNodeStatus.fromProtoV30)
 
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =
     getId().map(SequencerId(_))
@@ -84,7 +85,7 @@ class SequencerAdminConnection(
     val responseObserver =
       new ByteStringStreamObserver[OnboardingStateResponse](_.onboardingStateForSequencer)
     runCmd(
-      SequencerAdminCommands.OnboardingState(responseObserver, Left(sequencerId))
+      EnterpriseSequencerAdminCommands.OnboardingState(responseObserver, Left(sequencerId))
     ).flatMap(_ => responseObserver.resultBytes)
   }
 
@@ -95,7 +96,7 @@ class SequencerAdminConnection(
       domainParameters: StaticDomainParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      SequencerAdminCommands.InitializeFromGenesisState(
+      EnterpriseSequencerAdminCommands.InitializeFromGenesisState(
         // TODO(#10953) Stop doing that.
         topologySnapshot.toByteString(domainParameters.protocolVersion),
         domainParameters,
@@ -109,7 +110,7 @@ class SequencerAdminConnection(
       domainParameters: StaticDomainParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      SequencerAdminCommands.InitializeFromGenesisState(
+      EnterpriseSequencerAdminCommands.InitializeFromGenesisState(
         genesisState,
         domainParameters,
       )
@@ -119,7 +120,7 @@ class SequencerAdminConnection(
       onboardingState: ByteString
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      SequencerAdminCommands.InitializeFromOnboardingState(
+      EnterpriseSequencerAdminCommands.InitializeFromOnboardingState(
         onboardingState
       )
     )
@@ -171,7 +172,7 @@ class SequencerAdminConnection(
       member: Member,
       newTotalExtraTrafficLimit: NonNegativeLong,
       serial: PositiveInt,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]] = {
     runCmd(
       SequencerAdminCommands.SetTrafficPurchased(member, serial, newTotalExtraTrafficLimit)
     )
@@ -272,13 +273,13 @@ class SequencerAdminConnection(
       traceContext: TraceContext
   ): Future[String] =
     runCmd(
-      SequencerAdminCommands.Prune(ts)
+      EnterpriseSequencerAdminCommands.Prune(ts)
     )
 
   def disableMember(member: Member)(implicit
       traceContext: TraceContext
   ): Future[Unit] = runCmd(
-    SequencerAdminCommands.DisableMember(member)
+    EnterpriseSequencerAdminCommands.DisableMember(member)
   )
 
   override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =

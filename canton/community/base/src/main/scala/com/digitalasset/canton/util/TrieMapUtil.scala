@@ -3,8 +3,6 @@
 
 package com.digitalasset.canton.util
 
-import cats.syntax.either.*
-
 import scala.collection.concurrent.TrieMap
 
 object TrieMapUtil {
@@ -22,12 +20,14 @@ object TrieMapUtil {
       key: K,
       newValue: V,
       errorFn: (K, V, V) => E,
-  ): Either[E, Unit] =
+  ): Either[E, Unit] = {
+
     map.putIfAbsent(key, newValue) match {
-      case None => Either.unit
+      case None => Right(())
       case Some(oldValue) =>
         Either.cond(oldValue == newValue, (), errorFn(key, oldValue, newValue))
     }
+  }
 
   def insertIfAbsent[K, V, E](
       map: TrieMap[K, V],

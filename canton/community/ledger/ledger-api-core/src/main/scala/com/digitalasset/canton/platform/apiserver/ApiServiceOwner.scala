@@ -5,16 +5,12 @@ package com.digitalasset.canton.platform.apiserver
 
 import com.daml.jwt.JwtTimestampLeeway
 import com.daml.ledger.resources.ResourceOwner
+import com.daml.tls.TlsConfiguration
 import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.{AuthService, Authorizer}
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{
-  NonNegativeDuration,
-  NonNegativeFiniteDuration,
-  TlsServerConfig,
-}
+import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
 import com.digitalasset.canton.ledger.api.auth.*
-import com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedAuthorizationInterceptor
+import com.digitalasset.canton.ledger.api.auth.interceptor.AuthorizationInterceptor
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.health.HealthChecks
 import com.digitalasset.canton.ledger.api.util.TimeProvider
@@ -31,6 +27,7 @@ import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 import com.digitalasset.canton.platform.apiserver.execution.StoreBackedCommandExecutor.AuthenticateContract
 import com.digitalasset.canton.platform.apiserver.execution.{
+  AuthorityResolver,
   CommandProgressTracker,
   DynamicDomainParameterGetter,
 }
@@ -41,11 +38,9 @@ import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTr
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
-  InteractiveSubmissionServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
-import com.digitalasset.canton.platform.store.dao.events.LfValueTranslation
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.Engine
@@ -65,7 +60,7 @@ object ApiServiceOwner {
       address: Option[String] = DefaultAddress, // This defaults to "localhost" when set to `None`.
       maxInboundMessageSize: Int = DefaultMaxInboundMessageSize,
       port: Port = DefaultPort,
-      tls: Option[TlsServerConfig] = DefaultTls,
+      tls: Option[TlsConfiguration] = DefaultTls,
       seeding: Seeding = DefaultSeeding,
       initSyncTimeout: NonNegativeFiniteDuration = ApiServiceOwner.DefaultInitSyncTimeout,
       managementServiceTimeout: NonNegativeFiniteDuration =
@@ -92,6 +87,7 @@ object ApiServiceOwner {
       otherServices: immutable.Seq[BindableService] = immutable.Seq.empty,
       otherInterceptors: List[ServerInterceptor] = List.empty,
       engine: Engine,
+      authorityResolver: AuthorityResolver,
       servicesExecutionContext: ExecutionContextExecutor,
       checkOverloaded: TraceContext => Option[state.SubmissionResult] =
         _ => None, // Used for Canton rate-limiting,
@@ -105,8 +101,6 @@ object ApiServiceOwner {
       loggerFactory: NamedLoggerFactory,
       authenticateContract: AuthenticateContract,
       dynParamGetter: DynamicDomainParameterGetter,
-      interactiveSubmissionServiceConfig: InteractiveSubmissionServiceConfig,
-      lfValueTranslation: LfValueTranslation,
   )(implicit
       actorSystem: ActorSystem,
       materializer: Materializer,
@@ -115,22 +109,19 @@ object ApiServiceOwner {
   ): ResourceOwner[ApiService] = {
 
     val authorizer = new Authorizer(
-      now = Clock.systemUTC.instant _,
-      participantId = participantId,
-      ongoingAuthorizationFactory = UserBasedOngoingAuthorization.Factory(
-        now = Clock.systemUTC.instant _,
-        userManagementStore = userManagementStore,
-        userRightsCheckIntervalInSeconds = userManagement.cacheExpiryAfterWriteInSeconds,
-        pekkoScheduler = actorSystem.scheduler,
-        jwtTimestampLeeway = jwtTimestampLeeway,
-        tokenExpiryGracePeriodForStreams =
-          tokenExpiryGracePeriodForStreams.map(_.asJavaApproximation),
-        loggerFactory = loggerFactory,
-      )(servicesExecutionContext, traceContext),
+      Clock.systemUTC.instant _,
+      participantId,
+      userManagementStore,
+      servicesExecutionContext,
+      userRightsCheckIntervalInSeconds = userManagement.cacheExpiryAfterWriteInSeconds,
+      pekkoScheduler = actorSystem.scheduler,
       jwtTimestampLeeway = jwtTimestampLeeway,
+      tokenExpiryGracePeriodForStreams =
+        tokenExpiryGracePeriodForStreams.map(_.asJavaApproximation),
       telemetry = telemetry,
       loggerFactory = loggerFactory,
     )
+    // TODO(i12283) LLP: Consider fusing the index health check with the indexer health check
     val healthChecksWithIndexService = healthChecks + ("index" -> indexService)
 
     val identityProviderConfigLoader = new IdentityProviderConfigLoader {
@@ -151,6 +142,7 @@ object ApiServiceOwner {
         indexService = indexService,
         authorizer = authorizer,
         engine = engine,
+        authorityResolver = authorityResolver,
         timeProvider = timeServiceBackend.getOrElse(TimeProvider.UTC),
         timeProviderType =
           timeServiceBackend.fold[TimeProviderType](TimeProviderType.WallClock)(_ =>
@@ -180,8 +172,6 @@ object ApiServiceOwner {
         loggerFactory = loggerFactory,
         authenticateContract = authenticateContract,
         dynParamGetter = dynParamGetter,
-        interactiveSubmissionServiceConfig = interactiveSubmissionServiceConfig,
-        lfValueTranslation = lfValueTranslation,
       )(materializer, executionSequencerFactory, tracer)
         .map(_.withServices(otherServices))
       apiService <- new LedgerApiService(
@@ -190,7 +180,7 @@ object ApiServiceOwner {
         maxInboundMessageSize,
         address,
         tls,
-        new UserBasedAuthorizationInterceptor(
+        AuthorizationInterceptor(
           authService = authService,
           Option.when(userManagement.enabled)(userManagementStore),
           new IdentityProviderAwareAuthServiceImpl(
@@ -219,7 +209,7 @@ object ApiServiceOwner {
 
   val DefaultPort: Port = Port.tryCreate(6865)
   val DefaultAddress: Option[String] = None
-  val DefaultTls: Option[TlsServerConfig] = None
+  val DefaultTls: Option[TlsConfiguration] = None
   val DefaultMaxInboundMessageSize: Int = 64 * 1024 * 1024
   val DefaultInitSyncTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofSeconds(10)

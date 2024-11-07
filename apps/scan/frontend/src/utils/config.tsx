@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   ConfigProvider,
-  pollIntervalSchema,
   serviceSchema,
   spliceInstanceNamesSchema,
   useConfig,
 } from 'common-frontend';
-import { PollingStrategy } from 'common-frontend-utils';
 import React from 'react';
 import { z } from 'zod';
 
@@ -18,7 +16,6 @@ type ScanServicesConfig = {
 type ScanConfig = {
   services: ScanServicesConfig;
   spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
-  pollInterval?: z.infer<typeof pollIntervalSchema>;
 };
 
 const configScheme = z.object({
@@ -26,7 +23,6 @@ const configScheme = z.object({
     scan: serviceSchema,
   }),
   spliceInstanceNames: spliceInstanceNamesSchema,
-  pollInterval: pollIntervalSchema,
 });
 
 export const ConfigContext = React.createContext<ScanConfig | undefined>(undefined);
@@ -42,10 +38,3 @@ export const ScanConfigProvider: React.FC<{
 };
 
 export const useScanConfig: () => ScanConfig = () => useConfig<ScanConfig>(ConfigContext);
-
-export const useConfigPollInterval: () => number = () => {
-  const config = useScanConfig();
-
-  // Use default poll interval if not specified in config
-  return config.pollInterval ?? PollingStrategy.FIXED;
-};

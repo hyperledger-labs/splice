@@ -4,35 +4,46 @@
 package com.digitalasset.canton.participant.sync
 
 import cats.Eval
+import cats.data.EitherT
+import cats.syntax.alternative.*
+import cats.syntax.option.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.Update
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
-import com.digitalasset.canton.platform.indexer.IndexerState.RepairInProgress
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
+import com.digitalasset.canton.participant.LocalOffset
+import com.digitalasset.canton.participant.store.MultiDomainEventLog.PublicationData
+import com.digitalasset.canton.participant.store.*
+import com.digitalasset.canton.participant.sync.TimestampedEvent.{
+  EventId,
+  TimelyRejectionEventId,
+  TransactionEventId,
+}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.{ErrorUtil, LoggerUtil, MonadUtil, SimpleExecutionQueue}
-import org.slf4j.event.Level
+import com.digitalasset.canton.util.{ErrorUtil, MonadUtil, SimpleExecutionQueue}
+import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.{ExecutionContext, Future}
 
-/** Helper to publish participant events in a thread-safe way. For "regular" domain related events
-  * thread safety is taken care of by the [[com.digitalasset.canton.participant.event.RecordOrderPublisher]].
+/** Helper to publish participant events in a thread-safe way. For "regular" SingleDimensionEventLogs representing
+  * domains thread safety is taken care of by the [[com.digitalasset.canton.participant.event.RecordOrderPublisher]].
   *
   * ParticipantEventPublisher also encapsulates the participant clock generating unique participant recordTime.
   *
   * @param participantId        participant id
+  * @param participantEventLog  participant-local event log
+  * @param multiDomainEventLog  multi domain event log for registering participant event log
   * @param participantClock     clock for the current time to stamp published events with
   * @param loggerFactory        named logger factory
   */
 class ParticipantEventPublisher(
     participantId: ParticipantId,
-    ledgerApiIndexer: Eval[LedgerApiIndexer],
+    private val participantEventLog: Eval[ParticipantEventLog],
+    multiDomainEventLog: Eval[MultiDomainEventLog],
     participantClock: Clock,
     exitOnFatalFailures: Boolean,
     override protected val timeouts: ProcessingTimeout,
@@ -52,93 +63,108 @@ class ParticipantEventPublisher(
     crashOnFailure = exitOnFatalFailures,
   )
 
-  private def publishInternal(event: Update)(implicit traceContext: TraceContext): Future[Unit] = {
-    logger.debug(s"Publishing event at record time ${event.recordTime}: ${event.show}")
-    ledgerApiIndexer.value.queue
-      .offer(Traced(event))
-      // waiting for the participant event to persisted by Indexer
-      .flatMap(_ => event.persisted.future)
+  private def publishInternal(
+      event: LedgerSyncEvent
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    for {
+      localOffset <- participantEventLog.value.nextLocalOffset()
+      timestampedEvent = TimestampedEvent(
+        event,
+        localOffset,
+        None,
+        EventId.fromLedgerSyncEvent(event),
+      )
+      _ = logger.debug(
+        s"Publishing event with local offset ${localOffset} at record time ${event.recordTime}: ${event.description}"
+      )
+      _ <- participantEventLog.value.insert(timestampedEvent)
+      publicationData = PublicationData(
+        participantEventLog.value.id,
+        timestampedEvent,
+        inFlightReference = None, // No in-flight tracking for events published via this method
+      )
+      _ <- multiDomainEventLog.value.publish(publicationData)
+    } yield ()
   }
 
-  private def retryIfRepairInProgress(
-      retryBeforeWarning: Int = 10
-  )(f: => Future[Unit])(implicit traceContext: TraceContext): Future[Unit] =
-    f.recoverWith {
-      case repairInProgress: RepairInProgress =>
-        val logLevel =
-          if (retryBeforeWarning <= 0) Level.WARN
-          else Level.INFO
-        LoggerUtil.logAtLevel(
-          logLevel,
-          "Delaying the publication of participant event, as Repair operation is in progress. Waiting until Repair operation finished...",
-        )
-        repairInProgress.repairDone.flatMap { _ =>
-          LoggerUtil.logAtLevel(
-            logLevel,
-            "Repair operation finished...try to publish participant event again.",
-          )
-          retryIfRepairInProgress(retryBeforeWarning - 1)(f)
-        }
-
-      case t =>
-        Future.failed(t)
-    }
-
-  /** Events published this way will be delayed by ongoing repair-operations, meaning:
-    * the publication of this event will be postponed until the repair-operation is finished.
-    * Repair operations take precedence: after 10 times waiting for the ongoing
-    * repair to finish, a warning will be emitted for each subsequent retry.
-    *
-    * @return A Future which will be only successful if the event is successfully persisted by the indexer
-    */
-  def publishEventDelayableByRepairOperation(
-      event: Update
+  def publish(
+      event: LedgerSyncEvent
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     ErrorUtil.requireArgument(
       event.recordTime == ParticipantEventPublisher.now.toLf,
       show"RecordTime not initialized with 'now' literal. Participant event: $event",
     )
     executionQueue.execute(
-      // this is hopefully a temporary measure, and is needed since we schedule party notifications upon the related topology change's effective time, so we can never be sure, even if the domain is already disconnected that the participant event publisher is not used
-      // in case that is not needed anymore (thanks to ledger api party and topology unification),
-      // we should be able to plainly fail the rest of the events
-      retryIfRepairInProgress()(
-        publishInternal(event.withRecordTime(participantClock.uniqueTime().toLf))
-      ),
-      s"publish event ${event.show} with record time ${event.recordTime}",
+      publishInternal(event.setTimestamp(participantClock.uniqueTime().toLf)),
+      s"publish event ${event.description} with record time ${event.recordTime}",
     )
   }
 
-  /** Events publication this way might fail if a repair-operation is ongoing.
-    * Clients need to ensure not to make this call during repair operations.
+  /** Publishes each given event with its IDs in the participant event log unless the ID is already present.
     *
-    * @param events will be published after each other, maintaining the same order on the ledger as well
-    * @return A Future which will be only successful if all the event are successfully persisted by the indexer
+    * @return A [[scala.Left$]] for the events whose [[com.digitalasset.canton.participant.sync.TimestampedEvent.EventId]]
+    *         is already present. The other events are published.
     */
-  def publishDomainRelatedEvents(events: Seq[Traced[Update]]): FutureUnlessShutdown[Unit] =
-    MonadUtil.sequentialTraverse_(events) { tracedEvent =>
-      implicit val tc: TraceContext = tracedEvent.traceContext
-      executionQueue.execute(
-        publishInternal(tracedEvent.value)(tracedEvent.traceContext),
-        s"publish event ${tracedEvent.value.show} with record time ${tracedEvent.value.recordTime}",
-      )
-    }
+  def publishWithIds(
+      events: Seq[Traced[(EventId, LedgerSyncEvent)]]
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, Seq[TimestampedEvent], Unit] = EitherT {
+    def go: Future[Either[List[TimestampedEvent], Unit]] =
+      for {
+        insertResult <- allocateOffsetsAndInsert(events)
+        (clashes, insertedEvents) = events
+          .lazyZip(insertResult)
+          .map { case (Traced((eventId, event)), result) =>
+            result.map(localOffset => TimestampedEvent(event, localOffset, None, eventId.some))
+          }
+          .toList
+          .separate
+        // Make sure to call publish in order so that the MultiDomainEventLog does not complain about decreasing local offsets
+        _ <- MonadUtil.sequentialTraverse_(insertedEvents) { event =>
+          val inFlightReference = event.eventId.flatMap {
+            case timelyReject: TimelyRejectionEventId =>
+              Some(timelyReject.asInFlightReference)
+            case _: TransactionEventId => None
+          }
+          multiDomainEventLog.value.publish(
+            PublicationData(participantEventLog.value.id, event, inFlightReference)
+          )
+        }
+      } yield Either.cond(clashes.isEmpty, (), clashes)
 
-  /** The Init will be only published if the ledger is empty. This call can be repeated anytime, if the ledger is
-    * not empty, it will have no effect.
-    *
-    * @return A Future which will be only successful if the Init event is successfully persisted by the indexer
-    */
+    executionQueue.execute(go, s"insert events with IDs ${events.map(_.value._1)}")
+  }
+
+  @VisibleForTesting
+  private[sync] def allocateOffsetsAndInsert(
+      events: Seq[Traced[(EventId, LedgerSyncEvent)]]
+  )(implicit traceContext: TraceContext): Future[Seq[Either[TimestampedEvent, LocalOffset]]] = {
+    val eventCount = NonNegativeInt.tryCreate(events.size)
+    for {
+      newOffsets <- participantEventLog.value.nextLocalOffsets(eventCount)
+      offsetAndEvent = newOffsets.lazyZip(events)
+      timestampedEvents = offsetAndEvent.map((localOffset, tracedEvent) =>
+        tracedEvent.withTraceContext(implicit traceContext => { case (eventId, event) =>
+          TimestampedEvent(event, localOffset, None, eventId.some)
+        })
+      )
+      insertionResult <- participantEventLog.value.insertsUnlessEventIdClash(timestampedEvents)
+    } yield newOffsets.lazyZip(insertionResult).map { (localOffset, result) =>
+      result.map { case () => localOffset }
+    }
+  }
+
   def publishInitNeededUpstreamOnlyIfFirst(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] =
+  ): FutureUnlessShutdown[Unit] = {
     executionQueue.execute(
       for {
-        ledgerEnd <- ledgerApiIndexer.value.ledgerApiStore.value.ledgerEnd
+        maybeFirstOffset <- multiDomainEventLog.value.locateOffset(1).value
         _ <-
-          if (ledgerEnd.lastOffset == LedgerEnd.beforeBegin.lastOffset) {
+          if (maybeFirstOffset.isEmpty) {
             logger.debug("Attempt to publish init update")
-            val event = Update.Init(
+            val event = LedgerSyncEvent.Init(
               recordTime = participantClock.uniqueTime().toLf
             )
             // Do not call `publish` because this is already running inside the execution queue
@@ -147,6 +173,7 @@ class ParticipantEventPublisher(
       } yield (),
       "publish Init message",
     )
+  }
 
   override protected def onClosed(): Unit = Lifecycle.close(executionQueue)(logger)
 

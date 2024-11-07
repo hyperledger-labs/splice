@@ -146,20 +146,12 @@ object FutureTraverse extends WartTraverser {
       traverseInstanceEitherSymbol,
       traverseFilterInstanceOptionSymbol,
     )
+
     val futureLikeType = typeOf[DoNotTraverseLikeFuture]
     val futureLikeTester = FutureLikeTester.tester(u)(futureLikeType)
-    val allowTraverseSingleContainerType = typeOf[AllowTraverseSingleContainer]
-
-    def hasAllowTraverseSingleContainerAnnotation(symbol: Symbol): Boolean = {
-      val annotations = symbol.annotations
-      annotations.exists(_.tree.tpe =:= allowTraverseSingleContainerType)
-    }
 
     def isSingletonContainer(receiver: Tree): Boolean = receiver match {
       case Apply(_, List(implicitArg)) if allowedImplicits.contains(implicitArg.symbol) => true
-      case Apply(_, List(implicitArg))
-          if hasAllowTraverseSingleContainerAnnotation(implicitArg.symbol) =>
-        true
       case _ => false
     }
 
@@ -183,7 +175,7 @@ object FutureTraverse extends WartTraverser {
 
     new u.Traverser {
 
-      override def traverse(tree: Tree): Unit =
+      override def traverse(tree: Tree): Unit = {
         tree match {
           // Ignore trees marked by SuppressWarnings
           case t if hasWartAnnotation(u)(t) =>
@@ -196,6 +188,7 @@ object FutureTraverse extends WartTraverser {
           case _ =>
             super.traverse(tree)
         }
+      }
     }
   }
 }
@@ -204,5 +197,3 @@ object FutureTraverse extends WartTraverser {
   * when looking for traverse-like calls with such an applicative instance.
   */
 final class DoNotTraverseLikeFuture extends StaticAnnotation
-
-final class AllowTraverseSingleContainer extends StaticAnnotation

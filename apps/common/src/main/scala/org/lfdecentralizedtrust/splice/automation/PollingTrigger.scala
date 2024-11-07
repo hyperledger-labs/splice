@@ -14,11 +14,12 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.retry.ErrorKind.*
+import com.digitalasset.canton.util.retry.RetryUtil
 import org.apache.pekko.Done
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{blocking, Future, Promise}
+import scala.util.Failure
 
 /** A trigger that regularly executes work.
   *
@@ -143,13 +144,13 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                 )
                 .recover { case ex =>
                   // Call this to get the default logging
-                  val errorKind = retryable.determineExceptionErrorKind(ex, logger)
+                  val errorKind = retryable.retryOK(Failure(ex), logger, None)
                   // Determine if we need to log a warning due to repeated transient errors
                   val isTransientFailure = errorKind match {
-                    case TransientErrorKind(_) => true
-                    case FatalErrorKind => false
-                    case NoSuccessErrorKind => false
-                    case UnknownErrorKind => false
+                    case RetryUtil.NoErrorKind => false
+                    case RetryUtil.TransientErrorKind => true
+                    case RetryUtil.FatalErrorKind => false
+                    case RetryUtil.SpuriousTransientErrorKind => true
                   }
                   val numConsecutiveTransientFailures =
                     if (isTransientFailure) state.numConsecutiveTransientFailures + 1 else 0

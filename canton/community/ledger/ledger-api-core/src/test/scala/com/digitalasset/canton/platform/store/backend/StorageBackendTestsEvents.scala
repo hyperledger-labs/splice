@@ -3,13 +3,11 @@
 
 package com.digitalasset.canton.platform.store.backend
 
+import com.daml.ledger.api.v2.event.Event
+import com.daml.ledger.api.v2.transaction.TreeEvent
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
-import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
-  DomainOffset,
-  RawCreatedEvent,
-  RawFlatEvent,
-  RawTreeEvent,
-}
+import com.digitalasset.canton.platform.store.backend.EventStorageBackend.DomainOffset
+import com.digitalasset.canton.platform.store.dao.events.Raw
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -27,6 +25,9 @@ private[backend] trait StorageBackendTestsEvents
 
   import StorageBackendTestValues.*
   import DbDtoEq.*
+
+  private val emptyTraceContext =
+    SerializableTraceContext(TraceContext.empty).toDamlProto.toByteArray
 
   it should "find contracts by party" in {
     val partySignatory = Ref.Party.assertFromString("signatory")
@@ -511,13 +512,13 @@ private[backend] trait StorageBackendTestsEvents
     )
 
     def checkKeyAndMaintainersInTrees(
-        event: RawTreeEvent,
+        event: Raw.TreeEvent,
         createKey: Option[Array[Byte]],
         createKeyMaintainers: Array[String],
     ) = event match {
-      case created: RawCreatedEvent =>
+      case created: Raw.Created[TreeEvent] =>
         created.createKeyValue should equal(createKey)
-        created.createKeyMaintainers should equal(createKeyMaintainers.toSet)
+        created.createKeyMaintainers should equal(createKeyMaintainers)
       case _ => fail()
     }
 
@@ -529,13 +530,13 @@ private[backend] trait StorageBackendTestsEvents
     )
 
     def checkKeyAndMaintainersInFlats(
-        event: RawFlatEvent,
+        event: Raw.FlatEvent,
         createKey: Option[Array[Byte]],
         createKeyMaintainers: Array[String],
     ) = event match {
-      case created: RawCreatedEvent =>
+      case created: Raw.Created[Event] =>
         created.createKeyValue should equal(createKey)
-        created.createKeyMaintainers should equal(createKeyMaintainers.toSet)
+        created.createKeyMaintainers should equal(createKeyMaintainers)
       case _ => fail()
     }
 
@@ -1065,7 +1066,7 @@ private[backend] trait StorageBackendTestsEvents
         s"test $index lastDomainOffsetBeforerOrAtPublicationTime($beforeOrAtPublicationTimeInclusive)"
       ) {
         executeSql(
-          backend.event.lastDomainOffsetBeforeOrAtPublicationTime(
+          backend.event.lastDomainOffsetBeforerOrAtPublicationTime(
             beforeOrAtPublicationTimeInclusive = beforeOrAtPublicationTimeInclusive
           )
         ) shouldBe expectation

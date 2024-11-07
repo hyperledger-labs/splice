@@ -4,7 +4,8 @@
 package com.digitalasset.canton.http
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.jwt.{Jwt, JwtDecoder}
+import com.daml.jwt.JwtDecoder
+import com.daml.jwt.domain.Jwt
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.logging.LoggingContextOf
 import com.daml.metrics.pekkohttp.HttpMetricsInterceptor
@@ -45,18 +46,15 @@ import scalaz.Scalaz.*
 import java.nio.file.{Files, Path}
 import java.security.{Key, KeyStore}
 import javax.net.ssl.SSLContext
-import com.digitalasset.canton.config.{TlsClientConfig, TlsServerConfig}
-import com.digitalasset.canton.http.json.v2.V2Routes
-import com.digitalasset.canton.ledger.participant.state.WriteService
+import com.daml.tls.TlsConfiguration
+import com.digitalasset.canton.http.json2.V2Routes
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Using
 
 class HttpService(
     startSettings: StartSettings,
-    httpsConfiguration: Option[TlsServerConfig],
     channel: Channel,
-    writeService: WriteService,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     asys: ActorSystem,
@@ -74,176 +72,170 @@ class HttpService(
   private val directEc = DirectExecutionContext(noTracingLogger)
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def acquire()(implicit context: ResourceContext): Resource[ServerBinding] =
-    Resource({
-      logger.info(s"Starting JSON API server, ${lc.makeString}")
+  def acquire()(implicit context: ResourceContext): Resource[ServerBinding] = Resource({
+    logger.info(s"Starting JSON API server, ${lc.makeString}")
 
-      import startSettings.*
-      val DummyApplicationId: ApplicationId = ApplicationId("HTTP-JSON-API-Gateway")
+    import startSettings.*
+    val DummyApplicationId: ApplicationId = ApplicationId("HTTP-JSON-API-Gateway")
 
-      implicit val settings: ServerSettings = ServerSettings(asys).withTransparentHeadRequests(true)
-      val clientConfig = LedgerClientConfiguration(
-        applicationId = ApplicationId.unwrap(DummyApplicationId),
-        commandClient = CommandClientConfiguration.default,
+    implicit val settings: ServerSettings = ServerSettings(asys).withTransparentHeadRequests(true)
+    val clientConfig = LedgerClientConfiguration(
+      applicationId = ApplicationId.unwrap(DummyApplicationId),
+      commandClient = CommandClientConfiguration.default,
+    )
+
+    val ledgerClient: DamlLedgerClient =
+      DamlLedgerClient.withoutToken(channel, clientConfig, loggerFactory)
+    import org.apache.pekko.http.scaladsl.server.Directives.*
+    val bindingEt: EitherT[Future, HttpService.Error, ServerBinding] = for {
+      _ <- eitherT(Future.successful(\/-(ledgerClient)))
+      packageCache = LedgerReader.LoadCache.freshCache()
+
+      packageService = new PackageService(
+        reloadPackageStoreIfChanged =
+          doLoad(ledgerClient.v2.packageService, LedgerReader(loggerFactory), packageCache),
+        loggerFactory = loggerFactory,
       )
 
-      val ledgerClient: DamlLedgerClient =
-        DamlLedgerClient.withoutToken(channel, clientConfig, loggerFactory)
+      ledgerClientJwt = LedgerClientJwt(loggerFactory)
 
-      import org.apache.pekko.http.scaladsl.server.Directives.*
-      val bindingEt: EitherT[Future, HttpService.Error, ServerBinding] =
-        for {
-          _ <- eitherT(Future.successful(\/-(ledgerClient)))
-          packageCache = LedgerReader.LoadCache.freshCache()
+      commandService = new CommandService(
+        ledgerClientJwt.submitAndWaitForTransaction(ledgerClient),
+        ledgerClientJwt.submitAndWaitForTransactionTree(ledgerClient),
+        loggerFactory,
+      )
 
-          packageService = new PackageService(
-            reloadPackageStoreIfChanged =
-              doLoad(ledgerClient.packageService, LedgerReader(loggerFactory), packageCache),
-            loggerFactory = loggerFactory,
-          )
+      contractsService = new ContractsService(
+        packageService.resolveContractTypeId,
+        packageService.allTemplateIds,
+        ledgerClientJwt.getByContractId(ledgerClient),
+        ledgerClientJwt.getActiveContracts(ledgerClient),
+        ledgerClientJwt.getCreatesAndArchivesSince(ledgerClient),
+        loggerFactory,
+      )
 
-          ledgerClientJwt = LedgerClientJwt(loggerFactory)
+      partiesService = new PartiesService(
+        ledgerClientJwt.listKnownParties(ledgerClient),
+        ledgerClientJwt.getParties(ledgerClient),
+        ledgerClientJwt.allocateParty(ledgerClient),
+      )
 
-          commandService = new CommandService(
-            ledgerClientJwt.submitAndWaitForTransaction(ledgerClient),
-            ledgerClientJwt.submitAndWaitForTransactionTree(ledgerClient),
-            loggerFactory,
-          )
+      packageManagementService = new PackageManagementService(
+        ledgerClientJwt.listPackages(ledgerClient),
+        ledgerClientJwt.getPackage(ledgerClient),
+        { case (jwt, byteString) =>
+          implicit lc =>
+            ledgerClientJwt
+              .uploadDar(ledgerClient)(directEc, traceContext)(
+                jwt,
+                byteString,
+              )(lc)
+              .flatMap(_ => packageService.reload(jwt))
+              .map(_ => ())
+        },
+      )
 
-          contractsService = new ContractsService(
-            packageService.resolveContractTypeId,
-            packageService.allTemplateIds,
-            ledgerClientJwt.getByContractId(ledgerClient),
-            ledgerClientJwt.getActiveContracts(ledgerClient),
-            ledgerClientJwt.getCreatesAndArchivesSince(ledgerClient),
-            ledgerClientJwt.getLedgerEnd(ledgerClient),
-            loggerFactory,
-          )
+      meteringReportService = new MeteringReportService(
+        { case (jwt, request) =>
+          implicit lc =>
+            ledgerClientJwt
+              .getMeteringReport(ledgerClient)(directEc, traceContext)(jwt, request)(
+                lc
+              )
+        }
+      )
 
-          partiesService = new PartiesService(
-            ledgerClientJwt.listKnownParties(ledgerClient),
-            ledgerClientJwt.getParties(ledgerClient),
-            ledgerClientJwt.allocateParty(ledgerClient),
-          )
+      ledgerHealthService = HealthGrpc.stub(channel)
 
-          packageManagementService = new PackageManagementService(
-            ledgerClientJwt.listPackages(ledgerClient),
-            ledgerClientJwt.getPackage(ledgerClient),
-            { case (jwt, byteString) =>
-              implicit lc =>
-                ledgerClientJwt
-                  .uploadDar(ledgerClient)(directEc, traceContext)(
-                    jwt,
-                    byteString,
-                  )(lc)
-                  .flatMap(_ => packageService.reload(jwt))
-                  .map(_ => ())
-            },
-          )
+      healthService = new HealthService(() => ledgerHealthService.check(HealthCheckRequest()))
 
-          meteringReportService = new MeteringReportService(
-            { case (jwt, request) =>
-              implicit lc =>
-                ledgerClientJwt
-                  .getMeteringReport(ledgerClient)(directEc, traceContext)(jwt, request)(
-                    lc
-                  )
-            }
-          )
+      _ = metrics.health.registerHealthGauge(
+        HttpApiMetrics.ComponentName,
+        () => healthService.ready().map(_.checks.forall(_.result)),
+      )
 
-          ledgerHealthService = HealthGrpc.stub(channel)
+      (encoder, decoder) = HttpService.buildJsonCodecs(packageService)
 
-          healthService = new HealthService(() => ledgerHealthService.check(HealthCheckRequest()))
+      v2Routes = V2Routes(
+        ledgerClient,
+        mat.executionContext,
+        mat,
+        loggerFactory,
+      )
 
-          _ = metrics.health.registerHealthGauge(
-            HttpApiMetrics.ComponentName,
-            () => healthService.ready().map(_.checks.forall(_.result)),
-          )
+      jsonEndpoints = new Endpoints(
+        startSettings.httpsConfiguration.isEmpty,
+        HttpService.decodeJwt,
+        commandService,
+        contractsService,
+        partiesService,
+        packageManagementService,
+        meteringReportService,
+        healthService,
+        v2Routes,
+        encoder,
+        decoder,
+        debugLoggingOfHttpBodies,
+        ledgerClient.userManagementClient,
+        loggerFactory,
+      )
 
-          (encoder, decoder) = HttpService.buildJsonCodecs(packageService)
+      websocketService = new WebSocketService(
+        contractsService,
+        packageService.resolveContractTypeId,
+        decoder,
+        wsConfig,
+        loggerFactory,
+      )
 
-          v2Routes = V2Routes(
-            ledgerClient,
-            packageService,
-            metadataServiceEnabled = startSettings.damlDefinitionsServiceEnabled,
-            writeService,
-            mat.executionContext,
-            mat,
-            loggerFactory,
-          )
+      websocketEndpoints = new WebsocketEndpoints(
+        HttpService.decodeJwt,
+        websocketService,
+        ledgerClient.userManagementClient,
+        loggerFactory,
+      )
 
-          jsonEndpoints = new Endpoints(
-            httpsConfiguration.isEmpty,
-            HttpService.decodeJwt,
-            commandService,
-            contractsService,
-            partiesService,
-            packageManagementService,
-            meteringReportService,
-            healthService,
-            v2Routes,
-            encoder,
-            decoder,
-            debugLoggingOfHttpBodies,
-            ledgerClient.userManagementClient,
-            loggerFactory,
-          )
+      rateDurationSizeMetrics = HttpMetricsInterceptor.rateDurationSizeMetrics(metrics.http)
 
-          websocketService = new WebSocketService(
-            contractsService,
-            packageService.resolveContractTypeId,
-            decoder,
-            websocketConfig,
-            loggerFactory,
-          )
+      defaultEndpoints =
+        rateDurationSizeMetrics apply concat(
+          jsonEndpoints.all: Route,
+          websocketEndpoints.transactionWebSocket,
+        )
 
-          websocketEndpoints = new WebsocketEndpoints(
-            HttpService.decodeJwt,
-            websocketService,
-            ledgerClient.userManagementClient,
-            loggerFactory,
-          )
+      allEndpoints: Route = concat(
+        staticContentConfig.cata(
+          c => concat(StaticContentEndpoints.all(c, loggerFactory), defaultEndpoints),
+          defaultEndpoints,
+        ),
+        EndpointsCompanion.notFound(logger),
+      )
 
-          rateDurationSizeMetrics = HttpMetricsInterceptor.rateDurationSizeMetrics(metrics.http)
+      binding <- liftET[HttpService.Error] {
+        val serverBuilder = Http()
+          .newServerAt(address, httpPort.getOrElse(0))
+          .withSettings(settings)
 
-          defaultEndpoints =
-            rateDurationSizeMetrics apply concat(
-              jsonEndpoints.all: Route,
-              websocketEndpoints.transactionWebSocket,
-            )
-
-          allEndpoints: Route = concat(
-            defaultEndpoints,
-            EndpointsCompanion.notFound(logger),
-          )
-
-          binding <- liftET[HttpService.Error] {
-            val serverBuilder = Http()
-              .newServerAt(server.address, server.port.getOrElse(0))
-              .withSettings(settings)
-
-            httpsConfiguration
-              .fold(serverBuilder) { config =>
-                logger.info(s"Enabling HTTPS with $config")
-                serverBuilder.enableHttps(HttpService.httpsConnectionContext(config))
-              }
-              .bind(allEndpoints)
+        httpsConfiguration
+          .fold(serverBuilder) { config =>
+            logger.info(s"Enabling HTTPS with $config")
+            serverBuilder.enableHttps(HttpService.httpsConnectionContext(config))
           }
-
-          _ <- either(
-            server.portFile.cata(f => HttpService.createPortFile(f, binding), \/-(()))
-          ): ET[Unit]
-
-        } yield binding
-
-      (bindingEt.run: Future[HttpService.Error \/ ServerBinding]).flatMap {
-        case -\/(error) => Future.failed(new RuntimeException(error.message))
-        case \/-(binding) => Future.successful(binding)
+          .bind(allEndpoints)
       }
-    }) { binding =>
-      logger.info(s"Stopping JSON API server..., ${lc.makeString}")
-      binding.unbind().void
+
+      _ <- either(portFile.cata(f => HttpService.createPortFile(f, binding), \/-(()))): ET[Unit]
+
+    } yield binding
+
+    (bindingEt.run: Future[HttpService.Error \/ ServerBinding]).flatMap {
+      case -\/(error) => Future.failed(new RuntimeException(error.message))
+      case \/-(binding) => Future.successful(binding)
     }
+  })(binding => {
+    logger.info(s"Stopping JSON API server..., ${lc.makeString}")
+    binding.unbind().void
+  })
 
 }
 
@@ -306,19 +298,11 @@ object HttpService {
     PortFiles.write(file, Port(binding.localAddress.getPort)).liftErr(Error.apply)
   }
 
-  def buildSSLContext(config: TlsServerConfig): SSLContext = {
-    val keyStore = buildKeyStore(config)
-    buildSSLContext(keyStore)
-  }
-
-  def buildSSLContext(config: TlsClientConfig): SSLContext = {
-    val keyStore = buildKeyStore(config)
-    buildSSLContext(keyStore)
-  }
-
-  def buildSSLContext(keyStore: KeyStore): SSLContext = {
+  def buildSSLContext(config: TlsConfiguration): SSLContext = {
     import java.security.SecureRandom
     import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
+
+    val keyStore = buildKeyStore(config)
 
     val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
     keyManagerFactory.init(keyStore, null)
@@ -335,19 +319,13 @@ object HttpService {
     context
   }
 
-  private def httpsConnectionContext(config: TlsServerConfig): HttpsConnectionContext =
+  private def httpsConnectionContext(config: TlsConfiguration): HttpsConnectionContext =
     ConnectionContext.httpsServer(buildSSLContext(config))
 
-  private def buildKeyStore(config: TlsServerConfig): KeyStore = buildKeyStore(
-    config.certChainFile.unwrap.toPath,
-    config.privateKeyFile.unwrap.toPath,
-    config.trustCollectionFile.get.unwrap.toPath,
-  )
-
-  private def buildKeyStore(config: TlsClientConfig): KeyStore = buildKeyStore(
-    config.clientCert.get.certChainFile.toPath,
-    config.clientCert.get.privateKeyFile.toPath,
-    config.trustCollectionFile.get.unwrap.toPath,
+  private def buildKeyStore(config: TlsConfiguration): KeyStore = buildKeyStore(
+    config.certChainFile.get.toPath,
+    config.privateKeyFile.get.toPath,
+    config.trustCollectionFile.get.toPath,
   )
 
   private def buildKeyStore(certFile: Path, privateKeyFile: Path, caCertFile: Path): KeyStore = {
@@ -355,8 +333,8 @@ object HttpService {
     val alias = "key" // This can be anything as long as it's consistent.
 
     val cf = CertificateFactory.getInstance("X.509")
-    val cert = Using.resource(Files.newInputStream(certFile))(cf.generateCertificate(_))
-    val caCert = Using.resource(Files.newInputStream(caCertFile))(cf.generateCertificate(_))
+    val cert = Using.resource(Files.newInputStream(certFile)) { cf.generateCertificate(_) }
+    val caCert = Using.resource(Files.newInputStream(caCertFile)) { cf.generateCertificate(_) }
     val privateKey = loadPrivateKey(privateKeyFile)
 
     val keyStore = KeyStore.getInstance("PKCS12")

@@ -11,6 +11,7 @@ import "com/digitalasset/canton/protocol/v30/common_stable.proto";
 import "com/digitalasset/canton/protocol/v30/merkle.proto";
 import "com/digitalasset/canton/protocol/v30/quorum.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 import "scalapb/scalapb.proto";
 
 // Messages sent by a participant as part of the transaction protocol
@@ -62,13 +63,22 @@ message ViewCommonData {
 }
 
 message Informee {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   string party = 1;
   int32 weight = 2; // optional: only set if party is confirming
 }
 
 // EncryptedViewMessage
+
+message ParticipantRandomnessLookup {
+  // An encrypted random bytestring. After decryption, used in HKDF to derive the encryption keys for the view and
+  // its subviews
+  bytes randomness = 1;
+
+  // The fingerprint of the public key that was used to encrypt the randomness for the participant
+  string fingerprint = 2;
+}
 
 message ViewParticipantMessage {
   option deprecated = true;
@@ -77,23 +87,17 @@ message ViewParticipantMessage {
 // InformeeMessage
 
 message InformeeMessage {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   FullInformeeTree full_informee_tree = 1;
   com.digitalasset.canton.crypto.v30.Signature submitting_participant_signature = 2;
 }
 
 message LightTransactionViewTree {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   GenTransactionTree tree = 1;
-  repeated ViewHashAndKey subview_hashes_and_keys = 2;
-}
-
-message ViewHashAndKey {
-  bytes view_hash = 1;
-  // The randomness used to derive the encryption key for the view
-  bytes view_encryption_key_randomness = 2;
+  repeated bytes subview_hashes = 2;
 }
 
 message FullInformeeTree {
@@ -114,7 +118,7 @@ message InputContract {
 }
 
 message CommonMetadata {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
   // this used to contain a confirmation policy (Signatory or VIP) that no longer exists
@@ -125,7 +129,7 @@ message CommonMetadata {
 }
 
 message SubmitterMetadata {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
   repeated string act_as = 2;
@@ -135,15 +139,14 @@ message SubmitterMetadata {
   string submission_id = 6; // optional; absent if not specified by submitter
   v30.DeduplicationPeriod dedup_period = 7;
   int64 max_sequencing_time = 8; // in microseconds of UTC time since Unix epoch
-  ExternalAuthorization external_authorization = 9; // optional
 }
 
 // Messages sent by a participant as part of the transaction protocol
 
 message SessionKeyLookup {
-  // An asymmetrically encrypted randomness, used to generate the session key. This session key decrypts the
-  // underlying view.
-  bytes session_key_encrypted = 1;
+  // An asymmetrically encrypted randomness to generate the session key. This session key decrypts the
+  // randomness field in `EncryptedViewMessage`
+  bytes session_key_randomness = 1;
 
   // The asymmetric encryption specification used to encrypt the session key randomness
   com.digitalasset.canton.crypto.v30.EncryptionAlgorithmSpec encryption_algorithm_spec = 2;
@@ -153,7 +156,7 @@ message SessionKeyLookup {
 }
 
 message EncryptedViewMessage {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   bytes view_tree = 1;
 
@@ -162,9 +165,11 @@ message EncryptedViewMessage {
 
   com.digitalasset.canton.crypto.v30.Signature submitting_participant_signature = 3; // optional
   bytes view_hash = 4;
-  repeated SessionKeyLookup session_key_lookup = 5;
-  string domain_id = 6;
-  v30.ViewType view_type = 7;
+  // Randomness that is symmetrically encrypted with a session key. Used in the HKDF to derive the encryption keys for the view and its subviews
+  bytes randomness = 5;
+  repeated SessionKeyLookup session_key_randomness = 6;
+  string domain_id = 7;
+  v30.ViewType view_type = 8;
 }
 
 message ActionDescription {
@@ -190,7 +195,7 @@ message ActionDescription {
     bool by_key = 5;
     bytes node_seed = 6;
     bool failed = 8;
-    optional string interface_id = 9;
+    google.protobuf.StringValue interface_id = 9;
     string template_id = 10;
     repeated string package_preference = 11;
   }
@@ -200,7 +205,6 @@ message ActionDescription {
     repeated string actors = 2;
     bool by_key = 3;
     string template_id = 4;
-    optional string interface_id = 5;
   }
 
   message LookupByKeyActionDescription {
@@ -236,28 +240,4 @@ message ViewParticipantData {
     repeated int32 rollback_scope = 1;
     int32 next_child = 2;
   }
-}
-
-// Additional signatures provided by a single party
-// The purpose of these signatures is to allow parties to authorize transactions
-// by signing it with a private key not known to the network.
-
-message ExternalPartyAuthorization {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
-
-  string party = 1; // Submitting party
-  repeated com.digitalasset.canton.crypto.v30.Signature signatures = 2; // Signatures
-}
-
-message ExternalAuthorization {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
-
-  // The transaction serialization version used when building the hash
-  enum TransactionSerializationVersion {
-    TRANSACTION_SERIALIZATION_VERSION_UNSPECIFIED = 0;
-    TRANSACTION_SERIALIZATION_VERSION_V1 = 1;
-  }
-
-  repeated ExternalPartyAuthorization authentications = 1;
-  TransactionSerializationVersion serialization_version = 2;
 }

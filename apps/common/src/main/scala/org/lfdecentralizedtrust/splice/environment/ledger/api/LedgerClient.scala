@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.environment.ledger.api
 
-import com.daml.grpc.AuthCallCredentials
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.daml.ledger.api.v2 as lapi
@@ -17,7 +16,6 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
   GetPartiesRequest,
   PartyManagementServiceGrpc,
 }
-import com.daml.ledger.api.v2.interactive_submission_service.InteractiveSubmissionServiceGrpc
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
 import com.daml.ledger.javaapi.data.{Command, CreateUserResponse, ListUserRightsResponse, User}
@@ -30,8 +28,7 @@ import org.lfdecentralizedtrust.splice.util.DisclosedContracts
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.ledger.client.GrpcChannel
+import com.digitalasset.canton.ledger.client.{GrpcChannel, LedgerCallCredentials}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
@@ -56,10 +53,14 @@ final case object NoDedup extends DedupConfig {
   override def pretty = prettyOfObject[this.type]
 }
 
-final case class DedupOffset(offset: Long) extends DedupConfig {
+final case class DedupOffset(offset: String) extends DedupConfig {
   override def pretty = prettyOfClass(
-    param("offset", _.offset)
+    param("offset", _.offset.unquoted)
   )
+}
+
+final case object DedupBeginOffset extends DedupConfig {
+  override def pretty = prettyOfObject[this.type]
 }
 
 final case class DedupDuration(duration: Duration) extends DedupConfig {
@@ -117,7 +118,7 @@ private[environment] class LedgerClient(
         checkTokenUser(token)
         TraceContextGrpc.addTraceContextToCallOptions(
           stub
-            .withCallCredentials(new AuthCallCredentials(token.accessToken))
+            .withCallCredentials(new LedgerCallCredentials(token.accessToken))
         )
       }
     }
@@ -147,9 +148,6 @@ private[environment] class LedgerClient(
   private val identityProviderConfigServiceStub
       : identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub =
     identity_provider_config_service.IdentityProviderConfigServiceGrpc.stub(channel)
-  private val interactiveSubmissionServiceStub
-      : InteractiveSubmissionServiceGrpc.InteractiveSubmissionServiceStub =
-    InteractiveSubmissionServiceGrpc.stub(channel)
 
   private def toSource[T](f: Future[Source[T, NotUsed]]) =
     Source.futureSource(f).mapMaterializedValue(_ => NotUsed)
@@ -158,22 +156,20 @@ private[environment] class LedgerClient(
 
   def ledgerEnd()(implicit
       traceContext: TraceContext
-  ): Future[Long] = {
+  ): Future[lapi.participant_offset.ParticipantOffset.Value.Absolute] = {
     val req = lapi.state_service.GetLedgerEndRequest()
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
-      resp <- stub.getLedgerEnd(req)
-    } yield resp.offset
-  }
+      offset <- stub.getLedgerEnd(req).map { resp =>
+        val participantOffset =
+          resp.offset
+            .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
+        val absolute = participantOffset.value.absolute
+          .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
 
-  def latestPrunedOffset()(implicit
-      traceContext: TraceContext
-  ): Future[Long] = {
-    val req = lapi.state_service.GetLatestPrunedOffsetsRequest()
-    for {
-      stub <- withCredentialsAndTraceContext(stateServiceStub)
-      resp <- stub.getLatestPrunedOffsets(req)
-    } yield resp.participantPrunedUpToInclusive
+        lapi.participant_offset.ParticipantOffset.Value.Absolute(absolute)
+      }
+    } yield offset
   }
 
   def activeContracts(
@@ -236,13 +232,10 @@ private[environment] class LedgerClient(
       .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
     deduplicationConfig match {
       case DedupOffset(offset) =>
-        // Canton does not allow a zero offset (ledger begin) so just go for
-        // not specfying anything which means max deduplication duration.
-        if (offset > 0) {
-          commandsBuilder.setDeduplicationOffset(offset)
-        }
+        commandsBuilder.setDeduplicationOffset(offset)
       case DedupDuration(duration) =>
         commandsBuilder.setDeduplicationDuration(duration)
+      case DedupBeginOffset =>
       case NoDedup =>
     }
 
@@ -262,71 +255,6 @@ private[environment] class LedgerClient(
         waitFor.stubSubmit(stub, request, ec).map(waitFor.mapResponse)
     } yield res
   }
-
-  def prepareSubmission(
-      domainId: Option[String],
-      applicationId: String,
-      commandId: String,
-      actAs: Seq[String],
-      readAs: Seq[String],
-      commands: Seq[Command],
-      disclosedContracts: DisclosedContracts,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[lapi.interactive_submission_service.PrepareSubmissionResponse] = {
-    for {
-      stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
-      result <- stub.prepareSubmission(
-        lapi.interactive_submission_service.PrepareSubmissionRequest(
-          commands = commands.map(c => lapi.commands.Command.fromJavaProto(c.toProtoCommand)),
-          disclosedContracts = disclosedContracts.toLedgerApiDisclosedContracts.map(
-            lapi.commands.DisclosedContract.fromJavaProto(_)
-          ),
-          domainId = domainId.getOrElse(""),
-          applicationId = applicationId,
-          commandId = commandId,
-          actAs = actAs,
-          readAs = readAs,
-        )
-      )
-    } yield result
-  }
-
-  def executeSubmission(
-      preparedTransaction: interactive_submission_data.PreparedTransaction,
-      partySignatures: Map[PartyId, LedgerClient.Signature],
-      applicationId: String,
-      submissionId: String,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[lapi.interactive_submission_service.ExecuteSubmissionResponse] =
-    for {
-      stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
-      result <- stub.executeSubmission(
-        lapi.interactive_submission_service.ExecuteSubmissionRequest(
-          preparedTransaction = Some(preparedTransaction),
-          partySignatures =
-            Some(lapi.interactive_submission_service.PartySignatures(partySignatures.toList.map {
-              case (party, signature) =>
-                lapi.interactive_submission_service.SinglePartySignatures(
-                  party.toProtoPrimitive,
-                  Seq(
-                    lapi.interactive_submission_service.Signature(
-                      lapi.interactive_submission_service.SignatureFormat.SIGNATURE_FORMAT_RAW,
-                      signature.signature,
-                      signature.signedBy.toProtoPrimitive,
-                      lapi.interactive_submission_service.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519,
-                    )
-                  ),
-                )
-            })),
-          applicationId = applicationId,
-          submissionId = submissionId,
-        )
-      )
-    } yield result
 
   def listPackages()(implicit ec: ExecutionContext, tc: TraceContext): Future[Seq[String]] = {
     val request = ListPackagesRequest()
@@ -579,7 +507,7 @@ private[environment] class LedgerClient(
   def completions(
       applicationId: String,
       parties: Seq[PartyId],
-      begin: Long,
+      begin: lapi.participant_offset.ParticipantOffset.Value.Absolute,
   )(implicit tc: TraceContext): Source[CompletionStreamResponse, NotUsed] =
     toSource(
       for {
@@ -588,7 +516,9 @@ private[environment] class LedgerClient(
         lapi.command_completion_service.CompletionStreamRequest(
           applicationId = applicationId,
           parties = parties.map(_.toProtoPrimitive),
-          beginExclusive = begin,
+          // empty string does work but it now starts from ledger begin instead of ledger end
+          // which we never want.
+          beginExclusive = begin.value,
         ),
         stub.completionStream,
       ) map CompletionStreamResponse.fromProto
@@ -660,13 +590,13 @@ object LedgerClient {
   }
 
   final case class GetUpdatesRequest(
-      begin: Long,
-      end: Option[Long],
+      begin: lapi.participant_offset.ParticipantOffset,
+      end: Option[lapi.participant_offset.ParticipantOffset],
       filter: IngestionFilter,
   ) {
     private[LedgerClient] def toProto: lapi.update_service.GetUpdatesRequest =
       lapi.update_service.GetUpdatesRequest(
-        beginExclusive = begin,
+        beginExclusive = Some(begin),
         endInclusive = end,
         filter = Some(filter.toTransactionFilter),
       )
@@ -683,12 +613,12 @@ object LedgerClient {
     import com.daml.ledger.api.v2.CommandServiceOuterClass as CSOC
     import com.daml.ledger.javaapi.data as jdata
 
-    val CompletionOffset: SubmitAndWaitFor[Long] =
-      impl((r: CSOC.SubmitAndWaitResponse) => r.getCompletionOffset)(
+    val CompletionOffset: SubmitAndWaitFor[String] =
+      impl((_: CSOC.SubmitAndWaitForUpdateIdResponse).getCompletionOffset)(
         { case (stub, r, ec) =>
           stub
-            .submitAndWait(command_service.SubmitAndWaitRequest.fromJavaProto(r))
-            .map(r => command_service.SubmitAndWaitResponse.toJavaProto(r))(ec)
+            .submitAndWaitForUpdateId(command_service.SubmitAndWaitRequest.fromJavaProto(r))
+            .map(r => command_service.SubmitAndWaitForUpdateIdResponse.toJavaProto(r))(ec)
         }
       )
 
@@ -841,29 +771,16 @@ object LedgerClient {
     }
   }
 
-  final case class Signature(
-      signature: ByteString,
-      signedBy: Fingerprint,
-  )
-
-  final case class CompletionStreamResponse(laterOffset: Long, completion: Completion)
+  final case class CompletionStreamResponse(laterOffset: String, completion: Completion)
 
   object CompletionStreamResponse {
     def fromProto(
         spb: lapi.command_completion_service.CompletionStreamResponse
     ): CompletionStreamResponse = {
-      val offset: Long = spb.completionResponse match {
-        case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse
-              .Completion(completion) =>
-          completion.offset
-        case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse
-              .OffsetCheckpoint(checkpoint) =>
-          checkpoint.offset
-        case lapi.command_completion_service.CompletionStreamResponse.CompletionResponse.Empty =>
-          throw GrpcStatus.INTERNAL
-            .withDescription(s"Unexpected completion response: ${spb.completionResponse}")
-            .asRuntimeException
-      }
+      val offset = spb.checkpoint
+        .map(_.offset)
+        .getOrElse(throw new IllegalArgumentException("missing offset in CompletionStreamResponse"))
+      // ignoring checkpoint.record_time
       CompletionStreamResponse(
         offset,
         Completion.fromProto(spb.getCompletion),
@@ -878,14 +795,13 @@ object LedgerClient {
       applicationId: String,
       commandId: String,
       submissionId: String,
-      updateId: String,
       status: GrpcStatus,
       errorDetails: Seq[ErrorDetail],
   ) {
     def matchesSubmission(applicationId: String, commandId: String, submissionId: String): Boolean =
       this.applicationId == applicationId &&
-        commandId == this.commandId &&
-        submissionId == this.submissionId
+        this.commandId == commandId &&
+        this.submissionId == submissionId
   }
 
   object Completion {
@@ -899,7 +815,6 @@ object LedgerClient {
         applicationId = spb.applicationId,
         commandId = spb.commandId,
         submissionId = spb.submissionId,
-        updateId = spb.updateId,
         status = grpcStatus,
         errorDetails = errors,
       )
