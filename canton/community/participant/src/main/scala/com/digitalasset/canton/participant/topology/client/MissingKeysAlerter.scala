@@ -5,15 +5,15 @@ package com.digitalasset.canton.participant.topology.client
 
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.crypto.store.CryptoPrivateStore
-import com.digitalasset.canton.crypto.{Fingerprint, KeyPurpose, SigningKeyUsage}
+import com.digitalasset.canton.crypto.{Fingerprint, KeyPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.client.DomainTopologyClient
 import com.digitalasset.canton.topology.processing.*
-import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -30,17 +30,15 @@ class MissingKeysAlerter(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  def init()(implicit traceContext: TraceContext): Future[Unit] =
+  def init()(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       encryptionKeys <- client.currentSnapshotApproximation.encryptionKeys(participantId)
-      signingKeys <- client.currentSnapshotApproximation.signingKeys(
-        participantId,
-        SigningKeyUsage.All,
-      )
+      signingKeys <- client.currentSnapshotApproximation.signingKeys(participantId)
     } yield {
       encryptionKeys.foreach(key => alertOnMissingKey(key.fingerprint, KeyPurpose.Encryption))
       signingKeys.foreach(key => alertOnMissingKey(key.fingerprint, KeyPurpose.Signing))
     }
+  }
 
   def attachToTopologyProcessor(): TopologyTransactionProcessingSubscriber =
     new TopologyTransactionProcessingSubscriber {
@@ -58,7 +56,7 @@ class MissingKeysAlerter(
   private def processTransactions(
       timestamp: CantonTimestamp,
       transactions: Seq[GenericSignedTopologyTransaction],
-  )(implicit traceContext: TraceContext): Unit =
+  )(implicit traceContext: TraceContext): Unit = {
     // scan state and alarm if the domain suggest that I use a key which I don't have
     transactions.view
       .filter(tx => tx.operation == TopologyChangeOp.Replace && !tx.isProposal)
@@ -74,10 +72,11 @@ class MissingKeysAlerter(
           logger.info(
             s"Domain $domainId update my participant permission as of $timestamp to $permission"
           )
-        case OwnerToKeyMapping(`participantId`, keys) =>
+        case OwnerToKeyMapping(`participantId`, _, keys) =>
           keys.foreach(k => alertOnMissingKey(k.fingerprint, k.purpose))
         case _ => ()
       }
+  }
 
   private def alertOnMissingKey(fingerprint: Fingerprint, purpose: KeyPurpose)(implicit
       traceContext: TraceContext

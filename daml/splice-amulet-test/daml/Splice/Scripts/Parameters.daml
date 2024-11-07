@@ -75,11 +75,6 @@ defaultAmuletConfig = AmuletConfig with
     wallet = "0.1.0"
     walletPayments = "0.1.0"
 
-  -- Fee for keeping a transfer-preapproval around.
-  -- Similar to holding fees, it compensates the SVs for the storage cost of the contract.
-  -- Roughly equal to $1/year expressed as a daily rate.
-  transferPreapprovalFee = Some defaultTransferPreapprovalFee
-
 -- | Default configuration schedule with single current amulet config
 defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)
 defaultAmuletConfigSchedule = Schedule with

@@ -29,13 +29,7 @@ trait FlagCloseable extends AutoCloseable with PerformUnlessClosing {
 
 object FlagCloseable {
   def apply(tracedLogger: TracedLogger, timeoutsArgs: ProcessingTimeout): FlagCloseable =
-    withCloseContext(tracedLogger, timeoutsArgs)
-
-  def withCloseContext(
-      tracedLogger: TracedLogger,
-      timeoutsArgs: ProcessingTimeout,
-  ): FlagCloseable & HasCloseContext =
-    new FlagCloseable with HasCloseContext {
+    new FlagCloseable {
       override protected def logger: TracedLogger = tracedLogger
       override protected def timeouts: ProcessingTimeout = timeoutsArgs
     }

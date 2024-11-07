@@ -3,12 +3,13 @@
 
 package com.digitalasset.canton.ledger.api.auth.services
 
-import com.daml.ledger.api.v2.command_service.*
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc.CommandService
-import com.digitalasset.canton.auth.Authorizer
+import com.daml.ledger.api.v2.command_service.*
 import com.digitalasset.canton.ledger.api.ProxyCloseable
+import com.digitalasset.canton.ledger.api.auth.Authorizer
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.validation.CommandsValidator
+import com.google.protobuf.empty.Empty
 import io.grpc.ServerServiceDefinition
 import scalapb.lenses.Lens
 
@@ -25,6 +26,16 @@ final class CommandServiceAuthorization(
     with ProxyCloseable
     with GrpcApiService {
 
+  override def submitAndWait(request: SubmitAndWaitRequest): Future[Empty] = {
+    val effectiveSubmitters = CommandsValidator.effectiveSubmitters(request.commands)
+    authorizer.requireActAndReadClaimsForParties(
+      actAs = effectiveSubmitters.actAs,
+      readAs = effectiveSubmitters.readAs,
+      applicationIdL = Lens.unit[SubmitAndWaitRequest].commands.applicationId,
+      call = service.submitAndWait,
+    )(request)
+  }
+
   override def submitAndWaitForTransaction(
       request: SubmitAndWaitRequest
   ): Future[SubmitAndWaitForTransactionResponse] = {
@@ -37,15 +48,15 @@ final class CommandServiceAuthorization(
     )(request)
   }
 
-  override def submitAndWait(
+  override def submitAndWaitForUpdateId(
       request: SubmitAndWaitRequest
-  ): Future[SubmitAndWaitResponse] = {
+  ): Future[SubmitAndWaitForUpdateIdResponse] = {
     val effectiveSubmitters = CommandsValidator.effectiveSubmitters(request.commands)
     authorizer.requireActAndReadClaimsForParties(
       actAs = effectiveSubmitters.actAs,
       readAs = effectiveSubmitters.readAs,
       applicationIdL = Lens.unit[SubmitAndWaitRequest].commands.applicationId,
-      call = service.submitAndWait,
+      call = service.submitAndWaitForUpdateId,
     )(request)
   }
 

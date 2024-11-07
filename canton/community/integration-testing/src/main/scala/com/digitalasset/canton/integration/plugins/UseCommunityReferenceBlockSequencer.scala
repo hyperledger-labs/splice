@@ -11,13 +11,10 @@ import com.digitalasset.canton.config.{
   CommunityStorageConfig,
 }
 import com.digitalasset.canton.domain.sequencing.config.CommunitySequencerNodeConfig
+import com.digitalasset.canton.domain.sequencing.sequencer.CommunitySequencerConfig
 import com.digitalasset.canton.domain.sequencing.sequencer.reference.{
   CommunityReferenceSequencerDriverFactory,
   ReferenceSequencerDriver,
-}
-import com.digitalasset.canton.domain.sequencing.sequencer.{
-  BlockSequencerConfig,
-  CommunitySequencerConfig,
 }
 import com.digitalasset.canton.environment.CommunityEnvironment
 import com.digitalasset.canton.integration.CommunityConfigTransforms
@@ -55,7 +52,6 @@ class UseCommunityReferenceBlockSequencer[S <: CommunityStorageConfig](
     config.sequencers.keys.map { sequencerName =>
       sequencerName -> CommunitySequencerConfig.External(
         driverFactory.name,
-        BlockSequencerConfig(),
         ConfigCursor(
           driverFactory
             .configWriter(confidential = false)
@@ -65,6 +61,7 @@ class UseCommunityReferenceBlockSequencer[S <: CommunityStorageConfig](
             ),
           List(),
         ),
+        None,
       )
     }.toMap
 
@@ -124,10 +121,10 @@ class UseCommunityReferenceBlockSequencer[S <: CommunityStorageConfig](
     def mapSequencerConfigs(
         kv: (InstanceName, CommunitySequencerNodeConfig)
     ): (InstanceName, CommunitySequencerNodeConfig) = kv match {
-      case (name, cfg) =>
+      case (name, config) =>
         (
           name,
-          cfg.focus(_.sequencer).replace(sequencersToConfig(name)),
+          config.focus(_.sequencer).replace(sequencersToConfig(name)),
         )
     }
 

@@ -9,7 +9,6 @@ final case class RemoteSequencerConfig(
     adminApi: ClientConfig,
     publicApi: SequencerConnectionConfig.Grpc,
     grpcHealth: Option[ClientConfig] = None,
-    token: Option[String] = None,
 ) extends NodeConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

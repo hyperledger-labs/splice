@@ -31,14 +31,14 @@ object JavaDecodeUtil {
   def decodeCreated[TC](
       companion: ContractCompanion[TC, ?, ?]
   )(event: JavaCreatedEvent): Option[TC] =
-    if (event.getTemplateId == companion.getTemplateIdWithPackageId) {
+    if (event.getTemplateId == companion.TEMPLATE_ID) {
       Some(companion.fromCreatedEvent(event))
     } else None
 
   def decodeCreated[Id, View](
       companion: InterfaceCompanion[?, Id, View]
   )(event: JavaCreatedEvent): Option[Contract[Id, View]] =
-    if (event.getInterfaceViews.containsKey(companion.getTemplateIdWithPackageId)) {
+    if (event.getInterfaceViews.containsKey(companion.TEMPLATE_ID)) {
       Some(companion.fromCreatedEvent(event))
     } else None
 
@@ -82,7 +82,7 @@ object JavaDecodeUtil {
       companion: ContractCompanion[?, ?, T]
   )(event: ArchivedEvent): Option[ContractId[T]] =
     Option(event)
-      .filter(_.getTemplateId == companion.getTemplateIdWithPackageId)
+      .filter(_.getTemplateId == companion.TEMPLATE_ID)
       .map(_.getContractId)
       .map(new ContractId[T](_))
 
@@ -108,7 +108,7 @@ object JavaDecodeUtil {
     for {
       event <- eventsById.values.toList
       archive = event.toProtoTreeEvent.getExercised
-      if archive.getConsuming && archive.getTemplateId == companion.getTemplateIdWithPackageId.toProto
+      if archive.getConsuming && archive.getTemplateId == companion.TEMPLATE_ID.toProto
     } yield companion.toContractId(new ContractId(archive.getContractId))
 
 }

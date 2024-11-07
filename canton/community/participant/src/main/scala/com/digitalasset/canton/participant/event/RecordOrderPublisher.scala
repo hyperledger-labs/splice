@@ -3,40 +3,63 @@
 
 package com.digitalasset.canton.participant.event
 
+import cats.Eval
+import cats.syntax.foldable.*
+import cats.syntax.option.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.{CantonTimestamp, TaskScheduler, TaskSchedulerMetrics}
+import com.digitalasset.canton.data.{
+  CantonTimestamp,
+  PeanoQueue,
+  TaskScheduler,
+  TaskSchedulerMetrics,
+}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.ledger.participant.state.Update.SequencerIndexMoved
-import com.digitalasset.canton.ledger.participant.state.{SequencerIndex, Update}
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
   FutureUnlessShutdown,
+  PromiseUnlessShutdown,
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.event.AcsChange.reassignmentCountersForArchivedTransient
-import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.event.AcsChange.transferCountersForArchivedTransient
+import com.digitalasset.canton.participant.event.RecordOrderPublisher.PendingPublish
 import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet
-import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker
-import com.digitalasset.canton.participant.store.ActiveContractSnapshot
-import com.digitalasset.canton.store.CursorPrehead
-import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
+import com.digitalasset.canton.participant.protocol.submission.{
+  InFlightSubmissionTracker,
+  SequencedSubmission,
+}
+import com.digitalasset.canton.participant.store.EventLogId.DomainEventLogId
+import com.digitalasset.canton.participant.store.InFlightSubmissionStore.{
+  InFlightBySequencingInfo,
+  InFlightReference,
+}
+import com.digitalasset.canton.participant.store.MultiDomainEventLog.PublicationData
+import com.digitalasset.canton.participant.store.{
+  ActiveContractSnapshot,
+  EventLogId,
+  MultiDomainEventLog,
+  SingleDimensionEventLog,
+}
+import com.digitalasset.canton.participant.sync.TimestampedEvent
+import com.digitalasset.canton.participant.{LocalOffset, RequestOffset, TopologyOffset}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{RequestCounter, SequencerCounter}
+import com.google.common.annotations.VisibleForTesting
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Publishes upstream events and active contract set changes in the order of their record time.
   *
-  * The protocol processors produce events and active contract set changes in the result message order in phase 7.
-  * The [[RecordOrderPublisher]] pushes the events to indexer and the active contract set changes in record time order
-  * (which equals sequencing time order).
+  * The protocol processors emit events and active contract set changes in the result message order,
+  * which differs from the record time (= sequencing time) order.
+  * The [[RecordOrderPublisher]] pushes the events to [[store.SingleDimensionEventLog]] and the active contract set changes
   * (including empty changes on time proofs) to the appropriate listener, which is normally [[pruning.AcsCommitmentProcessor]].
   * The events are published only after the [[com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker]]
   * has observed the timestamp.
@@ -47,6 +70,7 @@ import scala.concurrent.{ExecutionContext, Future}
   *
   * @param initSc The initial sequencer counter from which on events should be published
   * @param initTimestamp The initial timestamp from which on events should be published
+  * @param eventLog The event log to publish the events to
   * @param metrics The task scheduler metrics
   * @param executionContextForPublishing Execution context for publishing the events
   */
@@ -54,7 +78,8 @@ class RecordOrderPublisher(
     domainId: DomainId,
     initSc: SequencerCounter,
     initTimestamp: CantonTimestamp,
-    ledgerApiIndexer: LedgerApiIndexer,
+    eventLog: SingleDimensionEventLog[DomainEventLogId],
+    multiDomainEventLog: Eval[MultiDomainEventLog],
     inFlightSubmissionTracker: InFlightSubmissionTracker,
     metrics: TaskSchedulerMetrics,
     exitOnFatalFailures: Boolean,
@@ -63,10 +88,14 @@ class RecordOrderPublisher(
     futureSupervisor: FutureSupervisor,
     activeContractSnapshot: ActiveContractSnapshot,
     clock: Clock,
-    onSequencerIndexMovingAhead: Traced[SequencerCounterCursorPrehead] => Unit,
-)(implicit val executionContextForPublishing: ExecutionContext)
+)(implicit val executionContextForPublishing: ExecutionContext, elc: ErrorLoggingContext)
     extends NamedLogging
     with FlagCloseableAsync {
+
+  // Synchronization to block publication of new events until preceding events recovered by crash recovery
+  // have been published
+  private val recovered: PromiseUnlessShutdown[Unit] =
+    new PromiseUnlessShutdown[Unit]("recovered", futureSupervisor)
 
   private[this] val taskScheduler: TaskScheduler[PublicationTask] =
     TaskScheduler(
@@ -83,155 +112,173 @@ class RecordOrderPublisher(
 
   private val acsChangeListener = new AtomicReference[Option[AcsChangeListener]](None)
 
-  /** This is a heavy handed approach to make the AcsPublication commence only after the corresponding update is persisted.
-    * This is needed because the AcsCommitmentProcessor expects that time is not moving backwards, meaning: after recovery
-    * we should not have anything reprocessed again, which has been processed already. This can be achieved if we wait for
-    * the corresponding Event's Update.persisted future to finish: this means the ledger end is also bumped, therefore any
-    * recovery only can start afterwards.
-    * This approach is based on the invariant that for each AcsPublicationTask we have a corresponding
-    * EventPublicationTask, which is the case since we are emitting for each sequencer counter either an Update event,
-    * or the SequencerIndexMoved Update event. Also it is assumed that the EventPublicationTask comes earlier than the
-    * AcsPublicationTask.
-    * These invariants are verified runtime as it is being used in lastPublishedPersisted below.
-    * Possible improvement to this approach: moving AcsPublications to the post-processing stage.
+  /** Schedules the given `event` to be published on the `eventLog`, and schedules the causal "tick" defined by `clock`.
+    *
+    * @param requestSequencerCounter The sequencer counter associated with the message that corresponds to the request
+    * @param eventO The timestamped event to be published
     */
-  private case class LastPublishedPersisted(
-      sequencerCounter: SequencerCounter,
-      timestamp: CantonTimestamp,
-      requestCounterO: Option[RequestCounter],
-      updatePersisted: Future[Unit],
-  )
-
-  private val lastPublishedPersistedRef: AtomicReference[Option[LastPublishedPersisted]] =
-    new AtomicReference(None)
-
-  private def updateLastPublishedPersisted(lastPublishedPersisted: LastPublishedPersisted): Unit =
-    lastPublishedPersistedRef.getAndUpdate { previousO =>
-      previousO.foreach { previous =>
-        assert(previous.timestamp < lastPublishedPersisted.timestamp)
-        assert(previous.sequencerCounter + 1 == lastPublishedPersisted.sequencerCounter)
-        lastPublishedPersisted.requestCounterO.foreach(currentRequestCounter =>
-          previous.requestCounterO.foreach(previousRequestCounter =>
-            assert(previousRequestCounter + 1 == currentRequestCounter)
-          )
-        )
-      }
-      Some(lastPublishedPersisted)
-    }.discard
-
-  private def lastPublishedPersisted(
-      sequencerCounter: SequencerCounter,
-      timestamp: CantonTimestamp,
-  ): Future[Unit] = {
-    val currentLastPublishedPersisted = lastPublishedPersistedRef
-      .get()
-      .getOrElse(
-        throw new IllegalStateException(
-          "There should always be a last published event by the time anyone waits for it"
-        )
+  def schedulePublication(
+      requestSequencerCounter: SequencerCounter,
+      requestCounter: RequestCounter,
+      requestTimestamp: CantonTimestamp,
+      eventO: Option[TimestampedEvent],
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    if (eventO.isEmpty) Future.unit
+    else {
+      logger.debug(
+        s"Schedule publication for request counter $requestCounter: event = ${eventO.isDefined}"
       )
-    // The two checks below validate the invariant documented above that the EventPublicationTask comes earlier than the AcsPublicationTask.
-    // Therefore, it is expected that the event that the ACS commitment processor is waiting to be persisted has indeed been previously published.
-    assert(sequencerCounter == currentLastPublishedPersisted.sequencerCounter)
-    assert(timestamp == currentLastPublishedPersisted.timestamp)
-    currentLastPublishedPersisted.updatePersisted
+
+      for {
+        _ <- eventO.traverse_(eventLog.insert(_))
+      } yield {
+        val inFlightReference =
+          InFlightBySequencingInfo(
+            domainId,
+            SequencedSubmission(requestSequencerCounter, requestTimestamp),
+          )
+        val task =
+          EventPublicationTask(
+            requestSequencerCounter,
+            RequestOffset(requestTimestamp, requestCounter),
+          )(
+            eventO,
+            Some(inFlightReference),
+          )
+        taskScheduler.scheduleTask(task)
+      }
+    }
+
+  /** Schedules the given `event` to be published on the `eventLog`, and schedules the causal "tick" defined by `clock`.
+    *
+    * @param sequencerCounter The sequencer counter associated with the message that corresponds to the request
+    * @param event            The timestamped event to be published
+    */
+  def schedulePublication(
+      sequencerCounter: SequencerCounter,
+      topologyOffset: TopologyOffset,
+      event: TimestampedEvent,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.debug(
+      s"Schedule publication for offset $topologyOffset derived from sc=$sequencerCounter"
+    )
+
+    for {
+      _ <- eventLog.insert(event)
+    } yield {
+      val task =
+        EventPublicationTask(sequencerCounter, topologyOffset)(
+          Some(event),
+          None,
+        )
+      taskScheduler.scheduleTask(task)
+    }
   }
 
-  /** Schedules the given `eventO` to be published on the `eventLog`, and schedules the causal "tick" defined by `clock`.
-    * Tick must be called exactly once for all sequencer counters higher than initTimestamp.
-    *
-    * @param eventO The update event to be published, or if absent the SequencerCounterMoved event will be published.
-    * @param requestCounterO The RequestCounter if applicable.
-    *                        For all requests requestCounterO needs to be provided, it is verified internally that
-    *                        the RequestCounter space is continuous.
-    *                        The provided requestCounterO must match the eventO's DomainIndex if provided.
-    */
-  def tick(
-      sequencerCounter: SequencerCounter,
-      timestamp: CantonTimestamp,
-      eventO: Option[Traced[Update]],
-      requestCounterO: Option[RequestCounter],
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    if (timestamp > initTimestamp) {
-      eventO
-        .flatMap(_.value.domainIndexOpt)
-        .flatMap(_._2.requestIndex)
-        .map(_.counter)
-        .foreach(requestCounter =>
-          logger.debug(s"Schedule publication for request counter $requestCounter")
+  def scheduleRecoveries(
+      toRecover: Seq[PendingPublish]
+  )(implicit traceContext: TraceContext): Unit = {
+    logger.debug(s"Schedule recovery for ${toRecover.length} pending events.")
+
+    val recoverF = MonadUtil.sequentialTraverse_[FutureUnlessShutdown, PendingPublish](toRecover) {
+      pendingPublish =>
+        logger.info(s"Recover pending causality update $pendingPublish")
+
+        val eventO = pendingPublish match {
+          case RecordOrderPublisher.PendingTransferPublish(_ts, _eventLogId) => None
+          case RecordOrderPublisher.PendingEventPublish(event, _ts, _eventLogId) => Some(event)
+        }
+
+        val inFlightRef = eventO.flatMap(tse =>
+          tse.requestSequencerCounter.map(sc =>
+            InFlightBySequencingInfo(
+              eventLog.id.domainId,
+              sequenced = SequencedSubmission(sc, tse.timestamp),
+            )
+          )
         )
-      taskScheduler.scheduleTask(
-        EventPublicationTask(
-          sequencerCounter,
-          timestamp,
-        )(
-          eventO,
-          requestCounterO,
-        )
-      )
-      logger.debug(
-        s"Observing time $timestamp for sequencer counter $sequencerCounter for publishing (with eventO:$eventO, requestCounterO:$requestCounterO)"
-      )
-      // Schedule a time observation task that delays the event publication
-      // until the InFlightSubmissionTracker has synchronized with submission registration.
-      taskScheduler.scheduleTask(TimeObservationTask(sequencerCounter, timestamp))
-      taskScheduler.addTick(sequencerCounter, timestamp)
-      // this adds backpressure from indexer queue to protocol processing:
-      //   indexer pekko source queue back-pressures via offer Future,
-      //   this propagates via in RecoveringQueue,
-      //   which propagates here in the taskScheduler's SimpleExecutionQueue,
-      //   which bubble up exactly here: waiting for all the possible event enqueueing to happen after the tick.
-      taskScheduler.flush()
-    } else {
-      logger.debug(
-        s"Skipping tick at sequencerCounter:$sequencerCounter timestamp:$timestamp (publication of event $eventO)"
-      )
-      Future.unit
+
+        publishEvent(eventO, inFlightRef)
     }
+
+    recovered.completeWith(recoverF)
+    ()
+  }
 
   def scheduleAcsChangePublication(
       recordSequencerCounter: SequencerCounter,
       timestamp: CantonTimestamp,
       requestCounter: RequestCounter,
       commitSet: CommitSet,
-  )(implicit traceContext: TraceContext): Unit =
+  ): Unit = TraceContext.withNewTraceContext { implicit traceContext =>
     taskScheduler.scheduleTask(
       AcsChangePublicationTask(recordSequencerCounter, timestamp)(Some((requestCounter, commitSet)))
     )
+  }
 
   /** Schedules an empty acs change publication task to be published to the `acsChangeListener`.
     */
   def scheduleEmptyAcsChangePublication(
       sequencerCounter: SequencerCounter,
       timestamp: CantonTimestamp,
-  )(implicit traceContext: TraceContext): Unit =
+  ): Unit = TraceContext.withNewTraceContext { implicit traceContext =>
     if (sequencerCounter >= initSc) {
       taskScheduler.scheduleTask(
         AcsChangePublicationTask(sequencerCounter, timestamp)(None)
       )
     }
+  }
+
+  /** Signals the progression of time to the record order publisher
+    * Does not notify the ACS commitment processor.
+    *
+    * @see TaskScheduler.addTick for the behaviour.
+    */
+  def tick(sequencerCounter: SequencerCounter, timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Unit =
+    if (timestamp > initTimestamp) {
+      logger.debug(
+        s"Observing time $timestamp for sequencer counter $sequencerCounter for publishing"
+      )
+      // Schedule a time observation task that delays the event publication
+      // until the InFlightSubmissionTracker has synchronized with submission registration.
+      taskScheduler.scheduleTask(TimeObservationTask(sequencerCounter, timestamp))
+      taskScheduler.addTick(sequencerCounter, timestamp)
+    }
+
+  /** The returned future completes after all events that are currently scheduled for publishing have been published. */
+  @VisibleForTesting
+  def flush(): Future[Unit] = {
+    recovered.future.flatMap { _bool =>
+      taskScheduler.flush()
+    }
+  }
+
+  /** Used to inspect the state of the sequencerCounterQueue, for testing purposes. */
+  @VisibleForTesting
+  def readSequencerCounterQueue(
+      sequencerCounter: SequencerCounter
+  ): PeanoQueue.AssociatedValue[CantonTimestamp] =
+    taskScheduler.readSequencerCounterQueue(sequencerCounter)
 
   private sealed trait PublicationTask extends TaskScheduler.TimedTask
 
   private object PublicationTask {
     def orderingSameTimestamp: Ordering[PublicationTask] = Ordering.by(rankSameTimestamp)
 
-    private def rankSameTimestamp(x: PublicationTask): Option[(Option[SequencerCounter], Int)] =
+    private def rankSameTimestamp(x: PublicationTask): Option[(Option[LocalOffset], Int)] =
       x match {
         case _: TimeObservationTask =>
           // TimeObservationTask comes first so that we synchronize with the InFlightSubmissionTracker before publishing an event.
           // All TimeObservationTasks with the same timestamp are considered equal.
           None
         case task: EventPublicationTask =>
-          Some(
-            (
-              Some(task.sequencerCounter),
-              // EventPublicationTask comes before AcsChangePublicationTask if they have the same sequencer counter.
-              // This is necessary to devise the future from the corresponding EventPublicationTask which gate the AcsPublication.
-              0,
-            )
-          )
-        case task: AcsChangePublicationTask => Some(Some(task.sequencerCounter) -> 1)
+          (
+            task.localOffset.some,
+            0, // EventPublicationTask comes before AcsChangePublicationTask if they have the same tie breaker. This is an arbitrary decision.
+          ).some
+        case task: AcsChangePublicationTask => (task.requestOffsetO, 1).some
       }
   }
 
@@ -244,8 +291,7 @@ class RecordOrderPublisher(
       override val timestamp: CantonTimestamp,
   )(implicit override val traceContext: TraceContext)
       extends PublicationTask {
-
-    override def perform(): FutureUnlessShutdown[Unit] =
+    override def perform(): FutureUnlessShutdown[Unit] = {
       performUnlessClosingUSF("observe-timestamp-task") {
         /*
          * Observe timestamp will only return an UnknownDomain error if the domain ID is not in the connectedDomainMap
@@ -266,8 +312,9 @@ class RecordOrderPublisher(
             FutureUnlessShutdown.abortedDueToShutdown
           }
       }
+    }
 
-    override protected def pretty: Pretty[this.type] = prettyOfClass(
+    override def pretty: Pretty[this.type] = prettyOfClass(
       param("timestamp", _.timestamp),
       param("sequencer counter", _.sequencerCounter),
     )
@@ -275,83 +322,65 @@ class RecordOrderPublisher(
     override def close(): Unit = ()
   }
 
-  // TODO(i18695): try to remove the Traced[] from the Update here and in protocol processing if possible
-  /** Task to publish the event `event` if defined. */
+  /** Task to register the causality update `update` and publish the event `event` if defined.
+    * Some causality updates are not currently associated with an event, for example transfer-ins
+    * require a causality update but are not always associated with an event. This is why the event
+    * is optional.
+    */
   private[RecordOrderPublisher] case class EventPublicationTask(
       override val sequencerCounter: SequencerCounter,
-      override val timestamp: CantonTimestamp,
+      localOffset: LocalOffset,
   )(
-      val eventO: Option[Traced[Update]],
-      val requestCounterO: Option[RequestCounter],
+      val eventO: Option[TimestampedEvent],
+      val inFlightReference: Option[InFlightReference],
   )(implicit val traceContext: TraceContext)
       extends PublicationTask {
 
-    private val event: Traced[Update] = eventO.getOrElse(
-      Traced(
-        SequencerIndexMoved(
-          domainId = domainId,
-          sequencerIndex = SequencerIndex(
-            counter = sequencerCounter,
-            timestamp = timestamp,
-          ),
-          requestCounterO = requestCounterO,
-        )
-      )
-    )
+    def timestamp: CantonTimestamp = localOffset.effectiveTime
 
-    // TODO(i18695): attempt to simplify data structures and data passing, so these assertions can be removed
-    assert(event.value.domainIndexOpt.isDefined)
-    event.value.domainIndexOpt.foreach { case (_, domainIndex) =>
-      assert(domainIndex.sequencerIndex.isDefined)
-      domainIndex.sequencerIndex.foreach { sequencerIndex =>
-        assert(sequencerIndex.timestamp == timestamp)
-        assert(sequencerIndex.counter == sequencerCounter)
-      }
-      requestCounterO match {
-        case Some(requestCounter) =>
-          assert(domainIndex.requestIndex.isDefined)
-          domainIndex.requestIndex.foreach { requestIndex =>
-            assert(requestIndex.counter == requestCounter)
-            assert(requestIndex.timestamp == timestamp)
-            assert(requestIndex.sequencerCounter == Some(sequencerCounter))
-          }
-
-        case None =>
-          assert(domainIndex.requestIndex.isEmpty)
-      }
+    override def perform(): FutureUnlessShutdown[Unit] = {
+      for {
+        _recovered <- recovered.futureUS
+        _unit <- publishEvent(eventO, inFlightReference)
+      } yield ()
     }
 
-    override def perform(): FutureUnlessShutdown[Unit] = performUnlessClosingUSF("publish-event") {
-      logger.debug(s"Publish event with domain index ${event.value.domainIndexOpt}")
-      FutureUnlessShutdown.outcomeF(
-        ledgerApiIndexer.queue
-          .offer(event)
-          .map { _ =>
-            updateLastPublishedPersisted(
-              LastPublishedPersisted(
-                sequencerCounter = sequencerCounter,
-                timestamp = timestamp,
-                requestCounterO = requestCounterO,
-                updatePersisted = event.value.persisted.future,
-              )
-            )
-            onSequencerIndexMovingAhead(
-              Traced(CursorPrehead(sequencerCounter, timestamp))
-            )
-          }
-      )
-    }
-
-    override protected def pretty: Pretty[this.type] =
+    override def pretty: Pretty[this.type] = {
       prettyOfClass(
         param("timestamp", _.timestamp),
         param("sequencerCounter", _.sequencerCounter),
-        param("event", _.event.value),
+        paramIfDefined("event", _.eventO.map(_.event.description.singleQuoted)),
       )
+    }
 
     override def close(): Unit = ()
   }
 
+  private def publishEvent(
+      eventO: Option[TimestampedEvent],
+      inFlightRef: Option[InFlightReference],
+  )(implicit tc: TraceContext): FutureUnlessShutdown[Unit] =
+    performUnlessClosingUSF("publish-event") {
+      for {
+        _published <- eventO.fold(FutureUnlessShutdown.unit) { event =>
+          logger.debug(s"Publish event with request counter ${event.localOffset}")
+          val data = PublicationData(eventLog.id, event, inFlightRef)
+          FutureUnlessShutdown.outcomeF(multiDomainEventLog.value.publish(data))
+        }
+      } yield ()
+    }
+
+  // tieBreaker is used to order tasks with the same timestamp
+  /*
+  Note that we put requestCounter in the second argument list, because it is used together with the commit set.
+  This means that the case class's generated equality method compares only timestamp, sequencerCounter.
+  However,
+  publicationTasks are ordered by
+  [[com.digitalasset.canton.participant.event.RecordOrderPublisher.PublicationTask.orderingSameTimestamp]]
+  which looks at timestamp, sequencerCounter and requestCounter.
+  Thus, the equals method considers more AcsChangePublicationTasks equal than the orderingSameTimestamp.
+  However, orderingSameTimestamp is used only for the TaskScheduler, which should not care about equality of tasks.
+   */
   private case class AcsChangePublicationTask(
       override val sequencerCounter: SequencerCounter,
       override val timestamp: CantonTimestamp,
@@ -359,36 +388,40 @@ class RecordOrderPublisher(
       val traceContext: TraceContext
   ) extends PublicationTask {
 
+    val requestOffsetO: Option[RequestOffset] = requestCounterCommitSetPairO.map { case (rc, _) =>
+      RequestOffset(timestamp, rc)
+    }
+
     override def perform(): FutureUnlessShutdown[Unit] = {
       // If the requestCounterCommitSetPairO is not set, then by default the commit set is empty, and
       // the request counter is the smallest possible value that does not throw an exception in
-      // ActiveContractStore.bulkContractsReassignmentCounterSnapshot, i.e., Genesis
+      // ActiveContractStore.bulkContractsTransferCounterSnapshot, i.e., Genesis
       val (requestCounter, commitSet) =
         requestCounterCommitSetPairO.getOrElse((RequestCounter.Genesis, CommitSet.empty))
-      // Augments the commit set with the updated reassignment counters for archive events,
+      // Augments the commit set with the updated transfer counters for archive events,
       // computes the acs change and publishes it
       logger.trace(
         show"The received commit set contains creations ${commitSet.creations}" +
-          show"assignments ${commitSet.assignments}" +
-          show"archivals ${commitSet.archivals} unassignments ${commitSet.unassignments}"
+          show"transfer-ins ${commitSet.transferIns}" +
+          show"archivals ${commitSet.archivals} transfer-outs ${commitSet.transferOuts}"
       )
 
-      val transientArchivals = reassignmentCountersForArchivedTransient(commitSet)
+      val transientArchivals = transferCountersForArchivedTransient(commitSet)
 
       val acsChangePublish =
         for {
-          // Retrieves the reassignment counters of the archived contracts from the latest state in the active contract store
-          archivalsWithReassignmentCountersOnly <- activeContractSnapshot
-            .bulkContractsReassignmentCounterSnapshot(
+          // Retrieves the transfer counters of the archived contracts from the latest state in the active contract store
+          archivalsWithTransferCountersOnly <- activeContractSnapshot
+            .bulkContractsTransferCounterSnapshot(
               commitSet.archivals.keySet -- transientArchivals.keySet,
               requestCounter,
             )
 
         } yield {
-          // Computes the ACS change by decorating the archive events in the commit set with their reassignment counters
+          // Computes the ACS change by decorating the archive events in the commit set with their transfer counters
           val acsChange = AcsChange.tryFromCommitSet(
             commitSet,
-            archivalsWithReassignmentCountersOnly,
+            archivalsWithTransferCountersOnly,
             transientArchivals,
           )
           logger.debug(
@@ -403,31 +436,52 @@ class RecordOrderPublisher(
               timestamp,
               requestCounterCommitSetPairO.map(_._1.unwrap).getOrElse(RecordTime.lowestTiebreaker),
             )
-          val waitForLastEventPersisted = lastPublishedPersisted(sequencerCounter, timestamp)
-          // The trace context is deliberately generated here instead of continuing the previous one
-          // to unlink the asynchronous acs commitment processing from message processing trace.
-          TraceContext.withNewTraceContext { implicit traceContext =>
-            acsChangeListener.get.foreach(
-              _.publish(recordTime, acsChange, waitForLastEventPersisted)
-            )
-          }
+          acsChangeListener.get.foreach(_.publish(recordTime, acsChange))
         }
       FutureUnlessShutdown.outcomeF(acsChangePublish)
     }
 
-    override protected def pretty: Pretty[this.type] =
+    override def pretty: Pretty[this.type] =
       prettyOfClass(param("timestamp", _.timestamp), param("sequencerCounter", _.sequencerCounter))
 
     override def close(): Unit = ()
   }
 
-  def setAcsChangeListener(listener: AcsChangeListener): Unit =
+  def setAcsChangeListener(listener: AcsChangeListener): Unit = {
     acsChangeListener.getAndUpdate {
       case None => Some(listener)
       case Some(_acsChangeListenerAlreadySet) =>
         throw new IllegalArgumentException("ACS change listener already set")
     }.discard
+  }
 
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    Seq(SyncCloseable("taskScheduler", taskScheduler.close()))
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    Seq(
+      SyncCloseable("taskScheduler", taskScheduler.close()),
+      SyncCloseable("recovered-promise", recovered.shutdown()),
+    )
+  }
+}
+object RecordOrderPublisher {
+  sealed trait PendingPublish {
+    val ts: CantonTimestamp
+    val createsEvent: Boolean
+    val eventLogId: EventLogId
+  }
+
+  final case class PendingTransferPublish(
+      ts: CantonTimestamp,
+      eventLogId: EventLogId,
+  ) extends PendingPublish {
+    override val createsEvent: Boolean = false
+  }
+
+  final case class PendingEventPublish(
+      event: TimestampedEvent,
+      ts: CantonTimestamp,
+      eventLogId: EventLogId,
+  ) extends PendingPublish {
+    override val createsEvent: Boolean = true
+  }
+
 }

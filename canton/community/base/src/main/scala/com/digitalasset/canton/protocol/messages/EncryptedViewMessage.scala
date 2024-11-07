@@ -9,21 +9,24 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.DecryptionError.InvariantViolation
 import com.digitalasset.canton.crypto.SyncCryptoError.SyncCryptoDecryptionError
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreError.FailedToReadKey
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPublicStore}
 import com.digitalasset.canton.data.ViewType
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.EncryptedView.checkEncryptionSpec
-import com.digitalasset.canton.protocol.messages.EncryptedViewMessageError.SyncCryptoDecryptError
+import com.digitalasset.canton.protocol.messages.EncryptedViewMessageError.{
+  SessionKeyCreationError,
+  SyncCryptoDecryptError,
+}
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter.{ParsingResult, parseRequiredNonEmpty}
-import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
+import com.digitalasset.canton.store.SessionKeyStore
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
@@ -58,7 +61,7 @@ sealed trait EncryptedView[+VT <: ViewType] extends Product with Serializable {
       "org.wartremover.warts.Null",
     )
   )
-  override def equals(that: Any): Boolean =
+  override def equals(that: Any): Boolean = {
     if (this eq that.asInstanceOf[Object]) true
     else if (!that.isInstanceOf[EncryptedView[?]]) false
     else {
@@ -66,6 +69,7 @@ sealed trait EncryptedView[+VT <: ViewType] extends Product with Serializable {
       val thisViewTree = this.viewTree
       if (thisViewTree eq null) other.viewTree eq null else thisViewTree == other.viewTree
     }
+  }
   override def hashCode(): Int = scala.runtime.ScalaRunTime._hashCode(this)
 
   /** Cast the type parameter to the given argument's [[com.digitalasset.canton.data.ViewType]]
@@ -174,7 +178,7 @@ object EncryptedView {
                  encryptionAlgorithmSpec.supportedEncryptionKeySpecs,
                )
              )
-           else Either.unit).toEitherT[FutureUnlessShutdown]
+           else Right(())).toEitherT[FutureUnlessShutdown]
         case None =>
           EitherT.leftT[FutureUnlessShutdown, Unit](
             DecryptionError.InvalidEncryptionKey(s"Encryption key $keyId not found")
@@ -201,8 +205,9 @@ object EncryptedView {
   *
   * @param viewHash   Transaction view hash in plain text - included such that the recipient can prove to a 3rd party
   *                   that it has correctly decrypted the `viewTree`
-  * @param sessionKeys a sequence of encrypted random values to each recipient of the view.
-  *                   These values are encrypted and are used to derive the symmetric session key for the view.
+  * @param randomness the view's randomness symmetrically encrypted with a session key.
+  * @param sessionKey a sequence of encrypted random values to each recipient of the view.
+  *                   These values are encrypted and are used to derive the symmetric session key.
   *                   Instead of sending a <SymmetricKey>, which could cause formatting issues
   *                   (e.g. different participants with different providers and, therefore, different key formats),
   *                   we send an encrypted <SecureRandomness>.
@@ -210,7 +215,8 @@ object EncryptedView {
 final case class EncryptedViewMessage[+VT <: ViewType](
     submittingParticipantSignature: Option[Signature],
     viewHash: ViewHash,
-    sessionKeys: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]],
+    randomness: Encrypted[SecureRandomness],
+    sessionKey: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]],
     encryptedView: EncryptedView[VT],
     override val domainId: DomainId,
     viewEncryptionScheme: SymmetricKeyScheme,
@@ -228,13 +234,15 @@ final case class EncryptedViewMessage[+VT <: ViewType](
   def copy[A <: ViewType](
       submittingParticipantSignature: Option[Signature] = this.submittingParticipantSignature,
       viewHash: ViewHash = this.viewHash,
-      sessionKeyRandomness: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]] = this.sessionKeys,
+      randomness: Encrypted[SecureRandomness] = this.randomness,
+      sessionKeyRandomness: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]] = this.sessionKey,
       encryptedView: EncryptedView[A] = this.encryptedView,
       domainId: DomainId = this.domainId,
       viewEncryptionScheme: SymmetricKeyScheme = this.viewEncryptionScheme,
   ): EncryptedViewMessage[A] = new EncryptedViewMessage(
     submittingParticipantSignature,
     viewHash,
+    randomness,
     sessionKeyRandomness,
     encryptedView,
     domainId,
@@ -246,7 +254,8 @@ final case class EncryptedViewMessage[+VT <: ViewType](
     encryptionScheme = viewEncryptionScheme.toProtoEnum,
     submittingParticipantSignature = submittingParticipantSignature.map(_.toProtoV30),
     viewHash = viewHash.toProtoPrimitive,
-    sessionKeyLookup = sessionKeys.map(EncryptedViewMessage.serializeSessionKeyEntry),
+    randomness = randomness.ciphertext,
+    sessionKeyRandomness = sessionKey.map(EncryptedViewMessage.serializeSessionKeyEntry),
     domainId = domainId.toProtoPrimitive,
     viewType = viewType.toProtoEnum,
   )
@@ -263,11 +272,12 @@ final case class EncryptedViewMessage[+VT <: ViewType](
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def traverse[F[_], VT2 <: ViewType](
       f: EncryptedView[VT] => F[EncryptedView[VT2]]
-  )(implicit F: Functor[F]): F[EncryptedViewMessage[VT2]] =
+  )(implicit F: Functor[F]): F[EncryptedViewMessage[VT2]] = {
     F.map(f(encryptedView)) { newEncryptedView =>
       if (newEncryptedView eq encryptedView) this.asInstanceOf[EncryptedViewMessage[VT2]]
       else updateView(newEncryptedView)
     }
+  }
 
   override def pretty: Pretty[EncryptedViewMessage.this.type] = prettyOfClass(
     param("view hash", _.viewHash),
@@ -279,7 +289,7 @@ final case class EncryptedViewMessage[+VT <: ViewType](
 object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewMessage[ViewType]] {
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.EncryptedViewMessage)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.EncryptedViewMessage)(
       supportedProtoVersion(_)(EncryptedViewMessage.fromProto),
       _.toByteString,
     )
@@ -288,7 +298,8 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
   def apply[VT <: ViewType](
       submittingParticipantSignature: Option[Signature],
       viewHash: ViewHash,
-      sessionKeys: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]],
+      randomness: Encrypted[SecureRandomness],
+      sessionKey: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]],
       encryptedView: EncryptedView[VT],
       domainId: DomainId,
       viewEncryptionScheme: SymmetricKeyScheme,
@@ -296,7 +307,8 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
   ): EncryptedViewMessage[VT] = EncryptedViewMessage(
     submittingParticipantSignature,
     viewHash,
-    sessionKeys,
+    randomness,
+    sessionKey,
     encryptedView,
     domainId,
     viewEncryptionScheme,
@@ -304,12 +316,13 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
 
   private def serializeSessionKeyEntry(
       encryptedSessionKey: AsymmetricEncrypted[SecureRandomness]
-  ): v30.SessionKeyLookup =
+  ): v30.SessionKeyLookup = {
     v30.SessionKeyLookup(
-      sessionKeyEncrypted = encryptedSessionKey.ciphertext,
+      sessionKeyRandomness = encryptedSessionKey.ciphertext,
       encryptionAlgorithmSpec = encryptedSessionKey.encryptionAlgorithmSpec.toProtoEnum,
       fingerprint = encryptedSessionKey.encryptedFor.toProtoPrimitive,
     )
+  }
 
   private def deserializeSessionKeyEntry(
       sessionKeyLookup: v30.SessionKeyLookup
@@ -320,8 +333,8 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
         "encryptionAlgorithmSpec",
         sessionKeyLookup.encryptionAlgorithmSpec,
       )
-      sessionKeyEncrypted = sessionKeyLookup.sessionKeyEncrypted
-    } yield AsymmetricEncrypted(sessionKeyEncrypted, encryptionAlgorithmSpec, fingerprint)
+      sessionKeyRandomness = sessionKeyLookup.sessionKeyRandomness
+    } yield AsymmetricEncrypted(sessionKeyRandomness, encryptionAlgorithmSpec, fingerprint)
 
   def fromProto(
       encryptedViewMessageP: v30.EncryptedViewMessage
@@ -331,6 +344,7 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
       encryptionSchemeP,
       signatureP,
       viewHashP,
+      randomnessP,
       sessionKeyMapP,
       domainIdP,
       viewTypeP,
@@ -346,6 +360,7 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
       viewTree = Encrypted.fromByteString[EncryptedView.CompressedView[viewType.View]](viewTreeP)
       encryptedView = EncryptedView(viewType)(viewTree)
       viewHash <- ViewHash.fromProtoPrimitive(viewHashP)
+      randomness = Encrypted.fromByteString[SecureRandomness](randomnessP)
       sessionKeyRandomnessNE <- parseRequiredNonEmpty(
         deserializeSessionKeyEntry,
         "session key",
@@ -356,6 +371,7 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
     } yield new EncryptedViewMessage(
       signature,
       viewHash,
+      randomness,
       sessionKeyRandomnessNE,
       encryptedView,
       DomainId(domainUid),
@@ -366,13 +382,36 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
   def decryptRandomness[VT <: ViewType](
       allowedEncryptionSpecs: RequiredEncryptionSpecs,
       snapshot: DomainSnapshotSyncCryptoApi,
-      sessionKeyStore: ConfirmationRequestSessionKeyStore,
+      sessionKeyStore: SessionKeyStore,
       encrypted: EncryptedViewMessage[VT],
       participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, SecureRandomness] =
+  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, SecureRandomness] = {
+    val pureCrypto = snapshot.pureCrypto
+
+    val randomnessLength = EncryptedViewMessage.computeRandomnessLength(pureCrypto)
+
+    def decryptViewRandomness(
+        sessionKeyRandomness: SecureRandomness
+    ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, SecureRandomness] =
+      for {
+        // derive symmetric key from randomness
+        sessionKey <- pureCrypto
+          .createSymmetricKey(sessionKeyRandomness, encrypted.viewEncryptionScheme)
+          .leftMap[EncryptedViewMessageError](SessionKeyCreationError)
+          .toEitherT[FutureUnlessShutdown]
+        randomness <- pureCrypto
+          .decryptWith(encrypted.randomness, sessionKey)(
+            SecureRandomness.fromByteString(randomnessLength)
+          )
+          .leftMap[EncryptedViewMessageError](
+            EncryptedViewMessageError.SymmetricDecryptError
+          )
+          .toEitherT[FutureUnlessShutdown]
+      } yield randomness
+
     for {
       /* We first need to check whether the target private encryption key exists and is active in the store; otherwise,
        * we cannot decrypt and should abort. This situation can occur
@@ -384,13 +423,12 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
           FutureUnlessShutdown.outcomeF(snapshot.ipsSnapshot.encryptionKeys(participantId))
         )
         .map(_.map(_.id).toSet)
-      encryptedSessionKeyForParticipant <- encrypted.sessionKeys
+      encryptedSessionKeyForParticipant <- encrypted.sessionKey
         .find(e => encryptionKeys.contains(e.encryptedFor))
         .toRight(
           EncryptedViewMessageError.MissingParticipantKey(participantId)
         )
         .toEitherT[FutureUnlessShutdown]
-      // TODO(#12911): throw an exception instead of a left for a missing private key in the store
       _ <- snapshot.crypto.cryptoPrivateStore
         .existsDecryptionKey(encryptedSessionKeyForParticipant.encryptedFor)
         .leftMap(err => EncryptedViewMessageError.PrivateKeyStoreVerificationError(err))
@@ -419,14 +457,13 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
             )
         )
 
-      // we get the randomness for the session key from the message or by searching the cache. If this encrypted
-      // randomness is in the cache this means that a previous view with the same recipients tree has been
-      // received before.
-      viewRandomness <-
+      // we get the randomness for the session key from the message or by searching the cache,
+      // which means that a previous view with the same recipients has been received before.
+      skRandom <-
         // we try to search for the cached session key randomness. If it does not exist
         // (or is disabled) we decrypt and store it
         // the result in the cache. There is no need to sync on this read-write operation because
-        // there is no problem if the value gets re-written.
+        // there is not problem if the value gets re-written.
         sessionKeyStore
           .getSessionKeyRandomness(
             snapshot.crypto.privateCrypto,
@@ -438,19 +475,23 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
               SyncCryptoDecryptionError(err)
             )
           )
+      viewRandomness <- decryptViewRandomness(skRandom)
     } yield viewRandomness
+  }
 
-  private def eitherT[B](value: Either[EncryptedViewMessageError, B])(implicit
+  final case class RecipientsInfo(informeeParticipants: Set[ParticipantId])
+
+  private def eitherT[VT <: ViewType, B](value: Either[EncryptedViewMessageError, B])(implicit
       ec: ExecutionContext
   ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, B] =
     EitherT.fromEither[FutureUnlessShutdown](value)
 
   def computeRandomnessLength(pureCrypto: CryptoPureApi): Int =
-    pureCrypto.defaultSymmetricKeyScheme.keySizeInBytes
+    pureCrypto.defaultHashAlgorithm.length.toInt
 
   // This method is not defined as a member of EncryptedViewMessage because the covariant parameter VT conflicts
   // with the parameter deserialize.
-  private def decryptWithRandomness[VT <: ViewType](
+  def decryptWithRandomness[VT <: ViewType](
       snapshot: DomainSnapshotSyncCryptoApi,
       encrypted: EncryptedViewMessage[VT],
       viewRandomness: SecureRandomness,
@@ -459,7 +500,8 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
   ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, VT#View] = {
 
     val pureCrypto = snapshot.pureCrypto
-    val randomnessLength = encrypted.viewEncryptionScheme.keySizeInBytes
+    val viewKeyLength = encrypted.viewEncryptionScheme.keySizeInBytes
+    val randomnessLength = computeRandomnessLength(snapshot.pureCrypto)
 
     for {
       _ <- EitherT.cond[FutureUnlessShutdown](
@@ -470,23 +512,28 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
           randomnessLength,
         ),
       )
+      viewKeyRandomness <-
+        eitherT(
+          pureCrypto
+            .computeHkdf(viewRandomness.unwrap, viewKeyLength, HkdfInfo.ViewKey)
+            .leftMap(EncryptedViewMessageError.HkdfExpansionError)
+        )
       viewKey <- eitherT(
         pureCrypto
-          .createSymmetricKey(viewRandomness, encrypted.viewEncryptionScheme)
+          .createSymmetricKey(viewKeyRandomness, encrypted.viewEncryptionScheme)
           .leftMap(err =>
             EncryptedViewMessageError
-              .SessionKeyCreationError(err)
+              .SymmetricDecryptError(DecryptionError.InvalidSymmetricKey(err.toString))
           )
       )
       decrypted <- eitherT(
         EncryptedView
           .decrypt(pureCrypto, viewKey, encrypted.encryptedView)(deserialize)
-          .leftMap(EncryptedViewMessageError.SymmetricDecryptError.apply)
+          .leftMap(EncryptedViewMessageError.SymmetricDecryptError)
       )
       _ <- eitherT(
-        Either.cond(
+        EitherUtil.condUnitE(
           decrypted.domainId == encrypted.domainId,
-          (),
           EncryptedViewMessageError.WrongDomainIdInEncryptedViewMessage(
             encrypted.domainId,
             decrypted.domainId,
@@ -499,7 +546,7 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
   def decryptFor[VT <: ViewType](
       staticDomainParameters: StaticDomainParameters,
       snapshot: DomainSnapshotSyncCryptoApi,
-      sessionKeyStore: ConfirmationRequestSessionKeyStore,
+      sessionKeyStore: SessionKeyStore,
       encrypted: EncryptedViewMessage[VT],
       participantId: ParticipantId,
       optViewRandomness: Option[SecureRandomness] = None,
@@ -507,7 +554,8 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
       implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, VT#View] =
+  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, VT#View] = {
+
     // verify that the view symmetric encryption scheme is part of the required schemes
     if (
       !staticDomainParameters.requiredSymmetricKeySchemes
@@ -522,21 +570,25 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
         )
       )
     } else {
+      val decryptedRandomness =
+        decryptRandomness(
+          staticDomainParameters.requiredEncryptionSpecs,
+          snapshot,
+          sessionKeyStore,
+          encrypted,
+          participantId,
+        )
+
       for {
         viewRandomness <- optViewRandomness.fold(
-          decryptRandomness(
-            staticDomainParameters.requiredEncryptionSpecs,
-            snapshot,
-            sessionKeyStore,
-            encrypted,
-            participantId,
-          )
+          decryptedRandomness
         )(r => EitherT.pure(r))
         decrypted <- decryptWithRandomness(snapshot, encrypted, viewRandomness)(
           deserialize
         )
       } yield decrypted
     }
+  }
 
   implicit val encryptedViewMessageCast
       : ProtocolMessageContentCast[EncryptedViewMessage[ViewType]] =
@@ -550,13 +602,13 @@ object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewM
 
 sealed trait EncryptedViewMessageError extends Product with Serializable with PrettyPrinting {
 
-  override protected def pretty: Pretty[EncryptedViewMessageError.this.type] = adHocPrettyInstance
+  override def pretty: Pretty[EncryptedViewMessageError.this.type] = adHocPrettyInstance
 }
 
 object EncryptedViewMessageError {
 
   final case class SessionKeyCreationError(
-      err: EncryptionKeyCreationError
+      keyCreationError: EncryptionKeyCreationError
   ) extends EncryptedViewMessageError
 
   final case class MissingParticipantKey(
@@ -574,6 +626,10 @@ object EncryptedViewMessageError {
   final case class WrongDomainIdInEncryptedViewMessage(
       declaredDomainId: DomainId,
       containedDomainId: DomainId,
+  ) extends EncryptedViewMessageError
+
+  final case class HkdfExpansionError(
+      cause: HkdfError
   ) extends EncryptedViewMessageError
 
   final case class WrongRandomnessLength(

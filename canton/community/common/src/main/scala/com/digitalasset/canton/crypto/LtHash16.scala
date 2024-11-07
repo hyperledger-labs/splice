@@ -87,6 +87,7 @@ object LtHash16 {
     */
   def tryCreate(bytes: ByteString) = new LtHash16(bytes.toByteArray)
 
-  def isNonEmptyCommitment(bytes: ByteString): Boolean =
+  def isNonEmptyCommitment(bytes: ByteString): Boolean = {
     bytes.size() == BYTE_LENGTH && bytes.asScala.exists(_ != 0)
+  }
 }

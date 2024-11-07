@@ -43,8 +43,9 @@ object DummmyServer {
 
   }
 
-  def serviceEndpointDummy(): Unit =
+  def serviceEndpointDummy(): Unit = {
     throw ErrorCodeFoo.Error("A user oriented message").asGrpcError
+  }
 
 }
 
@@ -60,7 +61,7 @@ object SampleClientSide {
   import io.grpc.StatusRuntimeException
   import scala.jdk.CollectionConverters.*
 
-  def example(): Unit =
+  def example(): Unit = {
     try {
       DummmyServer.serviceEndpointDummy()
     } catch {
@@ -119,4 +120,5 @@ object SampleClientSide {
           }.isDefined
         }
     }
+  }
 }

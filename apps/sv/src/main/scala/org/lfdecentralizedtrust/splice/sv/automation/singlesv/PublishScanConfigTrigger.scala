@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext

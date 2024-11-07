@@ -25,11 +25,13 @@ class SpanningTest extends AnyWordSpec with BaseTest with BeforeAndAfterEach {
 
   var testTelemetrySetup: TestTelemetrySetup = _
 
-  override def beforeEach(): Unit =
+  override def beforeEach(): Unit = {
     testTelemetrySetup = new TestTelemetrySetup()
+  }
 
-  override def afterEach(): Unit =
+  override def afterEach(): Unit = {
     testTelemetrySetup.close()
+  }
 
   private class Inner(implicit tracer: Tracer) extends Spanning {
     def foo()(implicit traceContext: TraceContext): Unit = withSpan("Inner.foo") { _ => span =>

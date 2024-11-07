@@ -17,7 +17,6 @@ import com.digitalasset.canton.participant.sync.TransactionRoutingError.{
 }
 import com.digitalasset.canton.participant.sync.{ConnectedDomainsLookup, TransactionRoutingError}
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient
-import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
 import com.digitalasset.canton.topology.transaction.ParticipantAttributes
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
@@ -33,6 +32,14 @@ private[routing] final class AdmissibleDomains(
     protected val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
+  // Not meant for public consumption, it's just for conciseness in this class
+  // A `PartyTopology` is something gathered for each domain which maps, for
+  // every party of the domain, on which participant it's hosted and with what
+  // permissions and trust level (i.e. the `ParticipantAttributes`)
+  // and submitting party's confirmation threshold
+  private type PartyTopology =
+    Map[LfPartyId, (Map[ParticipantId, ParticipantAttributes], Option[PositiveInt])]
+
   /** Domains that host both submitters and informees of the transaction:
     * - submitters have to be hosted on the local participant
     * - informees have to be hosted on some participant
@@ -45,16 +52,20 @@ private[routing] final class AdmissibleDomains(
 
     def queryPartyTopologySnapshotClient(
         domainPartyTopologySnapshotClient: (DomainId, PartyTopologySnapshotClient)
-    ): EitherT[Future, TransactionRoutingError, Option[(DomainId, Map[LfPartyId, PartyInfo])]] = {
+    ): EitherT[Future, TransactionRoutingError, Option[(DomainId, PartyTopology)]] = {
       val (domainId, partyTopologySnapshotClient) = domainPartyTopologySnapshotClient
       val allParties = submitters.view ++ informees.view
       partyTopologySnapshotClient
-        .activeParticipantsOfPartiesWithInfo(allParties.toSeq)
+        .activeParticipantsOfPartiesWithAttributes(allParties.toSeq)
+        .zip(partyTopologySnapshotClient.consortiumThresholds(submitters))
         .attemptT
-        .map { partyTopology =>
+        .map { case (partyTopology, thresholds) =>
           val partyTopologyWithThresholds = partyTopology
-            .filter { case (_, partyInfo) => partyInfo.participants.nonEmpty }
-
+            .filter { case (_, hostingParticipants) => hostingParticipants.nonEmpty }
+            .map { case (partyId, participants) =>
+              val thresholdO = thresholds.get(partyId)
+              partyId -> (participants, thresholdO)
+            }
           Option.when(partyTopologyWithThresholds.nonEmpty) {
             domainId -> partyTopologyWithThresholds
           }
@@ -65,8 +76,7 @@ private[routing] final class AdmissibleDomains(
         }
     }
 
-    def queryTopology()
-        : EitherT[Future, TransactionRoutingError, Map[DomainId, Map[LfPartyId, PartyInfo]]] =
+    def queryTopology(): EitherT[Future, TransactionRoutingError, Map[DomainId, PartyTopology]] =
       connectedDomains.snapshot.view
         .mapValues(_.topologyClient.currentSnapshotApproximation)
         .toVector
@@ -92,7 +102,7 @@ private[routing] final class AdmissibleDomains(
       ensureAllKnown(
         required = submitters,
         known = knownParties,
-        ifUnknown = TopologyErrors.UnknownSubmitters.Error.apply,
+        ifUnknown = TopologyErrors.UnknownSubmitters.Error,
       )
 
     def ensureAllInformeesAreKnown(
@@ -101,7 +111,7 @@ private[routing] final class AdmissibleDomains(
       ensureAllKnown(
         required = informees,
         known = knownParties,
-        ifUnknown = TopologyErrors.UnknownInformees.Error.apply,
+        ifUnknown = TopologyErrors.UnknownInformees.Error,
       )
 
     def ensureNonEmpty[I[_] <: collection.immutable.Iterable[?], A, E](
@@ -110,27 +120,21 @@ private[routing] final class AdmissibleDomains(
     ): EitherT[Future, E, NonEmpty[I[A]]] =
       EitherT.fromEither[Future](NonEmpty.from(iterable).toRight(ifEmpty))
 
-    def domainWithAll(parties: Set[LfPartyId])(
-        topology: (DomainId, Map[LfPartyId, PartyInfo])
-    ): Boolean =
+    def domainWithAll(parties: Set[LfPartyId])(topology: (DomainId, PartyTopology)): Boolean =
       parties.subsetOf(topology._2.keySet)
 
     def domainsWithAll(
         parties: Set[LfPartyId],
-        topology: Map[DomainId, Map[LfPartyId, PartyInfo]],
+        topology: Map[DomainId, PartyTopology],
         ifEmpty: Set[DomainId] => TransactionRoutingError,
-    ): EitherT[Future, TransactionRoutingError, NonEmpty[
-      Map[DomainId, Map[LfPartyId, PartyInfo]]
-    ]] = {
+    ): EitherT[Future, TransactionRoutingError, NonEmpty[Map[DomainId, PartyTopology]]] = {
       val domainsWithAllParties = topology.filter(domainWithAll(parties))
       ensureNonEmpty(domainsWithAllParties, ifEmpty(topology.keySet))
     }
 
     def domainsWithAllSubmitters(
-        topology: Map[DomainId, Map[LfPartyId, PartyInfo]]
-    ): EitherT[Future, TransactionRoutingError, NonEmpty[
-      Map[DomainId, Map[LfPartyId, PartyInfo]]
-    ]] =
+        topology: Map[DomainId, PartyTopology]
+    ): EitherT[Future, TransactionRoutingError, NonEmpty[Map[DomainId, PartyTopology]]] =
       domainsWithAll(
         parties = submitters,
         topology = topology,
@@ -138,32 +142,34 @@ private[routing] final class AdmissibleDomains(
       )
 
     def domainsWithAllInformees(
-        topology: Map[DomainId, Map[LfPartyId, PartyInfo]]
-    ): EitherT[Future, TransactionRoutingError, NonEmpty[
-      Map[DomainId, Map[LfPartyId, PartyInfo]]
-    ]] =
+        topology: Map[DomainId, PartyTopology]
+    ): EitherT[Future, TransactionRoutingError, NonEmpty[Map[DomainId, PartyTopology]]] =
       domainsWithAll(
         parties = informees,
         topology = topology,
         ifEmpty = TopologyErrors.InformeesNotActive.Error(_, informees),
       )
 
+    // PartyTopology -> Map[LfPartyId, (Map[ParticipantId, ParticipantAttributes], Option[PositiveInt])]
     def suitableDomains(
-        domainsWithAllSubmitters: NonEmpty[Map[DomainId, Map[LfPartyId, PartyInfo]]]
+        domainsWithAllSubmitters: NonEmpty[Map[DomainId, PartyTopology]]
     ): EitherT[Future, TransactionRoutingError, NonEmpty[Set[DomainId]]] = {
       logger.debug(
         s"Checking whether one domain in ${domainsWithAllSubmitters.keys} is suitable for submission"
       )
 
       // Return true if all submitters are locally hosted with correct permissions
-      def canUseDomain(domainId: DomainId, parties: Map[LfPartyId, PartyInfo]): Boolean = {
+      def canUseDomain(
+          domainId: DomainId,
+          parties: Map[LfPartyId, (Map[ParticipantId, ParticipantAttributes], Option[PositiveInt])],
+      ): Boolean = {
         // We keep only the relevant topology (submitter on the local participant)
-        val locallyHostedSubmitters: Map[LfPartyId, (ParticipantAttributes, PositiveInt)] =
-          parties.toSeq.mapFilter { case (party, partyInfo) =>
+        val locallyHostedSubmitters: Map[LfPartyId, (ParticipantAttributes, Option[PositiveInt])] =
+          parties.toSeq.mapFilter { case (party, (participants, threshold)) =>
             for {
-              permissions <- partyInfo.participants.get(localParticipantId)
+              permissions <- participants.get(localParticipantId)
               _ <- Option.when(submitters.contains(party))(())
-            } yield (party, (permissions, partyInfo.threshold))
+            } yield (party, (permissions, threshold))
           }.toMap
 
         val unknownSubmitters: Set[LfPartyId] = submitters.diff(locallyHostedSubmitters.keySet)
@@ -172,7 +178,7 @@ private[routing] final class AdmissibleDomains(
           case (party, (permissions, threshold)) =>
             if (permissions.permission < Submission)
               List(s"submitter $party has permissions=${permissions.permission}")
-            else if (threshold > PositiveInt.one)
+            else if (threshold.forall(_ > PositiveInt.one))
               List(s"submitter $party has threshold=$threshold")
             else Nil
         }
@@ -182,7 +188,7 @@ private[routing] final class AdmissibleDomains(
         if (!canUseDomain) {
           val context = Map(
             "unknown submitters" -> unknownSubmitters,
-            "incorrect permissions" -> incorrectPermissionSubmitters,
+            "incorrect permissions" -> incorrectPermissionSubmitters.toSeq,
           )
           logger.debug(s"Cannot use domain $domainId: $context")
         }

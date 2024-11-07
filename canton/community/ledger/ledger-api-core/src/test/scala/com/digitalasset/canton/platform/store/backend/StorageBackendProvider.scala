@@ -13,9 +13,11 @@ import com.digitalasset.canton.platform.store.backend.localstore.{
   PartyRecordStorageBackend,
   UserManagementStorageBackend,
 }
+import com.digitalasset.canton.platform.store.backend.oracle.OracleStorageBackendFactory
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresStorageBackendFactory
 import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
 import com.digitalasset.canton.platform.store.interning.MockStringInterning
+import com.digitalasset.canton.platform.store.testing.oracle.OracleAroundAll
 import com.digitalasset.canton.platform.store.testing.postgresql.PostgresAroundAll
 import org.scalatest.Suite
 
@@ -87,6 +89,15 @@ trait StorageBackendProviderH2 extends StorageBackendProvider with BaseTest { th
   override protected val backend: TestBackend = TestBackend(H2StorageBackendFactory, loggerFactory)
 }
 
+trait StorageBackendProviderOracle
+    extends StorageBackendProvider
+    with OracleAroundAll
+    with BaseTest {
+  this: Suite =>
+  override protected val backend: TestBackend =
+    TestBackend(OracleStorageBackendFactory, loggerFactory)
+}
+
 final case class TestBackend(
     ingestion: IngestionStorageBackend[_],
     parameter: ParameterStorageBackend,
@@ -122,11 +133,12 @@ object TestBackend {
     val ledgerEndCache = MutableLedgerEndCache()
     val stringInterning = new MockStringInterning
 
-    def createTestMeteringBackend: TestMeteringBackend =
+    def createTestMeteringBackend: TestMeteringBackend = {
       TestMeteringBackend(
         read = storageBackendFactory.createMeteringStorageReadBackend(ledgerEndCache),
         write = storageBackendFactory.createMeteringStorageWriteBackend,
       )
+    }
 
     TestBackend(
       ingestion = storageBackendFactory.createIngestionStorageBackend,

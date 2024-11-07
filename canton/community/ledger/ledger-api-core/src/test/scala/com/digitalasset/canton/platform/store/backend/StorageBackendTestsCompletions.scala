@@ -5,7 +5,6 @@ package com.digitalasset.canton.platform.store.backend
 
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.platform.indexer.parallel.{PostPublishData, PublishSource}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
@@ -36,11 +35,11 @@ private[backend] trait StorageBackendTestsCompletions
       val serializableTraceContext = SerializableTraceContext(aTraceContext).toDamlProto.toByteArray
 
       val dtos = Vector(
-        dtoCompletion(offset(1), submitters = Set(party)),
-        dtoCompletion(offset(2), submitters = Set(party), traceContext = emptyTraceContext),
+        dtoCompletion(offset(1), submitter = party),
+        dtoCompletion(offset(2), submitter = party, traceContext = emptyTraceContext),
         dtoCompletion(
           offset(3),
-          submitters = Set(party),
+          submitter = party,
           traceContext = serializableTraceContext,
         ),
       )
@@ -65,9 +64,9 @@ private[backend] trait StorageBackendTestsCompletions
       completions1to2 should have length 1
       completions0to9 should have length 3
 
-      completions0to9.head.completionResponse.completion.map(_.traceContext) shouldBe Some(None)
-      completions0to9(1).completionResponse.completion.map(_.traceContext) shouldBe Some(None)
-      completions0to9(2).completionResponse.completion.map(_.traceContext) shouldBe Some(
+      completions0to9.head.completion.map(_.traceContext) shouldBe Some(None)
+      completions0to9(1).completion.map(_.traceContext) shouldBe Some(None)
+      completions0to9(2).completion.map(_.traceContext) shouldBe Some(
         Some(SerializableTraceContext(aTraceContext).toDamlProto)
       )
     }
@@ -78,7 +77,7 @@ private[backend] trait StorageBackendTestsCompletions
     val applicationId = someApplicationId
 
     val dtos = Vector(
-      dtoCompletion(offset(1), submitters = Set(party))
+      dtoCompletion(offset(1), submitter = party)
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
@@ -91,10 +90,8 @@ private[backend] trait StorageBackendTestsCompletions
     )
 
     completions should not be empty
-    completions.head.completionResponse.completion should not be empty
-    completions.head.completionResponse.completion.toList.head.applicationId should be(
-      applicationId
-    )
+    completions.head.completion should not be empty
+    completions.head.completion.toList.head.applicationId should be(applicationId)
   }
 
   it should "correctly persist and retrieve submission IDs" in {
@@ -102,8 +99,8 @@ private[backend] trait StorageBackendTestsCompletions
     val submissionId = Some(someSubmissionId)
 
     val dtos = Vector(
-      dtoCompletion(offset(1), submitters = Set(party), submissionId = submissionId),
-      dtoCompletion(offset(2), submitters = Set(party), submissionId = None),
+      dtoCompletion(offset(1), submitter = party, submissionId = submissionId),
+      dtoCompletion(offset(2), submitter = party, submissionId = None),
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
@@ -122,29 +119,24 @@ private[backend] trait StorageBackendTestsCompletions
 
     completions should have length 2
     inside(completions) { case List(completionWithSubmissionId, completionWithoutSubmissionId) =>
-      completionWithSubmissionId.completionResponse.completion should not be empty
-      completionWithSubmissionId.completionResponse.completion.toList.head.submissionId should be(
-        someSubmissionId
-      )
-      completionWithoutSubmissionId.completionResponse.completion should not be empty
-      completionWithoutSubmissionId.completionResponse.completion.toList.head.submissionId should be(
-        ""
-      )
+      completionWithSubmissionId.completion should not be empty
+      completionWithSubmissionId.completion.toList.head.submissionId should be(someSubmissionId)
+      completionWithoutSubmissionId.completion should not be empty
+      completionWithoutSubmissionId.completion.toList.head.submissionId should be("")
     }
   }
 
   it should "correctly persist and retrieve command deduplication offsets" in {
     val party = someParty
-    val anOffset = Offset.beforeBegin.toLong
-    val anOffsetHex = ApiOffset.fromLong(anOffset)
+    val anOffsetHex = Offset.beforeBegin.toHexString
 
     val dtos = Vector(
       dtoCompletion(
         offset(1),
-        submitters = Set(party),
+        submitter = party,
         deduplicationOffset = Some(anOffsetHex),
       ),
-      dtoCompletion(offset(2), submitters = Set(party), deduplicationOffset = None),
+      dtoCompletion(offset(2), submitter = party, deduplicationOffset = None),
     )
 
     executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
@@ -165,12 +157,12 @@ private[backend] trait StorageBackendTestsCompletions
     completions should have length 2
     inside(completions) {
       case List(completionWithDeduplicationOffset, completionWithoutDeduplicationOffset) =>
-        completionWithDeduplicationOffset.completionResponse.completion should not be empty
-        completionWithDeduplicationOffset.completionResponse.completion.toList.head.deduplicationPeriod.deduplicationOffset should be(
-          Some(anOffset)
+        completionWithDeduplicationOffset.completion should not be empty
+        completionWithDeduplicationOffset.completion.toList.head.deduplicationPeriod.deduplicationOffset should be(
+          Some(anOffsetHex)
         )
-        completionWithoutDeduplicationOffset.completionResponse.completion should not be empty
-        completionWithoutDeduplicationOffset.completionResponse.completion.toList.head.deduplicationPeriod.deduplicationOffset should not be defined
+        completionWithoutDeduplicationOffset.completion should not be empty
+        completionWithoutDeduplicationOffset.completion.toList.head.deduplicationPeriod.deduplicationOffset should not be defined
     }
   }
 
@@ -183,13 +175,13 @@ private[backend] trait StorageBackendTestsCompletions
     val dtos = Vector(
       dtoCompletion(
         offset(1),
-        submitters = Set(party),
+        submitter = party,
         deduplicationDurationSeconds = Some(seconds),
         deduplicationDurationNanos = Some(nanos),
       ),
       dtoCompletion(
         offset(2),
-        submitters = Set(party),
+        submitter = party,
         deduplicationDurationSeconds = None,
         deduplicationDurationNanos = None,
       ),
@@ -213,56 +205,12 @@ private[backend] trait StorageBackendTestsCompletions
     completions should have length 2
     inside(completions) {
       case List(completionWithDeduplicationOffset, completionWithoutDeduplicationOffset) =>
-        completionWithDeduplicationOffset.completionResponse.completion should not be empty
-        completionWithDeduplicationOffset.completionResponse.completion.toList.head.deduplicationPeriod.deduplicationDuration should be(
+        completionWithDeduplicationOffset.completion should not be empty
+        completionWithDeduplicationOffset.completion.toList.head.deduplicationPeriod.deduplicationDuration should be(
           Some(expectedDuration)
         )
-        completionWithoutDeduplicationOffset.completionResponse.completion should not be empty
-        completionWithoutDeduplicationOffset.completionResponse.completion.toList.head.deduplicationPeriod.deduplicationDuration should not be defined
-    }
-  }
-
-  it should "correctly persist and retrieve submitters/act_as" in {
-    val party = someParty
-    val party2 = someParty2
-    val party3 = someParty3
-
-    val dtos = Vector(
-      dtoCompletion(
-        offset(1),
-        submitters = Set(party, party2, party3),
-      ),
-      dtoCompletion(
-        offset(2),
-        submitters = Set(party),
-      ),
-    )
-
-    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
-    executeSql(ingest(dtos, _))
-
-    executeSql(updateLedgerEnd(offset(2), 2L))
-    val completions = executeSql(
-      backend.completion
-        .commandCompletions(
-          Offset.beforeBegin,
-          offset(2),
-          someApplicationId,
-          Set(party, party2),
-          limit = 10,
-        )
-    ).toList
-
-    completions should have length 2
-    inside(completions) { case List(completion1, completion2) =>
-      completion1.completionResponse.completion should not be empty
-      completion1.completionResponse.completion.toList.head.actAs.toSet should be(
-        Set(party, party2)
-      )
-      completion2.completionResponse.completion should not be empty
-      completion2.completionResponse.completion.toList.head.actAs.toSet should be(
-        Set(party)
-      )
+        completionWithoutDeduplicationOffset.completion should not be empty
+        completionWithoutDeduplicationOffset.completion.toList.head.deduplicationPeriod.deduplicationDuration should not be defined
     }
   }
 
@@ -278,7 +226,7 @@ private[backend] trait StorageBackendTestsCompletions
     val dtos1 = Vector(
       dtoCompletion(
         offset(1),
-        submitters = Set(party),
+        submitter = party,
         deduplicationDurationSeconds = Some(seconds),
         deduplicationDurationNanos = None,
       )
@@ -304,7 +252,7 @@ private[backend] trait StorageBackendTestsCompletions
     val dtos2 = Vector(
       dtoCompletion(
         offset(2),
-        submitters = Set(party),
+        submitter = party,
         deduplicationDurationSeconds = None,
         deduplicationDurationNanos = Some(nanos),
       )
@@ -338,7 +286,7 @@ private[backend] trait StorageBackendTestsCompletions
       ),
       dtoCompletion(
         offset = offset(2),
-        submitters = Set(someParty),
+        submitter = someParty,
         commandId = commandId,
         applicationId = "applicationid1",
         submissionId = Some(submissionId),
@@ -349,7 +297,7 @@ private[backend] trait StorageBackendTestsCompletions
       ),
       dtoCompletion(
         offset = offset(5),
-        submitters = Set(someParty),
+        submitter = someParty,
         commandId = commandId,
         applicationId = "applicationid1",
         submissionId = Some(submissionId),
@@ -360,28 +308,28 @@ private[backend] trait StorageBackendTestsCompletions
       ),
       dtoCompletion(
         offset = offset(9),
-        submitters = Set(someParty),
+        submitter = someParty,
         commandId = commandId,
         applicationId = "applicationid1",
         submissionId = Some(submissionId),
         domainId = "x::domain1",
         recordTime = recordTime,
         messageUuid = None,
-        updateId = None,
+        transactionId = None,
         publicationTime = publicationTime,
         isTransaction = true,
         requestSequencerCounter = Some(11),
       ),
       dtoCompletion(
         offset = offset(11),
-        submitters = Set(someParty),
+        submitter = someParty,
         commandId = commandId,
         applicationId = "applicationid1",
         submissionId = Some(submissionId),
         domainId = "x::domain1",
         recordTime = recordTime,
         messageUuid = None,
-        updateId = None,
+        transactionId = None,
         publicationTime = publicationTime,
         isTransaction = true,
         requestSequencerCounter = None,

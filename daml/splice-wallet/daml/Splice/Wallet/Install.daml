@@ -19,7 +19,6 @@ import Splice.Wallet.Subscriptions
 import Splice.Wallet.TransferOffer
 import Splice.Wallet.BuyTrafficRequest
 import Splice.Wallet.TopUpState
-import Splice.Wallet.TransferPreapproval
 import Prelude hiding (forA)
 import Splice.Util
 
@@ -71,29 +70,6 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
       amuletsum <- catchAll (exercise context.amuletRules (AmuletRules_DevNet_Tap executionContext.endUser tapAmount context.context.openMiningRound))
       handleResultTap amuletsum
     ExtAmuletOperation _dummyUnitField -> error "ExtAmuletOperation: bare extension constructors are not allowed at runtime"
-    CO_CreateExternalPartySetupProposal externalParty preapprovalExpiresAt -> do
-      -- creates ExternalPartySetupProposal for externally hosted parties
-      resultE <- catchAll $ handleCreateExternalPartySetupProposal externalParty preapprovalExpiresAt
-      handleResult COO_CreateExternalPartySetupProposal resultE
-    CO_AcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt -> do
-      -- creates TransferPreapproval via the wallet
-      resultE <- catchAll $ handleAcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt
-      handleResult COO_AcceptTransferPreapprovalProposal resultE
-    CO_RenewTransferPreapproval previousApprovalCid newExpiresAt -> do
-      resultE <- catchAll $ handleRenewTransferPreapproval previousApprovalCid newExpiresAt
-      handleResult COO_RenewTransferPreapproval resultE
-    CO_TransferPreapprovalSend transferPreapprovalCid providerFeaturedAppRightCid amount -> do
-      -- The designated app provider for pre-approved transfers is the host of the receiver's party and
-      -- not sender's wallet provider. So, the `featuredAppRight` in this context needs to be replaced
-      -- with that of the app provider hosting the receiver which must be passed as an argument.
-      let transferContext = context.context with featuredAppRight = providerFeaturedAppRightCid
-      let paymentTransferContext = context with context = transferContext
-      result <- catchAll $ exercise transferPreapprovalCid TransferPreapproval_Send with
-        sender = executionContext.endUser
-        context = paymentTransferContext
-        inputs
-        amount
-      handleResultTransferPreapprovalSend result
   where
     context : PaymentTransferContext
     context = executionContext.paymentContext
@@ -163,14 +139,6 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
         executeAmuletOperationRec executionContext inputAmulets (COO_SubscriptionPayment (subscriptionPayment) :: prevResults) remainingOperations
 
-    handleResultTransferPreapprovalSend : Either InvalidTransferReason TransferPreapproval_SendResult -> Update [AmuletOperationOutcome]
-    handleResultTransferPreapprovalSend = \case
-      Left errorMsg -> handleLeft errorMsg
-      Right (TransferPreapproval_SendResult transferResult) -> do
-        let senderChange = transferResult.senderChangeAmulet
-        let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
-        executeAmuletOperationRec executionContext inputAmulets (COO_TransferPreapprovalSend senderChange :: prevResults) remainingOperations
-
     handleBuyMemberTraffic: Int -> Text -> Text -> Int -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId Amulet))
     handleBuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCidO = do
       now <- getTime
@@ -202,34 +170,6 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
       result <- exercise amuletRulesCid
         (AmuletRules_BuyMemberTraffic newInputs context.context executionContext.validator memberId synchronizerId migrationId trafficAmount)
       pure (result.purchasedTraffic, result.senderChangeAmulet)
-
-    handleCreateExternalPartySetupProposal : Party -> Time -> Update (ContractId ExternalPartySetupProposal, Optional (ContractId Amulet))
-    handleCreateExternalPartySetupProposal externalParty preapprovalExpiresAt = do
-      require "Only a validator can create a proposal to host an external party" (executionContext.endUser == executionContext.validator)
-      AmuletRules_CreateExternalPartySetupProposalResult{..} <- exercise context.amuletRules AmuletRules_CreateExternalPartySetupProposal with
-        context = executionContext.paymentContext
-        inputs
-        user = externalParty
-        validator = executionContext.validator
-        preapprovalExpiresAt
-      pure (proposalCid, transferResult.senderChangeAmulet)
-
-    handleAcceptTransferPreapprovalProposal : ContractId TransferPreapprovalProposal -> Time -> Update (ContractId TransferPreapproval, Optional (ContractId Amulet))
-    handleAcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt = do
-      require "Only a validator can accept a proposal to create a transfer preapproval" (executionContext.endUser == executionContext.validator)
-      TransferPreapprovalProposal_AcceptResult{..} <- exercise preapprovalProposalCid TransferPreapprovalProposal_Accept with
-        context = executionContext.paymentContext
-        inputs
-        expiresAt
-      pure (transferPreapprovalCid, transferResult.senderChangeAmulet)
-
-    handleRenewTransferPreapproval : ContractId TransferPreapproval -> Time -> Update (ContractId TransferPreapproval, Optional (ContractId Amulet))
-    handleRenewTransferPreapproval previousApprovalCid newExpiresAt = do
-      TransferPreapproval_RenewResult{..} <- exercise previousApprovalCid TransferPreapproval_Renew with
-        context = executionContext.paymentContext
-        inputs
-        newExpiresAt
-      pure (transferPreapprovalCid, transferResult.senderChangeAmulet)
 
 executeAmuletOperationRec _executionContext _inputs prevResults [] = do
   return prevResults
@@ -267,19 +207,6 @@ data AmuletOperation
   | ExtAmuletOperation with
       dummyUnitField :  ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
-  | CO_CreateExternalPartySetupProposal with
-      externalParty : Party
-      preapprovalExpiresAt : Time
-  | CO_AcceptTransferPreapprovalProposal with
-      preapprovalProposalCid: ContractId TransferPreapprovalProposal
-      expiresAt : Time
-  | CO_RenewTransferPreapproval with
-      previousApprovalCid : ContractId TransferPreapproval
-      newExpiresAt : Time
-  | CO_TransferPreapprovalSend with
-      transferPreapprovalCid : ContractId TransferPreapproval
-      providerFeaturedAppRightCid : Optional (ContractId FeaturedAppRight)
-      amount : Decimal
   deriving (Eq, Show)
 
 -- Enum of the possible outcomes of operating on a amulet through the wallet.
@@ -298,10 +225,6 @@ data AmuletOperationOutcome
   | ExtAmuletOperationOutcome with
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
-  | COO_CreateExternalPartySetupProposal (ContractId ExternalPartySetupProposal)
-  | COO_AcceptTransferPreapprovalProposal (ContractId TransferPreapproval)
-  | COO_RenewTransferPreapproval (ContractId TransferPreapproval)
-  | COO_TransferPreapprovalSend (Optional (ContractId Amulet))
   deriving (Eq, Show)
 
 data WalletAppInstall_ExecuteBatchResult = WalletAppInstall_ExecuteBatchResult
@@ -380,10 +303,6 @@ data WalletAppInstall_FeaturedAppRights_CancelResult = WalletAppInstall_Featured
 data WalletAppInstall_FeaturedAppRights_SelfGrantResult = WalletAppInstall_FeaturedAppRights_SelfGrantResult
   with
     featuredAppRight : ContractId FeaturedAppRight
-
-data WalletAppInstall_TransferPreapprovalProposal_CreateResult = WalletAppInstall_TransferPreapprovalProposal_CreateResult
-  with
-    preapprovalProposalCid : ContractId TransferPreapprovalProposal
 
 template WalletAppInstall
   with

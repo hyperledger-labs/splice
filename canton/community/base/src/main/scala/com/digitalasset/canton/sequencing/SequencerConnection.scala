@@ -81,7 +81,7 @@ final case class GrpcSequencerConnection(
       sequencerAlias.toProtoPrimitive,
     )
 
-  override protected def pretty: Pretty[GrpcSequencerConnection] =
+  override def pretty: Pretty[GrpcSequencerConnection] =
     prettyOfClass(
       param("sequencerAlias", _.sequencerAlias),
       param("endpoints", _.endpoints.map(_.toURI(transportSecurity)).toList),
@@ -146,7 +146,8 @@ object SequencerConnection {
   private def fromGrpcProto(
       grpcP: v30.SequencerConnection.Grpc,
       alias: String,
-  ): ParsingResult[SequencerConnection] =
+  ): ParsingResult[SequencerConnection] = {
+
     for {
       uris <- grpcP.connections
         .traverse { connection =>
@@ -168,6 +169,7 @@ object SequencerConnection {
       grpcP.customTrustCertificates,
       sequencerAlias,
     )
+  }
 
   def merge(connections: Seq[SequencerConnection]): Either[String, SequencerConnection] =
     for {

@@ -3,11 +3,10 @@
 
 package com.digitalasset.canton.config
 
-import com.daml.jwt.JwtTimestampLeeway
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.MetricName
 import com.daml.metrics.grpc.GrpcServerMetrics
-import com.daml.tls.{OcspProperties, ProtocolDisabler, TlsInfo, TlsVersion}
-import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.daml.tls.TlsVersion
 import com.digitalasset.canton.config.AdminServerConfig.defaultAddress
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, NonNegativeInt, Port}
 import com.digitalasset.canton.config.SequencerConnectionConfig.CertificateFile
@@ -54,18 +53,6 @@ trait ServerConfig extends Product with Serializable {
     */
   def sslContext: Option[SslContext]
 
-  /** If any defined, enforces token based authorization when accessing this node through the given `address` and `port`.
-    */
-  def authServices: Seq[AuthServiceConfig]
-
-  /** Leeway parameters for the jwt processing algorithms used in the authorization services
-    */
-  def jwtTimestampLeeway: Option[JwtTimestampLeeway]
-
-  /** If defined, the admin-token based authoriztion will be supported when accessing this node through the given `address` and `port`.
-    */
-  def adminToken: Option[String]
-
   /** server cert chain file if TLS is defined
     *
     * Used for domain internal GRPC sequencer connections
@@ -89,12 +76,10 @@ trait ServerConfig extends Product with Serializable {
   def instantiateServerInterceptors(
       tracingConfig: TracingConfig,
       apiLoggingConfig: ApiLoggingConfig,
+      metricsPrefix: MetricName,
+      metrics: LabeledMetricsFactory,
       loggerFactory: NamedLoggerFactory,
       grpcMetrics: GrpcServerMetrics,
-      authServices: Seq[AuthServiceConfig],
-      adminToken: Option[CantonAdminToken],
-      jwtTimestampLeeway: Option[JwtTimestampLeeway],
-      telemetry: Telemetry,
   ): CantonServerInterceptors
 
 }
@@ -103,21 +88,15 @@ trait CommunityServerConfig extends ServerConfig {
   override def instantiateServerInterceptors(
       tracingConfig: TracingConfig,
       apiLoggingConfig: ApiLoggingConfig,
+      metricsPrefix: MetricName,
+      metrics: LabeledMetricsFactory,
       loggerFactory: NamedLoggerFactory,
       grpcMetrics: GrpcServerMetrics,
-      authServices: Seq[AuthServiceConfig],
-      adminToken: Option[CantonAdminToken],
-      jwtTimestampLeeway: Option[JwtTimestampLeeway],
-      telemetry: Telemetry,
   ) = new CantonCommunityServerInterceptors(
     tracingConfig,
     apiLoggingConfig,
     loggerFactory,
     grpcMetrics,
-    authServices,
-    adminToken,
-    jwtTimestampLeeway,
-    telemetry,
   )
 }
 
@@ -141,7 +120,7 @@ trait AdminServerConfig extends ServerConfig {
       keepAliveClient = keepAliveServer.map(_.clientConfigFor),
     )
 
-  override def sslContext: Option[SslContext] = tls.map(CantonServerBuilder.sslContext(_))
+  override def sslContext: Option[SslContext] = tls.map(CantonServerBuilder.sslContext)
 
   override def serverCertChainFile: Option[ExistingFile] = tls.map(_.certChainFile)
 }
@@ -153,11 +132,8 @@ final case class CommunityAdminServerConfig(
     override val address: String = defaultAddress,
     internalPort: Option[Port] = None,
     tls: Option[TlsServerConfig] = None,
-    jwtTimestampLeeway: Option[JwtTimestampLeeway] = None,
     keepAliveServer: Option[KeepAliveServerConfig] = Some(KeepAliveServerConfig()),
     maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
-    authServices: Seq[AuthServiceConfig] = Seq.empty,
-    adminToken: Option[String] = None,
 ) extends AdminServerConfig
     with CommunityServerConfig
 
@@ -223,7 +199,7 @@ sealed trait BaseTlsArguments {
       knownTlsVersions
         .find(_ == minVersion)
         .fold[Seq[String]](
-          throw new IllegalArgumentException(s"Unknown TLS protocol version $minVersion")
+          throw new IllegalArgumentException(s"Unknown TLS protocol version ${minVersion}")
         )(versionFound => knownTlsVersions.filter(_ >= versionFound))
     }
 }
@@ -247,7 +223,7 @@ sealed trait BaseTlsArguments {
   *                            optional or unsupported.
   *                            If client authentication is enabled and this parameter is absent,
   *                            the certificates in the JVM trust store will be used instead.
-  * @param clientAuth indicates whether server requires, requests, or does not request auth from clients.
+  * @param clientAuth indicates whether server requires, requests, does does not request auth from clients.
   *                   Normally the ledger api server requires client auth under TLS, but using this setting this
   *                   requirement can be loosened.
   *                   See https://github.com/digital-asset/daml/commit/edd73384c427d9afe63bae9d03baa2a26f7b7f54
@@ -277,27 +253,6 @@ final case class TlsServerConfig(
     }
     TlsClientConfig(trustCollectionFile = Some(certChainFile), clientCert = clientCert)
   }
-
-  /** This is a side-effecting method. It modifies JVM TLS properties according to the TLS configuration. */
-  def setJvmTlsProperties(): Unit = {
-    if (enableCertRevocationChecking) OcspProperties.enableOcsp()
-    ProtocolDisabler.disableSSLv2Hello()
-  }
-
-  override def protocols: Option[Seq[String]] = {
-    val disallowedTlsVersions =
-      Seq(
-        TlsVersion.V1.version,
-        TlsVersion.V1_1.version,
-      )
-    minimumServerProtocolVersion match {
-      case Some(minVersion) if disallowedTlsVersions.contains(minVersion) =>
-        throw new IllegalArgumentException(s"Unsupported TLS version: $minVersion")
-      case _ =>
-        super.protocols
-    }
-  }
-
 }
 
 object TlsServerConfig {
@@ -318,10 +273,10 @@ object TlsServerConfig {
       "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
     )
     val logger = LoggerFactory.getLogger(TlsServerConfig.getClass)
-    val filtered = candidates.filter { x =>
+    val filtered = candidates.filter(x => {
       io.netty.handler.ssl.OpenSsl.availableOpenSslCipherSuites().contains(x) ||
       io.netty.handler.ssl.OpenSsl.availableJavaCipherSuites().contains(x)
-    }
+    })
     if (filtered.isEmpty) {
       val len = io.netty.handler.ssl.OpenSsl
         .availableOpenSslCipherSuites()
@@ -347,45 +302,6 @@ object TlsServerConfig {
   }
 
   val defaultMinimumServerProtocol = "TLSv1.2"
-
-  /** Netty incorrectly hardcodes the report that the SSLv2Hello protocol is enabled. There is no way
-    * to stop it from doing it, so we just filter the netty's erroneous claim. We also make sure that
-    * the SSLv2Hello protocol is knocked out completely at the JSSE level through the ProtocolDisabler
-    */
-  private def filterSSLv2Hello(protocols: Seq[String]): Seq[String] =
-    protocols.filter(_ != ProtocolDisabler.sslV2Protocol)
-
-  def logTlsProtocolsAndCipherSuites(
-      sslContext: SslContext,
-      isServer: Boolean,
-  ): Unit = {
-    val (who, provider, logger) =
-      if (isServer)
-        (
-          "Server",
-          SslContext.defaultServerProvider(),
-          LoggerFactory.getLogger(TlsServerConfig.getClass),
-        )
-      else
-        (
-          "Client",
-          SslContext.defaultClientProvider(),
-          LoggerFactory.getLogger(TlsClientConfig.getClass),
-        )
-
-    val tlsInfo = TlsInfo.fromSslContext(sslContext)
-    logger.info(s"$who TLS - enabled via $provider")
-    logger.debug(
-      s"$who TLS - supported protocols: ${filterSSLv2Hello(tlsInfo.supportedProtocols).mkString(", ")}."
-    )
-    logger.info(
-      s"$who TLS - enabled protocols: ${filterSSLv2Hello(tlsInfo.enabledProtocols).mkString(", ")}."
-    )
-    logger.debug(
-      s"$who TLS $who - supported cipher suites: ${tlsInfo.supportedCipherSuites.mkString(", ")}."
-    )
-    logger.info(s"$who TLS - enabled cipher suites: ${tlsInfo.enabledCipherSuites.mkString(", ")}.")
-  }
 
 }
 

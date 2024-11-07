@@ -601,8 +601,8 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
 
   it should "not set the offset" in {
     for {
-      _ <- store(singleCreate)
-      _ <- store(singleCreate)
+      (_, t1) <- store(singleCreate)
+      (_, t2) <- store(singleCreate)
       end <- ledgerDao.lookupLedgerEnd()
       activeContracts <- ledgerDao.transactionsReader
         .getActiveContracts(
@@ -614,6 +614,9 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
 
     } yield {
       activeContracts should not be empty
+      forAll(activeContracts) { ac =>
+        ac.offset shouldBe empty
+      }
     }
   }
 

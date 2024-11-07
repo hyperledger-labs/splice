@@ -4,11 +4,10 @@
 package com.digitalasset.canton.platform.apiserver
 
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
+import com.daml.tls.TlsConfiguration
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.TlsServerConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.ServerInterceptor
 
@@ -20,7 +19,7 @@ final class LedgerApiService(
     desiredPort: Port,
     maxInboundMessageSize: Int,
     address: Option[String],
-    tlsConfiguration: Option[TlsServerConfig],
+    tlsConfiguration: Option[TlsConfiguration] = None,
     interceptors: List[ServerInterceptor] = List.empty,
     servicesExecutor: Executor,
     metrics: LedgerApiServerMetrics,
@@ -34,9 +33,7 @@ final class LedgerApiService(
     (for {
       apiServices <- apiServicesOwner.acquire()
       _ = tlsConfiguration.map(_.setJvmTlsProperties())
-      sslContext = tlsConfiguration.map(
-        CantonServerBuilder.sslContext(_, logTlsProtocolAndCipherSuites = true)
-      )
+      sslContext = tlsConfiguration.flatMap(_.server)
       server <- GrpcServer
         .owner(
           address,
@@ -66,5 +63,4 @@ final class LedgerApiService(
       case Success(s) => Resource.successful(s)
     }
   }
-
 }

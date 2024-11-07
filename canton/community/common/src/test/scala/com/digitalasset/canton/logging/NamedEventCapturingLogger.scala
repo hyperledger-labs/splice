@@ -54,23 +54,17 @@ class NamedEventCapturingLogger(
       expectedThrowable: Throwable = null,
   ): Boolean = {
     val event = eventQueue.peek()
-    if (event != null && eventMatches(event, expectedMessage, expectedLevel, expectedThrowable)) {
+    if (
+      event != null && event.message == expectedMessage && event.level == expectedLevel && event.throwable == Option(
+        expectedThrowable
+      )
+    ) {
       pollEventQueue(None)
       true
     } else {
       false
     }
   }
-
-  def eventMatches(
-      event: LogEntry,
-      expectedMessage: String,
-      expectedLevel: Level,
-      expectedThrowable: Throwable = null,
-  ): Boolean =
-    event.message == expectedMessage && event.level == expectedLevel && event.throwable == Option(
-      expectedThrowable
-    )
 
   def assertNextMessageIs(
       expectedMessage: String,

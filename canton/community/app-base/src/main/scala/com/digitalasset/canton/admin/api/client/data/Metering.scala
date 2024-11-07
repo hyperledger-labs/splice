@@ -9,27 +9,30 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.google.protobuf.struct
 import com.google.protobuf.struct.Value.Kind
 import com.google.protobuf.struct.{ListValue, Struct}
-import io.circe.*
 import io.circe.Decoder.Result
 import io.circe.Json.*
+import io.circe.*
 
 object LedgerMeteringReport {
 
   def fromProtoV0(
       value: GetMeteringReportResponse
-  ): ParsingResult[String] =
+  ): ParsingResult[String] = {
+
     for {
       s <- ProtoConverter.required("meteringReportJson", value.meteringReportJson)
     } yield {
       StructEncoderDecoder(s).spaces2
     }
 
+  }
 }
 
 object StructEncoderDecoder extends Encoder[struct.Struct] with Decoder[struct.Struct] {
 
-  override def apply(s: struct.Struct): Json =
+  override def apply(s: struct.Struct): Json = {
     write(struct.Value.of(Kind.StructValue(s)))
+  }
 
   override def apply(c: HCursor): Result[struct.Struct] = {
     val value = read(c.value)
@@ -37,7 +40,7 @@ object StructEncoderDecoder extends Encoder[struct.Struct] with Decoder[struct.S
     else Left(DecodingFailure(s"Expected struct, not $value", Nil))
   }
 
-  private def write(value: struct.Value): Json =
+  private def write(value: struct.Value): Json = {
     value.kind match {
       case Kind.BoolValue(v) => Json.fromBoolean(v)
       case Kind.ListValue(v) => Json.fromValues(v.values.map(write))
@@ -46,6 +49,7 @@ object StructEncoderDecoder extends Encoder[struct.Struct] with Decoder[struct.S
       case Kind.StructValue(v) => Json.fromFields(v.fields.view.mapValues(write))
       case Kind.Empty | Kind.NullValue(_) => Json.Null
     }
+  }
 
   object StructFolder extends Folder[Kind] {
     def onNull = Kind.NullValue(struct.NullValue.NULL_VALUE)

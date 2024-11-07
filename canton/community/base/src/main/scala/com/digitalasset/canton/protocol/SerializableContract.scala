@@ -43,7 +43,7 @@ case class SerializableContract(
     contractSalt: Option[Salt],
 )
 // The class implements `HasVersionedWrapper` because we serialize it to an anonymous binary format (ByteString/Array[Byte]) when
-// writing to the ReassignmentStore and thus need to encode the version of the serialized Protobuf message
+// writing to the TransferStore and thus need to encode the version of the serialized Protobuf message
     extends HasVersionedWrapper[SerializableContract]
     with PrettyPrinting {
 
@@ -78,7 +78,7 @@ case class SerializableContract(
     )
   }
 
-  override protected def pretty: Pretty[SerializableContract] = prettyOfClass(
+  override def pretty: Pretty[SerializableContract] = prettyOfClass(
     param("contractId", _.contractId),
     paramWithoutValue("instance"), // Do not leak confidential data (such as PII) to the log file!
     param("metadata", _.metadata),
@@ -105,7 +105,7 @@ object SerializableContract
     with HasVersionedMessageCompanionDbHelpers[SerializableContract] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v32,
+      ProtocolVersion.v31,
       supportedProtoVersion(protocol.v30.SerializableContract)(fromProtoV30),
       _.toProtoV30.toByteString,
     )

@@ -16,12 +16,11 @@ import com.digitalasset.canton.ledger.api.validation.ValidateDisclosedContractsT
   lf,
   validateDisclosedContracts,
 }
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{Node as LfNode, *}
-import com.digitalasset.daml.lf.value.Value as Lf
+import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.value.Value.{ContractId, ValueRecord}
+import com.digitalasset.daml.lf.value.Value as Lf
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import org.scalatest.EitherValues
@@ -38,15 +37,7 @@ class ValidateDisclosedContractsTest
   behavior of classOf[ValidateDisclosedContracts].getSimpleName
 
   it should "validate the disclosed contracts when enabled" in {
-    validateDisclosedContracts(api.protoCommands) shouldBe Right(
-      ImmArray(DisclosedContract(lf.fatContractInstance, Some(lf.domainId)))
-    )
-  }
-
-  it should "allow a non-populated domain-id" in {
-    validateDisclosedContracts(api.protoCommands) shouldBe Right(
-      ImmArray(DisclosedContract(lf.fatContractInstance, Some(lf.domainId)))
-    )
+    validateDisclosedContracts(api.protoCommands) shouldBe Right(lf.expectedDisclosedContracts)
   }
 
   it should "fail validation on missing created event blob" in {
@@ -216,25 +207,11 @@ class ValidateDisclosedContractsTest
       metadata = Map.empty,
     )
   }
-
-  it should "fail validation on invalid domain_d" in {
-    requestMustFailWith(
-      request = validateDisclosedContracts(
-        ProtoCommands(disclosedContracts =
-          scala.Seq(api.protoDisclosedContract.copy(domainId = "cantBe!"))
-        )
-      ),
-      code = Status.Code.INVALID_ARGUMENT,
-      description =
-        "INVALID_FIELD(8,0): The submitted command has a field with invalid value: Invalid field DisclosedContract.domain_id: Invalid unique identifier `cantBe!` with missing namespace.",
-      metadata = Map.empty,
-    )
-  }
 }
 
 object ValidateDisclosedContractsTest {
   // TODO(#19494): Change to minVersion once 2.2 is released and 2.1 is removed
-  private val testTxVersion = LanguageVersion.v2_dev
+  private val testTxVersion = TransactionVersion.maxVersion
 
   private val validateDisclosedContracts = new ValidateDisclosedContracts
 
@@ -252,7 +229,6 @@ object ValidateDisclosedContractsTest {
     val keyMaintainers: Set[Ref.Party] = Set(bob)
     val createdAtSeconds = 1337L
     val someDriverMetadataStr = "SomeDriverMetadata"
-    val domainId = "x::domainId"
     val protoDisclosedContract: ProtoDisclosedContract = ProtoDisclosedContract(
       templateId = Some(templateId),
       contractId = contractId,
@@ -263,7 +239,6 @@ object ValidateDisclosedContractsTest {
             throw new RuntimeException(s"Cannot serialize createdEventBlob: ${err.errorMessage}"),
           identity,
         ),
-      domainId = domainId,
     )
 
     val protoCommands: ProtoCommands =
@@ -281,12 +256,16 @@ object ValidateDisclosedContractsTest {
     private val packageName: Ref.PackageName = Ref.PackageName.assertFromString(api.packageName)
     private val packageVersion: Ref.PackageVersion =
       Ref.PackageVersion.assertFromString(api.packageVersion)
+    private val createArg: ValueRecord = ValueRecord(
+      tycon = Some(templateId),
+      fields = ImmArray(Some(Ref.Name.assertFromString("something")) -> Lf.ValueTrue),
+    )
     private val createArgWithoutLabels: ValueRecord = ValueRecord(
       tycon = None,
       fields = ImmArray(None -> Lf.ValueTrue),
     )
     val lfContractId: ContractId.V1 = Lf.ContractId.V1.assertFromString(api.contractId)
-    val domainId = DomainId.tryFromString(api.domainId)
+
     private val driverMetadataBytes: Bytes =
       Bytes.fromByteString(ByteString.copyFromUtf8(api.someDriverMetadataStr))
     private val keyWithMaintainers: GlobalKeyWithMaintainers = GlobalKeyWithMaintainers.assertBuild(
@@ -302,13 +281,15 @@ object ValidateDisclosedContractsTest {
       Ref.PackageName.assertFromString(api.packageName),
     )
 
+    private val keyHash: Hash = keyWithMaintainers.globalKey.hash
+
     val fatContractInstance: FatContractInstance = FatContractInstance.fromCreateNode(
-      create = LfNode.Create(
+      create = Node.Create(
         coid = lf.lfContractId,
         templateId = lf.templateId,
         packageName = lf.packageName,
         packageVersion = Some(lf.packageVersion),
-        arg = lf.createArgWithoutLabels,
+        arg = lf.createArg,
         signatories = api.signatories,
         stakeholders = api.stakeholders,
         keyOpt = Some(lf.keyWithMaintainers),
@@ -316,6 +297,24 @@ object ValidateDisclosedContractsTest {
       ),
       createTime = Time.Timestamp.assertFromLong(api.createdAtSeconds * 1000000L),
       cantonData = lf.driverMetadataBytes,
+    )
+
+    val expectedDisclosedContracts: ImmArray[DisclosedContract] = ImmArray(
+      DisclosedContract(
+        templateId = templateId,
+        packageName = packageName,
+        packageVersion = Some(packageVersion),
+        contractId = lfContractId,
+        argument = createArgWithoutLabels,
+        createdAt = Time.Timestamp.assertFromLong(api.createdAtSeconds * 1000000L),
+        keyHash = Some(keyHash),
+        keyMaintainers = Some(api.keyMaintainers),
+        driverMetadata = driverMetadataBytes,
+        keyValue = Some(keyWithMaintainers.value),
+        signatories = api.signatories,
+        stakeholders = api.stakeholders,
+        transactionVersion = testTxVersion,
+      )
     )
   }
 }

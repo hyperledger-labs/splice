@@ -4,7 +4,6 @@
 package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
-import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
@@ -38,8 +37,7 @@ class TestSequencerClientSend extends SequencerClientSend {
       callback: SendCallback,
       amplify: Boolean,
   )(implicit
-      traceContext: TraceContext,
-      metricsContext: MetricsContext,
+      traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = {
     requestsQueue.add(
       Request(batch, topologyTimestamp, maxSequencingTime, messageId, aggregationRule, None)

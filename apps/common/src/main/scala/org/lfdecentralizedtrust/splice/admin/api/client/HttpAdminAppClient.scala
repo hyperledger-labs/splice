@@ -13,8 +13,8 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.external.common_admin as externalHttp
 import org.lfdecentralizedtrust.splice.http.v0.external.common_admin.CommonAdminClient
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.OffsetDateTime

@@ -54,9 +54,6 @@ package object canton {
   type LfPackageName = Ref.PackageName
   val LfPackageName: Ref.PackageName.type = Ref.PackageName
 
-  type LfPackageRef = Ref.PackageRef
-  val LfPackageRef: Ref.PackageRef.type = Ref.PackageRef
-
   type LfPackageVersion = Ref.PackageVersion
   val LfPackageVersion: Ref.PackageVersion.type = Ref.PackageVersion
 
@@ -108,17 +105,17 @@ package object canton {
 
   val SequencerCounter = new CounterCompanion[SequencerCounterDiscriminator] {}
 
-  /** The counter assigned by the transaction processor to confirmation and reassignment requests. */
+  /** The counter assigned by the transaction processor to confirmation and transfer requests. */
   type RequestCounterDiscriminator
   type RequestCounter = Counter[RequestCounterDiscriminator]
 
-  /** The counter assigned to a contract to count the number of its reassignments */
-  type ReassignmentDiscriminator
-  type ReassignmentCounter = Counter[ReassignmentDiscriminator]
+  /** The counter assigned to a contract to count the number of its transfers */
+  type TransferCounterDiscriminator
+  type TransferCounter = Counter[TransferCounterDiscriminator]
 
-  object ReassignmentCounter extends CounterCompanion[ReassignmentDiscriminator] {
-    def encodeDeterministically(reassignmentCounter: ReassignmentCounter): ByteString = encodeLong(
-      reassignmentCounter.unwrap
+  object TransferCounter extends CounterCompanion[TransferCounterDiscriminator] {
+    def encodeDeterministically(transferCounter: TransferCounter): ByteString = encodeLong(
+      transferCounter.unwrap
     )
   }
 

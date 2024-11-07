@@ -32,8 +32,9 @@ abstract class BenchmarkState {
   protected def extraStringCount = 0
 
   @Setup(Level.Trial)
-  def setupEntries(): Unit =
+  def setupEntries(): Unit = {
     entries = BenchmarkState.createEntries(stringCount + extraStringCount, stringLength)
+  }
 }
 
 object BenchmarkState {

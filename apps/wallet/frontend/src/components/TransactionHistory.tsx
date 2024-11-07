@@ -230,15 +230,6 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // ExtraTrafficPurchase
       text = 'Extra Traffic Purchase';
       break;
-    // TODO(#14568): Add frontend tests for the transfer pre-approval tx subtypes
-    case 'AmuletRules_CreateTransferPreapproval':
-      // TransferPreapprovalCreated
-      text = 'Transfer Preapproval Created';
-      break;
-    case 'TransferPreapproval_Renew':
-      // TransferPreapprovalRenewed
-      text = 'Transfer Preapproval Renewed';
-      break;
     case 'AcceptedAppPayment_Collect':
       // AppPaymentCollected
       text = 'App Payment Collected';

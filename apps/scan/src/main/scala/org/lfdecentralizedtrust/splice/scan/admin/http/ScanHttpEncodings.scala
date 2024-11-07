@@ -12,7 +12,6 @@ import org.lfdecentralizedtrust.splice.util.{Contract, Trees}
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.ByteString
 import io.circe.Json
@@ -46,7 +45,7 @@ sealed trait ScanHttpEncodings {
               tree.getRecordTime.toString,
               updateWithMigrationId.update.domainId.toProtoPrimitive,
               tree.getEffectiveAt.toString,
-              ApiOffset.fromLong(tree.getOffset),
+              tree.getOffset,
               tree.getRootEventIds.asScala.toVector,
               tree.getEventsById.asScala.map { case (eventId, treeEvent) =>
                 eventId -> javaToHttpEvent(treeEvent)
@@ -66,7 +65,7 @@ sealed trait ScanHttpEncodings {
             httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
-                ApiOffset.fromLong(update.offset),
+                update.offset.getOffset,
                 update.recordTime.toString,
                 httpApi.UpdateHistoryAssignment(
                   submitter.toProtoPrimitive,
@@ -90,7 +89,7 @@ sealed trait ScanHttpEncodings {
             httpApi.UpdateHistoryItem.fromUpdateHistoryReassignment(
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
-                ApiOffset.fromLong(update.offset),
+                update.offset.getOffset,
                 update.recordTime.toString,
                 httpApi.UpdateHistoryUnassignment(
                   submitter.toProtoPrimitive,
@@ -176,7 +175,7 @@ sealed trait ScanHttpEncodings {
             "",
             http.workflowId,
             Instant.parse(http.effectiveAt),
-            ApiOffset.assertFromStringToLong(http.offset),
+            http.offset,
             http.eventsById.map { case (eventId, treeEventHttp) =>
               eventId -> httpToJavaEvent(treeEventHttp)
             }.asJava,
@@ -199,7 +198,7 @@ sealed trait ScanHttpEncodings {
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
-                offset = ApiOffset.assertFromStringToLong(http.offset),
+                offset = new javaApi.ParticipantOffset.Absolute(http.offset),
                 recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
                 event = ledgerApi.ReassignmentEvent.Assign(
                   submitter = PartyId.tryFromProtoPrimitive(assignment.submitter),
@@ -222,7 +221,7 @@ sealed trait ScanHttpEncodings {
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
-                offset = ApiOffset.assertFromStringToLong(http.offset),
+                offset = new javaApi.ParticipantOffset.Absolute(http.offset),
                 recordTime = CantonTimestamp.assertFromInstant(Instant.parse(http.recordTime)),
                 event = ledgerApi.ReassignmentEvent.Unassign(
                   submitter = PartyId.tryFromProtoPrimitive(unassignment.submitter),
@@ -386,7 +385,7 @@ object ScanHttpEncodings {
             ledgerApi.ReassignmentUpdate(
               ledgerApi.Reassignment(
                 transfer.updateId,
-                1L,
+                new javaApi.ParticipantOffset.Absolute(""),
                 transfer.recordTime,
                 assign.copy(
                   createdEvent = new javaApi.CreatedEvent(
@@ -411,7 +410,7 @@ object ScanHttpEncodings {
             ledgerApi.ReassignmentUpdate(
               ledgerApi.Reassignment(
                 transfer.updateId,
-                1L,
+                new javaApi.ParticipantOffset.Absolute(""),
                 transfer.recordTime,
                 unassign,
               )
@@ -470,7 +469,7 @@ object ScanHttpEncodings {
       tree.getCommandId,
       tree.getWorkflowId,
       tree.getEffectiveAt,
-      1L, // tree.getOffset,
+      "", // tree.getOffset,
       eventsById.asJava,
       rootEventIds.asJava,
       tree.getDomainId,

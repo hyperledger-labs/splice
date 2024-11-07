@@ -3,95 +3,120 @@
 
 package com.digitalasset.canton.ledger.api.validation
 
-import cats.syntax.either.*
 import com.daml.error.ContextualizedErrorLogger
-import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.domain.types.ParticipantOffset
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.ParticipantBoundary
+import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
-import com.digitalasset.canton.platform.ApiOffset
+import com.digitalasset.daml.lf.data.Ref
 import io.grpc.StatusRuntimeException
+
+import scala.math.Ordered.*
 
 object ParticipantOffsetValidator {
 
-  def validateOptionalPositive(ledgerOffsetO: Option[Long], fieldName: String)(implicit
+  private val boundary = "boundary"
+
+  import FieldValidator.requireLedgerString
+  import ValidationErrors.{invalidArgument, missingField}
+
+  def validateOptional(
+      ledgerOffset: Option[ParticipantOffset],
+      fieldName: String,
+  )(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Option[ParticipantOffset]] =
-    ledgerOffsetO match {
-      case Some(off) =>
-        validatePositive(
-          off,
-          fieldName,
-          "the offset has to be either a positive integer (>0) or not defined at all",
-        ).map(
-          Some(_)
+  ): Either[StatusRuntimeException, Option[domain.ParticipantOffset]] =
+    ledgerOffset
+      .map(validate(_, fieldName))
+      .fold[Either[StatusRuntimeException, Option[domain.ParticipantOffset]]](Right(None))(
+        _.map(Some(_))
+      )
+
+  def validate(
+      ledgerOffset: ParticipantOffset,
+      fieldName: String,
+  )(implicit
+      contextualizedErrorLogger: ContextualizedErrorLogger
+  ): Either[StatusRuntimeException, domain.ParticipantOffset] = {
+    ledgerOffset.value match {
+      case ParticipantOffset.Value.Absolute(value) =>
+        requireLedgerString(value, fieldName).map(domain.ParticipantOffset.Absolute)
+      case ParticipantOffset.Value.Boundary(value) =>
+        convertLedgerBoundary(fieldName, value)
+      case ParticipantOffset.Value.Empty =>
+        Left(missingField(fieldName + ".(" + boundary + "|value)"))
+    }
+  }
+
+  def validate(ledgerOffset: String)(implicit
+      contextualizedErrorLogger: ContextualizedErrorLogger
+  ): Either[StatusRuntimeException, String] =
+    if (ledgerOffset.isEmpty)
+      Right(ledgerOffset)
+    else
+      Ref.LedgerString.fromString(ledgerOffset).left.map(invalidArgument)
+
+  def offsetIsBeforeEndIfAbsolute(
+      offsetType: String,
+      ledgerOffset: domain.ParticipantOffset,
+      ledgerEnd: domain.ParticipantOffset.Absolute,
+  )(implicit
+      contextualizedErrorLogger: ContextualizedErrorLogger
+  ): Either[StatusRuntimeException, Unit] =
+    ledgerOffset match {
+      case abs: domain.ParticipantOffset.Absolute if abs > ledgerEnd =>
+        Left(
+          RequestValidationErrors.OffsetAfterLedgerEnd
+            .Reject(offsetType, abs.value, ledgerEnd.value)
+            .asGrpcError
         )
-      case None => Right(None)
+      case _ => Right(())
     }
 
-  def validatePositive(
-      ledgerOffset: Long,
-      fieldName: String,
-      errorMsg: String = "the offset has to be a positive integer (>0)",
-  )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, ParticipantOffset] =
-    if (ledgerOffset <= 0)
-      Left(
-        RequestValidationErrors.NonPositiveOffset
-          .Error(
-            fieldName,
-            ledgerOffset,
-            errorMsg,
-          )
-          .asGrpcError
-      )
-    else
-      Right(Offset.fromLong(ledgerOffset).toHexString)
-
-  def validateNonNegative(ledgerOffset: Long, fieldName: String)(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, ParticipantOffset] =
-    if (ledgerOffset < 0)
-      Left(
-        RequestValidationErrors.NegativeOffset
-          .Error(
-            fieldName,
-            ledgerOffset,
-            s"the offset in $fieldName field has to be a non-negative integer (>=0)",
-          )
-          .asGrpcError
-      )
-    else
-      Right(Offset.fromLong(ledgerOffset).toHexString)
-
-  def offsetIsBeforeEnd(
-      offsetType: String,
-      ledgerOffset: ParticipantOffset,
-      ledgerEnd: ParticipantOffset,
-  )(implicit
-      contextualizedErrorLogger: ContextualizedErrorLogger
-  ): Either[StatusRuntimeException, Unit] =
-    Either.cond(
-      ledgerOffset <= ledgerEnd,
-      (),
-      RequestValidationErrors.OffsetAfterLedgerEnd
-        .Reject(
-          offsetType,
-          ApiOffset.assertFromStringToLong(ledgerOffset),
-          ApiOffset.assertFromStringToLong(ledgerEnd),
-        )
-        .asGrpcError,
-    )
-
   // Same as above, but with an optional offset.
-  def offsetIsBeforeEnd(
+  def offsetIsBeforeEndIfAbsolute(
       offsetType: String,
-      ledgerOffset: Option[ParticipantOffset],
-      ledgerEnd: ParticipantOffset,
+      ledgerOffset: Option[domain.ParticipantOffset],
+      ledgerEnd: domain.ParticipantOffset.Absolute,
   )(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger
   ): Either[StatusRuntimeException, Unit] =
-    ledgerOffset.fold(Either.unit[StatusRuntimeException])(
-      offsetIsBeforeEnd(offsetType, _, ledgerEnd)
+    ledgerOffset.fold[Either[StatusRuntimeException, Unit]](Right(()))(
+      offsetIsBeforeEndIfAbsolute(offsetType, _, ledgerEnd)
     )
+
+  def offsetIsBeforeEndIfAbsolute(
+      offsetType: String,
+      ledgerOffset: String,
+      ledgerEnd: domain.ParticipantOffset.Absolute,
+  )(implicit
+      contextualizedErrorLogger: ContextualizedErrorLogger
+  ): Either[StatusRuntimeException, Unit] =
+    if (ledgerOffset > ledgerEnd.value)
+      Left(
+        RequestValidationErrors.OffsetAfterLedgerEnd
+          .Reject(offsetType, ledgerOffset, ledgerEnd.value)
+          .asGrpcError
+      )
+    else Right(())
+
+  private def convertLedgerBoundary(
+      fieldName: String,
+      value: ParticipantBoundary,
+  )(implicit
+      contextualizedErrorLogger: ContextualizedErrorLogger
+  ): Either[StatusRuntimeException, domain.ParticipantOffset] = {
+    value match {
+      case ParticipantBoundary.Unrecognized(invalid) =>
+        Left(
+          invalidArgument(
+            s"Unknown ledger $boundary value '$invalid' in field $fieldName.$boundary"
+          )
+        )
+      case ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN =>
+        Right(domain.ParticipantOffset.ParticipantBegin)
+      case ParticipantBoundary.PARTICIPANT_BOUNDARY_END =>
+        Right(domain.ParticipantOffset.ParticipantEnd)
+    }
+  }
 }

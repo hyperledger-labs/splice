@@ -10,9 +10,7 @@ import {
   walletSchema,
   ConfigProvider,
   useConfig as useConfigFromContext,
-  pollIntervalSchema,
 } from 'common-frontend';
-import { PollingStrategy } from 'common-frontend-utils';
 import React from 'react';
 import { z } from 'zod';
 
@@ -20,7 +18,6 @@ const configScheme = z.object({
   auth: authSchema.optional(),
   testAuth: testAuthSchema.optional(),
   spliceInstanceNames: spliceInstanceNamesSchema,
-  pollInterval: pollIntervalSchema,
   services: z.object({
     wallet: walletSchema.optional(),
     scan: serviceSchema,
@@ -54,7 +51,6 @@ type SplitwellConfig = {
   auth: z.infer<typeof authSchema>;
   testAuth?: z.infer<typeof testAuthSchema>;
   spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
-  pollInterval?: z.infer<typeof pollIntervalSchema>;
   services: SplitwellServicesConfig;
   appManager: boolean;
 };
@@ -107,11 +103,4 @@ export const useConfig = (): SplitwellConfig => {
     },
     appManager: !!appManagerConfig,
   };
-};
-
-export const useConfigPollInterval: () => number = () => {
-  const config = useConfig();
-
-  // Use default poll interval if not specified in config
-  return config.pollInterval ?? PollingStrategy.FIXED;
 };

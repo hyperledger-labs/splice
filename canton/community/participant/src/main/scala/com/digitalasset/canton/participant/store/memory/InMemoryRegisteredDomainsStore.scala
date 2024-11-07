@@ -50,7 +50,7 @@ class InMemoryRegisteredDomainsStore(override protected val loggerFactory: Named
         val _ = domainAliasMap.put(alias, domainId)
       }
     })
-    EitherT.fromEither[Future](swapped.swap.getOrElse(Either.unit))
+    EitherT.fromEither[Future](swapped.swap.getOrElse(Right(())))
   }
 
   override def aliasToDomainIdMap(implicit

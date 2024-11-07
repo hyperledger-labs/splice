@@ -409,7 +409,7 @@ class HttpSvSoftDomainMigrationPocHandler(
       staticDomainParameters = node.parameters
         .toStaticDomainParameters(
           CommunityCryptoConfig(provider = CommunityCryptoProvider.Jce),
-          ProtocolVersion.v32,
+          ProtocolVersion.v31,
         )
         .valueOr(err =>
           throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
@@ -496,6 +496,7 @@ class HttpSvSoftDomainMigrationPocHandler(
           dsoStore.key.dsoParty,
           participantIds,
           participantId.uid.namespace.fingerprint,
+          Some(domainId),
           isProposal = true,
         ),
         logger,

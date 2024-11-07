@@ -63,7 +63,7 @@ class ResourceTemplateDecoder(
   override def decodeTemplate[TCid <: ContractId[T], T](
       companion: ContractCompanion[?, TCid, T]
   )(json: Json): T = {
-    val templateId = companion.getTemplateIdWithPackageId
+    val templateId = companion.TEMPLATE_ID
     val lfIdentifier = Ref.Identifier.assertFromString(
       s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}"
     )
@@ -88,19 +88,17 @@ class ResourceTemplateDecoder(
   override def decodeInterface[ICid <: ContractId[Marker], Marker, View](
       companion: InterfaceCompanion[Marker, ICid, View]
   )(json: Json): View = {
-    val viewType = packageSignatures(
-      PackageId.assertFromString(companion.getTemplateIdWithPackageId.getPackageId)
-    )
+    val viewType = packageSignatures(PackageId.assertFromString(companion.TEMPLATE_ID.getPackageId))
       .interfaces(
         QualifiedName(
-          ModuleName.assertFromString(companion.getTemplateIdWithPackageId.getModuleName),
-          DottedName.assertFromString(companion.getTemplateIdWithPackageId.getEntityName),
+          ModuleName.assertFromString(companion.TEMPLATE_ID.getModuleName),
+          DottedName.assertFromString(companion.TEMPLATE_ID.getEntityName),
         )
       )
       .viewType
       .getOrElse(
         throw new IllegalStateException(
-          s"Internal error: ${companion.getTemplateIdWithPackageId} does not have a view type"
+          s"Internal error: ${companion.TEMPLATE_ID} does not have a view type"
         )
       )
     decode(companion.valueDecoder, viewType, json)

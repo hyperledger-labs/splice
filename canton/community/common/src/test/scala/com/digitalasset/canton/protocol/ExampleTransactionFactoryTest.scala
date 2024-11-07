@@ -12,7 +12,8 @@ import org.scalatest.wordspec.AnyWordSpec
 class ExampleTransactionFactoryTest extends AnyWordSpec with BaseTest with HasExecutionContext {
   val factory = new ExampleTransactionFactory()()
 
-  forEvery(factory.standardHappyCases) { example =>
+  forEvery(factory.standardHappyCases)(example => {
+
     s"Example transaction $example" can {
 
       "determine the informees" in {
@@ -101,6 +102,6 @@ class ExampleTransactionFactoryTest extends AnyWordSpec with BaseTest with HasEx
         }
       }
     }
-  }
+  })
 
 }

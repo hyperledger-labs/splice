@@ -3,18 +3,8 @@
 
 package com.digitalasset.canton.http
 
-import com.digitalasset.canton.http.domain.{
-  ActiveContract,
-  Choice,
-  Contract,
-  ContractTypeId,
-  CreateAndExerciseCommand,
-  CreateCommand,
-  ExerciseCommand,
-  ExerciseResponse,
-  JwtWritePayload,
-}
-import com.daml.jwt.Jwt
+import com.digitalasset.canton.http.domain.{ActiveContract, Choice, Contract, ContractTypeId, CreateAndExerciseCommand, CreateCommand, ExerciseCommand, ExerciseResponse, JwtWritePayload}
+import com.daml.jwt.domain.Jwt
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes as lar
 import com.daml.ledger.api.v2 as lav2
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod
@@ -29,7 +19,6 @@ import com.digitalasset.canton.http.util.Logging.{InstanceUUID, RequestID}
 import com.digitalasset.canton.http.util.{Commands, Transactions}
 import com.digitalasset.canton.ledger.service.Grpc.StatusEnvelope
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.platform.ApiOffset
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import scalaz.std.scalaFuture.*
 import scalaz.syntax.show.*
@@ -74,18 +63,14 @@ class CommandService(
       jwtPayload: JwtWritePayload,
       input: CreateCommand[lav2.value.Record, ContractTypeId.Template.RequiredPkg],
   )(implicit
-      lc: LoggingContextOf[InstanceUUID with RequestID],
-      traceContext: TraceContext,
+      lc: LoggingContextOf[InstanceUUID with RequestID], traceContext: TraceContext
   ): Future[Error \/ domain.CreateCommandResponse[lav2.value.Value]] =
     withTemplateLoggingContext(input.templateId).run { implicit lc =>
       logger.trace(s"sending create command to ledger, ${lc.makeString}")
       val command = createCommand(input)
       val request = submitAndWaitRequest(jwtPayload, input.meta, command, "create")
       val et: ET[domain.CreateCommandResponse[lav2.value.Value]] = for {
-        response <- logResult(
-          Symbol("create"),
-          submitAndWaitForTransaction(jwt, request)(traceContext)(lc),
-        )
+        response <- logResult(Symbol("create"), submitAndWaitForTransaction(jwt, request)(traceContext)(lc))
         contract <- either(exactlyOneActiveContract(response))
       } yield domain.CreateCommandResponse(
         contract.contractId,
@@ -94,9 +79,7 @@ class CommandService(
         contract.payload,
         contract.signatories,
         contract.observers,
-        domain.CompletionOffset(
-          response.transaction.map(_.offset).map(ApiOffset.fromLong).getOrElse("")
-        ),
+        domain.CompletionOffset(response.completionOffset),
       )
       et.run
     }
@@ -128,9 +111,7 @@ class CommandService(
             } yield ExerciseResponse(
               exerciseResult,
               contracts,
-              domain.CompletionOffset(
-                response.transaction.map(_.offset).map(ApiOffset.fromLong).getOrElse("")
-              ),
+              domain.CompletionOffset(response.completionOffset),
             )
 
           et.run
@@ -158,9 +139,7 @@ class CommandService(
       } yield ExerciseResponse(
         exerciseResult,
         contracts,
-        domain.CompletionOffset(
-          response.transaction.map(_.offset).map(ApiOffset.fromLong).getOrElse("")
-        ),
+        domain.CompletionOffset(response.completionOffset),
       )
       et.run
     }
@@ -195,8 +174,9 @@ class CommandService(
 
   private def createCommand(
       input: CreateCommand[lav2.value.Record, ContractTypeId.Template.RequiredPkg]
-  ): lav2.commands.Command.Command.Create =
+  ): lav2.commands.Command.Command.Create = {
     Commands.create(refApiIdentifier(input.templateId), input.payload)
+  }
 
   private def exerciseCommand(
       input: ExerciseCommand.RequiredPkg[lav2.value.Value, ExerciseCommandRef]
@@ -207,7 +187,7 @@ class CommandService(
       case -\/((templateId, contractKey)) =>
         Commands.exerciseByKey(
           templateId = refApiIdentifier(templateId),
-          // TODO daml-14549 somehow pass choiceSource
+          // TODO #14549 somehow pass choiceSource
           contractKey = contractKey,
           choice = input.choice,
           argument = input.argument,
@@ -222,7 +202,7 @@ class CommandService(
     }
   }
 
-  // TODO daml-14549 somehow use the choiceInterfaceId
+  // TODO #14549 somehow use the choiceInterfaceId
   private def createAndExerciseCommand(
       input: CreateAndExerciseCommand.LAVResolved
   ): lav2.commands.Command.Command.CreateAndExercise =
@@ -267,14 +247,13 @@ class CommandService(
           workflowId = meta.flatMap(_.workflowId),
           meta.flatMap(_.disclosedContracts) getOrElse Seq.empty,
           meta.flatMap(_.domainId),
-          meta.flatMap(_.packageIdSelectionPreference) getOrElse Seq.empty,
         )
       }
   }
 
   private def exactlyOneActiveContract(
       response: lav2.command_service.SubmitAndWaitForTransactionResponse
-  ): Error \/ ActiveContract[ContractTypeId.Template.ResolvedPkgId, lav2.value.Value] =
+  ): Error \/ ActiveContract[ContractTypeId.Template.Resolved, lav2.value.Value] =
     activeContracts(response).flatMap {
       case Seq(x) => \/-(x)
       case xs @ _ =>
@@ -288,7 +267,7 @@ class CommandService(
 
   private def activeContracts(
       response: lav2.command_service.SubmitAndWaitForTransactionResponse
-  ): Error \/ ImmArraySeq[ActiveContract[ContractTypeId.Template.ResolvedPkgId, lav2.value.Value]] =
+  ): Error \/ ImmArraySeq[ActiveContract[ContractTypeId.Template.Resolved, lav2.value.Value]] =
     response.transaction
       .toRightDisjunction(
         InternalError(
@@ -300,11 +279,12 @@ class CommandService(
 
   private def activeContracts(
       tx: lav2.transaction.Transaction
-  ): Error \/ ImmArraySeq[ActiveContract[ContractTypeId.Template.ResolvedPkgId, lav2.value.Value]] =
+  ): Error \/ ImmArraySeq[ActiveContract[ContractTypeId.Template.Resolved, lav2.value.Value]] = {
     Transactions
       .allCreatedEvents(tx)
-      .traverse(ActiveContract.fromLedgerApi(domain.ActiveContract.ExtractAs.Template, _))
+      .traverse(ActiveContract.fromLedgerApi(domain.ActiveContract.IgnoreInterface, _))
       .leftMap(e => InternalError(Some(Symbol("activeContracts")), e.shows))
+  }
 
   private def contracts(
       response: lav2.command_service.SubmitAndWaitForTransactionTreeResponse

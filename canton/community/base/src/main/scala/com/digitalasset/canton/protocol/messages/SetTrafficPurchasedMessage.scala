@@ -36,13 +36,14 @@ final case class SetTrafficPurchasedMessage private (
   @transient override protected lazy val companionObj: SetTrafficPurchasedMessage.type =
     SetTrafficPurchasedMessage
 
-  def toProtoV30: v30.SetTrafficPurchasedMessage =
+  def toProtoV30: v30.SetTrafficPurchasedMessage = {
     v30.SetTrafficPurchasedMessage(
       member = member.toProtoPrimitive,
       serial = serial.value,
       totalTrafficPurchased = totalTrafficPurchased.value,
       domainId = domainId.toProtoPrimitive,
     )
+  }
 
   override protected[this] def toByteStringUnmemoized: ByteString =
     super[HasProtocolVersionedWrapper].toByteString
@@ -53,7 +54,7 @@ final case class SetTrafficPurchasedMessage private (
       getCryptographicEvidence
     )
 
-  override protected def pretty: Pretty[SetTrafficPurchasedMessage] = prettyOfClass(
+  override def pretty: Pretty[SetTrafficPurchasedMessage] = prettyOfClass(
     param("member", _.member),
     param("serial", _.serial),
     param("totalTrafficPurchased", _.totalTrafficPurchased),
@@ -68,7 +69,7 @@ object SetTrafficPurchasedMessage
   override val name: String = "SetTrafficPurchasedMessage"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(1) -> VersionedProtoConverter(ProtocolVersion.v32)(
+    ProtoVersion(1) -> VersionedProtoConverter(ProtocolVersion.v31)(
       v30.SetTrafficPurchasedMessage
     )(
       supportedProtoVersionMemoized(_)(fromProtoV30),
@@ -90,7 +91,7 @@ object SetTrafficPurchasedMessage
 
   def fromProtoV30(
       proto: v30.SetTrafficPurchasedMessage
-  )(bytes: ByteString): ParsingResult[SetTrafficPurchasedMessage] =
+  )(bytes: ByteString): ParsingResult[SetTrafficPurchasedMessage] = {
     for {
       member <- Member.fromProtoPrimitive(proto.member, "member")
       serial <- ProtoConverter.parsePositiveInt("serial", proto.serial)
@@ -109,6 +110,7 @@ object SetTrafficPurchasedMessage
       rpv,
       Some(bytes),
     )
+  }
 
   implicit val setTrafficPurchasedCast: SignedMessageContentCast[SetTrafficPurchasedMessage] =
     SignedMessageContentCast.create[SetTrafficPurchasedMessage](

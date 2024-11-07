@@ -11,7 +11,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDetector.LockedStates
 import com.digitalasset.canton.participant.protocol.conflictdetection.NaiveRequestTracker.TimedTask
 import com.digitalasset.canton.participant.store.ActiveContractStore.ContractState
-import com.digitalasset.canton.participant.store.{ActiveContractStore, ReassignmentStore}
+import com.digitalasset.canton.participant.store.{ActiveContractStore, TransferStore}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -120,8 +120,8 @@ import scala.util.Try
   *
   * A contract is <strong>active</strong> at time `t` if a request with activeness time at most `t` activates it, and
   * there is no finalized request at time `t` that has deactivated it.
-  * Activation happens through creation and assignment.
-  * Deactivation happens through archival and unassignment.
+  * Activation happens through creation and transfer-in.
+  * Deactivation happens through archival and transfer-out.
   * An active contract `c` is locked at time `t` if one of the following cases holds:
   * <ul>
   *   <li>There is an active request at time `t` that activates `c`.
@@ -183,7 +183,7 @@ trait RequestTracker extends RequestTrackerLookup with AutoCloseable with NamedL
     * and timestamp `requestTimestamp`, like the [[RequestTracker!.tick]] operation.
     *
     * The activeness check request is expressed as an activeness set comprising all the contracts that must be active
-    * and those that may be created or assigned.
+    * and those that may be created or transferred-in.
     * This operation returns a pair of futures indicating the outcome of the activeness check
     * and the timeout state of the request, described below.
     *
@@ -267,7 +267,7 @@ trait RequestTracker extends RequestTrackerLookup with AutoCloseable with NamedL
     *                  A [[scala.util.Failure$]] indicates that result processing failed and no commit set can be provided.
     * @return A future to indicate whether the request was successfully finalized.
     *         When this future completes, the request's effect is persisted to the [[store.ActiveContractStore]]
-    *         and the [[store.ReassignmentStore]].
+    *         and the [[store.TransferStore]].
     *         The future fails with an exception if the commit set tries to activate or deactivate
     *         a contract that was not locked during the activeness check.
     *         Otherwise, activeness irregularities are reported as [[scala.Left$]].
@@ -282,9 +282,9 @@ trait RequestTracker extends RequestTrackerLookup with AutoCloseable with NamedL
   /** Returns a future that completes after the request has progressed to the given timestamp.
     * If the request tracker has already progressed to the timestamp, [[scala.None]] is returned.
     */
-  def awaitTimestampUS(timestamp: CantonTimestamp)(implicit
+  def awaitTimestamp(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Option[FutureUnlessShutdown[Unit]]
+  ): Option[Future[Unit]]
 }
 
 trait RequestTrackerLookup extends AutoCloseable with NamedLogging {
@@ -333,7 +333,7 @@ object RequestTracker {
       sequencerCounter: SequencerCounter,
       timestamp: CantonTimestamp,
   ) extends RequestTrackerError {
-    override protected def pretty: Pretty[RequestAlreadyExists] = prettyOfClass(
+    override def pretty: Pretty[RequestAlreadyExists] = prettyOfClass(
       param("request counter", _.requestCounter),
       param("sequencer counter", _.sequencerCounter),
       param("timestamp", _.timestamp),
@@ -347,18 +347,14 @@ object RequestTracker {
   final case class RequestNotFound(requestCounter: RequestCounter)
       extends ResultError
       with CommitSetError {
-    override protected def pretty: Pretty[RequestNotFound] = prettyOfClass(
-      unnamedParam(_.requestCounter)
-    )
+    override def pretty: Pretty[RequestNotFound] = prettyOfClass(unnamedParam(_.requestCounter))
   }
 
   /** Returned by [[RequestTracker!.addResult]] if the result has been signalled beforehand
     * with different parameters for the same request
     */
   final case class ResultAlreadyExists(requestCounter: RequestCounter) extends ResultError {
-    override protected def pretty: Pretty[ResultAlreadyExists] = prettyOfClass(
-      unnamedParam(_.requestCounter)
-    )
+    override def pretty: Pretty[ResultAlreadyExists] = prettyOfClass(unnamedParam(_.requestCounter))
   }
 
   /** Trait for errors that can occur when adding a commit set */
@@ -368,16 +364,14 @@ object RequestTracker {
     * request
     */
   final case class ResultNotFound(requestCounter: RequestCounter) extends CommitSetError {
-    override protected def pretty: Pretty[ResultNotFound] = prettyOfClass(
-      unnamedParam(_.requestCounter)
-    )
+    override def pretty: Pretty[ResultNotFound] = prettyOfClass(unnamedParam(_.requestCounter))
   }
 
   /** Returned by [[RequestTracker!.addCommitSet]] if a different commit set has already been supplied
     * for the given request counter.
     */
   final case class CommitSetAlreadyExists(requestCounter: RequestCounter) extends CommitSetError {
-    override protected def pretty: Pretty[CommitSetAlreadyExists] = prettyOfClass(
+    override def pretty: Pretty[CommitSetAlreadyExists] = prettyOfClass(
       unnamedParam(_.requestCounter)
     )
   }
@@ -399,6 +393,6 @@ object RequestTracker {
   final case class AcsError(error: ActiveContractStore.AcsBaseError)
       extends RequestTrackerStoreError
 
-  final case class ReassignmentsStoreError(error: ReassignmentStore.ReassignmentStoreError)
+  final case class TransferStoreError(error: TransferStore.TransferStoreError)
       extends RequestTrackerStoreError
 }

@@ -39,7 +39,7 @@ class StoreBasedDomainTopologyInitializationCallback(
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
-  ): EitherT[Future, String, GenericStoredTopologyTransactions] =
+  ): EitherT[Future, String, GenericStoredTopologyTransactions] = {
     for {
       topologyTransactions <- sequencerClient.downloadTopologyStateForInit()
 
@@ -98,6 +98,7 @@ class StoreBasedDomainTopologyInitializationCallback(
     } yield {
       topologyTransactions
     }
+  }
 
   private def updateTopologyClientHead(
       topologyClient: DomainTopologyClientWithInit,
@@ -105,14 +106,12 @@ class StoreBasedDomainTopologyInitializationCallback(
       et: EffectiveTime,
   )(implicit traceContext: TraceContext): Unit = {
     topologyClient.updateHead(
-      st,
       et,
       st.toApproximate,
       potentialTopologyChange = true,
     )
     if (et.value != st.value) {
       topologyClient.updateHead(
-        st,
         et,
         et.toApproximate,
         potentialTopologyChange = true,

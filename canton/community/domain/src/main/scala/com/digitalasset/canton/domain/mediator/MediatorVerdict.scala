@@ -21,7 +21,7 @@ object MediatorVerdict {
     override def toVerdict(protocolVersion: ProtocolVersion): Verdict =
       Verdict.Approve(protocolVersion)
 
-    override protected def pretty: Pretty[MediatorApprove] = prettyOfObject[MediatorApprove]
+    override def pretty: Pretty[MediatorApprove] = prettyOfObject[MediatorApprove]
   }
   type MediatorApprove = MediatorApprove.type
 
@@ -31,7 +31,7 @@ object MediatorVerdict {
     override def toVerdict(protocolVersion: ProtocolVersion): Verdict =
       Verdict.ParticipantReject(reasons, protocolVersion)
 
-    override protected def pretty: Pretty[ParticipantReject] = {
+    override def pretty: Pretty[ParticipantReject] = {
       import Pretty.PrettyOps
 
       prettyOfClass(
@@ -58,7 +58,7 @@ object MediatorVerdict {
       )
     }
 
-    override protected def pretty: Pretty[MediatorReject] = prettyOfClass(
+    override def pretty: Pretty[MediatorReject] = prettyOfClass(
       param("reason", _.reason)
     )
   }

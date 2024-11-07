@@ -52,24 +52,28 @@ class LastErrorsAppender()
     errorsCache.getIfPresent(traceId).map(_.events)
 
   /** Allows to override the maximum numbers of errors to keep from a logback.xml */
-  def setMaxErrors(errors: Int): Unit =
+  def setMaxErrors(errors: Int): Unit = {
     maxErrors = errors
+  }
 
   /** Allows to override the maximum events to keep per trace-id from a logback.xml */
-  def setMaxEvents(events: Int): Unit =
+  def setMaxEvents(events: Int): Unit = {
     maxEvents = events
+  }
 
   /** Allows to override the maximum traces to keep from a logback.xml */
-  def setMaxTraces(traces: Int): Unit =
+  def setMaxTraces(traces: Int): Unit = {
     maxTraces = traces
+  }
 
-  def setLastErrorsFileAppenderName(name: String): Unit =
+  def setLastErrorsFileAppenderName(name: String): Unit = {
     lastErrorsFileAppenderName = name
+  }
 
   private def getTraceId(event: ILoggingEvent): Option[String] =
     Option(event.getMDCPropertyMap.get(CanLogTraceContext.traceIdMdcKey))
 
-  private def processError(event: ILoggingEvent): Unit =
+  private def processError(event: ILoggingEvent): Unit = {
     getTraceId(event).foreach { tid =>
       eventsCache.getIfPresent(tid).foreach { relatedEvents =>
         lazy val relatedEventsSeq = relatedEvents.toSeq
@@ -91,6 +95,8 @@ class LastErrorsAppender()
       }
     }
 
+  }
+
   private def processEvent(event: ILoggingEvent): Unit = {
     // Always cache the event if it has a trace-id
     getTraceId(event).foreach { tid =>
@@ -109,11 +115,12 @@ class LastErrorsAppender()
     processEvent(event)
   }
 
-  override def addAppender(newAppender: Appender[ILoggingEvent]): Unit =
+  override def addAppender(newAppender: Appender[ILoggingEvent]): Unit = {
     if (isLastErrorsFileAppender(newAppender))
       lastErrorsFileAppender = Some(newAppender)
     else
       appenders += newAppender
+  }
 
   override def iteratorForAppenders(): util.Iterator[Appender[ILoggingEvent]] = {
     val it = lastErrorsFileAppender.iterator ++ appenders.iterator
@@ -141,7 +148,8 @@ class LastErrorsAppender()
     lastErrorsFileAppender.foreach(_.stop())
   }
 
-  override def detachAppender(appender: Appender[ILoggingEvent]): Boolean =
+  override def detachAppender(appender: Appender[ILoggingEvent]): Boolean = {
+
     if (isLastErrorsFileAppender(appender)) {
       lastErrorsFileAppender = None
       true
@@ -152,6 +160,7 @@ class LastErrorsAppender()
       }
       index != -1
     }
+  }
 
   override def detachAppender(name: String): Boolean = throw new NotImplementedError()
 }
@@ -159,8 +168,9 @@ class LastErrorsAppender()
 @SuppressWarnings(Array("org.wartremover.warts.While"))
 class BoundedQueue[A](maxQueueSize: Int) extends mutable.Queue[A] {
 
-  private def trim(): Unit =
+  private def trim(): Unit = {
     while (size > maxQueueSize) dequeue().discard
+  }
 
   override def addOne(elem: A): BoundedQueue.this.type = {
     val ret = super.addOne(elem)

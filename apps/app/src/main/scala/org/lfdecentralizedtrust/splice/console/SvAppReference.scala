@@ -33,8 +33,8 @@ import org.lfdecentralizedtrust.splice.sv.automation.{
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
 import org.lfdecentralizedtrust.splice.util.Contract
-import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.console.{BaseInspection, Help}
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem

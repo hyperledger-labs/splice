@@ -37,14 +37,7 @@ class CompletionFromTransactionSpec
         ),
         (Some("submissionId"), None, None, None, "submissionId", DeduplicationPeriod.Empty),
         (None, None, None, None, "", DeduplicationPeriod.Empty),
-        (
-          None,
-          Some(12345678L),
-          None,
-          None,
-          "",
-          DeduplicationPeriod.DeduplicationOffset(12345678L),
-        ),
+        (None, Some("offset"), None, None, "", DeduplicationPeriod.DeduplicationOffset("offset")),
         (
           None,
           None,
@@ -69,7 +62,6 @@ class CompletionFromTransactionSpec
             expectedDeduplicationPeriod,
         ) =>
           val completionStream = CompletionFromTransaction.acceptedCompletion(
-            Set("party1", "party2"),
             Time.Timestamp.Epoch,
             Offset.beforeBegin,
             "commandId",
@@ -83,16 +75,16 @@ class CompletionFromTransactionSpec
             deduplicationDurationNanos,
           )
 
-          val completion = completionStream.completionResponse.completion.value
-          completion.domainTime.value.recordTime shouldBe Some(Timestamp(Instant.EPOCH))
-          completion.offset shouldBe 0L
+          val checkpoint = completionStream.checkpoint.value
+          checkpoint.recordTime shouldBe Some(Timestamp(Instant.EPOCH))
+          checkpoint.offset shouldBe ""
 
+          val completion = completionStream.completion.toList.head
           completion.commandId shouldBe "commandId"
           completion.updateId shouldBe "transactionId"
           completion.applicationId shouldBe "applicationId"
           completion.submissionId shouldBe expectedSubmissionId
           completion.deduplicationPeriod shouldBe expectedDeduplicationPeriod
-          completion.actAs.toSet shouldBe Set("party1", "party2")
       }
     }
 
@@ -106,7 +98,6 @@ class CompletionFromTransactionSpec
       forEvery(testCases) { (deduplicationDurationSeconds, deduplicationDurationNanos) =>
         an[IllegalArgumentException] shouldBe thrownBy(
           CompletionFromTransaction.acceptedCompletion(
-            Set.empty,
             Time.Timestamp.Epoch,
             Offset.beforeBegin,
             "commandId",
@@ -126,7 +117,6 @@ class CompletionFromTransactionSpec
     "create a rejected completion" in {
       val status = Status.of(io.grpc.Status.Code.INTERNAL.value(), "message", Seq.empty)
       val completionStream = CompletionFromTransaction.rejectedCompletion(
-        Set("party"),
         Time.Timestamp.Epoch,
         Offset.fromLong(2L),
         "commandId",
@@ -137,15 +127,15 @@ class CompletionFromTransactionSpec
         Some("submissionId"),
       )
 
-      val completion = completionStream.completionResponse.completion.value
-      completion.domainTime.value.recordTime shouldBe Some(Timestamp(Instant.EPOCH))
-      completion.offset shouldBe 2L
+      val checkpoint = completionStream.checkpoint.value
+      checkpoint.recordTime shouldBe Some(Timestamp(Instant.EPOCH))
+      checkpoint.offset shouldBe Offset.fromLong(2L).toHexString
 
+      val completion = completionStream.completion.toList.head
       completion.commandId shouldBe "commandId"
       completion.applicationId shouldBe "applicationId"
       completion.submissionId shouldBe "submissionId"
       completion.status shouldBe Some(status)
-      completion.actAs shouldBe Seq("party")
     }
   }
 }

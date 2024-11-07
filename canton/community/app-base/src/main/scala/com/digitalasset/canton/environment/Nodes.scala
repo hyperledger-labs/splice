@@ -5,10 +5,9 @@ package com.digitalasset.canton.environment
 
 import cats.data.EitherT
 import cats.instances.future.*
-import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.{Applicative, Id}
-import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
+import com.digitalasset.canton.concurrent.{ExecutionContextIdlenessExecutorService}
 import com.digitalasset.canton.config.{DbConfig, LocalNodeConfig, ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.domain.mediator.{
@@ -164,7 +163,7 @@ class ManagedNodes[
 
       val startup = for {
         // start migration
-        _ <- EitherT(Future(checkMigration(name, config.storage, params)))
+        _ <- EitherT(Future { checkMigration(name, config.storage, params) })
         instance = {
           nodes.put(name, StartingUp(promise, instanceCreated)).discard
           instanceCreated
@@ -196,12 +195,13 @@ class ManagedNodes[
 
   private def configAndParams(
       name: InstanceName
-  ): Either[StartupError, (NodeConfig, CantonNodeParameters)] =
+  ): Either[StartupError, (NodeConfig, CantonNodeParameters)] = {
     for {
       config <- configs.get(name).toRight(ConfigurationNotFound(name): StartupError)
       _ <- checkNotRunning(name)
       params = parametersFor(name)
     } yield (config, params)
+  }
 
   override def migrateDatabase(name: InstanceName): Either[StartupError, Unit] = blocking(
     synchronized {
@@ -255,7 +255,7 @@ class ManagedNodes[
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, ShutdownError, Unit] =
+  ): EitherT[Future, ShutdownError, Unit] = {
     EitherT(stage match {
       // wait for the node to complete startup
       case PreparingDatabase(promise) => promise.future
@@ -265,7 +265,7 @@ class ManagedNodes[
       case Left(_) =>
         // we can remap a startup failure to a success here, as we don't want the
         // startup failure to propagate into a shutdown failure
-        Either.unit
+        Right(())
       case Right(node) =>
         nodes.remove(name).foreach {
           // if there were other processes messing with the node, we won't shutdown
@@ -274,8 +274,9 @@ class ManagedNodes[
           case _ =>
             logger.info(s"Node $name has already disappeared.")
         }
-        Either.unit
+        Right(())
     }
+  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     val runningInstances = nodes.toList
@@ -289,7 +290,7 @@ class ManagedNodes[
       fn: DbConfig => F[Either[StartupError, Unit]]
   )(implicit F: Applicative[F]): F[Either[StartupError, Unit]] = storageConfig match {
     case dbConfig: DbConfig => fn(dbConfig)
-    case _ => F.pure(Either.unit)
+    case _ => F.pure(Right(()))
   }
 
   // if database is fresh, we will migrate it. Otherwise, we will check if there is any pending migrations,
@@ -304,7 +305,7 @@ class ManagedNodes[
       import TraceContext.Implicits.Empty.*
       logger.info(s"Setting up database schemas for $name")
 
-      def errorMapping(err: DbMigrations.Error): StartupError =
+      def errorMapping(err: DbMigrations.Error): StartupError = {
         err match {
           case DbMigrations.PendingMigrationError(msg) => PendingDatabaseMigration(name, msg)
           case err: DbMigrations.FlywayError => FailedDatabaseMigration(name, err)
@@ -312,6 +313,7 @@ class ManagedNodes[
           case err: DbMigrations.DatabaseVersionError => FailedDatabaseVersionChecks(name, err)
           case err: DbMigrations.DatabaseConfigError => FailedDatabaseConfigChecks(name, err)
         }
+      }
       val retryConfig =
         if (storageConfig.parameters.failFastOnStartup) RetryConfig.failFast
         else RetryConfig.forever
@@ -326,7 +328,8 @@ class ManagedNodes[
     }
 
   private def checkNotRunning(name: InstanceName): Either[StartupError, Unit] =
-    Either.cond(!isRunning(name), (), AlreadyRunning(name))
+    if (isRunning(name)) Left(AlreadyRunning(name))
+    else Right(())
 
   private def runMigration(
       name: InstanceName,

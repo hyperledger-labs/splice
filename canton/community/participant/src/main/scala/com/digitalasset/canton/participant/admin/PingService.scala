@@ -7,8 +7,8 @@ import cats.implicits.{toBifunctorOps, toFunctorFilterOps}
 import com.daml.error.utils.DecodedCantonError
 import com.daml.ledger.api.v2.commands.Commands
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod.DeduplicationDuration
-import com.daml.ledger.api.v2.event.CreatedEvent as ScalaCreatedEvent
 import com.daml.ledger.api.v2.event.Event.Event
+import com.daml.ledger.api.v2.event.CreatedEvent as ScalaCreatedEvent
 import com.daml.ledger.api.v2.reassignment.Reassignment
 import com.daml.ledger.api.v2.state_service.ActiveContract
 import com.daml.ledger.api.v2.transaction.Transaction
@@ -50,6 +50,7 @@ import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.util.{FutureUtil, LoggerUtil}
 import com.google.rpc.status.Status
 import io.opentelemetry.api.trace.Tracer
+import org.slf4j.event.Level
 import scalaz.Tag
 
 import java.time.{Duration, Instant}
@@ -107,14 +108,15 @@ class PingService(
 
   private def applicationId = "PingService"
 
-  override def onClosed(): Unit =
+  override def onClosed(): Unit = {
     // Note that we can not time out pings nicely here on shutdown as the admin
     // server is closed first, which means that our ping requests will never
     // return proper on shutdown abort
     Lifecycle.close(retrySubmitter, connection)(logger)
+  }
 
   private val retrySubmitter = new CommandSubmitterWithRetry(
-    connection.commandService,
+    connection.v2.commandService,
     clock,
     futureSupervisor,
     timeouts,
@@ -215,9 +217,10 @@ object PingService {
     protected def futureSupervisor: FutureSupervisor
     protected implicit def tracer: Tracer
 
-    override private[admin] def filters: TransactionFilter =
+    override private[admin] def filters: TransactionFilter = {
       // we can't filter by template id as we don't know when the admin workflow package is loaded
       LedgerConnection.transactionFilterByParty(Map(adminPartyId -> Seq.empty))
+    }
 
     private[admin] abstract class ContractWithExpiry(
         val contractId: ContractId[?],
@@ -235,7 +238,7 @@ object PingService {
       // most recently known location
       protected val currentDomain = new AtomicReference[(DomainId, Long)]((initialDomainId, 0))
 
-      override protected def pretty: Pretty[ContractWithExpiry] = prettyOfClass(
+      override def pretty: Pretty[ContractWithExpiry] = prettyOfClass(
         param("coid", x => x.contractId.contractId.readableHash),
         param("data", _.prettyData.singleQuoted),
         param(
@@ -250,13 +253,14 @@ object PingService {
 
       def domainId: DomainId = currentDomain.get()._1
 
-      def updateDomainId(newDomainId: DomainId, counter: Long): Unit =
+      def updateDomainId(newDomainId: DomainId, counter: Long): Unit = {
         currentDomain.updateAndGet { case (currentDomainId, currentCounter) =>
           if (counter > currentCounter)
             (newDomainId, counter)
           else
             (currentDomainId, currentCounter)
         }.discard
+      }
 
       def active: Boolean = acs.contains(contractId.contractId)
 
@@ -268,18 +272,19 @@ object PingService {
 
       protected def submitVacuum(id: String, cmds: Seq[Command])(implicit
           traceContext: TraceContext
-      ): Unit =
+      ): Unit = {
         if (active && !activeSubmission.get()) {
-          logger.info(s"$adminPartyId vacuuming ${template.getEntityName} $prettyData")
+          logger.info(s"$adminPartyId vacuuming ${template.getEntityName} ${prettyData}")
           submitInBackground(
             id,
-            s"vacuum-${template.getEntityName}-$prettyData",
+            s"vacuum-${template.getEntityName}-${prettyData}",
             cmds,
             workflowId,
             activeSubmission,
             clock.now + pingResponseTimeout,
           )
         }
+      }
 
       /** Invoked when archived */
       def archived(): Unit = ()
@@ -314,7 +319,7 @@ object PingService {
       res match {
         case Right(()) => ()
         case Left(err) =>
-          logger.error(s"Failed to process transaction $scalaTx due to $err")
+          logger.error(s"Failed to process transaction ${scalaTx} due to $err")
       }
     }
 
@@ -324,7 +329,7 @@ object PingService {
       val archived = coids.mapFilter { key =>
         acs.get(key) match {
           case Some(item) =>
-            logger.info(s"Archived $item")
+            logger.info(s"Archived ${item}")
             item.archived()
             Some(item)
           case None =>
@@ -360,17 +365,17 @@ object PingService {
           (javaEvent.getTemplateId, javaEvent, context)
         }
         .flatMap {
-          case (M.ping.Ping.TEMPLATE_ID_WITH_PACKAGE_ID, event, context) =>
+          case (M.ping.Ping.COMPANION.TEMPLATE_ID, event, context) =>
             Seq(pingCreated(context, M.ping.Ping.COMPANION.fromCreatedEvent(event)))
-          case (M.bong.BongProposal.TEMPLATE_ID_WITH_PACKAGE_ID, event, context) =>
+          case (M.bong.BongProposal.COMPANION.TEMPLATE_ID, event, context) =>
             Seq(bongProposalCreated(context, M.bong.BongProposal.COMPANION.fromCreatedEvent(event)))
-          case (M.bong.Explode.TEMPLATE_ID_WITH_PACKAGE_ID, event, context) =>
+          case (M.bong.Explode.COMPANION.TEMPLATE_ID, event, context) =>
             Seq(explodeCreated(context, M.bong.Explode.COMPANION.fromCreatedEvent(event)))
-          case (M.bong.Collapse.TEMPLATE_ID_WITH_PACKAGE_ID, event, context) =>
+          case (M.bong.Collapse.COMPANION.TEMPLATE_ID, event, context) =>
             Seq(collapseCreated(context, M.bong.Collapse.COMPANION.fromCreatedEvent(event)))
-          case (M.bong.Merge.TEMPLATE_ID_WITH_PACKAGE_ID, event, context) =>
+          case (M.bong.Merge.COMPANION.TEMPLATE_ID, event, context) =>
             Seq(mergeCreated(context, M.bong.Merge.COMPANION.fromCreatedEvent(event)))
-          case (M.bong.Bong.TEMPLATE_ID_WITH_PACKAGE_ID, event, context) =>
+          case (M.bong.Bong.COMPANION.TEMPLATE_ID, event, context) =>
             Seq(bongCreated(context, M.bong.Bong.COMPANION.fromCreatedEvent(event)))
           case _ => Seq.empty
         }
@@ -384,8 +389,8 @@ object PingService {
       val now = clock.now
       created.foreach { contract =>
         acs.put(contract.contractId.contractId, contract) match {
-          case Some(_) => logger.error(s"Duplicate contract $contract observed!")
-          case None => logger.info(s"Observed create of $contract")
+          case Some(_) => logger.error(s"Duplicate contract ${contract} observed!")
+          case None => logger.info(s"Observed create of ${contract}")
         }
         // respond if we are the active instance
         if (isActive) {
@@ -438,7 +443,7 @@ object PingService {
             }
           }
           process.left.foreach { err =>
-            logger.error(s"Failed to process reassignment: $err / $event")
+            logger.error(s"Failed to process reassignment: ${err} / $event")
           }
 
         case Reassignment.Event.Empty =>
@@ -453,7 +458,7 @@ object PingService {
       val loaded = acs.mapFilter { event =>
         val parsed = for {
           domainId <- DomainId.fromProtoPrimitive(event.domainId, "domain_id").leftMap(_.toString)
-          createEvent <- event.createdEvent.toRight(s"Empty created event for $event???")
+          createEvent <- event.createdEvent.toRight(s"Empty created event for ${event}???")
           createdAt <- ProtoConverter
             .parseRequired(
               CantonTimestamp.fromProtoTimestamp,
@@ -467,7 +472,7 @@ object PingService {
         parsed match {
           case Right(value) => Some(value)
           case Left(value) =>
-            logger.error(s"Unable to parse event $event: $value")
+            logger.error(s"Unable to parse event ${event}: $value")
             None
 
         }
@@ -492,7 +497,7 @@ object PingService {
         workflowId: WorkflowId,
         flag: AtomicBoolean,
         expire: CantonTimestamp,
-    )(implicit traceContext: TraceContext): Unit =
+    )(implicit traceContext: TraceContext): Unit = {
       NonNegativeFiniteDuration.create(expire - clock.now) match {
         case Right(timeout) =>
           if (!flag.getAndSet(true)) {
@@ -515,32 +520,34 @@ object PingService {
             )
           } else {
             logger.debug(
-              s"Skipping background submission of $action as one is already in progress"
+              s"Skipping background submission of ${action} as one is already in progress"
             )
           }
         case Left(err) =>
           logger.debug("Not submitting background submission as it is already expired: " + err)
       }
+    }
 
     protected def superviseBackgroundSubmission(
         description: String,
         timeout: NonNegativeFiniteDuration,
         submission: Future[CommandResult],
-    )(implicit traceContext: TraceContext): Unit =
+    )(implicit traceContext: TraceContext): Unit = {
       futureSupervisor
         .supervised(description, timeout.duration.toScala.plus(1.second))(submission)
         .foreach {
           case CommandResult.Success(_) =>
-            logger.debug(s"Successfully submitted $description")
+            logger.debug(s"Successfully submitted ${description}")
           case CommandResult.Failed(_, errorStatus) =>
-            logger.info(s"Submission $description failed with $errorStatus")
+            logger.info(s"Submission ${description} failed with ${errorStatus}")
           case CommandResult.AbortedDueToShutdown =>
-            logger.info(s"Submission $description was aborted due to shutdown")
+            logger.info(s"Submission ${description} was aborted due to shutdown")
           case CommandResult.TimeoutReached(_, lastErrorStatus) =>
             logger.info(
-              s"Submission $description was aborted due to timeout with last status $lastErrorStatus"
+              s"Submission ${description} was aborted due to timeout with last status ${lastErrorStatus}"
             )
         }
+    }
 
     private[admin] type PingId = String
     private[admin] type ContractIdS = String
@@ -563,12 +570,13 @@ object PingService {
         workflowId: Option[WorkflowId] = None,
         id: String = UUID.randomUUID().toString,
     )(implicit traceContext: TraceContext): Future[PingService.Result] = {
-      def reject(reason: String): Future[PingService.Result] =
+      def reject(reason: String): Future[PingService.Result] = {
         Future.successful(Failure(reason))
+      }
       if (isClosing) {
         reject("Aborting ping due to shutdown")
       } else if (maxLevel > maxLevelSupported) {
-        reject(s"Max level $maxLevel exceeds supported max level $maxLevelSupported")
+        reject(s"Max level ${maxLevel} exceeds supported max level ${maxLevelSupported}")
       } else if (targetParties.isEmpty) {
         reject("No target parties specified for ping")
       } else {
@@ -656,7 +664,7 @@ object PingService {
         }
       }
 
-      def pingTimedout(now: CantonTimestamp): Unit =
+      def pingTimedout(now: CantonTimestamp): Unit = {
         // no need to schedule vacuuming here, as this is scheduled as part of the create event
         requests.remove(id).foreach { _ =>
           if (promise.isCompleted) {
@@ -676,13 +684,17 @@ object PingService {
             promise.trySuccess(Failure(s"Timeout: $reason")).discard
           }
         }
+      }
 
-      private def recordFailure(error: String): Unit =
+      protected def reportFailure(reason: String, level: Level): Unit = {
+        val str = s"Failed ping id=${id}: ${reason}"
+        LoggerUtil.logAtLevel(level, str)
         requests
           .remove(id)
-          .foreach(_.promise.trySuccess(Failure(error)))
+          .foreach(_.promise.trySuccess(Failure(str)))
+      }
 
-      override protected def pretty: Pretty[PingRequest] = prettyOfClass(
+      override def pretty: Pretty[PingRequest] = prettyOfClass(
         param("id", _.id.singleQuoted),
         paramIfNonEmpty("domainId", _.domainId),
         paramIfNonEmpty("workflowId", _.workflowId.map(Tag.unwrap(_).singleQuoted)),
@@ -722,6 +734,22 @@ object PingService {
               ),
             )
           }
+        def handleCommandResult(result: CommandResult): Unit = result match {
+          case CommandResult.Success(transactionId) =>
+            logger.info(
+              s"Successfully submitted ping ${id} with transactionId=${transactionId}, waiting for response"
+            )
+          case CommandResult.Failed(_, errorStatus) =>
+            // warning as we failed premature
+            reportFailure(s"Failed to submit ping ${id}: ${errorStatus}", Level.WARN)
+          case CommandResult.AbortedDueToShutdown =>
+            reportFailure(s"Ping ${id} aborted due to shutdown", Level.INFO)
+          case CommandResult.TimeoutReached(_, lastErrorStatus) =>
+            reportFailure(
+              s"Timeout out while attempting to submit ping ${id}: ${lastErrorStatus}",
+              Level.INFO,
+            )
+        }
         withSpan("PingService.submit") { implicit traceContext => _span =>
           submitRetryingOnErrors(
             id,
@@ -733,8 +761,7 @@ object PingService {
             timeout,
           )
         }.onComplete {
-          case scala.util.Success(result) =>
-            handleCommandResult(s"ping id=$id")(result).leftMap(recordFailure).discard
+          case scala.util.Success(result) => handleCommandResult(result)
           case scala.util.Failure(exception) =>
             logger.error(
               s"Ping submission ${this} failed unexpectedly with an exception",
@@ -778,7 +805,7 @@ object PingService {
 
         override protected def prettyData: String = ping.data.id
 
-        override def respond(): Unit =
+        override def respond(): Unit = {
           if (ping.data.responder == adminPartyId.toProtoPrimitive) {
             logger.info(s"$adminPartyId responding to a ping from ${ping.data.initiator}")
             submitInBackground(
@@ -790,6 +817,7 @@ object PingService {
               expire,
             )
           }
+        }
 
         override def vacuum(): Unit = submitVacuum(
           ping.data.id,
@@ -812,7 +840,7 @@ object PingService {
         bong: M.bong.Bong.Contract,
     )(implicit
         traceContext: TraceContext
-    ): ContractWithExpiry =
+    ): ContractWithExpiry = {
       new ContractWithExpiry(
         bong.id,
         bong.getContractTypeId,
@@ -825,7 +853,7 @@ object PingService {
 
         requests.get(bong.data.id).foreach(_.observed())
 
-        override def respond(): Unit =
+        override def respond(): Unit = {
           if (bong.data.initiator == adminPartyId.toProtoPrimitive && !activeSubmission.get()) {
             logger.info(s"$adminPartyId acknowledging completed bong")
             submitInBackground(
@@ -837,6 +865,7 @@ object PingService {
               expire,
             )
           }
+        }
 
         override def vacuum(): Unit = submitVacuum(
           bong.data.id,
@@ -847,19 +876,22 @@ object PingService {
           completedPing(bong.data.id, bong.data.responder)
 
       }
+    }
 
-    private def completedPing(id: PingId, responder: String): Unit =
+    private def completedPing(id: PingId, responder: String): Unit = {
       requests.remove(id) match {
         case Some(request) => request.receivedResponse(responder)
         case None => // can happen if we e.g. restarted and lost a pending ping
       }
+    }
 
     private[admin] def bongProposalCreated(
         context: TxContext,
         proposal: M.bong.BongProposal.Contract,
     )(implicit
         traceContext: TraceContext
-    ): ContractWithExpiry =
+    ): ContractWithExpiry = {
+
       new ContractWithExpiry(
         proposal.id,
         proposal.getContractTypeId,
@@ -870,7 +902,7 @@ object PingService {
 
         override protected def prettyData: String = proposal.data.id
 
-        override def respond(): Unit =
+        override def respond(): Unit = {
           if (proposal.data.maxLevel >= maxLevelSupported.value) {
             vacuum()
           } else if (
@@ -886,6 +918,7 @@ object PingService {
               expire,
             )
           }
+        }
 
         override def vacuum(): Unit = submitVacuum(
           proposal.data.id,
@@ -898,6 +931,7 @@ object PingService {
 
         override def archived(): Unit = ()
       }
+    }
 
     private[admin] def explodeCreated(
         context: TxContext,
@@ -1043,7 +1077,7 @@ object PingService {
         case (_, value) if value.domainId == domainId && value.expire < now => value
       }
       if (items.nonEmpty) {
-        logger.info(s"Vacuuming ${items.size} stale contracts for $domainId")
+        logger.info(s"Vacuuming ${items.size} stale contracts for ${domainId}")
         items.foreach(_.vacuum())
       }
     }

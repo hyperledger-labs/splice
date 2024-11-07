@@ -211,7 +211,7 @@ class SvApp(
           config.parameters
             .toStaticDomainParameters(
               CommunityCryptoConfig(provider = CommunityCryptoProvider.Jce),
-              ProtocolVersion.v32,
+              ProtocolVersion.v31,
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")

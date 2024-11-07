@@ -56,12 +56,13 @@ object PruningSchedulerStore {
       loggerFactory: NamedLoggerFactory,
   )(implicit
       executionContext: ExecutionContext
-  ): PruningSchedulerStore =
+  ): PruningSchedulerStore = {
     storage match {
       case _: MemoryStorage =>
         new InMemoryPruningSchedulerStore(loggerFactory)
       case dbStorage: DbStorage =>
         new DbPruningSchedulerStore(nodeCode.threeLetterId, dbStorage, timeouts, loggerFactory)
     }
+  }
 
 }

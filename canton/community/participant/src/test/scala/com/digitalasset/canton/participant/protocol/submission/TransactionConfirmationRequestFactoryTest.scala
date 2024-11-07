@@ -11,38 +11,28 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.config.{CachingConfigs, LoggingConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.{SymbolicCrypto, SymbolicPureCrypto}
-import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewType.TransactionViewType
+import com.digitalasset.canton.data.*
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.DefaultParticipantStateValues
-import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.{
-  ParticipantAuthorizationError,
-  TransactionTreeFactoryError,
-}
+import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMessageFactory.UnableToDetermineParticipant
+import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.*
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.{
   ContractLookupError,
   SerializableContractOfId,
   TransactionTreeConversionError,
 }
-import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.{WithSuffixes, WithoutSuffixes}
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
-import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
-import com.digitalasset.canton.sequencing.protocol.{
-  MediatorGroupRecipient,
-  MemberRecipient,
-  OpenEnvelope,
-  Recipient,
-  Recipients,
-  RecipientsTree,
-}
+import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, OpenEnvelope}
 import com.digitalasset.canton.store.SessionKeyStore.RecipientGroup
-import com.digitalasset.canton.store.{SessionKeyStoreDisabled, SessionKeyStoreWithInMemoryCache}
-import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.store.SessionKeyStoreWithInMemoryCache
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.*
@@ -108,7 +98,7 @@ class TransactionConfirmationRequestFactoryTest
   // asymmetric encryption ciphertexts.
   private def newCryptoSnapshot: DomainSnapshotSyncCryptoApi = {
     val cryptoSnapshot = createCryptoSnapshot(defaultTopology)
-    cryptoSnapshot.crypto.pureCrypto match {
+    cryptoSnapshot.pureCrypto match {
       case crypto: SymbolicPureCrypto => crypto.setRandomnessFlag(true)
       case _ => ()
     }
@@ -225,13 +215,13 @@ class TransactionConfirmationRequestFactoryTest
 
     val orderedTvm = requestNoSignature.viewEnvelopes.map(tvm =>
       tvm.protocolMessage match {
-        case encViewMessage @ EncryptedViewMessage(_, _, _, _, _, _) =>
+        case encViewMessage @ EncryptedViewMessage(_, _, _, _, _, _, _) =>
           val encryptedRandomnessOrdering: Ordering[AsymmetricEncrypted[SecureRandomness]] =
             Ordering.by(_.encryptedFor.unwrap)
           tvm.copy(protocolMessage =
             encViewMessage
               .copy(sessionKeyRandomness =
-                encViewMessage.sessionKeys
+                encViewMessage.sessionKey
                   .sorted(encryptedRandomnessOrdering)
               )
           )
@@ -252,35 +242,11 @@ class TransactionConfirmationRequestFactoryTest
     val cryptoPureApi = cryptoSnapshot.pureCrypto
     val viewEncryptionScheme = cryptoPureApi.defaultSymmetricKeyScheme
 
-    /* We create a new crypto api to reset the randomness counter for each test, so that keys generated
-     * match those of the actual test.
-     */
-    val cryptoPureApiForRandomness = new SymbolicPureCrypto()
-
-    val privateKeysetCache: TrieMap[Recipients, SecureRandomness] =
+    val privateKeysetCache: TrieMap[NonEmpty[Set[ParticipantId]], SecureRandomness] =
       TrieMap.empty
 
-    val hashToKeyMap = example.transactionViewTreesWithWitnesses.map { case (tree, witnesses) =>
-      val ec: ExecutionContext = executorService
-      val recipients = witnesses
-        .toRecipients(cryptoSnapshot.ipsSnapshot)(ec, traceContext)
-        .value
-        .futureValue
-        .value
-
-      // simulates session key cache
-      val sessionKeyRandomness = privateKeysetCache.getOrElseUpdate(
-        recipients,
-        cryptoPureApiForRandomness.generateSecureRandomness(
-          computeRandomnessLength(cryptoPureApi)
-        ),
-      )
-
-      tree.viewHash -> (recipients, sessionKeyRandomness)
-    }.toMap
-
     val expectedTransactionViewMessages = example.transactionViewTreesWithWitnesses.map {
-      case (tree, _) =>
+      case (tree, witnesses) =>
         val signature =
           if (tree.isTopLevel) {
             Some(
@@ -291,47 +257,88 @@ class TransactionConfirmationRequestFactoryTest
             )
           } else None
 
-        val (recipients, sessionKeyRandomness) = hashToKeyMap(tree.viewHash)
+        val keySeed = tree.viewPosition.position.foldRight(testKeySeed) { case (pos, seed) =>
+          cryptoPureApi
+            .computeHkdf(
+              seed.unwrap,
+              cryptoPureApi.defaultSymmetricKeyScheme.keySizeInBytes,
+              HkdfInfo.subview(pos),
+            )
+            .valueOr(e => throw new IllegalStateException(s"Failed to derive key: $e"))
+        }
+        val symmetricKeyRandomness = cryptoPureApi
+          .computeHkdf(
+            keySeed.unwrap,
+            viewEncryptionScheme.keySizeInBytes,
+            HkdfInfo.ViewKey,
+          )
+          .valueOr(e => fail(s"Failed to derive key: $e"))
 
-        val sessionKey = cryptoPureApi
-          .createSymmetricKey(sessionKeyRandomness, viewEncryptionScheme)
-          .valueOrFail("fail to create symmetric key from randomness")
+        val symmetricKey = cryptoPureApi
+          .createSymmetricKey(symmetricKeyRandomness, viewEncryptionScheme)
+          .valueOrFail("failed to create symmetric key from randomness")
 
         val participants = tree.informees
           .map(cryptoSnapshot.ipsSnapshot.activeParticipantsOf(_).futureValue)
           .flatMap(_.keySet)
 
-        val ltvt = LightTransactionViewTree
-          .fromTransactionViewTree(
-            tree,
-            tree.subviewHashes.map(viewHash => hashToKeyMap(viewHash)._2),
-            testedProtocolVersion,
-          )
-          .valueOrFail("fail to create light transaction view tree")
-
         val encryptedView = EncryptedView
           .compressed(
             cryptoPureApi,
-            sessionKey,
+            symmetricKey,
             TransactionViewType,
-          )(ltvt)
-          .valueOr(err => fail(s"fail to encrypt view tree: $err"))
+          )(
+            LightTransactionViewTree.fromTransactionViewTree(tree, testedProtocolVersion)
+          )
+          .valueOr(err => fail(s"Failed to encrypt view tree: $err"))
+
+        val ec: ExecutionContext = executorService
+        val recipients = witnesses
+          .toRecipients(cryptoSnapshot.ipsSnapshot)(ec, traceContext)
+          .value
+          .futureValue
+          .value
 
         val encryptedViewMessage: EncryptedViewMessage[TransactionViewType] = {
+          {
+            // simulates session key cache
+            val keySeedSession = privateKeysetCache.getOrElseUpdate(
+              NonEmpty
+                .from(participants)
+                .getOrElse(fail("View without active participants of informees")),
+              cryptoPureApi
+                .computeHkdf(
+                  cryptoPureApi.generateSecureRandomness(keySeed.unwrap.size()).unwrap,
+                  viewEncryptionScheme.keySizeInBytes,
+                  HkdfInfo.SessionKey,
+                )
+                .valueOrFail("error generating randomness for session key"),
+            )
+            val sessionKey = cryptoPureApi
+              .createSymmetricKey(keySeedSession, viewEncryptionScheme)
+              .valueOrFail("failed to create session key from randomness")
+            val encryptedRandomness = cryptoPureApi
+              .encryptWith(keySeed, sessionKey, testedProtocolVersion)
+              .valueOrFail(
+                "could not encrypt view randomness with session key"
+              )
 
-          val randomnessMapNE = NonEmpty
-            .from(randomnessMap(sessionKeyRandomness, participants, cryptoPureApi).values.toSeq)
-            .valueOrFail("session key randomness map is empty")
+            val randomnessMapNE = NonEmpty
+              .from(randomnessMap(keySeedSession, participants, cryptoPureApi).values.toSeq)
+              .valueOrFail("session key randomness map is empty")
 
-          EncryptedViewMessage(
-            signature,
-            tree.viewHash,
-            randomnessMapNE,
-            encryptedView,
-            transactionFactory.domainId,
-            SymmetricKeyScheme.Aes128Gcm,
-            testedProtocolVersion,
-          )
+            EncryptedViewMessage(
+              signature,
+              tree.viewHash,
+              encryptedRandomness,
+              randomnessMapNE,
+              encryptedView,
+              transactionFactory.domainId,
+              SymmetricKeyScheme.Aes128Gcm,
+              testedProtocolVersion,
+            )
+          }
+
         }
 
         OpenEnvelope(encryptedViewMessage, recipients)(testedProtocolVersion)
@@ -346,6 +353,10 @@ class TransactionConfirmationRequestFactoryTest
       testedProtocolVersion,
     )
   }
+
+  val testKeySeed: SecureRandomness = randomOps.generateSecureRandomness(
+    newCryptoSnapshot.crypto.pureCrypto.defaultSymmetricKeyScheme.keySizeInBytes
+  )
 
   def randomnessMap(
       randomness: SecureRandomness,
@@ -367,22 +378,6 @@ class TransactionConfirmationRequestFactoryTest
   }
 
   private val singleFetch: transactionFactory.SingleFetch = transactionFactory.SingleFetch()
-  private lazy val defaultRecipientGroup = {
-    val recipientsTree = NonEmpty(
-      Seq,
-      RecipientsTree(
-        NonEmpty(Set, submittingParticipant, observerParticipant1, observerParticipant2)
-          .map(pId => MemberRecipient(pId).asInstanceOf[Recipient]),
-        Seq.empty,
-      ),
-    )
-    val recipients = Recipients(recipientsTree)
-
-    RecipientGroup(
-      recipients,
-      newCryptoSnapshot.pureCrypto.defaultSymmetricKeyScheme,
-    )
-  }
 
   "A ConfirmationRequestFactory" when {
     "everything is ok" can {
@@ -402,6 +397,7 @@ class TransactionConfirmationRequestFactoryTest
               newCryptoSnapshot,
               new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
               contractInstanceOfId,
+              Some(testKeySeed),
               maxSequencingTime,
               testedProtocolVersion,
             )
@@ -414,39 +410,15 @@ class TransactionConfirmationRequestFactoryTest
         }
       }
 
-      "use the same session encryption key if view recipients tree is the same" in {
-        val multipleRoots = transactionFactory.MultipleRoots
-        val factory = confirmationRequestFactory(Right(multipleRoots.transactionTree))
-        val store = SessionKeyStoreDisabled
-
-        factory
-          .createConfirmationRequest(
-            multipleRoots.wellFormedUnsuffixedTransaction,
-            submitterInfo,
-            workflowId,
-            multipleRoots.keyResolver,
-            mediator,
-            newCryptoSnapshot,
-            store,
-            contractInstanceOfId,
-            maxSequencingTime,
-            testedProtocolVersion,
-          )
-          .failOnShutdown
-          .map { tcr =>
-            tcr.viewEnvelopes.size shouldBe >(1)
-            tcr.viewEnvelopes.map(_.protocolMessage.sessionKeys).distinct.length shouldBe 1
-
-            // cache is disable so session key is not persisted for multiple transactions
-            store.convertStore.getSessionKeyInfoIfPresent(defaultRecipientGroup) shouldBe None
-          }
-      }
-
       s"use different session key after key is revoked between two requests" in {
         val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
         // we use the same store for two requests to simulate what would happen in a real scenario
         val store =
           new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig)
+        val recipientGroup = RecipientGroup(
+          NonEmpty(Set, submittingParticipant, observerParticipant1, observerParticipant2),
+          newCryptoSnapshot.pureCrypto.defaultSymmetricKeyScheme,
+        )
 
         def getSessionKeyFromConfirmationRequest(cryptoSnapshot: DomainSnapshotSyncCryptoApi) =
           factory
@@ -459,13 +431,14 @@ class TransactionConfirmationRequestFactoryTest
               cryptoSnapshot,
               store,
               contractInstanceOfId,
+              Some(testKeySeed),
               maxSequencingTime,
               testedProtocolVersion,
             )
             .failOnShutdown
             .map(_ =>
               store
-                .getSessionKeyInfoIfPresent(defaultRecipientGroup)
+                .getSessionKeyInfoIfPresent(recipientGroup)
                 .valueOrFail("session key not found")
             )
 
@@ -498,6 +471,7 @@ class TransactionConfirmationRequestFactoryTest
             emptyCryptoSnapshot,
             new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
             contractInstanceOfId,
+            Some(testKeySeed),
             maxSequencingTime,
             testedProtocolVersion,
           )
@@ -533,6 +507,7 @@ class TransactionConfirmationRequestFactoryTest
             confirmationOnlyCryptoSnapshot,
             new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
             contractInstanceOfId,
+            Some(testKeySeed),
             maxSequencingTime,
             testedProtocolVersion,
           )
@@ -565,6 +540,7 @@ class TransactionConfirmationRequestFactoryTest
             newCryptoSnapshot,
             new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
             contractInstanceOfId,
+            Some(testKeySeed),
             maxSequencingTime,
             testedProtocolVersion,
           )
@@ -594,6 +570,7 @@ class TransactionConfirmationRequestFactoryTest
             submitterOnlyCryptoSnapshot,
             new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
             contractInstanceOfId,
+            Some(testKeySeed),
             maxSequencingTime,
             testedProtocolVersion,
           )
@@ -602,8 +579,8 @@ class TransactionConfirmationRequestFactoryTest
           .map(
             _ should equal(
               Left(
-                TransactionConfirmationRequestFactory.RecipientsCreationError(
-                  s"Found no active participants for informees: ${List(observer)}"
+                EncryptedViewMessageCreationError(
+                  UnableToDetermineParticipant(Set(observer), submitterOnlyCryptoSnapshot.domainId)
                 )
               )
             )
@@ -612,7 +589,7 @@ class TransactionConfirmationRequestFactoryTest
     }
 
     "participants" when {
-      def runNoKeyTest(name: String, availableKeys: Set[KeyPurpose]): Unit =
+      def runNoKeyTest(name: String, availableKeys: Set[KeyPurpose]): Unit = {
         name must {
           "be rejected" in {
             val noKeyCryptoSnapshot =
@@ -630,6 +607,7 @@ class TransactionConfirmationRequestFactoryTest
                   noKeyCryptoSnapshot,
                   new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionKeyCacheConfig),
                   contractInstanceOfId,
+                  Some(testKeySeed),
                   maxSequencingTime,
                   testedProtocolVersion,
                 )
@@ -655,6 +633,7 @@ class TransactionConfirmationRequestFactoryTest
 
           }
         }
+      }
 
       runNoKeyTest("they have no public keys", availableKeys = Set.empty)
       runNoKeyTest("they have no public signing keys", availableKeys = Set(KeyPurpose.Encryption))

@@ -51,13 +51,19 @@ class DbIndexedStringStore(
     // not sure how to get "last insert id" here in case the row was inserted
     // therefore, we're just querying the db again. this is a bit dorky,
     // but we'll hardly ever do this, so should be good
-    val query =
-      sqlu"insert into common_static_strings (string, source) values ($str, $dbType) ON CONFLICT DO NOTHING"
+    val query = storage.profile match {
+      case _: DbStorage.Profile.Postgres | _: DbStorage.Profile.H2 =>
+        sqlu"insert into common_static_strings (string, source) values ($str, $dbType) ON CONFLICT DO NOTHING"
+      case _: DbStorage.Profile.Oracle =>
+        sqlu"""INSERT
+              /*+  IGNORE_ROW_ON_DUPKEY_INDEX ( common_static_strings (string, source) ) */
+              INTO common_static_strings (string, source) VALUES ($str,$dbType)"""
+    }
     // and now query it
     storage.update_(query, functionFullName)
   }
 
-  override def getForIndex(dbTyp: IndexedStringType, idx: Int): Future[Option[String300]] =
+  override def getForIndex(dbTyp: IndexedStringType, idx: Int): Future[Option[String300]] = {
     storage
       .query(
         sql"select string from common_static_strings where id = $idx and source = ${dbTyp.source}"
@@ -65,4 +71,5 @@ class DbIndexedStringStore(
         functionFullName,
       )
       .map(_.headOption)
+  }
 }

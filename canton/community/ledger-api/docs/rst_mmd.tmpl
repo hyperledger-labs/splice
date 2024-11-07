@@ -1,192 +1,143 @@
-{{/*
+Ledger API Reference
+####################
+{{range .Files}}
+{{$file_name := .Name}}
+.. _{{.Name}}:
 
-   A Go Text Template used to transform the Ledger API proto-doc information
-   into reStructuredText (Sphinx variant) for the Ledger API Reference docs
+{{.Name}}
+***************************************************************************************************
 
-   https://pkg.go.dev/text/template#section-documentation
-   https://pkg.go.dev/github.com/pseudomuto/protoc-gen-doc#section-readme
-   https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html
-   https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html
-   https://bashtage.github.io/sphinx-material/rst-cheatsheet/rst-cheatsheet.html
+{{.Description}}
+{{range .Messages}}
+.. _{{.FullName}}:
 
- */ -}}
+{{.LongName}}
+===================================================================================================
+{{$full_name := .FullName}}
+{{.Description}}
+{{if .HasFields}}
+.. list-table::
+   :header-rows: 1
 
-{{/* ---------------------------------------------------------
-  Nested template for method details
-  */ -}}
-{{define "TMethod"}}{{$method := . -}}
+   * - Field
+     - Type
+     - Label
+     - Description
+   {{range .Fields -}}
+   * - .. _{{$full_name}}.{{.Name}}: 
 
-{{$method.Description}}
+       {{if .IsOneof}}`oneof <https://developers.google.com/protocol-buffers/docs/proto3#oneof>`_ {{.OneofDecl}}.{{end}}{{.Name}}
+     - :ref:`{{.LongType}} <{{.FullType}}>`
+     - {{.Label}}
+     - {{nobr .Description}}{{if .DefaultValue}} Default: {{.DefaultValue}}{{end}}
+   {{end}}
+{{end}}
+{{if .HasExtensions}}
+.. list-table::
+   :header-rows: 1
 
-* Request: :ref:`{{$method.RequestLongType}} <{{$method.RequestFullType}}>`
-* Response: :ref:`{{$method.ResponseLongType}} <{{$method.ResponseFullType}}>`
+   * - Extension
+     - Type
+     - Base
+     - Number
+     - Description
+   {{range .Extensions -}}
+   * - {{.Name}}
+     - {{.LongType}}
+     - {{.ContainingLongType}}
+     - {{.Number}}
+     - {{nobr .Description}}{{if .DefaultValue}} Default: {{.DefaultValue}}{{end}}
+   {{end}}
+{{end}}
+{{end}}
+{{range .Enums}}
+.. _{{.FullName}}:
 
-{{end}}{{/* end of TMethod */ -}}
-
-{{/* ---------------------------------------------------------
-  Nested template for message details
-  */ -}}
-{{define "TMessage"}}{{$message := . -}}
-
-{{$message.Description}}
-
-{{if not $message.HasFields -}}
-Message has no fields.
-
-{{else -}}
-{{range $message.Fields}}{{$field := . -}}
-
-{{if $field.IsOneof -}}
-.. _{{$message.FullName}}.{{$field.OneofDecl}}.{{$field.Name}}:
-{{- else -}}
-.. _{{$message.FullName}}.{{$field.Name}}:
-{{- end}}
-
-``{{if $field.IsOneof -}}oneof {{$field.OneofDecl}}.{{end -}}
-{{$field.Name}}`` : :ref:`{{$field.LongType}} <{{$field.FullType}}>`
-{{- if len $field.Label}} ({{$field.Label}}){{end}}
-
-{{$field.Description}} {{if .DefaultValue}} Default: {{.DefaultValue}}{{end}}
-
-{{end}}{{/* end of $message.Fields */ -}}
-{{end}}{{/* end of if */ -}}
-{{end}}{{/* end of TMessage */ -}}
-
-{{/* ---------------------------------------------------------
-  Nested template for enum details
-  */ -}}
-{{define "TEnum"}}{{$enum:= .}}
-
-{{$enum.Description}}
+{{.LongName}}
+===================================================================================================
+{{$full_name := .FullName}}
+{{.Description}}
 
 .. list-table::
-   :header-rows: 0
-   :width: 100%
+   :header-rows: 1
 
-   {{range .Values}}{{$value := . -}}
-   * - .. _{{$enum.FullName}}.{{$value.Name}}:
+   * - Name
+     - Number
+     - Description
+   {{range .Values -}}
+   * - .. _{{$full_name}}.{{.Name}}:
 
-       {{$value.Name}}
-     - {{$value.Number}}
-     - {{nobr $value.Description}}
+       {{.Name}}
+     - {{.Number}}
+     - {{nobr .Description}}
+   {{end}}
 
-   {{end}}{{/* end of .Values loop */ -}}
-{{end}}{{/* end of TEnum */ -}}
+{{end}}
+{{if .HasExtensions}}
+.. _{{$file_name}}-extensions:
 
-{{/* ---------------------------------------------------------
-  Main template for the Ledger API reference
-  */ -}}
-====================
-Ledger API Reference
-====================
+File-level Extensions
+===================================================================================================
 
-The specification for the services, methods, and messages
-for interacting with the gRPC-based Ledger API.
+.. list-table::
+   :header-rows: 1
 
-{{/* Loop over all the proto files */ -}}
-{{$files := .Files -}}
-{{range $files}}{{$file := . -}}
+   * - Extension
+     - Type
+     - Base
+     - Number
+     - Description
+   {{range .Extensions -}}
+   * - {{.Name}}
+     - {{.LongType}}
+     - {{.ContainingLongType}}
+     - {{.Number}}
+     - {{nobr .Description}}{{if .DefaultValue}} Default: {{.DefaultValue}}{{end}}
+   {{end}}
+{{end}}
+{{range .Services}}
+.. _{{.FullName}}:
 
-----
+{{.LongName}}
+===================================================================================================
 
-.. _{{$file.Name}}:
+{{.Description}}
 
-``{{$file.Name}}``
+.. list-table::
+   :header-rows: 1
 
-{{/*--------------------------------------
-    Loop over all the services in a proto file */ -}}
-{{range $file.Services}}{{$service := . -}}
-
-.. _{{$service.FullName}}:
-
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-{{$service.LongName}}, |version {{$file.Package}}|
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-{{$service.Description}}
-
-{{/*--------------------------------------
-    Loop over all the methods in a service */ -}}
-{{range $service.Methods}}{{$method := . -}}
-
-.. _{{$service.FullName}}.{{$method.Name}}:
-
-{{$method.Name}} method, |version {{$file.Package}}|
-========================================================================================================================================================================================================
-
-{{template "TMethod" $method}}
-
-{{end}}{{/* end of $service.Methods */ -}}
-{{end}}{{/* end of $file.Services */ -}}
-
-{{/*--------------------------------------
-    Loop over all the messages in a file */ -}}
-{{range $file.Messages}}{{$message := . -}}
-
-.. _{{$message.FullName}}:
-
-{{$message.LongName}} message, |version {{$file.Package}}|
-========================================================================================================================================================================================================
-
-{{template "TMessage" $message -}}
-
-{{end}}{{/* end of $file.Messages */ -}}
-
-{{/*--------------------------------------
-    Loop over all the enums in a file */}}
-{{range $file.Enums}}{{$enum := .}}
-
-.. _{{$enum.FullName}}:
-
-{{$enum.LongName}} enum, |version {{$file.Package}}|
-========================================================================================================================================================================================================
-
-{{template "TEnum" $enum}}
-
-{{end}}{{/* end of $file.Enums */ -}}
-{{end}}{{/* end of .Files */}}
-
-{{/*--------------------------------------
-    Display information about scalars. */}}
-
-----
+   * - Method name
+     - Request type
+     - Response type
+     - Description
+   {{range .Methods -}}
+   * - {{.Name}}
+     - :ref:`{{.RequestLongType}} <{{.RequestFullType}}>`
+     - :ref:`{{.ResponseLongType}} <{{.ResponseFullType}}>`
+     - {{nobr .Description}}
+   {{end}}
+{{end}}
+{{end}}
 
 .. _scalarvaluetypes:
 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Scalar Value Types
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+***************************************************************************************************
 
-{{range .Scalars}}{{$scalar := .}}
+.. list-table::
+   :header-rows: 1
 
-.. _{{$scalar.ProtoType}}:
+   * - .proto type
+     - Notes
+     - C++ type
+     - Java type
+     - Python type
+   {{range .Scalars -}}
+   * - .. _{{.ProtoType}}: 
 
-**{{$scalar.ProtoType}}**
-
-  {{$scalar.Notes}}
-
-  .. list-table::
-    :header-rows: 1
-    :width: 100%
-    :widths: 25 25 25 25
-
-    * - Java
-      - Python
-      - C++
-      - C#
-
-    * - ``{{$scalar.JavaType}}``
-      - ``{{$scalar.PythonType}}``
-      - ``{{$scalar.CppType}}``
-      - ``{{$scalar.CSharp}}``
-
-{{end}}{{/* end of .Scalars */}}
-
-{{/*--------------------------------------
-    Display (v1) or (v2) with the Service names */}}
-.. |version com.daml.ledger.api.v1| replace:: v1
-.. |version com.daml.ledger.api.v1.testing| replace:: v1/testing
-.. |version com.daml.ledger.api.v1.admin| replace:: v1/admin
-.. |version com.daml.ledger.api.v2| replace:: v2
-.. |version com.daml.ledger.api.v2.testing| replace:: v2/testing
-.. |version com.daml.ledger.api.v2.admin| replace:: v2/admin
+       {{.ProtoType}}
+     - {{.Notes}}
+     - {{.CppType}}
+     - {{.JavaType}}
+     - {{.PythonType}}
+   {{end}}

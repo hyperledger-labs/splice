@@ -38,12 +38,13 @@ object CantonOnly {
   def tryBuildCompiledPackages(
       darMap: Map[PackageId, Ast.Package],
       enableLfDev: Boolean,
-  ): PureCompiledPackages =
+  ): PureCompiledPackages = {
     PureCompiledPackages.assertBuild(
       darMap,
       if (enableLfDev) Compiler.Config.Dev(LanguageMajorVersion.V2)
       else Compiler.Config.Default(LanguageMajorVersion.V2),
     )
+  }
 
   def encodeNode(
       enclosingVersion: TransactionVersion,

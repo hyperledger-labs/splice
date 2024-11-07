@@ -8,8 +8,8 @@ import cats.syntax.bifunctor.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.KeyPurpose.{Encryption, Signing}
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -46,7 +46,7 @@ final case class StoredPrivateKey(
 ) extends Product
     with Serializable {
 
-  def isEncrypted: Boolean = this.wrapperKeyId.isDefined
+  def isEncrypted: Boolean = { this.wrapperKeyId.isDefined }
 
 }
 
@@ -85,16 +85,25 @@ class DbCryptoPrivateStore(
 
   private def insertKeyUpdate(
       key: StoredPrivateKey
-  ): DbAction.WriteOnly[Int] =
-    sqlu"""insert into common_crypto_private_keys (key_id, purpose, data, name, wrapper_key_id)
+  ): DbAction.WriteOnly[Int] = {
+    storage.profile match {
+      case _: DbStorage.Profile.Oracle =>
+        sqlu"""insert
+               /*+  IGNORE_ROW_ON_DUPKEY_INDEX ( CRYPTO_PRIVATE_KEYS ( key_id ) ) */
+               into common_crypto_private_keys (key_id, purpose, data, name, wrapper_key_id)
+           values (${key.id}, ${key.purpose}, ${key.data}, ${key.name}, ${key.wrapperKeyId})"""
+      case _ =>
+        sqlu"""insert into common_crypto_private_keys (key_id, purpose, data, name, wrapper_key_id)
            values (${key.id}, ${key.purpose}, ${key.data}, ${key.name}, ${key.wrapperKeyId})
            on conflict do nothing"""
+    }
+  }
 
   private def insertKey(key: StoredPrivateKey)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Unit] = {
 
-    def equalKeys(existingKey: StoredPrivateKey, newKey: StoredPrivateKey): Boolean =
+    def equalKeys(existingKey: StoredPrivateKey, newKey: StoredPrivateKey): Boolean = {
       if (existingKey.wrapperKeyId.isEmpty) {
         existingKey.data == newKey.data &&
         existingKey.name == newKey.name &&
@@ -105,6 +114,7 @@ class DbCryptoPrivateStore(
         existingKey.name == newKey.name &&
         existingKey.purpose == newKey.purpose
       }
+    }
 
     for {
       inserted <- EitherT.right(
@@ -138,7 +148,7 @@ class DbCryptoPrivateStore(
       purpose: KeyPurpose,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[StoredPrivateKey]] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Option[StoredPrivateKey]] = {
     EitherT.right(
       storage
         .querySingleUnlessShutdown(
@@ -147,6 +157,7 @@ class DbCryptoPrivateStore(
         )
         .value
     )
+  }
 
   private[crypto] def writePrivateKey(
       key: StoredPrivateKey
@@ -158,12 +169,13 @@ class DbCryptoPrivateStore(
   @VisibleForTesting
   private[canton] def listPrivateKeys(purpose: KeyPurpose, encrypted: Boolean)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]] =
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]] = {
     EitherT.right(
       storage
         .queryUnlessShutdown(queryKeys(purpose), functionFullName)
         .map(keys => keys.filter(_.isEncrypted == encrypted))
     )
+  }
 
   private def deleteKey(keyId: Fingerprint): SqlAction[Int, NoStream, Effect.Write] =
     sqlu"delete from common_crypto_private_keys where key_id = $keyId"

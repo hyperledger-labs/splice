@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.topology
 
-import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.topology.store.TopologyStoreId
 
 trait TopologyManagerStatus {
@@ -11,9 +10,7 @@ trait TopologyManagerStatus {
 }
 
 object TopologyManagerStatus {
-  def combined[PureCrypto <: CryptoPureApi](
-      managers: TopologyManager[TopologyStoreId, PureCrypto]*
-  ): TopologyManagerStatus =
+  def combined(managers: TopologyManager[TopologyStoreId]*): TopologyManagerStatus =
     new TopologyManagerStatus {
       override def queueSize: Int = managers.map(_.queueSize).sum
     }

@@ -8,10 +8,6 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.{HashPurpose, Signature}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.sequencing.admin.data.{
-  SequencerAdminStatus,
-  SequencerHealthStatus,
-}
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
   CreateSubscriptionError,
@@ -23,6 +19,7 @@ import com.digitalasset.canton.domain.sequencing.sequencer.traffic.{
   SequencerTrafficStatus,
 }
 import com.digitalasset.canton.health.HealthListener
+import com.digitalasset.canton.health.admin.data.{SequencerAdminStatus, SequencerHealthStatus}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.PruningScheduler
@@ -156,9 +153,7 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
     ): Future[SequencerHealthStatus] = Future.successful(SequencerHealthStatus(isActive = true))
 
     override def adminStatus: SequencerAdminStatus = ???
-    override private[sequencing] def firstSequencerCounterServeableForSequencer(implicit
-        traceContext: TraceContext
-    ): Future[SequencerCounter] =
+    override private[sequencing] def firstSequencerCounterServeableForSequencer: SequencerCounter =
       ???
     override def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
         traceContext: TraceContext
@@ -176,7 +171,7 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
     ): EitherT[
       FutureUnlessShutdown,
       TrafficControlErrors.TrafficControlError,
-      Unit,
+      CantonTimestamp,
     ] = ???
 
     override def getTrafficStateAt(member: Member, timestamp: CantonTimestamp)(implicit
@@ -214,37 +209,18 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
   "health" should {
     "onHealthChange should register listener and immediately call it with current status" in {
       val sequencer = new StubSequencer(Set())
-      var status = SequencerHealthStatus(isActive = false)
+      var status = SequencerHealthStatus(false)
       sequencer.registerOnHealthChange(HealthListener("") { status = sequencer.getState })
 
-      status shouldBe SequencerHealthStatus(isActive = true)
+      status shouldBe SequencerHealthStatus(true)
     }
 
     "health status change should trigger registered health listener" in {
       val sequencer = new StubSequencer(Set())
-      var status = SequencerHealthStatus(isActive = true)
+      var status = SequencerHealthStatus(true)
       sequencer.registerOnHealthChange(HealthListener("") { status = sequencer.getState })
 
-      val badHealth = SequencerHealthStatus(isActive = false, Some("something bad happened"))
-      sequencer.reportHealthState(badHealth)
-
-      status shouldBe badHealth
-    }
-
-    "trigger high priority listeners before others" in {
-      val sequencer = new StubSequencer(Set())
-      var highPriorityStatus = SequencerHealthStatus(true)
-      var status = SequencerHealthStatus(true)
       val badHealth = SequencerHealthStatus(false, Some("something bad happened"))
-      sequencer.registerOnHealthChange(HealthListener("")({
-        // High prio should already have been set when we switch to the bad health state
-        if (sequencer.getState == badHealth) highPriorityStatus shouldBe badHealth
-        status = sequencer.getState
-      }))
-      sequencer.registerHighPriorityOnHealthChange(HealthListener("") {
-        highPriorityStatus = sequencer.getState
-      })
-
       sequencer.reportHealthState(badHealth)
 
       status shouldBe badHealth

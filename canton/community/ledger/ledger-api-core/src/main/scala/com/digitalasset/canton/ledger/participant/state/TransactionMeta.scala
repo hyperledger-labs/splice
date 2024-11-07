@@ -43,7 +43,7 @@ final case class TransactionMeta(
     optNodeSeeds: Option[ImmArray[(NodeId, crypto.Hash)]],
     optByKeyNodes: Option[ImmArray[NodeId]],
 ) extends PrettyPrinting {
-  override protected def pretty: Pretty[TransactionMeta.this.type] = prettyOfClass(
+  override def pretty: Pretty[TransactionMeta.this.type] = prettyOfClass(
     param("ledgerEffectiveTime", _.ledgerEffectiveTime),
     paramIfDefined("workflowId", _.workflowId),
     param("submissionTime", _.submissionTime),

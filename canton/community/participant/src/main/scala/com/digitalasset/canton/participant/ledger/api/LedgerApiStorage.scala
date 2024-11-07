@@ -23,10 +23,11 @@ class LedgerApiStorage private[api] (
     closeAction: String => Unit,
 ) extends AutoCloseable {
 
-  override def close(): Unit =
+  override def close(): Unit = {
     blocking {
       closeAction(jdbcUrl)
     }
+  }
 }
 
 /** Different approaches for erasing and closing ledger-api persisted data */

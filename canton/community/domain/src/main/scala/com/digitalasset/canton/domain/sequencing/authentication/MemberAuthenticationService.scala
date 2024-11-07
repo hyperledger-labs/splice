@@ -14,8 +14,9 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.*
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
 import com.digitalasset.canton.sequencing.authentication.{AuthenticationToken, MemberAuthentication}
@@ -23,8 +24,8 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.processing.*
-import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.FutureUtil
@@ -63,39 +64,35 @@ class MemberAuthenticationService(
     extends NamedLogging
     with FlagCloseable {
 
+  protected val tokenCache = new AuthenticationTokenCache(clock, store, loggerFactory)
+
   /** Domain generates nonce that he expects the participant to use to concatenate with the domain's id and sign
     * to proceed with the authentication (step 2).
     */
   def generateNonce(member: Member)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, AuthenticationError, (Nonce, NonEmpty[Seq[Fingerprint]])] =
+  ): EitherT[Future, AuthenticationError, (Nonce, NonEmpty[Seq[Fingerprint]])] = {
     for {
       _ <- EitherT.right(waitForInitialized)
       snapshot = cryptoApi.ips.currentSnapshotApproximation
       _ <- isActive(member)
       fingerprints <- EitherT(
-        snapshot
-          .signingKeys(member, SigningKeyUsage.SequencerAuthenticationOnly)
-          .map { keys =>
-            NonEmpty
-              .from(keys.map(_.fingerprint))
-              .toRight(
-                NoKeysWithCorrectUsageRegistered(
-                  member,
-                  SigningKeyUsage.SequencerAuthenticationOnly,
-                ): AuthenticationError
-              )
-          }
+        snapshot.signingKeys(member).map { keys =>
+          NonEmpty
+            .from(keys.map(_.fingerprint))
+            .toRight(NoKeysRegistered(member): AuthenticationError)
+        }
       )
       nonce = Nonce.generate(cryptoApi.pureCrypto)
       storedNonce = StoredNonce(member, nonce, clock.now, nonceExpirationInterval)
-      _ = store.saveNonce(storedNonce)
+      _ <- handlePassiveInstanceException(store.saveNonce(storedNonce))
     } yield {
       scheduleExpirations(storedNonce.expireAt)
       (nonce, fingerprints)
     }
+  }
 
-  private def waitForInitialized(implicit traceContext: TraceContext): Future[Unit] =
+  private def waitForInitialized(implicit traceContext: TraceContext): Future[Unit] = {
     // avoid logging if we're already done
     if (isTopologyInitialized.isCompleted) isTopologyInitialized
     else {
@@ -105,8 +102,21 @@ class MemberAuthenticationService(
         logger.debug(s"Topology has been initialized")
       }
     }
+  }
+
+  private def handlePassiveInstanceException[A](
+      future: Future[A]
+  ): EitherT[Future, AuthenticationError, A] =
+    EitherT(
+      future
+        .map(Right(_))
+        .recover { case _: PassiveInstanceException =>
+          Left(PassiveSequencer: AuthenticationError)
+        }
+    )
 
   /** Domain checks that the signature given by the member matches and returns a token if it does (step 4)
+    * Al
     */
   def validateSignature(member: Member, signature: Signature, providedNonce: Nonce)(implicit
       traceContext: TraceContext
@@ -114,25 +124,19 @@ class MemberAuthenticationService(
     for {
       _ <- EitherT.right(waitForInitialized)
       _ <- isActive(member)
-      value <- EitherT.fromEither(
-        ignoreExpired(store.fetchAndRemoveNonce(member, providedNonce))
-          .toRight(MissingNonce(member): AuthenticationError)
-      )
+      value <-
+        handlePassiveInstanceException(store.fetchAndRemoveNonce(member, providedNonce))
+          .map(ignoreExpired)
+          .subflatMap(_.toRight(MissingNonce(member): AuthenticationError))
       StoredNonce(_, nonce, generatedAt, _expireAt) = value
       authentication <- EitherT.fromEither(MemberAuthentication(member))
       hash = authentication.hashDomainNonce(nonce, domain, cryptoApi.pureCrypto)
       snapshot = cryptoApi.currentSnapshotApproximation
 
-      _ <- snapshot
-        .verifySignature(
-          hash,
-          member,
-          signature,
-        )
-        .leftMap { err =>
-          logger.warn(s"Member $member provided invalid signature: $err")
-          InvalidSignature(member): AuthenticationError
-        }
+      _ <- snapshot.verifySignature(hash, member, signature).leftMap { err =>
+        logger.warn(s"Member $member provided invalid signature: $err")
+        InvalidSignature(member)
+      }
       token = AuthenticationToken.generate(cryptoApi.pureCrypto)
       maybeRandomTokenExpirationTime =
         if (useExponentialRandomTokenExpiration) {
@@ -147,7 +151,7 @@ class MemberAuthenticationService(
         }
       tokenExpiry = clock.now.add(maybeRandomTokenExpirationTime)
       storedToken = StoredAuthenticationToken(member, tokenExpiry, token)
-      _ = store.saveToken(storedToken)
+      _ <- handlePassiveInstanceException(tokenCache.saveToken(storedToken))
     } yield {
       logger.info(
         s"$member authenticated new token with expiry $tokenExpiry"
@@ -160,33 +164,16 @@ class MemberAuthenticationService(
     * this domain's id, it means the participant was previously connected to a different domain on the same address and
     * now should be informed that this address now hosts a different domain.
     */
-  def validateToken(
-      intendedDomain: DomainId,
-      member: Member,
-      token: AuthenticationToken,
-  ): Either[AuthenticationError, StoredAuthenticationToken] =
+  def validateToken(intendedDomain: DomainId, member: Member, token: AuthenticationToken)(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, AuthenticationError, StoredAuthenticationToken] =
     for {
-      _ <- correctDomain(member, intendedDomain)
-      validTokenO = store.fetchTokens(member).filter(_.expireAt > clock.now).find(_.token == token)
-      validToken <- validTokenO.toRight(MissingToken(member)).leftWiden[AuthenticationError]
+      _ <- EitherT.fromEither[Future](correctDomain(member, intendedDomain))
+      validTokenO <- handlePassiveInstanceException(tokenCache.lookupMatchingToken(member, token))
+      validToken <- EitherT
+        .fromEither[Future](validTokenO.toRight(MissingToken(member)))
+        .leftWiden[AuthenticationError]
     } yield validToken
-
-  def invalidateMemberWithToken(
-      token: AuthenticationToken
-  )(implicit traceContext: TraceContext): Future[Either[LogoutTokenDoesNotExist.type, Unit]] =
-    for {
-      _ <- waitForInitialized
-    } yield {
-      store
-        .fetchToken(token)
-        .toRight(LogoutTokenDoesNotExist)
-        .map(token =>
-          // Force invalidation, whether the member is actually active or not
-          invalidateAndExpire(isActiveCheck = (_: Member) => Future.successful(false))(
-            token.member
-          )
-        )
-    }
 
   private def ignoreExpired[A <: HasExpiry](itemO: Option[A]): Option[A] =
     itemO.filter(_.expireAt > clock.now)
@@ -194,12 +181,14 @@ class MemberAuthenticationService(
   private def scheduleExpirations(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): Unit = {
-    def run(): Unit = performUnlessClosing(functionFullName) {
-      val now = clock.now
-      logger.debug(s"Expiring nonces and tokens up to $now")
-      store.expireNoncesAndTokens(now)
-    }.onShutdown(())
-
+    def run(): Unit = FutureUtil.doNotAwait(
+      performUnlessClosingF(functionFullName) {
+        val now = clock.now
+        logger.debug(s"Expiring nonces and tokens up to $now")
+        handlePassiveInstanceException(store.expireNoncesAndTokens(now)).value
+      }.unwrap,
+      "Expiring nonces and tokens failed",
+    )
     clock.scheduleAt(_ => run(), timestamp).discard
   }
 
@@ -227,12 +216,14 @@ class MemberAuthenticationService(
 
   protected def isMemberActive(check: TopologySnapshot => Future[Boolean])(implicit
       traceContext: TraceContext
-  ): Future[Boolean] =
-    // we are a bit more conservative here. a member needs to be active NOW and the head state (i.e. effective in the future)
-    Seq(cryptoApi.headSnapshot, cryptoApi.currentSnapshotApproximation)
-      .map(_.ipsSnapshot)
-      .parTraverse(check(_))
-      .map(_.forall(identity))
+  ): Future[Boolean] = {
+    cryptoApi.snapshot(cryptoApi.topologyKnownUntilTimestamp).flatMap { snapshot =>
+      // we are a bit more conservative here. a member needs to be active NOW and the head state (i.e. effective in the future)
+      Seq(snapshot.ipsSnapshot, cryptoApi.currentSnapshotApproximation.ipsSnapshot)
+        .parTraverse(check(_))
+        .map(_.forall(identity))
+    }
+  }
 
   protected def isParticipantActive(participant: ParticipantId)(implicit
       traceContext: TraceContext
@@ -245,14 +236,15 @@ class MemberAuthenticationService(
   protected def invalidateAndExpire[T <: Member](
       isActiveCheck: T => Future[Boolean]
   )(memberId: T)(implicit traceContext: TraceContext): Unit = {
-    val invalidateF = isActiveCheck(memberId).map { isActive =>
+    val invalidateF = isActiveCheck(memberId).flatMap { isActive =>
       if (!isActive) {
-        logger.debug(s"Expiring all auth-tokens of $memberId")
-        // first, remove all auth tokens
-        store.invalidateMember(memberId)
-        // second, ensure the sequencer client gets disconnected
-        invalidateMemberCallback(Traced(memberId))
-      }
+        logger.debug(s"Expiring all auth-tokens of ${memberId}")
+        tokenCache
+          // first, remove all auth tokens
+          .invalidateAllTokensForMember(memberId)
+          // second, ensure the sequencer client gets disconnected
+          .map(_ => invalidateMemberCallback(Traced(memberId)))
+      } else Future.unit
     }
     FutureUtil.doNotAwait(
       invalidateF,
@@ -272,13 +264,14 @@ object MemberAuthenticationService {
       scale: Double,
       min: Double,
       max: Double,
-  ): Double =
+  ): Double = {
     Iterator
       .continually {
         -math.log(scala.util.Random.nextDouble()) * scale
       }
       .filter(d => d >= min && d <= max)
       .next()
+  }
 }
 
 class MemberAuthenticationServiceImpl(
@@ -325,7 +318,7 @@ class MemberAuthenticationServiceImpl(
             ) =>
           val participant = cert.participantId
           logger.info(
-            s"Domain trust certificate of $participant was removed, forcefully disconnecting the participant."
+            s"Domain trust certificate of ${participant} was removed, forcefully disconnecting the participant."
           )
           invalidateAndExpire(isParticipantActive)(participant)
         case TopologyTransaction(
@@ -335,23 +328,14 @@ class MemberAuthenticationServiceImpl(
             ) if cert.loginAfter.exists(_ > clock.now) =>
           val participant = cert.participantId
           logger.info(
-            s"$participant is disabled until ${cert.loginAfter}. Removing any token and booting the participant"
+            s"${participant} is disabled until ${cert.loginAfter}. Removing any token and booting the participant"
           )
           invalidateAndExpire(isParticipantActive)(participant)
-        case TopologyTransaction(
-              TopologyChangeOp.Remove,
-              _serial,
-              cert: ParticipantDomainPermission,
-            ) =>
-          val participant = cert.participantId
-          logger.info(
-            s"$participant's access has been revoked by the domain. Removing any token and booting the participant"
-          )
-          invalidateAndExpire(isParticipantActive)(participant)
-
         case _ =>
       }
     })
+
+  override def onClosed(): Unit = Lifecycle.close(store)(logger)
 }
 
 trait MemberAuthenticationServiceFactory {

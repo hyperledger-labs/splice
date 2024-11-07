@@ -48,22 +48,40 @@ final class DbParticipantPruningSchedulerStore(
                   """
         case _: Profile.H2 =>
           sqlu"""merge into par_pruning_schedules (lock, cron, max_duration, retention, prune_internally_only)
-                     values ($singleRowLockValue, ${schedule.cron}, ${schedule.maxDuration}, ${schedule.retention}, ${participantSchedule.pruneInternallyOnly})
+                     values (${singleRowLockValue}, ${schedule.cron}, ${schedule.maxDuration}, ${schedule.retention}, ${participantSchedule.pruneInternallyOnly})
+                  """
+        case _: Profile.Oracle =>
+          sqlu"""merge into par_pruning_schedules pps
+                       using (
+                         select ${schedule.cron} cron,
+                                ${schedule.maxDuration} max_duration,
+                                ${schedule.retention} retention,
+                                ${participantSchedule.pruneInternallyOnly} prune_internally_only
+                         from dual
+                       ) excluded
+                     on (pps."LOCK" = 'X')
+                     when matched then
+                       update set pps.cron = excluded.cron, max_duration = excluded.max_duration,
+                                  retention = excluded.retention, prune_internally_only = excluded.prune_internally_only
+                     when not matched then
+                       insert (cron, max_duration, retention, prune_internally_only)
+                       values (excluded.cron, excluded.max_duration, excluded.retention, excluded.prune_internally_only)
                   """
       },
       functionFullName,
     )
   }
 
-  override def clearSchedule()(implicit tc: TraceContext): Future[Unit] =
+  override def clearSchedule()(implicit tc: TraceContext): Future[Unit] = {
     storage.update_(
       sqlu"""delete from par_pruning_schedules""",
       functionFullName,
     )
+  }
 
   override def getParticipantSchedule()(implicit
       tc: TraceContext
-  ): Future[Option[ParticipantPruningSchedule]] =
+  ): Future[Option[ParticipantPruningSchedule]] = {
     storage
       .query(
         sql"""select cron, max_duration, retention, prune_internally_only from par_pruning_schedules"""
@@ -83,6 +101,7 @@ final class DbParticipantPruningSchedulerStore(
           pruneInternallyOnly,
         )
       })
+  }
 
   override def updateCron(cron: Cron)(implicit tc: TraceContext): EitherT[Future, String, Unit] =
     EitherT {
@@ -124,6 +143,6 @@ final class DbParticipantPruningSchedulerStore(
     Either.cond(
       rowCount > 0,
       (),
-      s"Attempt to update $field of a schedule that has not been previously configured. Use set_schedule or set_participant_schedule instead.",
+      s"Attempt to update ${field} of a schedule that has not been previously configured. Use set_schedule or set_participant_schedule instead.",
     )
 }

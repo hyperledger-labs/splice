@@ -5,8 +5,10 @@ package com.digitalasset.canton.health
 
 import cats.implicits.showInterpolator
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.health.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
+import com.digitalasset.canton.util.ShowUtil.showPretty
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus
 import io.grpc.protobuf.services.HealthStatusManager
 
@@ -22,8 +24,9 @@ class GrpcHealthReporter(override val loggerFactory: NamedLoggerFactory)
     extends NamedLogging
     with NoTracing {
 
-  private def allServicesAreServing(healthStatusManager: ServiceHealthStatusManager): Boolean =
+  private def allServicesAreServing(healthStatusManager: ServiceHealthStatusManager): Boolean = {
     healthStatusManager.services.map(_.getState).forall(_ == ServingStatus.SERVING)
+  }
 
   /** Update a service in a health manager.
     * If the status is not SERVING, the aggregated health status will be updated to NOT_SERVING
@@ -74,16 +77,13 @@ class GrpcHealthReporter(override val loggerFactory: NamedLoggerFactory)
     */
   def registerHealthManager(
       healthStatusManager: ServiceHealthStatusManager
-  ): Unit =
+  ): Unit = {
     healthStatusManager.services.foreach(service =>
-      // Register as high priority because we want the health status exposed externally to reflect health changes
-      // as soon as possible, specifically before we disconnect clients, to avoid re-connection attempts to a node that
-      // is unhealthy
       service
-        .registerHighPriorityOnHealthChange(new HealthListener {
+        .registerOnHealthChange(new HealthListener {
           override def name: String = "GrpcHealthReporter"
 
-          override def poke()(implicit traceContext: TraceContext): Unit =
+          override def poke()(implicit traceContext: TraceContext): Unit = {
             Try(updateHealthManager(healthStatusManager, service))
               .recover {
                 // Can happen if we update the status while a listening RPC is being cancelled
@@ -95,7 +95,9 @@ class GrpcHealthReporter(override val loggerFactory: NamedLoggerFactory)
                   )
               }
               .discard[Try[Unit]]
+          }
         })
         .discard[Boolean]
     )
+  }
 }

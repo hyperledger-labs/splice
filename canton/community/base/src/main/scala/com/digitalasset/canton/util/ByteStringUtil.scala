@@ -25,7 +25,7 @@ object ByteStringUtil {
       val iterX = x.iterator()
       val iterY = y.iterator()
 
-      @tailrec def go(): Int =
+      @tailrec def go(): Int = {
         if (iterX.hasNext) {
           if (iterY.hasNext) {
             val cmp = iterX.next().compareTo(iterY.next())
@@ -33,6 +33,7 @@ object ByteStringUtil {
           } else 1
         } else if (iterY.hasNext) -1
         else 0
+      }
 
       go()
     }
@@ -54,7 +55,7 @@ object ByteStringUtil {
   def decompressGzip(
       bytes: ByteString,
       maxBytesLimit: Option[Int],
-  ): Either[DeserializationError, ByteString] =
+  ): Either[DeserializationError, ByteString] = {
     ResourceUtil
       .withResourceEither(new GZIPInputStream(bytes.newInput())) { gunzipper =>
         maxBytesLimit match {
@@ -75,6 +76,7 @@ object ByteStringUtil {
       }
       .leftMap(errorMapping)
       .flatten
+  }
 
   /** Based on the final size we either truncate the bytes to fit in that size or pad with 0s
     */
@@ -89,7 +91,7 @@ object ByteStringUtil {
       else bytes.substring(0, bytes.size() + padSize)
     }
 
-  private def errorMapping(err: Throwable): DeserializationError =
+  private def errorMapping(err: Throwable): DeserializationError = {
     err match {
       // all exceptions that were observed when testing these methods (see also `GzipCompressionTests`)
       case ex: ZipException => DefaultDeserializationError(ex.getMessage)
@@ -97,4 +99,5 @@ object ByteStringUtil {
         DefaultDeserializationError("Compressed byte input ended too early")
       case error => DefaultDeserializationError(error.getMessage)
     }
+  }
 }

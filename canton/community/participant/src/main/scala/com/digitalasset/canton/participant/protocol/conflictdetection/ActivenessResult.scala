@@ -5,27 +5,28 @@ package com.digitalasset.canton.participant.protocol.conflictdetection
 
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.store.ActiveContractStore
-import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.protocol.{LfContractId, TransferId}
 
 /** The result of the activeness check for an [[ActivenessSet]].
   * If all sets are empty, the activeness check was successful.
   *
   * @param contracts The contracts whose activeness check has failed
-  * @param inactiveReassignments The reassignments that shall be completed, but that are not active.
+  * @param inactiveTransfers The transfers that shall be completed, but that are not active.
   */
 final case class ActivenessResult(
     contracts: ActivenessCheckResult[LfContractId, ActiveContractStore.Status],
-    inactiveReassignments: Set[ReassignmentId],
+    inactiveTransfers: Set[TransferId],
 ) extends PrettyPrinting {
 
   def isSuccessful: Boolean =
-    contracts.isSuccessful && inactiveReassignments.isEmpty
+    contracts.isSuccessful && inactiveTransfers.isEmpty
 
-  override protected def pretty: Pretty[ActivenessResult] =
+  override def pretty: Pretty[ActivenessResult] = {
     prettyOfClass(
       param("contracts", _.contracts, !_.contracts.isEmpty),
-      paramIfNonEmpty("inactiveReassignments", _.inactiveReassignments),
+      paramIfNonEmpty("inactiveTransfers", _.inactiveTransfers),
     )
+  }
 }
 
 /** The result of the activeness check for an [[ActivenessCheck]].
@@ -56,7 +57,7 @@ private[conflictdetection] final case class ActivenessCheckResult[Key, Status <:
   def isSuccessful: Boolean =
     alreadyLocked.isEmpty && notFresh.isEmpty && unknown.isEmpty && notFree.isEmpty && notActive.isEmpty
 
-  override protected def pretty: Pretty[ActivenessCheckResult.this.type] = prettyOfClass(
+  override def pretty: Pretty[ActivenessCheckResult.this.type] = prettyOfClass(
     paramIfNonEmpty("alreadyLocked", _.alreadyLocked),
     paramIfNonEmpty("notFresh", _.notFresh),
     paramIfNonEmpty("unknown", _.unknown),

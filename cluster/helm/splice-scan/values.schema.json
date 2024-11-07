@@ -1,13 +1,7 @@
 {
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
-  "required": [
-    "spliceInstanceNames",
-    "migration",
-    "persistence",
-    "sequencerAddress",
-    "participantAddress"
-  ],
+  "required": ["spliceInstanceNames", "migration", "persistence", "sequencerAddress", "participantAddress"],
   "properties": {
     "imageRepo": {
       "type": "string"
@@ -120,15 +114,6 @@
     "isFirstSv": {
       "type": "boolean"
     },
-    "updateHistoryBackfilling": {
-      "type": "object",
-      "enabled": {
-        "type": "boolean"
-      },
-      "batchSize": {
-        "type": "integer"
-      }
-    },
     "participantAddress": {
       "type": "string"
     },
@@ -192,10 +177,6 @@
           "description": "The acornum of the name of Name Service on this network, as provided in the docs"
         }
       }
-    },
-    "uiPollInterval": {
-      "type": "number",
-      "description": "The interval in milliseconds to poll the UI for updates"
     }
   }
 }

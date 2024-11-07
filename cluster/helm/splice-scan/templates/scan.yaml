@@ -62,14 +62,6 @@ spec:
               is-first-sv = true
             }
         {{- end }}
-        {{- with .Values.updateHistoryBackfilling }}
-        - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_BACKFILLING
-          value: |
-            canton.scan-apps.scan-app {
-              update-history-backfill-enabled = {{ .enabled }}
-              update-history-backfill-batch-size = "{{ .batchSize }}"
-            }
-        {{- end }}
         - name: ADDITIONAL_CONFIG_MIGRATION_ID
           value: |
             canton.scan-apps.scan-app.domain-migration-id = {{ .Values.migration.id }}
@@ -211,8 +203,6 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceName | quote }}
         - name: SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
-        - name: SPLICE_APP_UI_POLL_INTERVAL
-          value: {{ .Values.uiPollInterval | default 90000 | quote }}
         image: "{{ .Values.imageRepo }}/scan-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).scan_web_ui) }}"
         {{- with .Values.imagePullPolicy }}
         imagePullPolicy: {{ . }}

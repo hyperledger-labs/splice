@@ -6,7 +6,6 @@ package com.digitalasset.canton.protocol
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, TestHash, TestSalt}
 import com.digitalasset.canton.data.{CantonTimestamp, ProcessedDisclosedContract}
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{
   BaseTest,
   LfPackageName,
@@ -58,7 +57,7 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
   }
 
   "SerializableContract.fromDisclosedContract" when {
-    val transactionVersion = LfLanguageVersion.v2_dev
+    val transactionVersion = LfTransactionVersion.maxVersion
 
     val createdAt = LfTimestamp.Epoch
     val contractSalt = TestSalt.generateSalt(0)
@@ -88,7 +87,6 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
       stakeholders = Set(alice),
       keyOpt = None,
       version = transactionVersion,
-      domainIdO = Some(DomainId.tryFromString("x::someDomain")),
     )
 
     "provided a valid disclosed contract" should {

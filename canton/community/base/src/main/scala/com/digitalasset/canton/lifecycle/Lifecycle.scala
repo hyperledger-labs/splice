@@ -35,7 +35,7 @@ object Lifecycle extends NoTracing {
   /** Attempts to close all provided closable instances.
     * Instances are closed in the order that they are provided.
     * These instances are expected to synchronously close or throw.
-    * If an exception is encountered when closing an instance, we will still attempt to close other closeables
+    * If an exception is encountered when closing an instances, we will still attempt to close other closeables
     * and then throw a [[ShutdownFailedException]].
     * Exceptions thrown by `close` will be logged and
     * the names of failed instances are wrapped into the [[ShutdownFailedException]].
@@ -62,7 +62,7 @@ object Lifecycle extends NoTracing {
       acc ++ stopSingle(instance).toList
     }
 
-    NonEmpty.from(failedInstances).foreach(i => throw new ShutdownFailedException(i))
+    NonEmpty.from(failedInstances).foreach { i => throw new ShutdownFailedException(i) }
   }
 
   def toCloseableOption[A <: AutoCloseable](maybeClosable: Option[A]): AutoCloseable =
@@ -102,7 +102,7 @@ object Lifecycle extends NoTracing {
 
   class CloseableChannel(val channel: ManagedChannel, logger: TracedLogger, name: String)
       extends AutoCloseable {
-    override def close(): Unit =
+    override def close(): Unit = {
       shutdownResource(
         s"channel: $channel ($name)",
         () => { val _ = channel.shutdown() },
@@ -114,15 +114,16 @@ object Lifecycle extends NoTracing {
         logger,
         verbose = false,
       )
+    }
 
     override def toString: String = s"ManagedChannel ($name, $channel)"
   }
 
   class CloseableServer(val server: Server, logger: TracedLogger, name: String)
       extends AutoCloseable {
-    override def close(): Unit =
+    override def close(): Unit = {
       shutdownResource(
-        s"server: $server ($name)",
+        s"server: $server (${name})",
         () => { val _ = server.shutdown() },
         () => { val _ = server.shutdownNow },
         _ => true,
@@ -131,7 +132,8 @@ object Lifecycle extends NoTracing {
         defaultForcedShutdownTimeout,
         logger,
       )
-    override def toString: String = s"ManagedServer ($name)"
+    }
+    override def toString: String = s"ManagedServer (${name})"
   }
 
   def shutdownResource[A](

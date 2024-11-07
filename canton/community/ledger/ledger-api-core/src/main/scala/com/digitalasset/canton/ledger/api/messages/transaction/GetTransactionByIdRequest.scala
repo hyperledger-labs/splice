@@ -3,10 +3,10 @@
 
 package com.digitalasset.canton.ledger.api.messages.transaction
 
-import com.digitalasset.canton.ledger.api.domain.UpdateId
+import com.digitalasset.canton.ledger.api.domain.TransactionId
 import com.digitalasset.daml.lf.data.Ref.Party
 
 final case class GetTransactionByIdRequest(
-    updateId: UpdateId,
+    transactionId: TransactionId,
     requestingParties: Set[Party],
 )

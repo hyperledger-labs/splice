@@ -23,7 +23,7 @@ object DomainMocks {
 
   val submissionId = SubmissionId(Ref.LedgerString.assertFromString("submissionId"))
 
-  val updateId = UpdateId(Ref.LedgerString.assertFromString("deadbeef"))
+  val transactionId = TransactionId(Ref.LedgerString.assertFromString("deadbeef"))
 
   val applicationId = Ref.ApplicationId.assertFromString("applicationId")
 

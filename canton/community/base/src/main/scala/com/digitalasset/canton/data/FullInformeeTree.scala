@@ -13,6 +13,7 @@ import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.version.*
 import com.google.common.annotations.VisibleForTesting
 import monocle.Lens
@@ -59,7 +60,7 @@ final case class FullInformeeTree private (tree: GenTransactionTree)(
   def toProtoV30: v30.FullInformeeTree =
     v30.FullInformeeTree(tree = Some(tree.toProtoV30))
 
-  override protected def pretty: Pretty[FullInformeeTree] = prettyOfParam(_.tree)
+  override def pretty: Pretty[FullInformeeTree] = prettyOfParam(_.tree)
 }
 
 object FullInformeeTree
@@ -67,7 +68,7 @@ object FullInformeeTree
   override val name: String = "FullInformeeTree"
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.FullInformeeTree)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v31)(v30.FullInformeeTree)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30.toByteString,
     )
@@ -104,7 +105,7 @@ object FullInformeeTree
       errors += "The participant metadata of an informee tree must be blinded."
 
     val message = errors.result().mkString(" ")
-    Either.cond(message.isEmpty, (), message)
+    EitherUtil.condUnitE(message.isEmpty, message)
   }
 
   private[data] def checkViews(
@@ -137,7 +138,7 @@ object FullInformeeTree
     go(rootViews.unblindedElements)
 
     val message = errors.result().mkString("\n")
-    Either.cond(message.isEmpty, (), message)
+    EitherUtil.condUnitE(message.isEmpty, message)
   }
 
   private[data] def viewCommonDataByViewPosition(

@@ -511,7 +511,7 @@ class AcsSnapshotTriggerTest
           "commandId",
           "workflowId",
           recordTime.toInstant,
-          0L,
+          "offset",
           java.util.Map.of(),
           java.util.List.of(),
           dummyDomain.toProtoPrimitive,

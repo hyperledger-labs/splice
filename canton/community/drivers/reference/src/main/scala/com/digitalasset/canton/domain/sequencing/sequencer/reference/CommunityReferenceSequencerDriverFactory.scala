@@ -26,6 +26,7 @@ final class CommunityReferenceSequencerDriverFactory extends BaseReferenceSequen
   override type StorageConfigType = CommunityStorageConfig
 
   @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
+  @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
   override def configParser: ConfigReader[ConfigType] = {
     import pureconfig.generic.semiauto.*
 
@@ -42,6 +43,7 @@ final class CommunityReferenceSequencerDriverFactory extends BaseReferenceSequen
   }
 
   @nowarn("cat=unused") // Work-around for IntelliJ Idea wrongly reporting unused implicits
+  @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
   override def configWriter(confidential: Boolean): ConfigWriter[ConfigType] = {
     import pureconfig.generic.semiauto.*
 

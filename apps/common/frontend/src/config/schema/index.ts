@@ -3,16 +3,13 @@
 import { z } from 'zod';
 
 import { authSchema, testAuthSchema } from './auth';
-import { pollIntervalSchema } from './polling';
 import { serviceSchema } from './service';
 
 export const baseConfigSchema = z.object({
   auth: authSchema,
-  pollInterval: pollIntervalSchema,
   testAuth: testAuthSchema,
   services: z.object({}).catchall(serviceSchema),
 });
 
 export * from './auth';
 export * from './service';
-export * from './polling';
