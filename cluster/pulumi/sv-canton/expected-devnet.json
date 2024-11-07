@@ -949,7 +949,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1071,7 +1071,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1275,7 +1275,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1702,7 +1702,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1824,7 +1824,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -2028,7 +2028,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -2455,7 +2455,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -2577,7 +2577,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -2781,7 +2781,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -3208,7 +3208,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -3330,7 +3330,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -3534,7 +3534,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -3946,7 +3946,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -4068,7 +4068,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -4272,7 +4272,7 @@
       "deletionProtection": true,
       "region": "us-central1",
       "settings": {
-        "activationPolicy": "NEVER",
+        "activationPolicy": "ALWAYS",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
