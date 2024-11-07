@@ -28,7 +28,7 @@ export const operator = new k8s.helm.v3.Release('pulumi-kubernetes-operator', {
       },
       requests: {
         cpu: 1,
-        memory: '2G',
+        memory: config.optionalEnv('OPERATOR_MEMORY_REQUESTS') || '2G',
       },
     },
     terminationGracePeriodSeconds: 1800,
