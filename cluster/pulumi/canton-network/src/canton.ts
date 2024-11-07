@@ -32,13 +32,13 @@ export function installCanton(
   dependsOn: CnInput<Resource>[]
 ): InstalledMigrationSpecificSv {
   const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
+  const externalMigrations = decentralizedSynchronizerMigrationConfig.allExternalMigrations;
   const activeMigrationId =
     decentralizedSynchronizerMigrationConfig.activeDatabaseId ||
     decentralizedSynchronizerMigrationConfig.active.id;
-  const migrationId = decentralizedSynchronizerMigrationConfig.allExternalMigrations
-    .map(e => e.id)
-    .includes(activeMigrationId)
-    ? activeMigrationId - 1
+  // we rely on the assumption that we never completely remove a migration between the internal and the active migration
+  const migrationId = externalMigrations.map(e => e.id).includes(activeMigrationId)
+    ? activeMigrationId - externalMigrations.length
     : activeMigrationId;
 
   const externalActiveMigration = {
