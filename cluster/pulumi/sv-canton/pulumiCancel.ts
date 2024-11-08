@@ -1,7 +1,7 @@
 import { DomainMigrationIndex } from 'splice-pulumi-common';
 import { config } from 'splice-pulumi-common/src/config';
 
-import { awaitAllOrThrowAllExceptions, downStack, PulumiAbortController } from '../pulumi';
+import { awaitAllOrThrowAllExceptions } from '../pulumi';
 import { runForAllMigrations, stackForMigration, svsToDeploy } from './pulumi';
 
 // used in CI clusters that run HDM to ensure everything is cleaned up
@@ -18,7 +18,9 @@ async function cancelMigrationId(migrationId: DomainMigrationIndex): Promise<voi
       await stack.cancel();
     })
   );
-  const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
+  const rejected = (
+    data.find(res => res.status === 'rejected') as PromiseRejectedResult | undefined
+  )?.reason;
   if (rejected) {
     throw new Error(rejected);
   }
@@ -32,7 +34,7 @@ async function cancelAllTheStacks() {
     for (const migrationId of extraMigrationsToReset) {
       cancelOperations.push(cancelMigrationId(migrationId));
     }
-    awaitAllOrThrowAllExceptions(cancelOperations);
+    await awaitAllOrThrowAllExceptions(cancelOperations);
     return null;
   });
 }
