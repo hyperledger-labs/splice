@@ -1085,7 +1085,7 @@ paths:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ListValidatorLicensesResponse"
 
   /v0/backfilling/migration-info:
-    get:
+    post:
       tags: [scan]
       x-jvm-package: scan
       operationId: "getMigrationInfo"
@@ -1106,7 +1106,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
   /v0/backfilling/updates-before:
-    get:
+    post:
       tags: [scan]
       x-jvm-package: scan
       operationId: "getUpdatesBefore"

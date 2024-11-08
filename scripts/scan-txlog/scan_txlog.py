@@ -2038,7 +2038,14 @@ class State:
         if event.template_id.qualified_name in self.args.ignore_root_create:
             if event.template_id.qualified_name in TemplateQualifiedNames.all_tracked:
                 self.active_contracts[event.contract_id] = event
-                return HandleTransactionResult.empty()
+                if (
+                    event.template_id.qualified_name
+                    == TemplateQualifiedNames.app_reward_coupon
+                ):
+                    round_number = event.payload.get_sv_reward_coupon_round()
+                    return HandleTransactionResult.for_open_round(round_number)
+                else:
+                    return HandleTransactionResult.empty()
             else:
                 return HandleTransactionResult.empty()
 
@@ -3766,13 +3773,13 @@ def _parse_cli_args():
     )
     parser.add_argument(
         "--ignore-root-create",
-        nargs="*",
+        action="append",
         default=[],
         help="Ignored root create in the form <TemplateQualifiedName>",
     )
     parser.add_argument(
         "--ignore-root-exercise",
-        nargs="*",
+        action="append",
         default=[],
         help="Ignored root exercise in the form <TemplateQualifiedName>:<Choice>",
     )
