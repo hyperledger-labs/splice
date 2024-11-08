@@ -3,6 +3,7 @@ import {
   DomainMigrationIndex,
   exactNamespace,
   Auth0Client,
+  supportsSvRunbookReset,
 } from 'splice-pulumi-common';
 import {
   coreSvsToDeploy,
@@ -27,6 +28,7 @@ export function installNode(
   const nodeConfig = svConfig!;
   const isCoreSv = nodeConfig.nodeName !== svRunbookConfig.nodeName;
   const isFirstSv = nodeConfig.nodeName === sv1Config.nodeName;
+  const isSvRunbook = nodeConfig.nodeName === svRunbookConfig.nodeName;
   return installCantonComponents(
     // namespace lifecycle managed by the main canton-network stack
     exactNamespace(nodeConfig.nodeName, true, true),
@@ -60,6 +62,9 @@ export function installNode(
                 })
             : [],
       },
-    }
+    },
+    undefined,
+    undefined,
+    isSvRunbook ? supportsSvRunbookReset : undefined
   );
 }

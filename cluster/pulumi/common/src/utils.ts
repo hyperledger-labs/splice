@@ -288,3 +288,5 @@ export const clusterProdLike = config.envFlag('GCP_CLUSTER_PROD_LIKE');
 // Outside of development, we use the default which corresponds to IfNotPresent
 // (unless the tag is LATEST which it never is in our setup).
 export const imagePullPolicy = clusterProdLike ? {} : { imagePullPolicy: 'Always' };
+
+export const supportsSvRunbookReset = config.envFlag('SUPPORTS_SV_RUNBOOK_RESET', false);

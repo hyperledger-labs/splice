@@ -5,11 +5,11 @@ import {
   loadYamlFromFile,
   REPO_ROOT,
   config,
+  supportsSvRunbookReset,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
 const cloudSqlEnabled = config.envFlag('SV_RUNBOOK_ENABLE_CLOUD_SQL', false);
-const supportsSvRunbookReset = config.envFlag('SUPPORTS_SV_RUNBOOK_RESET', false);
 
 export function installPostgres(
   xns: ExactNamespace,

@@ -46,7 +46,8 @@ export function installCantonComponents(
     mediator: Postgres;
     sequencer: Postgres;
   },
-  opts?: SpliceCustomResourceOptions
+  opts?: SpliceCustomResourceOptions,
+  disableProtection?: boolean
 ): InstalledMigrationSpecificSv | undefined {
   const logLevel = config.envFlag('SPLICE_DEPLOYMENT_NO_SV_DEBUG')
     ? 'INFO'
@@ -67,7 +68,8 @@ export function installCantonComponents(
       `participant-pg`,
       true,
       migrationStillRunning,
-      migrationId
+      migrationId,
+      disableProtection
     );
   const mediatorPostgres =
     dbs?.mediator ||
@@ -77,7 +79,8 @@ export function installCantonComponents(
       `mediator-pg`,
       true,
       migrationStillRunning,
-      migrationId
+      migrationId,
+      disableProtection
     );
   const sequencerPostgres =
     dbs?.sequencer ||
@@ -87,7 +90,8 @@ export function installCantonComponents(
       `sequencer-pg`,
       true,
       migrationStillRunning,
-      migrationId
+      migrationId,
+      disableProtection
     );
   if (migrationStillRunning) {
     const migrationInfo = migrationConfig

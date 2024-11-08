@@ -241,7 +241,8 @@ export function installPostgres(
   alias: string,
   uniqueSecretName = false,
   isActive: boolean = true,
-  migrationId?: number
+  migrationId?: number,
+  disableProtection?: boolean
 ): Postgres {
   let ret: Postgres;
   const secretName = uniqueSecretName ? instanceName + '-secrets' : 'postgres-secrets';
@@ -252,7 +253,7 @@ export function installPostgres(
       alias,
       secretName,
       isActive,
-      undefined,
+      disableProtection,
       migrationId?.toString()
     );
   } else {
