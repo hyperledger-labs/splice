@@ -35,7 +35,7 @@ import com.digitalasset.canton.util.{ErrorUtil, PriorityBlockingQueueUtil}
 import com.google.common.annotations.VisibleForTesting
 import io.grpc.ManagedChannel
 
-import java.time.{Duration, Instant, Clock as JClock}
+import java.time.{Clock as JClock, Duration, Instant}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
 import java.util.concurrent.{Callable, PriorityBlockingQueue, TimeUnit}
 import scala.annotation.tailrec
@@ -489,8 +489,15 @@ class RemoteClock(
           logger,
           this,
           // We retry at a higher level indefinitely and not here at all because we want a fairly short connection timeout here.
-          // Need to handle unavailable servers though, as that can happen on cancellation of the grpc channel on shutdown.
-          retryPolicy = { case GrpcServiceUnavailable(_, _, _, _, _) => true; case _ => false },
+          retryPolicy = _ => false,
+          // Do not log warnings for unavailable servers as that can happen on cancellation of the grpc channel on shutdown.
+          logPolicy = err =>
+            logger =>
+              implicit traceContext =>
+                err match {
+                  case unavailable: GrpcServiceUnavailable => logger.info(unavailable.toString)
+                  case _ => err.log(logger)
+                },
         )
         .bimap(_.toString, _.currentTime)
       timestamp <- EitherT.fromEither[FutureUnlessShutdown](
