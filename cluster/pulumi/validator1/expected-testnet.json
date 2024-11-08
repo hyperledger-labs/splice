@@ -380,7 +380,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -495,7 +495,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -575,7 +575,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "validator1-participant-2",
     "provider": "",
@@ -699,7 +699,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -879,7 +879,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

@@ -197,7 +197,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2"
+              "2",
+              "3"
             ]
           }
         },
@@ -209,7 +210,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -435,7 +436,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "loopback",
     "provider": "",
@@ -508,7 +509,7 @@
           "enabled": true
         }
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "scan",
     "provider": "",
@@ -703,7 +704,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -861,7 +862,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-app",
     "provider": "",
@@ -965,7 +966,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-cometbft-global-domain-2",
     "provider": "",
@@ -1101,7 +1102,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-global-domain-2",
     "provider": "",
@@ -1180,7 +1181,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1263,7 +1264,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-participant-2",
     "provider": "",
@@ -1340,7 +1341,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1417,7 +1418,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1531,7 +1532,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "validator",
     "provider": "",

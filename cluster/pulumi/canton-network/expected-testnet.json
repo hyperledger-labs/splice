@@ -322,7 +322,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "docs-docs",
     "provider": "",
@@ -671,7 +671,7 @@
           }
         },
         "node": {
-          "enableTimeoutCommit": false,
+          "enableTimeoutCommit": true,
           "externalAddress": "test.global.canton.network.digitalasset.com:26216",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-2-cometbft",
@@ -705,7 +705,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-cometbft-global-domain-2",
     "provider": "",
@@ -879,7 +879,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-global-domain-2",
     "provider": "",
@@ -929,7 +929,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2"
+              "2",
+              "3"
             ]
           }
         },
@@ -942,7 +943,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -995,7 +996,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -1138,7 +1139,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-participant-2",
     "provider": "",
@@ -1280,7 +1281,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -1542,7 +1543,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1659,7 +1660,7 @@
           }
         }
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
