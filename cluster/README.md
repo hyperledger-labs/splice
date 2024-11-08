@@ -2188,7 +2188,7 @@ the validation of the topology state in Canton. The concrete steps are:
    ```
    Note: We only export the sequencer keys which are relatively harmless and do not provide access to coin holdings. We also
    delete them afterwards and this is only possible after requesting PAM.
-4. Export the authorized store
+4. Export the genesis state (roughly the synchronizer topology state)
    ```
    val synchronizerTopologyBytes = sequencer.topology.transactions.genesis_state(filterDomainStore = sequencer.domain_id.filterString)
    ```
@@ -2196,7 +2196,7 @@ the validation of the topology state in Canton. The concrete steps are:
    ```
    synchronizerTopologyBytes.writeTo(new java.io.FileOutputStream("/tmp/state-export/genesis-state"))
    ```
-6. Export the synchronizer topology snapshot
+6. Export the authorized topology store snapshot
    ```
    val authorizedBytes = sequencer.topology.transactions.export_topology_snapshot("Authorized", filterMappings = Seq(TopologyMapping.Code.NamespaceDelegation, TopologyMapping.Code.OwnerToKeyMapping, TopologyMapping.Code.IdentifierDelegation, TopologyMapping.Code.VettedPackages), filterNamespace = sequencer.id.namespace.filterString)
    ```
@@ -2227,7 +2227,7 @@ the validation of the topology state in Canton. The concrete steps are:
     ```
     globalSequencerSv1.topology.transactions.import_topology_snapshot_from("/tmp/state-export/authorized", "Authorized")
     ```
-16. Initialize the sequencer from the synchronizer topology snapshot
+16. Initialize the sequencer from the genesis state
     ```
     globalSequencerSv1.setup.assign_from_genesis_state(com.google.protobuf.ByteString.readFrom(new java.io.FileInputStream("/tmp/state-export/genesis-state")), StaticDomainParameters.defaults(globalSequencerSv1.config.crypto, ProtocolVersion.latest))
     ```
