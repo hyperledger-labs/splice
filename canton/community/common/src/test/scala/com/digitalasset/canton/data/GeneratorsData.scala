@@ -634,7 +634,6 @@ final class GeneratorsData(
     for {
       salt <- Arbitrary.arbitrary[Salt]
       contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
-      creatingTransactionId <- Arbitrary.arbitrary[TransactionId]
       unassignmentResultEvent <- deliveryUnassignmentResultGen(contract, sourceProtocolVersion)
       reassignmentCounter <- reassignmentCounterGen
 
@@ -644,7 +643,6 @@ final class GeneratorsData(
       .create(hashOps)(
         salt,
         contract,
-        creatingTransactionId,
         unassignmentResultEvent,
         sourceProtocolVersion,
         targetProtocolVersion,
@@ -657,7 +655,6 @@ final class GeneratorsData(
     for {
       salt <- Arbitrary.arbitrary[Salt]
 
-      creatingTransactionId <- Arbitrary.arbitrary[TransactionId]
       contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
 
       targetDomain <- Arbitrary.arbitrary[Target[DomainId]]
@@ -670,7 +667,6 @@ final class GeneratorsData(
       .create(hashOps)(
         salt,
         contract,
-        creatingTransactionId,
         targetDomain,
         timeProof,
         sourceProtocolVersion,

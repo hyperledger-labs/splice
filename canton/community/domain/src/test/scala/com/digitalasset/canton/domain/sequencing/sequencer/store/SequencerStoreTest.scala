@@ -109,6 +109,7 @@ trait SequencerStoreTest
             payload,
             None,
             traceContext,
+            trafficReceiptO,
           ),
         )
 
@@ -128,6 +129,7 @@ trait SequencerStoreTest
             messageId,
             topologyTimestampO = Some(topologyTimestamp),
             traceContext,
+            trafficReceiptO,
           ),
         )
 
@@ -207,6 +209,7 @@ trait SequencerStoreTest
                   payload,
                   topologyTimestampO,
                   traceContext,
+                  _trafficReceiptO,
                 ) =>
               sender shouldBe senderId
               messageId shouldBe expectedMessageId
@@ -235,6 +238,7 @@ trait SequencerStoreTest
                   messageId,
                   topologyTimestampO,
                   _traceContext,
+                  _trafficReceiptO,
                 ) =>
               sender shouldBe senderId
               messageId shouldBe expectedMessageId
@@ -417,6 +421,7 @@ trait SequencerStoreTest
             messageId1,
             None,
             traceContext,
+            None,
           )
           timestampedError: Sequenced[Nothing] = Sequenced(ts1, error)
           _ <- env.saveEventsAndBuffer(instanceIndex, NonEmpty(Seq, timestampedError))
@@ -793,6 +798,7 @@ trait SequencerStoreTest
                   payload1,
                   None,
                   traceContext,
+                  None,
                 ),
               ),
               deliverEventWithDefaults(ts(5))(recipients = NonEmpty(SortedSet, aliceId, bobId)),
@@ -882,6 +888,7 @@ trait SequencerStoreTest
                   payload1,
                   None,
                   traceContext,
+                  None,
                 ),
               ),
               deliverEventWithDefaults(ts(5))(recipients = NonEmpty(SortedSet, aliceId, bobId)),
@@ -1173,6 +1180,7 @@ trait SequencerStoreTest
                     payload1,
                     None,
                     traceContext,
+                    None,
                   ),
                 ),
               ),

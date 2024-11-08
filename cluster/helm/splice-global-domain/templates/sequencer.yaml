@@ -161,7 +161,7 @@ spec:
       {{- if .Values.pvc }}
         - name: sequencer-volume
           persistentVolumeClaim:
-            claimName: "sequencer-pvc"
+            claimName: {{ .Release.Name }}-sequencer-pvc
       {{- end }}
 ---
 apiVersion: v1
@@ -197,7 +197,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "sequencer-pvc"
+  name: {{ .Release.Name }}-sequencer-pvc
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}-sequencer

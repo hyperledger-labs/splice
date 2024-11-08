@@ -3,12 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, TxLogQueries}
-import org.lfdecentralizedtrust.splice.util.QualifiedName
+import cats.data.NonEmptyList
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.VoteRequest
+import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, TxLogQueries}
+import org.lfdecentralizedtrust.splice.util.QualifiedName
 import slick.dbio.{Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.sql.SqlStreamingAction
@@ -36,41 +37,50 @@ trait DbVotesStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLo
   ], TxLogQueries.SelectFromTxLogTableResult, Effect.Read] = {
     val actionNameCondition = actionName match {
       case Some(actionName) =>
-        sql"""and #$actionNameColumnName like ${lengthLimited(s"%${lengthLimited(actionName)}%")}"""
-      case None => sql""""""
+        Some(sql"""#$actionNameColumnName like ${lengthLimited(
+            s"%${lengthLimited(actionName)}%"
+          )}""")
+      case None => None
     }
     val executedCondition = accepted match {
-      case Some(accepted) => sql"""and #$acceptedColumnName = ${accepted}"""
-      case None => sql""""""
+      case Some(accepted) => Some(sql"""#$acceptedColumnName = ${accepted}""")
+      case None => None
     }
     val effectivenessCondition = (effectiveFrom, effectiveTo) match {
       case (Some(effectiveFrom), Some(effectiveTo)) =>
-        sql"""and #$effectiveAtColumnName between ${lengthLimited(
+        Some(sql"""#$effectiveAtColumnName between ${lengthLimited(
             effectiveFrom
           )} and ${lengthLimited(
             effectiveTo
-          )}"""
+          )}""")
       case (Some(effectiveFrom), None) =>
-        sql"""and #$effectiveAtColumnName > ${lengthLimited(effectiveFrom)}"""
+        Some(sql"""#$effectiveAtColumnName > ${lengthLimited(effectiveFrom)}""")
       case (None, Some(effectiveTo)) =>
-        sql"""and #$effectiveAtColumnName < ${lengthLimited(effectiveTo)}"""
-      case (None, None) => sql""""""
+        Some(sql"""#$effectiveAtColumnName < ${lengthLimited(effectiveTo)}""")
+      case (None, None) => None
     }
     val requesterCondition = requester match {
       case Some(requester) =>
-        sql"""and #$requesterNameColumnName like ${lengthLimited(
+        Some(sql"""#$requesterNameColumnName like ${lengthLimited(
             s"%${lengthLimited(requester)}%"
-          )}"""
-      case None => sql""""""
+          )}""")
+      case None => None
     }
+    val conditions = NonEmptyList(
+      sql"""entry_type = ${dbType}""",
+      List(
+        actionNameCondition,
+        executedCondition,
+        requesterCondition,
+        effectivenessCondition,
+      ).flatten,
+    )
+    val whereClause = conditions.reduceLeft((a, b) => (a ++ sql""" and """ ++ b).toActionBuilder)
+
     TxLogQueries.selectFromTxLogTable(
       txLogTableName,
       storeId,
-      where = (sql"""entry_type = ${dbType} """
-        ++ actionNameCondition
-        ++ executedCondition
-        ++ requesterCondition
-        ++ effectivenessCondition).toActionBuilder,
+      where = whereClause.toActionBuilder,
       orderLimit = sql"""order by #$effectiveAtColumnName desc limit ${sqlLimit(limit)}""",
     )
   }
