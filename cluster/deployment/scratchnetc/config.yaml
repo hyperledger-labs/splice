@@ -2,3 +2,9 @@ infra:
   ipWhitelisting:
     extraWhitelistedIngress:
       - "35.225.102.103/32" # CI GKE cluster for CCI
+synchronizerMigration:
+  active:
+    id: 0
+    provider: internal
+    version: 0.3.0
+    releaseReference: "refs/heads/parth/retain-db-on-delete"
