@@ -7,8 +7,6 @@ synchronizerMigration:
     id: 4
     provider: external
     version: 0.3.0-snapshot.20241106.7534.0.vda74f38d
-    releaseReference: "refs/tags/cilr-upgrade"
-    migratingFrom: 3
-# TODO(#15901) Reenable after the 3.2 upgrade is complete
-persistentSequencerHeapDumps: false
+    releaseReference: "refs/tags/cilr"
+persistentSequencerHeapDumps: true
 sequencerVeryHighResources: true
