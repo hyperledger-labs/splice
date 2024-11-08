@@ -57,7 +57,6 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     instanceName: string,
     alias: string,
     secretName: string,
-    active: boolean = true,
     disableProtection: boolean = false,
     migrationId?: string
   ) {
@@ -79,7 +78,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         deletionProtection: disableProtection ? false : protectCloudSql,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
-          activationPolicy: active ? 'ALWAYS' : 'ALWAYS',
+          activationPolicy: 'ALWAYS',
           deletionProtectionEnabled: disableProtection ? false : protectCloudSql,
           databaseFlags: [{ name: 'temp_file_limit', value: '100000000' }],
           backupConfiguration: {
@@ -246,7 +245,6 @@ export function installPostgres(
   instanceName: string,
   alias: string,
   uniqueSecretName = false,
-  isActive: boolean = true,
   migrationId?: number
 ): Postgres {
   let ret: Postgres;
@@ -257,7 +255,6 @@ export function installPostgres(
       instanceName,
       alias,
       secretName,
-      isActive,
       false,
       migrationId?.toString()
     );

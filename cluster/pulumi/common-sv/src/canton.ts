@@ -66,7 +66,6 @@ export function installCantonComponents(
       `participant-${migrationId}-pg`,
       `participant-pg`,
       true,
-      migrationStillRunning,
       migrationId
     );
   const mediatorPostgres =
@@ -76,7 +75,6 @@ export function installCantonComponents(
       `mediator-${migrationId}-pg`,
       `mediator-pg`,
       true,
-      migrationStillRunning,
       migrationId
     );
   const sequencerPostgres =
@@ -86,7 +84,6 @@ export function installCantonComponents(
       `sequencer-${migrationId}-pg`,
       `sequencer-pg`,
       true,
-      migrationStillRunning,
       migrationId
     );
   if (migrationStillRunning) {

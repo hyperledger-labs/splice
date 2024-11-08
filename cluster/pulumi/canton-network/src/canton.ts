@@ -59,7 +59,6 @@ export function installCanton(
         `sequencer-pg`,
         `sequencer-${migrationId}-pg`,
         true,
-        decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
         migrationId
       );
     const mediatorPostgres =
@@ -69,7 +68,6 @@ export function installCanton(
         `mediator-pg`,
         `mediator-${migrationId}-pg`,
         true,
-        decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
         migrationId
       );
     const participantPostgres =
@@ -79,7 +77,6 @@ export function installCanton(
         `participant-pg`,
         `participant-${migrationId}-pg`,
         true,
-        decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
         migrationId
       );
     const installedMigrations = migrationsContainedInStack.map(migration => {
