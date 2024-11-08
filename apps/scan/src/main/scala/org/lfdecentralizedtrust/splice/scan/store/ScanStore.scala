@@ -276,6 +276,7 @@ trait ScanStore
   def lookupLatestTransferCommandEvents(
       sender: PartyId,
       nonce: Long,
+      limit: Int,
   )(implicit
       tc: TraceContext
   ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]]

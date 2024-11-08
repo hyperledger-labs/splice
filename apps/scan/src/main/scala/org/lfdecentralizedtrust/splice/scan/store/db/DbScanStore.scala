@@ -1010,7 +1010,7 @@ class DbScanStore(
     } yield result.map(contractFromRow(VoteRequest.COMPANION)(_))
   }
 
-  override def lookupLatestTransferCommandEvents(sender: PartyId, nonce: Long)(implicit
+  override def lookupLatestTransferCommandEvents(sender: PartyId, nonce: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]] =
     waitUntilAcsIngested {
@@ -1032,6 +1032,7 @@ class DbScanStore(
               select #${TxLogQueries.SelectFromTxLogTableResult.sqlColumnsCommaSeparated()}
               from ranked_rows
               where rank = 1
+              limit $limit
             """.toActionBuilder.as[TxLogQueries.SelectFromTxLogTableResult],
             "getLatestTransferCommandEventByContractId",
           )

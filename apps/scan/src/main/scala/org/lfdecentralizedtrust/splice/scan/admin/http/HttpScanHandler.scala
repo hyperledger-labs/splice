@@ -1078,6 +1078,7 @@ class HttpScanHandler(
         txLogEntryMap <- store.lookupLatestTransferCommandEvents(
           senderParty,
           nonce,
+          HttpScanHandler.MAX_TRANSFER_COMMAND_CONTRACTS,
         )
         filteredMap <- txLogEntryMap.view.toList
           .traverseFilter { case (cid, entry) =>
@@ -1732,4 +1733,10 @@ class HttpScanHandler(
         }
     }
   }
+}
+
+object HttpScanHandler {
+  // We expect a handful at most but want to somewhat guard against attacks
+  // so we just hardcode a limit of 100.
+  private val MAX_TRANSFER_COMMAND_CONTRACTS: Int = 100
 }
