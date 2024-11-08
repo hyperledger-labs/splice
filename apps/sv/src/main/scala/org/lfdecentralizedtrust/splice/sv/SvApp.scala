@@ -97,6 +97,7 @@ import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -600,16 +601,19 @@ class SvApp(
                     )(traceContext),
                   ) +:
                   softDomainMigrationPocHandler.map(handler =>
-                    SvSoftDomainMigrationPocResource.routes(
-                      handler,
-                      AdminAuthExtractor(
-                        verifier,
-                        svStore.key.svParty,
-                        svAutomation.connection,
-                        loggerFactory,
-                        "canton network sv admin realm",
-                      )(traceContext),
-                    )
+                    // TODO(#15921) setting a longer timeout for now just for the migration poc.
+                    withRequestTimeout(60.seconds) {
+                      SvSoftDomainMigrationPocResource.routes(
+                        handler,
+                        AdminAuthExtractor(
+                          verifier,
+                          svStore.key.svParty,
+                          svAutomation.connection,
+                          loggerFactory,
+                          "canton network sv admin realm",
+                        )(traceContext),
+                      )
+                    }
                   ))*
               )
             }
