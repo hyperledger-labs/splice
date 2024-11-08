@@ -57,15 +57,17 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     instanceName: string,
     alias: string,
     secretName: string,
-    disableProtection: boolean = false,
+    allowDeletion: boolean = false,
     migrationId?: string
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
+    const protect = allowDeletion ? false : protectCloudSql;
+    const retainOnDelete = allowDeletion ? false : preserveDbsOnDelete;
     const baseOpts = {
-      protect: disableProtection ? false : protectCloudSql,
+      protect: protect,
+      retainOnDelete: retainOnDelete,
       aliases: [{ name: instanceLogicalNameAlias }],
-      retainOnDelete: preserveDbsOnDelete,
     };
     super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
     this.instanceName = instanceName;
@@ -75,11 +77,11 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       instanceLogicalName,
       {
         databaseVersion: 'POSTGRES_14',
-        deletionProtection: disableProtection ? false : protectCloudSql,
+        deletionProtection: protect,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
           activationPolicy: 'ALWAYS',
-          deletionProtectionEnabled: disableProtection ? false : protectCloudSql,
+          deletionProtectionEnabled: protect,
           databaseFlags: [{ name: 'temp_file_limit', value: '100000000' }],
           backupConfiguration: {
             enabled: true,
@@ -120,20 +122,20 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       {
         instance: this.pgSvc.name,
         name: 'cantonnet',
-        deletionPolicy: preserveDbsOnDelete ? 'ABANDON' : 'DELETE',
+        deletionPolicy: retainOnDelete ? 'ABANDON' : 'DELETE',
       },
       {
         parent: this,
         deletedWith: this.pgSvc,
-        protect: disableProtection ? false : protectCloudSql,
-        retainOnDelete: preserveDbsOnDelete,
+        protect,
+        retainOnDelete,
         aliases: [{ name: `${this.namespace.logicalName}-db-${alias}-cantonnet` }],
       }
     );
 
     const password = generatePassword(`${instanceLogicalName}-passwd`, {
       parent: this,
-      protect: disableProtection ? false : protectCloudSql,
+      protect,
       aliases: [{ name: `${instanceLogicalNameAlias}-passwd` }],
     }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
@@ -143,7 +145,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       `user-${instanceLogicalName}`,
       {
         instance: this.pgSvc.name,
-        deletionPolicy: preserveDbsOnDelete ? 'ABANDON' : '',
+        deletionPolicy: retainOnDelete ? 'ABANDON' : '',
         name: 'cnadmin',
         password: password,
       },
@@ -151,8 +153,8 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         parent: this,
         deletedWith: pgDB,
         dependsOn: [passwordSecret],
-        protect: disableProtection ? false : protectCloudSql,
-        retainOnDelete: preserveDbsOnDelete,
+        protect,
+        retainOnDelete,
         aliases: [{ name: `user-${instanceLogicalNameAlias}` }],
       }
     );
@@ -178,12 +180,15 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     secretName: string,
     values?: ChartValues,
     overrideDbSizeFromValues?: boolean,
-    disableProtection?: boolean
+    allowDeletion: boolean = false,
   ) {
     const logicalName = xns.logicalName + '-' + instanceName;
     const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
+    const protect = allowDeletion ? false : protectCloudSql;
+    const retainOnDelete = allowDeletion ? false : preserveDbsOnDelete;
     super('canton:network:postgres', logicalName, [], {
-      protect: disableProtection ? false : protectCloudSql,
+      protect,
+      retainOnDelete,
       aliases: [{ name: logicalNameAlias, type: 'canton:network:postgres' }],
     });
 
