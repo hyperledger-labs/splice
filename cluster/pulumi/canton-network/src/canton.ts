@@ -63,13 +63,7 @@ export function installCanton(
       );
     const mediatorPostgres =
       defaultPostgres ||
-      postgres.installPostgres(
-        xns,
-        `mediator-pg`,
-        `mediator-${migrationId}-pg`,
-        true,
-        migrationId
-      );
+      postgres.installPostgres(xns, `mediator-pg`, `mediator-${migrationId}-pg`, true, migrationId);
     const participantPostgres =
       defaultPostgres ||
       postgres.installPostgres(

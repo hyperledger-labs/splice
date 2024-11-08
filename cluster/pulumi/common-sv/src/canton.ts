@@ -61,31 +61,13 @@ export function installCantonComponents(
   const migrationStillRunning = migrationConfig.isStillRunning(migrationId);
   const participantPg =
     dbs?.participant ||
-    installPostgres(
-      xns,
-      `participant-${migrationId}-pg`,
-      `participant-pg`,
-      true,
-      migrationId
-    );
+    installPostgres(xns, `participant-${migrationId}-pg`, `participant-pg`, true, migrationId);
   const mediatorPostgres =
     dbs?.mediator ||
-    installPostgres(
-      xns,
-      `mediator-${migrationId}-pg`,
-      `mediator-pg`,
-      true,
-      migrationId
-    );
+    installPostgres(xns, `mediator-${migrationId}-pg`, `mediator-pg`, true, migrationId);
   const sequencerPostgres =
     dbs?.sequencer ||
-    installPostgres(
-      xns,
-      `sequencer-${migrationId}-pg`,
-      `sequencer-pg`,
-      true,
-      migrationId
-    );
+    installPostgres(xns, `sequencer-${migrationId}-pg`, `sequencer-pg`, true, migrationId);
   if (migrationStillRunning) {
     const migrationInfo = migrationConfig
       .runningMigrations()

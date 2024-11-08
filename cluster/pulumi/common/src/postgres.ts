@@ -180,7 +180,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     secretName: string,
     values?: ChartValues,
     overrideDbSizeFromValues?: boolean,
-    allowDeletion: boolean = false,
+    allowDeletion: boolean = false
   ) {
     const logicalName = xns.logicalName + '-' + instanceName;
     const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
@@ -255,14 +255,7 @@ export function installPostgres(
   let ret: Postgres;
   const secretName = uniqueSecretName ? instanceName + '-secrets' : 'postgres-secrets';
   if (enableCloudSql) {
-    ret = new CloudPostgres(
-      xns,
-      instanceName,
-      alias,
-      secretName,
-      false,
-      migrationId?.toString()
-    );
+    ret = new CloudPostgres(xns, instanceName, alias, secretName, false, migrationId?.toString());
   } else {
     ret = new SplicePostgres(xns, instanceName, alias, secretName);
   }
