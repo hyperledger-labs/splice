@@ -65,7 +65,8 @@ class ExternalPartySetupProposalIntegrationTest
   )
 
   override lazy val updateHistoryIgnoredRootCreates = Seq(
-    TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
+    TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID,
+    amuletCodegen.AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
   )
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
@@ -192,7 +193,45 @@ class ExternalPartySetupProposalIntegrationTest
       0L,
     ) shouldBe None
 
-    // Transfer 10.0 from Alice to Bob (with OutputFees: 6.1, SenderChangeFee: 6.0)
+    val (_, issuingRound) = actAndCheck(
+      s"Advance rounds until there is at least one issuing round", {
+        advanceRoundsByOneTickViaAutomation()
+      },
+    )(
+      s"There is at least one issuing round",
+      _ => {
+        val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+        issuingRounds.toList.headOption.value.payload
+      },
+    )
+
+    val appRewardAmount = BigDecimal(10.0)
+
+    actAndCheck(
+      s"Create AppRewardCoupon for round ${issuingRound.round} through bare create",
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = sv1Backend.config.ledgerApiUser,
+        actAs = Seq(dsoParty),
+        readAs = Seq.empty,
+        update = new amuletCodegen.AppRewardCoupon(
+          dsoParty.toProtoPrimitive,
+          aliceParty.toProtoPrimitive,
+          false,
+          appRewardAmount.bigDecimal,
+          issuingRound.round,
+        ).create,
+      ),
+    )(
+      "AppRewardCoupon is visible",
+      _ =>
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
+            aliceParty,
+            c => c.data.provider == aliceParty.toProtoPrimitive,
+          ) should have length (1),
+    )
+
+    // Transfer 10.0 from Alice to Bob
     val prepareSend =
       aliceValidatorBackend.prepareTransferPreapprovalSend(
         aliceParty,
@@ -220,12 +259,22 @@ class ExternalPartySetupProposalIntegrationTest
     )(
       "validator automation completes transfer",
       _ => {
-        aliceValidatorBackend
-          .getExternalPartyBalance(aliceParty)
-          .totalUnlockedCoin shouldBe "17.9000000000"
+        BigDecimal(
+          aliceValidatorBackend
+            .getExternalPartyBalance(aliceParty)
+            .totalUnlockedCoin
+        ) should beAround(
+          BigDecimal(40 - 10 - 6.1 - 6.0 /* 6.1 output fees, 6.0 sender change fees */ ) +
+            BigDecimal(issuingRound.issuancePerUnfeaturedAppRewardCoupon) * appRewardAmount
+        )
         aliceValidatorBackend
           .getExternalPartyBalance(bobParty)
           .totalUnlockedCoin shouldBe "10.0000000000"
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
+            aliceParty,
+            c => c.data.provider == aliceParty.toProtoPrimitive,
+          ) shouldBe empty
         // Transfer command counter gets created/incremented
         aliceValidatorBackend.scanProxy
           .lookupTransferCommandCounterByParty(aliceParty)

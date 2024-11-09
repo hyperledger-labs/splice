@@ -191,6 +191,13 @@ class JoiningNodeInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
+      _ <- joiningConfig.fold(Future.unit)(onboardingConfig =>
+        SetupUtil.ensureSvNameMetadataAnnotation(
+          svAutomation.connection,
+          config,
+          onboardingConfig.name,
+        )
+      )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       // We need to first wait to ensure the CometBFT node is caught up
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any

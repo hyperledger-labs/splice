@@ -151,7 +151,7 @@ trait SigningPrivateStoreOps extends SigningPrivateOps {
 
 final case class Signature(
     format: SignatureFormat,
-    val signature: ByteString,
+    signature: ByteString,
     signedBy: Fingerprint,
     signingAlgorithmSpec: Option[SigningAlgorithmSpec],
 ) extends HasVersionedWrapper[Signature]
@@ -630,7 +630,7 @@ object SigningKeyPair {
 
 final case class SigningPublicKey private[crypto] (
     format: CryptoKeyFormat,
-    val key: ByteString,
+    key: ByteString,
     keySpec: SigningKeySpec,
     usage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.All,
 ) extends PublicKey
