@@ -12,8 +12,8 @@ import com.digitalasset.canton.crypto.{DomainSnapshotSyncCryptoApi, Signature}
 import com.digitalasset.canton.data.ViewType.ReassignmentViewType
 import com.digitalasset.canton.data.{
   CantonTimestamp,
+  FullReassignmentViewTree,
   ReassignmentSubmitterMetadata,
-  ReassignmentViewTree,
   ViewType,
 }
 import com.digitalasset.canton.error.TransactionError
@@ -103,7 +103,7 @@ trait ReassignmentProcessingSteps[
   override type RequestType <: ProcessingSteps.RequestType.Reassignment
   override val requestType: RequestType
 
-  override type FullView <: ReassignmentViewTree
+  override type FullView <: FullReassignmentViewTree
   override type ParsedRequestType = ParsedReassignmentRequest[FullView]
 
   override def embedNoMediatorError(error: NoMediatorError): ReassignmentProcessorError =
@@ -389,7 +389,7 @@ object ReassignmentProcessingSteps {
         Promise[com.google.rpc.status.Status]()
   )
 
-  final case class ParsedReassignmentRequest[VT <: ReassignmentViewTree](
+  final case class ParsedReassignmentRequest[VT <: FullReassignmentViewTree](
       override val rc: RequestCounter,
       override val requestTimestamp: CantonTimestamp,
       override val sc: SequencerCounter,
@@ -486,14 +486,14 @@ object ReassignmentProcessingSteps {
     override def message: String = s"Cannot fetch time proof for domain `$domainId`: $reason"
   }
 
-  final case class NoReassignmentSubmissionPermission(
-      kind: String,
+  final case class NotHostedOnParticipant(
+      reference: ReassignmentRef,
       party: LfPartyId,
       participantId: ParticipantId,
   ) extends ReassignmentProcessorError {
 
     override def message: String =
-      s"For $kind: $party does not have submission permission on $participantId"
+      s"For $reference: $party is not hosted on $participantId"
   }
 
   final case class StakeholdersMismatch(
@@ -532,13 +532,13 @@ object ReassignmentProcessingSteps {
     )
   }
 
-  final case class AssignmentSubmitterMustBeStakeholder(
-      reassignmentId: ReassignmentId,
+  final case class SubmitterMustBeStakeholder(
+      reference: ReassignmentRef,
       submittingParty: LfPartyId,
       stakeholders: Set[LfPartyId],
   ) extends ReassignmentProcessorError {
     override def message: String =
-      s"Cannot assign `$reassignmentId`: submitter `$submittingParty` is not a stakeholder"
+      s"For$reference: submitter `$submittingParty` is not a stakeholder"
   }
 
   final case class ReassignmentStoreFailed(
@@ -594,7 +594,7 @@ object ReassignmentProcessingSteps {
     )
   }
 
-  final case class ReinterpretationAborted(reassignmentId: ReassignmentId, reason: String)
+  final case class ReinterpretationAborted(reassignmentId: Option[ReassignmentId], reason: String)
       extends ReassignmentProcessorError {
     override def message: String =
       s"Cannot reassign `$reassignmentId`: reinterpretation aborted for reason `$reason`"
