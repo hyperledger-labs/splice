@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.validator.admin.http
 
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import com.daml.ledger.api.v2.interactive_submission_data
+import com.daml.ledger.api.v2.interactive
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
@@ -767,8 +767,9 @@ class HttpValidatorAdminHandler(
           .toList
           .flatMap(_.nodes)
           .flatMap(n =>
-            n.nodeType match {
-              case interactive_submission_data.Node.NodeType.Create(create) =>
+            n.getV1.nodeType match {
+              case interactive.transaction.v1.interactive_submission_data.Node.NodeType
+                    .Create(create) =>
                 Seq(create.contractId)
               case _ => Seq.empty
             }
