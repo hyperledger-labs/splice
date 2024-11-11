@@ -1,10 +1,6 @@
 synchronizerMigration:
-  legacy:
-    id: 0
-    provider: internal
-    version: 0.1.19
   active:
     id: 1
     provider: internal
-    version: 0.2.4
-    releaseReference: "refs/heads/release-line-0.2.4"
+    version: 0.2.6
+    releaseReference: "refs/heads/release-line-0.2.6"

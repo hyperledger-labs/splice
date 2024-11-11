@@ -285,7 +285,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-ingress-runbook",
+      "chart": "splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
       "name": "cluster-ingress-validator1",
@@ -336,7 +336,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -408,7 +408,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-cluster-loopback-gateway",
+      "chart": "splice-cluster-loopback-gateway",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
@@ -451,7 +451,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -461,7 +461,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-participant",
+      "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
       "name": "participant-1",
@@ -531,7 +531,7 @@
           }
         ]
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator1-participant-1",
     "provider": "",
@@ -661,7 +661,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "cn-validator",
+      "chart": "splice-validator",
       "compat": "true",
       "maxHistory": 10,
       "name": "validator-validator1",
@@ -713,7 +713,6 @@
         },
         "migration": {
           "id": 1,
-          "legacyId": 0,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -772,7 +771,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.2.4"
+      "version": "0.2.6"
     },
     "name": "validator1-validator-validator1",
     "provider": "",
