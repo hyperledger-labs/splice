@@ -11,13 +11,17 @@ Release Notes
 Upcoming
 --------
 
+* Fix a Canton node initialization issue that caused newly initialized participants, mediators, and sequencers to reuse their root namespace signing key for all signing purposes.
+  Upgrading to this release will also fix the key usage on all validators and SVs that were originally onboarded on an affected version (versions 0.2.4 to 0.2.8),
+  generating fresh signing keys for affected Canton nodes.
+
 * Deployment
 
   * An optional value ``uiPollInterval`` has been added to the Helm charts for ``splice-scan``, ``splice-sv-node``, and ``splice-validator``. This value allows you to configure the interval at which the deployed UIs poll the services for updates in milliseconds. If unspecified, the default value is 1000 (1 second).
   * The log field ``labels."k8s-pod/cn-component"`` has been renamed to ``labels."k8s-pod/splice-component"``.
 
 0.2.8
---------
+-----
 
 * SV App
 

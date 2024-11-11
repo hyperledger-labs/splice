@@ -14,10 +14,11 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.prettyString
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
-import com.digitalasset.canton.crypto.{KeyPurpose, SigningKeyUsage}
+import com.digitalasset.canton.crypto.{KeyPurpose, SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -60,17 +61,19 @@ class NodeInitializer(
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
     for {
+      namespaceKey <- connection.generateKeyPair("namespace", SigningKeyUsage.NamespaceOnly)
+
       // All nodes need a signing key
-      // TODO(#14930) Split namespace and signing key.
+      // TODO(#16017) consider splitting keys instead of using `All`
       signingKey <- connection.generateKeyPair("signing", SigningKeyUsage.All)
 
       // Only participants need an encryption key, but for simplicity every node gets one
       encryptionKey <- connection.generateEncryptionKeyPair("encryption")
 
-      // Construct the fresh node identity from the signing key fingerprint and the name hint.
+      // Construct the fresh node identity from the namespace signing key fingerprint and the name hint.
       // This mirrors the implementation in the Canton auto-init stage, see [[CantonNodeBootstrapX.SetupNodeId.autoCompleteStage()]].
-      namespace = Namespace(signingKey.id)
-      uid = UniqueIdentifier.tryCreate(identifierName, signingKey.id.toProtoPrimitive)
+      namespace = Namespace(namespaceKey.id)
+      uid = UniqueIdentifier.tryCreate(identifierName, namespaceKey.id.toProtoPrimitive)
       nodeId = nodeIdentity(uid)
 
       // Setting node identity
@@ -80,7 +83,7 @@ class NodeInitializer(
       // Adding root certificate
       _ <- connection.ensureNamespaceDelegation(
         namespace = namespace,
-        target = signingKey,
+        target = namespaceKey,
         isRootDelegation = true,
         signedBy = namespace.fingerprint,
         retryFor = RetryFor.Automation,
@@ -122,7 +125,8 @@ class NodeInitializer(
             logger.info(
               s"Node has identity $id, matching expected identifier $idenfitierName."
             )
-            Future.unit
+            // fixes previously initialized nodes with messed up keys
+            rotateSigningKeyIfSameAsNamespaceKey(id, nodeIdentity)
           } else {
             logger.error(
               s"Node has identity $id, but identifier $idenfitierName was expected."
@@ -138,6 +142,48 @@ class NodeInitializer(
         case None =>
           logger.info(s"Node has no identity, generating a new one")
           initializeWithNewIdentity(idenfitierName, nodeIdentity)
+      }
+    } yield ()
+  }
+
+  private def findOwnerToKeyMappingThatUsesNamespaceSigningKey(
+      id: UniqueIdentifier,
+      nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Option[OwnerToKeyMapping]] = {
+    for {
+      ownerToKeyMappings <- connection.listOwnerToKeyMapping(nodeIdentity(id))
+    } yield ownerToKeyMappings.map(_.mapping).find { mapping =>
+      mapping.keys.exists {
+        case key: SigningPublicKey =>
+          key.id == id.namespace.fingerprint
+        case _ => false
+      }
+    }
+  }
+
+  private def rotateSigningKeyIfSameAsNamespaceKey(
+      id: UniqueIdentifier,
+      nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    for {
+      ownerToKeyMapping <- findOwnerToKeyMappingThatUsesNamespaceSigningKey(id, nodeIdentity)
+      _ <- ownerToKeyMapping match {
+        case Some(mapping) =>
+          for {
+            // TODO(#16017) consider splitting keys instead of using `All`
+            newSigningKey <- connection.generateKeyPair("signing", SigningKeyUsage.All)
+            _ <- connection.ensureOwnerToKeyMapping(
+              member = nodeIdentity(id),
+              keys = NonEmpty(Seq, newSigningKey) ++ mapping.keys.filter {
+                case key: SigningPublicKey if key.id == id.namespace.fingerprint => false
+                case _ => true
+              },
+              retryFor = RetryFor.Automation,
+            )
+          } yield logger.info(
+            s"Rotated signing key which is the same as the namespace keys for node with ID $id"
+          )
+        case None => Future.unit
       }
     } yield ()
   }

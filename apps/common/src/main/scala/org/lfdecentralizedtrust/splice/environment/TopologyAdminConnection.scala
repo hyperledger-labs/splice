@@ -377,6 +377,7 @@ abstract class TopologyAdminConnection(
     ).map(_.result)
   }
 
+  // only creates a mapping if no mapping exists, so you might not get those keys
   def ensureInitialOwnerToKeyMapping(
       member: Member,
       keys: NonEmpty[Seq[PublicKey]],
@@ -386,18 +387,80 @@ abstract class TopologyAdminConnection(
     retryProvider.ensureThatB(
       retryFor,
       "ensure_initial_owner_to_key_mapping",
-      show"Initial key mapping for $member exists",
+      show"An initial key mapping for $member exists",
       listOwnerToKeyMapping(
         member
       ).map(_.nonEmpty),
-      proposeInitialOwnerToKeyMapping(member, keys, signedBy).map(_ => ()),
+      proposeOwnerToKeyMapping(member, keys, signedBy, PositiveInt.one).map(_ => ()),
       logger,
     )
 
-  private def proposeInitialOwnerToKeyMapping(
+  // overwrites existing mappings, so you definitely end up with those keys
+  def ensureOwnerToKeyMapping(
+      member: Member,
+      keys: NonEmpty[Seq[PublicKey]],
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    // We make two transactions - one to add new keys one to remove old keys - to ensure overlap and a smooth transition.
+    // S.a. Canton's `rotate_key`
+    for {
+      _ <- retryProvider.ensureThat(
+        retryFor,
+        "ensure_owner_to_key_mapping_add",
+        show"Key mapping for $member exists and contains the keys ${keys.map(_.fingerprint)}",
+        for {
+          ownerToKeyMappings <- listOwnerToKeyMapping(member)
+        } yield ownerToKeyMappings match {
+          case Seq() => Left(None)
+          case Seq(mapping) =>
+            Either.cond(
+              keys.toSet.subsetOf(mapping.mapping.keys.toSet),
+              (),
+              Some(mapping),
+            )
+          case _ => throw new IllegalStateException("Multiple owner to key mappings found")
+        },
+        (mappingO: Option[TopologyResult[OwnerToKeyMapping]]) =>
+          (mappingO match {
+            case None => proposeOwnerToKeyMapping(member, keys, Seq.empty, PositiveInt.one)
+            case Some(mapping) =>
+              proposeOwnerToKeyMapping(
+                member,
+                (keys ++ mapping.mapping.keys).distinct,
+                Seq.empty,
+                mapping.base.serial + PositiveInt.one,
+              )
+          }).map(_ => ()),
+        logger,
+      )
+      _ <- retryProvider.ensureThat(
+        retryFor,
+        "ensure_owner_to_key_mapping_trim",
+        show"Key mapping for $member exists and contains exactly the keys ${keys.map(_.fingerprint)}",
+        for {
+          ownerToKeyMappings <- listOwnerToKeyMapping(member)
+        } yield ownerToKeyMappings match {
+          case Seq(mapping) =>
+            Either.cond(
+              keys.toSet == mapping.mapping.keys.toSet,
+              (),
+              mapping,
+            )
+          case _ =>
+            throw new IllegalStateException("Unexpected number of owner to key mappings found")
+        },
+        (mapping: TopologyResult[OwnerToKeyMapping]) =>
+          proposeOwnerToKeyMapping(member, keys, Seq.empty, mapping.base.serial + PositiveInt.one)
+            .map(_ => ()),
+        logger,
+      )
+    } yield ()
+
+  private def proposeOwnerToKeyMapping(
       member: Member,
       keys: NonEmpty[Seq[PublicKey]],
       signedBy: Seq[Fingerprint],
+      serial: PositiveInt,
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransaction[TopologyChangeOp, OwnerToKeyMapping]] =
@@ -408,13 +471,13 @@ abstract class TopologyAdminConnection(
         keys = keys,
       ),
       signedBy = signedBy,
-      serial = PositiveInt.one,
+      serial = serial,
       isProposal = false,
       change = TopologyChangeOp.Replace,
       forceChanges = ForceFlags.none,
     )
 
-  private def listOwnerToKeyMapping(member: Member)(implicit
+  def listOwnerToKeyMapping(member: Member)(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[OwnerToKeyMapping]]] =
     runCmd(
@@ -1602,7 +1665,6 @@ abstract class TopologyAdminConnection(
         ).map(_ => ()),
       logger,
     )
-
 }
 
 object TopologyAdminConnection {
