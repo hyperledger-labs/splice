@@ -523,6 +523,27 @@ jobs:
       - notify-cluster-fail:
           cluster: "ciperiodic"
 
+
+  launch_ciperiodic_migration_operator_workflow:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - run:
+          name: Launches the deploy_ciperiodic_migration_operator workflow using the latest release branch as base_version
+          command: |
+            source .envrc.vars
+
+            latest_base_version=$(build-tools/find_latest_hard_migration_base_version.sh)
+            curl --fail-with-body --request POST \
+              --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
+              --header "Circle-Token: ${CIRCLECI_TOKEN}" \
+              --header 'content-type: application/json' \
+              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciperiodic-migration-operator\", \"base-version\": \"$latest_base_version\"}}"
+      - notify-cluster-fail:
+          cluster: "ciperiodic"
+
   wait_for_daml_upgrade:
     executor: self_hosted
     environment:

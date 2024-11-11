@@ -30,6 +30,7 @@ parameters:
         deploy-ciperiodic-migration,
         deploy-ciperiodic-migration-operator,
         determine-ciperiodic-migration-work,
+        determine-ciperiodic-migration-operator-work,
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
         healthcheck-cidaily,

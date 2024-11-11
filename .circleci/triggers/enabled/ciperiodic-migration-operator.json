@@ -1,15 +1,15 @@
 {
-    "name" : "CIPeriodic Migration Test",
+    "name" : "CIPeriodic Migration with operator deployment Test",
     "description" : "Tests a synchronizer migration with version upgrade from the latest release to the version on main",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
-      "run-job": "determine-ciperiodic-migration-work"
+      "run-job": "determine-ciperiodic-migration-operator-work"
     },
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
-        6, 14, 22
+        2, 10, 18
       ],
       "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],
