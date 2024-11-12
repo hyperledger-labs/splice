@@ -18,14 +18,14 @@ export const voteRequests: ListDsoRulesVoteRequestsResponse = {
       template_id:
         '2790a114f83d5f290261fae1e7e46fba75a861a3dd603c6b4ef6b67b49053948:Splice.DsoRules:VoteRequest',
       contract_id:
-        '10f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca99',
+        '10f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca91',
       payload: {
         dso: 'DSO::1220ebe7643fe0617f6f8e1d147137a3b174b350adf0ac2280f967c9abb712c81afb',
         votes: [
           [
             'Digital-Asset-2',
             {
-              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da31',
               accept: true,
               reason: {
                 url: '',
@@ -55,14 +55,14 @@ export const voteRequests: ListDsoRulesVoteRequestsResponse = {
       template_id:
         '2790a114f83d5f290261fae1e7e46fba75a861a3dd603c6b4ef6b67b49053948:Splice.DsoRules:VoteRequest',
       contract_id:
-        '20f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca99',
+        '20f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca92',
       payload: {
         dso: 'DSO::1220ebe7643fe0617f6f8e1d147137a3b174b350adf0ac2280f967c9abb712c81afb',
         votes: [
           [
             'Digital-Asset-2',
             {
-              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da32',
               accept: true,
               reason: {
                 url: '',
@@ -88,14 +88,14 @@ export const voteRequests: ListDsoRulesVoteRequestsResponse = {
       template_id:
         '2790a114f83d5f290261fae1e7e46fba75a861a3dd603c6b4ef6b67b49053948:Splice.DsoRules:VoteRequest',
       contract_id:
-        '20f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca99',
+        '20f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca93',
       payload: {
         dso: 'DSO::1220ebe7643fe0617f6f8e1d147137a3b174b350adf0ac2280f967c9abb712c81afb',
         votes: [
           [
             'Digital-Asset-2',
             {
-              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da33',
               accept: true,
               reason: {
                 url: '',
@@ -144,7 +144,7 @@ export const voteResultsAmuletRules: ListDsoRulesVoteResultsResponse = {
           [
             'Digital-Asset-2',
             {
-              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da34',
               accept: true,
               reason: {
                 url: '',
@@ -183,7 +183,7 @@ export const voteResultsAmuletRules: ListDsoRulesVoteResultsResponse = {
           [
             'Digital-Asset-2',
             {
-              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da35',
               accept: false,
               reason: {
                 url: '',
@@ -211,7 +211,7 @@ export const voteResultsAmuletRules: ListDsoRulesVoteResultsResponse = {
           [
             'Digital-Asset-2',
             {
-              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da36',
               accept: true,
               reason: {
                 url: '',
@@ -255,7 +255,7 @@ export const voteResultsDsoRules: ListDsoRulesVoteResultsResponse = {
           [
             'Digital-Asset-2',
             {
-              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da37',
               accept: true,
               reason: {
                 url: '',
@@ -326,7 +326,7 @@ export const voteResultsDsoRules: ListDsoRulesVoteResultsResponse = {
           [
             'Digital-Asset-2',
             {
-              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da38',
+              sv: 'digital-asset-2::122063072c8e53ca2690deeff0be9002ac252f9927caebec8e2f64233b95db66da39',
               accept: false,
               reason: {
                 url: '',
