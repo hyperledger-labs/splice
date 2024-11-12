@@ -298,6 +298,7 @@ class DbUserWalletStore(
           .querySingle(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
+              domainMigrationId,
               storeId,
               sql"entry_type = ${TxLogEntry.EntryType.TransferOfferTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
@@ -324,6 +325,7 @@ class DbUserWalletStore(
           .querySingle(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
+              domainMigrationId,
               storeId,
               sql"entry_type = ${TxLogEntry.EntryType.BuyTrafficRequestTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",

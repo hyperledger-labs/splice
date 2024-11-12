@@ -342,10 +342,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )(
             store1.multiDomainAcsStore
           )
-          result <- store2.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
+          result1 <- store1.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
+          result2 <- store2.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
         } yield {
-          result.offset shouldBe cancelledTree.getOffset
-          result.value.map(_.status) should be(
+          result1.offset shouldBe cancelledTree.getOffset
+          result2.offset shouldBe 0L
+          result2.value.map(_.status) should be(
             Some(
               BuyTrafficRequestTxLogEntry.Status.Rejected(
                 BuyTrafficRequestStatusRejected("just because")
