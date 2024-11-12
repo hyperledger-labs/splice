@@ -12,8 +12,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.fees.SteppedRate
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{PaymentAmount, Unit}
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.{ccToDollars, dollarsToCC}
@@ -25,16 +23,13 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-class WalletSweepTrigger(
+abstract class WalletSweepTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
-    connection: SpliceLedgerConnection,
     config: WalletSweepConfig,
     scanConnection: ScanConnection,
 )(implicit
@@ -45,34 +40,57 @@ class WalletSweepTrigger(
 
   override protected def extraMetricLabels = Seq("party" -> store.key.endUserParty.toString)
 
+  /** additional validation called as part of retrieveTasks which can be used to catch configuration mistakes early
+    */
+  protected def extraRetrieveTasksValidation()(implicit tc: TraceContext): Future[Unit]
+
+  /** Get the balance that has not yet been transferred but already should be deducted from the available balance
+    */
+  protected def getOutstandingBalanceUsd(
+      amuletPrice: java.math.BigDecimal,
+      amuletConfig: AmuletConfig[USD],
+  )(implicit tc: TraceContext): Future[BigDecimal]
+
+  protected def outstandingDescription: String
+
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[WalletSweepTrigger.Task]] = {
     for {
+      _ <- extraRetrieveTasksValidation()
       amuletRules <- scanConnection.getAmuletRules()
       round <- scanConnection.getLatestOpenMiningRound()
       amuletPrice = round.payload.amuletPrice
       currentAmuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(CantonTimestamp.now())
       balance <- store.getAmuletBalanceWithHoldingFees(round.payload.round.number).map(_._1)
       balanceUsd = BigDecimal(ccToDollars(balance.bigDecimal, amuletPrice))
-      sumOfOutstandingTransfersOffersUsd <- getSumOfOutstandingTransfersOffersUsd(
+      outstandingBalanceUsd <- getOutstandingBalanceUsd(
         amuletPrice,
         currentAmuletConfig,
       )
     } yield {
-      if (balanceUsd - sumOfOutstandingTransfersOffersUsd > config.maxBalanceUsd.value) {
+      if (balanceUsd - outstandingBalanceUsd > config.maxBalanceUsd.value) {
         val trackingId = UUID.randomUUID.toString
         Seq(WalletSweepTrigger.Task(trackingId))
       } else {
         if (balanceUsd > config.maxBalanceUsd.value) {
           logger.info(
-            s"Balance $balanceUsd is above max balance ${config.maxBalanceUsd.value} but there are outstanding transfer offers with a sum of ${sumOfOutstandingTransfersOffersUsd}, not creating additional transfer offers"
+            s"Balance $balanceUsd is above max balance ${config.maxBalanceUsd.value} but there are outstanding $outstandingDescription with a value of ${outstandingBalanceUsd}, not creating additional $outstandingDescription"
           )
         }
         Seq.empty
       }
     }
   }
+
+  protected def sweep(
+      task: WalletSweepTrigger.Task,
+      balanceUsd: BigDecimal,
+      outstandingBalanceUsd: BigDecimal,
+      amountToSendBeforeFeesUsd: BigDecimal,
+      amountToSendAfterFeesUsd: BigDecimal,
+      amountToSendAfterFeesCC: java.math.BigDecimal,
+  )(implicit tc: TraceContext): Future[Unit]
 
   override protected def completeTask(
       task: WalletSweepTrigger.Task
@@ -85,60 +103,24 @@ class WalletSweepTrigger(
       currentAmuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(CantonTimestamp.now())
       balance <- store.getAmuletBalanceWithHoldingFees(round.payload.round.number).map(_._1)
       balanceUsd = BigDecimal(ccToDollars(balance.bigDecimal, amuletPrice))
-      // We only consider transfer offers to the receiver since we want to err on the side of creating
-      // transfer offers unless the receiver has not acted and not consider other activity.
-      // If there are other offers things might just fail with out of fund.
-      sumOfOutstandingTransfersOffersUsd <- getSumOfOutstandingTransfersOffersUsd(
-        amuletPrice,
-        currentAmuletConfig,
-      )
+      outstandingBalanceUsd <- getOutstandingBalanceUsd(amuletPrice, currentAmuletConfig)
       res <-
-        if (balanceUsd - sumOfOutstandingTransfersOffersUsd > config.maxBalanceUsd.value) {
+        if (balanceUsd - outstandingBalanceUsd > config.maxBalanceUsd.value) {
           val amountToSendBeforeFeesUsd =
-            balanceUsd - sumOfOutstandingTransfersOffersUsd - config.minBalanceUsd.value
+            balanceUsd - outstandingBalanceUsd - config.minBalanceUsd.value
           val amountToSendAfterFeesUsd =
             getAmountToSendAfterFees(amountToSendBeforeFeesUsd, currentAmuletConfig)
               .setScale(10, scala.math.BigDecimal.RoundingMode.HALF_UP)
               .bigDecimal
           val amountToSendAfterFeesCC = dollarsToCC(amountToSendAfterFeesUsd, amuletPrice)
-          for {
-            filteredTransferOffers <- store.getOutstandingTransferOffers(
-              None,
-              Some(config.receiver),
-            )
-            transferOfferAlreadyExists = filteredTransferOffers.exists(
-              _.payload.trackingId == task.trackingId
-            )
-            install <- store.getInstall()
-            result <-
-              if (transferOfferAlreadyExists) {
-                Future.successful("Transfer offer already exists.")
-              } else {
-                logger.info(
-                  s"Creating a transfer offer with trackingId ${task.trackingId} for $amountToSendAfterFeesUsd USD ($amountToSendAfterFeesCC CC)."
-                )
-                logger.debug(
-                  s"Before fees amount: $amountToSendBeforeFeesUsd USD (balance of $balanceUsd, outstanding offers are $sumOfOutstandingTransfersOffersUsd USD, and configured min balance is ${config.minBalanceUsd.value})"
-                )
-                val cmd = install.exercise(
-                  _.exerciseWalletAppInstall_CreateTransferOffer(
-                    config.receiver.toProtoPrimitive,
-                    new PaymentAmount(amountToSendAfterFeesCC, Unit.AMULETUNIT),
-                    s"Sweeping wallet funds to receiver ${config.receiver}.",
-                    Instant.now().plus(10, ChronoUnit.MINUTES),
-                    task.trackingId,
-                  )
-                )
-                connection
-                  .submit(
-                    Seq(store.key.validatorParty),
-                    Seq(),
-                    cmd,
-                  )
-                  .noDedup
-                  .yieldResult()
-              }
-          } yield Some(result)
+          sweep(
+            task = task,
+            balanceUsd = balanceUsd,
+            outstandingBalanceUsd = outstandingBalanceUsd,
+            amountToSendBeforeFeesUsd = amountToSendBeforeFeesUsd,
+            amountToSendAfterFeesUsd = amountToSendAfterFeesUsd,
+            amountToSendAfterFeesCC = amountToSendAfterFeesCC,
+          ).map(Some(_))
         } else {
           Future.successful(None)
         }
@@ -167,26 +149,6 @@ class WalletSweepTrigger(
     }
   }
 
-  private def getSumOfOutstandingTransfersOffersUsd(
-      amuletPrice: java.math.BigDecimal,
-      currentAmuletConfig: AmuletConfig[USD],
-  )(implicit tc: TraceContext) = {
-    for {
-      filteredTransferOffers <- store.getOutstandingTransferOffers(
-        None,
-        Some(config.receiver),
-      )
-    } yield filteredTransferOffers
-      .map(c => {
-        BigDecimal(ccToDollars(c.payload.amount.amount, amuletPrice)) + computeTransferFees(
-          BigDecimal(c.payload.amount.amount),
-          currentAmuletConfig.transferConfig.transferFee,
-        )
-          + computeCreateFees(currentAmuletConfig)
-      })
-      .sum
-  }
-
   private def getAmountToSendAfterFees(
       amountToSendBeforeFeesUsd: BigDecimal,
       currentAmuletConfig: AmuletConfig[USD],
@@ -199,12 +161,12 @@ class WalletSweepTrigger(
     amountToSendBeforeFeesUsd - createFee - transferFee
   }
 
-  private def computeCreateFees(
+  protected def computeCreateFees(
       currentAmuletConfig: AmuletConfig[USD]
   ): BigDecimal =
     BigDecimal(currentAmuletConfig.transferConfig.createFee.fee) * 2
 
-  private def computeTransferFees(
+  protected def computeTransferFees(
       amountUsd: BigDecimal,
       transferFeeConfigUsd: SteppedRate,
   ): BigDecimal = {

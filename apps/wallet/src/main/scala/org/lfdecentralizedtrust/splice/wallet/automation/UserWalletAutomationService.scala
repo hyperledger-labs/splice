@@ -133,15 +133,28 @@ class UserWalletAutomationService(
   }
 
   walletSweep.foreach { config =>
-    registerTrigger(
-      new WalletSweepTrigger(
-        triggerContext,
-        store,
-        connection,
-        config,
-        scanConnection,
+    if (config.useTransferPreapproval) {
+      registerTrigger(
+        new WalletPreapprovalSweepTrigger(
+          triggerContext,
+          store,
+          connection,
+          config,
+          scanConnection,
+          treasury,
+        )
       )
-    )
+    } else {
+      registerTrigger(
+        new WalletTransferOfferSweepTrigger(
+          triggerContext,
+          store,
+          connection,
+          config,
+          scanConnection,
+        )
+      )
+    }
   }
 
   autoAcceptTransfers.foreach { config =>
@@ -184,7 +197,8 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[UnassignTrigger.Template[?, ?]],
       aTrigger[AssignTrigger],
       aTrigger[TransferFollowTrigger],
-      aTrigger[WalletSweepTrigger],
+      aTrigger[WalletTransferOfferSweepTrigger],
+      aTrigger[WalletPreapprovalSweepTrigger],
       aTrigger[AutoAcceptTransferOffersTrigger],
       aTrigger[AmuletMetricsTrigger],
     )
