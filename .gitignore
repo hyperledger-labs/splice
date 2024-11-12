@@ -17,6 +17,7 @@ _build/
 .metals
 .ammonite
 **/metals.sbt
+**/.scala-build/*
 
 # We want to share run configurations
 !.idea/runConfigurations

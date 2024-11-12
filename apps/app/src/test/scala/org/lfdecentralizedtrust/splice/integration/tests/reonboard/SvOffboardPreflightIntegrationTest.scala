@@ -179,6 +179,7 @@ class SvOffboardPreflightIntegrationTest
                   element.underlying.sendKeys(voteReasonBody)
                 }
                 click on "save-vote-button"
+                click on "vote-confirmation-dialog-accept-button"
               },
             )(
               "sv can see the new vote request detail",

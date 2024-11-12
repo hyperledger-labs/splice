@@ -20,6 +20,11 @@ Upcoming
   * An optional value ``uiPollInterval`` has been added to the Helm charts for ``splice-scan``, ``splice-sv-node``, and ``splice-validator``. This value allows you to configure the interval at which the deployed UIs poll the services for updates in milliseconds. If unspecified, the default value is 1000 (1 second).
   * The log field ``labels."k8s-pod/cn-component"`` has been renamed to ``labels."k8s-pod/splice-component"``.
 
+* SV UI
+
+  * The SV UI now shows aa confirmation dialog with disclaimers when creating a Vote Request or Voting.
+
+
 0.2.8
 -----
 

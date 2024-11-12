@@ -35,6 +35,7 @@ import {
   isScheduleDateTimeValid,
   VoteRequestValidity,
 } from '../../utils/validations';
+import { VoteConfirmationDialog } from '../VoteConfirmationDialog';
 import SvListVoteRequests from './SvListVoteRequests';
 import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
@@ -61,6 +62,7 @@ export const CreateVoteRequest: React.FC = () => {
   const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
   const [expiration, setExpiration] = useState<Dayjs | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   // States related to constraints from vote requests
   const [
@@ -236,7 +238,13 @@ export const CreateVoteRequest: React.FC = () => {
     expiresAt = undefined;
   }
 
-  // TODO (#4966): add a popup to ask confirmation
+  const expirationInDays = dayjs(expiresAt).diff(dayjs(), 'day');
+
+  const handleConfirmationAccept = () => {
+    createVoteRequestMutation.mutate();
+    setConfirmDialogOpen(false);
+  };
+
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
       <Typography mt={4} variant="h4">
@@ -368,7 +376,7 @@ export const CreateVoteRequest: React.FC = () => {
                 type={'submit'}
                 size="large"
                 onClick={() => {
-                  createVoteRequestMutation.mutate();
+                  setConfirmDialogOpen(true);
                 }}
               >
                 Send Request to Super Validators
@@ -377,6 +385,22 @@ export const CreateVoteRequest: React.FC = () => {
           </Stack>
         </CardContent>
       </Card>
+      <VoteConfirmationDialog
+        showDialog={confirmDialogOpen}
+        onAccept={handleConfirmationAccept}
+        onClose={() => setConfirmDialogOpen(false)}
+        title="Confirm Your Vote Request"
+      >
+        <Typography variant="h6">Are you sure you want to create this vote request?</Typography>
+        <br />
+        Please note:
+        <ul>
+          <li>This action cannot be undone.</li>
+          <li>You will not be able to edit this request afterwards.</li>
+          <li>You may only edit your vote after creation.</li>
+          <li>The vote request will expire in {expirationInDays} days.</li>
+        </ul>
+      </VoteConfirmationDialog>
     </Stack>
   );
 };
