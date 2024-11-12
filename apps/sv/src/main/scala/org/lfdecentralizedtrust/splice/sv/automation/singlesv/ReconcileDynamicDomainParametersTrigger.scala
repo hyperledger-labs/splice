@@ -163,7 +163,7 @@ class ReconcileDynamicDomainParametersTrigger(
       )
     } yield {
       TaskSuccess(
-        s"Successfully reconcile SynchronizerFeesConfig $task"
+        s"Successfully reconciled DynamicDomainParameters $task"
       )
     }
   }
