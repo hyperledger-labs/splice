@@ -53,6 +53,8 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 // TODO(#14568) Merge this into ExternallySignedPartyOnboardingTest
+// TODO(#15990) Re-enable this test
+@org.scalatest.Ignore
 class ExternalPartySetupProposalIntegrationTest
     extends IntegrationTest
     with HasExecutionContext

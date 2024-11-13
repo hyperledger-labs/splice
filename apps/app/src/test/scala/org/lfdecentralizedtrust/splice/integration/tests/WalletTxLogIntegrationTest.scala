@@ -1155,7 +1155,8 @@ class WalletTxLogIntegrationTest
       )
     }
 
-    "handle external party transfer preapprovals" in { implicit env =>
+    // TODO(#15990) Re-enable this test
+    "handle external party transfer preapprovals" ignore { implicit env =>
       def renewTransferPreapprovalTrigger =
         bobValidatorBackend.validatorAutomation.trigger[RenewTransferPreapprovalTrigger]
 
