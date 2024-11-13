@@ -94,7 +94,7 @@ async function main(deps) {
 ## Please consider backporting to the following branches: ##
 ${finalBranches.map((b) => `- [ ] ${b}`).join('\n')}
 
-Please check the boxes for branches that you wish to backport to and backport PRs will
+:arrow_forward: Please check the boxes for branches that you wish to backport to and backport PRs will
 automatically be created when you merge this PR.
 
 ## Explanation: ##
