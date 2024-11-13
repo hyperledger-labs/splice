@@ -34,6 +34,9 @@ final case class WalletSweepConfig(
     // The minimum balance in USD to keep in the wallet.
     minBalanceUsd: NonNegativeNumeric[BigDecimal],
     receiver: PartyId,
+    // If set to true we use the transfer preapproval of the receiver to transfer
+    // directly instead of creating a transfer offer.
+    useTransferPreapproval: Boolean = false,
 )
 
 final case class AutoAcceptTransfersConfig(

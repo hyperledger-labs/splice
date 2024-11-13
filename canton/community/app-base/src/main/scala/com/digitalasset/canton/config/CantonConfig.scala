@@ -209,8 +209,7 @@ object ClockConfig {
     *
     * @param skew    maximum simulated clock skew (0)
     *                If positive, Canton nodes will use a WallClock, but the time of the wall clocks
-    *                will be shifted by a random number between `-simulateMaxClockSkewMillis` and
-    *                `simulateMaxClockSkewMillis`. The clocks will never move backwards.
+    *                will be shifted by a random number. The clocks will never move backwards.
     */
   final case class WallClock(
       skew: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(0)
@@ -256,10 +255,8 @@ final case class CantonParameters(
     enableAdditionalConsistencyChecks: Boolean = false,
     manualStart: Boolean = false,
     startupParallelism: Option[PositiveInt] = None,
-    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
-    nonStandardConfig: Boolean = true,
-    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
-    alphaVersionSupport: Boolean = true,
+    nonStandardConfig: Boolean = false,
+    alphaVersionSupport: Boolean = false,
     betaVersionSupport: Boolean = false,
     portsFile: Option[String] = None,
     timeouts: TimeoutSettings = TimeoutSettings(),

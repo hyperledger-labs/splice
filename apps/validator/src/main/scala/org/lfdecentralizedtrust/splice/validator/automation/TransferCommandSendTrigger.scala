@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferinput.InputAmulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferinput.InputAppRewardCoupon
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   PaymentTransferContext,
   TransferContext,
@@ -20,9 +20,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   TransferCommand
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
-import org.lfdecentralizedtrust.splice.util.AssignedContract
+import org.lfdecentralizedtrust.splice.store.PageLimit
+import org.lfdecentralizedtrust.splice.util.{AssignedContract, SpliceUtil}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.ExternalPartyWalletManager
 import com.digitalasset.canton.data.CantonTimestamp
@@ -69,7 +72,28 @@ class TransferCommandSendTrigger(
         case Some(wallet) =>
           for {
             transferPreapprovalO <- scanConnection.lookupTransferPreapprovalByParty(receiver)
-            amulets <- wallet.store.listAmulets()
+            (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
+            openRound = SpliceUtil.selectLatestOpenMiningRound(now, openRounds)
+            configUsd = openRound.payload.transferConfigUsd
+            maxNumInputs = configUsd.maxNumInputs.intValue()
+            amulets <- wallet.store.listSortedAmuletsAndQuantity(
+              openRound.payload.round.number,
+              PageLimit.tryCreate(maxNumInputs),
+            )
+            openIssuingRounds = issuingMiningRounds.filter(c =>
+              c.payload.opensAt.isBefore(now.toInstant)
+            )
+            issuingRoundsMap = openIssuingRounds.view.map { r =>
+              val imr = r.payload
+              (imr.round, imr)
+            }.toMap
+            appRewards <- wallet.store.listSortedAppRewards(
+              issuingRoundsMap,
+              PageLimit.tryCreate(maxNumInputs),
+            )
+            inputs: Seq[TransferInput] = (amulets.map(_._2) ++ appRewards.map(a =>
+              new InputAppRewardCoupon(a._1.contractId)
+            )).take(maxNumInputs)
             featuredAppRight <- transferPreapprovalO
               .traverse { preapproval =>
                 val provider = PartyId.tryFromProtoPrimitive(preapproval.payload.provider)
@@ -94,11 +118,20 @@ class TransferCommandSendTrigger(
               logger,
             )
             amuletRules <- scanConnection.getAmuletRulesWithState()
-            openRound <- scanConnection.getLatestOpenMiningRound()
+            rewardInputRounds = appRewards.map(_._1.payload.round).toSet
             transferContext = new TransferContext(
               openRound.contractId,
-              // TODO(#15160) Include app rewards
-              Map.empty.asJava,
+              openIssuingRounds.view
+                // only provide rounds that are actually used in transfer context to avoid unnecessary fetching.
+                .filter(r => rewardInputRounds.contains(r.payload.round))
+                .map(r =>
+                  (
+                    r.payload.round,
+                    r.contractId,
+                  )
+                )
+                .toMap[Round, IssuingMiningRound.ContractId]
+                .asJava,
               // validator right contracts are not visible to DSO
               // so cannot use validator rewards. That's fine
               // as we also don't expect the external party to have any
@@ -111,7 +144,7 @@ class TransferCommandSendTrigger(
                   amuletRules.contractId,
                   transferContext,
                 ),
-                amulets.map[TransferInput](a => new InputAmulet(a.contractId)).asJava,
+                inputs.asJava,
                 transferPreapprovalO.map(_.contractId).toJava,
                 transferCommandNonce.contractId,
               )
@@ -123,10 +156,12 @@ class TransferCommandSendTrigger(
                 cmd,
               )
               .withDisclosedContracts(
-                ledgerConnection.disclosedContracts(
-                  amuletRules,
-                  (openRound +: transferPreapprovalO.toList)*
-                )
+                ledgerConnection
+                  .disclosedContracts(
+                    amuletRules,
+                    (openRound +: transferPreapprovalO.toList)*
+                  )
+                  .addAll(openIssuingRounds)
               )
               .noDedup
               .yieldResult()

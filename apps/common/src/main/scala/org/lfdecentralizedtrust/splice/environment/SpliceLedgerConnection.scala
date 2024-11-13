@@ -518,6 +518,11 @@ class BaseLedgerConnection(
       _.map(PartyId.tryFromProtoPrimitive(_))
     )
 
+  def getSvNameFromUserMetadata(userId: String)(implicit
+      traceContext: TraceContext
+  ): Future[String] =
+    waitForUserMetadata(userId, SV_NAME_USER_METADATA_KEY)
+
   def ensureIdentityProviderConfig(id: String, issuer: String, jwksUrl: String, audience: String)(
       implicit tc: TraceContext
   ): Future[Unit] =
@@ -996,7 +1001,7 @@ class SpliceLedgerConnection(
       disclosedContracts: DisclosedContracts,
   )(implicit
       traceContext: TraceContext
-  ): Future[lapi.interactive_submission_service.PrepareSubmissionResponse] = {
+  ): Future[lapi.interactive.interactive_submission_service.PrepareSubmissionResponse] = {
     client.prepareSubmission(
       domainId = domainId.map(_.toProtoPrimitive),
       applicationId = applicationId,
@@ -1014,7 +1019,7 @@ class SpliceLedgerConnection(
     */
   def executeSubmissionAndWait(
       submitter: PartyId,
-      preparedTransaction: lapi.interactive_submission_data.PreparedTransaction,
+      preparedTransaction: lapi.interactive.interactive_submission_service.PreparedTransaction,
       partySignatures: Map[PartyId, LedgerClient.Signature],
       waitForOffset: Boolean,
   )(implicit traceContext: TraceContext): Future[String] = {
@@ -1145,6 +1150,8 @@ class SpliceLedgerConnection(
 object BaseLedgerConnection {
 
   val DSO_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/dso_party"
+
+  val SV_NAME_USER_METADATA_KEY: String = "sv.app.network.canton.global/sv_name"
 
   val INITIAL_ACS_IMPORT_METADATA_KEY: String = "network.canton.global/initial_acs_import"
 
