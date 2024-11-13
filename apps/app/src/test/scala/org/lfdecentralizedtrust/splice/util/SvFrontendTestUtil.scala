@@ -39,5 +39,8 @@ trait SvFrontendTestUtil extends TestCommon {
     clue("click the submit button") {
       click on "create-voterequest-submit-button"
     }
+    clue("click accept on the confirmation dialog") {
+      click on "vote-confirmation-dialog-accept-button"
+    }
   }
 }

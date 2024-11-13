@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.validator.store.db
 
 import cats.implicits.*
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store.AppConfiguration
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
@@ -23,7 +24,7 @@ import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
-import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers}
+import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
@@ -33,11 +34,13 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -185,6 +188,31 @@ class DbValidatorStore(
     )
   }
 
+  override def listExpiringTransferPreapprovals(
+      renewalDuration: NonNegativeFiniteDuration
+  ): ListExpiredContracts[TransferPreapproval.ContractId, TransferPreapproval] = {
+    (now: CantonTimestamp, limit: PageLimit) => implicit traceContext =>
+      waitUntilAcsIngested {
+        for {
+          result <- storage
+            .query(
+              selectFromAcsTableWithState(
+                ValidatorTables.acsTableName,
+                storeId,
+                domainMigrationId,
+                sql"""
+                   template_id_qualified_name = ${QualifiedName(
+                    TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
+                  )} and contract_expires_at < ${now.plus(renewalDuration.asJava)}
+              """,
+              ),
+              "listExpiringTransferPreapprovals",
+            )
+          limited = applyLimit("listExpiringTransferPreapprovals", limit, result)
+        } yield limited.map(assignedContractFromRow(TransferPreapproval.COMPANION)(_))
+      }
+  }
+
   override def lookupExternalPartySetupProposalByUserPartyWithOffset(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
@@ -204,7 +232,7 @@ class DbValidatorStore(
                 ExternalPartySetupProposal.COMPANION.TEMPLATE_ID
               )}
                 and user_party = $partyId
-            """, // TODO(#14568): ensure this is indexed
+            """,
             orderLimit = sql"""
                 limit 1
             """,

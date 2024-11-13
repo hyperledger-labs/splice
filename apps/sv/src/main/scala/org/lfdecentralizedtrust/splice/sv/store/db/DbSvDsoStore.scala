@@ -266,6 +266,33 @@ class DbSvDsoStore(
     } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
   }
 
+  override def listConfirmationsByActionConfirmer(
+      action: ActionRequiringConfirmation,
+      confirmer: PartyId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[Confirmation.ContractId, Confirmation]]] = waitUntilAcsIngested {
+    for {
+      result <- storage
+        .query(
+          selectFromAcsTable(
+            DsoTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                Confirmation.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
+                and confirmer = $confirmer
+                and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}""",
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
+          "listConfirmations",
+        )
+      limited = applyLimit("listConfirmations", limit, result)
+    } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
+  }
+
   override def listAppRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]]] =
@@ -1556,56 +1583,30 @@ class DbSvDsoStore(
   )(implicit tc: TraceContext): Future[Seq[Contract[
     splice.dsorules.Confirmation.ContractId,
     splice.dsorules.Confirmation,
-  ]]] =
-    for {
-      // TODO(#14568) Hit indices for this instead of doing a linear search
-      confirmations <- multiDomainAcsStore.listContracts(
-        splice.dsorules.Confirmation.COMPANION
+  ]]] = {
+    val expectedAction = new splice.dsorules.actionrequiringconfirmation.ARC_DsoRules(
+      new splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateTransferCommandCounter(
+        new splice.dsorules.DsoRules_CreateTransferCommandCounter(
+          partyId.toProtoPrimitive
+        )
       )
-    } yield {
-      confirmations
-        .map(_.contract)
-        .filter { c =>
-          c.payload.confirmer == confirmer.toProtoPrimitive &&
-          (c.payload.action match {
-            case action: splice.dsorules.actionrequiringconfirmation.ARC_DsoRules =>
-              action.dsoAction match {
-                case action: splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateTransferCommandCounter =>
-                  action.dsoRules_CreateTransferCommandCounterValue.sender == partyId.toProtoPrimitive
-                case _ => false
-              }
-            case _ => false
-          })
-        }
-    }
+    )
+    listConfirmationsByActionConfirmer(expectedAction, confirmer)
+  }
 
   override def listExternalPartyAmuletRulesConfirmation(
       confirmer: PartyId
   )(implicit tc: TraceContext): Future[Seq[Contract[
     splice.dsorules.Confirmation.ContractId,
     splice.dsorules.Confirmation,
-  ]]] =
-    for {
-      // TODO(#14568) Hit indices for this instead of doing a linear search
-      confirmations <- multiDomainAcsStore.listContracts(
-        splice.dsorules.Confirmation.COMPANION
+  ]]] = {
+    val expectedAction = new splice.dsorules.actionrequiringconfirmation.ARC_DsoRules(
+      new splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateExternalPartyAmuletRules(
+        new splice.dsorules.DsoRules_CreateExternalPartyAmuletRules()
       )
-    } yield {
-      confirmations
-        .map(_.contract)
-        .filter { c =>
-          c.payload.confirmer == confirmer.toProtoPrimitive &&
-          (c.payload.action match {
-            case action: splice.dsorules.actionrequiringconfirmation.ARC_DsoRules =>
-              action.dsoAction match {
-                case _: splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateExternalPartyAmuletRules =>
-                  true
-                case _ => false
-              }
-            case _ => false
-          })
-        }
-    }
+    )
+    listConfirmationsByActionConfirmer(expectedAction, confirmer)
+  }
 
   def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
       companion: C,

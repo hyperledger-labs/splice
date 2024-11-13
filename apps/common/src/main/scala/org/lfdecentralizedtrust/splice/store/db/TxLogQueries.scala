@@ -29,9 +29,11 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
     TxLogQueries.selectFromTxLogTable(tableName, storeId, where, orderLimit)
 
   /** Same as [[selectFromAcsTableWithOffset]], but for tx log tables.
+    * Note that the offset might be 0 if the migration is new.
     */
   protected def selectFromTxLogTableWithOffset(
       tableName: String,
+      currentMigrationIdForOffset: Long,
       storeId: Int,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
@@ -47,6 +49,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
        from store_descriptors sd
            left join store_last_ingested_offsets o
                on sd.id = o.store_id
+               and o.migration_id = $currentMigrationIdForOffset
            left join #$tableName tx
                on o.store_id = tx.store_id
                and """ ++ where ++ sql"""
