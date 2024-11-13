@@ -97,7 +97,7 @@ jobs:
           git config submodule.recurse true
           git fetch origin $base_branch
           git fetch origin $commit_sha
-          # TODO: should this be the original author instead?
+          # TODO(#16006): should this be the original author instead?
           git config user.email "splice-maintainers@digitalasset.com"
           git config user.name "DA Automation"
           git checkout -b $new_branch origin/$base_branch
