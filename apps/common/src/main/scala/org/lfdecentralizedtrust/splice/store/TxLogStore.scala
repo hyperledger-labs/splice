@@ -89,8 +89,8 @@ object TxLogStore {
     lazy val empty: Parser[Nothing] = new Parser[Nothing] {
       override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
           tc: TraceContext
-      ) = Seq.empty
-      override def error(offset: Long, eventId: String, domainId: DomainId) = None
+      ): Seq[Nothing] = Seq.empty
+      override def error(offset: Long, eventId: String, domainId: DomainId): Option[Nothing] = None
     }
   }
 
@@ -112,13 +112,13 @@ object TxLogStore {
   object Config {
     def empty: Config[Nothing] = new Config[Nothing] {
       override def parser = Parser.empty
-      override def entryToRow = throw new RuntimeException(
+      override def entryToRow: Nothing = throw new RuntimeException(
         "This app does not serialize any TxLog entries"
       )
-      override def encodeEntry = throw new RuntimeException(
+      override def encodeEntry: Nothing = throw new RuntimeException(
         "This app does not serialize any TxLog entries"
       )
-      override def decodeEntry = throw new RuntimeException(
+      override def decodeEntry: Nothing = throw new RuntimeException(
         "This app does not serialize any TxLog entries"
       )
     }

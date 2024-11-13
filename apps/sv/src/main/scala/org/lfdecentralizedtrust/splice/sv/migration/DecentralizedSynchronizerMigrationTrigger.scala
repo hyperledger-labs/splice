@@ -45,7 +45,10 @@ final class DecentralizedSynchronizerMigrationTrigger(
   override protected lazy val context =
     baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
-  override val sequencerAdminConnection = Some(sequencerAdminConnection0)
+  override val sequencerAdminConnection
+      : Some[org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection] = Some(
+    sequencerAdminConnection0
+  )
 
   val domainDataSnapshotGenerator = new DomainDataSnapshotGenerator(
     participantAdminConnection,

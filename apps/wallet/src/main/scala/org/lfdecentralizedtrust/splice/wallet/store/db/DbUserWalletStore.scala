@@ -94,12 +94,23 @@ class DbUserWalletStore(
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 
-  override protected def acsContractFilter = UserWalletStore.contractFilter(key, domainMigrationId)
+  override protected def acsContractFilter
+      : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
+        org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
+      ] = UserWalletStore.contractFilter(key, domainMigrationId)
 
-  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
-    override val parser =
+  override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
+    org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
+  ] {
+    val parser: org.lfdecentralizedtrust.splice.wallet.store.UserWalletTxLogParser;
+    def entryToRow
+        : org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry => org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletTxLogStoreRowData
+  } = new TxLogStore.Config[TxLogEntry] {
+    override val parser: org.lfdecentralizedtrust.splice.wallet.store.UserWalletTxLogParser =
       new UserWalletTxLogParser(loggerFactory, key.endUserParty)
-    override def entryToRow = WalletTables.UserWalletTxLogStoreRowData.fromTxLogEntry
+    override def entryToRow
+        : org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry => org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletTxLogStoreRowData =
+      WalletTables.UserWalletTxLogStoreRowData.fromTxLogEntry
     override def encodeEntry = TxLogEntry.encode
     override def decodeEntry = TxLogEntry.decode
   }

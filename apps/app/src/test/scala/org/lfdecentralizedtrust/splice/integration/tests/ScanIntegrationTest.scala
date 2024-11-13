@@ -710,8 +710,11 @@ class ScanIntegrationTest
 
     inside(response) {
       case _ if response.status == StatusCodes.BadRequest =>
-        inside(Unmarshal(response.entity).to[String].value.value) { case Success(response) =>
-          response should include("Invalid unique identifier `None` with missing namespace")
+        inside(Unmarshal(response.entity).to[String].value.value) {
+          case Success(successfullResponse) =>
+            successfullResponse should include(
+              "Invalid unique identifier `None` with missing namespace"
+            )
         }
     }
   }
@@ -735,10 +738,11 @@ class ScanIntegrationTest
 
     inside(response) {
       case _ if response.status == StatusCodes.BadRequest =>
-        inside(Unmarshal(response.entity).to[String].value.value) { case Success(response) =>
-          response should include(
-            "Invalid timestamp: Text 'Invalid' could not be parsed at index 0"
-          )
+        inside(Unmarshal(response.entity).to[String].value.value) {
+          case Success(successfullResponse) =>
+            successfullResponse should include(
+              "Invalid timestamp: Text 'Invalid' could not be parsed at index 0"
+            )
         }
     }
   }

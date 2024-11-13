@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.auth.CantonAdminToken
 import org.lfdecentralizedtrust.splice.SpliceMetrics
 import org.lfdecentralizedtrust.splice.admin.api.HttpRequestLogger
 import org.lfdecentralizedtrust.splice.auth.{
@@ -86,7 +87,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
   val name: InstanceName
 
   // Not used for splice
-  override def adminToken = ???
+  override def adminToken: CantonAdminToken = ???
 
   protected val retryProvider: RetryProvider =
     RetryProvider(
@@ -449,7 +450,7 @@ object NodeBase {
       version: ReleaseVersion,
   ) extends com.digitalasset.canton.health.admin.data.NodeStatus.Status {
 
-    override val components = Seq.empty
+    override val components: Seq[Nothing] = Seq.empty
 
     // Doesn't matter for splice but is required by the trait
     override val topologyQueue =

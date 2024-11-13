@@ -66,7 +66,10 @@ class DbSplitwellStore(
     with SplitwellStore {
 
   import MultiDomainAcsStore.*
-  override lazy val acsContractFilter = SplitwellStore.contractFilter(key)
+  override lazy val acsContractFilter
+      : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
+        org.lfdecentralizedtrust.splice.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData
+      ] = SplitwellStore.contractFilter(key)
 
   import multiDomainAcsStore.waitUntilAcsIngested
 

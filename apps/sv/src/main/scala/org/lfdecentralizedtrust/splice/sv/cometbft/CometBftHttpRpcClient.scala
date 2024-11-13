@@ -25,7 +25,6 @@ import io.grpc.Status
 import java.net.http.HttpClient
 import java.util.concurrent.Executor
 import java.util.{Base64, UUID}
-import scala.annotation.nowarn
 import scala.compat.java8.FutureConverters.CompletionStageOps
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -207,7 +206,6 @@ class CometBftHttpRpcClient(
 
 }
 
-@nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 object CometBftHttpRpcClient {
 
   private val AbciQueryMethod = "abci_query"
@@ -256,9 +254,7 @@ object CometBftHttpRpcClient {
     implicit val cometBftBroadcastResultDecoder: Decoder[CometBftBroadcastResult] =
       Decoder.forProduct2("deliver_tx", "check_tx")(CometBftBroadcastResult.apply)
 
-    @nowarn("cat=unused")
     implicit def successDecoder[T: Decoder]: Decoder[CometBftCallResponse[T]] = deriveDecoder
-    @nowarn("cat=unused")
     implicit def responseEncoder[T: Encoder]: Encoder[CometBftCallResponse[T]] = deriveEncoder
   }
 

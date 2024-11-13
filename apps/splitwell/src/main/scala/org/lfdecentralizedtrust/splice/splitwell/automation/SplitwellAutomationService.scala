@@ -70,7 +70,9 @@ class SplitwellAutomationService(
       ingestUpdateHistoryFromParticipantBegin = true,
     ) {
 
-  override def companion = SplitwellAutomationService
+  override def companion
+      : org.lfdecentralizedtrust.splice.splitwell.automation.SplitwellAutomationService.type =
+    SplitwellAutomationService
 
   registerTrigger(
     new AcceptedAppPaymentRequestsTrigger(
@@ -141,7 +143,7 @@ class SplitwellAutomationService(
 
 object SplitwellAutomationService extends AutomationServiceCompanion {
 
-  override protected[this] def expectedTriggerClasses =
+  override protected[this] def expectedTriggerClasses: Seq[Nothing] =
     Seq.empty
 
   private val walletPaymentsToSplitwell: Map[PackageVersion, DarResource] =

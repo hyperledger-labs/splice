@@ -66,7 +66,7 @@ trait AppReference extends InstanceReference {
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   // Doesn't make sense for splice
-  override def health = ???
+  override def health: Nothing = ???
 
   // clear_cache exists to invalidate topology caches which we don't have in our apps.
   override def clear_cache(): Unit = ()
@@ -93,7 +93,7 @@ trait AppReference extends InstanceReference {
   ): Unit
 
   // Doesn't make sense for Splice
-  override def adminToken = ???
+  override def adminToken: Nothing = ???
 }
 
 trait HttpAppReference extends AppReference with HttpCommandRunner {

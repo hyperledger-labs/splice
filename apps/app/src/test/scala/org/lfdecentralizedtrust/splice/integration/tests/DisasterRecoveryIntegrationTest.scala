@@ -80,7 +80,7 @@ class DisasterRecoveryIntegrationTest
 
   override def dbsSuffix = "disaster_recovery"
 
-  override def usesDbs = {
+  override def usesDbs: IndexedSeq[String] = {
     (1 to 4)
       .map(i =>
         Seq(

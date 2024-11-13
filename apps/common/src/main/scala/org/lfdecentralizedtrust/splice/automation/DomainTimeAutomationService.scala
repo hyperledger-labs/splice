@@ -35,7 +35,7 @@ final class DomainTimeAutomationService(
       retryProvider,
     ) {
 
-  override val companion = DomainTimeAutomationService
+  override val companion: DomainTimeAutomationService.type = DomainTimeAutomationService
 
   private val store =
     new DomainTimeStore(clock, config.maxAllowedDomainTimeDelay, retryProvider, loggerFactory)

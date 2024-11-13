@@ -95,7 +95,9 @@ class ValidatorAutomationService(
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
     ) {
-  override def companion = ValidatorAutomationService
+  override def companion
+      : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
+    ValidatorAutomationService
 
   val appManagerStore =
     new AppManagerStore(
@@ -299,5 +301,5 @@ object ValidatorAutomationService extends AutomationServiceCompanion {
       case _ => None
     }
 
-  override protected[this] def expectedTriggerClasses = Seq.empty
+  override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
 }

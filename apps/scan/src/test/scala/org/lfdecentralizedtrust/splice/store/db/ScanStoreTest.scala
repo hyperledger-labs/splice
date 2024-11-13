@@ -389,7 +389,7 @@ abstract class ScanStoreTest
         val expireAmount2 = -18.0
         for {
           store <- mkStore()
-          amuletRulesContract = amuletRules()
+          _ = amuletRules()
           // the round where the mint happened and for the rounds before and after
           _ <- sequentialTraverse_(Seq(user1 -> mintAmount1, user2 -> mintAmount2)) {
             case (user, mintAmount) =>
@@ -439,8 +439,8 @@ abstract class ScanStoreTest
         } yield forEvery(
           Table(
             ("user", "round", "amulet amount"),
-            (user1, 1L, 0),
-            (user2, 1L, 0),
+            (user1, 1L, BigDecimal(0)),
+            (user2, 1L, BigDecimal(0)),
             // check mints
             (user1, 2L, mintAmount1 - 1 * holdingFee),
             (user2, 2L, mintAmount2 - 1 * holdingFee),

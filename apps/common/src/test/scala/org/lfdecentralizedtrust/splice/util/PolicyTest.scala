@@ -35,7 +35,7 @@ class PolicyTest
             .delay(resetRetriesAfter + 50.millis)
             .map(_ => fail("delayed to reset retries, but failed instead"))
         case `atSpecial` => Future(doAssert)
-        case n => Future(fail(s"made $n runs instead of reaching $atSpecial runs"))
+        case runs => Future(fail(s"made $runs runs instead of reaching $atSpecial runs"))
       }
 
       val maxDelay = 250.millis

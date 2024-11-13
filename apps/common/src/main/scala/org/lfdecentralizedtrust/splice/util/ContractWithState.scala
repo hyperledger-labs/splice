@@ -56,7 +56,7 @@ object ContractWithState {
         cachedValue map (_.contract),
         MaybeCachedContract(maybeCached.contract),
       )
-      state <- maybeCached.domainId.traverse(d => DomainId fromString d map Assigned)
+      state <- maybeCached.domainId.traverse(d => DomainId fromString d map Assigned.apply)
     } yield ContractWithState(contract, state getOrElse InFlight)
   }
 
@@ -68,7 +68,7 @@ object ContractWithState {
     for {
       contract <- Contract.fromHttp(companion)(http.contract)
       state <- http.domainId
-        .traverse(d => DomainId.fromString(d).map(ContractState.Assigned))
+        .traverse(d => DomainId.fromString(d).map(ContractState.Assigned.apply))
         .left
         .map(err => ProtoDeserializationError.ValueConversionError("domainId", err))
     } yield ContractWithState(

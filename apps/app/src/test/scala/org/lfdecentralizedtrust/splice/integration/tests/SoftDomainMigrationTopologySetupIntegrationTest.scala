@@ -91,7 +91,8 @@ class SoftDomainMigrationTopologySetupIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
       .fromResources(
         Seq("simple-topology.conf", "simple-topology-soft-domain-upgrade.conf"),

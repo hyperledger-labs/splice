@@ -127,7 +127,7 @@ lazy val root: Project = (project in file("."))
   )
   .settings(
     BuildCommon.sharedSettings,
-    scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    scalacOptions ++= Seq("-Wconf:src=src_managed/.*:silent"),
     // Needed to be able to resolve scalafmt snapshot versions
     resolvers ++= Resolver.sonatypeOssRepos("snapshots"),
     damlDarsLockCheckerFileArg := {

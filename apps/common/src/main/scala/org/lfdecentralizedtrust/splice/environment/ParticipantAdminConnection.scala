@@ -69,7 +69,8 @@ class ParticipantAdminConnection(
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
 
   private val hashOps = new HashOps {
-    override def defaultHashAlgorithm = HashAlgorithm.Sha256
+    override def defaultHashAlgorithm: com.digitalasset.canton.crypto.HashAlgorithm.Sha256.type =
+      HashAlgorithm.Sha256
   }
 
   private def listConnectedDomains()(implicit
@@ -315,7 +316,7 @@ class ParticipantAdminConnection(
       configuredDomains <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListConfiguredDomains)
     } yield configuredDomains
       .collectFirst {
-        case (config, _) if config.domain == domain => config
+        case (configuredDomain, _) if configuredDomain.domain == domain => configuredDomain
       }
 
   def getDomainConnectionConfig(
@@ -590,7 +591,9 @@ object ParticipantAdminConnection {
       Right(Option.when(!response.data.isEmpty)(response.data))
 
     // might be a big file to download
-    override def timeoutType = GrpcAdminCommand.DefaultUnboundedTimeout
+    override def timeoutType
+        : com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.DefaultUnboundedTimeout.type =
+      GrpcAdminCommand.DefaultUnboundedTimeout
 
   }
 

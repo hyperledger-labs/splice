@@ -35,7 +35,7 @@ final class DomainParamsAutomationService(
       retryProvider,
     ) {
 
-  override val companion = DomainParamsAutomationService
+  override val companion: DomainParamsAutomationService.type = DomainParamsAutomationService
 
   private val store =
     new DomainParamsStore(retryProvider, loggerFactory)

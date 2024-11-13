@@ -84,7 +84,8 @@ final class ResetDecentralizedNamespace extends ResetTopologyStatePlugin {
               .filterNot(_.name.endsWith("Onboarded"))
               .map(_.participantClientWithAdminToken)
           val usableSvsByNamespace = usableSvs.map(p => p.id.uid.namespace -> p).toMap
-          (existingDecentralizedNamespace.item.owners + sv1.participantClientWithAdminToken.id.uid.namespace)
+          existingDecentralizedNamespace.item.owners
+            .concat(Set(sv1.participantClientWithAdminToken.id.uid.namespace))
             .foreach { namespace =>
               val sv = usableSvsByNamespace.getOrElse(
                 namespace,

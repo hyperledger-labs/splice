@@ -49,7 +49,7 @@ class ExternalPartyWalletManager(
     mat: Materializer,
     tracer: Tracer,
     templateJsonDecoder: TemplateJsonDecoder,
-    close: CloseContext,
+    closeContext: CloseContext,
 ) extends AutoCloseable
     with NamedLogging
     with HasHealth

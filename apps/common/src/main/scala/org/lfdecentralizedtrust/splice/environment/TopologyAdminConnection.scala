@@ -947,8 +947,9 @@ abstract class TopologyAdminConnection(
                   proposal.mapping.participants
                 )
                 proposal.mapping.participantIds ==
-                  newHostingParticipants.map(_.participantId)
-                  && proposal.mapping.threshold == Thresholds.partyToParticipantThreshold(
+                  newHostingParticipants.map(
+                    _.participantId
+                  ) && proposal.mapping.threshold == Thresholds.partyToParticipantThreshold(
                     newHostingParticipants
                   )
               })

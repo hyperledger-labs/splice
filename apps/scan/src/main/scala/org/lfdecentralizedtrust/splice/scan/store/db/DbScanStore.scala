@@ -125,9 +125,20 @@ class DbScanStore(
   import multiDomainAcsStore.waitUntilAcsIngested
   private val storeMetrics = new DbScanStoreMetrics(retryProvider.metricsFactory)
 
-  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
-    override val parser = new ScanTxLogParser(loggerFactory)
-    override def entryToRow = ScanTables.ScanTxLogRowData.fromTxLogEntry
+  override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
+    org.lfdecentralizedtrust.splice.scan.store.TxLogEntry
+  ] {
+    val parser: org.lfdecentralizedtrust.splice.scan.store.ScanTxLogParser;
+    def entryToRow
+        : org.lfdecentralizedtrust.splice.scan.store.TxLogEntry => org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanTxLogRowData
+  } = new TxLogStore.Config[TxLogEntry] {
+    override val parser: org.lfdecentralizedtrust.splice.scan.store.ScanTxLogParser =
+      new ScanTxLogParser(
+        loggerFactory
+      )
+    override def entryToRow
+        : org.lfdecentralizedtrust.splice.scan.store.TxLogEntry => org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanTxLogRowData =
+      ScanTables.ScanTxLogRowData.fromTxLogEntry
     override def encodeEntry = TxLogEntry.encode
     override def decodeEntry = TxLogEntry.decode
   }

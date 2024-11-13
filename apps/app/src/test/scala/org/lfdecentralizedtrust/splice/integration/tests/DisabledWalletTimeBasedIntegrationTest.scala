@@ -43,8 +43,8 @@ class DisabledWalletTimeBasedIntegrationTest
       loggerFactory.assertLogsSeq(LevelAndAbove(Level.DEBUG))(
         startAllSync(sv1Backend, sv1ValidatorBackend, sv1ScanBackend),
         logs => {
-          inside(logs) { case logs =>
-            logs.exists(log =>
+          inside(logs) { case _logs =>
+            _logs.exists(log =>
               log.loggerName.matches(
                 s".*${classOf[TreasuryService].getSimpleName}.*SV=sv1.*"
               ) || log.loggerName.matches(

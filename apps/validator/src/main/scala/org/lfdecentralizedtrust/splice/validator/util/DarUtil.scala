@@ -11,7 +11,8 @@ import java.io.InputStream
 
 private[validator] object DarUtil {
   private val hashOps = new HashOps {
-    override def defaultHashAlgorithm = HashAlgorithm.Sha256
+    override def defaultHashAlgorithm: com.digitalasset.canton.crypto.HashAlgorithm.Sha256.type =
+      HashAlgorithm.Sha256
   }
 
   def readDar(

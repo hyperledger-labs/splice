@@ -37,7 +37,7 @@ class TransactionTreeExtensionsTest extends AnyWordSpec with BaseTest {
       }.value
       case class FakeTpl() extends jcg.DamlRecord[FakeTpl] {
         override def toValue() = c.getArguments
-        override def jsonEncoder() = fail("jsonEncoder should not be used")
+        override def jsonEncoder(): Nothing = fail("jsonEncoder should not be used")
       }
       type FakeId = jcg.ContractId[FakeTpl]
       lazy val fakeCompanion: jcg.ContractCompanion.WithoutKey[jcg.Contract[
@@ -63,7 +63,12 @@ class TransactionTreeExtensionsTest extends AnyWordSpec with BaseTest {
           _ => FakeTpl(),
           (i, d, s, o) =>
             new jcg.Contract[FakeId, FakeTpl](i, d, s, o) {
-              override def getCompanion() = fakeCompanion
+              override def getCompanion()
+                  : com.daml.ledger.javaapi.data.codegen.ContractCompanion.WithoutKey[
+                    com.daml.ledger.javaapi.data.codegen.Contract[FakeId, FakeTpl],
+                    FakeId,
+                    FakeTpl,
+                  ] = fakeCompanion
             },
           Seq.empty.asJava,
         )

@@ -74,7 +74,10 @@ trait SvDsoStore
   override protected lazy val loggerFactory: NamedLoggerFactory =
     outerLoggerFactory.append("store", "dsoParty")
 
-  override lazy val acsContractFilter =
+  override lazy val acsContractFilter
+      : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
+        org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData
+      ] =
     SvDsoStore.contractFilter(key.dsoParty, domainMigrationId)
 
   def key: SvStore.Key

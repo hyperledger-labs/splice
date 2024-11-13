@@ -18,7 +18,7 @@ trait TxLogRowData {
 }
 object TxLogRowData {
   final object TxLogRowDataWithoutIndices extends TxLogRowData {
-    def indexColumns = Seq.empty
+    def indexColumns: Seq[Nothing] = Seq.empty
   }
   def noIndices = TxLogRowDataWithoutIndices
 }

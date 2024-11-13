@@ -41,7 +41,7 @@ class WalletPreapprovalSweepTrigger(
       currentAmuletConfig: AmuletConfig[USD],
   )(implicit tc: TraceContext) = Future.successful(BigDecimal(0.0))
 
-  override protected def outstandingDescription = throw Status.INTERNAL
+  override protected def outstandingDescription: Nothing = throw Status.INTERNAL
     .withDescription(
       s"outstandingDescription should never be called for ${this.getClass.getSimpleName}"
     )

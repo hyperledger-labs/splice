@@ -35,7 +35,10 @@ trait SvSvStore extends AppStore {
   override protected lazy val loggerFactory: NamedLoggerFactory =
     outerLoggerFactory.append("store", "svParty")
 
-  override lazy val acsContractFilter = SvSvStore.contractFilter(key)
+  override lazy val acsContractFilter
+      : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
+        org.lfdecentralizedtrust.splice.sv.store.db.SvTables.SvAcsStoreRowData
+      ] = SvSvStore.contractFilter(key)
 
   def lookupValidatorOnboardingBySecretWithOffset(
       secret: String

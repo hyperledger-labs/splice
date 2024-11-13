@@ -299,7 +299,6 @@ case class SpliceConfig(
 
 // NOTE: the below is patterned after CantonCommunityConfig.
 // In case of changes, recopy from there.
-@nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 object SpliceConfig {
 
   final case class ConfigValidationFailed(reason: String) extends FailureReason {
@@ -459,9 +458,6 @@ object SpliceConfig {
     implicit val sequencerPruningConfig: ConfigReader[SequencerPruningConfig] =
       deriveReader[SequencerPruningConfig]
     implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] = {
-      // Somehow the implicit search seems to have trouble finding the sequencer pruning config implicit.
-      // Redefining it here works though.
-      @nowarn("cat=unused")
       implicit val sequencerPruningConfig2 = sequencerPruningConfig
       deriveReader[SvSequencerConfig]
         .emap { sequencerConfig =>

@@ -13,7 +13,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.typesafe.scalalogging.Logger
 import io.circe.parser.decode as circeDecode
 
-import scala.annotation.nowarn
 import scala.util.control.NonFatal
 
 object K8sUtil {
@@ -78,7 +77,6 @@ object K8sUtil {
         )
     }
 
-    @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
     private object TokenDataJsonProtocol {
       import io.circe.{Decoder, Encoder}
       import io.circe.generic.semiauto.*

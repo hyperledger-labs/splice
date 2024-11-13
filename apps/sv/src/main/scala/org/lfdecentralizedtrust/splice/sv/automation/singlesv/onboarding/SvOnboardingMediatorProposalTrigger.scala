@@ -62,9 +62,8 @@ class SvOnboardingMediatorProposalTrigger(
         .map { case (mediatorConfig, sequencerConfig) =>
           val mediatorId = mediatorConfig.mediatorId
           MemberIdUtil.MediatorId
-            .tryFromProtoPrimitive(mediatorId, "mediatorId")
-            -> MemberIdUtil.SequencerId
-              .tryFromProtoPrimitive(sequencerConfig.sequencerId, "sequencerId")
+            .tryFromProtoPrimitive(mediatorId, "mediatorId") -> MemberIdUtil.SequencerId
+            .tryFromProtoPrimitive(sequencerConfig.sequencerId, "sequencerId")
         }
       val mediatorsToAdd =
         synchronizerNodeConfiguredNodes

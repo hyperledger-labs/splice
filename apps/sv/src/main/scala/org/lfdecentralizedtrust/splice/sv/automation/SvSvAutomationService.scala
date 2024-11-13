@@ -58,11 +58,12 @@ class SvSvAutomationService(
       config.ingestFromParticipantBegin,
       config.ingestUpdateHistoryFromParticipantBegin,
     ) {
-  override def companion = SvSvAutomationService
+  override def companion: org.lfdecentralizedtrust.splice.sv.automation.SvSvAutomationService.type =
+    SvSvAutomationService
   registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))
   registerTrigger(new AssignTrigger(triggerContext, svStore, connection, store.key.svParty))
 }
 
 object SvSvAutomationService extends AutomationServiceCompanion {
-  override protected[this] def expectedTriggerClasses = Seq.empty
+  override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
 }

@@ -287,7 +287,7 @@ object HttpWalletAppClient {
             domainId <- contractWithState.domainId.traverse(DomainId.fromString)
           } yield ContractWithState(
             contract,
-            domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+            domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
           )
         )
     }
@@ -453,11 +453,11 @@ object HttpWalletAppClient {
               case SubscriptionStateContract(SubscriptionStateIdleContract(contract)) =>
                 Contract
                   .fromHttp(subsCodegen.SubscriptionIdleState.COMPANION)(contract)
-                  .map(SubscriptionIdleState)
+                  .map(SubscriptionIdleState.apply)
               case SubscriptionStateContract(SubscriptionStatePaymentContract(contract)) =>
                 Contract
                   .fromHttp(subsCodegen.SubscriptionPayment.COMPANION)(contract)
-                  .map(SubscriptionPayment)
+                  .map(SubscriptionPayment.apply)
               case other =>
                 Left(
                   ProtoDeserializationError.UnrecognizedField(
@@ -983,13 +983,13 @@ object HttpWalletAppClient {
           .decodeJavaContractId(TransferPreapproval.COMPANION)(
             response.transferPreapprovalContractId
           )
-          .map(CreateTransferPreapprovalResponse.Created)
+          .map(CreateTransferPreapprovalResponse.Created.apply)
       case http.CreateTransferPreapprovalResponse.Conflict(response) =>
         Codec
           .decodeJavaContractId(TransferPreapproval.COMPANION)(
             response.transferPreapprovalContractId
           )
-          .map(CreateTransferPreapprovalResponse.AlreadyExists)
+          .map(CreateTransferPreapprovalResponse.AlreadyExists.apply)
     }
   }
 

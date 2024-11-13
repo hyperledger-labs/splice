@@ -125,11 +125,13 @@ class SvOnboardingSequencerTrigger(
       store,
     ) {
 
-  override val reconciler = new SequencerOnboarding(
-    store.key.svParty,
-    store,
-    participantAdminConnection,
-    logger,
-  )
+  override val reconciler
+      : org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SequencerOnboarding =
+    new SequencerOnboarding(
+      store.key.svParty,
+      store,
+      participantAdminConnection,
+      logger,
+    )
 
 }

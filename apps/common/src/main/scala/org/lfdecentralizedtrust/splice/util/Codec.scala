@@ -143,8 +143,8 @@ object Codec {
 
   implicit val roundValue: Codec[Round, Long] =
     new Codec[Round, Long] {
-      def encode(d: Round) = d.number
-      def decode(e: Long) = Right(new Round(e))
+      def encode(d: Round): Long = d.number
+      def decode(e: Long): Right[Nothing, Round] = Right(new Round(e))
     }
 
   object Timestamp extends CodecCompanion[CantonTimestamp] {

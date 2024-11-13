@@ -24,7 +24,7 @@ class JwksRSAKeyProvider(provider: JwkProvider) extends RSAKeyProvider {
     }
   }
 
-  override def getPrivateKey() = null
+  override def getPrivateKey(): Null = null
 
-  override def getPrivateKeyId() = null
+  override def getPrivateKeyId(): Null = null
 }

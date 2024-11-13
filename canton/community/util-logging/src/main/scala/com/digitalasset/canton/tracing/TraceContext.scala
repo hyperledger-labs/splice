@@ -36,13 +36,13 @@ class TraceContext private[tracing] (val context: OpenTelemetryContext)
 
   lazy val spanParentId: Option[String] = span
     .collect {
-      case span: ReadableSpan if span.getParentSpanContext.isValid =>
-        span.getParentSpanContext.getSpanId
+      case readableSpan: ReadableSpan if readableSpan.getParentSpanContext.isValid =>
+        readableSpan.getParentSpanContext.getSpanId
     }
 
   lazy val spanName: Option[String] = span
-    .collect { case span: ReadableSpan =>
-      span.getName
+    .collect { case readableSpan: ReadableSpan =>
+      readableSpan.getName
     }
 
   /** Convert to ledger-api server's telemetry context to facilitate integration

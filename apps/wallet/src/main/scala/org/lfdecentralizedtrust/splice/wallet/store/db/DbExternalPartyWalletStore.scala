@@ -57,6 +57,9 @@ class DbExternalPartyWalletStore(
   override def toString: String =
     show"DbExternalPartyWalletStore(externalParty=${key.externalParty})"
 
-  override protected def acsContractFilter = ExternalPartyWalletStore.contractFilter(key)
+  override protected def acsContractFilter
+      : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
+        org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.ExternalPartyWalletAcsStoreRowData
+      ] = ExternalPartyWalletStore.contractFilter(key)
 
 }

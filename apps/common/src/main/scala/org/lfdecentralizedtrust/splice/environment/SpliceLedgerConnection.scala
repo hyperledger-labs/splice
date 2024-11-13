@@ -478,7 +478,6 @@ class BaseLedgerConnection(
   def waitForPackages(
       requiredPackageIds: Set[String]
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
     if (requiredPackageIds.isEmpty) {
       logger.debug("Skipping waiting for required packages to be uploaded, as there are none.")
@@ -829,7 +828,6 @@ class SpliceLedgerConnection(
     def noDedup(implicit cid: DedupNotSpecifiedYet): submit[C, Unit, DomId] =
       copy(commandIdDeduplicationOffset = ())
 
-    @annotation.nowarn("cat=unused&msg=notNE")
     def withDomainId(
         domainId: DomainId,
         disclosedContracts: DisclosedContracts = DisclosedContracts(),

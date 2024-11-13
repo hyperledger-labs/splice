@@ -39,7 +39,9 @@ class DsoDelegateBasedAutomationService(
       retryProvider,
     ) {
 
-  override def companion = DsoDelegateBasedAutomationService
+  override def companion
+      : org.lfdecentralizedtrust.splice.sv.automation.DsoDelegateBasedAutomationService.type =
+    DsoDelegateBasedAutomationService
 
   def start(): Unit = {
     registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
