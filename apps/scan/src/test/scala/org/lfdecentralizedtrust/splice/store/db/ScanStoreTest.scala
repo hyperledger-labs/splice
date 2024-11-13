@@ -1378,7 +1378,7 @@ abstract class ScanStoreTest
             userParty(1),
             0L,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map.empty
           rules = amuletRules()
           externalPartyRules = externalPartyAmuletRules()
@@ -1388,7 +1388,7 @@ abstract class ScanStoreTest
             externalPartyRules,
             transferCmd,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
@@ -1434,7 +1434,7 @@ abstract class ScanStoreTest
           )(
             store.multiDomainAcsStore
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
@@ -1463,7 +1463,7 @@ abstract class ScanStoreTest
             userParty(1),
             0L,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map.empty
           rules = amuletRules()
           externalPartyRules = externalPartyAmuletRules()
@@ -1472,7 +1472,7 @@ abstract class ScanStoreTest
             externalPartyRules,
             transferCmd,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
@@ -1505,7 +1505,7 @@ abstract class ScanStoreTest
           )(
             store.multiDomainAcsStore
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
@@ -1535,7 +1535,7 @@ abstract class ScanStoreTest
             userParty(1),
             0L,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map.empty
           rules = amuletRules()
           externalPartyRules = externalPartyAmuletRules()
@@ -1544,7 +1544,7 @@ abstract class ScanStoreTest
             externalPartyRules,
             transferCmd,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
@@ -1570,7 +1570,7 @@ abstract class ScanStoreTest
           )(
             store.multiDomainAcsStore
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
@@ -1599,7 +1599,7 @@ abstract class ScanStoreTest
             userParty(1),
             0L,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map.empty
           rules = amuletRules()
           externalPartyRules = externalPartyAmuletRules()
@@ -1608,7 +1608,7 @@ abstract class ScanStoreTest
             externalPartyRules,
             transferCmd,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
@@ -1635,7 +1635,7 @@ abstract class ScanStoreTest
           )(
             store.multiDomainAcsStore
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd.contractId ->
               TransferCommandTxLogEntry(
@@ -1687,11 +1687,11 @@ abstract class ScanStoreTest
             Instant.EPOCH,
             0L,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map.empty
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 1L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 1L, 10)
           _ = result shouldBe Map.empty
-          result <- store.lookupLatestTransferCommandEvents(userParty(2), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(2), 0L, 10)
           _ = result shouldBe Map.empty
           rules = amuletRules()
           externalPartyRules = externalPartyAmuletRules()
@@ -1708,11 +1708,11 @@ abstract class ScanStoreTest
               transferCmd1.contractId.contractId,
               TransferCommandTxLogEntry.Status.Created(TransferCommandCreated()),
             )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(transferCmd1.contractId -> transferCmd1Status)
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 1L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 1L, 10)
           _ = result shouldBe Map.empty
-          result <- store.lookupLatestTransferCommandEvents(userParty(2), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(2), 0L, 10)
           _ = result shouldBe Map.empty
           tx2 <- createTransferCommand(
             store,
@@ -1750,14 +1750,18 @@ abstract class ScanStoreTest
             transferCmd4.contractId.contractId,
             TransferCommandTxLogEntry.Status.Created(TransferCommandCreated()),
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 10)
           _ = result shouldBe Map(
             transferCmd1.contractId -> transferCmd1Status,
             transferCmd4.contractId -> transferCmd4Status,
           )
-          result <- store.lookupLatestTransferCommandEvents(userParty(1), 1L)
+          resultLimit <- store.lookupLatestTransferCommandEvents(userParty(1), 0L, 1)
+          _ = resultLimit shouldBe Map(
+            transferCmd1.contractId -> transferCmd1Status
+          )
+          result <- store.lookupLatestTransferCommandEvents(userParty(1), 1L, 10)
           _ = result shouldBe Map(transferCmd2.contractId -> transferCmd2Status)
-          result <- store.lookupLatestTransferCommandEvents(userParty(2), 0L)
+          result <- store.lookupLatestTransferCommandEvents(userParty(2), 0L, 10)
           _ = result shouldBe Map(transferCmd3.contractId -> transferCmd3Status)
         } yield succeed
       }

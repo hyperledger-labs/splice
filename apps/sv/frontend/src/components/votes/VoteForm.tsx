@@ -28,6 +28,7 @@ import { ContractId } from '@daml/types';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useSvConfig } from '../../utils';
+import { VoteConfirmationDialog } from '../VoteConfirmationDialog';
 
 interface VoteFormProps {
   vote?: SvVote;
@@ -66,6 +67,17 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
     setReasonUrl(vote ? vote.reason.url : '');
     setReasonBody(vote ? vote.reason.body : '');
     setIsEditing(true);
+  };
+
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+
+  const handleConfirmationAccept = () => {
+    castOrUpdateVoteMutation.mutate();
+    setConfirmDialogOpen(false);
+  };
+
+  const handleConfirmationClose = () => {
+    setConfirmDialogOpen(false);
   };
 
   return (
@@ -197,7 +209,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                           id="save-vote-button"
                           variant="contained"
                           endIcon={<SendIcon />}
-                          onClick={() => castOrUpdateVoteMutation.mutate()}
+                          onClick={() => setConfirmDialogOpen(true)}
                         >
                           Save
                         </Button>
@@ -209,6 +221,17 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <VoteConfirmationDialog
+          showDialog={confirmDialogOpen}
+          onClose={handleConfirmationClose}
+          onAccept={handleConfirmationAccept}
+          title="Confirm Your Vote"
+        >
+          <Typography variant="h5">
+            Are you sure you want to {voteEditing} the changes proposed in this vote?
+          </Typography>
+        </VoteConfirmationDialog>
       </Stack>
     </>
   );

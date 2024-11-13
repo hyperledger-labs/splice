@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.nonempty.NonEmpty
 import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceBackendConfig}
 import org.lfdecentralizedtrust.splice.console.AppBackendReference
@@ -15,7 +16,17 @@ import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, 
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.{
+  MediatorId,
+  Member,
+  Namespace,
+  NodeIdentity,
+  ParticipantId,
+  SequencerId,
+  UniqueIdentifier,
+}
 
 import java.util.UUID
 import scala.concurrent.duration.DurationInt
@@ -130,14 +141,15 @@ class ManualStartIntegrationTest
           aliceValidatorBackend,
         )
 
-        val allTopologyConnections = Seq(
-          participantAdminConnection("sv1", sv1Backend.config),
-          sequencerAdminConnection("sv1", sv1Backend.config),
-          mediatorAdminConnection("sv1", sv1Backend.config),
-          participantAdminConnection("sv2", sv2Backend.config),
-          sequencerAdminConnection("sv2", sv2Backend.config),
-          mediatorAdminConnection("sv2", sv2Backend.config),
-          participantAdminConnection("alice", aliceValidatorBackend.config),
+        val allTopologyConnections
+            : Seq[(TopologyAdminConnection, UniqueIdentifier => Member & NodeIdentity)] = Seq(
+          (participantAdminConnection("sv1", sv1Backend.config), ParticipantId.apply),
+          (sequencerAdminConnection("sv1", sv1Backend.config), SequencerId.apply),
+          (mediatorAdminConnection("sv1", sv1Backend.config), MediatorId.apply),
+          (participantAdminConnection("sv2", sv2Backend.config), ParticipantId.apply),
+          (sequencerAdminConnection("sv2", sv2Backend.config), SequencerId.apply),
+          (mediatorAdminConnection("sv2", sv2Backend.config), MediatorId.apply),
+          (participantAdminConnection("alice", aliceValidatorBackend.config), ParticipantId.apply),
         )
 
         clue("All Canton nodes are running but have no identity") {
@@ -145,17 +157,23 @@ class ManualStartIntegrationTest
             // Eventually, because the query to the server will fail while the server is still starting up
             // Long timeout because Canton is slow to start up
             eventually(timeUntilSuccess = 60.seconds) {
-              val id = connection.getIdOption().futureValue
-              id.initialized shouldBe false
-              id.uniqueIdentifier shouldBe None
+              val idResult = connection.getIdOption().futureValue
+              idResult.initialized shouldBe false
+              idResult.uniqueIdentifier shouldBe None
             }
           }
 
-          allTopologyConnections.foreach(assertHasNoIdentity)
+          allTopologyConnections.foreach(x => assertHasNoIdentity(x._1))
         }
 
         clue("Starting all Splice apps") {
           startAllSync(allCnApps*)
+        }
+
+        clue(
+          "All Canton nodes have identity and signing keys different from their namespace keys"
+        ) {
+          allTopologyConnections.foreach(assertSigningKeysDifferent.tupled)
         }
 
         // A most basic check to see whether the network is functional
@@ -185,11 +203,154 @@ class ManualStartIntegrationTest
         )
 
         clue("Cleaning up") {
-          allTopologyConnections.foreach(_.close())
+          allTopologyConnections.foreach(_._1.close())
+          retryProvider.close()
+        }
+      }
+    }
+    "start with initialized Canton participants and fix signing keys if needed" in { implicit env =>
+      import env.environment.scheduler
+      import env.executionContext
+      val grpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(
+        NoOpMetricsFactory,
+        "testing",
+      )
+      val retryProvider = new RetryProvider(
+        loggerFactory,
+        ProcessingTimeout(),
+        new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
+        NoOpMetricsFactory,
+      )
+      def participantAdminConnection(name: String, config: SpliceBackendConfig) = {
+        val loggerFactoryWithKey = loggerFactory.append("participant", name)
+        new ParticipantAdminConnection(
+          ClientConfig(port = config.participantClient.adminApi.port),
+          env.environment.config.monitoring.logging.api,
+          loggerFactoryWithKey,
+          grpcClientMetrics,
+          retryProvider,
+        )
+      }
+      withCantonSvNodes(
+        adminUsersFromSvBackends =
+          (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
+        logSuffix = s"manual-start",
+        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsEnvMap = Map(
+          "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
+          "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
+        ),
+      )() {
+
+        val allCnApps = Seq[AppBackendReference](
+          sv1Backend,
+          sv1ScanBackend,
+          sv1ValidatorBackend,
+          sv2Backend,
+          sv2ScanBackend,
+          sv2ValidatorBackend,
+          aliceValidatorBackend,
+        )
+
+        val allParticipantAdminConnectionsExSv1 = Seq(
+          (
+            participantAdminConnection("sv2", sv2Backend.config),
+            sv2Backend.config.cantonIdentifierConfig.value.participant,
+          ),
+          (
+            participantAdminConnection("alice", aliceValidatorBackend.config),
+            aliceValidatorBackend.config.cantonIdentifierConfig.value.participant,
+          ),
+        )
+        val allParticipantAdminConnections = Seq(
+          (
+            participantAdminConnection("sv1", sv1Backend.config),
+            sv1Backend.config.cantonIdentifierConfig.value.participant,
+          )
+        ) ++ allParticipantAdminConnectionsExSv1
+
+        clue("Initialize all participants, with signing keys reusal") {
+          def initializeWithKeyReuse(connection: ParticipantAdminConnection, name: String) = {
+            // Eventually, because the query to the server will fail while the server is still starting up
+            // Long timeout because Canton is slow to start up
+            eventually(timeUntilSuccess = 60.seconds) {
+
+              val signingKey =
+                connection.generateKeyPair("signing", SigningKeyUsage.All).futureValue
+              val encryptionKey = connection.generateEncryptionKeyPair("encryption").futureValue
+              // this is part of the wrong part! we should not be reusing this key
+              val namespace = Namespace(signingKey.id)
+              val uid = UniqueIdentifier.tryCreate(name, signingKey.id.toProtoPrimitive)
+              val nodeId = ParticipantId.apply(uid)
+
+              // Setting node identity
+              connection.initId(nodeId).futureValue
+
+              // Adding root certificate
+              connection
+                .ensureNamespaceDelegation(
+                  namespace = namespace,
+                  target = signingKey,
+                  isRootDelegation = true,
+                  signedBy = namespace.fingerprint,
+                  retryFor = RetryFor.Automation,
+                )
+                .futureValue
+
+              // Adding owner-to-key mappings
+              connection
+                .ensureInitialOwnerToKeyMapping(
+                  member = nodeId,
+                  keys = NonEmpty(Seq, signingKey, encryptionKey),
+                  signedBy = Seq(namespace.fingerprint),
+                  retryFor = RetryFor.Automation,
+                )
+                .futureValue
+            }
+
+          }
+          // SV1's original init is more complicated and things get messy when we mess with the participant before starting that;
+          // so we're skipping sv1 here to not overcomplicate the test
+          allParticipantAdminConnectionsExSv1.foreach(initializeWithKeyReuse.tupled)
+        }
+
+        clue("Starting all Splice apps") {
+          startAllSync(allCnApps*)
+        }
+
+        clue(
+          "All Canton nodes have identity and signing keys different from their namespace keys"
+        ) {
+          eventually() {
+            allParticipantAdminConnections.foreach(x =>
+              assertSigningKeysDifferent(x._1, ParticipantId.apply)
+            )
+          }
+        }
+        clue("Cleaning up") {
+          allParticipantAdminConnections.foreach(_._1.close())
           retryProvider.close()
         }
       }
     }
   }
-
+  def assertSigningKeysDifferent(
+      connection: TopologyAdminConnection,
+      nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
+  ) = {
+    eventually() {
+      val idResult = connection.getIdOption().futureValue
+      idResult.initialized shouldBe true
+      val id = nodeIdentity(idResult.uniqueIdentifier.value)
+      val ownerToKeyMappings =
+        connection.listOwnerToKeyMapping(id).futureValue.map(_.mapping)
+      ownerToKeyMappings.foreach { mapping =>
+        mapping.keys.foreach {
+          case key: SigningPublicKey =>
+            key.id should not be id.namespace.fingerprint
+          case _ =>
+        }
+      }
+    }
+  }
 }
