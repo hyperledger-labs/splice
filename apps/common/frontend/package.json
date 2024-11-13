@@ -22,7 +22,6 @@
     "common-typeface-termina": "1.0.0",
     "date-fns": "2.29.3",
     "decimal.js-light": "2.5.1",
-    "splitwell-openapi": "0.0.1",
     "dompurify": "3.1.6",
     "grpc-web": "1.3.1",
     "html-react-parser": "5.1.15",
@@ -30,24 +29,26 @@
     "jsondiffpatch": "0.6.0",
     "react-oidc-context": "2.2.2",
     "react-router-dom": "6.8.1",
+    "splitwell-openapi": "0.0.1",
     "sv-openapi": "0.0.1",
     "web-vitals": "2.1.4",
+    "xunit-viewer": "^10.6.1",
     "zod": "3.19.1"
   },
   "devDependencies": {
     "@tanstack/eslint-plugin-query": "4.29.4",
     "@tanstack/react-query-devtools": "4.29.6",
     "@trivago/prettier-plugin-sort-imports": "4.0.0",
-    "@types/node": "18.11.0",
     "@types/dompurify": "3.0.5",
+    "@types/node": "18.11.0",
     "@types/react": "18.0.28",
     "@types/react-dom": "18.0.11",
+    "common-test-utils": "^0.1.0",
     "eslint": "8.34.0",
     "eslint-config-react-app": "7.0.1",
     "prettier": "2.8.4",
     "typescript": "4.9.5",
-    "vitest": "^2.1.4",
-    "common-test-utils": "^0.1.0"
+    "vitest": "^2.1.4"
   },
   "exports": {
     ".": "./lib/index.js",
@@ -72,7 +73,8 @@
     "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
     "start": "tsc --watch",
     "test": "PORT=0 vitest",
-    "test:sbt": "PORT=0 vitest --run"
+    "test:sbt": "PORT=0 vitest --run",
+    "xunit-viewer": "xunit-viewer -r ../../../test-reports/ -o ../../../log/report.html"
   },
   "types": "lib/index.d.ts"
 }

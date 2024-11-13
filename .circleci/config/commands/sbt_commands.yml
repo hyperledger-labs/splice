@@ -111,12 +111,11 @@ commands:
           command: |
             for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
             do
-              mkdir -p test-reports/"$subproject"
+              mkdir -p test-reports
+              mkdir -p log
               # Keep going, if there is no test report.
-              cp -v "$subproject"/target/test-reports/TEST-*.xml test-reports/"$subproject" || true
+              cp -v "$subproject"/target/test-reports/TEST-*.xml test-reports || true
             done
-      - store_test_results:
-          path: test-reports
 
   # Adapted from Canton's CI definition
   split_tests_for_parallel_run:

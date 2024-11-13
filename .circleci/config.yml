@@ -1248,12 +1248,11 @@ commands:
           command: |
             for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
             do
-              mkdir -p test-reports/"$subproject"
+              mkdir -p test-reports
+              mkdir -p log
               # Keep going, if there is no test report.
-              cp -v "$subproject"/target/test-reports/TEST-*.xml test-reports/"$subproject" || true
+              cp -v "$subproject"/target/test-reports/TEST-*.xml test-reports || true
             done
-      - store_test_results:
-          path: test-reports
 
   # Adapted from Canton's CI definition
   split_tests_for_parallel_run:
@@ -1388,7 +1387,6 @@ commands:
         default: false
       <<: *runner_type
     steps:
-      - upload_test_reports
       # sbt caches are job-specific, so we're ignoring the upload_caches parameter,
       # and saving those caches in every job
       - save_sbt_cache:
@@ -3186,6 +3184,11 @@ jobs:
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmTest"
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
+      - upload_test_reports
+      - execute_sbt_command:
+          cmd: "apps-common-frontend/npmGenerateViteReport"
+          fail_on_error_in_output: false
+          when: "on_fail"
       - save_sbt_job_result:
           runner_type: "selfhosted"
 
@@ -3361,9 +3364,7 @@ jobs:
                     echo "Publishing ${source} to ${full_path}"
                     curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
                   }
-                  
                   make cluster/helm/build -j
-                  
                   for chart in cluster/helm/target/*.tgz; do
                     artifactory_url="https://digitalasset.jfrog.io/artifactory"
                     publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"

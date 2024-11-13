@@ -42,6 +42,7 @@ object BuildCommon {
       taskKey[Unit]("checks formatting of frontend code, but does not fix anything")
     lazy val npmFix = taskKey[Unit]("fixes formatting of frontend code")
     lazy val npmTest = taskKey[Unit]("run all frontend unit tests")
+    lazy val npmGenerateViteReport = taskKey[Unit]("generate html vite test reports")
     lazy val npmBuild = taskKey[Unit]("build an npm project")
 
     lazy val compileOpenApi = taskKey[Seq[File]]("build typescript code")

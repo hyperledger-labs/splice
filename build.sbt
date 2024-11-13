@@ -812,6 +812,15 @@ lazy val `apps-common-frontend` = {
           Some(npmRootDir.value),
         )
       },
+      npmGenerateViteReport := {
+        val log = streams.value.log
+        runCommand(
+          Seq("npm", "run", "xunit-viewer", "--workspaces", "--if-present"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
       cleanFiles += damlTsCodegenDir.value,
       cleanFiles += baseDirectory.value / "lib",
       cleanFiles += baseDirectory.value / "../../node_modules",

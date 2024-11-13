@@ -27,6 +27,10 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       setupFiles: ['./src/__tests__/setup/setup.ts'],
+      reporters: [
+        'default',
+        ['junit', { outputFile: './../target/test-reports/TEST-scan.xml' }], // JUnit XML report
+      ],
     },
   });
 });
