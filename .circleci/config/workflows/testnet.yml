@@ -10,7 +10,8 @@ workflow:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
-          migration_id: 2
+          migration_id: 3
+          internal_stack: false
           context:
             - artifactory
             - canton-network-vpn
@@ -22,7 +23,7 @@ workflow:
     jobs:
       - backup_status_cluster:
           cluster: "testnet"
-          migration_id: 2
+          migration_id: 3
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context
