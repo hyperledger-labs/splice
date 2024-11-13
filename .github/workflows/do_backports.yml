@@ -3,14 +3,13 @@
 
 name: Auto-backport PRs to release branches
 on:
-  # pull_request:
-  #   types:
-  #     - closed
-  pull_request
+  pull_request:
+    types:
+      - closed
 
 jobs:
   get_backport_branches:
-    # if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true
     runs-on: self-hosted-docker
     outputs:
       branches: ${{ steps.get_backport_branches.outputs.result }}
@@ -30,15 +29,12 @@ jobs:
       matrix:
         branch: ${{ fromJSON(needs.get_backport_branches.outputs.branches) }}
       fail-fast: false
-    # uses: ./.github/workflows/backport.yml
-    # # Grant access to secrets in order to use the ssh key to pull the submodule
-    # secrets: inherit
-    # with:
-    #   base_branch: ${{ matrix.branch }}
-    #   pr_number: ${{ github.event.pull_request.number }}
-    #   # Request the original PR author to review the backport PR (since this was approved by others
-    #   # and merged already, we don't need to request review from them)
-    #   reviewer: ${{ github.event.pull_request.user.login }}
-    runs-on: self-hosted-docker
-    steps:
-      - run: echo "backporting to ${{ matrix.branch }}"
+    uses: ./.github/workflows/backport.yml
+    # Grant access to secrets in order to use the ssh key to pull the submodule
+    secrets: inherit
+    with:
+      base_branch: ${{ matrix.branch }}
+      pr_number: ${{ github.event.pull_request.number }}
+      # Request the original PR author to review the backport PR (since this was approved by others
+      # and merged already, we don't need to request review from them)
+      reviewer: ${{ github.event.pull_request.user.login }}
