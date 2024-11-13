@@ -15,18 +15,18 @@ async function getBackportComment(deps) {
     console.log("No backport comment found");
     return undefined;
   }
-  const comment = backportComments.join("\n");
+  const comment = backportComments.map(comment => comment.body).join("\n");
   return comment;
 }
 
 async function getBackportBranches(deps) {
-  comment = await getBackportComment(deps);
+  const comment = await getBackportComment(deps);
   if (comment == undefined) {
     return [];
   }
-  console.log(comment.body);
+  console.log(comment);
 
-  const lines = comment.body.split('\n');
+  const lines = comment.split('\n');
   const backportLines = lines.filter((line) => {
     return line.match(/^\s*- \[x\]/) !== null;
   });
