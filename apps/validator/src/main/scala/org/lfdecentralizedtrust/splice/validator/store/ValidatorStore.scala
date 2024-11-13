@@ -25,20 +25,20 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
   QueryResult,
   TemplateFilter,
 }
-import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore, PageLimit}
+import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
 import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
 import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Hash
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Time.Timestamp
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -133,19 +133,7 @@ trait ValidatorStore extends WalletStore with AppStore {
   ): ListExpiredContracts[
     amuletrulesCodegen.TransferPreapproval.ContractId,
     amuletrulesCodegen.TransferPreapproval,
-  ] = { (now: CantonTimestamp, limit: PageLimit) => implicit traceContext =>
-    {
-      def isReadyForRenewal(preapproval: amuletrulesCodegen.TransferPreapproval): Boolean =
-        now.toInstant.isAfter(preapproval.expiresAt.minus(renewalDuration.asJava))
-
-      // TODO(#14568): Move this filter and limit into the DB query
-      multiDomainAcsStore
-        .listAssignedContracts(
-          amuletrulesCodegen.TransferPreapproval.COMPANION
-        )
-        .map(_.filter(p => isReadyForRenewal(p.payload)).take(limit.limit))
-    }
-  }
+  ]
 
   def lookupExternalPartySetupProposalByUserPartyWithOffset(
       partyId: PartyId
@@ -448,6 +436,7 @@ object ValidatorStore {
           ValidatorAcsStoreRowData(
             contract = contract,
             userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
         },
         mkFilter(externalpartyamuletrulesCodegen.TransferCommand.COMPANION)(co =>
