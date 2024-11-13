@@ -121,6 +121,7 @@ class SvOffboardPreflightIntegrationTest
         }
         clue("click the submit button") {
           click on "create-voterequest-submit-button"
+          click on "vote-confirmation-dialog-accept-button"
         }
 
         eventually() {
