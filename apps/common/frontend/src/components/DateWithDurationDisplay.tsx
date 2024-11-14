@@ -11,6 +11,7 @@ interface DateWithDurationDisplayProps {
   datetime: string | Date | undefined;
   format?: string;
   enableDuration?: boolean;
+  onlyDuration?: boolean;
 }
 
 const DateWithDurationDisplay: React.FC<DateWithDurationDisplayProps> = (
@@ -29,7 +30,9 @@ const DateWithDurationDisplay: React.FC<DateWithDurationDisplayProps> = (
 
   return (
     <>
-      {format(dateObj, f)} <span>{expireDuration}</span>
+      {props.enableDuration && props.onlyDuration
+        ? expireDuration
+        : `${format(dateObj, f)} ${expireDuration}`}
     </>
   );
 };

@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder';
 import { useMutation } from '@tanstack/react-query';
-import { ActionView, DisableConditionally, SvClientProvider } from 'common-frontend';
+import {
+  ActionView,
+  DateWithDurationDisplay,
+  DisableConditionally,
+  SvClientProvider,
+} from 'common-frontend';
 import { getUTCWithOffset } from 'common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
@@ -290,6 +295,14 @@ export const CreateVoteRequest: React.FC = () => {
               }}
               closeOnSelect
             />
+            <Typography variant="body2" mt={1}>
+              Expires{' '}
+              <DateWithDurationDisplay
+                datetime={expiration?.toDate()}
+                enableDuration
+                onlyDuration
+              />
+            </Typography>
           </Stack>
           {actionName === 'SRARC_OffboardSv' && <OffboardSv chooseAction={chooseAction} />}
           {actionName === 'SRARC_GrantFeaturedAppRight' && (

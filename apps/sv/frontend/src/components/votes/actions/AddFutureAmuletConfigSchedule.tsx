@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Loading } from 'common-frontend';
+import { DateWithDurationDisplay, Loading } from 'common-frontend';
 import { getUTCWithOffset, JsonEditor, JSONValue } from 'common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
@@ -103,6 +103,10 @@ const AddFutureAmuletConfigSchedule: React.FC<{
           }}
           closeOnSelect
         />
+        <Typography variant="body2" mt={1}>
+          Effective{' '}
+          <DateWithDurationDisplay datetime={date?.toDate()} enableDuration onlyDuration />
+        </Typography>
         <Typography variant="h6" mt={4}>
           Configuration
         </Typography>

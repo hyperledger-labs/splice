@@ -7,6 +7,7 @@ import AuthProvider from './AuthProvider';
 import CopyableTypography from './CopyableTypography';
 import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
+import DateWithDurationDisplay from './DateWithDurationDisplay';
 import DisableConditionally from './DisableConditionally';
 import DsoViewPrettyJSON, { DsoInfo } from './Dso';
 import ErrorBoundary from './ErrorBoundary';
@@ -60,6 +61,7 @@ export {
   TitledTable,
   TransferButton,
   SubscriptionButton,
+  DateWithDurationDisplay,
   DsoViewPrettyJSON,
   DsoInfo,
   VotesHooksContext,
