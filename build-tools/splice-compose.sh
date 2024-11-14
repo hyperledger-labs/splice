@@ -68,17 +68,6 @@ function _do_start_validator {
       "$@" \
       "-w" \
         | tee -a "${REPO_ROOT}/log/compose-wait.log" 2>&1 || _error "Validator failed to become ready"
-
-    # We are also waiting here for the readiness endpoint explicitly, and not only relying on
-    # docker healthchecks, to support versions of the images that did not include the healthchecks.
-    # TODO(#14303): remove this once the images of the base version include healthchecks
-    # shellcheck disable=SC2034
-    for i in {1..60}; do
-        curl -sf "wallet.localhost/api/validator/readyz" && break
-        echo -n "."
-        sleep 10
-    done
-    curl -sf "wallet.localhost/api/validator/readyz" || _error "Validator is not ready after 30 minutes" || exit 1
   fi
 
 }
@@ -112,6 +101,9 @@ function _start_validator {
   if [ -n "$participant_id" ]; then
     extra_flags+=("-P" "$participant_id")
   fi
+  if [ "$trust_single" -eq 1 ]; then
+    extra_flags+=("-b")
+  fi
 
   secret_url="${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare"
   _info "Curling ${secret_url} for the secret"
@@ -127,11 +119,6 @@ function _start_validator {
     exit 1
   fi
 
-  # TODO(#14303): remove this once the migration base version supports the splice-instance-names endpoint
-  if ! curl -sLf "${scan}/api/scan/v0/splice-instance-names" > /dev/null; then
-    _info "Scan does not support the splice-instance-names endpoint, using hardcoded values"
-    export SPLICE_INSTANCE_NAMES='{"network_name":"Canton Network","network_favicon_url":"https://www.canton.network/hubfs/cn-favicon-05%201-1.png","amulet_name":"Canton Coin","amulet_name_acronym":"CC","name_service_name":"Canton Name Service","name_service_name_acronym":"CNS"}'
-  fi
   mkdir -p "${REPO_ROOT}/log"
 
   _info "Starting validator"
@@ -141,7 +128,6 @@ function _start_validator {
     "-q" "${sequencer}" \
     "-o" "${secret}" \
     "-m" "${migration_id}" \
-    "-b" \
     "-p" "${party_hint}" \
   )
 
@@ -191,7 +177,8 @@ function subcmd_start {
   restore_identities_dump=""
   party_hint="$(whoami)-composeValidator-1"
   participant_id=""
-  while getopts 'haldn:m:Mwt:i:p:P:' arg; do
+  trust_single=0
+  while getopts 'haldn:m:Mwt:i:p:P:b' arg; do
     case ${arg} in
       h)
         subcmd_help
@@ -230,6 +217,9 @@ function subcmd_start {
         ;;
       P)
         participant_id="${OPTARG}"
+        ;;
+      b)
+        trust_single=1
         ;;
       ?)
         subcmd_help
@@ -276,6 +266,7 @@ function usage_start {
   _info "      -i <identities_dump>: restore identities from a dump file"
   _info "      -p <party_hint>: party hint (by default, <local_user>-composeValidator-1)"
   _info "      -P <participant_id>: participant identifier (by default, identical to the party hint)"
+  _info "      -b: Disable BFT reads&writes and trust a single SV."
 }
 
 subcommand_whitelist[stop]='stop a validator'

@@ -39,6 +39,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       "-w",
       "-p",
       partyHint,
+      "-b",
     ) ++ startFlags).asJava
     val builder = new ProcessBuilder(command)
     extraEnv.foreach { case (k, v) => builder.environment().put(k, v) }

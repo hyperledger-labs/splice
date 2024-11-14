@@ -9,9 +9,6 @@ services:
     environment:
       - SPLICE_APP_VALIDATOR_WALLET_USER_NAME=administrator
       - SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME=ledger-api-user
-      # TODO (#14303) remove CN_ defs once this file is no longer used for <=0.2.1
-      - CN_APP_VALIDATOR_WALLET_USER_NAME=administrator
-      - CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME=ledger-api-user
       - |
         ADDITIONAL_CONFIG_DISABLE_AUTH=
           canton.validator-apps.validator_backend {

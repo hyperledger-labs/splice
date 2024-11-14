@@ -200,15 +200,10 @@ if [ -z "${IMAGE_TAG:-}" ]; then
   fi
 fi
 
-if [ -z "${SPLICE_INSTANCE_NAMES:-}" ]; then
-  if [ -z "${host_scan_address}" ]; then
-    splice_instance_names=$(curl -sSLf "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
-  else
-    splice_instance_names=$(curl -sSLf "${host_scan_address}/api/scan/v0/splice-instance-names")
-  fi
+if [ -z "${host_scan_address}" ]; then
+  splice_instance_names=$(curl -sSLf "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
 else
-  # TODO(#14303): remove this once the migration base version supports the splice-instance-names endpoint
-  splice_instance_names=${SPLICE_INSTANCE_NAMES}
+  splice_instance_names=$(curl -sSLf "${host_scan_address}/api/scan/v0/splice-instance-names")
 fi
 SPLICE_APP_UI_NETWORK_NAME=$(echo "${splice_instance_names}" | jq -r '.network_name')
 export SPLICE_APP_UI_NETWORK_NAME
