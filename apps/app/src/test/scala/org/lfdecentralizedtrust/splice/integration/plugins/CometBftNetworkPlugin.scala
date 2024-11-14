@@ -42,7 +42,7 @@ class CometBftNetworkPlugin(
   override def afterEnvironmentDestroyed(config: SpliceConfig): Unit = {
     val containerConnectionKeys = config.svApps.values
       .flatMap(svApp => svApp.cometBftConfig.map(_.connectionUri))
-      .map(CometBftConnectionConfig)
+      .map(CometBftConnectionConfig.apply)
     containerConnectionKeys.foreach { connectionKey =>
       val container = runningContainers(connectionKey)
       container.shutdown()

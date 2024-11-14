@@ -28,14 +28,14 @@ object GcpCredentialsConfig {
   final case class User(
       jsonCredentials: String
   ) extends GcpCredentialsConfig {
-    override def credentials =
+    override def credentials: com.google.auth.oauth2.UserCredentials =
       UserCredentials.fromStream(stringToInputStream(jsonCredentials))
   }
 
   final case class ServiceAccount(
       jsonCredentials: String
   ) extends GcpCredentialsConfig {
-    override def credentials =
+    override def credentials: com.google.auth.oauth2.ServiceAccountCredentials =
       ServiceAccountCredentials.fromStream(stringToInputStream(jsonCredentials))
   }
 }

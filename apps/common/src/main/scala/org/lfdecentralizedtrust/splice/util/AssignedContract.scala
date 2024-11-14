@@ -7,9 +7,8 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.logging.pretty.PrettyPrinting
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
-
 import PrettyInstances.*
 
 /** A contract that is ready to be acted upon
@@ -20,7 +19,7 @@ final case class AssignedContract[TCid, T](
     domain: DomainId,
 ) extends PrettyPrinting
     with Contract.Has[TCid, T] {
-  override def pretty = prettyOfClass[AssignedContract[TCid, T]](
+  override def pretty: Pretty[AssignedContract[TCid, T]] = prettyOfClass[AssignedContract[TCid, T]](
     param("contract", _.contract),
     param("domain", _.domain),
   )

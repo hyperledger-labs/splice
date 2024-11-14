@@ -127,7 +127,7 @@ lazy val root: Project = (project in file("."))
   )
   .settings(
     BuildCommon.sharedSettings,
-    scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    scalacOptions ++= Seq("-Wconf:src=src_managed/.*:silent"),
     // Needed to be able to resolve scalafmt snapshot versions
     resolvers ++= Resolver.sonatypeOssRepos("snapshots"),
     damlDarsLockCheckerFileArg := {
@@ -807,6 +807,15 @@ lazy val `apps-common-frontend` = {
           BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", workspace, log)
         runCommand(
           Seq("npm", "run", "test:sbt", "--workspaces", "--if-present"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmGenerateViteReport := {
+        val log = streams.value.log
+        runCommand(
+          Seq("npm", "run", "xunit-viewer", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),

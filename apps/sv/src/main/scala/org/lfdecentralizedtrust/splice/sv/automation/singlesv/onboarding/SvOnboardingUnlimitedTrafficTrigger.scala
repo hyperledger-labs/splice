@@ -128,8 +128,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
     } yield {
       !dsoRulesAndStates
         .activeSvParticipantAndMediatorIds(task.synchronizerId)
-        .contains(task.memberId)
-      || trafficState.extraTrafficLimit == UnlimitedTraffic
+        .contains(task.memberId) || trafficState.extraTrafficLimit == UnlimitedTraffic
     }
   }
 }

@@ -33,7 +33,8 @@ class SpliceConsoleEnvironment(
 ) extends ConsoleEnvironment // TODO(#736): Generalize this.
     {
 
-  override val errorHandler = ThrowWithDetailsErrorHandler
+  override val errorHandler: com.digitalasset.canton.console.ThrowWithDetailsErrorHandler.type =
+    ThrowWithDetailsErrorHandler
 
   val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
     DarResources.splitwell.all ++

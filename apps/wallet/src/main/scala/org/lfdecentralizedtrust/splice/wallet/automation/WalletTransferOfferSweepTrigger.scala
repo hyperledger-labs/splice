@@ -37,7 +37,7 @@ class WalletTransferOfferSweepTrigger(
   override protected def getOutstandingBalanceUsd(
       amuletPrice: java.math.BigDecimal,
       currentAmuletConfig: AmuletConfig[USD],
-  )(implicit tc: TraceContext) = {
+  )(implicit tc: TraceContext): scala.concurrent.Future[BigDecimal] = {
     for {
       filteredTransferOffers <- store.getOutstandingTransferOffers(
         None,
@@ -48,8 +48,7 @@ class WalletTransferOfferSweepTrigger(
         BigDecimal(ccToDollars(c.payload.amount.amount, amuletPrice)) + computeTransferFees(
           BigDecimal(c.payload.amount.amount),
           currentAmuletConfig.transferConfig.transferFee,
-        )
-          + computeCreateFees(currentAmuletConfig)
+        ) + computeCreateFees(currentAmuletConfig)
       })
       .sum
   }

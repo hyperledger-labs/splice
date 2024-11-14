@@ -77,16 +77,6 @@ class RequireBlockingTest extends AnyWordSpec with Matchers {
       assertIsErrorSynchronized(result)
     }
 
-    "fail to detect renamed synchronized" in {
-      val result = WartTestTraverser(RequireBlocking) {
-        val x = new Object()
-        import x.synchronized as foo
-        foo(19)
-      }
-      // assertIsErrorSynchronized(result)
-      result.errors shouldBe Seq.empty
-    }
-
     "allow synchronized statements inside blocking calls" in {
       val result = WartTestTraverser(RequireBlocking) {
         blocking(this.synchronized(42))

@@ -72,7 +72,9 @@ class UserWalletAutomationService(
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
     ) {
-  override def companion = UserWalletAutomationService
+  override def companion
+      : org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService.type =
+    UserWalletAutomationService
 
   registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))
   registerTrigger(

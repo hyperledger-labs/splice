@@ -106,7 +106,14 @@ class DamlCIUpgradeVotePreflightTest
             click on "cast-vote-button"
             click on "accept-vote-button"
             click on "save-vote-button"
-            click on "vote-confirmation-dialog-accept-button"
+            try {
+              click on "vote-confirmation-dialog-accept-button"
+            } catch {
+              case _: org.openqa.selenium.NoSuchElementException =>
+              // Maybe we're on an old version without a confirmation dialog
+              // TODO(#16090) remove once the ciupgade base version contains #15693
+            }
+
           }
         }
       }

@@ -196,7 +196,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     val traceParentRegEx =
       raw".*\[([0-9a-zA-Z]{2}-[0-9a-zA-Z]{32}-[0-9a-zA-Z]{16}-[0-9a-zA-Z]{2})\]$$".r
     msg match {
-      case traceParentRegEx(value) => TraceContext.fromW3CTraceParent(value)
+      case traceParentRegEx(traceParent) => TraceContext.fromW3CTraceParent(traceParent)
       case _ => traceContext
     }
   }

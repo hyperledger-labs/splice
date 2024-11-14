@@ -53,7 +53,7 @@ class AuthTokenManagerTest extends AsyncWordSpec with BaseTest {
     val (tokenManager, mock, _) = setup()
 
     for {
-      error1 <- loggerFactory.suppressWarningsAndErrors {
+      _ <- loggerFactory.suppressWarningsAndErrors {
         val call1 = tokenManager.getToken
         mock.error()
         call1.map(_ shouldBe empty)

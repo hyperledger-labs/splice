@@ -431,8 +431,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   // TODO (#10859) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
-  // TODO(#15990) Re-enable this test
-  "migrate global domain to new nodes with downtime" ignore { implicit env =>
+  "migrate global domain to new nodes with downtime" in { implicit env =>
     import env.environment.scheduler
     import env.executionContext
     val retryProvider = new RetryProvider(

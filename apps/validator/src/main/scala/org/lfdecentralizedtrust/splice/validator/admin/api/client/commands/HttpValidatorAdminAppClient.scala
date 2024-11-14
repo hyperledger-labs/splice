@@ -276,7 +276,7 @@ object HttpValidatorAdminAppClient {
           domainId <- contractWithState.domainId.traverse(DomainId.fromString)
         } yield ContractWithState(
           contract,
-          domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+          domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
         )
       )
     }
@@ -435,7 +435,7 @@ object HttpValidatorAdminAppClient {
           domainId <- contractWithState.domainId.traverse(DomainId.fromString)
         } yield ContractWithState(
           contract,
-          domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+          domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
         )
       )
     }

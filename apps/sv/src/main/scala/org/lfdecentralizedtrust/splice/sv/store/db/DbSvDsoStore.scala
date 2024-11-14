@@ -129,9 +129,20 @@ class DbSvDsoStore(
       }
     }
   }
-  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
-    override val parser = new DsoTxLogParser(loggerFactory)
-    override def entryToRow = DsoTables.DsoTxLogRowData.fromTxLogEntry
+  override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
+    org.lfdecentralizedtrust.splice.sv.store.TxLogEntry
+  ] {
+    val parser: org.lfdecentralizedtrust.splice.sv.store.DsoTxLogParser;
+    def entryToRow
+        : org.lfdecentralizedtrust.splice.sv.store.TxLogEntry => org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoTxLogRowData
+  } = new TxLogStore.Config[TxLogEntry] {
+    override val parser: org.lfdecentralizedtrust.splice.sv.store.DsoTxLogParser =
+      new DsoTxLogParser(
+        loggerFactory
+      )
+    override def entryToRow
+        : org.lfdecentralizedtrust.splice.sv.store.TxLogEntry => org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoTxLogRowData =
+      DsoTables.DsoTxLogRowData.fromTxLogEntry
     override def encodeEntry = TxLogEntry.encode
     override def decodeEntry = TxLogEntry.decode
   }

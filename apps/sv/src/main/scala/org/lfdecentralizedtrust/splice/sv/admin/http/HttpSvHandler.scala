@@ -542,7 +542,6 @@ class HttpSvHandler(
         sequencerAdminConnection,
         sequencerId,
       )
-      decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
       _ = logger.info(s"Downloading sequencer onboarding state for $sequencerId")
       onboardingState <- sequencerAdminConnection.getOnboardingState(sequencerId)
     } yield onboardingState

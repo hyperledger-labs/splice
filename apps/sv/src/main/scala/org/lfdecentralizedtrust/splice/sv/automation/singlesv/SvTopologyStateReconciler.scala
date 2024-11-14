@@ -92,7 +92,7 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
       )
       .mergeAll[TaskTrigger](
         contractsToRunOn.map(
-          store.multiDomainAcsStore.streamAssignedContracts(_).map(StreamedAssignedContract)
+          store.multiDomainAcsStore.streamAssignedContracts(_).map(StreamedAssignedContract.apply)
         ),
         eagerComplete = false,
       )

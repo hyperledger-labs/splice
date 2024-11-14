@@ -40,7 +40,6 @@ function check_patterns_locally() {
     '(Chart-template\.yaml|helm/.*/NOTES.txt):.*Canton Network' # TODO (#15710) remove Canton Network from helm descriptions
     '^[^:]+V001__create_schema\.sql:' # TODO (#15491) avoiding changing hashes
     'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (#15747) auth0 env names
-    'cluster/compose/validator/.*\.yaml' # TODO (#14303) old base-version
     '/helm/.*(Values\.ingress\.cns|cns: |name: cns-|- "cns\.)' # TODO (#15739) cns in splice-cluster-ingress-runbook
     'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (#15741) new secret
     'Headers.scala:.*"cn-svc-configs"' # TODO (#15742) references to missing project subdirectory

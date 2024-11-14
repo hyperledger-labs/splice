@@ -386,10 +386,11 @@ class AppManagerIntegrationTest extends IntegrationTestWithSharedEnvironment wit
         .futureValue
       inside(response) {
         case _ if response.status == StatusCodes.OK =>
-          inside(Unmarshal(response.entity).to[String].value.value) { case Success(response) =>
-            response shouldBe s"""{"result":{"primaryParty":"${aliceValidatorBackend
-                .getValidatorPartyId()
-                .toProtoPrimitive}","userId":"${aliceValidatorBackend.config.ledgerApiUser}"},"status":200}"""
+          inside(Unmarshal(response.entity).to[String].value.value) {
+            case Success(successfullResponse) =>
+              successfullResponse shouldBe s"""{"result":{"primaryParty":"${aliceValidatorBackend
+                  .getValidatorPartyId()
+                  .toProtoPrimitive}","userId":"${aliceValidatorBackend.config.ledgerApiUser}"},"status":200}"""
           }
       }
     }

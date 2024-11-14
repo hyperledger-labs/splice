@@ -1393,7 +1393,7 @@ class UpdateHistory(
         """.as[Boolean].headOption,
         "getBackfillingState",
       )
-      .map(_.map(BackfillingState))
+      .map(_.map(BackfillingState.apply))
 
   private[this] def setBackfillingComplete()(implicit
       tc: TraceContext

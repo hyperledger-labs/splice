@@ -105,7 +105,9 @@ class SvDsoAutomationService(
       config.ingestUpdateHistoryFromParticipantBegin,
     ) {
 
-  override def companion = SvDsoAutomationService
+  override def companion
+      : org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.type =
+    SvDsoAutomationService
 
   private[splice] val restartDsoDelegateBasedAutomationTrigger =
     new RestartDsoDelegateBasedAutomationTrigger(

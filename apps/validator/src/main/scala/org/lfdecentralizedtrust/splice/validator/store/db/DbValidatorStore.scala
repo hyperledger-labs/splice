@@ -85,7 +85,10 @@ class DbValidatorStore(
     key.dsoParty,
   )
 
-  override lazy val acsContractFilter = ValidatorStore.contractFilter(key, domainMigrationId)
+  override lazy val acsContractFilter
+      : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
+        org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
+      ] = ValidatorStore.contractFilter(key, domainMigrationId)
 
   import multiDomainAcsStore.waitUntilAcsIngested
 
