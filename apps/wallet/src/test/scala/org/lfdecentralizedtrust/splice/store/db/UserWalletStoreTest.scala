@@ -1,11 +1,7 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import org.lfdecentralizedtrust.splice.codegen.java.splice.{
-  amulet as amuletCodegen,
-  amuletrules as amuletrulesCodegen,
-  round as roundCodegen,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -19,7 +15,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_MintResult
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
@@ -33,7 +28,12 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 import org.lfdecentralizedtrust.splice.wallet.store.db.DbUserWalletStore
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit, StoreTest}
+import org.lfdecentralizedtrust.splice.store.{
+  Limit,
+  PageLimit,
+  TransferInputStore,
+  TransferInputStoreTest,
+}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
@@ -55,7 +55,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.concurrent.Future
 
-abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
+abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecutionContext {
 
   "UserWalletStore" should {
 
@@ -769,39 +769,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listSortedAmuletsAndQuantity" should {
-
-      "return correct results" in {
-        for {
-          store <- mkStore(user1)
-          _ <- dummyDomain.ingest(mintTransaction(user1, 11.0, 1L, 1.0))(store.multiDomainAcsStore)
-          _ <- dummyDomain.ingest(mintTransaction(user1, 12.0, 2L, 2.0))(store.multiDomainAcsStore)
-          _ <- dummyDomain.ingest(mintTransaction(user1, 13.0, 3L, 4.0))(store.multiDomainAcsStore)
-          _ <- dummyDomain.ingest(mintTransaction(user1, 10.0, 4L, 1.0))(store.multiDomainAcsStore)
-        } yield {
-          def top3At(round: Long): Seq[Double] =
-            store
-              .listSortedAmuletsAndQuantity(round, PageLimit.tryCreate(3))
-              .futureValue
-              .map(_._1.toDouble)
-
-          // Values of the 4 amulets by time:
-          // 11 10 09 08 07 06 05 04 03 02
-          //    12 10 08 06 04 02 00 00 00
-          //       13 09 05 01 00 00 00 00
-          //          10 09 08 07 06 05 04
-          // Note: need to start at round 4, as listSortedAmuletsAndQuantity() does not filter out amulets
-          // created after the given round
-          top3At(4L) should contain theSameElementsAs Seq(10.0, 9.0, 8.0)
-          top3At(5L) should contain theSameElementsAs Seq(9.0, 7.0, 6.0)
-          top3At(6L) should contain theSameElementsAs Seq(8.0, 6.0, 4.0)
-          top3At(7L) should contain theSameElementsAs Seq(7.0, 5.0, 2.0)
-          top3At(8L) should contain theSameElementsAs Seq(6.0, 4.0)
-        }
-      }
-
-    }
-
     "listTransactions" should {
 
       // This helper is similar to the one in WalletTxLogTestUtil
@@ -1358,48 +1325,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  /** A AmuletRules_Mint exercise event with one child Amulet create event */
-  private def mintTransaction(
-      receiver: PartyId,
-      amount: Double,
-      round: Long,
-      ratePerRound: Double,
-      amuletPrice: Double = 1.0,
-  )(
-      offset: Long
-  ) = {
-    val amuletContract = amulet(receiver, amount, round, ratePerRound)
-
-    // This is a non-consuming choice, the store should not mind that some of the referenced contracts don't exist
-    val amuletRulesCid = nextCid()
-    val openMiningRoundCid = nextCid()
-
-    mkExerciseTx(
-      offset,
-      exercisedEvent(
-        amuletRulesCid,
-        amuletrulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
-        None,
-        amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_Mint.name,
-        consuming = false,
-        new amuletrulesCodegen.AmuletRules_Mint(
-          receiver.toProtoPrimitive,
-          amuletContract.payload.amount.initialAmount,
-          new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),
-        ).toValue,
-        new AmuletRules_MintResult(
-          new amuletCodegen.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](
-            amuletContract.contractId,
-            new java.math.BigDecimal(amuletPrice),
-            new Round(round),
-          )
-        ).toValue,
-      ),
-      Seq(toCreatedEvent(amuletContract, Seq(receiver))),
-      dummyDomain,
-    )
-  }
-
   private def mkTransferOfferTx(
       offset: Long,
       trackingId: String,
@@ -1572,9 +1497,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       migrationId: Long = domainMigrationId,
   ): Future[UserWalletStore]
 
-  lazy val acsOffset = nextOffset()
-  lazy val domain = dummyDomain.toProtoPrimitive
-  lazy val domainAlias = DomainAlias.tryCreate(domain)
+  override def mkTransferInputStore(partyId: PartyId): Future[TransferInputStore] = mkStore(partyId)
+
+  protected lazy val acsOffset: Long = nextOffset()
+  protected lazy val domain: String = dummyDomain.toProtoPrimitive
+  protected lazy val domainAlias: DomainAlias = DomainAlias.tryCreate(domain)
 }
 
 class DbUserWalletStoreTest

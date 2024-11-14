@@ -67,6 +67,7 @@ org.lfdecentralizedtrust.splice.store.ScanHistoryBackfillingTest
 org.lfdecentralizedtrust.splice.store.UpdateHistoryBackfillingTest
 org.lfdecentralizedtrust.splice.store.UpdateHistoryTest
 org.lfdecentralizedtrust.splice.store.db.AcsSnapshotStoreTest
+org.lfdecentralizedtrust.splice.store.db.DbExternalPartyWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbScanStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvDsoStoreTest
