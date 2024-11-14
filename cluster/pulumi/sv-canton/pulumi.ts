@@ -45,20 +45,24 @@ const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
 const coreSvs = onlyRunbook ? [] : Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
 export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
 
-export async function runForAllMigrations(
-  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<void>,
+type RunForAllMigrationsResult<T> = Map<[MigrationInfo, string], T>;
+
+export async function runForAllMigrations<T>(
+  runForStack: (stack: automation.Stack, migration: MigrationInfo, sv: string) => Promise<T>,
   requiresExistingStack: boolean
-): Promise<void> {
+): Promise<RunForAllMigrationsResult<T>> {
   console.log(
     `Running for migration ${JSON.stringify(migrations)} and svs ${JSON.stringify(svsToDeploy)}`
   );
+  const ret: RunForAllMigrationsResult<T> = new Map();
   for (const migration of migrations) {
     console.log(`Running for migration ${migration.id}`);
 
     const data = await Promise.allSettled(
       svsToDeploy.map(async sv => {
         const stack = await stackForMigration(sv, migration.id, requiresExistingStack);
-        await runForStack(stack, migration, sv);
+        const result = await runForStack(stack, migration, sv);
+        ret.set([migration, sv], result);
       })
     );
     const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
@@ -66,4 +70,5 @@ export async function runForAllMigrations(
       throw new Error(rejected);
     }
   }
+  return ret;
 }
