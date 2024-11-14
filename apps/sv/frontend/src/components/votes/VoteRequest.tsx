@@ -272,6 +272,25 @@ export const CreateVoteRequest: React.FC = () => {
               </NativeSelect>
             </FormControl>
           </Stack>
+          <Stack direction="column" mb={4} spacing={1}>
+            <Typography variant="h6" mt={4}>
+              Vote Request Expires At
+            </Typography>
+            <DesktopDateTimePicker
+              label={`Enter time in local timezone (${getUTCWithOffset()})`}
+              value={expiration}
+              minDateTime={dayjs()}
+              maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
+              readOnly={false}
+              onChange={(newValue: Dayjs | null) => setExpiration(newValue)}
+              slotProps={{
+                textField: {
+                  id: 'datetime-picker-vote-request-expiration',
+                },
+              }}
+              closeOnSelect
+            />
+          </Stack>
           {actionName === 'SRARC_OffboardSv' && <OffboardSv chooseAction={chooseAction} />}
           {actionName === 'SRARC_GrantFeaturedAppRight' && (
             <GrantFeaturedAppRight chooseAction={chooseAction} />
@@ -292,6 +311,7 @@ export const CreateVoteRequest: React.FC = () => {
           {actionName === 'SRARC_UpdateSvRewardWeight' && (
             <UpdateSvRewardWeight chooseAction={chooseAction} action={action} />
           )}
+
           <Typography variant="h5">Proposal</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>
@@ -320,25 +340,6 @@ export const CreateVoteRequest: React.FC = () => {
                 Open
               </Button>
             </Box>
-          </Stack>
-          <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h5" mt={4}>
-              Vote Request Expires At
-            </Typography>
-            <DesktopDateTimePicker
-              label={`Enter time in local timezone (${getUTCWithOffset()})`}
-              value={expiration}
-              minDateTime={dayjs()}
-              maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
-              readOnly={false}
-              onChange={(newValue: Dayjs | null) => setExpiration(newValue)}
-              slotProps={{
-                textField: {
-                  id: 'datetime-picker-vote-request-expiration',
-                },
-              }}
-              closeOnSelect
-            />
           </Stack>
           {action && (
             <Stack direction="column" mb={4} spacing={1}>
