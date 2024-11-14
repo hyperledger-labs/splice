@@ -82,8 +82,6 @@ resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
 -- TODO(#15720): Don't just ignore this - investigate!
 -(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"Request to.*/accept resulted in a timeout")
--- TODO(#15730): Don't just ignore this - investigate!
--(resource.labels.container_name="sequencer" AND jsonPayload.message=~"Sending submission request.*has not completed after")
 
 ${conditionalString(
   enableChaosMesh,
