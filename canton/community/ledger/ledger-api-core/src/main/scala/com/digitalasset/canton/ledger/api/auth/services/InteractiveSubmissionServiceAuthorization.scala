@@ -34,8 +34,10 @@ final class InteractiveSubmissionServiceAuthorization(
       request: PrepareSubmissionRequest
   ): Future[PrepareSubmissionResponse] = {
     val effectiveSubmitters = CommandsValidator.effectiveSubmitters(request)
-    authorizer.requireReadClaimsForAllParties(
-      parties = effectiveSubmitters.readAs,
+    authorizer.requireActAndReadClaimsForParties(
+      actAs = Set.empty, // At submission time the actAs parties are only reading
+      readAs = effectiveSubmitters.readAs ++ effectiveSubmitters.actAs,
+      applicationIdL = Lens.unit[PrepareSubmissionRequest].applicationId,
       call = service.prepareSubmission,
     )(request)
   }
