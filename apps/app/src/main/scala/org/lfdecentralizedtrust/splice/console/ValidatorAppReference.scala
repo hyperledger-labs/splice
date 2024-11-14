@@ -504,7 +504,8 @@ final class ValidatorAppBackendReference(
     s"http://127.0.0.1:${config.clientAdminApi.port}"
   )
 
-  val nodes = consoleEnvironment.environment.validators
+  val nodes: org.lfdecentralizedtrust.splice.environment.ValidatorApps =
+    consoleEnvironment.environment.validators
 
   @Help.Summary(
     "Returns the state of this app. May only be called while the app is running."

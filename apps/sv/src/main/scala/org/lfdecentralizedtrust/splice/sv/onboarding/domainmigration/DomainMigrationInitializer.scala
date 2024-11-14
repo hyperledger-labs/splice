@@ -127,7 +127,7 @@ class DomainMigrationInitializer(
     if (config.domainMigrationId != migrationDump.migrationId)
       throw Status.INVALID_ARGUMENT
         .withDescription(
-          "Migration id from the dump does not match the configured migration id in ths SV. Please check if the SV app is configured with the correct migration id"
+          s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in ths SV ${config.domainMigrationId}. Please check if the SV app is configured with the correct migration id"
         )
         .asRuntimeException()
     val storeKey =

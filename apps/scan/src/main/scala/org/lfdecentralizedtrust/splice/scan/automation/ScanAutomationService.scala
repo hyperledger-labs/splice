@@ -62,7 +62,9 @@ class ScanAutomationService(
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
     ) {
-  override def companion = ScanAutomationService
+  override def companion
+      : org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService.type =
+    ScanAutomationService
 
   registerTrigger(new ScanAggregationTrigger(store, triggerContext))
   registerTrigger(new ScanBackfillAggregatesTrigger(store, triggerContext))
@@ -91,5 +93,5 @@ class ScanAutomationService(
 }
 
 object ScanAutomationService extends AutomationServiceCompanion {
-  override protected[this] def expectedTriggerClasses = Seq.empty
+  override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
 }

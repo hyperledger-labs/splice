@@ -198,18 +198,18 @@ class WalletTxLogTimeBasedIntegrationTest
         _ => charlieWalletClient.balance().unlockedQty should be > balance0,
       )
 
-      val expectedAliceBalanceChange = BigDecimal(0)
-        - 3 * transferAmount // each output is worth `transferAmount`
-        - 3 * transferFee * senderFeeRatio // one transferFee for each output
-        - 3 * amuletConfig.amuletCreateFee * senderFeeRatio // one amuletCreateFee for each output
-        - amuletConfig.lockHolderFee * senderFeeRatio // one lockHolderFee for each lock holder that is not the receiver
-        - amuletConfig.amuletCreateFee // one amuletCreateFee for the sender change amulet
+      val expectedAliceBalanceChange = BigDecimal(0) -
+        3 * transferAmount - // each output is worth `transferAmount`
+        3 * transferFee * senderFeeRatio - // one transferFee for each output
+        3 * amuletConfig.amuletCreateFee * senderFeeRatio - // one amuletCreateFee for each output
+        amuletConfig.lockHolderFee * senderFeeRatio - // one lockHolderFee for each lock holder that is not the receiver
+        amuletConfig.amuletCreateFee // one amuletCreateFee for the sender change amulet
 
-      val expectedCharlieBalanceChange = BigDecimal(0)
-        + 2 * transferAmount // 2 amulets created for Charlie (the locked amulet does not change his balance)
-        - 3 * transferFee * receiverFeeRatio // one transferFee for each output
-        - 3 * amuletConfig.amuletCreateFee * receiverFeeRatio // one amuletCreateFee for each output
-        - amuletConfig.lockHolderFee * receiverFeeRatio // one lockHolderFee for each lock holder that is not the receiver
+      val expectedCharlieBalanceChange = BigDecimal(0) +
+        2 * transferAmount - // 2 amulets created for Charlie (the locked amulet does not change his balance)
+        3 * transferFee * receiverFeeRatio - // one transferFee for each output
+        3 * amuletConfig.amuletCreateFee * receiverFeeRatio - // one amuletCreateFee for each output
+        amuletConfig.lockHolderFee * receiverFeeRatio // one lockHolderFee for each lock holder that is not the receiver
 
       // This test advances 2 rounds between the tap and the transfer
       val expectedHoldingFees = 2 * amuletConfig.holdingFee

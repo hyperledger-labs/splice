@@ -42,6 +42,7 @@ object BuildCommon {
       taskKey[Unit]("checks formatting of frontend code, but does not fix anything")
     lazy val npmFix = taskKey[Unit]("fixes formatting of frontend code")
     lazy val npmTest = taskKey[Unit]("run all frontend unit tests")
+    lazy val npmGenerateViteReport = taskKey[Unit]("generate html vite test reports")
     lazy val npmBuild = taskKey[Unit]("build an npm project")
 
     lazy val compileOpenApi = taskKey[Seq[File]]("build typescript code")
@@ -86,9 +87,13 @@ object BuildCommon {
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
         scalacOptions ++= Seq(
           "-Wconf:src=src_managed/.*:silent",
-          "-Wunused:patvars",
+          // renable once scala is > 2.13.15 https://github.com/scala/bug/issues/13041
+//          "-Wunused:patvars",
           "-Wunused:privates",
           "-Wunused:params",
+          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpouse of that warning
+          "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:s",
+          "-quickfix:any",
         ),
         Test / testOptions ++= Seq(
           // Enable logging of begin and end of test cases, test suites, and test runs.
@@ -296,7 +301,13 @@ object BuildCommon {
     //        |.*daml-codegen.*
     //      """
     //    ),
-    scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    scalacOptions ++= Seq(
+      "-Wconf:src=src_managed/.*:silent",
+      // disable scala 3 migration warnings for canton as we're not gonna fix those
+      "-Wconf:cat=scala3-migration:silent",
+      "-Wconf:msg=Name .* is already introduced in an enclosing scope as .*:silent",
+      "-Wconf:msg=@nowarn annotation does not suppress any warnings:silent",
+    ),
     headerSources / excludeFilter := "*",
     headerResources / excludeFilter := "*",
   ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings
@@ -449,6 +460,7 @@ object BuildCommon {
         `canton-wartremover-extension` % "compile->compile;test->test",
       )
       .settings(
+        sharedCantonSettings,
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
@@ -486,6 +498,7 @@ object BuildCommon {
       )
       .enablePlugins(DamlPlugin)
       .settings(
+        sharedCantonSettings,
         // commented out from Canton OS repo as settings don't apply to us
         //      sharedAppSettings,
         disableTests,
@@ -656,6 +669,7 @@ object BuildCommon {
         `canton-community-base`
       )
       .settings(
+        sharedCantonSettings,
         removeTestSources,
         sharedSettings,
         // JvmRulesPlugin.damlRepoHeaderSettings,
@@ -967,6 +981,7 @@ object BuildCommon {
       .apply("canton-blake2b", file("canton/community/lib/Blake2b"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
+        sharedCantonSettings,
         removeTestSources,
         sharedSettings,
         libraryDependencies ++= Seq(
@@ -982,6 +997,7 @@ object BuildCommon {
       .apply("canton-slick-fork", file("canton/community/lib/slick"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
+        sharedCantonSettings,
         removeTestSources,
         sharedSettings,
         libraryDependencies ++= Seq(
@@ -1022,6 +1038,7 @@ object BuildCommon {
       .apply("canton-pekko-fork", file("canton/community/lib/pekko"))
       .disablePlugins(ScalafixPlugin, ScalafmtPlugin, WartRemover)
       .settings(
+        sharedCantonSettings,
         sharedSettings,
         libraryDependencies ++= Seq(
           pekko_stream,
@@ -1045,6 +1062,7 @@ object BuildCommon {
         `canton-google-common-protos-scala`,
       )
       .settings(
+        sharedCantonSettings,
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
@@ -1071,6 +1089,7 @@ object BuildCommon {
         `canton-ledger-api`,
       )
       .settings(
+        sharedCantonSettings,
         disableTests,
         sharedSettings,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
@@ -1141,6 +1160,7 @@ object BuildCommon {
         ScalafmtPlugin,
       ) // to accommodate different daml repo coding style
       .settings(
+        sharedCantonSettings,
         removeTestSources,
         sharedSettings,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
@@ -1196,6 +1216,7 @@ object BuildCommon {
         WartRemover,
       )
       .settings(
+        sharedCantonSettings,
         scalacOptions --= removeCompileFlagsForDaml,
         sharedSettings,
         // we restrict the compilation to a few files that we actually need, skipping the large majority ...
@@ -1240,6 +1261,7 @@ object BuildCommon {
       WartRemover,
     )
     .settings(
+      sharedCantonSettings,
       sharedSettings,
       // we restrict the compilation to a few files that we actually need, skipping the large majority ...
       excludeFilter := HiddenFileFilter || "scalapb.proto",
@@ -1263,6 +1285,7 @@ object BuildCommon {
         WartRemover,
       )
       .settings(
+        sharedCantonSettings,
         scalacOptions --= removeCompileFlagsForDaml,
         scalacOptions += "-Wconf:cat=deprecation:s",
         sharedSettings,
@@ -1292,6 +1315,7 @@ object BuildCommon {
         `canton-ledger-api`
       )
       .settings(
+        sharedCantonSettings,
         disableTests,
         sharedSettings,
         compileOrder := CompileOrder.JavaThenScala,
@@ -1327,12 +1351,12 @@ object BuildCommon {
       ) // to accommodate different daml repo coding style
       .enablePlugins(DamlPlugin)
       .settings(
+        sharedCantonSettings,
         removeTestSources,
         sharedSettings,
         scalacOptions --= removeCompileFlagsForDaml
           // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3")
-          :+ "-Wnonunit-statement",
+          .filterNot(_ == "-Xsource:3") :+ "-Wnonunit-statement",
         scalacOptions += "-Wconf:src=src_managed/.*:silent" ++ Seq(
           "lint-byname-implicit",
           "other-match-analysis",

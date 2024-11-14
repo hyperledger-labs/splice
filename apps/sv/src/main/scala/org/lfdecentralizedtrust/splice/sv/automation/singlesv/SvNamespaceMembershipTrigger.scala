@@ -133,13 +133,14 @@ class SvNamespaceMembershipTrigger(
       store,
     ) {
 
-  override val reconciler = new NamespaceMembership(
-    store.key.svParty,
-    store.key.dsoParty,
-    participantAdminConnection,
-    logger,
-    store,
-  )
+  override val reconciler: DsoRulesTopologyStateReconciler[NamespaceDiff] =
+    new NamespaceMembership(
+      store.key.svParty,
+      store.key.dsoParty,
+      participantAdminConnection,
+      logger,
+      store,
+    )
 
 }
 

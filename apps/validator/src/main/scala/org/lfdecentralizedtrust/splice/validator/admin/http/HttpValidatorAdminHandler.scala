@@ -558,8 +558,8 @@ class HttpValidatorAdminHandler(
       for {
         domainId <- getAmuletRulesDomain()(tracedContext)
         result <- store.lookupExternalPartySetupProposalByUserPartyWithOffset(userParty).flatMap {
-          case QueryResult(_, Some(contractWithState)) => {
-            if (contractWithState.contract.contractId.contractId != body.contractId)
+          case QueryResult(_, Some(externalPartySetupProposal)) => {
+            if (externalPartySetupProposal.contract.contractId.contractId != body.contractId)
               Future.successful(
                 v0.ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse
                   .BadRequest(
@@ -567,7 +567,7 @@ class HttpValidatorAdminHandler(
                   )
               )
             else {
-              val commands = contractWithState.toAssignedContract
+              val commands = externalPartySetupProposal.toAssignedContract
                 .getOrElse(
                   throw Status.Code.FAILED_PRECONDITION.toStatus
                     .withDescription(s"Invalid contract")
@@ -584,7 +584,7 @@ class HttpValidatorAdminHandler(
                   Seq(userParty),
                   Seq(userParty),
                   commands,
-                  DisclosedContracts.Empty,
+                  storeWithIngestion.connection.disclosedContracts(externalPartySetupProposal),
                 )
                 .flatMap { r =>
                   Future.successful(

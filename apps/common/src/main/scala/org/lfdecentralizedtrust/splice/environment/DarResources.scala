@@ -222,7 +222,8 @@ final case class DarResource(
 
 object DarResource {
   private val hashOps = new HashOps {
-    override def defaultHashAlgorithm = HashAlgorithm.Sha256
+    override def defaultHashAlgorithm: com.digitalasset.canton.crypto.HashAlgorithm.Sha256.type =
+      HashAlgorithm.Sha256
   }
 
   def apply(file: String): DarResource = {

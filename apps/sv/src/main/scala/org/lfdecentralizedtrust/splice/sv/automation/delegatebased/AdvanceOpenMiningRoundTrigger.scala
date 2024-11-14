@@ -64,7 +64,7 @@ class AdvanceOpenMiningRoundTrigger(
           amuletPriceVotes.map(_.contractId).asJava,
         )
       )
-      (offset, _) <- svTaskContext.connection
+      (_, _) <- svTaskContext.connection
         .submit(
           Seq(store.key.svParty),
           Seq(store.key.dsoParty),

@@ -88,7 +88,7 @@ final class SplitwellAppClientReference(
 
   override def httpClientConfig = config.adminApi
 
-  override lazy val ledgerApi =
+  override lazy val ledgerApi: com.digitalasset.canton.console.ExternalLedgerApiClient =
     new ExternalLedgerApiClient(
       config.participantClient.ledgerApi.clientConfig.address,
       config.participantClient.ledgerApi.clientConfig.port,
@@ -109,7 +109,7 @@ final class SplitwellAppClientReference(
     val connectedDomains = getConnectedDomains(userParty)
     val filteredRules = rules.filter(c => connectedDomains.contains(c._1))
     filteredRules.toList match {
-      case Seq((domain, rules)) => (domain, rules)
+      case Seq((domain, domainRules)) => (domain, domainRules)
       case Seq() =>
         throw new IllegalStateException(
           s"Expected exactly one SplitwellRules contract for user $userParty but got $rules"
@@ -487,7 +487,8 @@ final class SplitwellAppBackendReference(
     s"http://127.0.0.1:${config.clientAdminApi.port}"
   )
 
-  override val nodes = consoleEnvironment.environment.splitwells
+  override val nodes: org.lfdecentralizedtrust.splice.environment.SplitwellApps =
+    consoleEnvironment.environment.splitwells
 
   @Help.Summary(
     "Returns the state of this app. May only be called while the app is running."
@@ -499,7 +500,8 @@ final class SplitwellAppBackendReference(
   )
   def splitwellAutomation: SplitwellAutomationService = appState.automation
 
-  override lazy val ledgerApi = participantClient
+  override lazy val ledgerApi: SplitwellAppBackendReference.this.participantClient.type =
+    participantClient
 
   @Help.Summary("Return local splitwell app config")
   def config: SplitwellAppBackendConfig =

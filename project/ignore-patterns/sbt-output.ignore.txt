@@ -105,4 +105,6 @@ npm-install.sh.*returned non-zero exit code: .*, retrying
 # Ignore noise from bundled splice-node execution
 .*Appender named.*not referenced.*
 
+You are using an unreleased and unstable version of damml3. This will break without warning.
+
 # Make sure to have a trailing newline

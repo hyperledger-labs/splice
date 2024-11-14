@@ -34,7 +34,8 @@ class AppManagerFrontendIntegrationTest
     splitwellBundle,
   )
 
-  override def environmentDefinition =
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>

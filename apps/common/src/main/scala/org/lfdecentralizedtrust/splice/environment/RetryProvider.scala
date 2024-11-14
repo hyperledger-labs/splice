@@ -616,42 +616,32 @@ object RetryProvider {
                         statusCode == Status.Code.INVALID_ARGUMENT &&
                         raw"No participant of the party .* has confirmation permission on both domains at respective timestamps".r
                           .findFirstMatchIn(description)
-                          .isDefined
-                        ||
+                          .isDefined ||
                         // This can happen if the party allocation has not yet been propagated to the new domain.
                         statusCode == Status.Code.INVALID_ARGUMENT &&
                         raw"The following parties are not active on the target domain".r
                           .findFirstMatchIn(description)
-                          .isDefined
-                        ||
-                        // TODO (#8011) Remove me once Canton yields a different error for in-flight contracts
+                          .isDefined || // TODO (#8011) Remove me once Canton yields a different error for in-flight contracts
                         (statusCode == Status.Code.INVALID_ARGUMENT &&
                           errorDetails.exists {
                             case ed: ErrorDetails.ErrorInfoDetail =>
                               ed.errorCodeId == com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.MalformedRequest.id &&
                               ed.metadata.get("reason").exists(_ contains "Unknown contract")
                             case _ => false
-                          })
-                        ||
-                        // TODO(#10160) Remove this once Canton fixes the error code.
+                          }) || // TODO(#10160) Remove this once Canton fixes the error code.
                         (statusCode == Status.Code.INVALID_ARGUMENT &&
                           description.contains(
                             SequencerErrors.MaxSequencingTimeTooFar.id
-                          ))
-                        ||
+                          )) ||
                         // This can occur when we try to get the domain time while still being disconnected from the domain
                         statusCode == Status.Code.INVALID_ARGUMENT &&
                         raw"Time tracker for domain .* not found".r
                           .findFirstMatchIn(description)
-                          .isDefined
-                        ||
-                        // This can occur if the party has not yet been propagated to the ledger API server
+                          .isDefined || // This can occur if the party has not yet been propagated to the ledger API server
                         statusCode == Status.Code.INVALID_ARGUMENT &&
                         raw"Provided parties have not been found in identity_provider_id".r
                           .findFirstMatchIn(description)
-                          .isDefined
-                        ||
-                        // CANCELLED can also be a deliberate cancellation from the client
+                          .isDefined || // CANCELLED can also be a deliberate cancellation from the client
                         // so we only retry if we observe RST_STREAM which we sometimes see
                         // around Canton restarts.
                         (statusCode == Status.Code.CANCELLED && description.contains(
@@ -817,7 +807,7 @@ object RetryProvider {
           metricsFactory: LabeledMetricsFactory,
           additionalMetricsLabels: Map[String, String],
           flagCloseable: FlagCloseable,
-      ) = RetryProvider.RetryableError(
+      ): RetryableError = RetryProvider.RetryableError(
         operationName,
         additionalCodes,
         Map.empty,
@@ -838,7 +828,7 @@ object RetryProvider {
             metricsFactory: LabeledMetricsFactory,
             additionalMetricsLabels: Map[String, String],
             flagCloseable: FlagCloseable,
-        ) = RetryProvider.RetryableError(
+        ): RetryableError = RetryProvider.RetryableError(
           operationName,
           Seq.empty,
           additionalConditions,

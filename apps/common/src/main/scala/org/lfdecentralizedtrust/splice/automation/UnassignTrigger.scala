@@ -7,10 +7,10 @@ import org.apache.pekko.stream.Materializer
 import com.daml.ledger.javaapi.data.Template as CodegenTemplate
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractTypeCompanion, DamlRecord}
 import org.lfdecentralizedtrust.splice.automation.{TaskOutcome, TaskSuccess, TriggerContext}
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.store.{AppStore, MultiDomainAcsStore}
-import org.lfdecentralizedtrust.splice.util.{Contract, AssignedContract}
+import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -18,8 +18,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import UnassignTrigger.GetTargetDomain
+import io.grpc.Status
 
 class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
     override protected val context: TriggerContext,
@@ -70,7 +70,8 @@ class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Contrac
     } yield TaskSuccess(outcome)
   }
 
-  private[automation] override final def additionalRetryableConditions = {
+  private[automation] override final def additionalRetryableConditions
+      : Map[Status.Code, RetryProvider.Condition.Category] = {
     import io.grpc.Status
     import com.daml.error.ErrorCategory.InvalidIndependentOfSystemState
     import org.lfdecentralizedtrust.splice.environment.RetryProvider.Condition

@@ -4,12 +4,13 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, ReassignmentEvent}
 import org.lfdecentralizedtrust.splice.store.AppStore
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -56,7 +57,8 @@ class AssignTrigger(
         }
     } yield TaskSuccess(outcome)
 
-  private[automation] override final def additionalRetryableConditions = {
+  private[automation] override final def additionalRetryableConditions
+      : Map[Status.Code, RetryProvider.Condition.Category] = {
     import io.grpc.Status
     import com.daml.error.ErrorCategory.InvalidIndependentOfSystemState
     import org.lfdecentralizedtrust.splice.environment.RetryProvider.Condition

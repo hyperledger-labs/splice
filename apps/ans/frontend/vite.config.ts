@@ -33,6 +33,10 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       setupFiles: ['./src/__tests__/setup/setup.ts'],
+      reporters: [
+        'default',
+        ['junit', { outputFile: './../target/test-reports/TEST-ans.xml' }], // JUnit XML report
+      ],
     },
   });
 });

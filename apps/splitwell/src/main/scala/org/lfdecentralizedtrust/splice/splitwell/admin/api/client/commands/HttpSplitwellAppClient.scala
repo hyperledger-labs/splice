@@ -69,7 +69,7 @@ object HttpSplitwellAppClient {
         .traverse(DomainId.fromProtoPrimitive(_, "domain_id"))
     } yield ContractWithState(
       contract,
-      domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+      domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned.apply),
     )
   }
 

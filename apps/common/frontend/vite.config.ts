@@ -30,6 +30,10 @@ export default defineConfig(({ mode }) => {
       chaiConfig: {
         truncateThreshold: 10000,
       },
+      reporters: [
+        'default',
+        ['junit', { outputFile: './../target/test-reports/TEST-common.xml' }], // JUnit XML report
+      ],
     },
   });
 });

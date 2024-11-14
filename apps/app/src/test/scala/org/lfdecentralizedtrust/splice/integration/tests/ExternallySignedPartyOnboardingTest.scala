@@ -14,8 +14,6 @@ import java.util.UUID
 import scala.collection.mutable
 import scala.sys.process.{Process, ProcessLogger}
 
-// TODO(#15990) Re-enable this test
-@org.scalatest.Ignore
 class ExternallySignedPartyOnboardingTest
     extends IntegrationTest
     with HasExecutionContext

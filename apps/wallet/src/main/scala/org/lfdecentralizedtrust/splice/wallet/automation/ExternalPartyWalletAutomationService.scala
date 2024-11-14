@@ -55,7 +55,9 @@ class ExternalPartyWalletAutomationService(
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
     ) {
-  override def companion = ExternalPartyWalletAutomationService
+  override def companion
+      : org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService.type =
+    ExternalPartyWalletAutomationService
 }
 
 object ExternalPartyWalletAutomationService extends AutomationServiceCompanion {

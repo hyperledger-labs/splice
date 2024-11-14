@@ -39,42 +39,44 @@ class AppUpgradeIntegrationTest
   private val splitwellDarPathCurrent =
     "daml/splitwell/src/main/resources/dar/splitwell-current.dar"
 
-  override def environmentDefinition = EnvironmentDefinition
-    .simpleTopology4Svs(this.getClass.getSimpleName)
-    .withManualStart
-    // We don't currently register the upgrade of splitwell in app manager, just want to test
-    // that we can actually upgrade splitwell and use the new payment APIs in it.
-    .withoutInitialManagerApps
-    // TODO(#8300) Consider removing this once domain config updates are less disruptive, particularly
-    // to the tests after SVs 2 and 3 have been upgraded
-    .withSequencerConnectionsFromScanDisabled()
-    .addConfigTransform((_, config) => {
-      // Makes the test a bit faster and easier to debug. See #11488
-      ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
-    })
-    .addConfigTransform((_, config) => {
-      config
-        .focus(_.validatorApps)
-        .modify(_.updatedWith(InstanceName.tryCreate("splitwellValidatorApp"))(_.map {
-          splitwellValidator =>
-            splitwellValidator
-              .focus(_.appInstances)
-              .modify(_.map {
-                case (n @ "splitwell", appInstance) =>
-                  n -> appInstance
-                    .focus(_.dars)
-                    .modify(_.map { darPath =>
-                      Paths.get(
-                        darPath.toString.replace(
-                          "current",
-                          DarResources.splitwell_current.metadata.version.toString(),
+  override def environmentDefinition
+      : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
+    EnvironmentDefinition
+      .simpleTopology4Svs(this.getClass.getSimpleName)
+      .withManualStart
+      // We don't currently register the upgrade of splitwell in app manager, just want to test
+      // that we can actually upgrade splitwell and use the new payment APIs in it.
+      .withoutInitialManagerApps
+      // TODO(#8300) Consider removing this once domain config updates are less disruptive, particularly
+      // to the tests after SVs 2 and 3 have been upgraded
+      .withSequencerConnectionsFromScanDisabled()
+      .addConfigTransform((_, config) => {
+        // Makes the test a bit faster and easier to debug. See #11488
+        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+      })
+      .addConfigTransform((_, config) => {
+        config
+          .focus(_.validatorApps)
+          .modify(_.updatedWith(InstanceName.tryCreate("splitwellValidatorApp"))(_.map {
+            splitwellValidator =>
+              splitwellValidator
+                .focus(_.appInstances)
+                .modify(_.map {
+                  case (n @ "splitwell", appInstance) =>
+                    n -> appInstance
+                      .focus(_.dars)
+                      .modify(_.map { darPath =>
+                        Paths.get(
+                          darPath.toString.replace(
+                            "current",
+                            DarResources.splitwell_current.metadata.version.toString(),
+                          )
                         )
-                      )
-                    })
-                case x => x
-              })
-        }))
-    })
+                      })
+                  case x => x
+                })
+          }))
+      })
 
   "A set of Splice apps" should {
     "be upgradeable" in { implicit env =>
