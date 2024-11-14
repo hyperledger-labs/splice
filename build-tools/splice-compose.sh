@@ -109,7 +109,7 @@ function _start_validator {
   _info "Curling ${secret_url} for the secret"
   secret=""
   for i in {1..30}; do
-    secret=$(curl -sfL -X POST "${secret_url}") && break
+    secret=$(curl --connect-timeout 10 --max-time 20 -sfL -X POST "${secret_url}") && break
     _warning "Failed to fetch secret, retrying in 10 seconds"
     sleep 10
   done
