@@ -5,9 +5,9 @@ import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
+  FrontendLoginUtil,
   SpliceUtil,
   SynchronizerFeesTestUtil,
-  FrontendLoginUtil,
   WalletFrontendTestUtil,
   WalletTestUtil,
 }
@@ -18,12 +18,15 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   TxLogEntry as walletLogEntry,
 }
 import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.scalatest.Assertion
 
 import java.time.Duration
 import java.util.UUID
 import scala.collection.parallel.immutable.ParVector
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
+import monocle.macros.syntax.lens.*
 
 class WalletTransactionHistoryFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "sv1")
@@ -34,7 +37,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
     with FrontendLoginUtil {
 
   private val amuletPrice = 2
-  override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
+  override def walletAmuletPrice: java.math.BigDecimal =
+    SpliceUtil.damlDecimal(amuletPrice.toDouble)
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
@@ -42,6 +46,14 @@ class WalletTransactionHistoryFrontendIntegrationTest
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       .withAmuletPrice(amuletPrice)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs_(
+          _.focus(_.transferPreapproval)
+            // set renewal duration to be same as pre-approval lifetime
+            // to ensure renewal gets triggered immediately
+            .modify(c => c.copy(renewalDuration = c.preapprovalLifetime))
+        )(config)
+      )
 
   "A wallet transaction history UI" should {
 
@@ -300,7 +312,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
       }
     }
 
-    "shows notification transactions" in { implicit env =>
+    "show notification transactions" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
@@ -348,6 +360,62 @@ class WalletTransactionHistoryFrontendIntegrationTest
             .text
             .replaceAll("[()]", "") shouldBe "P2P Payment Failed"
         }
+      }
+    }
+
+    "show transfer preapproval purchases and renewals" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        val sv1Party = sv1ValidatorBackend.getValidatorPartyId()
+        val sv1Name = sv1Backend
+          .getDsoInfo()
+          .dsoRules
+          .payload
+          .svs
+          .asScala
+          .get(sv1Party.toProtoPrimitive)
+          .value
+          .name
+        val sv1ValidatorWalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
+        val amuletConfig = sv1ScanBackend.getAmuletConfigAsOf(env.environment.clock.now)
+        val preapprovalFeeRate = amuletConfig.transferPreapprovalFee.toScala.map(BigDecimal(_))
+        val (_, preapprovalFee) = SpliceUtil.transferPreapprovalFees(
+          bobValidatorBackend.config.transferPreapproval.preapprovalLifetime,
+          preapprovalFeeRate,
+          amuletPrice,
+        )
+        sv1WalletClient.tap(10.0)
+        browseToSv1Wallet(sv1ValidatorWalletUser)
+        actAndCheck(
+          "SV1 creates a transfer preapproval and automation renews it immediately",
+          sv1WalletClient.createTransferPreapproval(),
+        )(
+          "SV1 sees the creation and renewal transactions",
+          _ => {
+            val txs = findAll(className("tx-row")).toSeq
+            forExactly(1, txs) { tx =>
+              matchTransaction(tx)(
+                amuletPrice = 2,
+                expectedAction = "Sent",
+                expectedSubtype = "Transfer Preapproval Created",
+                expectedPartyDescription = Some(
+                  s"Automation ${expectedAns(sv1Party, s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
+                ),
+                expectedAmountAmulet = -preapprovalFee,
+              )
+            }
+            forExactly(1, txs) { tx =>
+              matchTransaction(tx)(
+                amuletPrice = 2,
+                expectedAction = "Sent",
+                expectedSubtype = "Transfer Preapproval Renewed",
+                expectedPartyDescription = Some(
+                  s"Automation ${expectedAns(sv1Party, s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
+                ),
+                expectedAmountAmulet = -preapprovalFee,
+              )
+            }
+          },
+        )
       }
     }
   }
