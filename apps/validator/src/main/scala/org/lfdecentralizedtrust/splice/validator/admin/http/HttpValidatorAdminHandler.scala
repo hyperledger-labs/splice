@@ -266,9 +266,10 @@ class HttpValidatorAdminHandler(
             publicKey = publicKey,
             participantAdminConnection = participantAdminConnection,
           )
-          .map { topologyTxs =>
+          .map { case (partyId, topologyTxs) =>
             v0.ValidatorAdminResource.GenerateExternalPartyTopologyResponse.OK(
               definitions.GenerateExternalPartyTopologyResponse(
+                partyId.toProtoPrimitive,
                 topologyTxs
                   .map(tx =>
                     definitions.TopologyTx(
@@ -276,7 +277,7 @@ class HttpValidatorAdminHandler(
                       hash = tx.hash.hash.toHexString,
                     )
                   )
-                  .toVector
+                  .toVector,
               )
             )
           }

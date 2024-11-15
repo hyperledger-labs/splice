@@ -170,7 +170,7 @@ private[validator] object ValidatorUtil {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]]] = {
+  ): Future[(PartyId, Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]])] = {
     val partyId = PartyId.tryCreate(partyHint, fingerprint = publicKey.fingerprint)
 
     for {
@@ -222,7 +222,7 @@ private[validator] object ValidatorUtil {
             )
           )
       )
-    } yield transactions
+    } yield (partyId, transactions)
 
   }
 
