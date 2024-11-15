@@ -57,6 +57,17 @@ workflow:
             - artifactory
             - slack-context
       # Scala
+      - scala_test_self_hosted:
+          <<: *minor-release-branch-never
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          name: "scala_test wall clock time"
+          test_names_file: "test-full-class-names.log"
+          start_canton_options: "-w"
+          # TODO(#10912) Investigate why things got slower
+          parallelism: 10
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -64,12 +75,11 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
-          name: "scala_test wall clock time"
-          test_names_file: "test-full-class-names.log"
-          start_canton_options: "-w -f -m"
+          name: "scala_test wall clock time docker"
+          test_names_file: "test-docker-full-class-names.log"
+          start_canton_options: "-w -f"
           resource_class: "xlarge"
-          # TODO(#10912) Investigate why things got slower
-          parallelism: 11
+          parallelism: 1
       - scala_test_self_hosted:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -89,7 +99,7 @@ workflow:
           name: "scala_test sim time"
           test_names_file: "test-full-class-names-sim-time.log"
           start_canton_options: "-s"
-          parallelism: 5
+          parallelism: 4
       - scala_test_self_hosted:
           <<: *notify-fail
           context:

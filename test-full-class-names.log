@@ -25,7 +25,6 @@ org.lfdecentralizedtrust.splice.integration.tests.ScanTxLogOwnerExpireLockIntegr
 org.lfdecentralizedtrust.splice.integration.tests.SequencerPruningIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.SplitwellIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.SplitwellUpgradeIntegrationTest
-org.lfdecentralizedtrust.splice.integration.tests.SvCometBftIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.SvDevNetReonboardingIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.SvDsoPartyManagementIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.SvIdentitiesDumpIntegrationTest
@@ -74,9 +73,6 @@ org.lfdecentralizedtrust.splice.store.db.DbSvDsoStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbSvSvStoreTest
 org.lfdecentralizedtrust.splice.store.db.DbUserWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.ScanAggregatorTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClientIntegrationTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftRequestSignerTest
 org.lfdecentralizedtrust.splice.sv.util.SvOnboardingTokenTest
 org.lfdecentralizedtrust.splice.sv.util.WeightDistributionForSvTest
 org.lfdecentralizedtrust.splice.unit.store.DecentralizedSynchronizerMigrationCoverageTest

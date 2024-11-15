@@ -169,6 +169,14 @@ executors:
     resource_class: dach_ny/cn-runner-large
     docker:
       - image: cimg/base:current
+      - image: postgres:14
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        command: [
+          "postgres",
+          "-c", "max_connections=16000"
+        ]
     environment:
       COURSIER_CACHE: "/cache/coursier"
   self_hosted:
@@ -4864,7 +4872,7 @@ jobs:
             sudo chown $USER /run/postgresql
       - setup_nix_self_hosted
       - start_canton_in_background:
-          start_canton_options: << parameters.start_canton_options >> -p local
+          start_canton_options: << parameters.start_canton_options >> -p external
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - when:
@@ -4947,6 +4955,17 @@ workflows:
             - artifactory
             - slack-context
       # Scala
+      - scala_test_self_hosted:
+          <<: *minor-release-branch-never
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          name: "scala_test wall clock time"
+          test_names_file: "test-full-class-names.log"
+          start_canton_options: "-w"
+          # TODO(#10912) Investigate why things got slower
+          parallelism: 10
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -4954,12 +4973,11 @@ workflows:
             - artifactory
             - slack-context
             - canton-network-vpn
-          name: "scala_test wall clock time"
-          test_names_file: "test-full-class-names.log"
-          start_canton_options: "-w -f -m"
+          name: "scala_test wall clock time docker"
+          test_names_file: "test-docker-full-class-names.log"
+          start_canton_options: "-w -f"
           resource_class: "xlarge"
-          # TODO(#10912) Investigate why things got slower
-          parallelism: 11
+          parallelism: 1
       - scala_test_self_hosted:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -4979,7 +4997,7 @@ workflows:
           name: "scala_test sim time"
           test_names_file: "test-full-class-names-sim-time.log"
           start_canton_options: "-s"
-          parallelism: 5
+          parallelism: 4
       - scala_test_self_hosted:
           <<: *notify-fail
           context:

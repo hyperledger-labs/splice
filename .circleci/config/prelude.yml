@@ -164,6 +164,14 @@ executors:
     resource_class: dach_ny/cn-runner-large
     docker:
       - image: cimg/base:current
+      - image: postgres:14
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        command: [
+          "postgres",
+          "-c", "max_connections=16000"
+        ]
     environment:
       COURSIER_CACHE: "/cache/coursier"
   self_hosted:

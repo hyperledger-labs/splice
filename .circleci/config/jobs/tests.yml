@@ -191,7 +191,7 @@ jobs:
             sudo chown $USER /run/postgresql
       - setup_nix_self_hosted
       - start_canton_in_background:
-          start_canton_options: << parameters.start_canton_options >> -p local
+          start_canton_options: << parameters.start_canton_options >> -p external
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - when:
