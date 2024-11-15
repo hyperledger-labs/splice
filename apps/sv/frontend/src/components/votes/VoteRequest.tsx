@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder';
 import { useMutation } from '@tanstack/react-query';
-import { ActionView, DisableConditionally, SvClientProvider } from 'common-frontend';
+import {
+  ActionView,
+  DateWithDurationDisplay,
+  DisableConditionally,
+  SvClientProvider,
+} from 'common-frontend';
 import { getUTCWithOffset } from 'common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
@@ -272,6 +277,33 @@ export const CreateVoteRequest: React.FC = () => {
               </NativeSelect>
             </FormControl>
           </Stack>
+          <Stack direction="column" mb={4} spacing={1}>
+            <Typography variant="h6" mt={4}>
+              Vote Request Expires At
+            </Typography>
+            <DesktopDateTimePicker
+              label={`Enter time in local timezone (${getUTCWithOffset()})`}
+              value={expiration}
+              minDateTime={dayjs()}
+              maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
+              readOnly={false}
+              onChange={(newValue: Dayjs | null) => setExpiration(newValue)}
+              slotProps={{
+                textField: {
+                  id: 'datetime-picker-vote-request-expiration',
+                },
+              }}
+              closeOnSelect
+            />
+            <Typography variant="body2" mt={1}>
+              Expires{' '}
+              <DateWithDurationDisplay
+                datetime={expiration?.toDate()}
+                enableDuration
+                onlyDuration
+              />
+            </Typography>
+          </Stack>
           {actionName === 'SRARC_OffboardSv' && <OffboardSv chooseAction={chooseAction} />}
           {actionName === 'SRARC_GrantFeaturedAppRight' && (
             <GrantFeaturedAppRight chooseAction={chooseAction} />
@@ -292,6 +324,7 @@ export const CreateVoteRequest: React.FC = () => {
           {actionName === 'SRARC_UpdateSvRewardWeight' && (
             <UpdateSvRewardWeight chooseAction={chooseAction} action={action} />
           )}
+
           <Typography variant="h5">Proposal</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>
@@ -320,25 +353,6 @@ export const CreateVoteRequest: React.FC = () => {
                 Open
               </Button>
             </Box>
-          </Stack>
-          <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h5" mt={4}>
-              Vote Request Expires At
-            </Typography>
-            <DesktopDateTimePicker
-              label={`Enter time in local timezone (${getUTCWithOffset()})`}
-              value={expiration}
-              minDateTime={dayjs()}
-              maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
-              readOnly={false}
-              onChange={(newValue: Dayjs | null) => setExpiration(newValue)}
-              slotProps={{
-                textField: {
-                  id: 'datetime-picker-vote-request-expiration',
-                },
-              }}
-              closeOnSelect
-            />
           </Stack>
           {action && (
             <Stack direction="column" mb={4} spacing={1}>
