@@ -49,8 +49,8 @@ trait TransferInputStore extends AppStore with LimitHelpers {
       )
     )
 
-  /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
-    * and optionally filtered by a set of issuing rounds.
+  /** Returns the validator reward coupon sorted by their round in ascending order.
+    * Optionally filtered by a set of issuing rounds.
     */
   def listSortedValidatorRewards(
       activeIssuingRoundsO: Option[Set[Long]],
@@ -79,7 +79,7 @@ trait TransferInputStore extends AppStore with LimitHelpers {
     )
 
   /** Returns the app reward coupon sorted by their round in ascending order and their value in descending order.
-    * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
+    * All rewards are from the given `activeIssuingRounds`.
     */
   def listSortedAppRewards(
       issuingRoundsMap: Map[Round, IssuingMiningRound],

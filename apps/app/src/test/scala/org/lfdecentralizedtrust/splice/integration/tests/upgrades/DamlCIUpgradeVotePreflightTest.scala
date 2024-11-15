@@ -109,9 +109,11 @@ class DamlCIUpgradeVotePreflightTest
             try {
               click on "vote-confirmation-dialog-accept-button"
             } catch {
-              case _: org.openqa.selenium.NoSuchElementException =>
+              // See WebBrowser:2988 to see how the NoSuchElementException gets wrapped in a TestFailedException
+              case tf: org.scalatest.exceptions.TestFailedException
+                  if tf.cause.exists(_.isInstanceOf[org.openqa.selenium.NoSuchElementException]) =>
               // Maybe we're on an old version without a confirmation dialog
-              // TODO(#16090) remove once the ciupgade base version contains #15693
+              // TODO(#16090) remove once the ciupgrade base version contains #15693
             }
 
           }

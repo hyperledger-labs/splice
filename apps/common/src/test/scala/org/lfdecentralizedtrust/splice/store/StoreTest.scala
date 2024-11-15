@@ -216,6 +216,26 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  protected def issuingMiningRound(dso: PartyId, round: Long) = {
+    val template = new roundCodegen.IssuingMiningRound(
+      dso.toProtoPrimitive,
+      new Round(round),
+      numeric(1.0), // issuancePerValidatorRewardCoupon
+      numeric(1.0), // issuancePerFeaturedAppRewardCoupon
+      numeric(2.0), // issuancePerUnfeaturedAppRewardCoupon
+      numeric(1.0), // issuancePerSvRewardCoupon
+      Instant.now().truncatedTo(ChronoUnit.MICROS),
+      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(600),
+      java.util.Optional.of(numeric(1.0)), // optIssuancePerValidatorFaucetCoupon
+    )
+
+    contract(
+      roundCodegen.IssuingMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new roundCodegen.IssuingMiningRound.ContractId(nextCid()),
+      template,
+    )
+  }
+
   protected def closedMiningRound(dso: PartyId, round: Long) = {
     val template = new roundCodegen.ClosedMiningRound(
       dso.toProtoPrimitive,
@@ -912,6 +932,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         workflowId: String = "",
         recordTime: Instant = defaultEffectiveAt,
         packageName: String = dummyPackageName,
+        createdEventObservers: Seq[PartyId] = Seq.empty,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
@@ -922,6 +943,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         workflowId,
         recordTime,
         packageName,
+        createdEventObservers,
       )
 
       store.testIngestionSink
