@@ -1916,6 +1916,7 @@
           "istioNamespace": "cluster-ingress",
           "logAsJson": true,
           "proxy": {
+            "excludeInboundPorts": "5432,26657",
             "excludeOutboundPorts": "5432,26657",
             "resources": {
               "limits": {

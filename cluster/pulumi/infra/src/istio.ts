@@ -72,6 +72,7 @@ function configureIstiod(
           logAsJson: true,
           proxy: {
             // disable traffic proxying for the postgres port and CometBFT RPC port
+            excludeInboundPorts: '5432,26657',
             excludeOutboundPorts: '5432,26657',
             resources: {
               limits: {
