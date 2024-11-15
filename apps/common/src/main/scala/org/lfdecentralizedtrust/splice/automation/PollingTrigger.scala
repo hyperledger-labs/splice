@@ -18,7 +18,8 @@ import com.digitalasset.canton.util.retry.ErrorKind.*
 import org.apache.pekko.Done
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{blocking, Future, Promise}
+import scala.concurrent.{Future, Promise, blocking}
+import scala.util.{Failure, Success}
 
 /** A trigger that regularly executes work.
   *
@@ -71,7 +72,13 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           waitForReadyToWork()
             .flatMap(_ => performWorkIfAvailable())
             .transform { performedWork =>
-              MetricsContext.withExtraMetricLabels(("work_done", performedWork.toString)) { m =>
+              val performedWorkMetricsString = performedWork match {
+                case Success(value) => s"Success($value)"
+                // `.toString`ing an exception might end up exceeding the max cardinality, see #16132
+                // so instead we just include the exception name
+                case Failure(exception) => s"Failure(${exception.getClass.getName})"
+              }
+              MetricsContext.withExtraMetricLabels(("work_done", performedWorkMetricsString)) { m =>
                 latencyTimer.stop()(m)
               }
 
