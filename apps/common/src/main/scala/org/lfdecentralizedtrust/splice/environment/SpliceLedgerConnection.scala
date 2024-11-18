@@ -997,6 +997,7 @@ class SpliceLedgerConnection(
       readAs: Seq[PartyId],
       commands: Seq[Command],
       disclosedContracts: DisclosedContracts,
+      verboseHashing: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[lapi.interactive.interactive_submission_service.PrepareSubmissionResponse] = {
@@ -1009,6 +1010,7 @@ class SpliceLedgerConnection(
       readAs = readAs.map(_.toProtoPrimitive),
       commands = commands,
       disclosedContracts = disclosedContracts,
+      verboseHashing = verboseHashing,
     )
   }
 

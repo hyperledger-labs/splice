@@ -586,6 +586,7 @@ class HttpValidatorAdminHandler(
                   Seq(userParty),
                   commands,
                   storeWithIngestion.connection.disclosedContracts(externalPartySetupProposal),
+                  body.verboseHashing.getOrElse(false),
                 )
                 .flatMap { r =>
                   Future.successful(
@@ -596,6 +597,7 @@ class HttpValidatorAdminHandler(
                         // across languages.
                         Base64.getEncoder.encodeToString(r.getPreparedTransaction.toByteArray),
                         HexString.toHexString(r.preparedTransactionHash),
+                        r.hashingDetails,
                       )
                     )
                   )
@@ -762,6 +764,7 @@ class HttpValidatorAdminHandler(
             commands,
             storeWithIngestion.connection
               .disclosedContracts(externalPartyAmuletRules),
+            body.verboseHashing.getOrElse(false),
           )
         transferCommandCid = r.preparedTransaction
           .flatMap(_.transaction)
@@ -787,6 +790,7 @@ class HttpValidatorAdminHandler(
             Base64.getEncoder.encodeToString(r.getPreparedTransaction.toByteArray),
             HexString.toHexString(r.preparedTransactionHash),
             transferCommandCid,
+            r.hashingDetails,
           )
         )
       }

@@ -285,6 +285,7 @@ object HttpValidatorAdminAppClient {
   case class PrepareAcceptExternalPartySetupProposal(
       contractId: amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
       userPartyId: PartyId,
+      verboseHashing: Boolean,
   ) extends BaseCommand[
         http.PrepareAcceptExternalPartySetupProposalResponse,
         definitions.PrepareAcceptExternalPartySetupProposalResponse,
@@ -301,6 +302,7 @@ object HttpValidatorAdminAppClient {
         definitions.PrepareAcceptExternalPartySetupProposalRequest(
           contractId.contractId,
           userPartyId.toProtoPrimitive,
+          Some(verboseHashing),
         ),
         headers = headers,
       )
@@ -468,6 +470,7 @@ object HttpValidatorAdminAppClient {
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
       nonce: Long,
+      verboseHashing: Boolean,
   ) extends BaseCommand[
         http.PrepareTransferPreapprovalSendResponse,
         definitions.PrepareTransferPreapprovalSendResponse,
@@ -487,6 +490,7 @@ object HttpValidatorAdminAppClient {
           amount,
           expiresAt.toInstant.atOffset(ZoneOffset.UTC),
           nonce,
+          Some(verboseHashing),
         ),
         headers = headers,
       )

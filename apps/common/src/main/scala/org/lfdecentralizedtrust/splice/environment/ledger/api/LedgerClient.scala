@@ -271,6 +271,7 @@ private[environment] class LedgerClient(
       readAs: Seq[String],
       commands: Seq[Command],
       disclosedContracts: DisclosedContracts,
+      verboseHashing: Boolean,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -288,6 +289,7 @@ private[environment] class LedgerClient(
           commandId = commandId,
           actAs = actAs,
           readAs = readAs,
+          verboseHashing = verboseHashing,
         )
       )
     } yield result
