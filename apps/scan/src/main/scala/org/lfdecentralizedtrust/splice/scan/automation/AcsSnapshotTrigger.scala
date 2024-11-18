@@ -65,11 +65,7 @@ class AcsSnapshotTrigger(
     *         And also for past migrations, whether the SV was present in them or not.
     */
   private def isHistoryBackfilled(migrationId: Long)(implicit tc: TraceContext) = {
-    if (updateHistoryBackfillEnabled) {
-      updateHistory.sourceHistory.migrationInfo(migrationId).map(_.exists(_.complete))
-    } else {
-      Future.successful(true)
-    }
+    updateHistory.sourceHistory.migrationInfo(migrationId).map(_.exists(_.complete))
   }
 
   private def retrieveTask()(implicit

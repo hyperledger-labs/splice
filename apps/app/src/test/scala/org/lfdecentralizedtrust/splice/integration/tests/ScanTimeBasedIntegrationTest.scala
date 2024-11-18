@@ -428,6 +428,18 @@ class ScanTimeBasedIntegrationTest
     val (aliceUserParty, _) = onboardAliceAndBob()
     val migrationId = sv1ScanBackend.config.domainMigrationId
 
+    clue(
+      "Wait for backfilling to complete, as the ACS snapshot trigger is paused until then"
+    ) {
+      eventually() {
+        sv1ScanBackend.automation.store.updateHistory
+          .getBackfillingState()
+          .futureValue
+          .exists(_.complete) should be(true)
+        advanceTime(sv1ScanBackend.config.automation.pollingInterval.asJava)
+      }
+    }
+
     val snapshotBefore = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
       getLedgerTime,
       migrationId,

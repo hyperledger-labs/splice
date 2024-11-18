@@ -535,9 +535,15 @@ class AcsSnapshotTriggerTest
     when(store.currentMigrationId).thenReturn(currentMigrationId)
     val updateHistory: UpdateHistory = mock[UpdateHistory]
     when(updateHistory.isReady).thenReturn(true)
-    when(updateHistory.sourceHistory).thenReturn(
-      mock[HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse]]
-    )
+    val sourceHistory = mock[HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse]]
+    // migrationInfo() is only used to check whether backfilling is complete
+    when(sourceHistory.migrationInfo(anyLong)(any[TraceContext]))
+      .thenReturn(
+        Future.successful(
+          Some(HistoryBackfilling.SourceMigrationInfo(None, Map.empty, complete = true))
+        )
+      )
+    when(updateHistory.sourceHistory).thenReturn(sourceHistory)
     when(updateHistory.getPreviousMigrationId(anyLong)(any[TraceContext])).thenAnswer { (n: Long) =>
       Future.successful(n match {
         case 0L => None

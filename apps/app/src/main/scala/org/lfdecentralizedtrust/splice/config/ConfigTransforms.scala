@@ -735,14 +735,12 @@ object ConfigTransforms {
     )
 
   def enableScanHistoryBackfilling: ConfigTransform = config => {
-    val backfillingEnabled = config.scanApps.size > 1
     ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
       scanConfig.copy(
-        updateHistoryBackfillEnabled = backfillingEnabled,
+        updateHistoryBackfillEnabled = true,
         updateHistoryBackfillBatchSize = 5,
       )
     )(config)
-
   }
 
   def modifyAllANStorageConfigs(

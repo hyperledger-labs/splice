@@ -5,12 +5,12 @@ import better.files.File.apply
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
-  ParticipantClientConfig,
   NetworkAppClientConfig,
+  ParticipantClientConfig,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  updateAutomationConfig,
   ConfigurableApp,
+  updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.console.{
   AppBackendReference,
@@ -63,6 +63,7 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import io.circe.syntax.EncoderOps
+import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTrigger
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.{Files, Path}
@@ -115,6 +116,10 @@ class DisasterRecoveryIntegrationTest
         (_, conf) =>
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
+          )(conf),
+        (_, conf) =>
+          updateAutomationConfig(ConfigurableApp.Scan)(
+            _.withPausedTrigger[AcsSnapshotTrigger]
           )(conf),
         (_, conf) =>
           conf.copy(
@@ -299,7 +304,7 @@ class DisasterRecoveryIntegrationTest
       ),
     )() {
 
-      withCantonSvNodes(
+      val (acsSnapshotBeforeDisaster, acsSnapshotAfterDisaster) = withCantonSvNodes(
         (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
         s"sequencers-mediators-before-disaster-$cantonInstanceSuffix",
         participants = false,
@@ -350,6 +355,10 @@ class DisasterRecoveryIntegrationTest
           },
         )
 
+        val acsSnapshotBeforeDisaster = withClueAndLog("Generating ACS snapshot before disaster") {
+          sv1ScanBackend.forceAcsSnapshotNow()
+        }
+
         // In a real disaster, we would find the available ACS timestamp from each SV, and take the
         // minimum on a majority of SVs, but here we want to make sure all SVs have the tap in their
         // ACS, so we just make sure that the timestamp right after the tap that we want to retain is
@@ -390,6 +399,10 @@ class DisasterRecoveryIntegrationTest
             .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
             .flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
           taps should contain allElementsOf Seq(walletUsdToAmulet(1337), walletUsdToAmulet(1338))
+        }
+
+        val acsSnapshotAfterDisaster = withClueAndLog("Generating ACS snapshot after disaster") {
+          sv1ScanBackend.forceAcsSnapshotNow()
         }
 
         // Note: the dumps contain data from the sequencers, need to get
@@ -433,6 +446,8 @@ class DisasterRecoveryIntegrationTest
         clue("Shutting down old apps") {
           stopAllAsync(allAppsBeforeDisaster*).futureValue
         }
+
+        (acsSnapshotBeforeDisaster, acsSnapshotAfterDisaster)
       }
 
       // The sequencers and mediators have been shut down here, only participants are still alive
@@ -546,6 +561,30 @@ class DisasterRecoveryIntegrationTest
                 case e: BalanceChangeTxLogEntry => e.amount
               }
               balanceChanges should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
+            }
+
+            withClueAndLog(
+              "Only one ACS snapshot visible"
+            ) {
+              sv1ScanLocalBackend.getDateOfMostRecentSnapshotBefore(
+                before = acsSnapshotBeforeDisaster.minusMillis(1L),
+                migrationId = 0L,
+              ) shouldBe None
+
+              sv1ScanLocalBackend
+                .getDateOfMostRecentSnapshotBefore(
+                  before = acsSnapshotBeforeDisaster.plusMillis(1L),
+                  migrationId = 0L,
+                )
+                .map(_.toInstant) shouldBe Some(acsSnapshotBeforeDisaster.toInstant)
+
+              // acsSnapshotAfterDisaster should be deleted by `UpdateHistory.cleanUpDataAfterDomainMigration`
+              sv1ScanLocalBackend
+                .getDateOfMostRecentSnapshotBefore(
+                  before = acsSnapshotAfterDisaster.plusMillis(1L),
+                  migrationId = 0L,
+                )
+                .map(_.toInstant) shouldBe Some(acsSnapshotBeforeDisaster.toInstant)
             }
 
             withClueAndLog("New domain is functional") {
