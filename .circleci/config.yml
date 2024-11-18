@@ -1256,6 +1256,21 @@ commands:
           command: |
             for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
             do
+              mkdir -p test-reports/"$subproject"
+              # Keep going, if there is no test report.
+              cp -v "$subproject"/target/test-reports/TEST-*.xml test-reports/"$subproject" || true
+            done
+      - store_test_results:
+          path: test-reports
+
+  upload_ui_test_reports:
+    steps:
+      - run:
+          when: always
+          name: Group test reports by subproject
+          command: |
+            for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
+            do
               mkdir -p test-reports
               mkdir -p log
               # Keep going, if there is no test report.
@@ -1395,6 +1410,7 @@ commands:
         default: false
       <<: *runner_type
     steps:
+      - upload_test_reports
       # sbt caches are job-specific, so we're ignoring the upload_caches parameter,
       # and saving those caches in every job
       - save_sbt_cache:
@@ -3192,7 +3208,7 @@ jobs:
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmTest"
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
-      - upload_test_reports
+      - upload_ui_test_reports
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmGenerateViteReport"
           fail_on_error_in_output: false

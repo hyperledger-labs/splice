@@ -30,6 +30,7 @@ commands:
         default: false
       <<: *runner_type
     steps:
+      - upload_test_reports
       # sbt caches are job-specific, so we're ignoring the upload_caches parameter,
       # and saving those caches in every job
       - save_sbt_cache:
