@@ -930,7 +930,8 @@
           "decentralizedSynchronizer": {
             "migrationIds": [
               "3",
-              "2"
+              "2",
+              "4"
             ]
           }
         },
@@ -1055,7 +1056,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test",
-          "migration_id": "2"
+          "migration_id": "1"
         }
       }
     },
@@ -1198,7 +1199,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test",
-          "migration_id": "2"
+          "migration_id": "1"
         }
       }
     },
@@ -1340,7 +1341,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test",
-          "migration_id": "2"
+          "migration_id": "1"
         }
       }
     },
