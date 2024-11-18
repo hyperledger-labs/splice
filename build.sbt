@@ -813,7 +813,9 @@ lazy val `apps-common-frontend` = {
         )
       },
       npmGenerateViteReport := {
+        val copyViteReports = baseDirectory.value / "../../../scripts/copy-vite-reports.sh"
         val log = streams.value.log
+        runCommand(Seq(copyViteReports.toString), log, None, None)
         runCommand(
           Seq("npm", "run", "xunit-viewer", "--workspaces", "--if-present"),
           log,
@@ -1456,8 +1458,10 @@ printTests := {
       name.contains("DecentralizedSynchronizerMigrationIntegrationTest") ||
       name.contains("BootstrapPackageConfigIntegrationTest") ||
       name.contains("SvOffboardingIntegrationTest")
-  def isDockerBasedTest(name: String): Boolean =
+  def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
+  def isDockerBasedTest(name: String): Boolean =
+    name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
     name contains "RecordTimeToleranceTimeBasedIntegrationTest"
 
@@ -1553,7 +1557,12 @@ printTests := {
     (
       "tests using docker images",
       "test-full-class-names-docker-based.log",
-      (t: String) => isDockerBasedTest(t),
+      (t: String) => isDockerComposeBasedTest(t),
+    ),
+    (
+      "tests with wall clock time using docker",
+      "test-docker-full-class-names.log",
+      (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && isDockerBasedTest(t),
     ),
     (
       "tests with wall clock time",

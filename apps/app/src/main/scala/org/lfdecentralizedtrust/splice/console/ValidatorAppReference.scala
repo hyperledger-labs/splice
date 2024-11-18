@@ -204,10 +204,15 @@ abstract class ValidatorAppReference(
   def prepareAcceptExternalPartySetupProposal(
       contractId: amuletrulesCodegen.ExternalPartySetupProposal.ContractId,
       userPartyId: PartyId,
+      verboseHashing: Boolean = false,
   ): definitions.PrepareAcceptExternalPartySetupProposalResponse = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAdminAppClient.PrepareAcceptExternalPartySetupProposal(contractId, userPartyId)
+        HttpValidatorAdminAppClient.PrepareAcceptExternalPartySetupProposal(
+          contractId,
+          userPartyId,
+          verboseHashing,
+        )
       )
     }
   }
@@ -255,6 +260,7 @@ abstract class ValidatorAppReference(
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
       nonce: Long,
+      verboseHashing: Boolean = false,
   ): definitions.PrepareTransferPreapprovalSendResponse = {
     consoleEnvironment.run {
       httpCommand(
@@ -264,6 +270,7 @@ abstract class ValidatorAppReference(
           amount,
           expiresAt,
           nonce,
+          verboseHashing,
         )
       )
     }

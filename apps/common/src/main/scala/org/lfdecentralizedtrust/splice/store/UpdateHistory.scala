@@ -572,7 +572,10 @@ class UpdateHistory(
     val previousMigrationId = domainMigrationInfo.currentMigrationId - 1
     domainMigrationInfo.acsRecordTime match {
       case Some(acsRecordTime) =>
-        deleteRolledBackUpdateHistory(historyId, previousMigrationId, acsRecordTime)
+        for {
+          _ <- deleteAcsSnapshotsAfter(historyId, previousMigrationId, acsRecordTime)
+          _ <- deleteRolledBackUpdateHistory(historyId, previousMigrationId, acsRecordTime)
+        } yield ()
       case _ =>
         logger.debug("No previous domain migration, not checking or deleting updates")
         Future.unit
@@ -632,6 +635,53 @@ class UpdateHistory(
         }
       )
     storage.update(action, "deleteRolledBackUpdateHistory")
+  }
+
+  /** Deletes all ACS snapshots with a record time after the given time.
+    *
+    * Note: ACS snapshots are managed by [[AcsSnapshotStore]] which is part of the scan app
+    * and depends on this store. In theory this method should be implemented there.
+    *
+    * However, due to foreign key constraints, we need to delete acs snapshots before we can delete
+    * updates referenced by the snapshots, and this store deletes updates as part of its initialization.
+    * To avoid orchestrating store initialization, we simply implement this method here.
+    * This works because all apps use the same database schema.
+    */
+  def deleteAcsSnapshotsAfter(
+      historyId: Long,
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    logger.info(
+      s"Deleting ACS snapshots for history $historyId with migration $migrationId and recordTime > $recordTime"
+    )
+    val deleteAction = for {
+      dataToDelete <-
+        sql"""
+          delete from acs_snapshot
+          where history_id = $historyId and migration_id = $migrationId and snapshot_record_time > $recordTime
+          returning first_row_id, last_row_id
+        """.asUpdateReturning[(Long, Long)]
+      expectedDataRows = dataToDelete.foldLeft(0L)((total, r) => total + (r._2 - r._1 + 1))
+      _ = logger.info(
+        s"Deleted ${dataToDelete.size} rows from acs_snapshot, expecting to delete $expectedDataRows rows from acs_snapshot_data"
+      )
+      deletedDataRows <- DBIO.traverse(dataToDelete) { case (first_row, last_row) =>
+        sqlu"""
+          delete from acs_snapshot_data
+          where row_id between $first_row and $last_row
+        """
+      }
+      _ = logger.info(
+        s"Deleted ${deletedDataRows.sum} rows from acs_snapshot_data"
+      )
+    } yield ()
+
+    storage
+      .queryAndUpdate(
+        deleteAction.transactionally,
+        "deleteAcsSnapshotsAfter",
+      )
   }
 
   /** Deletes all updates on the given domain with a record time before the given time.
