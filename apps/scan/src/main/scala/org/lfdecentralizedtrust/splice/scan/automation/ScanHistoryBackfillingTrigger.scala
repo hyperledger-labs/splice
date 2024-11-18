@@ -130,6 +130,13 @@ class ScanHistoryBackfillingTrigger(
           )
         case Some(JoiningTransactionTreeUpdate(treeUpdate, _)) =>
           for {
+            // Before deleting updates, we need to delete ACS snapshots that were generated before backfilling was enabled.
+            // This will delete all ACS snapshots for migration id where the SV node joined the network.
+            _ <- store.updateHistory.deleteAcsSnapshotsAfter(
+              historyId = store.updateHistory.historyId,
+              migrationId = treeUpdate.migrationId,
+              recordTime = CantonTimestamp.MinValue,
+            )
             // Joining SVs need to delete updates before the joining transaction, because they ingested those updates
             // only with the visibility of the SV party and not the DSO party.
             // Note that this will also delete the import updates because they have a record time of 0,

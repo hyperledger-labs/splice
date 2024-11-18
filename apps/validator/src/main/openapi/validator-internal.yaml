@@ -817,8 +817,11 @@ components:
     GenerateExternalPartyTopologyResponse:
       type: object
       required:
+        - party_id
         - topology_txs
       properties:
+        party_id:
+          type: string
         topology_txs:
           type: array
           items:
@@ -1369,6 +1372,12 @@ components:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         user_party_id:
           type: string
+        verbose_hashing:
+          type: boolean
+          description: |
+            When true, the response will contain additional details on how the transaction was encoded and hashed.
+            This can be useful for troubleshooting of hash mismatches. Should only be used for debugging.
+          default: false
 
     PrepareAcceptExternalPartySetupProposalResponse:
       type: object
@@ -1385,6 +1394,12 @@ components:
             and can be decoded using standard protobuf libraries.
         tx_hash:
           description: Hex-encoded hash of the transaction
+          type: string
+        hashing_details:
+          description: |
+            Optional additional details on how the transaction was encoded and hashed. Only set if verbose_hashing=true in the request.
+            Note that there are no guarantees on the stability of the format or content of this field.
+            Its content should NOT be parsed and should only be used for troubleshooting purposes.
           type: string
 
     SubmitAcceptExternalPartySetupProposalRequest:
@@ -1481,6 +1496,12 @@ components:
             The expected value of the counter that is used to order and deduplicate TransferCommands. Starts at 0 and  increases
             by 1 for each executed TransferCommand (independent of whether is succeeded or not). The most recent value can be read from scan
             through /v0/transfer-command-counter/{party}
+        verbose_hashing:
+          type: boolean
+          description: |
+            When true, the response will contain additional details on how the transaction was encoded and hashed.
+            This can be useful for troubleshooting of hash mismatches. Should only be used for debugging.
+          default: false
 
     PrepareTransferPreapprovalSendResponse:
       type: object
@@ -1504,6 +1525,12 @@ components:
             Prefix of the ContractId of the created TransferCommand. Matches the contract id of the corresponding `Create` node in the prepared transaction which
             also only contains the prefix. The final transaction observed on the update stream or in the result of looking up the transfer command status on Scan
             adds an additional suffix to the contract id.
+          type: string
+        hashing_details:
+          description: |
+            Optional additional details on how the transaction was encoded and hashed. Only set if verbose_hashing=true in the request.
+            Note that there are no guarantees on the stability of the format or content of this field.
+            Its content should NOT be parsed and should only be used for troubleshooting purposes.
           type: string
 
     SubmitTransferPreapprovalSendRequest:
