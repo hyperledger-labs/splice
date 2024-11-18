@@ -813,7 +813,9 @@ lazy val `apps-common-frontend` = {
         )
       },
       npmGenerateViteReport := {
+        val copyViteReports = baseDirectory.value / "../../../scripts/copy-vite-reports.sh"
         val log = streams.value.log
+        runCommand(Seq(copyViteReports.toString), log, None, None)
         runCommand(
           Seq("npm", "run", "xunit-viewer", "--workspaces", "--if-present"),
           log,

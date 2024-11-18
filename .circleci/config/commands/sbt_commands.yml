@@ -118,20 +118,6 @@ commands:
       - store_test_results:
           path: test-reports
 
-  upload_ui_test_reports:
-    steps:
-      - run:
-          when: always
-          name: Group test reports by subproject
-          command: |
-            for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
-            do
-              mkdir -p test-reports
-              mkdir -p log
-              # Keep going, if there is no test report.
-              cp -v "$subproject"/target/test-reports/TEST-*.xml test-reports || true
-            done
-
   # Adapted from Canton's CI definition
   split_tests_for_parallel_run:
     description: split tests for parallel execution

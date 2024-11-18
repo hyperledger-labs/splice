@@ -57,7 +57,6 @@ jobs:
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmTest"
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
-      - upload_ui_test_reports
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmGenerateViteReport"
           fail_on_error_in_output: false

@@ -340,6 +340,7 @@ Note that the entire command must be quoted in this case, especially if it has s
 - `apps-common/compile`: compile production code of the `apps-common` subproject
 - `apps-frontends/compile`: compile and codegen only frontend code
 - `apps-frontends/npmTest`: runs all frontend unit tests
+- `apps-frontends/npmGenerateViteReport`: generates a html report of the vite frontend tests after the above was executed (named report.html located in the log folder)
 - `apps-frontends/npmLint`: checks formatting of frontend code, but does not fix anything
 - `apps-frontends/npmFix`: fixes formatting of frontend code
 - `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled.
