@@ -20,9 +20,10 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 - [ ] If you are upgrading to a new Canton major version, manually test compatibility of dev/test/mainnet snapshots as described in `cluster/README.md`
 - [ ] open or create corresponding agenda and tracking sheet in [this folder](https://drive.google.com/drive/folders/0ACLduXEo3vM1Uk9PVA)
 - [ ] prepare our staging nodes and tell partners
+  - [ ] (later) forward-port to branches that may serve as potential future release sources (e.g. for 0.2.8, 0.2 and `main`; `main` is always included)
 - [ ] a sufficient number of partners have reported that they are ready / prepared (or look as if they are); check once and escalate if check failed
 - [ ] (only if hard migration) vote on scheduled downtime
-- [ ] disable periodic CI jobs (including sv and validator runbook resets)
+- [ ] disable periodic CI jobs (including sv and validator runbook resets) on `main`
 - [ ] (only if DevNet) take down multi-validator stack (does not handle hard domain migrations in its current form): `cncluster pulumi multi-validator down` from release branch
 
 ### Call with all SVs (hard migrations version; remove me if DR)
@@ -31,6 +32,7 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 - [ ] ensure that apps are sufficiently caught up
 - [ ] take backups with `cncluster backup_nodes`
 - [ ] merge PR to migrate to higher migration ID
+  - [ ] (later) forward-port to branches that may serve as potential future release sources
 - [ ] check: domain is healthy
 
 ### Call with all SVs (DR version; remove me if hard migration)
@@ -41,15 +43,18 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 - [ ] get the dumps with `cncluster take_disaster_recovery_dumps`
 - [ ] copy the dumps into our PVCs with `cncluster copy_disaster_recovery_dumps`
 - [ ] merge PR to migrate to higher migration ID
+  - [ ] (later) forward-port to branches that may serve as potential future release sources
 - [ ] check: domain is healthy
 
 ### Cleanup
 
 - [ ] unset `synchronizerMigration.active.migratingFrom` on the release branch so that future redeploys don't attempt to migrate
-- [ ] patch periodic CI jobs
-- [ ] trigger periodic CI jobs manually once to make sure the patches worked
-- [ ] re-enable periodic CI jobs
-- [ ] make sure that the versions and migration IDs from the release branch are forward ported to the main branch
+  - [ ] (later) forward-port to branches that may serve as potential future release sources
+- [ ] update `migration_id` & make any other needed changes in periodic CI jobs on release branch
+  - [ ] (later) forward-port to branches that may serve as potential future release sources
+- [ ] trigger periodic CI jobs manually once to make sure the updates worked
+- [ ] re-enable periodic CI jobs on `main`
+- [ ] recheck above forward-port items (e.g. versions, migration IDs)
 - [ ] take down old synchronizer nodes (once we're allowed to based on agreement with other SVs)
 
 ### Follow-up
