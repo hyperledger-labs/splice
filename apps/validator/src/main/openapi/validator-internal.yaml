@@ -817,8 +817,11 @@ components:
     GenerateExternalPartyTopologyResponse:
       type: object
       required:
+        - party_id
         - topology_txs
       properties:
+        party_id:
+          type: string
         topology_txs:
           type: array
           items:
