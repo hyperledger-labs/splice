@@ -3,10 +3,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
-  checkAmuletRulesExpectedConfigDiffsHTML,
-  checkDsoRulesExpectedConfigDiffsHTML,
   getExpectedAmuletRulesConfigDiffsHTML,
   getExpectedDsoRulesConfigDiffsHTML,
+} from 'common-test-handlers';
+import {
+  checkAmuletRulesExpectedConfigDiffsHTML,
+  checkDsoRulesExpectedConfigDiffsHTML,
 } from 'common-test-utils';
 import { test, expect, describe } from 'vitest';
 

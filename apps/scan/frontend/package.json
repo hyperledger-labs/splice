@@ -57,6 +57,10 @@
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "type:check": "tsc --noEmit",
     "start": "vite --force",
-    "test": "PORT=0 vitest"
+    "test": "PORT=0 vitest",
+    "dev": "vite --mode testing"
+  },
+  "msw": {
+    "workerDirectory": "public"
   }
 }

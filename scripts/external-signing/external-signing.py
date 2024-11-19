@@ -195,6 +195,7 @@ async def handle_setup_party(args, validator_client):
         args.party_hint, public_key_hex
     )
     txs = response["topology_txs"]
+    prepared_party_id = response["party_id"]
 
     signer = eddsa.new(private_key, "rfc8032")
 
@@ -211,6 +212,7 @@ async def handle_setup_party(args, validator_client):
         public_key_hex,
     )
     party_id = response["party_id"]
+    assert party_id == prepared_party_id
     logger.debug(f"Completed party setup, party id is: {party_id}")
 
 
