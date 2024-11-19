@@ -24,6 +24,10 @@ Upcoming
 
   * The SV UI now shows aa confirmation dialog with disclaimers when creating a Vote Request or Voting.
 
+* Docs
+
+  * Added a new section to the Validator documentation on how to share the operator wallet with multiple users. See :ref:`validator-users`.
+
 
 0.2.8
 -----

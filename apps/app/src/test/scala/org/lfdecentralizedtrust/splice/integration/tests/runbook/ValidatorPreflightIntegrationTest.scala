@@ -21,7 +21,11 @@ import scala.jdk.OptionConverters.RichOptional
 /** Base for preflight tests running against a deployed validator
   */
 abstract class ValidatorPreflightIntegrationTestBase
-    extends FrontendIntegrationTestWithSharedEnvironment("alice-validator", "bob-validator")
+    extends FrontendIntegrationTestWithSharedEnvironment(
+      "alice-validator",
+      "bob-validator",
+      "charlie-validator",
+    )
     with FrontendLoginUtil
     with PreflightIntegrationTestUtil
     with AnsFrontendTestUtil
@@ -53,18 +57,17 @@ abstract class ValidatorPreflightIntegrationTestBase
   override def beforeEach() = {
     super.beforeEach();
 
-    val aliceUser = retryAuth0Calls(auth0.createUser());
-    logger.debug(
-      s"Created user Alice ${aliceUser.email} with password ${aliceUser.password} (id: ${aliceUser.id})"
-    )
+    def addUser(name: String) = {
+      val user = retryAuth0Calls(auth0.createUser())
+      logger.debug(
+        s"Created user $name: email ${user.email}, password ${user.password}, id: ${user.id}"
+      )
+      auth0Users += (name -> user)
+    }
 
-    val bobUser = retryAuth0Calls(auth0.createUser());
-    logger.debug(
-      s"Created user Bob ${bobUser.email} with password ${bobUser.password} (id: ${bobUser.id})"
-    )
-
-    auth0Users += ("alice-validator" -> aliceUser)
-    auth0Users += ("bob-validator" -> bobUser)
+    addUser("alice-validator")
+    addUser("bob-validator")
+    addUser("charlie-validator")
   }
 
   override def afterEach() = {
@@ -132,8 +135,8 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   "run through runbook against cluster validator" in { implicit env =>
     val aliceUser = auth0Users.get("alice-validator").value
-
     val bobUser = auth0Users.get("bob-validator").value
+    val charlieUser = auth0Users.get("charlie-validator").value
 
     val alicePartyId = withFrontEnd("alice-validator") { implicit webDriver =>
       val alicePartyId = loginAndOnboardToWalletUi(aliceUser)
@@ -208,6 +211,34 @@ abstract class ValidatorPreflightIntegrationTestBase
         )
       }
 
+      clue("Logging out") {
+        click on "logout-button"
+        waitForQuery(id("oidc-login-button"))
+      }
+    }
+
+    clue("Onboard charlie manually to share a party with Bob") {
+      validatorClient.onboardUser(charlieUser.id, Some(PartyId.tryFromProtoPrimitive(bobPartyId)))
+    }
+
+    withFrontEnd("charlie-validator") { implicit webDriver =>
+      clue("Charlie should be able to login without onboarding and share a party with Bob") {
+        auth0Login(
+          charlieUser,
+          walletUiUrl,
+          () => {
+            logger.debug(
+              s"Checking party ID for charlie: ${find(className("party-id"))} (bob's is ${bobPartyId}"
+            )
+            find(className("party-id")) should not be None
+            val charliePartyId = seleniumText(find(className("party-id")))
+            logger.debug(
+              s"Checking party ID for charlie (it's not none): ${charliePartyId} (bob's is ${bobPartyId}"
+            )
+            charliePartyId should be(bobPartyId)
+          },
+        )
+      }
       clue("Logging out") {
         click on "logout-button"
         waitForQuery(id("oidc-login-button"))
