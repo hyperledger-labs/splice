@@ -322,7 +322,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "docs-docs",
     "provider": "",
@@ -661,7 +661,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-cometbft-global-domain-1",
     "provider": "",
@@ -835,7 +835,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-global-domain-1",
     "provider": "",
@@ -898,7 +898,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -951,7 +951,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -1094,7 +1094,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-participant-1",
     "provider": "",
@@ -1236,7 +1236,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -1472,7 +1472,7 @@
           }
         ]
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1589,7 +1589,7 @@
           }
         }
       },
-      "version": "0.2.6"
+      "version": "0.2.8"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",
