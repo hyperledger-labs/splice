@@ -28,12 +28,10 @@ export function installSpliceStacks(reference: GitFluxRef): void {
     );
   }
   if (mustInstallValidator1) {
-    // TODO(#15579): set refresh to false when version >= 0.2.5 as it no longer drop the split stacks
-    createStackCR('validator1', 'validator1', false, reference, {}, true);
+    createStackCR('validator1', 'validator1', false, reference);
   }
   if (mustInstallSplitwell) {
-    // TODO(#15579): set refresh to false when version >= 0.2.5 as it no longer drop the split stacks
-    createStackCR('splitwell', 'splitwell', false, reference, {}, true);
+    createStackCR('splitwell', 'splitwell', false, reference);
   }
   createStackCR('infra', 'infra', false, reference);
   createStackCR('canton-network', 'canton-network', false, reference);

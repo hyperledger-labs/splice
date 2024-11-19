@@ -98,7 +98,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/canton-network/canton-network.test",
         "useLocalStackOnly": true
@@ -433,7 +432,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/infra/infra.test",
         "useLocalStackOnly": true
@@ -810,7 +808,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": true,
         "retryOnUpdateConflict": true,
         "stack": "organization/splitwell/splitwell.test",
         "useLocalStackOnly": true
@@ -931,7 +928,6 @@
             "name": "splice-node-migration-3"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-3.test",
         "useLocalStackOnly": true
@@ -1052,7 +1048,6 @@
             "name": "splice-node-migration-4"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-4.test",
         "useLocalStackOnly": true
@@ -1161,7 +1156,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": true,
         "retryOnUpdateConflict": true,
         "stack": "organization/validator1/validator1.test",
         "useLocalStackOnly": true

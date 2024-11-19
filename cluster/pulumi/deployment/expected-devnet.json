@@ -98,7 +98,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/canton-network/canton-network.dev",
         "useLocalStackOnly": true
@@ -433,7 +432,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/infra/infra.dev",
         "useLocalStackOnly": true
@@ -542,7 +540,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/multi-validator/multi-validator.dev",
         "useLocalStackOnly": true
@@ -919,7 +916,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": true,
         "retryOnUpdateConflict": true,
         "stack": "organization/splitwell/splitwell.dev",
         "useLocalStackOnly": true
@@ -1040,7 +1036,6 @@
             "name": "splice-node-migration-2"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-2.dev",
         "useLocalStackOnly": true
@@ -1161,7 +1156,6 @@
             "name": "splice-node-migration-3"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-3.dev",
         "useLocalStackOnly": true
@@ -1282,7 +1276,6 @@
             "name": "splice-node-migration-2"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-2-migration-2.dev",
         "useLocalStackOnly": true
@@ -1403,7 +1396,6 @@
             "name": "splice-node-migration-3"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-2-migration-3.dev",
         "useLocalStackOnly": true
@@ -1524,7 +1516,6 @@
             "name": "splice-node-migration-2"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-3-migration-2.dev",
         "useLocalStackOnly": true
@@ -1645,7 +1636,6 @@
             "name": "splice-node-migration-3"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-3-migration-3.dev",
         "useLocalStackOnly": true
@@ -1766,7 +1756,6 @@
             "name": "splice-node-migration-2"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-4-migration-2.dev",
         "useLocalStackOnly": true
@@ -1887,7 +1876,6 @@
             "name": "splice-node-migration-3"
           }
         },
-        "refresh": false,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-4-migration-3.dev",
         "useLocalStackOnly": true
@@ -2008,7 +1996,7 @@
             "name": "splice-node-migration-2"
           }
         },
-        "refresh": false,
+        "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-migration-2.dev",
@@ -2130,7 +2118,7 @@
             "name": "splice-node-migration-3"
           }
         },
-        "refresh": false,
+        "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-canton/sv-canton.sv-migration-3.dev",
@@ -2240,7 +2228,7 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
+        "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
         "stack": "organization/sv-runbook/sv-runbook.dev",
@@ -2350,7 +2338,7 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": false,
+        "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
         "stack": "organization/validator-runbook/validator-runbook.dev",
@@ -2460,7 +2448,6 @@
             "name": "splice-node-active"
           }
         },
-        "refresh": true,
         "retryOnUpdateConflict": true,
         "stack": "organization/validator1/validator1.dev",
         "useLocalStackOnly": true
