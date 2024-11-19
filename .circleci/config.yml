@@ -5584,7 +5584,7 @@ workflows:
 
   reset_validator_runbook_cilr:
     when:
-      equal: [ reset-validator-runbook-devnet, << pipeline.parameters.run-job >> ]
+      equal: [ reset-validator-runbook-cilr, << pipeline.parameters.run-job >> ]
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
