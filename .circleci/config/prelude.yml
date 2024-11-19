@@ -41,6 +41,7 @@ parameters:
         reset-sv-runbook-cilr,
         reset-sv-runbook-devnet,
         healthcheck-sv-runbook-devnet,
+        reset-validator-runbook-cilr,
         reset-validator-runbook-devnet,
         healthcheck-validator-runbook-devnet,
         backup-cidaily,
