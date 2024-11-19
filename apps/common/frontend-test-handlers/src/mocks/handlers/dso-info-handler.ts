@@ -1,7 +1,7 @@
 import { rest, RestHandler } from 'msw';
 
-import { getAmuletConfig } from './amulet-config-handler';
-import { getDsoConfig } from './dso-config-handler';
+import { getAmuletConfig } from '../helpers/amulet-config-helper';
+import { getDsoConfig } from '../helpers/dso-config-helper';
 
 // Obtained via `curl https://sv.sv-2.cimain.network.canton.global/api/sv/v0/dso`
 // ...and then npmFix made it look nice.

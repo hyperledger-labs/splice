@@ -5,14 +5,23 @@ import { ErrorBoundary } from 'common-frontend';
 import ReactDOM from 'react-dom/client';
 
 import App from './App';
+import { worker } from './__tests__/mocks/browser';
 import { SvConfigProvider } from './utils';
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <SvConfigProvider>
-        <App />
-      </SvConfigProvider>
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+async function deferRender() {
+  if (import.meta.env.MODE === 'testing') {
+    await worker.start();
+  }
+}
+
+deferRender().then(() => {
+  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <SvConfigProvider>
+          <App />
+        </SvConfigProvider>
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+});

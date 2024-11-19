@@ -45,6 +45,7 @@
     "@types/uuid": "8.3.4",
     "@vitejs/plugin-react": "^4.0.4",
     "common-test-utils": "^0.1.0",
+    "common-test-handlers": "^0.1.0",
     "common-test-vite-utils": "^0.1.0",
     "happy-dom": "^11.0.0",
     "prettier": "2.8.4",
@@ -65,6 +66,10 @@
     "type:check": "tsc --noEmit",
     "start": "vite --force",
     "test": "PORT=0 vitest",
-    "test:sbt": "PORT=0 vitest --run"
+    "test:sbt": "PORT=0 vitest --run",
+    "dev": "vite --mode testing"
+  },
+  "msw": {
+    "workerDirectory": "public"
   }
 }

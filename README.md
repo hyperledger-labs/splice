@@ -886,6 +886,18 @@ You can do so as follows:
 2. Call `sbt bundle` to build a Canton enterprise release in `<YOUR_CANTON_REPO>/enterprise/app/target/release`.
 3. Call `start-canton.sh -c <YOUR_CANTON_REPO>/enterprise/app/target/release/canton-enterprise-<VERSION>-SNAPSHOT/bin/canton`
 
+### Frontend Testing
+
+Frontend integration tests are either run with _sbt_ against local canton and canton network instances from the repository root directory using:
+- `./start-canton.sh` to start canton,
+- `./scripts/start-backends-for-local-frontend-testing.sh` to start the canton network backends,
+- `./start-frontends.sh` to start the UIs,
+- `sbt testOnly *FrontendIntegrationTest*` to run the tests.
+
+or done with _vitest_ against mock data from the corresponding UI frontend directory using:
+- `npm test` to run the tests,
+- `npm run dev` to start the frontend and navigate the UI against mock handlers.
+
 ### Managing Frontends for Tests
 
 Some integration tests use our web frontends. Similarly to Canton described above, we also serve the frontends outside of the tests themselves.

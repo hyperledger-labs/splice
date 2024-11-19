@@ -756,13 +756,19 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "common-frontend",
+              "common-test-handlers",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
               "common-test-vite-utils",
+              log,
+            )
+            BuildCommon.TS.runWorkspaceCommand(
+              npmRootDir.value,
+              "build",
+              "common-frontend",
               log,
             )
             (baseDirectory.value / "lib" ** "*").get.toSet
@@ -801,6 +807,7 @@ lazy val `apps-common-frontend` = {
             "common-test-vite-utils",
             "common-frontend-utils",
             "common-test-utils",
+            "common-test-handlers",
             "common-frontend",
           )
         )
