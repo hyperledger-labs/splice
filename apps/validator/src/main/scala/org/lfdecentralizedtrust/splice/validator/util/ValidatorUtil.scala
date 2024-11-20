@@ -235,7 +235,6 @@ private[validator] object ValidatorUtil {
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     val store = storeWithIngestion.store
-    val validatorParty = store.key.validatorParty
     store.lookupInstallByName(endUserName).flatMap {
       case None =>
         // Note: it's OK to skip off-boarding in this case, as on-boarding always creates an install contract first,
@@ -250,7 +249,6 @@ private[validator] object ValidatorUtil {
         for {
           _ <-
             if (
-              endUserParty == validatorParty ||
               endUserName == validatorUserName ||
               validatorWalletUserName.contains(endUserName)
             ) {
