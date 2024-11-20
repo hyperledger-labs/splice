@@ -329,10 +329,6 @@ class SvTimeBasedRewardCouponIntegrationTest
       },
     )
 
-    clue("Resume SV4's SvRewardCouponTrigger") {
-      sv4RewardCouponTrigger.resume()
-    }
-
   }
 
 }
