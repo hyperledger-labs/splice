@@ -683,6 +683,29 @@ particularly if all helm charts are deployed at the same time. The
 Configuring the Cluster Ingress
 -------------------------------
 
+Hostnames and URLs
+++++++++++++++++++
+
+The SV operators have decided to follow the following convention for all SV hostnames and URLs:
+
+- For DevNet, all hostnames should be in the format ``<service-name>.sv-<enumerator>.dev.global.canton.network.<companyTLD>``,
+  where:
+
+  - ``<service-name>`` is the name of the service, e.g., ``sv``, ``wallet``, ``scan``
+  - ``<enumerator>`` is a unique number for each SV node operated by the same organization, starting at 1,
+    e.g. ``sv-1`` for the first node operated by an organization.
+  - ``<companyTLD>`` is the top-level domain of the company operating the SV node, e.g.
+    ``digitalasset.com`` for Digital Asset.
+- For TestNet, all hostnames should similarly be in the format ``<service-name>.sv-<enumerator>.test.global.canton.network.<companyTLD>``.
+- For MainNet, all hostnames should be in the format all hostnames should be in the format ``<service-name>.sv-<enumerator>.global.canton.network.<companyTLD>``
+  (note that for MainNet, the name of the network, e.g. dev/test/main is ommitted from the hostname).
+
+Note that the reference ingress charts provided below do not fully satisfy these requirements,
+as they ommit the ``enumerator`` part of the hostname.
+
+Ingress Configuration
++++++++++++++++++++++
+
 An IP whitelisting json file ``allowed-ip-ranges-external.json`` will be provided in each SV operations announcement.
 This file contains other clusters' egress IPs that require access to your super validator's components. These IPs typically belong to peer super-validators, validators and the Digital Asset VPN.
 

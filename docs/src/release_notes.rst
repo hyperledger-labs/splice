@@ -28,6 +28,8 @@ Upcoming
 
   * Added a new section to the Validator documentation on how to share the operator wallet with multiple users. See :ref:`validator-users`.
 
+  * Added a new subsection to Supervalidator documentation documenting the URL conventions agreed upon by the SV operators.
+
 
 0.2.8
 -----
