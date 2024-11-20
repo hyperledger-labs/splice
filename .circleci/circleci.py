@@ -171,6 +171,23 @@ def fetch_jobs(workflow: Workflow) -> list[Job]:
   url = f"{BASE_CCI_API_URL}/workflow/{workflow.id}/job"
   return fetch_paginated(url, JobsResponse.Schema())
 
+def _ratelimit_info(err: requests.exceptions.HTTPError):
+  h = err.response.headers
+  new_reset = h.get('RateLimit-Reset')
+  old_reset = h.get('X-RateLimit-Reset')
+  try:
+    new_reset = int(new_reset or '')
+  except ValueError:
+    pass
+  try:
+    old_reset = int(old_reset or '')
+  except ValueError:
+    pass
+  if isinstance(new_reset, int) and isinstance(old_reset, int):
+    return f"{max(new_reset, old_reset)} seconds, Retry-After: {h.get('Retry-After')}"
+  else:
+    return f"RateLimit-Reset: {new_reset}, X-RateLimit-Reset: {old_reset}, Retry-After: {h.get('Retry-After')}"
+
 @dataclass
 class SuccessStats:
   failure_window: timedelta
@@ -180,9 +197,7 @@ class SuccessStats:
   last_job_success: datetime | None
   last_workflow_success: datetime | None
 
-# Fetch statistics on similar past jobs.  Note this takes 5sec to run in local
-# tests, so consider passing around the results rather than re-calling
-def failures_and_last_success(pipeline_number: int, branch: str, workflow: Workflow, job_name: str):
+def _try_failures_and_last_success(pipeline_number: int, branch: str, workflow: Workflow, job_name: str):
   prior_to_workflow_start = workflow.created_at - timedelta(seconds=1)
   failure_window = timedelta(hours=12)
   failed_statuses = frozenset(("failed", "error", "failing"))
@@ -210,3 +225,14 @@ def failures_and_last_success(pipeline_number: int, branch: str, workflow: Workf
     success_window = success_window,
     last_job_success = last_success_job and last_success_job.stopped_at,
     last_workflow_success = last_success_wf and last_success_wf.stopped_at)
+
+# Fetch statistics on similar past jobs.  Note this takes 5sec to run in local
+# tests, so consider passing around the results rather than re-calling
+def failures_and_last_success(pipeline_number: int, branch: str, workflow: Workflow, job_name: str):
+  try:
+    return _try_failures_and_last_success(pipeline_number, branch, workflow, job_name)
+  except requests.exceptions.HTTPError as e:
+    if e.response.status_code == 429:
+      return f"Hit a rate limit in CCI when fetching stats: {_ratelimit_info(e)}"
+    else:
+      raise e

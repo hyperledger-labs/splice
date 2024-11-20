@@ -16,15 +16,21 @@ def build_msg(args: FailureArgs, gh_url: str):
   workflow = fetch_workflow(args.workflow_id)
   stats = failures_and_last_success(
     workflow.pipeline_number, args.branch, workflow, args.job_name)
-  now = datetime.now(timezone.utc)
 
   cluster_text = f" on cluster {args.cluster}" if args.cluster else ""
   text=f"""*Job {workflow.name}:{args.job_name} {workflow.pipeline_number}:{args.job_num} failed {cluster_text}:dumpster-fire:.
   (<{gh_url}|Issue in GitHub>)
-  {failure_stat(f"workflow {workflow.name}", stats.failed_workflows, stats.last_workflow_success, stats, now)}
-  {failure_stat(f"Job {args.job_name}", stats.failed_jobs, stats.last_job_success, stats, now)}"""
+  {render_success_stats(stats, workflow, args)}"""
 
   return text
+
+def render_success_stats(stats: str | SuccessStats, workflow: Workflow, args: FailureArgs):
+  if isinstance(stats, str):
+    return stats
+  else:
+    now = datetime.now(timezone.utc)
+    return f"""{failure_stat(f"workflow {workflow.name}", stats.failed_workflows, stats.last_workflow_success, stats, now)}
+  {failure_stat(f"Job {args.job_name}", stats.failed_jobs, stats.last_job_success, stats, now)}"""
 
 def failure_stat(what: str, failures: int, last_success: datetime | None, windows: SuccessStats, now: datetime):
   if failures:
