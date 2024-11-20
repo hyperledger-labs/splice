@@ -2,6 +2,10 @@ name: Build
 on: pull_request
 # TODO(#15988): also on commits on main and release branches
 
+# Cancel previously runs of this workflow on the same branch, unless it's main
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   static_tests:
