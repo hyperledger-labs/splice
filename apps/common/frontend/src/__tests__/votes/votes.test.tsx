@@ -5,11 +5,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { DsoInfo, SvVote, VotesHooks, VotesHooksContext } from 'common-frontend';
 import { theme } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
-import {
-  checkAmuletRulesExpectedConfigDiffsHTML,
-  dsoInfo,
-  getExpectedAmuletRulesConfigDiffsHTML,
-} from 'common-test-utils';
+import { dsoInfo, getExpectedAmuletRulesConfigDiffsHTML } from 'common-test-handlers';
+import { checkAmuletRulesExpectedConfigDiffsHTML } from 'common-test-utils';
 import React from 'react';
 import { test, expect, describe } from 'vitest';
 
