@@ -17,7 +17,6 @@ import {
   imagePullSecret,
   CnInput,
   activeVersion,
-  helmChartNamesPrefix,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
@@ -42,7 +41,7 @@ export async function installSplitwell(
   const loopback = installSpliceHelmChart(
     xns,
     'loopback',
-    `${helmChartNamesPrefix(activeVersion)}-cluster-loopback-gateway`,
+    'splice-cluster-loopback-gateway',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -76,7 +75,7 @@ export async function installSplitwell(
   installSpliceHelmChart(
     xns,
     'splitwell-app',
-    `${helmChartNamesPrefix(activeVersion)}-splitwell-app`,
+    'splice-splitwell-app',
     {
       postgres: swPostgres.address,
       metrics: {
@@ -160,19 +159,14 @@ export async function installSplitwell(
 }
 
 function installIngress(xns: ExactNamespace, dependsOn: CnInput<pulumi.Resource>[]) {
-  installSpliceHelmChart(
-    xns,
-    'cluster-ingress-splitwell-uis',
-    `${helmChartNamesPrefix(activeVersion)}-cluster-ingress-runbook`,
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-        svNamespace: xns.logicalName,
-      },
-      withSvIngress: false,
-      opts: {
-        dependsOn: dependsOn,
-      },
-    }
-  );
+  installSpliceHelmChart(xns, 'cluster-ingress-splitwell-uis', 'splice-cluster-ingress-runbook', {
+    cluster: {
+      hostname: CLUSTER_HOSTNAME,
+      svNamespace: xns.logicalName,
+    },
+    withSvIngress: false,
+    opts: {
+      dependsOn: dependsOn,
+    },
+  });
 }

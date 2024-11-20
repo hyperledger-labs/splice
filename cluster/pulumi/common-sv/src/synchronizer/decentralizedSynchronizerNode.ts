@@ -7,7 +7,6 @@ import {
   domainLivenessProbeInitialDelaySeconds,
   DomainMigrationIndex,
   ExactNamespace,
-  helmChartNamesPrefix,
   installSpliceHelmChart,
   jmxOptions,
   loadYamlFromFile,
@@ -137,7 +136,7 @@ export class InStackDecentralizedSynchronizerNode
     installSpliceHelmChart(
       xns,
       this.name,
-      `${helmChartNamesPrefix(version)}-global-domain`,
+      'splice-global-domain',
       {
         ...decentralizedSynchronizerValues,
         ...{
@@ -169,11 +168,7 @@ export class InStackDecentralizedSynchronizerNode
               ...(dbs.setCoreDbNames ? { databaseName: mediatorDbName } : {}),
             },
           },
-          ...autoInitValues(
-            `${helmChartNamesPrefix(version)}-global-domain`,
-            version,
-            onboardingName
-          ),
+          ...autoInitValues('splice-global-domain', version, onboardingName),
           enablePostgresMetrics: true,
           metrics: {
             enable: true,

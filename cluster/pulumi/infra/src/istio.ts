@@ -6,7 +6,6 @@ import {
   activeVersion,
   ExactNamespace,
   HELM_MAX_HISTORY_SIZE,
-  helmChartNamesPrefix,
   infraAffinityAndTolerations,
   installSpliceHelmChart,
   isMainNet,
@@ -375,7 +374,7 @@ function configureGateway(
   return installSpliceHelmChart(
     ingressNs,
     'cluster-gateway',
-    `${helmChartNamesPrefix(activeVersion)}-istio-gateway`,
+    'splice-istio-gateway',
     {
       cluster: {
         cantonHostname: isMainNet

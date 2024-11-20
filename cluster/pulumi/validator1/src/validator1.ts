@@ -16,7 +16,6 @@ import {
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
-  helmChartNamesPrefix,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import {
@@ -44,7 +43,7 @@ export async function installValidator1(
   const loopback = installSpliceHelmChart(
     xns,
     'loopback',
-    `${helmChartNamesPrefix(activeVersion)}-cluster-loopback-gateway`,
+    'splice-cluster-loopback-gateway',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -127,7 +126,7 @@ export async function installValidator1(
     installSpliceHelmChart(
       xns,
       'splitwell-web-ui',
-      `${helmChartNamesPrefix(activeVersion)}-splitwell-web-ui`,
+      'splice-splitwell-web-ui',
       {
         ...spliceInstanceNames,
         auth: {
@@ -155,7 +154,7 @@ function installIngress(
   installSpliceHelmChart(
     xns,
     `cluster-ingress-${xns.logicalName}`,
-    `${helmChartNamesPrefix(activeVersion)}-cluster-ingress-runbook`,
+    'splice-cluster-ingress-runbook',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,

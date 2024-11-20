@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 
 import { CnChartVersion } from './artifacts';
-import { helmChartNamesPrefix, installSpliceRunbookHelmChart } from './helm';
+import { installSpliceRunbookHelmChart } from './helm';
 import { ExactNamespace } from './utils';
 
 export function installLoopback(
@@ -12,7 +12,7 @@ export function installLoopback(
   return installSpliceRunbookHelmChart(
     namespace,
     'loopback',
-    `${helmChartNamesPrefix(version)}-cluster-loopback-gateway`,
+    'splice-cluster-loopback-gateway',
     {
       cluster: {
         hostname: clusterHostname,

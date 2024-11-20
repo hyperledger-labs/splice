@@ -16,7 +16,6 @@ import {
   REPO_ROOT,
   sanitizedForPostgres,
   SpliceCustomResourceOptions,
-  helmChartNamesPrefix,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
@@ -58,7 +57,7 @@ export function installParticipant(
   const release = installSpliceHelmChart(
     xns,
     name,
-    `${helmChartNamesPrefix(version)}-participant`,
+    'splice-participant',
     {
       ...participantValuesWithSpecifiedAud,
       logLevel,
@@ -79,7 +78,7 @@ export function installParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
-      ...autoInitValues(`${helmChartNamesPrefix(version)}-participant`, version, nodeIdentifier),
+      ...autoInitValues('splice-participant', version, nodeIdentifier),
     },
     version,
     {

@@ -5,7 +5,6 @@ import {
   ExactNamespace,
   installSpliceRunbookHelmChart,
   installPostgresPasswordSecret,
-  helmChartNamesPrefix,
 } from 'splice-pulumi-common';
 
 export function installPostgres(xns: ExactNamespace, name: string): k8s.helm.v3.Release {
@@ -20,7 +19,7 @@ export function installPostgres(xns: ExactNamespace, name: string): k8s.helm.v3.
   return installSpliceRunbookHelmChart(
     xns,
     name,
-    `${helmChartNamesPrefix(activeVersion)}-postgres`,
+    'splice-postgres',
     {
       persistence: { secretName },
       db: { volumeSize: '600Gi', maxConnections: 1000 },

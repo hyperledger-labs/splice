@@ -8,7 +8,6 @@ import {
   config,
   DomainMigrationIndex,
   ExactNamespace,
-  helmChartNamesPrefix,
   installSpliceHelmChart,
   isDevNet,
   loadYamlFromFile,
@@ -69,7 +68,7 @@ export function installCometBftNode(
   const release = installSpliceHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
-    `${helmChartNamesPrefix(version)}-cometbft`,
+    'splice-cometbft',
     _.mergeWith(cometBftValues, {
       sv1: nodeConfigs.sv1,
       // TODO (#13845) remove when ciperiodic version >= 0.1.18

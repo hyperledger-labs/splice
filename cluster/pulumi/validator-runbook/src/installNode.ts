@@ -35,7 +35,6 @@ import {
   spliceInstanceNames,
   validatorSecrets,
   ValidatorTopupConfig,
-  helmChartNamesPrefix,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
@@ -110,7 +109,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     xns.ns.metadata.name,
     xns.logicalName,
     'cluster-ingress-validator',
-    `${helmChartNamesPrefix(activeVersion)}-cluster-ingress-runbook`,
+    'splice-cluster-ingress-runbook',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -305,7 +304,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
   return installSpliceRunbookHelmChart(
     xns,
     'validator',
-    `${helmChartNamesPrefix(activeVersion)}-validator`,
+    'splice-validator',
     validatorValuesWithMaybeTopups,
     activeVersion,
     { dependsOn: dependsOn }

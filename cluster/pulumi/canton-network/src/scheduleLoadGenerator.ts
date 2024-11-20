@@ -6,7 +6,6 @@ import {
   config,
   exactNamespace,
   generatePortSequence,
-  helmChartNamesPrefix,
   imagePullSecret,
   installSpliceHelmChart,
   isDevNet,
@@ -26,7 +25,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
     const loopback = installSpliceHelmChart(
       xns,
       'loopback',
-      `${helmChartNamesPrefix(activeVersion)}-cluster-loopback-gateway`,
+      'splice-cluster-loopback-gateway',
       {
         cluster: {
           hostname: CLUSTER_HOSTNAME,
@@ -81,7 +80,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
     installSpliceHelmChart(
       xns,
       'load-tester',
-      `${helmChartNamesPrefix(activeVersion)}-load-tester`,
+      'splice-load-tester',
       {
         prometheusRw,
         config: JSON.stringify({

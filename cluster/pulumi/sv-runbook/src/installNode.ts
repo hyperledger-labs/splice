@@ -39,7 +39,6 @@ import {
   spliceInstanceNames,
   DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
-  helmChartNamesPrefix,
   UPDATE_HISTORY_BACKFILLING_BATCH_SIZE,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
@@ -135,7 +134,7 @@ export async function installNode(
     xns.logicalName,
     xns.logicalName,
     'cluster-ingress-sv',
-    `${helmChartNamesPrefix(activeVersion)}-cluster-ingress-runbook`,
+    'splice-cluster-ingress-runbook',
     {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
@@ -318,7 +317,7 @@ async function installSvAndValidator(
   const sv = installSpliceRunbookHelmChart(
     xns,
     'sv-app',
-    `${helmChartNamesPrefix(activeVersion)}-sv-node`,
+    'splice-sv-node',
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
     activeVersion,
     {
@@ -357,8 +356,8 @@ async function installSvAndValidator(
 
   installSpliceRunbookHelmChart(
     xns,
-    `scan`,
-    `${helmChartNamesPrefix(activeVersion)}-scan`,
+    'scan',
+    'splice-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     activeVersion,
     {
@@ -418,7 +417,7 @@ async function installSvAndValidator(
   const validator = installSpliceRunbookHelmChart(
     xns,
     'validator',
-    `${helmChartNamesPrefix(activeVersion)}-validator`,
+    'splice-validator',
     validatorValuesWithMaybeTopups,
     activeVersion,
     {
