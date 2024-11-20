@@ -207,6 +207,8 @@ function _retry_until_value() {
         sleep 5
     done
 
+    # no functions currently use it
+    # shellcheck disable=SC2034
     ret=$found
 }
 
@@ -1047,14 +1049,11 @@ function subcmd_wait() {
         _retry_until_value "kubectl get ns $namespace -o jsonpath='{.status.phase}'" "namespace $namespace to be active" "'Active'"
         if [ -z "$app" ]; then
             _log "Namespace $namespace ready, waiting for all pods"
-            _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=1s --namespace $namespace"
+            _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=3s --namespace $namespace"
         else
             _log "Namespace $namespace ready, waiting for $app"
-            _retry_until_value "kubectl get pods --selector=app=$app,migration=$migration_id -n $namespace -o name" "pod for app $app" ^"pod" 1
-            pod=$ret
-            _log "Pod $pod found, waiting for ready state"
-            _retry_until_success "kubectl wait --for=condition=Ready --timeout=1s --namespace $namespace $pod"
-            _log "Pod $pod ready"
+            _retry_until_success "kubectl wait pod --for=condition=Ready --timeout=3s --namespace $namespace --selector=app=$app,migration=$migration_id"
+            _log "Pod for app $app ready in namespace $namespace for migration id $migration_id"
         fi
     fi
 }
