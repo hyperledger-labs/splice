@@ -137,20 +137,14 @@ jobs:
         default: true
     steps:
       - checkout_with_retry
-      # TODO(#14646): since we're not backporting the docker-compose deployment, we need to deploy from
-      #       main using only images from the base version. For now this seems to work, hopefully
-      #       we will not break this. Once the base version includes the docker-compose validator,
-      #       we should deploy from the base version.
       - when:
           condition: << parameters.base_version >>
           steps:
             - run:
-                name: Find the image tag associated with << parameters.base_version >>
+                name: Check out commit << parameters.base_version >>
                 command: |
                   echo "Checking out commit << parameters.base_version >>"
                   git checkout << parameters.base_version >>
-                  echo $(build-tools/get-snapshot-version) > /tmp/base-version
-                  git checkout "$CIRCLE_SHA1"
       - setup_nix
       - setup_vpn
       - setup_vpn_routes:
@@ -179,8 +173,7 @@ jobs:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
-            # TODO(#14646): once we deploy from base_version we can remove the -t parameter
-            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1" -t $(cat /tmp/base-version)
+            build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1"
           cmd_retry_count: << parameters.deploy_retry_count >>
       # these do NOT show the logs of the compose validator, but might help debug onboarding errors
       - print_gcloud_logs_commands:
