@@ -929,7 +929,7 @@ Your identites may be fetched from your node through the following endpoint:
 
 .. code-block:: bash
 
-    curl 'https://sv.sv.YOUR_HOSTNAME/api/sv/v0/admin/domain/identities-dump' -H 'authorization: Bearer <token>'
+    curl "https://sv.sv.YOUR_HOSTNAME/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer <token>"
 
 where `<token>` is an OAuth2 Bearer Token obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
 

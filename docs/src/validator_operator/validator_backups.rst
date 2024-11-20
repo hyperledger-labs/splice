@@ -26,7 +26,7 @@ Your identites may be fetched from your node through the following endpoint:
 
 .. code-block:: bash
 
-    curl 'https://wallet.validator.YOUR_HOSTNAME/api/validator/v0/admin/participant/identities' -H 'authorization: Bearer <token>'
+    curl "https://wallet.validator.YOUR_HOSTNAME/api/validator/v0/admin/participant/identities" -H "authorization: Bearer <token>"
 
 where `<token>` is an OAuth2 Bearer Token with enough claims to access the Validator app,
 as obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
