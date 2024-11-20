@@ -2221,7 +2221,7 @@ the validation of the topology state in Canton. The concrete steps are:
     ```
 14. Initialize the sequencer with the sequencer id you previously saved (swap out the ID in the command)
     ```
-    globalSequencerSv1.topology.init_id(SequencerId.fromProtoPrimitive("SEQ::Digital-Asset-2::12201d30df6225faa982c022855941345c0e970a150cd653c4dfa78108d01de3b586", "").right.get.uid)
+    globalSequencerSv1.topology.init_id(SequencerId.fromProtoPrimitive("<sequencer ID (SEQ::...)>", "").right.get.uid)
     ```
 15. Import the authorized store snapshot
     ```
