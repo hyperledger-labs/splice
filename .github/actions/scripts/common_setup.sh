@@ -12,10 +12,14 @@ set -euo pipefail
 git config --global --add safe.directory "$(pwd)"
 git fetch --tags --force origin
 git checkout main
-git checkout "$GITHUB_HEAD_REF"
+if [ "$GITHUB_HEAD_REF" != "main" ]; then
+  git checkout -B "$GITHUB_HEAD_REF"
+fi
 git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
 
-git checkout "$GITHUB_SHA"
+if [ -n "${GITHUB_SHA:-}" ]; then
+  git checkout "$GITHUB_SHA"
+fi
 
 # Compute open-api cache key, that's used in many different caches so we compute it once here.
 find . -wholename '*/openapi/*.yaml' | LC_ALL=C sort | xargs sha256sum > openapi-cache-key.txt
