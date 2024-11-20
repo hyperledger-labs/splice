@@ -1056,7 +1056,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -1199,7 +1199,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },
@@ -1341,7 +1341,7 @@
         "tier": "db-custom-2-7680",
         "userLabels": {
           "cluster": "test",
-          "migration_id": "1"
+          "migration_id": "2"
         }
       }
     },

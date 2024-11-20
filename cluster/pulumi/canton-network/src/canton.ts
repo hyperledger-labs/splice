@@ -33,12 +33,16 @@ export function installCanton(
 ): InstalledMigrationSpecificSv {
   const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
   const externalMigrations = decentralizedSynchronizerMigrationConfig.allExternalMigrations;
+  const upgradeMigration = decentralizedSynchronizerMigrationConfig.upgrade;
+  const externalNonUpgradeMigration = externalMigrations.filter(m =>
+    upgradeMigration ? m.id !== upgradeMigration.id : true
+  );
   const activeMigrationId =
     decentralizedSynchronizerMigrationConfig.activeDatabaseId ||
     decentralizedSynchronizerMigrationConfig.active.id;
   // we rely on the assumption that we never completely remove a migration between the internal and the active migration
   const migrationId = externalMigrations.map(e => e.id).includes(activeMigrationId)
-    ? activeMigrationId - externalMigrations.length
+    ? activeMigrationId - externalNonUpgradeMigration.length
     : activeMigrationId;
 
   const externalActiveMigration = {
