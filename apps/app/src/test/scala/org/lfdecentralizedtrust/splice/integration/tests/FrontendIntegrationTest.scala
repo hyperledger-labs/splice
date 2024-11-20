@@ -523,6 +523,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   private def assertAuth0LoginFormVisible()(implicit
       webDriver: WebDriverType
   ) = {
+    find(tagName("h1")) should not be None
     find(tagName("h1")).value.text shouldBe "Welcome"
     find(cssSelector("div.password")) should not be empty
   }
@@ -530,6 +531,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   private def assertAuth0AuthorizationFormVisible()(implicit
       webDriver: WebDriverType
   ) = {
+    find(tagName("h1")) should not be None
     find(tagName("h1")).value.text shouldBe "Authorize App"
   }
 

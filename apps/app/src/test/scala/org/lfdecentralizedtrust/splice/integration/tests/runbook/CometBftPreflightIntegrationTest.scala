@@ -6,16 +6,13 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.integration.tests.auth.PreflightAuthUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import java.net.{InetSocketAddress, Socket}
 import scala.util.Using
 
 /** Preflight test that makes sure that the cometBFT nodes of *our* SVs (1-4) have initialized fine.
   */
-class CometBftPreflightIntegrationTest
-    extends IntegrationTestWithSharedEnvironment
-    with PreflightAuthUtil {
+class CometBftPreflightIntegrationTest extends IntegrationTestWithSharedEnvironment {
 
   override lazy val resetRequiredTopologyState: Boolean = false
 

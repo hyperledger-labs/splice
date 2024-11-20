@@ -1,7 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as jtv from '@mojotech/json-type-validation';
-import { dsoInfo, getDsoAction, getAmuletRulesAction } from 'common-test-utils';
+import { getDsoAction, getAmuletRulesAction } from 'common-test-handlers';
+import { dsoInfo } from 'common-test-handlers';
 import {
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
