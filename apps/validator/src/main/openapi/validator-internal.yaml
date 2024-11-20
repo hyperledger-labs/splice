@@ -616,10 +616,10 @@ paths:
       description: |
         Creates a root namespace topology transaction, which will create the party and sets the public key
         controlling the party namespace,
-        a party to participant mapping topology transaction, which hosts the party on the participant with Submission rights,
+        a party to participant mapping topology transaction, which hosts the party on the participant with Confirmation rights,
         and a party to key mapping topology transaction, which sets the key to authorize daml transactions.
         The hash of each of these transactions will be signed along with the corresponding topology transaction (unchanged)
-        will be used in the /v0/external-party-topology/submit endpoint
+        in the /v0/external-party-topology/submit endpoint
       requestBody:
         required: true
         content:
@@ -642,8 +642,8 @@ paths:
       x-jvm-package: validator_admin
       operationId: "submitExternalPartyTopology"
       description: |
-        Constructs a SignedTopologyTranscation and writes the topology transactions to the authorized store.
-        The input will consist of the unchanged topology transcation and the signed hash from the /v0/external-party-topology/generate endpoint
+        Constructs a SignedTopologyTransaction and writes the topology transactions to the authorized store.
+        The input will consist of the unchanged topology transaction and the signed hash from the /v0/external-party-topology/generate endpoint
       requestBody:
         required: true
         content:
