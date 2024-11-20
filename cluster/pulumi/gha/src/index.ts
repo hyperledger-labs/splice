@@ -1,5 +1,5 @@
 import { installController } from './controller';
-import { installRunnerScaleSet } from './runners';
+import { installRunnerScaleSets } from './runners';
 
 const controller = installController();
-installRunnerScaleSet(controller);
+installRunnerScaleSets(controller);

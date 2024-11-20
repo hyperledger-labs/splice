@@ -5,10 +5,13 @@ on:
       start_canton_options:
         type: string
         required: true
+      runs_on:
+        type: string
+        required: true
 
 jobs:
   scala_test:
-    runs-on: self-hosted-docker
+    runs-on: ${{ inputs.runs_on }}
     # Docker Hub image that `container-job` executes in
     container:
       # TODO(#15988): We're currently (ab)using the cimg/base image as a base image for our self-hosted runners.
