@@ -1,6 +1,12 @@
 name: Build
-on: pull_request
-# TODO(#15988): also on commits on main and release branches
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+  push:
+    branches:
+      - 'main'
+# TODO(#15988): notify on failure when running on commits to main
+# TODO(#15988): run also on commits to release branches
 
 # Cancel previously runs of this workflow on the same branch, unless it's main
 concurrency:
