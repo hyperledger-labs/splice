@@ -470,9 +470,7 @@ function subcmd_test_before_migration {
   # shellcheck disable=SC2034
   for i in {1..360}; do
     echo -n "."
-    # We can't use the log file because the background process that dumped the log files died with the
-    # end of the previous bash step
-    if docker logs splice-validator-validator-1 | grep -q "Wrote domain migration dump"; then
+    if docker exec splice-validator-validator-1 ls -l /domain-upgrade-dump/domain_migration_dump.json; then
       done=1
       break
     fi
