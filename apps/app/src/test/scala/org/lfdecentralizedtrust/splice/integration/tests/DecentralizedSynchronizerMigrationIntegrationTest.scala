@@ -902,10 +902,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   prepareSend.transaction,
                   HexString.toHexString(
                     crypto
-                      .sign(
-                        Hash
-                          .fromByteString(HexString.parseToByteString(prepareSend.txHash).value)
-                          .value,
+                      .signBytes(
+                        HexString.parseToByteString(prepareSend.txHash).value,
                         externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
                       )
                       .value

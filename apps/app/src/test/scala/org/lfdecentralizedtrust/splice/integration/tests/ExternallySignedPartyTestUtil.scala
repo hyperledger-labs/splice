@@ -153,8 +153,8 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         preparedTx.transaction,
         HexString.toHexString(
           crypto
-            .sign(
-              Hash.fromByteString(HexString.parseToByteString(preparedTx.txHash).value).value,
+            .signBytes(
+              HexString.parseToByteString(preparedTx.txHash).value,
               externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
             )
             .value

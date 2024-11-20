@@ -48,7 +48,7 @@ trait SigningOps {
     signBytes(hash.getCryptographicEvidence, signingKey, signingAlgorithmSpec)
 
   /** Preferably, we sign a hash; however, we also allow signing arbitrary bytes when necessary. */
-  protected[crypto] def signBytes(
+  def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       signingAlgorithmSpec: SigningAlgorithmSpec = defaultSigningAlgorithmSpec,

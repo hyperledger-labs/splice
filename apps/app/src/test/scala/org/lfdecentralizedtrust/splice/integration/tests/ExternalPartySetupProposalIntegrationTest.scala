@@ -247,8 +247,8 @@ class ExternalPartySetupProposalIntegrationTest
         prepareSend.transaction,
         HexString.toHexString(
           crypto
-            .sign(
-              Hash.fromByteString(HexString.parseToByteString(prepareSend.txHash).value).value,
+            .signBytes(
+              HexString.parseToByteString(prepareSend.txHash).value,
               alicePrivateKey.asInstanceOf[SigningPrivateKey],
             )
             .value
@@ -420,12 +420,8 @@ class ExternalPartySetupProposalIntegrationTest
           prepareSendNoPreapproval.transaction,
           HexString.toHexString(
             crypto
-              .sign(
-                Hash
-                  .fromByteString(
-                    HexString.parseToByteString(prepareSendNoPreapproval.txHash).value
-                  )
-                  .value,
+              .signBytes(
+                HexString.parseToByteString(prepareSendNoPreapproval.txHash).value,
                 alicePrivateKey.asInstanceOf[SigningPrivateKey],
               )
               .value

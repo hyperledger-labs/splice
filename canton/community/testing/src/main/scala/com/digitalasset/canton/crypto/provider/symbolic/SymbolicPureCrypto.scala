@@ -47,7 +47,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
     NonEmpty.mk(Set, EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm)
   override val defaultPbkdfScheme: PbkdfScheme = PbkdfScheme.Argon2idMode1
 
-  override protected[crypto] def signBytes(
+  override def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       signingAlgorithmSpec: SigningAlgorithmSpec = defaultSigningAlgorithmSpec,
