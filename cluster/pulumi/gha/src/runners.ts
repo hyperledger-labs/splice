@@ -102,6 +102,12 @@ export function installRunnerScaleSet(controller: k8s.helm.v3.Release): k8s.helm
         },
         template: {
           spec: {
+            metadata: {
+              // prevent eviction by the gke autoscaler
+              annotations: {
+                'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+              },
+            },
             initContainers: [
               {
                 name: 'init-dind-externals',
