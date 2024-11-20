@@ -33,6 +33,10 @@ inputs:
     description: "Timeout for the SBT command"
     required: false
     default: "25m"
+  additional_nix_args:
+    description: "Additional arguments to pass to the Nix command"
+    required: false
+    default: ""
 
 runs:
   using: 'composite'
@@ -40,14 +44,12 @@ runs:
     - name: Execute SBT command"
       uses: ./.github/actions/nix/run_bash_command_in_nix
       with:
-        additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
+        additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD ${{ inputs.additional_nix_args }}"
         cmd: |
             # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
             export PROTOCBRIDGE_NO_CLEANUP="1"
 
             run_sbt() {
-               export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
-               export ARTIFACTORY_PASSWORD="${{ inputs.artifactory_password }}"
                export ${{ inputs.extra_env_vars }}
                # Define sbt command
                SBT_CMD=(sbt)
@@ -72,6 +74,8 @@ runs:
                 # .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
                 # <</ parameters.fail_on_error_in_output >>
             }
+            export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
+            export ARTIFACTORY_PASSWORD="${{ inputs.artifactory_password }}"
             ${{ inputs.pre_sbt_cmd }}
             run_sbt
             ${{ inputs.post_sbt_cmd }}

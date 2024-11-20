@@ -7,6 +7,14 @@ inputs:
   additional_nix_args:
     description: 'Additional arguments to pass to nix develop'
     required: false
+  cmd_retry_count:
+    description: 'The number of times to retry the command'
+    required: false
+    default: "0"
+  cmd_retry_wait:
+    description: 'The number of seconds to wait between retries'
+    required: false
+    default: "5"
 runs:
   using: 'composite'
   steps:
@@ -68,13 +76,12 @@ runs:
 
           # TODO(#15988): once we support cluster deployments in GHA, add cluster authentication here
 
-          # TODO(#15988): make the number of retries an argument
-          MAX_RETRY=3
+          MAX_RETRY=${{ inputs.cmd_retry_count }}
           n=0
           until [ $n -gt $MAX_RETRY ]
           do
               if [ $n -gt 0 ]; then
-                sleep 10
+                sleep ${{ inputs.cmd_retry_wait }}
               fi
               cmd_wrapper() {
                 # We write the cmd to a separate file. That way `set -e` statements in the cmd will take effect

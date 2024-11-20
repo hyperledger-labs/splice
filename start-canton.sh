@@ -9,6 +9,7 @@ function usage() {
   echo "Flags:"
   echo "  -h               display this help message"
   echo "  -d               start in detached mode"
+  echo "  -D               don't even wait for Canton to start before going on detached mode (implies -d)"
   echo "  -b               start in the background"
   echo "  -p postgres_mode postgres mode used in scripts/postgres.sh, default 'docker'"
   echo "  -w               only start canton instance with wall clock time"
@@ -31,7 +32,7 @@ global_cometbft=0
 softDomainMigration=0
 collect_metrics=0
 
-args=$(getopt -o "hdap:c:wsbtfgm" -l "help,soft-domain-migration" -- "$@")
+args=$(getopt -o "hdDap:c:wsbtfgm" -l "help,soft-domain-migration" -- "$@")
 
 eval set -- "$args"
 
@@ -45,6 +46,10 @@ do
         --help)
             usage
             exit 0
+            ;;
+        -D)
+            daemon=3
+            break
             ;;
         -b)
             daemon=2
@@ -255,14 +260,17 @@ if [[ $collect_metrics -eq 1 ]]; then
   ./scripts/start-opentelemetry-collector.sh
 fi
 
-if [ $wallclocktime -eq 0 ]; then
-  ./wait-for-canton.sh -s
-elif [ $simtime -eq 0 ]; then
-  ./wait-for-canton.sh -w
+if [ $daemon -ne 3 ]; then
+  if [ $wallclocktime -eq 0 ]; then
+    ./wait-for-canton.sh -s
+  elif [ $simtime -eq 0 ]; then
+    ./wait-for-canton.sh -w
+  else
+    ./wait-for-canton.sh
+  fi
 else
-  ./wait-for-canton.sh
+  echo "-D specified, not waiting for canton to start "
 fi
-
 
 tmux_cmd toxiproxy toxiproxy-server > log/toxi.log 2>&1
 

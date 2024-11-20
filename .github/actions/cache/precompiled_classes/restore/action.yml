@@ -1,0 +1,26 @@
+name: "Restore Precompiled Classes"
+description: "Restore the precompiled classes from the cache"
+inputs:
+  cache_version:
+    description: "Version of the cache"
+    required: true
+outputs:
+  cache_hit:
+    description: "Cache hit"
+    value: ${{ steps.restore.outputs.cache-hit }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Restore precompiled classes
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: /tmp/classes
+        key: classes-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }} rev:${{ github.sha }}
+        restore-keys: |
+          classes-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }}
+          classes-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }}
+    - name: Extract precompiled classes
+      shell: bash
+      run: ./.github/actions/scripts/extract_precompiled_classes.sh

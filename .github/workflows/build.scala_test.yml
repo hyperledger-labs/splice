@@ -1,0 +1,126 @@
+name: Scala Test
+on:
+  workflow_call:
+    inputs:
+      start_canton_options:
+        type: string
+        required: true
+
+jobs:
+  scala_test:
+    runs-on: self-hosted-docker
+    # Docker Hub image that `container-job` executes in
+    container:
+      # TODO(#15988): We're currently (ab)using the cimg/base image as a base image for our self-hosted runners.
+      # Ideally, we'd build our own image that includes the necessary dependencies. But then
+      # we need to either push it somewhere public or grant access to the runner to pull it.
+      # We also can't simply use ubuntu:latest because its default user is root, and building
+      # nix as root fails.
+      image: cimg/base:current
+      volumes:
+        - /cache:/cache
+      # TODO(#15988): running as privileged for now for the bind-mount of /nix/store.
+      options: --privileged
+
+    services:
+      postgres:
+        # TODO(#15988): clean this up, use a proper released image instead:
+        #               - Once this is in a snapshot, use the snapshot version.
+        #               - Once this is in a release, use the release version.
+        image: digitalasset-canton-network-docker-dev.jfrog.io/splice-test-postgres:0.3.0-itai-dirty
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup
+        shell: bash
+        run: ./.github/actions/scripts/common_setup.sh
+
+      - name: Set up Nix
+        uses: ./.github/actions/nix/setup_self_hosted_nix
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          # TODO(#15988): consider this trick for setting cache_version globally: https://stackoverflow.com/a/74217028
+          cache_version: 0
+
+      # Starting canton before setting up SBT, to gain a bit of time doing both in parallel
+      - name: Start Canton
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        env:
+          POSTGRES_HOST: postgres
+          CANTON_DB_HOST: postgres
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        with:
+          cmd: |
+            mkdir -p log
+            # re-exporting POSTGRES_HOST because it is hardcoded to localhost
+            # in .envrc.vars, thus overwritten when nix starts, so here we are
+            # inside nix and can re-export it to the value we want.
+            export POSTGRES_HOST=postgres
+            ./start-canton.sh -p external -D ${{ inputs.start_canton_options }}
+          additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
+          cmd_retry_count: 3
+        # TODO(#15988): GHA does not support background jobs, therefore we introduced the -D flag
+        # and just running in the background, but this means that we are not retrying on all
+        # failures. Consider wrapping start-canton in a script that also retries, and
+        # running that in the background.
+
+      - name: Set up SBT
+        id: setup_sbt
+        uses: ./.github/actions/sbt/setup_sbt
+        with:
+          cache_version: 0
+
+      - name: Wait for Canton to be ready
+        shell: bash
+        run: |
+            if [[ "${{ inputs.start_canton_options }}" == *"-w"* ]]; then
+              ./wait-for-canton.sh -w
+            elif [[ "${{ inputs.start_canton_options }}" == *"-s"* ]]; then
+              ./wait-for-canton.sh -s
+            fi
+
+      - name: Run tests
+        uses: ./.github/actions/sbt/execute_sbt_command
+        env:
+          # TODO(#15988): move this into an image that we can use for all jobs
+          COURSIER_CACHE: /cache/coursier
+        with:
+            extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=postgres POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres
+            artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+            artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+            # TODO(#15988): For now just two arbitrarily chosen tests out of 'scala_test sim time'
+            cmd: "\"testOnly \
+              org.lfdecentralizedtrust.splice.integration.tests.WalletRewardsTimeBasedIntegrationTest
+              org.lfdecentralizedtrust.splice.integration.tests.SvTimeBasedRewardCouponIntegrationTest\""
+            additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
+
+      - name: Check logs for errors
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          # we don't care if some integration test happened to make the repo dirty
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: checkErrors
+
+      - name: Post-SBT job
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/sbt/post_sbt
+        with:
+          cache_version: 0
+          setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
+
+      - name: Upload logs
+        if: ${{ failure() }}
+        uses: ./.github/actions/sbt/upload_logs

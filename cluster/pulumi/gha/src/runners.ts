@@ -60,6 +60,29 @@ export function installRunnerScaleSet(controller: k8s.helm.v3.Release): k8s.helm
     }
   );
   const cachePvc = createCachePvc(runnersNamespace);
+  // TODO(#15988): for now, this uses the token of the person running the pulumi command.
+  // It should be a service account instead.
+  const artifactoryCreds = `${spliceEnvConfig.requireEnv('ARTIFACTORY_USER')}:${spliceEnvConfig.requireEnv(`ARTIFACTORY_PASSWORD`)}`;
+  const artifactoryCredsBase64 = Buffer.from(artifactoryCreds).toString('base64');
+  const dockerConfigSecret = new k8s.core.v1.Secret('docker-config-secret', {
+    metadata: {
+      namespace: runnersNamespace.metadata.name,
+    },
+    data: {
+      'config.json': Buffer.from(
+        JSON.stringify({
+          auths: {
+            'digitalasset-canton-network-docker.jfrog.io': {
+              auth: artifactoryCredsBase64,
+            },
+            'digitalasset-canton-network-docker-dev.jfrog.io': {
+              auth: artifactoryCredsBase64,
+            },
+          },
+        })
+      ).toString('base64'),
+    },
+  });
 
   return new k8s.helm.v3.Release(
     'gha-runner-scale-set',
@@ -111,6 +134,12 @@ export function installRunnerScaleSet(controller: k8s.helm.v3.Release): k8s.helm
                   {
                     name: 'dind-sock',
                     mountPath: '/var/run',
+                  },
+                  {
+                    name: 'docker-config',
+                    mountPath: '/home/runner/.docker/config.json',
+                    readOnly: true,
+                    subPath: 'config.json',
                   },
                 ],
               },
@@ -182,6 +211,12 @@ export function installRunnerScaleSet(controller: k8s.helm.v3.Release): k8s.helm
                   name: configMap.metadata.name,
                 },
               },
+              {
+                name: 'docker-config',
+                secret: {
+                  secretName: dockerConfigSecret.metadata.name,
+                },
+              },
             ],
             ...appsAffinityAndTolerations,
           },
@@ -191,7 +226,7 @@ export function installRunnerScaleSet(controller: k8s.helm.v3.Release): k8s.helm
       },
     },
     {
-      dependsOn: [tokenSecret, controller, configMap],
+      dependsOn: [tokenSecret, controller, configMap, cachePvc, dockerConfigSecret],
     }
   );
 }

@@ -30,6 +30,8 @@ images := \
 	multi-validator \
 	multi-participant \
 	pulumi-kubernetes-operator \
+	\
+	splice-test-postgres \
 
 canton-image := cluster/images/canton
 splice-image := cluster/images/splice-app

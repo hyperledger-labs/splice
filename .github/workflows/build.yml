@@ -5,5 +5,11 @@ on: pull_request
 
 jobs:
   static_tests:
-    uses: ./.github/workflows/static_tests.yml
+    uses: ./.github/workflows/build.static_tests.yml
+    secrets: inherit
+
+  scala_test_sim_time:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      start_canton_options: -s
     secrets: inherit
