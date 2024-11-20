@@ -109,7 +109,7 @@ function _start_validator {
   _info "Curling ${secret_url} for the secret"
   secret=""
   for i in {1..30}; do
-    secret=$(curl --connect-timeout 10 --max-time 20 -sfL -X POST "${secret_url}") && break
+    secret=$(curl --connect-timeout 10 --max-time 20 -sfL --show-error -X POST "${secret_url}") && break
     _warning "Failed to fetch secret, retrying in 10 seconds"
     sleep 10
   done
@@ -349,7 +349,7 @@ function subcmd_start_network {
   # to return before the services are actually ready, so we retry fetching the onboarding
   # secret until it actually succeeds
   for i in {1..30}; do
-    secret=$(curl -sfL -X POST "${get_secret_url}") && break
+    secret=$(curl -sfL --show-error -X POST "${get_secret_url}") && break
     _warning "Failed to fetch secret, retrying in 10 seconds"
     sleep 10
   done

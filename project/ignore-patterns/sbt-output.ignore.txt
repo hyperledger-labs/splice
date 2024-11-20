@@ -107,4 +107,7 @@ npm-install.sh.*returned non-zero exit code: .*, retrying
 
 You are using an unreleased and unstable version of damml3. This will break without warning.
 
+# output by the compose validator in DockerComposeFullNetworkFrontendIntegrationTest
+curl.*The requested URL returned error
+
 # Make sure to have a trailing newline
