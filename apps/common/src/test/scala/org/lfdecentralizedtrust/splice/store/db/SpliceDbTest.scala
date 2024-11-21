@@ -112,9 +112,9 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
   override def afterAll(): Unit = {
     implicit val tc: TraceContext = TraceContext.empty
+    super.afterAll()
     logger.info("Releasing SpliceDbTest lock")
     dbLockSocket.foreach(_.close())
-    super.afterAll()
   }
 }
 
