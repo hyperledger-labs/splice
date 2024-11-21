@@ -10,8 +10,13 @@ chart=$1
 publish () {
   source=$1
   full_path=$2
-  echo "Publishing ${source} to ${full_path}"
-  curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
+  response=$(curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -s -o /dev/null -w "%{http_code}" "${full_path}")
+  if [ "$response" -eq 200 ]; then
+    echo "Helm chart ${source} already exists in the repository."
+  else
+    echo "Publishing helm chart ${source} to ${full_path}"
+    curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
+  fi
 }
 
 artifactory_url="https://digitalasset.jfrog.io/artifactory"
