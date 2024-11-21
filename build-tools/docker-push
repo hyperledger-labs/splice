@@ -53,8 +53,9 @@ if docker-image-reference-exists "${imageReference}"; then
     exit 0
   else
     if [ -z "${developerVersionUsed}" ]; then
-      _error "Image already exists in repo with image ID '${remoteImageId}'\nThis does not match local image ID:               '${imageId}'\n${imageReference}\nNot pushing image."
-      exit 1
+      #TODO(#16272) fix overwrites
+      _info "Image already exists in repo with image ID '${remoteImageId}'\nThis does not match local image ID:               '${imageId}'\n${imageReference}\nNot pushing image."
+      exit 0
     fi
   fi
 fi
