@@ -6,7 +6,7 @@ import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
-import { CnChartVersion, repositories } from './artifacts';
+import { CnChartVersion, repositories, repository } from './artifacts';
 import { config } from './config';
 import { activeVersion } from './domainMigration';
 import {
@@ -14,7 +14,6 @@ import {
   ChartValues,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
-  dockerImageArtifactsRepository,
   ExactNamespace,
   fixedTokens,
   HELM_CHART_TIMEOUT_SEC,
@@ -25,7 +24,7 @@ import {
   REPO_ROOT,
 } from './utils';
 
-// The default type of dependsOn is an unworkable abonimation.
+// The default type of dependsOn is an unworkable abomination.
 export type SpliceCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'dependsOn'> & {
   dependsOn?: pulumi.Input<pulumi.Resource>[];
 };
@@ -120,13 +119,7 @@ function cnChartValues(
     {},
     chartDefaultValues,
     {
-      // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
-      imageRepo:
-        version.type === 'local' ||
-        artifactsRepository === 'google' ||
-        dockerImageArtifactsRepository === 'google'
-          ? repositories.google.dockerImages
-          : undefined,
+      imageRepo: repository(artifactsRepository).dockerImages,
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         name: CLUSTER_NAME,
@@ -163,13 +156,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
       repositoryOpts: repositoryOpts(version),
       values: {
         ...values,
-        // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
-        imageRepo:
-          version.type === 'local' ||
-          artifactsRepository === 'google' ||
-          dockerImageArtifactsRepository === 'google'
-            ? repositories.google.dockerImages
-            : undefined,
+        imageRepo: repository(artifactsRepository).dockerImages,
         ...appsAffinityAndTolerations,
         // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
         clusterUrl: CLUSTER_HOSTNAME,
@@ -209,7 +196,7 @@ export function chartPath(chartName: string, version: CnChartVersion): string {
       : chartName.replace(/^splice/, 'cn');
   return version.type === 'local'
     ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${compatibleName}/`
-    : version.repository === repositories.google
+    : version.repository === repositories.private
       ? `${version.repository.helm}/${compatibleName}`
       : compatibleName;
 }
@@ -229,7 +216,7 @@ function versionStringWithPossibleOverride(
 
 // repository opts are not supported for oci charts
 export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.RepositoryOpts | undefined {
-  if (version.type === 'local' || version.repository === repositories.google) {
+  if (version.type === 'local' || version.repository === repositories.private) {
     return undefined;
   } else {
     const username = config.requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');

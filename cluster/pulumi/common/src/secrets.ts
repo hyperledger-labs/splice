@@ -50,10 +50,40 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
 }
 
 export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
-  const artifactory = 'digitalasset-canton-network-docker.jfrog.io';
+  const publicArtifactory = 'digitalasset-canton-network-docker.jfrog.io';
+  const privateArtifactory = 'digitalasset-canton-network-docker-dev.jfrog.io';
   const username = config.requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
   const password = config.requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
+  const clusterBaseName = config.requireEnv('GCP_CLUSTER_BASENAME');
   const k8sProvider = new k8s.Provider('k8s-imgpull-' + ns, { enableServerSideApply: true });
+
+  const prodDockerConfig = JSON.stringify({
+    auths: {
+      [publicArtifactory]: {
+        auth: btoa(username + ':' + password),
+        username: username,
+        password: password,
+      },
+    },
+  });
+
+  const scratchDockerConfig = JSON.stringify({
+    auths: {
+      [publicArtifactory]: {
+        auth: btoa(username + ':' + password),
+        username: username,
+        password: password,
+      },
+      [privateArtifactory]: {
+        auth: btoa(username + ':' + password),
+        username: username,
+        password: password,
+      },
+    },
+  });
+  const dockerConfigJson = clusterBaseName.startsWith('scratch')
+    ? scratchDockerConfig
+    : prodDockerConfig;
   const secret = new k8s.core.v1.Secret(ns + '-docker-reg-cred', {
     metadata: {
       name: 'docker-reg-cred',
@@ -61,15 +91,7 @@ export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
     },
     type: 'kubernetes.io/dockerconfigjson',
     stringData: {
-      '.dockerconfigjson': JSON.stringify({
-        auths: {
-          [artifactory]: {
-            auth: btoa(username + ':' + password),
-            username: username,
-            password: password,
-          },
-        },
-      }),
+      '.dockerconfigjson': dockerConfigJson,
     },
   });
   const patch = new k8s.core.v1.ServiceAccountPatch(

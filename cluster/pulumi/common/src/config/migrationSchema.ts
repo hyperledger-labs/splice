@@ -3,6 +3,7 @@ import * as util from 'node:util';
 import { z } from 'zod';
 
 import { CHARTS_VERSION, CnChartVersion, parsedVersion } from '../artifacts';
+import { artifactsRepository } from '../utils';
 import { spliceEnvConfig } from './envConfig';
 
 export enum MigrationProvider {
@@ -15,7 +16,6 @@ export const defaultActiveMigration = {
   version: CHARTS_VERSION,
   provider: MigrationProvider.INTERNAL,
 };
-const repositoryValue = spliceEnvConfig.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
 
 const migrationVersion = z
   .string()
@@ -28,7 +28,7 @@ const migrationVersion = z
       });
       return z.NEVER;
     } else {
-      return parsedVersion(version || CHARTS_VERSION, repositoryValue);
+      return parsedVersion(version || CHARTS_VERSION, artifactsRepository);
     }
   });
 export const MigrationInfoSchema = z
@@ -53,7 +53,7 @@ export const SynchronizerMigrationSchema = z
     active: MigrationInfoSchema.extend({
       migratingFrom: z.number().optional(),
       version: migrationVersion.transform((version, ctx) => {
-        const parsedChartsVersion = parsedVersion(CHARTS_VERSION, repositoryValue);
+        const parsedChartsVersion = parsedVersion(CHARTS_VERSION, artifactsRepository);
         if (CHARTS_VERSION && !_.isEqual(parsedChartsVersion, version)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,

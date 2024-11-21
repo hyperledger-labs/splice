@@ -656,8 +656,8 @@
         ],
         "image": {
           "pullPolicy": "Always",
-          "registry": "us-central1-docker.pkg.dev",
-          "repository": "da-cn-shared/cn-images/pulumi-kubernetes-operator",
+          "registry": "digitalasset-canton-network-docker.jfrog.io",
+          "repository": "digitalasset/pulumi-kubernetes-operator",
           "tag": "0.0.1-deadbeef"
         },
         "maxHistory": 10,

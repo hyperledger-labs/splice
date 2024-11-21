@@ -52,7 +52,7 @@ export async function installValidator1(
     activeVersion,
     { dependsOn: [xns.ns] }
   );
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
     ? postgres.installPostgres(xns, 'postgres', 'postgres', false)

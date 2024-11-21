@@ -98,7 +98,7 @@ jobs:
             /tmp/vpn-scripts/restart-vpn.sh
       - get_cluster:
           cluster: << parameters.cluster >>
-      - docker_login_internal
+      - docker_login_artifactory
       - run_bash_command_in_nix:
           cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
       - execute_sbt_command:

@@ -27,7 +27,7 @@ IMAGE_DIGESTS := cluster/helm/.image-digests
 .PHONY: cluster/helm/push
 cluster/helm/push:
 	@for file in cluster/helm/target/*.tgz; do \
-		helm push $$file oci://us-central1-docker.pkg.dev/da-cn-shared/cn-images; \
+	    publish_helm_chart.sh $$file;\
 	done
 
 .PHONY: cluster/helm/write-version

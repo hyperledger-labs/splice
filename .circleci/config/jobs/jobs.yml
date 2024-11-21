@@ -183,11 +183,10 @@ jobs:
       - setup_sbt_test_job:
           runner_type: "circleci"
       - docker_login_artifactory
-      - docker_login_internal
       - run_bash_command_in_nix:
           cmd_name: Check if images already exist
           cmd: |
-            if make docker-check; then
+            if make docker-image-reference-exists --err-missing; then
               echo "Docker images already exist"
               # Running a circleci-agent command from within run_bash_command_in_nix does not work, so we create a file
               # that represents the need to halt, and call `circleci-agent step halt` in a separate `run` step
@@ -219,7 +218,8 @@ jobs:
           cmd: make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
-          cmd_name: Push Helm Artifacts to gcp
+          additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
+          cmd_name: Push Helm Artifacts
           cmd: make cluster/helm/push -j
           cmd_retry_count: 5
       - when:
@@ -230,17 +230,8 @@ jobs:
                 cmd_name: Push Helm Artifacts to artifactory
                 additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
                 cmd: |
-                  publish () {
-                    source=$1
-                    full_path=$2
-                    echo "Publishing ${source} to ${full_path}"
-                    curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
-                  }
                   make cluster/helm/build -j
-                  for chart in cluster/helm/target/*.tgz; do
-                    artifactory_url="https://digitalasset.jfrog.io/artifactory"
-                    publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
-                  done
+                  make cluster/helm/push -j
       - save_frontend_builds
       - save_sbt_job_result:
           runner_type: "circleci"
@@ -256,20 +247,6 @@ jobs:
       - setup_sbt_test_job:
           runner_type: "circleci"
       - docker_login_artifactory
-      - run_bash_command_in_nix:
-          cmd_name: Promote images to Artifactory
-          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
-           --keep DOCKER_CERT_PATH \
-           --keep DOCKER_HOST \
-           --keep DOCKER_MACHINE_NAME \
-           --keep DOCKER_TLS_VERIFY \
-           --keep NO_PROXY"
-          cmd: |
-            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
-
-            make docker-promote
-          cmd_retry_count: 5 # Retry in case of connectivity issues
       - run_bash_command_in_nix:
           cmd_name: Push Helm charts and tag git accordingly
           additional_nix_args: "--keep ARTIFACTORY_USER \
@@ -748,7 +725,7 @@ jobs:
       - checkout_with_retry
       - setup_nix
       - setup_vpn
-      - docker_login_internal
+      - docker_login_artifactory
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
@@ -765,9 +742,14 @@ jobs:
       - run_bash_command_in_nix:
           cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
       - run_bash_command_in_nix:
+          additional_nix_args: >
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
           cmd: |
+            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
+            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidatorArm-1"
           cmd_retry_count: 3
       - store_artifacts:

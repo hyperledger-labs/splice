@@ -4,14 +4,14 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/lib/libcli.source"
 
 if [ -z "$1" ]; then
-    _error "Usage: $0 <image-tag> [--optional]"
+    _error "Usage: $0 <image-tag> [--err-missing]"
 else
     image=$1
 fi
 
 if [ -n "$2" ]; then
-    if [ "$2" = "--optional" ]; then
-        optional=yes
+    if [ "$2" = "--err-missing" ]; then
+        err_missing=yes
     else
         _error "Invalid command line option: $2"
         exit 1
@@ -21,18 +21,19 @@ fi
 # check if docker is running
 out="$(docker info 2>&1)" || _error "Cannot check for image, docker seems to be down:\n${out}"
 
-# check the image exists
-gcloud container images describe "${image}" > /dev/null 2>&1
+# check if the image exists in the repo
+docker buildx imagetools inspect "${image}" > /dev/null 2>&1
 IMAGE_CHECK=$?
 
 if [ "${IMAGE_CHECK}" -eq 0 ] ; then
   _log "Image exists in repo: ${image}"
   exit 0
 else
-  if [ -z "${optional}" ]; then
-    _error "Image does not exist in repo: ${image}"
-  else
+  # fail with error if --err-missing is used
+  if [ -z "${err_missing}" ]; then
     _log "Image does not exist in repo: ${image}"
+  else
+    _error "Image does not exist in repo: ${image}"
   fi
   exit 1
 fi

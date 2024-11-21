@@ -35,6 +35,7 @@
           "hostname": "global.canton.network.digitalasset.com"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
