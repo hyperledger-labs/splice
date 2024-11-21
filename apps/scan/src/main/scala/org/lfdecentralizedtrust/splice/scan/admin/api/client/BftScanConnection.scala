@@ -496,7 +496,7 @@ object BftScanConnection {
       requestsToDo: Int,
       targetSuccess: Int,
   ) {
-    def enoughAvailableScans: Boolean = connections.size >= requestsToDo && requestsToDo > 0
+    def enoughAvailableScans: Boolean = connections.size >= targetSuccess && targetSuccess > 0
   }
 
   object BftCallConfig {

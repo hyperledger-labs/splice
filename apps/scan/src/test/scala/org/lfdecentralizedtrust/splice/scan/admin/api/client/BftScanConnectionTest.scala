@@ -310,7 +310,7 @@ class BftScanConnectionTest
     "work with partial failures" in {
       // f = (2ok + 2bad - 1) / 3 = 1
       // 2 Scans is JUST enough for f+1=2
-      val connections = getMockedConnections(n = 3)
+      val connections = getMockedConnections(n = 2)
       connections.foreach(makeMockReturn(_, partyIdA))
       val bft = getBft(
         connections,

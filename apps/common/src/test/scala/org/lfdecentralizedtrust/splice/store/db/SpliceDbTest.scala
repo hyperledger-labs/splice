@@ -76,7 +76,10 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
             RESTART IDENTITY CASCADE""".asUpdate,
         "resetAllAppTables",
       )
-    } yield ()
+    } yield {
+      logger.info("Resetting all Splice app database tables complete")
+      ()
+    }
   }
 
   private var dbLockSocket: Option[ServerSocket] = None
