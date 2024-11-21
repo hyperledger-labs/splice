@@ -12,12 +12,16 @@ set -euo pipefail
 git config --global --add safe.directory "$(pwd)"
 git fetch --tags --force origin
 git checkout main
-if [ "$GITHUB_HEAD_REF" != "main" ]; then
-  git checkout -B "$GITHUB_HEAD_REF"
+echo "GITHUB_HEAD_REF: ${GITHUB_HEAD_REF:-}"
+if [ -n "${GITHUB_HEAD_REF:-}" ] && [ "$GITHUB_HEAD_REF" != "main" ]; then
+  echo "Checking out $GITHUB_HEAD_REF"
+  git checkout "$GITHUB_HEAD_REF"
 fi
 git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
 
+echo "GITHUB_SHA: ${GITHUB_SHA:-}"
 if [ -n "${GITHUB_SHA:-}" ]; then
+  echo "Checking out $GITHUB_SHA"
   git checkout "$GITHUB_SHA"
 fi
 
