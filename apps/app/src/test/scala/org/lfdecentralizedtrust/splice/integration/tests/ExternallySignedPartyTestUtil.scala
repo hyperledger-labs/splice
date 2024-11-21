@@ -89,9 +89,10 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
   protected def createAndAcceptExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
+      verboseHashing: Boolean = false,
   ): (TransferPreapproval.ContractId, String) = {
     val proposal = createExternalPartySetupProposal(provider, externalPartyOnboarding)
-    acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal)
+    acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal, verboseHashing)
   }
 
   protected def createExternalPartySetupProposal(
@@ -117,9 +118,15 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
       proposal: ExternalPartySetupProposal.ContractId,
+      verboseHashing: Boolean = false,
   ): (TransferPreapproval.ContractId, String) = {
     val preparedTx =
-      prepareAcceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal)
+      prepareAcceptExternalPartySetupProposal(
+        provider,
+        externalPartyOnboarding,
+        proposal,
+        verboseHashing,
+      )
     submitExternalPartySetupProposal(provider, externalPartyOnboarding, preparedTx)
   }
 
@@ -127,15 +134,24 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
       proposal: ExternalPartySetupProposal.ContractId,
+      verboseHashing: Boolean = false,
   ): PrepareAcceptExternalPartySetupProposalResponse = {
     val (prepare, _) = actAndCheck(
       s"Prepare acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party}",
-      provider.prepareAcceptExternalPartySetupProposal(proposal, externalPartyOnboarding.party),
+      provider.prepareAcceptExternalPartySetupProposal(
+        proposal,
+        externalPartyOnboarding.party,
+        verboseHashing,
+      ),
     )(
       s"acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party} prepared",
       prepare => {
         prepare.txHash should not be empty
         prepare.transaction should not be empty
+        if (verboseHashing)
+          prepare.hashingDetails should not be empty
+        else
+          prepare.hashingDetails shouldBe empty
       },
     )
     prepare
