@@ -8,21 +8,37 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.0
+-----
 
-* Fix a Canton node initialization issue that caused newly initialized participants, mediators, and sequencers to reuse their root namespace signing key for all signing purposes.
-  Upgrading to this release will also fix the key usage on all validators and SVs that were originally onboarded on an affected version (versions 0.2.4 to 0.2.8),
-  generating fresh signing keys for affected Canton nodes.
+Note: This release must be applied through the :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` procedure
+
+* Canton
+
+  This release upgrades from Canton 3.1 to Canton 3.2.
+  In addition to stability improvements, the primary change is adding support for externally hosted parties, which enables supporting Amulet custody.
+
+* Validator App, Scan App
+
+  * Add support for Amulet custody.
+  * Fixed a bug where BFT scan calls would fail even though enough remote scan connections are available. This would happen if roughly a third of the SV nodes are offline.
+
+* Wallet UI
+
+  * Support for non-external parties to exchange amulets with externally hosted ones via pre-approved transfers.
+
+* SV UI
+
+  * The SV UI now shows a confirmation dialog when creating a Vote Request or Voting.
 
 * Deployment
 
   * An optional value ``uiPollInterval`` has been added to the Helm charts for ``splice-scan``, ``splice-sv-node``, and ``splice-validator``. This value allows you to configure the interval at which the deployed UIs poll the services for updates in milliseconds. If unspecified, the default value is 1000 (1 second).
   * The log field ``labels."k8s-pod/cn-component"`` has been renamed to ``labels."k8s-pod/splice-component"``.
 
-* SV UI
+* Security
 
-  * The SV UI now shows aa confirmation dialog with disclaimers when creating a Vote Request or Voting.
+  * Fix a Canton node initialization issue that caused newly initialized participants, mediators, and sequencers to reuse their root namespace signing key for all signing purposes. Upgrading to this release will also fix the key usage on all validators and SVs that were originally onboarded on an affected version (versions 0.2.4 to 0.2.8), generating fresh signing keys for affected Canton nodes.
 
 * Docs
 
