@@ -152,7 +152,11 @@ class ExternalPartySetupProposalIntegrationTest
     aliceValidatorBackend.participantClient.parties
       .hosted(filterParty = aliceParty.filterString) should not be empty
     aliceValidatorWalletClient.tap(50.0)
-    createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, onboardingAlice)
+    createAndAcceptExternalPartySetupProposal(
+      aliceValidatorBackend,
+      onboardingAlice,
+      verboseHashing = true,
+    )
     eventually() {
       aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceParty) should not be empty
       aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
@@ -175,7 +179,11 @@ class ExternalPartySetupProposalIntegrationTest
     aliceValidatorBackend.participantClient.parties
       .hosted(filterParty = bobParty.filterString) should not be empty
     val (cidBob, _) =
-      createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, onboardingBob)
+      createAndAcceptExternalPartySetupProposal(
+        aliceValidatorBackend,
+        onboardingBob,
+        verboseHashing = true,
+      )
     eventually() {
       aliceValidatorBackend.lookupTransferPreapprovalByParty(bobParty) should not be empty
       aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(bobParty) should not be empty
@@ -239,7 +247,9 @@ class ExternalPartySetupProposalIntegrationTest
         BigDecimal(10.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         0L,
+        verboseHashing = true,
       )
+    prepareSend.hashingDetails should not be empty
     val (updateId, _) = actAndCheck(
       "Submit signed TransferCommand creation",
       aliceValidatorBackend.submitTransferPreapprovalSend(
@@ -247,8 +257,8 @@ class ExternalPartySetupProposalIntegrationTest
         prepareSend.transaction,
         HexString.toHexString(
           crypto
-            .sign(
-              Hash.fromByteString(HexString.parseToByteString(prepareSend.txHash).value).value,
+            .signBytes(
+              HexString.parseToByteString(prepareSend.txHash).value,
               alicePrivateKey.asInstanceOf[SigningPrivateKey],
             )
             .value
@@ -401,6 +411,7 @@ class ExternalPartySetupProposalIntegrationTest
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         1L,
       )
+    prepareSendNoPreapproval.hashingDetails shouldBe empty
 
     // Archive the preapproval
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
@@ -420,12 +431,8 @@ class ExternalPartySetupProposalIntegrationTest
           prepareSendNoPreapproval.transaction,
           HexString.toHexString(
             crypto
-              .sign(
-                Hash
-                  .fromByteString(
-                    HexString.parseToByteString(prepareSendNoPreapproval.txHash).value
-                  )
-                  .value,
+              .signBytes(
+                HexString.parseToByteString(prepareSendNoPreapproval.txHash).value,
                 alicePrivateKey.asInstanceOf[SigningPrivateKey],
               )
               .value

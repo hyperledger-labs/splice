@@ -5,7 +5,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   TransferPreapproval,
 }
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
-import org.lfdecentralizedtrust.splice.http.v0.definitions.SignedTopologyTx
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  PrepareAcceptExternalPartySetupProposalResponse,
+  SignedTopologyTx,
+}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import com.digitalasset.canton.config.CommunityCryptoProvider
 import com.digitalasset.canton.crypto.*
@@ -18,7 +21,8 @@ import java.util.UUID
 
 trait ExternallySignedPartyTestUtil extends TestCommon {
   def onboardExternalParty(
-      validatorBackend: ValidatorAppBackendReference
+      validatorBackend: ValidatorAppBackendReference,
+      partyHint: String = UUID.randomUUID().toString,
   ): OnboardingResult = {
     val signingPublicKey =
       validatorBackend.participantClient.keys.secret
@@ -31,7 +35,6 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       .download(signingPublicKey.fingerprint, ProtocolVersion.dev)
     val privateKey =
       CryptoKeyPair.fromTrustedByteString(signingKeyPairByteString).value.privateKey
-    val partyHint = UUID.randomUUID().toString
     val listOfTransactionsAndHashes = validatorBackend
       .generateExternalPartyTopology(
         partyHint,
@@ -86,37 +89,105 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
   protected def createAndAcceptExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
+      verboseHashing: Boolean = false,
   ): (TransferPreapproval.ContractId, String) = {
-    val proposal = provider.createExternalPartySetupProposal(externalPartyOnboarding.party)
-    provider
-      .listExternalPartySetupProposals()
-      .map(c => c.contract.contractId.contractId) contains proposal.contractId
-    acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal)
+    val proposal = createExternalPartySetupProposal(provider, externalPartyOnboarding)
+    acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal, verboseHashing)
+  }
+
+  protected def createExternalPartySetupProposal(
+      provider: ValidatorAppBackendReference,
+      externalPartyOnboarding: OnboardingResult,
+  ): ExternalPartySetupProposal.ContractId = {
+    val (proposal, _) = actAndCheck(
+      s"Create external party proposal for ${externalPartyOnboarding.party}", {
+        provider.createExternalPartySetupProposal(externalPartyOnboarding.party)
+      },
+    )(
+      s"External party proposal for ${externalPartyOnboarding.party} was created",
+      proposal => {
+        provider
+          .listExternalPartySetupProposals()
+          .map(_.contract.contractId.contractId) should contain(proposal.contractId)
+      },
+    )
+    proposal
   }
 
   protected def acceptExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
       proposal: ExternalPartySetupProposal.ContractId,
+      verboseHashing: Boolean = false,
   ): (TransferPreapproval.ContractId, String) = {
-    val prepare =
-      provider.prepareAcceptExternalPartySetupProposal(proposal, externalPartyOnboarding.party)
-    prepare.txHash should not be empty
-    prepare.transaction should not be empty
+    val preparedTx =
+      prepareAcceptExternalPartySetupProposal(
+        provider,
+        externalPartyOnboarding,
+        proposal,
+        verboseHashing,
+      )
+    submitExternalPartySetupProposal(provider, externalPartyOnboarding, preparedTx)
+  }
 
-    provider.submitAcceptExternalPartySetupProposal(
-      externalPartyOnboarding.party,
-      prepare.transaction,
-      HexString.toHexString(
-        crypto
-          .sign(
-            Hash.fromByteString(HexString.parseToByteString(prepare.txHash).value).value,
-            externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
-          )
-          .value
-          .signature
+  protected def prepareAcceptExternalPartySetupProposal(
+      provider: ValidatorAppBackendReference,
+      externalPartyOnboarding: OnboardingResult,
+      proposal: ExternalPartySetupProposal.ContractId,
+      verboseHashing: Boolean = false,
+  ): PrepareAcceptExternalPartySetupProposalResponse = {
+    val (prepare, _) = actAndCheck(
+      s"Prepare acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party}",
+      provider.prepareAcceptExternalPartySetupProposal(
+        proposal,
+        externalPartyOnboarding.party,
+        verboseHashing,
       ),
-      HexString.toHexString(externalPartyOnboarding.publicKey.key),
+    )(
+      s"acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party} prepared",
+      prepare => {
+        prepare.txHash should not be empty
+        prepare.transaction should not be empty
+        if (verboseHashing)
+          prepare.hashingDetails should not be empty
+        else
+          prepare.hashingDetails shouldBe empty
+      },
     )
+    prepare
+  }
+
+  protected def submitExternalPartySetupProposal(
+      provider: ValidatorAppBackendReference,
+      externalPartyOnboarding: OnboardingResult,
+      preparedTx: PrepareAcceptExternalPartySetupProposalResponse,
+  ): (TransferPreapproval.ContractId, String) = {
+    val (_, result) = actAndCheck(
+      s"Submit acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party}",
+      provider.submitAcceptExternalPartySetupProposal(
+        externalPartyOnboarding.party,
+        preparedTx.transaction,
+        HexString.toHexString(
+          crypto
+            .signBytes(
+              HexString.parseToByteString(preparedTx.txHash).value,
+              externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
+            )
+            .value
+            .signature
+        ),
+        HexString.toHexString(externalPartyOnboarding.publicKey.key),
+      ),
+    )(
+      s"acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party} submitted",
+      submitResult => {
+        val (transferPreapprovalCid, updateId) = submitResult
+        transferPreapprovalCid.contractId should not be empty
+        updateId should not be empty
+        provider.lookupTransferPreapprovalByParty(externalPartyOnboarding.party) should not be empty
+        submitResult
+      },
+    )
+    result
   }
 }
