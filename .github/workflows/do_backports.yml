@@ -25,6 +25,7 @@ jobs:
             return await script({github, context});
   backport_prs:
     needs: get_backport_branches
+    if: needs.get_backport_branches.outputs.branches != '[]' && needs.get_backport_branches.outputs.branches != ''
     strategy:
       matrix:
         branch: ${{ fromJSON(needs.get_backport_branches.outputs.branches) }}
