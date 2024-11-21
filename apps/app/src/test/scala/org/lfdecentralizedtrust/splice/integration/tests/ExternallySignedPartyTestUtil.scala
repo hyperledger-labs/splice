@@ -21,7 +21,8 @@ import java.util.UUID
 
 trait ExternallySignedPartyTestUtil extends TestCommon {
   def onboardExternalParty(
-      validatorBackend: ValidatorAppBackendReference
+      validatorBackend: ValidatorAppBackendReference,
+      partyHint: String = UUID.randomUUID().toString,
   ): OnboardingResult = {
     val signingPublicKey =
       validatorBackend.participantClient.keys.secret
@@ -34,7 +35,6 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       .download(signingPublicKey.fingerprint, ProtocolVersion.dev)
     val privateKey =
       CryptoKeyPair.fromTrustedByteString(signingKeyPairByteString).value.privateKey
-    val partyHint = UUID.randomUUID().toString
     val listOfTransactionsAndHashes = validatorBackend
       .generateExternalPartyTopology(
         partyHint,
@@ -184,6 +184,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         val (transferPreapprovalCid, updateId) = submitResult
         transferPreapprovalCid.contractId should not be empty
         updateId should not be empty
+        provider.lookupTransferPreapprovalByParty(externalPartyOnboarding.party) should not be empty
         submitResult
       },
     )
