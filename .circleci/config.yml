@@ -3345,18 +3345,10 @@ jobs:
       - run_bash_command_in_nix:
           additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
           cmd_name: Push Helm Artifacts
-          cmd: make cluster/helm/push -j
+          cmd: |
+            make cluster/helm/build -j
+            make cluster/helm/push -j
           cmd_retry_count: 5
-      - when:
-          condition:
-            equal: [ main, << pipeline.git.branch >> ]
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: Push Helm Artifacts to artifactory
-                additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
-                cmd: |
-                  make cluster/helm/build -j
-                  make cluster/helm/push -j
       - save_frontend_builds
       - save_sbt_job_result:
           runner_type: "circleci"
@@ -3373,7 +3365,7 @@ jobs:
           runner_type: "circleci"
       - docker_login_artifactory
       - run_bash_command_in_nix:
-          cmd_name: Push Helm charts and tag git accordingly
+          cmd_name: tag git
           additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD \
            --keep GITHUB_TOKEN \
