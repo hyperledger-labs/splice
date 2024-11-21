@@ -3,12 +3,12 @@
 import { UseQueryResult } from '@tanstack/react-query';
 import React, { useContext } from 'react';
 
-import { ContractId } from '@daml/types';
-
 import {
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
-} from '../../../daml.js/splice-dso-governance-0.1.9/lib/Splice/DsoRules';
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { ContractId } from '@daml/types';
+
 import { Contract } from '../../../utils';
 import { SvVote } from '../../models';
 import { DsoInfo } from '../Dso';

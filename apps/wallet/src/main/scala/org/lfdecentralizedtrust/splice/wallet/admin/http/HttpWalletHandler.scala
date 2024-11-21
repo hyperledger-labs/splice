@@ -713,7 +713,9 @@ class HttpWalletHandler(
                 case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
                   throw Status.ABORTED
                     .withDescription(
-                      "Transfer preapproval creation request timed out. Please retry in some time."
+                      "Transfer preapproval creation request timed out because validator automation did not complete it in time. " +
+                        "This is most likely because the validator has insufficient funds to cover the transfer preapproval creation fee. " +
+                        "Please contact your validator administrator or retry in some time."
                     )
                     .asRuntimeException()
               }
