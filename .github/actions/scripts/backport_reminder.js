@@ -70,7 +70,7 @@ async function main(deps) {
   const allBranches = [
     ...(clusterBranches.map(c => flattenBranchesForCluster(c))),
     // TODO(#16006): un-hardcode release-line-0.2 here
-    ['main', 'release-line-0.2']
+    ['main', 'release-line-0.2', 'release-line-0.3.0']
   ]
 
   console.log(`all branches: ${allBranches}`);
