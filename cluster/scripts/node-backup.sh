@@ -7,6 +7,7 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
+# shellcheck disable=SC1091
 source "${REPO_ROOT}/cluster/scripts/utils.source"
 
 RUN_ID=$(date +%s)
@@ -137,7 +138,7 @@ function wait_for_cloudsql_backup() {
 
   local -i i=0
 
-  _info "Waiting for $description db backup to complete..."
+  _info "Waiting for $description db backup to complete for $db_id..."
   while true; do
     backup=$(gcloud sql backups list --instance "$db_id" --filter="description=\"$RUN_ID\"" --format=json)
     status=$(echo "$backup" | jq -r '.[].status')
@@ -248,7 +249,7 @@ function wait_for_backup() {
 }
 
 function usage() {
-  echo "Usage: $0 <sv|validator> <namespace> <migration id> [<component_name>]"
+  echo "Usage: $0 <sv|validator> <namespace> <migration id> <internal (true|false)> [<component_name>]"
 }
 
 function main() {
@@ -259,7 +260,7 @@ function main() {
 
   local namespace=$2
   local migration_id=$3
-  local internal=$4
+  local internal=$4 # "true" for internal stack, "false" for external stack
   local requested_component="${5:-}"
 
   # TODO(#9361): support multiple domains / non-default-ID'd ones

@@ -7,6 +7,7 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
+# shellcheck disable=SC1091
 source "${REPO_ROOT}/cluster/scripts/utils.source"
 
 function component_to_deployments() {
@@ -189,6 +190,7 @@ function restore_cloudsql_postgres() {
   local -r run_id=$3
   local -r migration_id=$4
   local -r internal=$5
+  local -r restore_cluster=$6 # optional, cluster to restore into (if different than current)
   MAX_RETRIES=20
   retry_count=0
 
@@ -196,26 +198,34 @@ function restore_cloudsql_postgres() {
 
   stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
   instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
-  cloudsql_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack")
-  backup_id=$(gcloud sql backups list --instance "$cloudsql_id" --filter="description=\"$run_id\"" --format=json | jq -r '.[].id')
 
-  _warning "This operation will restore the CloudSQL DB instance $cloudsql_id from backup, overwriting its current data."
+  cloudsql_backup_instance_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack")
+  cloudsql_restore_instance_id=$cloudsql_backup_instance_id
+
+  if [ -n "$restore_cluster" ]; then
+    cloudsql_restore_instance_id=$(get_cloudsql_id "$namespace-$instance-pg" "$stack" "$restore_cluster")
+    _info "Using restoring from $cloudsql_backup_instance_id into $cloudsql_restore_instance_id"
+  fi
+
+  backup_id=$(gcloud sql backups list --instance "$cloudsql_backup_instance_id" --filter="description=\"$run_id\"" --format=json | jq -r '.[].id')
+
+  _warning "This operation will restore the CloudSQL DB instance $cloudsql_restore_instance_id from backup, overwriting its current data."
   _warning "Please consider backing up and/or cloning the DB instance before continuing."
   await_confirmation
 
-  echo "Waiting for any operations on $cloudsql_id to finish"
+  echo "Waiting for any operations on $cloudsql_restore_instance_id to finish"
 
   # Wait for any existing operations to finish (to avoid e.g. conflicting with automated periodic backups)
-  gcloud sql operations list --instance="$cloudsql_id" --filter='NOT status:done' --format='value(name)' | xargs -r gcloud sql operations wait
+  gcloud sql operations list --instance="$cloudsql_restore_instance_id" --filter='NOT status:done' --format='value(name)' | xargs -r gcloud sql operations wait
 
   echo "All operations finished"
 
-  _info "Restoring CloudSQL DB instance $cloudsql_id from backup $backup_id"
+  _info "Restoring CloudSQL DB instance $cloudsql_backup_instance_id from backup $backup_id to $cloudsql_restore_instance_id"
 
   until [ $retry_count -gt $MAX_RETRIES ]; do
     # disabling exit on error to allow for retries
     set +e
-    output=$(gcloud sql backups restore "$backup_id" --restore-instance="$cloudsql_id" --backup-instance="$cloudsql_id" --quiet 2>&1)
+    output=$(gcloud sql backups restore "$backup_id" --restore-instance="$cloudsql_restore_instance_id" --backup-instance="$cloudsql_backup_instance_id" --quiet 2>&1)
     restore_exit_code=$?
     set -e
 
@@ -234,7 +244,7 @@ function restore_cloudsql_postgres() {
 
 
     if [ $retry_count -gt $MAX_RETRIES ]; then
-      _error "Restore of DB instance $cloudsql_id from backup $backup_id exceeded max retries"
+      _error "Restore of DB instance $cloudsql_restore_instance_id from backup $backup_id ($cloudsql_backup_instance_id) exceeded max retries"
       return 1
     fi
   done
@@ -246,6 +256,7 @@ function restore_component() {
   local -r migration_id=$3
   local -r run_id=$4
   local -r internal=$5
+  local -r restore_cluster=$6 # cluster to restore into (if different from current)
   local -r deployment_names=$(component_to_deployments "$component" "$migration_id")
   local stack
 
@@ -265,7 +276,7 @@ function restore_component() {
         restore_pvc_postgres "$namespace" "$component" "$run_id"
         ;;
       "canton:cloud:postgres")
-        restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id" "$internal"
+        restore_cloudsql_postgres "$namespace" "$component" "$run_id" "$migration_id" "$internal" "$restore_cluster"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -326,7 +337,7 @@ function wait_restore_component() {
 }
 
 function usage() {
-  echo "Usage: $0 <namespace> <run_id> <component>..."
+  echo "Usage: $0 [-r <restore_cluster>] <namespace> <run_id> <component>..."
 }
 
 function main() {
@@ -337,11 +348,16 @@ function main() {
 
   force=0
   POSITIONAL_ARGS=()
+  restore_cluster=""
   while [[ $# -gt 0 ]]; do
       case $1 in
           --force)
               force=1
               shift
+              ;;
+          -r)
+              restore_cluster=$2
+              shift 2
               ;;
           -*)
               _error "Unknown option $1"
@@ -375,7 +391,7 @@ function main() {
 
   _info " ** Restoring ** "
   for component in "${@:5}"; do
-    restore_component "$namespace" "$component" "$migration_id" "$run_id" "$internal"
+    restore_component "$namespace" "$component" "$migration_id" "$run_id" "$internal" "$restore_cluster"
   done
 
   _info " ** Waiting for all restore operations to finish ** "
