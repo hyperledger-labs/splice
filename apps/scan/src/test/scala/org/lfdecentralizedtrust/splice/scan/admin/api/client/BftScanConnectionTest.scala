@@ -576,6 +576,52 @@ class BftScanConnectionTest
         )
       }
     }
+
+    "fail when when consensus cannot be reached" in {
+      val connections = getMockedConnections(n = 7) // f=2
+      def infoResponse(first: Int, last: Int, complete: Boolean) =
+        Some(
+          SourceMigrationInfo(
+            None,
+            Map(domainId -> DomainRecordTimeRange(ctime(first), ctime(last))),
+            complete = complete,
+          )
+        )
+
+      def mockResponses(connection: Int, updates: Seq[Int]) = {
+        makeMockReturnMigrationInfo(connections(connection), 0, infoResponse(1, 10, true))
+        makeMockReturnUpdatesBefore(
+          connections(connection),
+          0,
+          ctime(5),
+          ctime(1),
+          updates.map(testUpdate),
+          10,
+        )
+      }
+
+      // Two scans return updates [1,2,3,5]
+      mockResponses(0, Seq(1, 2, 3, 5))
+      mockResponses(1, Seq(1, 2, 3, 5))
+      // Two scans return updates [1,3,4,5]
+      mockResponses(2, Seq(1, 3, 4, 5))
+      mockResponses(3, Seq(1, 3, 4, 5))
+      // Two scans return updates [1,2,3,4,5]
+      mockResponses(4, Seq(1, 2, 3, 4, 5))
+      mockResponses(5, Seq(1, 2, 3, 4, 5))
+      // One scans returns updates [1,5]
+      mockResponses(6, Seq(1, 5))
+
+      val bft = getBft(connections)
+
+      // Note: getUpdatesBefore() doesn't produce WARN logs, so we don't need to suppress them
+      for {
+        failure <- bft.getUpdatesBefore(0, domainId, ctime(5), None, 10).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
+        code should be(StatusCodes.BadGateway)
+        message should include("Failed to reach consensus from 5 Scan nodes")
+      }
+    }
   }
 
   "ScanAggregatesConnection" should {
