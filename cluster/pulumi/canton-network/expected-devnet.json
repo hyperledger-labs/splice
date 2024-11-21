@@ -1923,7 +1923,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3"
+              "3",
+              "4"
             ]
           }
         },
@@ -2793,7 +2794,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3"
+              "3",
+              "4"
             ]
           }
         },
@@ -3629,7 +3631,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3"
+              "3",
+              "4"
             ]
           }
         },
@@ -4465,7 +4468,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3"
+              "3",
+              "4"
             ]
           }
         },

@@ -198,7 +198,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3"
+              "3",
+              "4"
             ]
           }
         },
