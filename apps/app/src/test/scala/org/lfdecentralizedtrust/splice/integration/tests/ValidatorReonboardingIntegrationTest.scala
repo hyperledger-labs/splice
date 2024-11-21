@@ -190,7 +190,6 @@ class ValidatorReonboardingIntegrationTest
       "alice-participant",
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> s"participant_alice_validator",
-      "AUTO_INIT_ALL" -> "true",
     ) {
       aliceValidatorBackend.startSync()
       val aliceValidatorWalletParty =

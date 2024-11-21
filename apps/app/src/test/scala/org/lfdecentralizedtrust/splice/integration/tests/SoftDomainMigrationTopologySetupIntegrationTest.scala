@@ -1,21 +1,28 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.metrics.api.noop.NoOpMetricsFactory
-import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.sequencing.SequencerConnections
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.{BaseTest, DomainAlias, SequencerAlias}
 import org.lfdecentralizedtrust.splice.automation.{AmuletConfigReassignmentTrigger, AssignTrigger}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.AmuletConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.AmuletDecentralizedSynchronizerConfig
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
-  ARC_AmuletRules,
-  ARC_DsoRules,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
   DsoDecentralizedSynchronizerConfig,
   SynchronizerState,
   SynchronizerConfig as DamlSynchronizerConfig,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
+  ARC_AmuletRules,
+  ARC_DsoRules,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRulesConfig,
@@ -27,7 +34,6 @@ import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SynchronizerCon
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
-  RetryProvider,
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -41,6 +47,11 @@ import org.lfdecentralizedtrust.splice.splitwell.automation.AcceptedAppPaymentRe
 import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellDomains
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   ConfigScheduleUtil,
@@ -51,22 +62,6 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
-  AdvanceOpenMiningRoundTrigger,
-  ExpireIssuingMiningRoundTrigger,
-}
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
-import com.digitalasset.canton.{BaseTest, DomainAlias, SequencerAlias}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.sequencing.SequencerConnections
-import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
-import com.digitalasset.canton.topology.store.TopologyStoreId
 import org.scalatest.time.{Minute, Span}
 
 import java.time.temporal.ChronoUnit
@@ -592,18 +587,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
   def waitForSynchronizerInitialized(
       sv: SvAppBackendReference
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    import env.environment.scheduler
     import env.executionContext
-    val grpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(
-      NoOpMetricsFactory,
-      "testing",
-    )
-    val retryProvider = new RetryProvider(
-      loggerFactory,
-      ProcessingTimeout(),
-      new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
-      NoOpMetricsFactory,
-    )
     val loggerFactoryWithKey = loggerFactory.append("synchronizer", sv.name)
     val sequencerAdminConnection = new SequencerAdminConnection(
       ClientConfig(port = sv.config.localSynchronizerNode.value.sequencer.adminApi.port),
@@ -627,6 +611,5 @@ class SoftDomainMigrationTopologySetupIntegrationTest
 
     sequencerAdminConnection.close()
     mediatorAdminConnection.close()
-    retryProvider.close()
   }
 }
