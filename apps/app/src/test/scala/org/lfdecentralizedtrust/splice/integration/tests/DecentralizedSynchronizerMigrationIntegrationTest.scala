@@ -552,12 +552,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         Some(sv4LocalBackend),
       ),
       logSuffix = "global-domain-migration",
-      extraParticipantsConfigFileName = Some("standalone-participant-extra-splitwell.conf"),
+      extraParticipantsConfigFileNames =
+        Seq("standalone-participant-extra.conf", "standalone-participant-second-extra.conf"),
       extraParticipantsEnvMap = Map(
         "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
         "EXTRA_PARTICIPANT_DB" -> s"participant_extra_${dbsSuffix}",
-        "SPLITWELL_PARTICIPANT_DB" -> s"participant_splitwell_${dbsSuffix}",
-        "SPLITWELL_PARTICIPANT_ADMIN_USER" -> splitwellValidatorBackend.config.ledgerApiUser,
+        "SECOND_EXTRA_PARTICIPANT_DB" -> s"participant_second_extra_${dbsSuffix}",
+        "SECOND_EXTRA_PARTICIPANT_ADMIN_USER" -> splitwellValidatorBackend.config.ledgerApiUser,
       ),
     )() {
       aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)

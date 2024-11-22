@@ -1212,7 +1212,7 @@ commands:
           cmd_name: Executing "sbt << parameters.cmd >>"
           no_output_timeout: << parameters.no_output_timeout >>
           when: << parameters.when >>
-          additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
+          additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS --keep GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
           cluster: << parameters.cluster >>
           working_dir: << parameters.working_dir >>
           cmd: |
@@ -4962,6 +4962,9 @@ workflows:
           name: "scala_test wall clock time"
           test_names_file: "test-full-class-names.log"
           start_canton_options: "-w"
+          pre_sbt_cmd: |
+            echo $GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS > /tmp/gcp-creds.json
+            export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-creds.json"
           # TODO(#10912) Investigate why things got slower
           parallelism: 10
       - scala_test:

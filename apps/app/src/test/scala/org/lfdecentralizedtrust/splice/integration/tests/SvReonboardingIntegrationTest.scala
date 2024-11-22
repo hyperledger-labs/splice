@@ -384,7 +384,7 @@ class SvReonboardingIntegrationTest
         logSuffix = "sv4-reonboarding-new",
         svs123 = false,
         overrideSvDbsSuffix = Some("reonboard_new"),
-        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
         extraParticipantsEnvMap = Map(
           "EXTRA_PARTICIPANT_ADMIN_USER" -> validatorLocalBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> s"participant_reonboard_new",

@@ -46,7 +46,7 @@ function check_patterns_locally() {
     '(Validator|Sv)App\.scala:.*"canton network.*realm"' # TODO (#15744) remove 'canton network' from realm names
     'istio-gateway/.*gateway\.yaml:.*credentialName: cn-' # TODO (#15745) TLS credential names in istio-gateway
     'GcpConfig\.scala:' # cluster-specific
-    '/da-cn-shared/cn-images|GOOGLE_CLOUD_PROJECT=da-cn-shared' # gcp
+    '/da-cn-shared/cn-images|GOOGLE_CLOUD_PROJECT=da-cn-shared|"KMS_PROJECT_ID" -> "da-cn-shared"' # gcp
     '/cn-release-bundles' # docs route
     'cn-(http|apps|public-http)-gateway' # helm gateway templates
     'SpliceTests\.scala.*getMeterProvider\.get."cn_tests"' # test metrics

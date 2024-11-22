@@ -101,7 +101,7 @@ class ManualStartIntegrationTest
         adminUsersFromSvBackends =
           (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
         logSuffix = s"manual-start",
-        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
         extraParticipantsEnvMap = Map(
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
@@ -189,7 +189,7 @@ class ManualStartIntegrationTest
         adminUsersFromSvBackends =
           (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
         logSuffix = s"manual-start",
-        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
         extraParticipantsEnvMap = Map(
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),

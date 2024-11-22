@@ -6,14 +6,18 @@ package org.lfdecentralizedtrust.splice.identities
 import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.environment.{BuildInfo, TopologyAdminConnection}
+import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump.NodeKey
 import org.lfdecentralizedtrust.splice.util.BackupDump
+import com.digitalasset.canton.crypto.{EncryptionPublicKeyWithName, SigningPublicKeyWithName}
+import com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
 import java.time.Instant
-import scala.concurrent.{blocking, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.util.Try
 
 /** A store for accessing the node identities. */
 class NodeIdentitiesStore(
@@ -29,17 +33,33 @@ class NodeIdentitiesStore(
     for {
       id <- adminConnection.identity()
       keysMetadata <- adminConnection.listMyKeys()
-      // TODO(#14916): We should support key ids when we consume the change (DACH-NY/canton#21429) from Canton
-      keys <- keysMetadata.traverse(keyM =>
-        adminConnection
-          .exportKeyPair(keyM.publicKeyWithName.publicKey.id)
-          .map(keyBytes =>
-            NodeIdentitiesDump.NodeKey.KeyPair(
-              keyBytes.toByteArray.toSeq,
-              keyM.publicKeyWithName.name.map(_.unwrap),
+      keys <- keysMetadata.traverse {
+        case PrivateKeyMetadata(publicKeyWithName, _, None) =>
+          adminConnection
+            .exportKeyPair(publicKeyWithName.publicKey.id)
+            .map(keyBytes =>
+              NodeIdentitiesDump.NodeKey.KeyPair(
+                keyBytes.toByteArray.toSeq,
+                publicKeyWithName.name.map(_.unwrap),
+              ): NodeKey
             )
-          )
-      )
+        case PrivateKeyMetadata(keyWithName, _, Some(kmsKeyId)) =>
+          val keyTypeT: Try[NodeIdentitiesDump.NodeKey.KeyType] = Try(keyWithName match {
+            case _: SigningPublicKeyWithName =>
+              NodeIdentitiesDump.NodeKey.KeyType.Signing
+            case _: EncryptionPublicKeyWithName =>
+              NodeIdentitiesDump.NodeKey.KeyType.Encryption
+            case _ =>
+              throw new IllegalArgumentException(s"Unknown key type: $keyWithName")
+          })
+          Future.fromTry(keyTypeT).map { keyType =>
+            NodeIdentitiesDump.NodeKey.KmsKeyId(
+              keyType,
+              kmsKeyId.unwrap,
+              keyWithName.name.map(_.unwrap),
+            ): NodeKey
+          }
+      }
       authorizedStoreSnapshot <- adminConnection.exportAuthorizedStoreSnapshot(id.uid)
     } yield {
       NodeIdentitiesDump(

@@ -275,7 +275,7 @@ class DisasterRecoveryIntegrationTest
       (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
       s"participants-before-disaster-$cantonInstanceSuffix",
       sequencersMediators = false,
-      extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+      extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
       extraParticipantsEnvMap = Map(
         "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
         "EXTRA_PARTICIPANT_DB" -> s"participant_extra_disaster_recovery",
@@ -436,7 +436,7 @@ class DisasterRecoveryIntegrationTest
         overrideSvDbsSuffix = Some("disaster_recovery_new"),
         overrideSequencerDriverDbSuffix = Some("disaster_recovery_new"),
         portsRange = Some(28),
-        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
         extraParticipantsEnvMap = Map(
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> "participant_extra_disaster_recovery_new",

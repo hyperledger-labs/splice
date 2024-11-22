@@ -16,7 +16,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
     Seq(
       s"sequencer_driver_${dbsSuffix}",
       s"participant_extra_$dbsSuffix",
-      s"participant_splitwell_$dbsSuffix",
+      s"participant_second_extra_$dbsSuffix",
     ) ++
       (1 to 4).flatMap(index =>
         Seq(
@@ -42,7 +42,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
       overrideSvDbsSuffix: Option[String] = None,
       overrideSequencerDriverDbSuffix: Option[String] = None,
       portsRange: Option[Int] = None,
-      extraParticipantsConfigFileName: Option[String] = None,
+      extraParticipantsConfigFileNames: Seq[String] = Seq.empty,
       extraParticipantsEnvMap: Map[String, String] = Map.empty,
   )(extraEnv: (String, String)*)(test: => A)(implicit tc: TraceContext): A = {
 
@@ -61,7 +61,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
         ) ++
         conditionalConf(sv4 && participants, "standalone-participant-sv4.conf") ++
         conditionalConf(sv4 && sequencersMediators, "standalone-sequencer-mediator-sv4.conf") ++
-        extraParticipantsConfigFileName.toList.map(testResourcesPath / _)
+        extraParticipantsConfigFileNames.toList.map(testResourcesPath / _)
 
     def adminUserEnv(index: Integer) = {
       adminUsersFromSvBackends

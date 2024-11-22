@@ -498,7 +498,6 @@ abstract class TopologyAdminConnection(
         TopologyResult(base, mapping)
       }
     }
-
   private def exportTopologySnapshot(
       store: TopologyStoreId,
       proposals: Boolean,
@@ -1275,13 +1274,25 @@ abstract class TopologyAdminConnection(
   def generateKeyPair(name: String, usage: NonEmpty[Set[SigningKeyUsage]])(implicit
       traceContext: TraceContext
   ): Future[SigningPublicKey] = {
-    runCmd(VaultAdminCommands.GenerateSigningKey(name, usage, Some(EcCurve25519)))
+    runCmd(VaultAdminCommands.GenerateSigningKey(name, usage, None))
   }
 
   def generateEncryptionKeyPair(name: String)(implicit
       traceContext: TraceContext
   ): Future[EncryptionPublicKey] = {
     runCmd(VaultAdminCommands.GenerateEncryptionKey(name, None))
+  }
+
+  def registerKmsSigningKey(kmsKeyId: String, usage: NonEmpty[Set[SigningKeyUsage]], name: String)(
+      implicit traceContext: TraceContext
+  ): Future[SigningPublicKey] = {
+    runCmd(VaultAdminCommands.RegisterKmsSigningKey(kmsKeyId, usage, name))
+  }
+
+  def registerKmsEncryptionKey(kmsKeyId: String, name: String)(implicit
+      traceContext: TraceContext
+  ): Future[EncryptionPublicKey] = {
+    runCmd(VaultAdminCommands.RegisterKmsEncryptionKey(kmsKeyId, name))
   }
 
   def importKeyPair(keyPair: Array[Byte], name: Option[String])(implicit
