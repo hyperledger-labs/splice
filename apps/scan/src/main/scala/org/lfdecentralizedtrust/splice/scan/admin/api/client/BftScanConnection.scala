@@ -339,6 +339,12 @@ class BftScanConnection(
         // Do not log warnings for failures to reach consensus, as this would be too noisy,
         // and instead rely on metrics to situations when backfilling is not progressing.
         Level.INFO,
+        // This call returns up to 100 full daml transaction trees. It's not feasible to log them all,
+        // so we only print their update ids. This is enough to investigate consensus failures if different
+        // scans return different updates. In the more unlikely case where scans disagree on the payload of
+        // a given update, we would need to fetch the update payload from the update history database.
+        shortenResponsesForLog =
+          (responses: Seq[LedgerClient.GetTreeUpdatesResponse]) => responses.map(_.update.updateId),
       )
     } yield {
       result
@@ -349,6 +355,7 @@ class BftScanConnection(
       call: SingleScanConnection => Future[T],
       callConfig: BftCallConfig = BftCallConfig.default(scanList.scanConnections),
       consensusFailureLogLevel: Level = Level.WARN,
+      shortenResponsesForLog: T => Any = identity[T],
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
     val connections = scanList.scanConnections
     if (!callConfig.enoughAvailableScans) {
@@ -371,6 +378,7 @@ class BftScanConnection(
             requestFrom = Random.shuffle(callConfig.connections).take(callConfig.requestsToDo),
             nTargetSuccess = callConfig.targetSuccess,
             logger,
+            shortenResponsesForLog,
           ),
           logger,
           (_: String) => ConsensusNotReachedRetryable,
@@ -403,6 +411,7 @@ object BftScanConnection {
       requestFrom: Seq[C],
       nTargetSuccess: Int,
       logger: TracedLogger,
+      shortenResponsesForLog: T => Any = identity[T],
   )(implicit ec: ExecutionContext, tc: TraceContext, mat: Materializer): Future[T] = {
     require(requestFrom.nonEmpty, "At least one request must be made.")
 
@@ -428,7 +437,11 @@ object BftScanConnection {
           if (nResponsesDone.incrementAndGet() == requestFrom.size) { // all Scans are done
             finalResponse.future.value match {
               case None =>
-                val exception = new ConsensusNotReached(requestFrom.size, responses.asScala.toMap)
+                val exception = ConsensusNotReached(
+                  requestFrom.size,
+                  responses,
+                  shortenResponsesForLog,
+                )
                 finalResponse.tryFailure(exception): Unit
               case Some(consensusResponse) =>
                 logDisagreements(logger, consensusResponse, responses)
@@ -496,7 +509,7 @@ object BftScanConnection {
       requestsToDo: Int,
       targetSuccess: Int,
   ) {
-    def enoughAvailableScans: Boolean = connections.size >= requestsToDo && requestsToDo > 0
+    def enoughAvailableScans: Boolean = connections.size >= targetSuccess && targetSuccess > 0
   }
 
   object BftCallConfig {
@@ -956,10 +969,28 @@ object BftScanConnection {
 
   class ConsensusNotReached(
       numRequests: Int,
-      responses: Map[BftScanConnection.ScanResponse[?], List[Uri]],
+      responses: Seq[(List[Uri], BftScanConnection.ScanResponse[?])],
   ) extends RuntimeException(
         s"Failed to reach consensus from $numRequests Scan nodes. Responses: $responses"
       )
+  object ConsensusNotReached {
+    def apply[T](
+        numRequests: Int,
+        responses: ConcurrentHashMap[BftScanConnection.ScanResponse[T], List[Uri]],
+        shortenResponses: T => Any,
+    ): ConsensusNotReached = {
+      val shortResponses: Seq[(List[Uri], BftScanConnection.ScanResponse[?])] =
+        responses.asScala.toSeq.map {
+          case (SuccessfulResponse(response), uris) =>
+            uris -> SuccessfulResponse(shortenResponses(response))
+          case (HttpFailureResponse(status, body), uris) =>
+            uris -> HttpFailureResponse(status, body)
+          case (ExceptionFailureResponse(error), uris) => uris -> ExceptionFailureResponse(error)
+        }
+
+      new ConsensusNotReached(numRequests, shortResponses)
+    }
+  }
 
   object ConsensusNotReachedRetryable extends ExceptionRetryPolicy {
     override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit

@@ -278,10 +278,24 @@ class NodeInitializer(
     dump.keys.traverse_ {
       case NodeIdentitiesDump.NodeKey.KeyPair(keyPair, name) =>
         connection.importKeyPair(keyPair.toArray, name)
-      case NodeIdentitiesDump.NodeKey.KmsKeyId(_, _, _) =>
-        // it is not possible for now unless someone manually creates dump with key ids
-        // TODO(#14916): We should support key ids when we consume the change (DACH-NY/canton#21429) from Canton
-        throw new UnsupportedOperationException("KMS keys are not supported")
+      case NodeIdentitiesDump.NodeKey.KmsKeyId(keyType, keyId, Some(name)) =>
+        keyType match {
+          case NodeIdentitiesDump.NodeKey.KeyType.Signing =>
+            connection.registerKmsSigningKey(
+              keyId,
+              if (name.contains("namespace")) SigningKeyUsage.NamespaceOnly
+              else SigningKeyUsage.All,
+              name,
+            )
+          case NodeIdentitiesDump.NodeKey.KeyType.Encryption =>
+            connection.registerKmsEncryptionKey(keyId, name)
+        }
+      case NodeIdentitiesDump.NodeKey.KmsKeyId(_, _, None) =>
+        Future.failed(
+          new IllegalArgumentException(
+            "KMS key without name in dump is not supported"
+          )
+        )
     }
   }
 

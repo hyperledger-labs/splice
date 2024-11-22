@@ -53,6 +53,11 @@ function _log() {
   echo "$@"
 }
 
+# Issue a log message on stderr
+function _debug() {
+  echo "DEBUG: $*" 1>&2
+}
+
 # issue a user friendly red error
 function _error_msg(){
   echo -e "\e[1;31mERROR: $@\e[0m" >&2

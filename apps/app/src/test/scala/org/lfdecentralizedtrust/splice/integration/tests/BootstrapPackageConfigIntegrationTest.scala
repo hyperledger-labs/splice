@@ -110,7 +110,7 @@ class BootstrapPackageConfigIntegrationTest
         Some(sv4Backend),
       ),
       "boostrap-dso-with-specific-package-config",
-      extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+      extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
       extraParticipantsEnvMap = Map(
         "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
         "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),

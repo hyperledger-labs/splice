@@ -2,9 +2,9 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File
 import org.lfdecentralizedtrust.splice.config.{
-  SpliceConfig,
   ConfigTransforms,
   ParticipantBootstrapDumpConfig,
+  SpliceConfig,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ensureNovelDamlNames,
@@ -17,7 +17,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.ProcessTestUtil
 import monocle.macros.syntax.lens.*
-
 import java.nio.file.Path
 
 abstract class ParticipantIdentitiesImportTestBase extends IntegrationTest with ProcessTestUtil {
@@ -31,10 +30,8 @@ abstract class ParticipantIdentitiesImportTestBase extends IntegrationTest with 
   val scanAppPath: File = svNodePath / "scan-app"
   val svValidatorAppPath: File = svNodePath / "validator-app"
 
-  val validatorParticipantPath: File = validatorNodePath / "canton-participant"
   val validatorAppPath: File = validatorNodePath / "validator-app"
 
-  def sv1ParticipantDumpFilename: Path
   def aliceParticipantDumpFilename: Path
 
   override def environmentDefinition: EnvironmentDefinition =
@@ -57,20 +54,18 @@ abstract class ParticipantIdentitiesImportTestBase extends IntegrationTest with 
         (_, config) => ensureNovelDamlNames()(config),
         (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
         (_, config) =>
-          updateAllSvAppConfigs { case (name, c) =>
-            if (name == "sv1Local") {
-              c.copy(participantBootstrappingDump =
-                Some(ParticipantBootstrapDumpConfig.File(sv1ParticipantDumpFilename))
-              )
-            } else {
-              c
-            }
-          }(config),
-        (_, config) =>
           updateAllValidatorConfigs { case (name, c) =>
             if (name == "aliceValidatorLocal") {
-              c.copy(participantBootstrappingDump =
-                Some(ParticipantBootstrapDumpConfig.File(aliceParticipantDumpFilename))
+              val randomParticipantSuffix =
+                (new scala.util.Random).nextInt().toHexString.toLowerCase
+              c.copy(
+                participantBootstrappingDump = Some(
+                  ParticipantBootstrapDumpConfig
+                    .File(
+                      aliceParticipantDumpFilename,
+                      Some(s"aliceValidatorLocal-$randomParticipantSuffix"),
+                    )
+                )
               )
             } else {
               c

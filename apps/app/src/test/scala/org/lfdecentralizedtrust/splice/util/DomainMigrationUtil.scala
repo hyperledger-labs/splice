@@ -1,35 +1,28 @@
 package org.lfdecentralizedtrust.splice.util
 
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.metrics.api.noop.NoOpMetricsFactory
-import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
+import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.logging.SuppressingLogger
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.UpgradeSynchronizerNode
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.logging.SuppressingLogger
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.scalatest.Assertion
 
 import java.nio.file.{Path, Paths}
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.Using
 
 trait DomainMigrationUtil extends BaseTest with TestCommon {
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
-  // This is all test code, don't wire up a metrics factory.
-  val grpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(
-    NoOpMetricsFactory,
-    "testing",
-  )
 
   def withClueAndLog[T](clueMessage: String)(fun: => T): T = withClue(clueMessage) {
     clue(clueMessage)(fun)

@@ -210,11 +210,11 @@ class AcsSnapshotTrigger(
         .map { insertCount =>
           if (insertCount == 0) {
             logger.error(
-              s"No entries were inserted for snapshot $snapshotRecordTime. This is very likely a bug."
+              s"No entries were inserted for by task $task on history ${updateHistory.historyId}. This is very likely a bug."
             )
           }
           TaskSuccess(
-            s"Successfully inserted $insertCount entries for snapshot $snapshotRecordTime."
+            s"Successfully inserted $insertCount entries by task $task on history ${updateHistory.historyId}."
           )
         }
   }
@@ -276,6 +276,7 @@ object AcsSnapshotTrigger {
 
     override def pretty: Pretty[this.type] = prettyOfClass(
       param("snapshotRecordTime", _.snapshotRecordTime),
+      param("migrationId", _.migrationId),
       param("lastSnapshot", _.lastSnapshot),
     )
   }

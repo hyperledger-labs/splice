@@ -2,29 +2,43 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.HexString
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules,
   DsoRules_AddSv,
   SynchronizerUpgradeSchedule,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.Group
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype.Transfer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.ReceiverAmuletAmount
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
   NetworkAppClientConfig,
   ParticipantClientConfig,
   SynchronizerConfig,
-}
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
@@ -37,16 +51,15 @@ import org.lfdecentralizedtrust.splice.environment.{
   EnvironmentImpl,
   ParticipantAdminConnection,
   RetryFor,
-  RetryProvider,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
-import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
@@ -56,10 +69,13 @@ import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellSynchronizerConfig,
 }
 import org.lfdecentralizedtrust.splice.store.{PageLimit, TreeUpdateWithMigrationId}
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvNamespaceMembershipTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
+  ReceiveSvRewardCouponTrigger,
+  SvNamespaceMembershipTrigger,
+}
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.DomainMigration
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.testDumpDir
 import org.lfdecentralizedtrust.splice.util.{
   DomainMigrationUtil,
   PackageQualifiedName,
@@ -70,41 +86,19 @@ import org.lfdecentralizedtrust.splice.util.{
   SvTestUtil,
   WalletTestUtil,
 }
-import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.testDumpDir
 import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
   ValidatorSynchronizerConfig,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{
-  ClientConfig,
-  NonNegativeDuration,
-  NonNegativeFiniteDuration,
-  ProcessingTimeout,
-}
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import com.digitalasset.canton.util.HexString
-import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
 
 import java.io.File
 import java.nio.file.Path
-import java.time.{Duration, Instant}
 import java.time.temporal.ChronoUnit
+import java.time.{Duration, Instant}
 import java.util.UUID
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.DurationInt
@@ -432,14 +426,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "migrate global domain to new nodes with downtime" in { implicit env =>
-    import env.environment.scheduler
     import env.executionContext
-    val retryProvider = new RetryProvider(
-      loggerFactory,
-      ProcessingTimeout(),
-      new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
-      NoOpMetricsFactory,
-    )
 
     startAllSync(
       sv1ScanBackend, // Used by SV 1 & 3
@@ -565,12 +552,13 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         Some(sv4LocalBackend),
       ),
       logSuffix = "global-domain-migration",
-      extraParticipantsConfigFileName = Some("standalone-participant-extra-splitwell.conf"),
+      extraParticipantsConfigFileNames =
+        Seq("standalone-participant-extra.conf", "standalone-participant-second-extra.conf"),
       extraParticipantsEnvMap = Map(
         "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
         "EXTRA_PARTICIPANT_DB" -> s"participant_extra_${dbsSuffix}",
-        "SPLITWELL_PARTICIPANT_DB" -> s"participant_splitwell_${dbsSuffix}",
-        "SPLITWELL_PARTICIPANT_ADMIN_USER" -> splitwellValidatorBackend.config.ledgerApiUser,
+        "SECOND_EXTRA_PARTICIPANT_DB" -> s"participant_second_extra_${dbsSuffix}",
+        "SECOND_EXTRA_PARTICIPANT_ADMIN_USER" -> splitwellValidatorBackend.config.ledgerApiUser,
       ),
     )() {
       aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
@@ -902,10 +890,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   prepareSend.transaction,
                   HexString.toHexString(
                     crypto
-                      .sign(
-                        Hash
-                          .fromByteString(HexString.parseToByteString(prepareSend.txHash).value)
-                          .value,
+                      .signBytes(
+                        HexString.parseToByteString(prepareSend.txHash).value,
                         externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],
                       )
                       .value

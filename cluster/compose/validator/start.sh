@@ -200,11 +200,19 @@ if [ -z "${IMAGE_TAG:-}" ]; then
   fi
 fi
 
-if [ -z "${host_scan_address}" ]; then
-  splice_instance_names=$(curl -sSLf "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names")
-else
-  splice_instance_names=$(curl -sSLf "${host_scan_address}/api/scan/v0/splice-instance-names")
+for i in {1..30}; do
+  if [ -z "${host_scan_address}" ]; then
+    splice_instance_names=$(curl -sSLf "${SCAN_ADDRESS}/api/scan/v0/splice-instance-names") && break
+  else
+    splice_instance_names=$(curl -sSLf "${host_scan_address}/api/scan/v0/splice-instance-names") && break
+  fi
+  _warning "Failed to fetch splice_instance_names, retrying in 10 seconds (retry #$i)"
+  sleep 10
+done
+if [ -z "$splice_instance_names" ]; then
+  _error "Failed to fetch splice_instance_names"
 fi
+
 SPLICE_APP_UI_NETWORK_NAME=$(echo "${splice_instance_names}" | jq -r '.network_name')
 export SPLICE_APP_UI_NETWORK_NAME
 SPLICE_APP_UI_NETWORK_FAVICON_URL=$(echo "${splice_instance_names}" | jq -r '.network_favicon_url')
