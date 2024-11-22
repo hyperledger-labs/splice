@@ -4913,7 +4913,7 @@ workflows:
           test_names_file: "test-full-class-names.log"
           start_canton_options: "-w"
           # TODO(#10912) Investigate why things got slower
-          parallelism: 10
+          parallelism: 6
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
