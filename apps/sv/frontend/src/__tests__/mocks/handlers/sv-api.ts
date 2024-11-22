@@ -50,7 +50,12 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
                   (data.accepted
                     ? r.outcome.tag === 'VRO_Accepted'
                     : r.outcome.tag === 'VRO_Rejected') &&
-                  dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
+                  (data.effectiveTo
+                    ? dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
+                    : true) &&
+                  (data.effectiveFrom
+                    ? dayjs(r.completedAt).isAfter(dayjs(data.effectiveFrom))
+                    : true)
               )
               .slice(0, data.limit || 10),
           })
@@ -64,9 +69,24 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
                   (data.accepted
                     ? r.outcome.tag === 'VRO_Accepted'
                     : r.outcome.tag === 'VRO_Rejected') &&
-                  dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
+                  (data.effectiveTo
+                    ? r.outcome.value
+                      ? dayjs(r.outcome.value.effectiveAt).isBefore(dayjs(data.effectiveTo))
+                      : dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
+                    : true) &&
+                  (data.effectiveFrom
+                    ? r.outcome.value
+                      ? dayjs(r.outcome.value.effectiveAt).isAfter(dayjs(data.effectiveFrom))
+                      : dayjs(r.completedAt).isAfter(dayjs(data.effectiveFrom))
+                    : true)
               )
               .slice(0, data.limit || 10),
+          })
+        );
+      } else if (data.actionName === 'CRARC_UpdateFutureAmuletConfigSchedule') {
+        return res(
+          ctx.json<ListDsoRulesVoteResultsResponse>({
+            dso_rules_vote_results: [],
           })
         );
       } else {
@@ -75,7 +95,19 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
             dso_rules_vote_results: voteResultsAmuletRules.dso_rules_vote_results
               .concat(voteResultsDsoRules.dso_rules_vote_results)
               .filter(r =>
-                data.accepted ? r.outcome.tag === 'VRO_Accepted' : r.outcome.tag === 'VRO_Rejected'
+                data.accepted
+                  ? r.outcome.tag === 'VRO_Accepted'
+                  : r.outcome.tag === 'VRO_Rejected' &&
+                    (data.effectiveTo
+                      ? r.outcome.value
+                        ? dayjs(r.outcome.value.effectiveAt).isBefore(dayjs(data.effectiveTo))
+                        : dayjs(r.completedAt).isBefore(dayjs(data.effectiveTo))
+                      : true) &&
+                    (data.effectiveFrom
+                      ? r.outcome.value
+                        ? dayjs(r.outcome.value.effectiveAt).isAfter(dayjs(data.effectiveFrom))
+                        : dayjs(r.completedAt).isAfter(dayjs(data.effectiveFrom))
+                      : true)
               ),
           })
         );
