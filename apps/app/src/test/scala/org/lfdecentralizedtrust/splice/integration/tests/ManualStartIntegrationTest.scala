@@ -1,21 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.nonempty.NonEmpty
-import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
-import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceBackendConfig}
-import org.lfdecentralizedtrust.splice.console.AppBackendReference
-import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{
@@ -27,6 +14,16 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   UniqueIdentifier,
 }
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceBackendConfig}
+import org.lfdecentralizedtrust.splice.console.AppBackendReference
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
+import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
 
 import java.util.UUID
 import scala.concurrent.duration.DurationInt
@@ -78,28 +75,7 @@ class ManualStartIntegrationTest
 
   "Splice apps" should {
     "start with uninitialized Canton nodes" in { implicit env =>
-      import env.environment.scheduler
       import env.executionContext
-      val grpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(
-        NoOpMetricsFactory,
-        "testing",
-      )
-      val retryProvider = new RetryProvider(
-        loggerFactory,
-        ProcessingTimeout(),
-        new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
-        NoOpMetricsFactory,
-      )
-      def participantAdminConnection(name: String, config: SpliceBackendConfig) = {
-        val loggerFactoryWithKey = loggerFactory.append("participant", name)
-        new ParticipantAdminConnection(
-          ClientConfig(port = config.participantClient.adminApi.port),
-          env.environment.config.monitoring.logging.api,
-          loggerFactoryWithKey,
-          grpcClientMetrics,
-          retryProvider,
-        )
-      }
       def sequencerAdminConnection(name: String, config: SvAppBackendConfig) = {
         val loggerFactoryWithKey = loggerFactory.append("sequencer", name)
         new SequencerAdminConnection(
@@ -125,7 +101,7 @@ class ManualStartIntegrationTest
         adminUsersFromSvBackends =
           (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
         logSuffix = s"manual-start",
-        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
         extraParticipantsEnvMap = Map(
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
@@ -204,38 +180,16 @@ class ManualStartIntegrationTest
 
         clue("Cleaning up") {
           allTopologyConnections.foreach(_._1.close())
-          retryProvider.close()
         }
       }
     }
+
     "start with initialized Canton participants and fix signing keys if needed" in { implicit env =>
-      import env.environment.scheduler
-      import env.executionContext
-      val grpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(
-        NoOpMetricsFactory,
-        "testing",
-      )
-      val retryProvider = new RetryProvider(
-        loggerFactory,
-        ProcessingTimeout(),
-        new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
-        NoOpMetricsFactory,
-      )
-      def participantAdminConnection(name: String, config: SpliceBackendConfig) = {
-        val loggerFactoryWithKey = loggerFactory.append("participant", name)
-        new ParticipantAdminConnection(
-          ClientConfig(port = config.participantClient.adminApi.port),
-          env.environment.config.monitoring.logging.api,
-          loggerFactoryWithKey,
-          grpcClientMetrics,
-          retryProvider,
-        )
-      }
       withCantonSvNodes(
         adminUsersFromSvBackends =
           (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
         logSuffix = s"manual-start",
-        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
         extraParticipantsEnvMap = Map(
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
@@ -270,7 +224,7 @@ class ManualStartIntegrationTest
         ) ++ allParticipantAdminConnectionsExSv1
 
         clue("Initialize all participants, with signing keys reusal") {
-          def initializeWithKeyReuse(connection: ParticipantAdminConnection, name: String) = {
+          def initializeWithKeyReuse(connection: ParticipantAdminConnection, name: String): Unit = {
             // Eventually, because the query to the server will fail while the server is still starting up
             // Long timeout because Canton is slow to start up
             eventually(timeUntilSuccess = 60.seconds) {
@@ -329,15 +283,15 @@ class ManualStartIntegrationTest
         }
         clue("Cleaning up") {
           allParticipantAdminConnections.foreach(_._1.close())
-          retryProvider.close()
         }
       }
     }
   }
-  def assertSigningKeysDifferent(
+
+  private def assertSigningKeysDifferent(
       connection: TopologyAdminConnection,
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
-  ) = {
+  ): Unit = {
     eventually() {
       val idResult = connection.getIdOption().futureValue
       idResult.initialized shouldBe true
@@ -352,5 +306,19 @@ class ManualStartIntegrationTest
         }
       }
     }
+  }
+
+  private def participantAdminConnection(name: String, config: SpliceBackendConfig)(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    import env.executionContext
+    val loggerFactoryWithKey = loggerFactory.append("participant", name)
+    new ParticipantAdminConnection(
+      ClientConfig(port = config.participantClient.adminApi.port),
+      env.environment.config.monitoring.logging.api,
+      loggerFactoryWithKey,
+      grpcClientMetrics,
+      retryProvider,
+    )
   }
 }

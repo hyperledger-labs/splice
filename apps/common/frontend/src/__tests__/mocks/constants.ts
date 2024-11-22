@@ -1,12 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ContractId, emptyMap } from '@daml/types';
-
 import {
   DsoRules_CloseVoteRequestResult,
   Vote,
   VoteRequest,
-} from '../../../daml.js/splice-dso-governance-0.1.9/lib/Splice/DsoRules';
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { ContractId, emptyMap } from '@daml/types';
+
 import { Contract } from '../../../utils';
 import { SvVote } from '../../models';
 

@@ -2,15 +2,20 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.File
 import better.files.File.apply
-import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import io.circe.syntax.EncoderOps
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
   NetworkAppClientConfig,
   ParticipantClientConfig,
-}
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.console.{
   AppBackendReference,
@@ -18,57 +23,38 @@ import org.lfdecentralizedtrust.splice.console.{
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
-import org.lfdecentralizedtrust.splice.environment.{EnvironmentImpl, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
+import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.DomainMigration
 import org.lfdecentralizedtrust.splice.sv.config.{
   SvDecentralizedSynchronizerConfig,
   SvSynchronizerConfig,
 }
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.DomainMigration
 import org.lfdecentralizedtrust.splice.sv.migration.{
   DomainDataSnapshot,
   DomainMigrationDump,
   SynchronizerNodeIdentities,
 }
-import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump as ValidatorDomainMigrationDump
-import org.lfdecentralizedtrust.splice.util.{
-  DomainMigrationUtil,
-  ProcessTestUtil,
-  StandaloneCanton,
-  SvTestUtil,
-  WalletTestUtil,
-}
+import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.DomainMigrationUtil.testDumpDir
 import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
   ValidatorSynchronizerConfig,
 }
+import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump as ValidatorDomainMigrationDump
 import org.lfdecentralizedtrust.splice.wallet.store.BalanceChangeTxLogEntry
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{
-  ClientConfig,
-  NonNegativeDuration,
-  NonNegativeFiniteDuration,
-  ProcessingTimeout,
-}
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import io.circe.syntax.EncoderOps
-import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTrigger
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
-import scala.concurrent.duration.*
 import scala.util.Using
 
 class DisasterRecoveryIntegrationTest
@@ -281,23 +267,15 @@ class DisasterRecoveryIntegrationTest
       cantonInstanceSuffix: String,
       getAndWriteDumps: (Seq[SynchronizerNodeIdentities], Instant) => Unit,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    import env.environment.scheduler
     import env.executionContext
 
     val svBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
-
-    val retryProvider = new RetryProvider(
-      loggerFactory,
-      ProcessingTimeout(),
-      new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
-      NoOpMetricsFactory,
-    )
 
     withCantonSvNodes(
       (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
       s"participants-before-disaster-$cantonInstanceSuffix",
       sequencersMediators = false,
-      extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+      extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
       extraParticipantsEnvMap = Map(
         "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
         "EXTRA_PARTICIPANT_DB" -> s"participant_extra_disaster_recovery",
@@ -458,7 +436,7 @@ class DisasterRecoveryIntegrationTest
         overrideSvDbsSuffix = Some("disaster_recovery_new"),
         overrideSequencerDriverDbSuffix = Some("disaster_recovery_new"),
         portsRange = Some(28),
-        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsConfigFileNames = Seq("standalone-participant-extra.conf"),
         extraParticipantsEnvMap = Map(
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> "participant_extra_disaster_recovery_new",
