@@ -6,11 +6,10 @@ import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
-import { CnChartVersion, repositories, repository } from './artifacts';
+import { CnChartVersion, repositories } from './artifacts';
 import { config } from './config';
 import { activeVersion } from './domainMigration';
 import {
-  artifactsRepository,
   ChartValues,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
@@ -119,7 +118,7 @@ function cnChartValues(
     {},
     chartDefaultValues,
     {
-      imageRepo: repository(artifactsRepository).dockerImages,
+      imageRepo: version.repository.dockerImages,
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         name: CLUSTER_NAME,
@@ -156,7 +155,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
       repositoryOpts: repositoryOpts(version),
       values: {
         ...values,
-        imageRepo: repository(artifactsRepository).dockerImages,
+        imageRepo: version.repository.dockerImages,
         ...appsAffinityAndTolerations,
         // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
         clusterUrl: CLUSTER_HOSTNAME,
