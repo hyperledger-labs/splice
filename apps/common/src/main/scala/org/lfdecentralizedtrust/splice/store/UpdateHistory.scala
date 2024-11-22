@@ -599,6 +599,8 @@ class UpdateHistory(
               select row_id
               from update_history_transactions
               where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+              -- order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
+              order by record_time
             )
           """,
           sqlu"""
@@ -607,6 +609,8 @@ class UpdateHistory(
               select row_id
               from update_history_transactions
               where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+              -- order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
+              order by record_time
             )
           """,
           sqlu"""
@@ -703,13 +707,15 @@ class UpdateHistory(
     val deleteAction = for {
       numCreates <- (
         sql"delete from update_history_creates where update_row_id in (" ++
-          sql"select row_id from update_history_transactions where" ++ filterCondition ++
-          sql")"
+          sql"select row_id from update_history_transactions where " ++ filterCondition ++
+          // order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
+          sql" order by record_time)"
       ).toActionBuilder.asUpdate
       numExercises <- (
         sql"delete from update_history_exercises where update_row_id in (" ++
-          sql"select row_id from update_history_transactions where" ++ filterCondition ++
-          sql")"
+          sql"select row_id from update_history_transactions where " ++ filterCondition ++
+          // order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
+          sql" order by record_time)"
       ).toActionBuilder.asUpdate
       numTransactions <- (
         sql"delete from update_history_transactions where " ++ filterCondition

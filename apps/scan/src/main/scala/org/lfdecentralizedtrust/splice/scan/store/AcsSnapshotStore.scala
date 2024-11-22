@@ -94,6 +94,8 @@ class AcsSnapshotStore(
                       and txs.migration_id = $migrationId
                       and txs.record_time >= $from -- this will be >= MinValue for the first snapshot, which includes ACS imports
                       and txs.record_time < $until
+                    -- order clause forces the query planner to use the updt_hist_tran_hi_mi_rt_di index
+                    order by record_time
                     ),
                 new_creates as (select contract_id
                                 from transactions_in_snapshot txs
