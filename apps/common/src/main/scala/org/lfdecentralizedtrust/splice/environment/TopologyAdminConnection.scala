@@ -25,7 +25,6 @@ import com.digitalasset.canton.config.{
   NonNegativeDuration,
   NonNegativeFiniteDuration,
 }
-import com.digitalasset.canton.crypto.SigningKeySpec.EcCurve25519
 import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
   Fingerprint,
