@@ -1350,7 +1350,7 @@
           {
             "name": "Digital-Asset-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcGfwLnDE3vQuWcHE7CfVABigVK5nPeAjqFf66pIlXpqeoklu4KMnDE4Zse465NcWUgfMnjmmSw53hKRxuR6RFg==",
-            "rewardWeightBps": 140000
+            "rewardWeightBps": 150000
           },
           {
             "name": "SV-Nodeops-Limited",
@@ -1360,17 +1360,17 @@
           {
             "name": "Cumberland-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0oiJ1uUtJ5J4uduDUsuluNoIRCkptsQG6xAkS+D2by50QmSdEvW+IyndIKQSnyQIpUF6ezCLMQGfnLtjsPcrkw==",
-            "rewardWeightBps": 120000
+            "rewardWeightBps": 130000
           },
           {
             "name": "Cumberland-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEl2ilRkAgmWGR4mqHHR15zqDvGs64nu+n0JPJR0i9r5xzEU4GW52sKov34LdYXQq3K//w7W+NDFw+RfxfEYvDbA==",
-            "rewardWeightBps": 120000
+            "rewardWeightBps": 130000
           },
           {
             "name": "Digital-Asset-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXENgmM6XF+Dl45CCFlga8mFFX9LgcZWeRJPogk4qD8UVyulAw5v5yjVJtZfxj7G61+La1t5pgUaBfdSl0SB0TA==",
-            "rewardWeightBps": 140000
+            "rewardWeightBps": 150000
           },
           {
             "name": "MPC-Holding-Inc",

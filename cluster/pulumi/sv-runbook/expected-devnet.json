@@ -709,17 +709,17 @@
           {
             "name": "Liberty-City-Ventures-Dev-Net",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEL0+Du+6Bm+NmtNwOnzyu8zR4Xpe+zQ/CXKeT7BatMTnQLPYcsLNgl5zwQFlf9Qf16YkQu5t83fbg2jMI3cozaQ==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 0
           },
           {
             "name": "Cumberland-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESLPPYUXcHS7yOEmDHHA4+/UueQM9KU26GvMXqYVJh/okOWFzdiXWtSDZfL1dYUJ9q9KrkNztVlANExBTjY70Vw==",
-            "rewardWeightBps": 120000
+            "rewardWeightBps": 130000
           },
           {
             "name": "Cumberland-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9/PUF/FFmdhbJNtxt+fR67LEW9vM/NluHSKTecvaqx7EYymDRsJf0GShphXwJAgrFzEOQ0Vsmbu6dmO6N1x8/g==",
-            "rewardWeightBps": 120000
+            "rewardWeightBps": 130000
           },
           {
             "name": "Digital-Asset-Eng-2",
@@ -744,12 +744,12 @@
           {
             "name": "Digital-Asset-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==",
-            "rewardWeightBps": 140000
+            "rewardWeightBps": 150000
           },
           {
             "name": "Digital-Asset-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEigGf2Onr2vc4jP3uFJ+ZVelkd/V2f07cwQRjrRS+AICooKg3OMFEzkFgZZjbyWJT9vUZte3y8iAXNIMwBNPw6g==",
-            "rewardWeightBps": 140000
+            "rewardWeightBps": 150000
           },
           {
             "name": "Global-Synchronizer-Foundation",
@@ -759,7 +759,7 @@
           {
             "name": "MPC-Holding-Inc",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgWriOYpZeYXC09cPOKm/s1MzZSrJvKZc3Mz4RqYLsA7j/umQfLFKqWWu1TT77JrrGTTp57aXUTcrGg0DvyRq/Q==",
-            "rewardWeightBps": 10000
+            "rewardWeightBps": 110000
           },
           {
             "name": "Tradeweb-Markets",
