@@ -5,14 +5,6 @@ package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
-import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
-import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
-  AuthorizedStateChanged,
-  TopologyTransactionType,
-}
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -26,13 +18,14 @@ import com.digitalasset.canton.admin.api.client.data.topology.{
   ListOwnerToKeyMappingResult,
   ListVettedPackagesResult,
 }
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
   ApiLoggingConfig,
   ClientConfig,
   NonNegativeDuration,
   NonNegativeFiniteDuration,
 }
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.crypto.SigningKeySpec.EcCurve25519
 import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
   Fingerprint,
@@ -40,30 +33,37 @@ import com.digitalasset.canton.crypto.{
   SigningKeyUsage,
   SigningPublicKey,
 }
-import com.digitalasset.canton.crypto.SigningKeySpec.EcCurve25519
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.time.FetchTimeResponse
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQuery
+import com.digitalasset.canton.topology.store.TimeQuery.HeadState
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   TimeQuery,
   TopologyStoreId,
 }
-import com.digitalasset.canton.topology.store.TimeQuery.HeadState
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
+import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
+  AuthorizedStateChanged,
+  TopologyTransactionType,
+}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -658,40 +658,6 @@ abstract class TopologyAdminConnection(
       )
     )
 
-  /** Version of [[ensureTopologyMapping]] that also handles proposals:
-    * - a new topology transaction is created as a proposal
-    * - checks the proposals as well to see if the check holds
-    */
-  private def ensureTopologyProposal[M <: TopologyMapping: ClassTag](
-      store: TopologyStoreId,
-      description: String,
-      check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
-      update: M => Either[String, M],
-      retryFor: RetryFor,
-      signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
-    ensureTopologyMapping(
-      store,
-      s"proposal $description",
-      check(TopologyTransactionType.AuthorizedState)
-        .leftFlatMap { authorizedState =>
-          EitherT(
-            check(TopologyTransactionType.ProposalSignedBy(signedBy))
-              .leftMap(_ => authorizedState)
-              .value
-              .recover {
-                case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
-                  Left(authorizedState)
-              }
-          )
-        },
-      update,
-      retryFor,
-      signedBy,
-      isProposal = true,
-    )
-  }
-
   /** Ensure that either the accepted state passes the check, or a topology mapping is created that passes the check
     *  - run the check to see if it holds
     *  - if not then create transaction with the updated mapping
@@ -791,254 +757,6 @@ abstract class TopologyAdminConnection(
           },
         )
     }
-  }
-
-  def proposeInitialPartyToParticipant(
-      store: TopologyStoreId,
-      partyId: PartyId,
-      participantId: ParticipantId,
-      signedBy: Fingerprint,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
-    proposeInitialPartyToParticipant(store, partyId, Seq(participantId), signedBy)
-  }
-  def proposeInitialPartyToParticipant(
-      store: TopologyStoreId,
-      partyId: PartyId,
-      participants: Seq[ParticipantId],
-      signedBy: Fingerprint,
-      isProposal: Boolean = false,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
-    val hostingParticipants = participants.map(
-      HostingParticipant(
-        _,
-        ParticipantPermission.Submission,
-      )
-    )
-    proposeMapping(
-      store,
-      PartyToParticipant.tryCreate(
-        partyId,
-        Thresholds.partyToParticipantThreshold(hostingParticipants),
-        hostingParticipants,
-      ),
-      signedBy = signedBy,
-      serial = PositiveInt.one,
-      isProposal = isProposal,
-    )
-  }
-
-  def ensurePartyToParticipantRemovalProposal(
-      domainId: DomainId,
-      party: PartyId,
-      participantToRemove: ParticipantId,
-      signedBy: Fingerprint,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[TopologyResult[PartyToParticipant]] = {
-    def removeParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
-      participants.filterNot(_.participantId == participantToRemove)
-    }
-    ensurePartyToParticipantProposal(
-      s"Party $party is proposed to be removed from $participantToRemove",
-      domainId,
-      party,
-      removeParticipant,
-      signedBy,
-    )
-  }
-
-  def ensurePartyToParticipantAdditionProposal(
-      domainId: DomainId,
-      party: PartyId,
-      newParticipant: ParticipantId,
-      signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
-    def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
-      // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
-      // See SvOnboardingPromoteToSubmitterTrigger.
-      val newHostingParticipant =
-        HostingParticipant(newParticipant, ParticipantPermission.Observation)
-      if (participants.map(_.participantId).contains(newHostingParticipant.participantId)) {
-        participants
-      } else {
-        participants.appended(newHostingParticipant)
-      }
-    }
-    ensurePartyToParticipantProposal(
-      s"Party $party is proposed to be added on $newParticipant",
-      domainId,
-      party,
-      addParticipant,
-      signedBy,
-    )
-  }
-
-  def ensurePartyToParticipantAdditionProposalWithSerial(
-      domainId: DomainId,
-      party: PartyId,
-      newParticipant: ParticipantId,
-      expectedSerial: PositiveInt,
-      signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
-    ensureTopologyMapping[PartyToParticipant](
-      TopologyStoreId.DomainStore(domainId),
-      show"Party $party is authorized on $newParticipant",
-      EitherT(
-        getPartyToParticipant(domainId, party)
-          .map(result =>
-            Either
-              .cond(
-                result.mapping.participants
-                  .exists(hosting => hosting.participantId == newParticipant),
-                result,
-                result,
-              )
-          )
-      ),
-      previous => {
-        val newHostingParticipants = previous.participants.appended(
-          HostingParticipant(
-            newParticipant,
-            ParticipantPermission.Observation,
-          )
-        )
-        Right(
-          PartyToParticipant.tryCreate(
-            previous.partyId,
-            participants = newHostingParticipants,
-            threshold = Thresholds
-              .partyToParticipantThreshold(newHostingParticipants),
-          )
-        )
-      },
-      RetryFor.ClientCalls,
-      signedBy,
-      isProposal = true,
-      recreateOnAuthorizedStateChange = RecreateOnAuthorizedStateChange.Abort(expectedSerial),
-    )
-  }
-
-  // the participantChange participant sequence must be ordering, if not canton will consider topology proposals with different ordering as fully different proposals and will not aggregate signatures
-  private def ensurePartyToParticipantProposal(
-      description: String,
-      domainId: DomainId,
-      party: PartyId,
-      participantChange: Seq[HostingParticipant] => Seq[
-        HostingParticipant
-      ], // participantChange must be idempotent
-      signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
-    def findPartyToParticipant(topologyTransactionType: TopologyTransactionType) = EitherT {
-      topologyTransactionType match {
-        case proposals @ (TopologyTransactionType.ProposalSignedBy(_) |
-            TopologyTransactionType.AllProposals) =>
-          listPartyToParticipant(
-            filterStore = domainId.filterString,
-            filterParty = party.filterString,
-            proposals = proposals,
-          ).map { proposals =>
-            proposals
-              .find(proposal => {
-                val newHostingParticipants = participantChange(
-                  proposal.mapping.participants
-                )
-                proposal.mapping.participantIds ==
-                  newHostingParticipants.map(
-                    _.participantId
-                  ) && proposal.mapping.threshold == Thresholds.partyToParticipantThreshold(
-                    newHostingParticipants
-                  )
-              })
-              .getOrElse(
-                throw Status.NOT_FOUND
-                  .withDescription(
-                    s"No party to participant proposal for party $party on domain $domainId"
-                  )
-                  .asRuntimeException()
-              )
-              .asRight
-          }
-        case TopologyTransactionType.AuthorizedState =>
-          getPartyToParticipant(domainId, party).map(result => {
-            val newHostingParticipants = participantChange(
-              result.mapping.participants
-            )
-            Either.cond(
-              result.mapping.participantIds ==
-                newHostingParticipants.map(_.participantId),
-              result,
-              result,
-            )
-          })
-      }
-    }
-
-    ensureTopologyProposal[PartyToParticipant](
-      TopologyStoreId.DomainStore(domainId),
-      description,
-      queryType => findPartyToParticipant(queryType),
-      previous => {
-        val newHostingParticipants = participantChange(previous.participants)
-        Right(
-          PartyToParticipant.tryCreate(
-            previous.partyId,
-            participants = newHostingParticipants,
-            threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
-          )
-        )
-      },
-      RetryFor.WaitingOnInitDependency,
-      signedBy,
-    )
-  }
-
-  def ensureHostingParticipantIsPromotedToSubmitter(
-      domainId: DomainId,
-      party: PartyId,
-      participantId: ParticipantId,
-      signedBy: Fingerprint,
-      retryFor: RetryFor,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
-    def promoteParticipantToSubmitter(
-        participants: Seq[HostingParticipant]
-    ): Seq[HostingParticipant] = {
-      val newValue = HostingParticipant(participantId, ParticipantPermission.Submission)
-      val oldIndex = participants.indexWhere(_.participantId == newValue.participantId)
-      participants.updated(oldIndex, newValue)
-    }
-
-    ensureTopologyMapping[PartyToParticipant](
-      TopologyStoreId.DomainStore(domainId),
-      s"Participant $participantId is promoted to have Submission permission for party $party",
-      EitherT(getPartyToParticipant(domainId, party).map(result => {
-        Either.cond(
-          result.mapping.participants
-            .contains(HostingParticipant(participantId, ParticipantPermission.Submission)),
-          result,
-          result,
-        )
-      })),
-      previous => {
-        Either.cond(
-          previous.participants.exists(_.participantId == participantId), {
-            val newHostingParticipants = promoteParticipantToSubmitter(previous.participants)
-            PartyToParticipant.tryCreate(
-              previous.partyId,
-              participants = newHostingParticipants,
-              threshold = Thresholds.partyToParticipantThreshold(newHostingParticipants),
-            )
-          },
-          show"Participant $participantId does not host party $party",
-        )
-      },
-      retryFor,
-      signedBy,
-      isProposal = true,
-    )
   }
 
   def addTopologyTransactions(

@@ -76,7 +76,10 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
             RESTART IDENTITY CASCADE""".asUpdate,
         "resetAllAppTables",
       )
-    } yield ()
+    } yield {
+      logger.info("Resetting all Splice app database tables complete")
+      ()
+    }
   }
 
   private var dbLockSocket: Option[ServerSocket] = None
@@ -109,9 +112,9 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
   override def afterAll(): Unit = {
     implicit val tc: TraceContext = TraceContext.empty
+    super.afterAll()
     logger.info("Releasing SpliceDbTest lock")
     dbLockSocket.foreach(_.close())
-    super.afterAll()
   }
 }
 
