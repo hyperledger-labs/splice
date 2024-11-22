@@ -8,6 +8,7 @@ import {
   svCometBftKeysFromSecret,
 } from 'splice-pulumi-common';
 import { SweepConfig } from 'splice-pulumi-common-validator';
+import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 import { StaticSvConfig } from './config';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
@@ -420,6 +421,6 @@ export const coreSvsToDeploy = svConfigs.slice(0, dsoSize);
 export const allSvsToDeploy = coreSvsToDeploy.concat(DeploySvRunbook ? [svRunbookConfig] : []);
 
 export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
-  const asJson = config.optionalEnv(`${nodeName}_SWEEP`);
+  const asJson = spliceEnvConfig.optionalEnv(`${nodeName}_SWEEP`);
   return asJson && JSON.parse(asJson);
 }

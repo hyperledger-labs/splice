@@ -30,6 +30,18 @@ export type SpliceCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'de
   dependsOn?: pulumi.Input<pulumi.Resource>[];
 };
 
+export function withAddedDependencies(
+  opts?: SpliceCustomResourceOptions,
+  extraDependsOn?: pulumi.Input<pulumi.Resource>[]
+): SpliceCustomResourceOptions {
+  return opts
+    ? {
+        ...opts,
+        dependsOn: opts.dependsOn?.concat(extraDependsOn || []),
+      }
+    : { dependsOn: extraDependsOn };
+}
+
 // pulumi.Input<T> allows Promise<T>, which can cause issues with our deployment scripts (i.e. auth0 token cache)
 // if not awaited. this custom type is a subset that excludes promises, which gives us some type safety
 export type CnInput<T> = T | pulumi.OutputInstance<T>;

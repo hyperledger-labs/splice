@@ -45,6 +45,10 @@ export class CometBftNodeConfigs {
     return this.staticToNodeConfig(this._nodeConfigs.self);
   }
 
+  get selfSvNodeName(): string {
+    return this._nodeConfigs.self.nodeName;
+  }
+
   get sv1NodeConfig(): CometBftNodeConfig {
     return this.staticToNodeConfig(this._nodeConfigs.sv1);
   }

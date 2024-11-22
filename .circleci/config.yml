@@ -4966,7 +4966,7 @@ workflows:
             echo $GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS > /tmp/gcp-creds.json
             export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-creds.json"
           # TODO(#10912) Investigate why things got slower
-          parallelism: 10
+          parallelism: 6
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
