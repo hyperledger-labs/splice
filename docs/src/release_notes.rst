@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Deployment
+
+  * Make the wallet sweep config value `use-transfer-preapproval` optional in the validator helm chart with a default of `false`.
+
 0.3.0
 -----
 
