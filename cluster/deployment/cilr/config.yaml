@@ -10,7 +10,7 @@ synchronizerMigration:
   active:
     id: 4
     provider: external
-    version: 0.3.0
+    version: 0.3.1-snapshot.20241122.7690.0.v751a9ce0
     releaseReference: "refs/tags/cilr"
 persistentSequencerHeapDumps: true
 sequencerVeryHighResources: true
