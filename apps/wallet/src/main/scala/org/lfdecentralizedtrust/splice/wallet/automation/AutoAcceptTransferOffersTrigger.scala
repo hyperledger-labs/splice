@@ -84,7 +84,7 @@ class AutoAcceptTransferOffersTrigger(
     } else {
       Future.successful(
         TaskSuccess(
-          s"Not configured to auto-accept transfer offers from sender: ${transferOffer.contract.payload.sender} "
+          s"Not configured to auto-accept transfer offers from sender: ${transferOffer.contract.payload.sender}"
         )
       )
     }
