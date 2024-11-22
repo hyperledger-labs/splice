@@ -147,7 +147,6 @@
           "svNamespace": "validator"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -249,7 +248,6 @@
           "hostname": "dev.global.canton.network.digitalasset.com"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -431,7 +429,6 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true,
           "migration": {
@@ -529,7 +526,6 @@
         "db": {
           "volumeSize": "50Gi"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
           "secretName": "postgres-secrets"
         },
@@ -606,7 +602,6 @@
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },

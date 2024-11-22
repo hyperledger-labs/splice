@@ -3,12 +3,10 @@ import * as pulumi from '@pulumi/pulumi';
 import _ from 'lodash';
 import {
   appsAffinityAndTolerations,
-  artifactsRepository,
   config,
   imagePullPolicy,
   jmxOptions,
   numNodesPerInstance,
-  repository,
 } from 'splice-pulumi-common';
 import { ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
@@ -49,9 +47,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
 
     const newOpts = { ...opts, parent: this, dependsOn: [args.namespace] };
     const zeroPad = (num: number, places: number) => String(num).padStart(places, '0');
-    const version =
-      config.optionalEnv('MULTI_VALIDATOR_IMAGE_VERSION') || config.requireEnv('CHARTS_VERSION');
-    const repo = repository(artifactsRepository).dockerImages;
+
     this.deployment = new k8s.apps.v1.Deployment(
       name,
       {
@@ -81,7 +77,9 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
               containers: [
                 {
                   name: args.imageName,
-                  image: `${repo}/${args.imageName}:${version}`,
+                  image: `us-central1-docker.pkg.dev/da-cn-shared/cn-images/${
+                    args.imageName
+                  }:${config.optionalEnv('MULTI_VALIDATOR_IMAGE_VERSION') || config.requireEnv('CHARTS_VERSION')}`,
                   ...imagePullPolicy,
                   ...args.container,
                   ports: args.container.ports.concat([

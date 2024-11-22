@@ -85,7 +85,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
 
-  const imagePullDeps = imagePullSecret(xns);
+  // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
+  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const validator = await installValidator({
     xns,
@@ -101,7 +102,9 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     nodeIdentifier: 'validator-runbook',
   });
 
-  const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
+  // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
+  const ingressImagePullDeps =
+    activeVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installSpliceRunbookHelmChartByNamespaceName(
     xns.ns.metadata.name,
     xns.logicalName,

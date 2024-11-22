@@ -194,7 +194,6 @@
           "svNamespace": "sv"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -340,7 +339,6 @@
           "hostname": "test.global.canton.network.digitalasset.com"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -389,7 +387,6 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },
@@ -607,7 +604,6 @@
         "db": {
           "volumeSize": "48Gi"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
           "secretName": "apps-pg-secret"
         },
@@ -740,7 +736,6 @@
           }
         ],
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-2.test.global.canton.network.digitalasset.com"
         },
@@ -884,7 +879,6 @@
         "decentralizedSynchronizerUrl": "https://sequencer-4.sv-2.test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },

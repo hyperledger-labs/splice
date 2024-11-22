@@ -274,7 +274,20 @@ commands:
          cmd: |
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-           echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
+  docker_login_internal:
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Log in to DA-internal Docker registry
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
+            --keep DOCKER_CERT_PATH \
+            --keep DOCKER_HOST \
+            --keep DOCKER_MACHINE_NAME \
+            --keep DOCKER_TLS_VERIFY \
+            --keep NO_PROXY"
+          cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+            gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
 
   docker_pull_test_images:
     steps:

@@ -181,7 +181,6 @@
           "chainId": "test-3",
           "chainIdSuffix": "1"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -292,7 +291,6 @@
           "chainId": "test-4",
           "chainIdSuffix": "1"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -462,7 +460,6 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
@@ -555,7 +552,6 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
@@ -828,7 +824,6 @@
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
@@ -972,7 +967,6 @@
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "logLevel": "DEBUG",
         "metrics": {
           "enable": true,

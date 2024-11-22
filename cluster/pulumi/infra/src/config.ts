@@ -7,7 +7,7 @@ import {
   loadJsonFromFile,
   REPO_ROOT,
 } from 'splice-pulumi-common';
-import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
 export const clusterBasename = pulumi.getStack().replace(/.*[.]/, '');
@@ -25,7 +25,7 @@ export type Config = z.infer<typeof InfraConfigSchema>;
 
 // eslint-disable-next-line
 // @ts-ignore
-export const infraConfig = InfraConfigSchema.parse(clusterYamlConfig).infra;
+export const infraConfig = InfraConfigSchema.parse(spliceConfig.clusterConfig).infra;
 
 const daSupportNodeIpRanges: string[] = approveDaSupportSvNode ? ['35.244.74.143/32'] : [];
 

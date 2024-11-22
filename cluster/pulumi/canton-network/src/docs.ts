@@ -9,7 +9,7 @@ import {
 export function installDocs(): pulumi.Resource {
   const xns = exactNamespace('docs');
 
-  const imagePullDeps = imagePullSecret(xns);
+  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const dependsOn = imagePullDeps.concat([xns.ns]);
 

@@ -365,7 +365,6 @@
           "svNamespace": "splitwell"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "opts": {
           "dependsOn": [
             {
@@ -535,7 +534,6 @@
           "name": "cn-mainnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -596,7 +594,6 @@
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true,
           "migration": {
@@ -731,7 +728,6 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },
@@ -946,7 +942,6 @@
         "contactPoint": "sv-support@digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },

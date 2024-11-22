@@ -10,9 +10,11 @@ import { CnChartVersion, repositories } from './artifacts';
 import { config } from './config';
 import { activeVersion } from './domainMigration';
 import {
+  artifactsRepository,
   ChartValues,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
+  dockerImageArtifactsRepository,
   ExactNamespace,
   fixedTokens,
   HELM_CHART_TIMEOUT_SEC,
@@ -23,22 +25,10 @@ import {
   REPO_ROOT,
 } from './utils';
 
-// The default type of dependsOn is an unworkable abomination.
+// The default type of dependsOn is an unworkable abonimation.
 export type SpliceCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'dependsOn'> & {
   dependsOn?: pulumi.Input<pulumi.Resource>[];
 };
-
-export function withAddedDependencies(
-  opts?: SpliceCustomResourceOptions,
-  extraDependsOn?: pulumi.Input<pulumi.Resource>[]
-): SpliceCustomResourceOptions {
-  return opts
-    ? {
-        ...opts,
-        dependsOn: opts.dependsOn?.concat(extraDependsOn || []),
-      }
-    : { dependsOn: extraDependsOn };
-}
 
 // pulumi.Input<T> allows Promise<T>, which can cause issues with our deployment scripts (i.e. auth0 token cache)
 // if not awaited. this custom type is a subset that excludes promises, which gives us some type safety
@@ -130,7 +120,13 @@ function cnChartValues(
     {},
     chartDefaultValues,
     {
-      imageRepo: version.repository.dockerImages,
+      // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
+      imageRepo:
+        version.type === 'local' ||
+        artifactsRepository === 'google' ||
+        dockerImageArtifactsRepository === 'google'
+          ? repositories.google.dockerImages
+          : undefined,
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         name: CLUSTER_NAME,
@@ -167,7 +163,13 @@ export function installSpliceRunbookHelmChartByNamespaceName(
       repositoryOpts: repositoryOpts(version),
       values: {
         ...values,
-        imageRepo: version.repository.dockerImages,
+        // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
+        imageRepo:
+          version.type === 'local' ||
+          artifactsRepository === 'google' ||
+          dockerImageArtifactsRepository === 'google'
+            ? repositories.google.dockerImages
+            : undefined,
         ...appsAffinityAndTolerations,
         // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
         clusterUrl: CLUSTER_HOSTNAME,
@@ -207,7 +209,7 @@ export function chartPath(chartName: string, version: CnChartVersion): string {
       : chartName.replace(/^splice/, 'cn');
   return version.type === 'local'
     ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${compatibleName}/`
-    : version.repository === repositories.private
+    : version.repository === repositories.google
       ? `${version.repository.helm}/${compatibleName}`
       : compatibleName;
 }
@@ -227,7 +229,7 @@ function versionStringWithPossibleOverride(
 
 // repository opts are not supported for oci charts
 export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.RepositoryOpts | undefined {
-  if (version.type === 'local' || version.repository === repositories.private) {
+  if (version.type === 'local' || version.repository === repositories.google) {
     return undefined;
   } else {
     const username = config.requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');

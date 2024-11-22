@@ -244,8 +244,6 @@ jobs:
             --keep K6_VALIDATOR_ADMIN_PASSWORD
             --keep SLACK_ACCESS_TOKEN
             --keep CIRCLE_BUILD_URL
-            --keep ARTIFACTORY_USER
-            --keep ARTIFACTORY_PASSWORD
           gce_authenticate: true
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |
@@ -354,8 +352,6 @@ jobs:
             --keep K6_VALIDATOR_ADMIN_PASSWORD
             --keep SLACK_ACCESS_TOKEN
             --keep CIRCLE_BUILD_URL
-            --keep ARTIFACTORY_USER
-            --keep ARTIFACTORY_PASSWORD
           gce_authenticate: true
           cmd_retry_count: << parameters.deploy_retry_count >>
           cmd_before_retry: |

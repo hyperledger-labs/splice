@@ -8,7 +8,7 @@ set -euo pipefail
 function get_digest() {
   img=$1
 
-  img_name=$(get-docker-image-reference "$img")
+  img_name=$(get-docker-image-name "$img" --artifactory)
   # The docker image is multi-arch, but the digests are per architecture. We support amd64 clusters only, so pick that digest.
   docker manifest inspect "$img_name" | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest'
 }

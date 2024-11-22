@@ -248,7 +248,6 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -629,7 +628,6 @@
           "svNamespace": "sv-1"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -692,7 +690,6 @@
           "name": "cn-testnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -749,7 +746,6 @@
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "isFirstSv": true,
         "metrics": {
           "enable": true
@@ -935,7 +931,6 @@
           },
           "prefix": "test/sv-1"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 200000,
           "baseRateBurstWindowMins": 20,
@@ -1043,7 +1038,6 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },

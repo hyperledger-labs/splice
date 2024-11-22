@@ -8,7 +8,7 @@ import { config } from './config';
 import { activeVersion } from './domainMigration';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
-import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME, GCP_ZONE } from './utils';
+import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME } from './utils';
 
 const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
 const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
@@ -103,7 +103,9 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
               },
           locationPreference: {
             // it's fairly critical for performance that the sql instance is in the same zone as the GKE nodes
-            zone: GCP_ZONE || config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE'),
+            zone:
+              config.optionalEnv('CLOUDSDK_COMPUTE_ZONE') ||
+              config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE'),
           },
         },
       },

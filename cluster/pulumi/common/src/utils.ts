@@ -17,7 +17,6 @@ export const REPO_ROOT = config.requireEnv('REPO_ROOT', 'root directory of the r
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
-export const GCP_ZONE = config.optionalEnv('CLOUDSDK_COMPUTE_ZONE');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 
 export const EXPECTED_MAX_BLOCK_RATE_PER_SECOND =

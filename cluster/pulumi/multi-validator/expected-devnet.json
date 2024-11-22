@@ -145,7 +145,6 @@
           "hostname": "dev.global.canton.network.digitalasset.com"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -292,7 +291,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.8",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -717,7 +716,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.8",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -1142,7 +1141,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.8",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -1567,7 +1566,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.8",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -1992,7 +1991,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-participant:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-participant:0.2.8",
                 "livenessProbe": {
                   "failureThreshold": 5,
                   "grpc": {
@@ -2453,7 +2452,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.8",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -2831,7 +2830,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.8",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3209,7 +3208,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.8",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3587,7 +3586,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.8",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -3965,7 +3964,7 @@
                     "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
                   }
                 ],
-                "image": "digitalasset-canton-network-docker.jfrog.io/digitalasset/multi-validator:0.2.8",
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.2.8",
                 "livenessProbe": {
                   "exec": {
                     "command": [
@@ -4299,7 +4298,6 @@
           "maxConnections": 1000,
           "volumeSize": "600Gi"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
           "secretName": "postgres-0-secret"
         },
@@ -4362,7 +4360,6 @@
           "maxConnections": 1000,
           "volumeSize": "600Gi"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
           "secretName": "postgres-1-secret"
         },
@@ -4425,7 +4422,6 @@
           "maxConnections": 1000,
           "volumeSize": "600Gi"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
           "secretName": "postgres-2-secret"
         },
@@ -4488,7 +4484,6 @@
           "maxConnections": 1000,
           "volumeSize": "600Gi"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
           "secretName": "postgres-3-secret"
         },
@@ -4551,7 +4546,6 @@
           "maxConnections": 1000,
           "volumeSize": "600Gi"
         },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "persistence": {
           "secretName": "postgres-4-secret"
         },

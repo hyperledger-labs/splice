@@ -63,6 +63,20 @@ export DATA_EXPORT_BUCKET_SA_IAM_ACCOUNT="da-cn-data-exports@da-cn-devnet.iam.gs
 # See https://cloud.google.com/blog/products/containers-kubernetes/kubectl-auth-changes-in-gke
 export USE_GKE_GCLOUD_AUTH_PLUGIN=true
 
+### The name of the repository for Docker images.
+#
+# Entities (CI/CD or individuals) that write docker images as part of
+# the build process will need to have write access to this project and
+# artifat registry.
+#
+# Entities (k8s mainly) that read docker images will need to have read
+# access. This can be granted by creating a role binding in the
+# da-cn-shared project between the default service account for the
+# cluster's GCE project and the the "Artifact Registry Service Agent"
+# role.
+export GCP_REPO_NAME="da-cn-shared/cn-images"
+
+
 # CometBFT settings
 export COMETBFT_DOCKER_IMAGE="digitalasset-canton-enterprise-docker.jfrog.io/cometbft-canton-network:${COMETBFT_RELEASE_VERSION}"
 

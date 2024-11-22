@@ -234,16 +234,7 @@ function subcmd_start {
   fi
 
   if [ $da_repo -eq 1 ]; then
-    if [[ "$IMAGE_TAG" == *-dirty ]]; then
-      export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
-    else
-      current_branch=$(git rev-parse --abbrev-ref HEAD)
-      if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
-        export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
-      else
-        export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
-      fi
-    fi
+    export IMAGE_REPO=us-central1-docker.pkg.dev/da-cn-shared/cn-images/
   else
     # Locally built images (the default when using this script)
     export IMAGE_REPO=""

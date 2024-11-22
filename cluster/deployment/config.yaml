@@ -1,8 +1,3 @@
-# Reference configuration options
-#svs:
-#  sv-1:
-#    cometbft:
-#      snapshotName: "nicu-test-cometbft-cloning"
 infra:
   ipWhitelisting:
     extraWhitelistedIngress: []

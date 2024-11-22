@@ -1,8 +1,5 @@
-import * as gcp from '@pulumi/gcp';
-import * as k8s from '@pulumi/kubernetes';
 import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
-import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   CLUSTER_BASENAME,
@@ -11,18 +8,15 @@ import {
   config,
   DomainMigrationIndex,
   ExactNamespace,
-  GCP_ZONE,
   installSpliceHelmChart,
   isDevNet,
   loadYamlFromFile,
   REPO_ROOT,
   SpliceCustomResourceOptions,
-  withAddedDependencies,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
-import { svsConfiguration } from '../clusterSvConfig';
-import { CometBftNodeConfigs } from './cometBftNodeConfigs';
+import { CometBftNodeConfig, CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { disableCometBftStateSync } from './cometbftConfig';
 
 export type Cometbft = {
@@ -63,7 +57,7 @@ export function installCometBftNode(
       YOUR_HOSTNAME: CLUSTER_HOSTNAME,
     }
   );
-  const nodeConfig = nodeConfigs.self;
+  const nodeConfig: CometBftNodeConfig = nodeConfigs.self;
   const isSv1 = nodeConfigs.self.id === nodeConfigs.sv1NodeConfig.id;
   // legacy domains don't need cometbft state sync because no new nodes will join
   // upgrade domains don't need cometbft state sync because until they are active cometbft will not really progress its height a lot
@@ -71,127 +65,69 @@ export function installCometBftNode(
   // sv-app we cannot configure state sync until the sv app has migrated
   // if a migration is running we must not configure state sync because that will also add a pulumi dependency and our migrate flow will break (sv2-4 depending on sv1)
   const stateSyncEnabled = !isSv1 && enableStateSync && !isRunningMigration && isActiveDomain;
-  const cometbftChartValues = _.mergeWith(cometBftValues, {
-    sv1: nodeConfigs.sv1,
-    // TODO (#13845) remove when ciperiodic version >= 0.1.18
-    founder: nodeConfigs.sv1,
-    istioVirtualService: {
-      enabled: true,
-      gateway: 'cluster-ingress/cn-apps-gateway',
-      port: nodeConfig.istioPort,
-    },
-    node: {
-      ...cometBftValues.node,
-      ...nodeConfig,
-      ...(nodeConfig.validator ? { keysSecret: '' } : {}),
-      enableTimeoutCommit,
-    },
-    logLevel,
-    peers: nodeConfigs.peers
-      .filter(peer => peer.id !== nodeConfigs.self.id && peer.id !== nodeConfigs.sv1.nodeId)
-      .map(peer => {
-        /*
-         * We configure the peers explicitly here so that every cometbft node knows about the other nodes.
-         * This is required to bypass the use of externalAddress when communicating between cometbft nodes for sv1-sv4
-         * We bypass the external address and use the internal kubernetes services address so that there is no requirement for
-         * sending the traffic through the loopback to satisfy the firewall rules
-         * */
-        return {
-          nodeId: peer.id,
-          externalAddress: nodeConfigs.p2pServiceAddress(peer.id),
-        };
-      }),
-    stateSync: {
-      ...cometBftValues.stateSync,
-      enable: stateSyncEnabled,
-    },
-    genesis: {
-      // for TestNet-like deployments on scratchnet, set the chainId to 'test'
-      chainId:
-        `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
-          ? 'test'
-          : `${CLUSTER_BASENAME}-${migrationId}`,
-      chainIdSuffix: config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || '0',
-    },
-    metrics: {
-      enable: true,
-      migration: {
-        id: migrationId,
-        active: isActiveDomain,
-      },
-      labels: [{ key: 'active_migration', value: isActiveDomain }],
-    },
-    db: {
-      volumeSize: clusterSmallDisk ? '240Gi' : undefined,
-    },
-    extraLogLevelFlags: config.optionalEnv('COMETBFT_EXTRA_LOG_LEVEL_FLAGS'),
-  });
-  const svIdentifier = nodeConfigs.selfSvNodeName;
-  const svIdentifierWithMigration = `${svIdentifier}-m${migrationId}`;
-  const svConfiguration = svsConfiguration[svIdentifier];
-  let volumeDependecies: Resource[] = [];
-  if (svConfiguration?.cometbft) {
-    const volumeSize = cometbftChartValues.db.volumeSize;
-    const diskSnapshot = gcp.compute.getSnapshot({
-      name: svConfiguration.cometbft.snapshotName,
-    });
-
-    if (!GCP_ZONE) {
-      throw new Error('Zone is required to create a disk');
-    }
-    const restoredDisk = new gcp.compute.Disk(
-      `${svIdentifierWithMigration}-cometbft-restored-data`,
-      {
-        name: `${svIdentifierWithMigration}-cometbft-restored-disk`,
-        // eslint-disable-next-line promise/prefer-await-to-then
-        size: diskSnapshot.then(snapshot => snapshot.diskSizeGb),
-        // eslint-disable-next-line promise/prefer-await-to-then
-        snapshot: diskSnapshot.then(snapshot => snapshot.selfLink),
-        type: 'pd-ssd',
-        zone: GCP_ZONE,
-      },
-      opts
-    );
-
-    // create the underlying persistent volume that will be used by cometbft from the state of an existing PV
-    volumeDependecies = [
-      new k8s.core.v1.PersistentVolume(
-        `${svIdentifier}-cometbft-data`,
-        {
-          metadata: {
-            name: `${svIdentifier}-cometbft-data-pv`,
-          },
-          spec: {
-            capacity: {
-              storage: volumeSize,
-            },
-            volumeMode: 'Filesystem',
-            accessModes: ['ReadWriteOnce'],
-            persistentVolumeReclaimPolicy: 'Delete',
-            storageClassName: cometbftChartValues.db.volumeStorageClass,
-            claimRef: {
-              name: `global-domain-${migrationId}-cometbft-cometbft-data`,
-              namespace: xns.ns.metadata.name,
-            },
-            csi: {
-              driver: 'pd.csi.storage.gke.io',
-              volumeHandle: restoredDisk.id,
-            },
-          },
-        },
-        opts
-      ),
-    ];
-  }
   const release = installSpliceHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
-    `splice-cometbft`,
-    cometbftChartValues,
+    'splice-cometbft',
+    _.mergeWith(cometBftValues, {
+      sv1: nodeConfigs.sv1,
+      // TODO (#13845) remove when ciperiodic version >= 0.1.18
+      founder: nodeConfigs.sv1,
+      istioVirtualService: {
+        enabled: true,
+        gateway: 'cluster-ingress/cn-apps-gateway',
+        port: nodeConfig.istioPort,
+      },
+      node: {
+        ...cometBftValues.node,
+        ...nodeConfig,
+        ...(nodeConfig.validator ? { keysSecret: '' } : {}),
+        enableTimeoutCommit,
+      },
+      logLevel,
+      peers: nodeConfigs.peers
+        .filter(peer => peer.id !== nodeConfigs.self.id && peer.id !== nodeConfigs.sv1.nodeId)
+        .map(peer => {
+          /*
+           * We configure the peers explicitly here so that every cometbft node knows about the other nodes.
+           * This is required to bypass the use of externalAddress when communicating between cometbft nodes for sv1-sv4
+           * We bypass the external address and use the internal kubernetes services address so that there is no requirement for
+           * sending the traffic through the loopback to satisfy the firewall rules
+           * */
+          return {
+            nodeId: peer.id,
+            externalAddress: nodeConfigs.p2pServiceAddress(peer.id),
+          };
+        }),
+      stateSync: {
+        ...cometBftValues.stateSync,
+        enable: stateSyncEnabled,
+      },
+      genesis: {
+        // for TestNet-like deployments on scratchnet, set the chainId to 'test'
+        chainId:
+          `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
+            ? 'test'
+            : `${CLUSTER_BASENAME}-${migrationId}`,
+        chainIdSuffix: config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || '0',
+      },
+      metrics: {
+        enable: true,
+        migration: {
+          id: migrationId,
+          active: isActiveDomain,
+        },
+        labels: [{ key: 'active_migration', value: isActiveDomain }],
+      },
+      db: {
+        volumeSize: clusterSmallDisk ? '240Gi' : undefined,
+      },
+      extraLogLevelFlags: config.optionalEnv('COMETBFT_EXTRA_LOG_LEVEL_FLAGS'),
+    }),
     version,
     // support old runbook names, can be removed once the runbooks are all reset and latest release is >= 0.2.x
     {
-      ...withAddedDependencies(opts, volumeDependecies),
+      ...opts,
       aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
     }

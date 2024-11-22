@@ -2,8 +2,7 @@
 
 In the Canton Network team, we use CircleCI to manage continuous integration with tests, image building, image pushing, and ultimately deployment.
 
-Currently we run our DevNet in a kubernetes cluster hosted on Google's GCE/GKE platform.
-All images we build are pushed to Artifactory docker registries, digitalasset-canton-network-docker-dev.jfrog.io for private developer releases and digitalasset-canton-network-docker.jfrog.io for public releases.
+Currently we run our DevNet in a kubernetes cluster hosted on Google's GCE/GKE platform. Google also offers private docker registries via the Artifact Registry. All images we build are pushed to this registry.
 
 Along the way, we have the ability to issue Slack notifications from within a job to our team channel based upon the end result of a workflow.
 
@@ -25,8 +24,7 @@ Additionally, the key itself has no expiry. At a future point, we may want to co
 
 ## Images
 
-We build docker images for all applications as part of the `build` workflow, and push them to Artifactory.
-This is covered by the `docker-images-push` job. This job runs nightly as part of the `deploy` workflow.
+We build docker images for all applications as part of the `build` workflow, and push them to Google Artifact Registry. This is covered by the `docker-images-push` job. This job runs nightly as part of the `deploy` workflow.
 
 ## Deployments
 
