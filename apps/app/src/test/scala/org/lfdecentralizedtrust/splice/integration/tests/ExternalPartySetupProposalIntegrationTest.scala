@@ -148,7 +148,7 @@ class ExternalPartySetupProposalIntegrationTest
   "TransferPreapproval allows to transfer between externally signed parties" in { implicit env =>
     // Onboard and Create/Accept ExternalPartySetupProposal for Alice
     val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
-      onboardExternalParty(aliceValidatorBackend)
+      onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
     aliceValidatorBackend.participantClient.parties
       .hosted(filterParty = aliceParty.filterString) should not be empty
     aliceValidatorWalletClient.tap(50.0)
@@ -175,7 +175,7 @@ class ExternalPartySetupProposalIntegrationTest
 
     // Onboard and Create/Accept ExternalPartySetupProposal for Bob
     val onboardingBob @ OnboardingResult(bobParty, _, _) =
-      onboardExternalParty(aliceValidatorBackend)
+      onboardExternalParty(aliceValidatorBackend, Some("bobExternal"))
     aliceValidatorBackend.participantClient.parties
       .hosted(filterParty = bobParty.filterString) should not be empty
     val (cidBob, _) =

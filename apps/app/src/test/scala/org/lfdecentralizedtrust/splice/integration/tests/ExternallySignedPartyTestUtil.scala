@@ -22,7 +22,7 @@ import java.util.UUID
 trait ExternallySignedPartyTestUtil extends TestCommon {
   def onboardExternalParty(
       validatorBackend: ValidatorAppBackendReference,
-      partyHint: String = UUID.randomUUID().toString,
+      partyHint: Option[String] = None,
   ): OnboardingResult = {
     val signingPublicKey =
       validatorBackend.participantClient.keys.secret
@@ -31,13 +31,14 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
           SigningKeyUsage.All,
           Some(SigningKeySpec.EcCurve25519),
         )
+    val truePartyHint = partyHint.getOrElse(UUID.randomUUID().toString)
     val signingKeyPairByteString = validatorBackend.participantClient.keys.secret
       .download(signingPublicKey.fingerprint, ProtocolVersion.dev)
     val privateKey =
       CryptoKeyPair.fromTrustedByteString(signingKeyPairByteString).value.privateKey
     val listOfTransactionsAndHashes = validatorBackend
       .generateExternalPartyTopology(
-        partyHint,
+        truePartyHint,
         HexString.toHexString(signingPublicKey.key),
       )
       .topologyTxs
@@ -62,7 +63,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
     )
 
     OnboardingResult(
-      PartyId.tryCreate(partyHint, signingPublicKey.fingerprint),
+      PartyId.tryCreate(truePartyHint, signingPublicKey.fingerprint),
       signingPublicKey,
       privateKey,
     )
