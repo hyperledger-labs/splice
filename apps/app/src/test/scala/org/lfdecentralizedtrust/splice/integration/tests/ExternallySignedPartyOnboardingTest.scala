@@ -44,7 +44,6 @@ class ExternallySignedPartyOnboardingTest
         Seq(
           "python",
           "scripts/external-signing/external-signing.py",
-          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           "generate-key-pair",
           s"--key-directory=${tempDirectory.path}",
           s"--key-name=$keyName",
@@ -55,8 +54,8 @@ class ExternallySignedPartyOnboardingTest
         Seq(
           "python",
           "scripts/external-signing/external-signing.py",
-          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           "setup-party",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           s"--key-directory=${tempDirectory.path}",
           s"--key-name=$keyName",
           s"--party-hint=$partyHint",
@@ -76,8 +75,8 @@ class ExternallySignedPartyOnboardingTest
         Seq(
           "python",
           "scripts/external-signing/external-signing.py",
-          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           "setup-transfer-preapproval",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           s"--key-directory=${tempDirectory.path}",
           s"--key-name=$keyName",
           s"--party-id=${partyId.toProtoPrimitive}",
@@ -110,7 +109,6 @@ class ExternallySignedPartyOnboardingTest
         Seq(
           "python",
           "scripts/external-signing/external-signing.py",
-          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           "generate-key-pair",
           s"--key-directory=${tempDirectory.path}",
           s"--key-name=$keyName2",
@@ -121,8 +119,8 @@ class ExternallySignedPartyOnboardingTest
         Seq(
           "python",
           "scripts/external-signing/external-signing.py",
-          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           "setup-party",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           s"--key-directory=${tempDirectory.path}",
           s"--key-name=$keyName2",
           s"--party-hint=$partyHint2",
@@ -139,8 +137,8 @@ class ExternallySignedPartyOnboardingTest
         Seq(
           "python",
           "scripts/external-signing/external-signing.py",
-          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           "setup-transfer-preapproval",
+          s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
           s"--key-directory=${tempDirectory.path}",
           s"--key-name=$keyName2",
           s"--party-id=${partyId2.toProtoPrimitive}",
@@ -162,8 +160,9 @@ class ExternallySignedPartyOnboardingTest
           Seq(
             "python",
             "scripts/external-signing/external-signing.py",
-            s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
             "transfer-preapproval-send",
+            s"--validator-url=http://localhost:${aliceValidatorBackend.config.adminApi.port}",
+            s"--scan-url=http://localhost:${sv1ScanBackend.config.adminApi.port}",
             s"--key-directory=${tempDirectory.path}",
             s"--key-name=$keyName",
             s"--sender-party-id=${partyId.toProtoPrimitive}",
