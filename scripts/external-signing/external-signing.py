@@ -12,7 +12,6 @@ from Crypto.PublicKey import ECC
 from Crypto.Signature import eddsa
 from dataclasses import dataclass
 import os
-import uuid
 
 cli_log_handler = colorlog.StreamHandler()
 cli_log_handler.setFormatter(
@@ -47,6 +46,31 @@ async def session_post(session: aiohttp.ClientSession, url, payload):
     except aiohttp.client_exceptions.ClientResponseError as cause:
         raise HttpException(err, cause) from None
     return response
+
+
+async def session_get(session: aiohttp.ClientSession, url, payload):
+    response = await session.get(url, params=payload)
+    err = await response.text()
+    try:
+        response.raise_for_status()
+    except aiohttp.client_exceptions.ClientResponseError as cause:
+        raise HttpException(err, cause) from None
+    return response
+
+
+@dataclass
+class ScanClient:
+    session: aiohttp.ClientSession
+    url: str
+
+    async def lookup_transfer_command_status(self, sender, nonce):
+        payload = {"sender": sender, "nonce": nonce}
+        response = await session_get(
+            self.session,
+            f"{self.url}/api/scan/v0/transfer-command/status",
+            payload
+        )
+        return await response.json()
 
 
 @dataclass
@@ -156,7 +180,7 @@ class ValidatorClient:
         )
 
 
-async def handle_generate_key_pair(args, validator_client):
+async def handle_generate_key_pair(args):
     private_key = ECC.generate(curve="ed25519")
     public_key = private_key.public_key()
     [private_key_file, public_key_file] = key_names(args.key_directory, args.key_name)
@@ -216,19 +240,30 @@ async def handle_setup_party(args, validator_client):
     logger.debug(f"Completed party setup, party id is: {party_id}")
 
 
-async def poll_for_transfer_preapproval(
-    party_id, validator_client, timeout=30, poll_interval=1
+async def lookup_transfer_command_status(party_id, nonce, contract_id_prefix, scan_client):
+    response = await scan_client.lookup_transfer_command_status(party_id, nonce)
+    for contract_id, contract_with_status in response["transfer_commands_by_contract_id"].items():
+        if contract_id.startswith(contract_id_prefix):
+            return contract_with_status
+
+
+async def poll_for_transfer_command_status(
+    party_id, nonce, contract_id_prefix,
+    scan_client, timeout=30, poll_interval=1
 ):
-    logger.debug("Waiting for validator automation to create transfer preapproval")
     async with asyncio.timeout(timeout):
         while True:
-            try:
-                response = await validator_client.lookup_transfer_preapproval(party_id)
-            except HttpException:
-                logger.debug("Still waiting...")
-                await asyncio.sleep(poll_interval)
-            else:
-                return response
+            contract_with_status = await lookup_transfer_command_status(
+                party_id,
+                nonce,
+                contract_id_prefix,
+                scan_client
+            )
+            status = contract_with_status["status"]
+            logger.debug(f"Transfer command status: {status}")
+            if status["status"] in ["sent", "failed"]:
+                return contract_with_status
+            await asyncio.sleep(poll_interval)
 
 
 async def handle_setup_transfer_preapproval(args, validator_client):
@@ -252,7 +287,7 @@ async def handle_setup_transfer_preapproval(args, validator_client):
     )
 
 
-async def handle_transfer_preapproval_send(args, validator_client):
+async def handle_transfer_preapproval_send(args, validator_client, scan_client):
     logger.debug(
         f"Exercise choice TransferPreapproval_Send to transfer {args.amount} \
         from {args.sender_party_id} to {args.receiver_party_id}"
@@ -274,20 +309,20 @@ async def handle_transfer_preapproval_send(args, validator_client):
     await validator_client.submit_transfer_preapproval_send(
         args.sender_party_id, response["transaction"], signed_hash, public_key_hex
     )
+    await poll_for_transfer_command_status(
+        args.sender_party_id,
+        args.nonce,
+        response['transfer_command_contract_id_prefix'],
+        scan_client
+    )
     logger.debug("Transfer complete.")
 
 
 def parse_cli_args():
     parser = argparse.ArgumentParser(
-        description="Utility script to interact with the external signing part of the Validator API"
+        description="Utility script to interact with the external signing parts of the Validator and Scan APIs"
     )
-    subparsers = parser.add_subparsers(required=True)
-
-    parser.add_argument(
-        "--validator-url",
-        help="Address of Validator API",
-        required=True,
-    )
+    subparsers = parser.add_subparsers(required=True, dest='subcommand')
 
     parser_generate_key_pair = subparsers.add_parser(
         "generate-key-pair", help="Generate a new key pair"
@@ -300,6 +335,11 @@ def parse_cli_args():
         "setup-party", help="Setup a new externally-hosted party"
     )
     parser_setup_party.set_defaults(handler=handle_setup_party)
+    parser_setup_party.add_argument(
+        "--validator-url",
+        help="Address of Validator API",
+        required=True
+    )
     parser_setup_party.add_argument("--party-hint", required=True)
     parser_setup_party.add_argument("--key-directory", required=True)
     parser_setup_party.add_argument("--key-name", required=True)
@@ -311,6 +351,11 @@ def parse_cli_args():
     parser_setup_transfer_preapproval.set_defaults(
         handler=handle_setup_transfer_preapproval
     )
+    parser_setup_transfer_preapproval.add_argument(
+        "--validator-url",
+        help="Address of Validator API",
+        required=True
+    )
     parser_setup_transfer_preapproval.add_argument("--party-id", required=True)
     parser_setup_transfer_preapproval.add_argument("--key-directory", required=True)
     parser_setup_transfer_preapproval.add_argument("--key-name", required=True)
@@ -321,6 +366,16 @@ def parse_cli_args():
     )
     parser_transfer_preapproval_send.set_defaults(
         handler=handle_transfer_preapproval_send
+    )
+    parser_transfer_preapproval_send.add_argument(
+        "--validator-url",
+        help="Address of Validator API",
+        required=True
+    )
+    parser_transfer_preapproval_send.add_argument(
+        "--scan-url",
+        help="Address of Scan API",
+        required=True
     )
     parser_transfer_preapproval_send.add_argument("--sender-party-id", required=True)
     parser_transfer_preapproval_send.add_argument("--receiver-party-id", required=True)
@@ -342,8 +397,15 @@ async def main():
     }
 
     async with aiohttp.ClientSession(headers=headers) as session:
-        validator_client = ValidatorClient(session, args.validator_url)
-        await args.handler(args, validator_client)
+        if args.subcommand == "generate-key-pair":
+            await args.handler(args)
+        elif args.subcommand == 'transfer-preapproval-send':
+            validator_client = ValidatorClient(session, args.validator_url)
+            scan_client = ScanClient(session, args.scan_url)
+            await args.handler(args, validator_client, scan_client)
+        else:
+            validator_client = ValidatorClient(session, args.validator_url)
+            await args.handler(args, validator_client)
 
 
 if __name__ == "__main__":
