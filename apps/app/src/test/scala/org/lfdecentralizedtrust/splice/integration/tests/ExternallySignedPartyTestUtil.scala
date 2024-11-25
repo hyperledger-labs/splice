@@ -186,6 +186,9 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         transferPreapprovalCid.contractId should not be empty
         updateId should not be empty
         provider.lookupTransferPreapprovalByParty(externalPartyOnboarding.party) should not be empty
+        provider.scanProxy.lookupTransferPreapprovalByParty(
+          externalPartyOnboarding.party
+        ) should not be empty
         submitResult
       },
     )
