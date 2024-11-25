@@ -222,28 +222,22 @@ M3 - TestNet Launch.
 
 ### IntelliJ Setup
 
-* Clone the repository first, if you haven't yet
-* Run `which java` and `which sbt` within `canton-network-node` directory to respectively find the JRE/SDK
-    and sbt versions used by nix. The outputs should roughly look as follows:
-    ```
-    canton-network-node$ which java
-    /nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/bin/java
-    canton-network-node$ which sbt
-    /nix/store/9q28hwzz8yy75l317k2v2mdq485hgja0-sbt-1.6.2/bin/sbt
-    ```
-* Add the Java SDK from nix per the instructions [in the Daml repo.](https://github.com/digital-asset/daml/blob/main/BAZEL.md#configuring-the-jdk-in-intellij)
- In the example above, the JDK would be at `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/lib/openjdk`.
-* Open the repository via 'File -> New -> Project from existing sources'
-* 'Import project from external model' and select sbt. If you don't see sbt, make sure you have the `Scala` IntelliJ plugins installed.
-* Point IntelliJ to the JRE home and sbt-launch jar. From the example above, these should respectively be
-        `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/` and
-        `/nix/store/9q28hwzz8yy75l317k2v2mdq485hgja0-sbt-1.6.2/share/sbt/bin/sbt-launch.jar`.
-* Also configure it with the JDK you added above. If the JDK doesn't show up as one of the options, you may need to
-    choose any other SDK and set up the correct SDK for the project after following the rest of the steps.
-    In that case, you will need to verify that all usages of the JDK in 'Settings' and 'Project Structure' use the correct
-    SDK.
-* Otherwise choose [these settings in the dialogue](https://i.imgur.com/B3yWCZ9.png) (see sbt explanations [here](https://www.jetbrains.com/help/idea/sbt.html))
-* Note that intellij must be started from within the project directory so the tools and environment provided by Nix are loaded correctly. On macos, this can be done via the `open` command, for example: `open -a "IntelliJ IDEA CE"`.
+* The following instructions work for recent IntelliJ installs (tested on "IntelliJ IDEA 2024.3 (Community Edition)").
+* Install the Scala plugin in IntelliJ if you don't have it yet.
+* Clone the repository first, if you haven't yet, and setup `direnv`
+  (otherwise the environment variables referenced below are not defined).
+* **Important**: start IntelliJ from the repo directory so that it has access to all the environment variables
+  and the `nix` packages defined using `direnv` .
+  On macos, this can be done via the `open` command, for example: `open -a "IntelliJ IDEA CE"`.
+* Open the repository via "File -> Open".
+* IntelliJ should prompt you whether you want to import the `sbt` project. Answer yes. The import will fail
+  though as the JDK and sbt launcher are not yet setup.
+* Determine the path for the JDK by running `echo $JAVA_HOME` in the repo root and add it to IntelliJ using
+  the "Add JDK from disk" action (can be found using Ctrl-Shift-A).
+* Determine the path of the sbt launcher using `echo $SBT_LAUNCH_PATH` and add it
+  using the "&launcher (sbt launch.jar)" config (can be found using Ctrl-Shift-A).
+  See sbt explanations [here](https://www.jetbrains.com/help/idea/sbt.html) for more info.
+* Your sbt settings should in the end roughly look like the ones in this [screenshot](https://i.imgur.com/B3yWCZ9.png)
 
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
