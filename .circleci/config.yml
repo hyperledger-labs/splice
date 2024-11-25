@@ -7473,7 +7473,7 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
-          migration_id: 4
+          migration_id: 0
           internal_stack: false
           context:
             - artifactory
@@ -7486,7 +7486,7 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "testnet"
-          migration_id: 4
+          migration_id: 0
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context
