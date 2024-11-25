@@ -63,7 +63,7 @@ enableWallet: true
 # AUTO_ACCEPT_START
 # To configure the validator to auto-accept transfer offers from specific parties, uncomment and fill in the following:
 #autoAcceptTransfers:
-#  "<receiverPartyId>"
+#  "<receiverPartyId>":
 #    fromParties:
 #      - "<senderPartyId>"
 # AUTO_ACCEPT_END

@@ -34,7 +34,7 @@ class ExternallySignedTxsTimeBasedIntegrationTest
       aliceValidatorWalletClient.tap(100.0)
 
       // Onboard external party 1
-      val onboarding1 = onboardExternalParty(aliceValidatorBackend, "externalParty1")
+      val onboarding1 = onboardExternalParty(aliceValidatorBackend, Some("externalParty1"))
       // Advance time a small amount to give time for the onboarding topo txs to become effective
       advanceTime(Duration.ofSeconds(5))
       val proposal1 = createExternalPartySetupProposal(aliceValidatorBackend, onboarding1)
@@ -77,7 +77,7 @@ class ExternallySignedTxsTimeBasedIntegrationTest
       )
 
       // Onboard external party 2
-      val onboarding2 = onboardExternalParty(aliceValidatorBackend, "externalParty2")
+      val onboarding2 = onboardExternalParty(aliceValidatorBackend, Some("externalParty2"))
       // Advance time a small amount to give time for the onboarding topo txs to become effective
       advanceTime(Duration.ofSeconds(5))
       val proposal2 = createExternalPartySetupProposal(aliceValidatorBackend, onboarding2)

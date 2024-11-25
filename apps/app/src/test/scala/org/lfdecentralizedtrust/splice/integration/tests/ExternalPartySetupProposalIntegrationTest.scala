@@ -148,7 +148,7 @@ class ExternalPartySetupProposalIntegrationTest
   "TransferPreapproval allows to transfer between externally signed parties" in { implicit env =>
     // Onboard and Create/Accept ExternalPartySetupProposal for Alice
     val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
-      onboardExternalParty(aliceValidatorBackend)
+      onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
     aliceValidatorBackend.participantClient.parties
       .hosted(filterParty = aliceParty.filterString) should not be empty
     aliceValidatorWalletClient.tap(50.0)
@@ -164,18 +164,18 @@ class ExternalPartySetupProposalIntegrationTest
       ) should not be empty
     }
 
-    // Transfer 40.0 to Alice
+    // Transfer 2000.0 to Alice
     aliceValidatorBackend
       .getExternalPartyBalance(aliceParty)
       .totalUnlockedCoin shouldBe "0.0000000000"
-    aliceValidatorWalletClient.transferPreapprovalSend(aliceParty, 40.0, UUID.randomUUID.toString)
+    aliceValidatorWalletClient.transferPreapprovalSend(aliceParty, 2000.0, UUID.randomUUID.toString)
     aliceValidatorBackend
       .getExternalPartyBalance(aliceParty)
-      .totalUnlockedCoin shouldBe "40.0000000000"
+      .totalUnlockedCoin shouldBe "2000.0000000000"
 
     // Onboard and Create/Accept ExternalPartySetupProposal for Bob
     val onboardingBob @ OnboardingResult(bobParty, _, _) =
-      onboardExternalParty(aliceValidatorBackend)
+      onboardExternalParty(aliceValidatorBackend, Some("bobExternal"))
     aliceValidatorBackend.participantClient.parties
       .hosted(filterParty = bobParty.filterString) should not be empty
     val (cidBob, _) =
@@ -239,12 +239,12 @@ class ExternalPartySetupProposalIntegrationTest
           ) should have length (1),
     )
 
-    // Transfer 10.0 from Alice to Bob
+    // Transfer 1000.0 from Alice to Bob
     val prepareSend =
       aliceValidatorBackend.prepareTransferPreapprovalSend(
         aliceParty,
         bobParty,
-        BigDecimal(10.0),
+        BigDecimal(1000.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         0L,
         verboseHashing = true,
@@ -274,12 +274,12 @@ class ExternalPartySetupProposalIntegrationTest
             .getExternalPartyBalance(aliceParty)
             .totalUnlockedCoin
         ) should beAround(
-          BigDecimal(40 - 10 - 6.1 - 6.0 /* 6.1 output fees, 6.0 sender change fees */ ) +
+          BigDecimal(2000 - 1000 - 16.0 - 6.0 /* 16 output fees, 6.0 sender change fees */ ) +
             BigDecimal(issuingRound.issuancePerUnfeaturedAppRewardCoupon) * appRewardAmount
         )
         aliceValidatorBackend
           .getExternalPartyBalance(bobParty)
-          .totalUnlockedCoin shouldBe "10.0000000000"
+          .totalUnlockedCoin shouldBe "1000.0000000000"
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
             aliceParty,
@@ -316,7 +316,7 @@ class ExternalPartySetupProposalIntegrationTest
           aliceParty.toProtoPrimitive,
           bobParty.toProtoPrimitive,
           aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive,
-          BigDecimal(10.0).bigDecimal,
+          BigDecimal(1000.0).bigDecimal,
           payload.expiresAt,
           0L,
         )
