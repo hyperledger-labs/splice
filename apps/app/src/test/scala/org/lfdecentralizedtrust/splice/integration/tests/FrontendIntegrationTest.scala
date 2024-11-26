@@ -621,7 +621,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
     val (_, needsAuthorization) = silentActAndCheck(
       "Auth0 login: Fill out and submit login form", {
-        textField(id("username")).value = username
+        emailField(id("username")).value = username
         find(id("password")).foreach(_.underlying.sendKeys(password))
         inside(findAll(name("action")).filter(_.text == "Continue").filter(_.isDisplayed).toSeq) {
           case Seq(button) =>
