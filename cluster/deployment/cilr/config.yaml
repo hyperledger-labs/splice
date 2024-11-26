@@ -3,10 +3,6 @@ infra:
     extraWhitelistedIngress:
       - "35.225.102.103/32" # CI GKE cluster for CCI
 synchronizerMigration:
-  archived:
-    - id: 3
-      provider: internal
-      releaseReference: "refs/tags/cilr-legacy"
   active:
     id: 4
     provider: external
