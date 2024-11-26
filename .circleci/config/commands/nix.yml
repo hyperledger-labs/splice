@@ -256,6 +256,7 @@ commands:
 
             # append random string to the cmd.sh file to avoid parallel steps writing and executing the same cmd.sh files
             CMD_FILE=$(mktemp cmd-XXXXXX.sh)
+            echo "temporary CMD_FILE: $CMD_FILE"
             cat \<<'EOF' > $CMD_FILE
 
               set -euo pipefail
@@ -348,11 +349,19 @@ commands:
                     # but this way we ensure all the commands will fail on error and no lead to confusing behaviour
                     # append random string to the cmd.sh file to avoid parallel steps writing and executing the same cmd.sh files
                     CMD_FILE_2=$(mktemp cmd-XXXXXX.sh)
+                    echo "temporary CMD_FILE_2: $CMD_FILE_2"
                     cat \<<'EOF2' > $CMD_FILE_2
                     set -euo pipefail
                     echo "Running command"
                     << parameters.cmd >>
             EOF2
+                    RESULT=$?
+
+                    if [ $RESULT -ne 0 ]; then
+                      echo "Failed to write command to CMD_FILE_2 $CMD_FILE_2"
+                      exit $RESULT
+                    fi
+                    echo "Wrote command to CMD_FILE $CMD_FILE_2"
                     bash $CMD_FILE_2
                   }
                   cmd_wrapper && break
@@ -368,6 +377,14 @@ commands:
                 exit 1
               fi
             EOF
+
+            RESULT=$?
+
+            if [ $RESULT -ne 0 ]; then
+              echo "Failed to write command to CMD_FILE $CMD_FILE"
+              exit $RESULT
+            fi
+            echo "Wrote command to CMD_FILE $CMD_FILE"
 
             echo "Running actual command"
             # Run the command for real within the nix environment

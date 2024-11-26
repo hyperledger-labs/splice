@@ -68,6 +68,7 @@ runs:
 
         # append random string to the cmd.sh file to avoid parallel steps writing and executing the same cmd.sh files
         CMD_FILE=$(mktemp cmd-XXXXXX.sh)
+        echo "temporary CMD_FILE: $CMD_FILE"
         cat <<'EOF' > $CMD_FILE
 
           set -euo pipefail
@@ -97,6 +98,13 @@ runs:
                 echo "Running command"
                 ${{ inputs.cmd }}
         EOF2
+                RESULT=$?
+
+                if [ $RESULT -ne 0 ]; then
+                  echo "Failed to write command to CMD_FILE_2 $CMD_FILE_2"
+                  exit $RESULT
+                fi
+                echo "Wrote command to CMD_FILE $CMD_FILE_2"
                 bash $CMD_FILE_2
               }
               cmd_wrapper && break
@@ -111,6 +119,14 @@ runs:
             exit 1
           fi
         EOF
+
+        RESULT=$?
+
+        if [ $RESULT -ne 0 ]; then
+          echo "Failed to write command to CMD_FILE $CMD_FILE"
+          exit $RESULT
+        fi
+        echo "Wrote command to CMD_FILE $CMD_FILE"
 
         ADDITIONAL_NIX_ARGS="${{ inputs.additional_nix_args }}"
 
