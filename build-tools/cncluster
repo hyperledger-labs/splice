@@ -643,6 +643,7 @@ function subcmd_create() {
         ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
         gcloud container clusters create "${GCP_CLUSTER_NAME}" \
                --create-subnetwork name="${GCP_CLUSTER_NAME}-subnet" \
+               --enable-dataplane-v2 \
                --enable-master-authorized-networks \
                --enable-ip-alias \
                --enable-private-nodes \
