@@ -7,7 +7,6 @@ import { load } from 'js-yaml';
 
 import { CnChartVersion } from './artifacts';
 import { config } from './config';
-import { spliceConfig } from './config/config';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 300;
@@ -73,7 +72,6 @@ export const sequencerPruningConfig = enableSequencerPruning
   : { enabled: false };
 
 const lowResourceSequencer = config.envFlag('SEQUENCER_LOW_RESOURCES', false);
-const veryHighResourceSequencer = spliceConfig.configuration.sequencerVeryHighResources;
 export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceRequirements } =
   lowResourceSequencer
     ? {
@@ -88,20 +86,7 @@ export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceR
           },
         },
       }
-    : veryHighResourceSequencer
-      ? {
-          resources: {
-            limits: {
-              cpu: '4',
-              memory: '12Gi',
-            },
-            requests: {
-              cpu: '3',
-              memory: '4Gi',
-            },
-          },
-        }
-      : {};
+    : {};
 export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
 );
