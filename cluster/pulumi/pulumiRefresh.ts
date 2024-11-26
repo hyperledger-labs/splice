@@ -9,7 +9,7 @@ async function runCoreStackRefresh() {
   operations.push(refreshStack(validator1, abortController));
   const splitwell = await stack('splitwell', 'splitwell', true, {});
   operations.push(refreshStack(splitwell, abortController));
-  awaitAllOrThrowAllExceptions(operations);
+  await awaitAllOrThrowAllExceptions(operations);
 }
 
 runCoreStackRefresh().catch(e => {

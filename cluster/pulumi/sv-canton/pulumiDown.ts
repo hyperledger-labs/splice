@@ -20,7 +20,9 @@ async function downMigrationId(migrationId: DomainMigrationIndex): Promise<void>
       await downStack(stack, abortController);
     })
   );
-  const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
+  const rejected = (
+    data.find(res => res.status === 'rejected') as PromiseRejectedResult | undefined
+  )?.reason;
   if (rejected) {
     throw new Error(rejected);
   }
@@ -34,7 +36,7 @@ async function downAllTheStacks() {
     for (const migrationId of extraMigrationsToReset) {
       downOperations.push(downMigrationId(migrationId));
     }
-    awaitAllOrThrowAllExceptions(downOperations);
+    await awaitAllOrThrowAllExceptions(downOperations);
     return null;
   });
 }

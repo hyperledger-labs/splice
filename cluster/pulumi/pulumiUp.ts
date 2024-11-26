@@ -18,7 +18,7 @@ async function runCoreStacksUp() {
       const splitwell = await stack('splitwell', 'splitwell', true, {});
       operations.push(upStack(splitwell, abortController));
     }
-    awaitAllOrThrowAllExceptions(operations);
+    await awaitAllOrThrowAllExceptions(operations);
   });
 }
 

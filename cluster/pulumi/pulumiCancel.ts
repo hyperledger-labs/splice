@@ -17,7 +17,7 @@ async function runCoreStackCancel() {
     const splitwell = await stack('splitwell', 'splitwell', true, {});
     operations.push(splitwell.cancel());
   }
-  awaitAllOrThrowAllExceptions(operations);
+  await awaitAllOrThrowAllExceptions(operations);
 }
 
 runCoreStackCancel().catch(e => {
