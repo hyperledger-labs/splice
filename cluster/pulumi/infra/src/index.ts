@@ -3,7 +3,7 @@ import { config } from 'splice-pulumi-common';
 
 import { clusterIsBeingReset, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
-import { clusterBasename } from './config';
+import { clusterBasename, clusterBaseDomain } from './config';
 import {
   installGcpLoggingAlerts,
   installMaintenanceUpdateAlerts,
@@ -14,7 +14,7 @@ import { configureNetwork } from './network';
 import { configureObservability } from './observability';
 import { configureStorage } from './storage';
 
-const network = configureNetwork(clusterBasename);
+const network = configureNetwork(clusterBasename, clusterBaseDomain);
 
 export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;

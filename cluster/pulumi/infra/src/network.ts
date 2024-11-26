@@ -269,7 +269,11 @@ class CantonNetwork extends pulumi.ComponentResource {
   ingressNs: ExactNamespace;
   dnsNames: string[];
 
-  constructor(clusterName: string, opts: pulumi.ComponentResourceOptions | undefined = undefined) {
+  constructor(
+    clusterName: string,
+    clusterBaseDomain: string,
+    opts: pulumi.ComponentResourceOptions | undefined = undefined
+  ) {
     super('canton:gcp:CantonNetwork', clusterName, {}, opts);
 
     const ingressIp = ipAddress(`cn-${clusterName}net-ip`);
@@ -299,7 +303,7 @@ class CantonNetwork extends pulumi.ComponentResource {
       daDnsName = `global.canton.network.digitalasset.com`;
       daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
     } else {
-      cantonGlobalDnsName = `${clusterName}.network.canton.global`;
+      cantonGlobalDnsName = `${clusterBaseDomain}.network.canton.global`;
       cantonGlobalDnsEntries = clusterDnsEntries(
         cantonGlobalDnsName,
         'canton-global',
@@ -307,7 +311,7 @@ class CantonNetwork extends pulumi.ComponentResource {
         publicIngressIp
       );
 
-      daDnsName = `${clusterName}.global.canton.network.digitalasset.com`;
+      daDnsName = `${clusterBaseDomain}.global.canton.network.digitalasset.com`;
       daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
     }
 
@@ -329,6 +333,9 @@ class CantonNetwork extends pulumi.ComponentResource {
   }
 }
 
-export function configureNetwork(clusterBasename: string): CantonNetwork {
-  return new CantonNetwork(clusterBasename);
+export function configureNetwork(
+  clusterBasename: string,
+  clusterBaseDomain: string
+): CantonNetwork {
+  return new CantonNetwork(clusterBasename, clusterBaseDomain);
 }

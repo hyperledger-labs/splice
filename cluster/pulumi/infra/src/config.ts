@@ -11,6 +11,10 @@ import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader'
 import { z } from 'zod';
 
 export const clusterBasename = pulumi.getStack().replace(/.*[.]/, '');
+
+export const clusterHostname = config.requireEnv('GCP_CLUSTER_HOSTNAME');
+export const clusterBaseDomain = clusterHostname.split('.')[0];
+
 export const gcpDnsProject = config.requireEnv('GCP_DNS_PROJECT');
 
 export const InfraConfigSchema = z.object({

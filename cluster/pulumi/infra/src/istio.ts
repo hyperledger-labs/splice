@@ -10,7 +10,7 @@ import {
   installSpliceHelmChart,
   isMainNet,
 } from '../../common';
-import { clusterBasename, loadIPRanges } from './config';
+import { clusterBaseDomain, clusterBasename, loadIPRanges } from './config';
 
 export const istioVersion = {
   istio: '1.22.2',
@@ -379,10 +379,10 @@ function configureGateway(
       cluster: {
         cantonHostname: isMainNet
           ? 'network.canton.global'
-          : `${clusterBasename}.network.canton.global`,
+          : `${clusterBaseDomain}.network.canton.global`,
         daHostname: isMainNet
           ? 'global.canton.network.digitalasset.com'
-          : `${clusterBasename}.global.canton.network.digitalasset.com`,
+          : `${clusterBaseDomain}.global.canton.network.digitalasset.com`,
         basename: clusterBasename,
       },
     },
