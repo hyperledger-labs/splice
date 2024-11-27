@@ -253,16 +253,19 @@ async def poll_for_transfer_command_status(
 ):
     async with asyncio.timeout(timeout):
         while True:
-            contract_with_status = await lookup_transfer_command_status(
-                party_id,
-                nonce,
-                contract_id_prefix,
-                scan_client
-            )
-            status = contract_with_status["status"]
-            logger.debug(f"Transfer command status: {status}")
-            if status["status"] in ["sent", "failed"]:
-                return contract_with_status
+            try:
+                contract_with_status = await lookup_transfer_command_status(
+                    party_id,
+                    nonce,
+                    contract_id_prefix,
+                    scan_client
+                )
+                status = contract_with_status["status"]
+                logger.debug(f"Transfer command status: {status}")
+                if status["status"] in ["sent", "failed"]:
+                    return contract_with_status
+            except HttpException:
+                logger.debug("Transfer command not found yet.")
             await asyncio.sleep(poll_interval)
 
 
