@@ -17,7 +17,7 @@ export class SpliceConfigContext {
       // fix difference between deployment folder name and cluster name
       return gcpclusterbasename.replace('scratch', 'scratchnet');
     } else {
-      const netSuffixedClusters = ['test', 'dev', 'main'];
+      const netSuffixedClusters = ['test', 'testzrh', 'dev', 'main', 'mainzrh'];
       if (
         netSuffixedClusters.some(cluster => {
           return cluster == gcpclusterbasename;

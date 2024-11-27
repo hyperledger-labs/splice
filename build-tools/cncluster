@@ -623,9 +623,6 @@ subcommand_whitelist[create]='Create a cluster from scratch.'
 function subcmd_create() {
     _prompt_to_confirm --no-lock
 
-    # TODO(#14069) -- new clusters in new regions need this created beforehand
-    CLOUDSDK_KMS_REGION="us-central1"
-
     if _cluster_exists; then
         _warning "Cluster already exists."
     else
@@ -698,9 +695,20 @@ function subcmd_create() {
         gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
     fi
 
+    # Check if a keyring exists in the region
+    set +e
+    gcloud kms keyrings describe pulumi --location "$CLOUDSDK_COMPUTE_REGION"
+    exit_code=$?
+    set -e
+
+    if [ $exit_code -ne 0 ]; then
+        # Create a keyring for pulumi
+        gcloud kms keyrings create pulumi --location "$CLOUDSDK_COMPUTE_REGION"
+    fi
+
     # Create a kms key for pulumi.
     set +e
-    error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_KMS_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
+    error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
     exit_code=$?
     set -e
 
@@ -708,7 +716,7 @@ function subcmd_create() {
       if [[ $error_message == *"ALREADY_EXISTS"* ]]; then
         # Rotate the key if it exists
         _log "ALREADY_EXISTS error encountered. Rotating the key..."
-        gcloud kms keys versions create --key "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_KMS_REGION" --keyring "pulumi" --primary
+        gcloud kms keys versions create --key "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --primary
       else
         _warning "Failed to create a KMS key for Pulumi."
         _log "$error_message"
