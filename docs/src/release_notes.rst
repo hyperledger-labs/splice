@@ -18,7 +18,14 @@ Upcoming
 0.3.0
 -----
 
-Note: This release must be applied through the :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` procedure
+.. important::
+
+    * **Daml recompilation may be required:** this release changes the definition of the ``AmuletRules`` template arguments,
+      as it introduces a new optional config value called ``transferPreapprovalFee`` (see :ref:`daml_changes_0.3.0`).
+      If your Daml code depends on ``splice-amulet`` < ``0.1.6``, then you **must
+      recompile** and redeploy it after the network was upgraded to ``splice-amulet-0.1.6`` and
+      before the SVs change this optional config value away from its default value.
+    * This release must be applied through the :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` procedure.
 
 * Canton
 
@@ -52,6 +59,79 @@ Note: This release must be applied through the :ref:`Synchronizer Upgrade with D
   * Added a new section to the Validator documentation on how to share the operator wallet with multiple users. See :ref:`validator-users`.
 
   * Added a new subsection to Supervalidator documentation documenting the URL conventions agreed upon by the SV operators.
+
+.. _daml_changes_0.3.0:
+
+Daml Changes in 0.3.0
+~~~~~~~~~~~~~~~~~~~~~
+
+The Daml changes introduce support for the external custody of the keys of a Daml party.
+Signatures required from these external parties can be collected via a crypto custodian's system, and
+can involve multiple human confirmers. Transactions submitted in the name of these parties can thus take
+multiple hours from the creation of the transaction signing request to the final commit of the transaction on the network.
+This increased latency required several changes in the Daml models underlying Amulet.
+They can be reviewed in detail by diffing the ``daml`` directory in the https://github.com/hyperledger-labs/splice
+repo.
+
+The key changes are summarized below:
+
+  * Changes the existing ``AmuletRules`` template:
+
+    * Add a new config field ``transferPreapprovalFee`` in the ``AmuletConfig`` stored in ``AmuletRules``.
+
+      **Important:** once this field is set to ``Some value``, you can no longer call choices on ``AmuletRules``
+      using Daml code built against a version before ``splice-amulet-0.1.6``! Please recompile and redistribute
+      your Daml code once the SVs have upgraded to ``splice-amulet-0.1.6`` on your target network.
+    * Add the choices ``AmuletRules_CreateTransferPreapproval`` and ``AmuletRules_CreateExternalPartySetupProposal``
+      explained below.
+
+  * New workflows and templates:
+
+    * Introduce the ability for a party to declare to the network that they are OK with receiving incoming Amulet transfers
+      from any party by creating a ``TransferPreapproval``. This is used by externally hosted parties to receive funds
+      without having to actively confirm that they are OK to receive the funds.
+      It must also be used by parties that want to receive funds from externally hosted parties,
+      as external party wallets currently do not use the transfer offer workflow.
+    * The ``TransferPreapproval`` contracts are expected to be created by the party’s crypto custodian, which pays the
+      yearly maintenance fee. That fee is configurable via DSO vote and initially set to $1 per year.
+      The payment itself happens by burning the corresponding amount of Amulet on purchase. In return for paying that fee,
+      the crypto custodian is recorded as the app provider and validator operator on all Amulet transfers executed via the
+      ``TransferPreapproval`` maintained by them.
+    * A helper workflow called an ``ExternalPartySetupProposal`` has been added for crypto custody providers to set up
+      both the ``TransferPreapproval`` and the ``ValidatorRight`` for an external party. The latter is required for
+      claiming validator activity records. That workflow is initiated by the crypto custody provider calling the
+      ``AmuletRules_CreateExternalPartySetupProposal`` choice.
+    * Parties can also directly purchase a ``TransferPreapproval`` using ``AmuletRules_CreateTransferPreapproval`` choice.
+    * Furthermore, parties are given the ability to delegate executing a Amulet transfer to a party of their choosing using the
+      ``ExternalPartyAmuletRules_CreateTransferCommand``. We introduced this feature because the normal Amulet transfer
+      transactions refer to the ``OpenMiningRound`` contracts, which are valid for at most 30 minutes
+      (10 minutes of pre-announcement time, and 2 * 10 minutes of active time). This time is too short to accommodate
+      the human-in-the-loop confirmation workflows of crypto custody providers, which in turn would result in failed
+      transactions due to referencing a stale round contract.
+    * The typical choice for the delegate is a normal party on the crypto custodians node. That party is expected to be
+      online and submit the actual transfer as soon as the ``TransferCommand`` is visible. The input amulets for the transfer
+      are selected by the delegate; and they are expected to select inputs that cover the required amount provided they exist.
+      In case there are not enough funds the ``TransferCommand`` gets archived and marked as failed.
+    * External parties creating multiple ``TransferCommands`` are protected from executing the same transfer twice using an
+      Ethereum style nonce tracked by the DSO, which must be sequentially increasing for a transfer command to be executed.
+      We expect the wallet of these parties to select the right nonce using information available from Amulet scan.
+      Having multiple transfer commands in-flight is supported.
+    * All transactions involving ``TransferCommands`` and ``TransferPreapprovals`` have the ``dso`` party as a signatory
+      and are thus always validated by ⅔ of the SV nodes.
+
+
+  * The Daml changes in this release require a governance vote to upgrade the package configs to:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.6
+    amuletNameService  0.1.6
+    dsoGovernance      0.1.9
+    validatorLifecycle 0.1.1
+    wallet             0.1.6
+    walletPayments     0.1.6
+    ================== =======
 
 
 0.2.8
