@@ -18,4 +18,5 @@ export * from './utils';
 export * from './packageConfig';
 export * from './stackReferences';
 export * from './artifacts';
+export * from './kms';
 export * from './config/migrationSchema';

@@ -16,19 +16,27 @@ import {
   REPO_ROOT,
   sanitizedForPostgres,
   SpliceCustomResourceOptions,
+  KmsConfig,
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+
+import { getParticipantKmsHelmResources } from './participantKms';
 
 export function installParticipant(
   migrationId: DomainMigrationIndex,
   xns: ExactNamespace,
   auth0Config: Auth0Config,
   nodeIdentifier: string,
+  kmsConfig?: KmsConfig,
   version: CnChartVersion = activeVersion,
   defaultPostgres?: postgres.Postgres,
   logLevel?: LogLevel,
   customOptions?: SpliceCustomResourceOptions
 ): { participantAddress: Output<string> } {
+  const { kmsValues, gkeCredentialsSecret } = kmsConfig
+    ? getParticipantKmsHelmResources(xns, kmsConfig)
+    : { kmsValues: {}, gkeCredentialsSecret: [] };
+
   const participantPostgres =
     defaultPostgres || postgres.installPostgres(xns, `participant-pg`, `participant-pg`, true);
   const participantValues: ChartValues = {
@@ -39,6 +47,7 @@ export function installParticipant(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
       { MIGRATION_ID: migrationId.toString() }
     ),
+    ...kmsValues,
     metrics: {
       enable: true,
     },
@@ -83,7 +92,9 @@ export function installParticipant(
     version,
     {
       ...(customOptions || {}),
-      dependsOn: (customOptions?.dependsOn || []).concat([participantPostgres]),
+      dependsOn: (customOptions?.dependsOn || [])
+        .concat([participantPostgres])
+        .concat(gkeCredentialsSecret),
     }
   );
   return {

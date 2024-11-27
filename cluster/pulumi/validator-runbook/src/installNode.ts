@@ -173,6 +173,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.h
     xns,
     auth0Client.getCfg(),
     validatorConfig.nodeIdentifier,
+    undefined,
     activeVersion,
     postgres,
     undefined,

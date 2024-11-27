@@ -23,6 +23,7 @@ import {
   installValidatorApp,
   installValidatorSecrets,
 } from 'splice-pulumi-common-validator/src/validator';
+import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 export async function installValidator1(
@@ -31,6 +32,7 @@ export async function installValidator1(
   onboardingSecret: string,
   validatorWalletUser: string,
   splitPostgresInstances: boolean,
+
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   installSplitwell: boolean,
   backupConfig?: BackupConfig,
@@ -52,6 +54,9 @@ export async function installValidator1(
     activeVersion,
     { dependsOn: [xns.ns] }
   );
+
+  const kmsConfig = spliceConfig.configuration.validator1?.kms;
+
   const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
@@ -75,6 +80,7 @@ export async function installValidator1(
     xns,
     auth0Client.getCfg(),
     'validator1',
+    kmsConfig,
     decentralizedSynchronizerMigrationConfig.active.version,
     defaultPostgres,
     undefined,

@@ -59,6 +59,7 @@
           unlock_shared_cluster: false
           silence_deployment_alerts: true
           context:
+            - artifactory
             - canton-network-vpn
             - slack-context
           requires:

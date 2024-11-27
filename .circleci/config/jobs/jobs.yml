@@ -7,7 +7,9 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in one place
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - run_bash_command_in_nix:

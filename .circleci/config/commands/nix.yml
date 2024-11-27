@@ -79,6 +79,9 @@ commands:
   setup_nix_self_hosted:
     description: Set up Nix self hosted
     parameters:
+      save:
+        type: boolean
+        default: false
       clone_command:
         type: string
         # order by name, mixed to try to reduce conflicts when running in multiple jobs at the same time
@@ -90,7 +93,7 @@ commands:
             set -euxo pipefail
             git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
             uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
-            echo "cci_cache_version: << pipeline.parameters.cache-version >>" >> /tmp/nix-cache-key # Add cache version to the cache key
+            echo "ci_cache_version: << pipeline.parameters.cache-version >>" >> /tmp/nix-cache-key # Add cache version to the cache key
             sudo mkdir -p /nix/store
             sudo chown -R $USER:$USER /nix
             cache_key=($(md5sum "/tmp/nix-cache-key"))

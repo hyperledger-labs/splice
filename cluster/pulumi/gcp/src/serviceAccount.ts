@@ -14,6 +14,8 @@ const roleToPulumiName = (role: Role): string => {
 };
 
 export class ServiceAccount extends pulumi.ComponentResource {
+  name: pulumi.Output<string>;
+
   constructor(
     name: string,
     args: {
@@ -28,6 +30,7 @@ export class ServiceAccount extends pulumi.ComponentResource {
     const { roles, ...gcpArgs } = args;
 
     const account = new gcp.serviceaccount.Account(`${name}-sa`, gcpArgs, opts);
+    this.name = account.name;
 
     roles.forEach(r => {
       const role = typeof r === 'string' ? r : r.id;
