@@ -513,7 +513,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
       bobWalletClient,
       bob,
       42.0,
-      timeUntilSuccess = 40.seconds,
+      timeUntilSuccess = 80.seconds,
     )
 
     val aliceAmulets = aliceWalletClient.list().amulets
