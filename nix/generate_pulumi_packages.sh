@@ -24,6 +24,7 @@ plugins=(
   "pulumi/random=4.14.0"
   "pulumi/gcp=7.2.1"
   "pulumi/auth0=3.3.2"
+  "pulumi/std=1.7.3"
   "pulumiverse/grafana=0.4.2"
 )
 
@@ -59,7 +60,7 @@ function genSrcs() {
     # url as defined here
     # https://github.com/pulumi/pulumi/blob/06d4dde8898b2a0de2c3c7ff8e45f97495b89d82/pkg/workspace/plugins.go#L197
     if [ "$src" == "pulumi" ]; then
-      local url="https://api.pulumi.com/releases/plugins/pulumi-resource-${plug}-v${version}-${1}-${2}.tar.gz"
+      local url="https://github.com/pulumi/pulumi-${plug}/releases/download/v${version}/pulumi-resource-${plug}-v${version}-${1}-${2}.tar.gz"
     elif [ "$src" == "pulumiverse" ]; then
       local url="https://github.com/pulumiverse/pulumi-${plug}/releases/download/v${version}/pulumi-resource-${plug}-v${version}-${1}-${2}.tar.gz"
     else
