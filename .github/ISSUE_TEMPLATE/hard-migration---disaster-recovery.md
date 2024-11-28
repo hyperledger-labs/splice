@@ -39,7 +39,7 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 
 - [ ] everyone scales down their CometBFT nodes with `kubectl scale deployment --replicas=0 -n <namespace> global-domain-<old-migration-id>-cometbft`
 - [ ] take backups with `cncluster backup_nodes`
-- [ ] agree on a timestamp based on logs (e.g., ask everyone for their latest `Commitment correct for sender` log entry on the participant and use the min of that)
+- [ ] agree on a timestamp based on logs (e.g., ask everyone for the `toInclusive` value of their latest `Commitment correct for sender and period CommitmentPeriod(fromExclusive = X, toInclusive = THIS)` log entry on the participant and use the min of that)
 - [ ] get the dumps with `cncluster take_disaster_recovery_dumps`
 - [ ] copy the dumps into our PVCs with `cncluster copy_disaster_recovery_dumps`
 - [ ] merge PR to migrate to higher migration ID

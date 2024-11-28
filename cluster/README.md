@@ -10,6 +10,8 @@
     - [Granting VPN Access to External Partners](#granting-vpn-access-to-external-partners)
     - [Connecting Locally Hosted Canton Network Apps to a Cluster](#connecting-locally-hosted-canton-network-apps-to-a-cluster)
     - [Network Configuration Within Kubernetes](#network-configuration-within-kubernetes)
+    - [Check live IP whitelist](#check-live-ip-whitelist)
+    - [Check cluster ingress and egress IPs](#check-cluster-ingress-and-egress-ips)
   - [Cluster Tooling](#cluster-tooling)
   - [Node Pools](#node-pools)
   - [Cluster Deployments](#cluster-deployments)
@@ -274,6 +276,22 @@ redirects a specific port to a given Kubernetes `Service`. The
 `Service`s are then backed by `Pod`s that serve the actual API
 request. To make the ledger API available to web frontends, we
 enable the JSON API support in our Canton participants.
+
+### Check live IP whitelist
+
+You can see the active whitelist of the cluster by running
+
+```
+kubectl describe svc -n cluster-ingress istio-ingress | grep "LoadBalancer"
+```
+
+### Check cluster ingress and egress IPs
+
+You can get the cluster's egress IP by running:
+
+```
+cncluster pulumi infra stack output
+```
 
 ## Cluster Tooling
 
@@ -1472,6 +1490,17 @@ The following steps assume that:
 
 See also: [Operating on Production Clusters](../OPERATIONS.md)
 
+### Spreadsheet steps
+
+As part of HDMs and DR practices there's a Google Docs spreadsheet where each SV partner marks themselves as ready for each step.
+We're also expected to follow the steps in the spreadsheet, which map to the instructions on the next section.
+However, the following steps don't require an action from us:
+
+- "There is identities dump from your SV available": this dump is taken when the application starts.
+  If you really want to make sure, you can check the logs of the SV app for an entry that says "Wrote node identities dump" [GCloud Logs example](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-testnet%22%0A%22Wrote%20node%20identities%20dump%22%0A;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T05:19:14.578112132Z;duration=PT30M?project=da-cn-devnet) around app startup.
+- "Copy Dump to sv-app": this is done as part of the `cncluster copy_disaster_recovery_dumps` command.
+- "Restored from the dump": this is done automatically by our pulumi/helm setup, but you do need to validate everything works properly afterward.
+
 #### Via the Pulumi operator
 
 1. Start a Slack thread on which you document the steps you take.
@@ -1485,22 +1514,25 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
    * if using `external` as the provider, generate and commit the Pulumi secret provider configuration files for the
      new stacks using the steps outlined in [troubleshooting external stacks](#troubleshooting-external-stacks) to
      ensure the pulumi preview job on your PR succeeds.
-1. If using `external` as the provider, deploy the operator from the deployment branch to create the new stacks CRs.
+1. If using `external` as the provider, deploy the operator from the deployment branch to create the new stack's k8s Custom Resources.
 1. Once the operator has applied your changes successfully and you can confirm that the cluster is (still) healthy (no alerts, health check failures etc.), report to our partners that you have completed the prepare step (setting a good example).
 1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
-1. Coordinate with all other SVs to schedule a migration via governance vote.
+1. Only for Hard Domain Migrations: Coordinate with all other SVs to schedule a migration via governance vote.
    For testing (or if our SVs have a governance majority) you can also run `cncluster hard_domain_migration_trigger`.
 1. Make sure that [validators](https://daholdings.slack.com/archives/C06QB1ZEGCE) are informed about the scheduled hard migration, the expected downtime associated with that, and the expected version and migration ID after the migration.
-1. Deactivate our periodic health checks, backups and backup status checks for the target cluster by merging a PR to `main`
-   (close to the scheduled synchronizer pausing date).
+1. Deactivate our periodic health checks for the target cluster by merging a PR to `main` (close to the scheduled synchronizer pausing date).
    If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
-1. Take down the `multi-validator` stack. From the deployment directory on the current release branch, run `CI=true cncluster pulumi multi-validator down`.
-1. Wait until the scheduled time has arrived, the domain is paused and a migration dump has been exported.
+   You can optionally disable backups and backup status checks. If you don't, they will just fail with no further consequences,
+   at least let people on monitoring rotation know that this is expected until HDM/DR is done.
+1. Take down the `multi-validator` stack if it exists. From the deployment directory on the current release branch, run `CI=true cncluster pulumi multi-validator down`.
+1. Request PAM access some time before the scheduled time.
+   Keep in mind a PAM request lasts for 4h, so you want to ensure you'll have PAM for the duration of the meeting.
+1. Wait until the scheduled time has arrived. For hard domain migrations, the domain should be paused and a migration dump should be exported.
    If unsure, check the logs of the SV app (and any validator apps) for an entry such as "Wrote domain migration dump"
    (e.g., via [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Wrote%20domain%20migration%20dump%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-09T13:01:30.491233228Z;duration=PT30M?project=da-cn-devnet)).
 1. Take a screenshot of the amulet balance of our SVs. You'll use this as a reference to check the balance after the migration is complete.
-1. Wait until all our apps have fully caught up.
+1. For hard domain migrations: Wait until all our apps have fully caught up.
    For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
    It's probably easiest to check this via the [GCE Log Explorer](https://console.cloud.google.com/logs/query;query=resource.labels.cluster_name%3D%22cn-devnet%22%0A%22Ingested%20transaction%22;summaryFields=resource%252Flabels%252Fnamespace_name:false:32:beginning;cursorTimestamp=2024-10-11T04:41:04.651869226Z;duration=PT30M?project=da-cn-devnet).
    Once you have verified this, move onto the next step quickly (no need to wait for the go-ahead from the person leading the call).
@@ -1556,6 +1588,13 @@ See also: [Operating on Production Clusters](../OPERATIONS.md)
 ##### Troubleshooting external stacks
 
 Upgrading a cluster to use external Canton stacks leads to known failures that need to be addressed via manual steps.
+The following steps need to be run before a Hard Domain Migration or a Disaster Recovery:
+
+1. Change to the correct cluster directory. e.g. `cluster/deployment/devnet`
+1. For each SV namespace, run the following command to refresh the Pulumi stack and generate the corresponding secret provider configuration:
+   `CI=1 SPLICE_MIGRATION_ID=<migration-id> SPLICE_SV=<sv-namespace> cncluster pulumi sv-canton refresh --skip-preview --yes`
+1. Commit the generated yaml files to `main` as well as to the branch you're deploying from.
+   They should be of the form `Pulumi.sv-canton.<sv-namespace>-migration-<migration-id>.<cluster>.yaml`
 
 If the operator complains that a stack doesn't exist, try refreshing manually.
 
@@ -1563,13 +1602,7 @@ If you (then) see error logs like:
 ```
 error: constructing secrets manager of type "passphrase": constructing secrets manager: passphrase must be set with PULUMI_CONFIG_PASSPHRASE or PULUMI_CONFIG_PASSPHRASE_FILE environment variables
 ```
-You need to commit the new Pulumi files generated by the manual refresh.
-
-1. Change to the correct cluster directory. e.g. `cluster/deployment/devnet`
-1. For each SV namespace, run the following command to refresh the Pulumi stack and generate the corresponding secret provider configuration:
-   `CI=1 SPLICE_MIGRATION_ID=<migration-id> SPLICE_SV=<sv-namespace> cncluster pulumi sv-canton refresh --skip-preview --yes`
-1. Commit the generated yaml files to `main` as well as to the branch you're deploying from.
-   They should be of the form `Pulumi.sv-canton.<sv-namespace>-migration-<migration-id>.<cluster>.yaml`
+You need to commit the new Pulumi files generated by the manual refresh following the steps above.
 
 #### Manual steps
 
