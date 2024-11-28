@@ -555,7 +555,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-4",
+      "name": "participant-0",
       "namespace": "splitwell",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -598,7 +598,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 4
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -609,7 +609,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_4",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -624,7 +624,7 @@
       },
       "version": "0.2.8"
     },
-    "name": "splitwell-participant-4",
+    "name": "splitwell-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -732,9 +732,9 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 0
         },
-        "participantHost": "participant-4",
+        "participantHost": "participant-0",
         "persistence": {
           "databaseName": "app_splitwell",
           "port": 5432,
@@ -946,8 +946,7 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
-          "legacyId": 3,
+          "id": 0,
           "migrating": false
         },
         "nodeIdentifier": "splitwell",
@@ -958,7 +957,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-0",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

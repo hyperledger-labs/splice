@@ -631,8 +631,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "4",
-              "3"
+              "0"
             ]
           }
         },
@@ -751,9 +750,9 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 0
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_1",
           "port": 5432,
@@ -762,7 +761,7 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
-        "sequencerAddress": "global-domain-4-sequencer",
+        "sequencerAddress": "global-domain-0-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -882,21 +881,21 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "http://global-domain-4-sequencer.sv-1:5008",
+        "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-4-mediator",
-          "sequencerAddress": "global-domain-4-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-4.sv-2.test.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-0.sv-2.test.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "expectedValidatorOnboardings": [
@@ -931,6 +930,7 @@
           },
           "prefix": "test/sv-1"
         },
+        "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.4\",\"amuletNameServiceVersion\": \"0.1.4\",\"dsoGovernanceVersion\": \"0.1.7\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.4\",\"walletPaymentsVersion\": \"0.1.4\"}",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 200000,
           "baseRateBurstWindowMins": 20,
@@ -943,8 +943,7 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
-          "legacyId": 3,
+          "id": 0,
           "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
@@ -952,7 +951,7 @@
         "onboardingName": "Digital-Asset-2",
         "onboardingRoundZeroDuration": "27 h",
         "onboardingType": "found-dso",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -1034,7 +1033,7 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-4.sv-2.test.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-2.test.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -1042,10 +1041,10 @@
           "enable": true
         },
         "migration": {
-          "id": 4
+          "id": 0
         },
         "nodeIdentifier": "Digital-Asset-2",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-0",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -1091,10 +1090,10 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64529b128448ded6aa68048f",
         "walletSweep": {
-          "Digital-Asset-2::12206a4847b4e2b7a9058552942ae4669d8d8fc8a8042f4627ef84fc5585799268f9": {
+          "Digital-Asset-2::1220d8749a807f84ffd21562284604a94e450762046c2f70d7a2edb240d98df68524": {
             "maxBalanceUSD": 3000,
             "minBalanceUSD": 100,
-            "receiver": "validator_validator_service_user::1220e9b9e2c059a3fb73f3789d5687c2c7ad0d694e454e4b6c63da20191ccbf87e1d"
+            "receiver": "DigitalAsset-Wallet-1::12207fda6d83dee700f4808ed425588faeba3ceb5f3f220f78ce13a74e54183732b9"
           }
         }
       },

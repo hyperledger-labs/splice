@@ -367,7 +367,7 @@
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "4"
+            "activeMigrationId": "0"
           },
           "splitwell": true
         },
@@ -508,7 +508,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-4",
+      "name": "participant-0",
       "namespace": "validator1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -551,7 +551,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 4
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -562,7 +562,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_4",
+          "databaseName": "participant_0",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -577,7 +577,7 @@
       },
       "version": "0.2.8"
     },
-    "name": "validator1-participant-4",
+    "name": "validator1-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -820,8 +820,7 @@
           "enable": true
         },
         "migration": {
-          "id": 4,
-          "legacyId": 3,
+          "id": 0,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -832,7 +831,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-0",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {

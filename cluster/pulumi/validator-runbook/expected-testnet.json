@@ -412,7 +412,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-4",
+      "name": "participant-0",
       "namespace": "validator",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -455,7 +455,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 4
+            "id": 0
           }
         },
         "participantAdminUserNameFrom": {
@@ -466,7 +466,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_4",
+          "databaseName": "participant_0",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -482,7 +482,7 @@
       },
       "version": "0.2.8"
     },
-    "name": "validator-participant-4",
+    "name": "validator-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -629,10 +629,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "4"
+          "id": "0"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-4",
+        "participantAddress": "participant-0",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
