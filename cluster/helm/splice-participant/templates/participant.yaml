@@ -56,6 +56,19 @@ spec:
         - name: CANTON_PARTICIPANT_POSTGRES_DB
           value: {{ .Values.persistence.databaseName }}
         {{- end }}
+        {{- if .Values.kms }}
+        - name: ADDITIONAL_CONFIG_SPLICE_PARTICIPANT_CRYPTO_PROVIDER_KMS
+          value: |
+            canton.participants.participant.crypto {
+              provider = kms
+              kms = {
+                type = {{ .Values.kms.type }}
+                location-id = {{ .Values.kms.locationId }}
+                project-id = {{ .Values.kms.projectId }}
+                key-ring-id = {{ .Values.kms.keyRingId }}
+              }
+            }
+        {{- end }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "splice-util-lib.log-level" .Values | indent 8}}
         ports:
@@ -91,6 +104,19 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
+        {{- if and .Values.extraVolumeMounts (gt (len .Values.extraVolumeMounts) 0) }}
+        volumeMounts:
+          {{- range .Values.extraVolumeMounts }}
+          - name: {{ .name }}
+            mountPath: {{ .mountPath }}
+            {{- if .subPath }}
+            subPath: {{ .subPath }}
+            {{- end }}
+            {{- if .readOnly }}
+            readOnly: {{ .readOnly }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
       initContainers:
         - name: pg-init
           image: postgres:14
@@ -124,6 +150,16 @@ spec:
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if and .Values.extraVolumes (gt (len .Values.extraVolumes) 0) }}
+      volumes:
+        {{- range .Values.extraVolumes }}
+        - name: {{ .name }}
+          {{- if .secret }}
+          secret:
+            secretName: {{ .secret.secretName }}
+          {{- end }}
+        {{- end }}
       {{- end }}
 ---
 apiVersion: v1
