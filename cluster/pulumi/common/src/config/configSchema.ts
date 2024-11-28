@@ -1,4 +1,3 @@
-import { Validator1ConfigSchema } from 'validator1/src/config';
 import { z } from 'zod';
 
 import { defaultActiveMigration, SynchronizerMigrationSchema } from './migrationSchema';
@@ -12,7 +11,6 @@ export const ConfigSchema = z.object({
     active: defaultActiveMigration,
   }),
   persistentSequencerHeapDumps: z.boolean().default(false),
-  validator1: Validator1ConfigSchema.optional(),
   pulumiProjectConfig: z
     .record(z.string(), PulumiProjectConfigSchema)
     .and(

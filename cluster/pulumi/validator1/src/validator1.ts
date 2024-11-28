@@ -23,8 +23,9 @@ import {
   installValidatorApp,
   installValidatorSecrets,
 } from 'splice-pulumi-common-validator/src/validator';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
+
+import { validator1Config } from './config';
 
 export async function installValidator1(
   auth0Client: Auth0Client,
@@ -55,7 +56,7 @@ export async function installValidator1(
     { dependsOn: [xns.ns] }
   );
 
-  const kmsConfig = spliceConfig.configuration.validator1?.kms;
+  const kmsConfig = validator1Config?.kms;
 
   const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
 

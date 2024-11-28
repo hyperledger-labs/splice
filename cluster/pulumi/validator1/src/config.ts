@@ -1,14 +1,23 @@
+import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 export const Validator1ConfigSchema = z.object({
-  kms: z
+  validator1: z
     .object({
-      type: z.string(),
-      locationId: z.string(),
-      projectId: z.string(),
-      keyRingId: z.string(),
+      kms: z
+        .object({
+          type: z.string(),
+          locationId: z.string(),
+          projectId: z.string(),
+          keyRingId: z.string(),
+        })
+        .optional(),
     })
     .optional(),
 });
 
-export type Validator1Config = z.infer<typeof Validator1ConfigSchema>;
+export type Config = z.infer<typeof Validator1ConfigSchema>;
+
+// eslint-disable-next-line
+// @ts-ignore
+export const validator1Config = Validator1ConfigSchema.parse(clusterYamlConfig).validator1;
