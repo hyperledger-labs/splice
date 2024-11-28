@@ -8,8 +8,17 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.1
+-----
+
+.. important::
+
+    * This release fixes an upgrading-related bug in 0.3.0.
+      Please skip 0.3.0 and upgrade directly to 0.3.1 through the :ref:`Synchronizer Upgrade with Downtime <sv-upgrades>` procedure.
+
+* Bugfixes
+
+  * Fix Canton topology import issue that can cause synchronizer upgrades with downtime to fail on some networks.
 
 * Deployment
 
