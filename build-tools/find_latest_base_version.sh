@@ -8,4 +8,4 @@ set -euo pipefail
 
 # latest_release=$(cat "$REPO_ROOT/LATEST_RELEASE")
 # TODO(#15852) Switch this back to latest_release
-echo "release-line-0.3.0"
+echo "release-line-0.3.1"
