@@ -2,7 +2,6 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as semver from 'semver';
 import * as postgres from 'splice-pulumi-common/src/postgres';
-import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
@@ -25,6 +24,7 @@ import {
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
+  InstalledHelmChart,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
@@ -32,8 +32,8 @@ import {
   sanitizedForPostgres,
   spliceInstanceNames,
   SvIdKey,
-  validatorOnboardingSecretName,
   updateHistoryBackfillingValues,
+  validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
   DecentralizedSynchronizerNode,
@@ -113,8 +113,8 @@ export type SvOnboarding =
 
 export type InstalledSv = {
   validatorApp: Resource;
-  svApp: Release;
-  scan: Release;
+  svApp: InstalledHelmChart;
+  scan: InstalledHelmChart;
   decentralizedSynchronizer: DecentralizedSynchronizerNode;
   participant: SvParticipant;
   ingress: Resource;
@@ -465,7 +465,7 @@ function installScan(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   nodename: string,
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
-  svApp: Release,
+  svApp: pulumi.Resource,
   participant: SvParticipant,
   postgres: Postgres
 ) {

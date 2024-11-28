@@ -1,6 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   Auth0Config,
   autoInitValues,
@@ -8,6 +7,7 @@ import {
   DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
+  InstalledHelmChart,
   installSpliceHelmChart,
   jmxOptions,
   loadYamlFromFile,
@@ -33,7 +33,7 @@ export function installSvParticipant(
   onboardingName: string,
   participantAdminUserNameFrom?: k8s.types.input.core.v1.EnvVarSource,
   customOptions?: SpliceCustomResourceOptions
-): Release {
+): InstalledHelmChart {
   const name = `participant-${migrationId}`;
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {

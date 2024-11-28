@@ -2,13 +2,13 @@ import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
 import * as _ from 'lodash';
-import { Release } from '@pulumi/kubernetes/helm/v3';
+import { Resource } from '@pulumi/pulumi';
 
 import { config } from './config';
 import { activeVersion } from './domainMigration';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
-import { ChartValues, clusterSmallDisk, ExactNamespace, CLUSTER_BASENAME, GCP_ZONE } from './utils';
+import { ChartValues, CLUSTER_BASENAME, clusterSmallDisk, ExactNamespace, GCP_ZONE } from './utils';
 
 const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
 const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);
@@ -161,7 +161,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
   instanceName: string;
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
-  pg: Release;
+  pg: Resource;
   secretName: pulumi.Output<string>;
 
   constructor(

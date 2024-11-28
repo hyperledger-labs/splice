@@ -1,7 +1,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as _ from 'lodash';
-import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
@@ -12,6 +11,7 @@ import {
   DomainMigrationIndex,
   ExactNamespace,
   GCP_ZONE,
+  InstalledHelmChart,
   installSpliceHelmChart,
   isDevNet,
   loadYamlFromFile,
@@ -27,7 +27,7 @@ import { disableCometBftStateSync } from './cometbftConfig';
 
 export type Cometbft = {
   rpcServiceName: string;
-  release: Release;
+  release: InstalledHelmChart;
 };
 
 /**

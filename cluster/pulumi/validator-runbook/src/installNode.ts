@@ -1,4 +1,3 @@
-import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import _ from 'lodash';
 import {
@@ -35,6 +34,7 @@ import {
   spliceInstanceNames,
   validatorSecrets,
   ValidatorTopupConfig,
+  InstalledHelmChart,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
@@ -131,12 +131,12 @@ type ValidatorConfig = {
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
   otherDeps: CnInput<pulumi.Resource>[];
-  loopback: k8s.helm.v3.Release | null;
+  loopback: InstalledHelmChart | null;
   backupConfigSecret?: pulumi.Resource;
   nodeIdentifier: string;
 };
 
-async function installValidator(validatorConfig: ValidatorConfig): Promise<k8s.helm.v3.Release> {
+async function installValidator(validatorConfig: ValidatorConfig): Promise<InstalledHelmChart> {
   const {
     xns,
     onboardingSecret,

@@ -1,4 +1,3 @@
-import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as semver from 'semver';
 import {
@@ -40,6 +39,7 @@ import {
   DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
   UPDATE_HISTORY_BACKFILLING_BATCH_SIZE,
+  InstalledHelmChart,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -162,7 +162,7 @@ type SvConfig = {
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
-  loopback: k8s.helm.v3.Release | null;
+  loopback: InstalledHelmChart | null;
   backupConfigSecret?: pulumi.Resource;
   svKey: CnInput<SvIdKey>;
   onboardingName: string;

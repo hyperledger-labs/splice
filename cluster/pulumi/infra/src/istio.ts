@@ -7,6 +7,7 @@ import {
   ExactNamespace,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
+  InstalledHelmChart,
   installSpliceHelmChart,
   isMainNet,
 } from '../../common';
@@ -370,7 +371,7 @@ function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
-): k8s.helm.v3.Release {
+): InstalledHelmChart {
   return installSpliceHelmChart(
     ingressNs,
     'cluster-gateway',
@@ -399,7 +400,7 @@ export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
   publicIngressIp: pulumi.Output<string>
-): k8s.helm.v3.Release {
+): InstalledHelmChart {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
     metadata: {

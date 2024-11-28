@@ -1,13 +1,13 @@
-import * as k8s from '@pulumi/kubernetes';
 import * as random from '@pulumi/random';
 import {
   activeVersion,
   ExactNamespace,
   installSpliceRunbookHelmChart,
   installPostgresPasswordSecret,
+  InstalledHelmChart,
 } from 'splice-pulumi-common';
 
-export function installPostgres(xns: ExactNamespace, name: string): k8s.helm.v3.Release {
+export function installPostgres(xns: ExactNamespace, name: string): InstalledHelmChart {
   const password = new random.RandomPassword(`${xns.logicalName}-${name}-passwd`, {
     length: 16,
     overrideSpecial: '_%@',

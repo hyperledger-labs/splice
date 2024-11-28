@@ -8,7 +8,9 @@ import path from 'path';
 
 import { CnChartVersion, repositories } from './artifacts';
 import { config } from './config';
+import { spliceConfig } from './config/config';
 import { activeVersion } from './domainMigration';
+import { PulumiPlaceholderResource } from './pulumiUtilResources';
 import {
   artifactsRepository,
   ChartValues,
@@ -24,6 +26,8 @@ import {
   loadYamlFromFile,
   REPO_ROOT,
 } from './utils';
+
+export type InstalledHelmChart = Release | PulumiPlaceholderResource;
 
 // The default type of dependsOn is an unworkable abonimation.
 export type SpliceCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'dependsOn'> & {
@@ -72,7 +76,7 @@ function installSpliceHelmChartByNamespaceName(
   includeNamespaceInName = true,
   affinityAndTolerations = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
-): Release {
+): InstalledHelmChart {
   return new k8s.helm.v3.Release(
     includeNamespaceInName ? `${nsLogicalName}-${name}` : name,
     {
@@ -82,7 +86,7 @@ function installSpliceHelmChartByNamespaceName(
       version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
       repositoryOpts: repositoryOpts(version),
       values: {
-        ...cnChartValues(nsLogicalName, version, chartName, values),
+        ...cnChartValues(version, chartName, values),
         ...affinityAndTolerations,
         ...imagePullPolicy,
       },
@@ -103,7 +107,7 @@ export function installSpliceHelmChart(
   includeNamespaceInName = true,
   affinityAndTolerations = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
-): Release {
+): InstalledHelmChart {
   return installSpliceHelmChartByNamespaceName(
     xns.logicalName,
     xns.ns.metadata.name,
@@ -119,7 +123,6 @@ export function installSpliceHelmChart(
 }
 
 function cnChartValues(
-  nsLogicalName: string,
   version: CnChartVersion,
   chartName: string,
   overrideValues: ChartValues = {}
@@ -128,7 +131,7 @@ function cnChartValues(
   const chartDefaultValues =
     version.type === 'local' ? loadYamlFromFile(`${chartPath(chartName, version)}values.yaml`) : {};
 
-  const values = _.mergeWith(
+  return _.mergeWith(
     {},
     chartDefaultValues,
     {
@@ -151,8 +154,6 @@ function cnChartValues(
     overrideValues,
     (a, b) => (_.isArray(b) ? b : undefined)
   );
-
-  return values;
 }
 
 export function installSpliceRunbookHelmChartByNamespaceName(
@@ -164,33 +165,37 @@ export function installSpliceRunbookHelmChartByNamespaceName(
   version: CnChartVersion = activeVersion,
   opts?: SpliceCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
-): k8s.helm.v3.Release {
-  return new k8s.helm.v3.Release(
-    name,
-    {
-      name: name,
-      namespace: nsMetadataName,
-      chart: chartPath(chartName, version),
-      version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
-      repositoryOpts: repositoryOpts(version),
-      values: {
-        ...values,
-        // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
-        imageRepo:
-          version.type === 'local' ||
-          artifactsRepository === 'google' ||
-          dockerImageArtifactsRepository === 'google'
-            ? repositories.google.dockerImages
-            : undefined,
-        ...appsAffinityAndTolerations,
-        // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
-        clusterUrl: CLUSTER_HOSTNAME,
+): InstalledHelmChart {
+  if (spliceConfig.pulumiProjectConfig.installDataOnly) {
+    return new PulumiPlaceholderResource(name);
+  } else {
+    return new k8s.helm.v3.Release(
+      name,
+      {
+        name: name,
+        namespace: nsMetadataName,
+        chart: chartPath(chartName, version),
+        version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
+        repositoryOpts: repositoryOpts(version),
+        values: {
+          ...values,
+          // We pull images from artifactory if we have a remote version and not explicitly set to use gcp artifact registry
+          imageRepo:
+            version.type === 'local' ||
+            artifactsRepository === 'google' ||
+            dockerImageArtifactsRepository === 'google'
+              ? repositories.google.dockerImages
+              : undefined,
+          ...appsAffinityAndTolerations,
+          // TODO(#14409): remove this once migration tests stop using 0.1 releases (we removed this variable in 0.2.0)
+          clusterUrl: CLUSTER_HOSTNAME,
+        },
+        timeout,
+        maxHistory: HELM_MAX_HISTORY_SIZE,
       },
-      timeout,
-      maxHistory: HELM_MAX_HISTORY_SIZE,
-    },
-    opts
-  );
+      opts
+    );
+  }
 }
 
 export function installSpliceRunbookHelmChart(
@@ -201,7 +206,7 @@ export function installSpliceRunbookHelmChart(
   version: CnChartVersion = activeVersion,
   opts?: SpliceCustomResourceOptions,
   timeout: number = HELM_CHART_TIMEOUT_SEC
-): k8s.helm.v3.Release {
+): InstalledHelmChart {
   return installSpliceRunbookHelmChartByNamespaceName(
     ns.ns.metadata.name,
     ns.logicalName,
