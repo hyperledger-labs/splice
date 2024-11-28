@@ -37,6 +37,7 @@ export function installCanton(
     },
     peers: [],
   };
+  installCometbftKeys(svNamespace);
   const externalActiveMigration = {
     decentralizedSynchronizer: new CrossStackDecentralizedSynchronizerNode(
       activeMigrationId,
@@ -71,7 +72,6 @@ export function installCanton(
       decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
     );
 
-    installCometbftKeys(svNamespace);
     const installedMigrations = migrationsContainedInStack.map(migration => {
       return {
         migration,
