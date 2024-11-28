@@ -19,4 +19,5 @@ export * from './packageConfig';
 export * from './stackReferences';
 export * from './artifacts';
 export * from './kms';
+export * from './serviceAccount';
 export * from './config/migrationSchema';

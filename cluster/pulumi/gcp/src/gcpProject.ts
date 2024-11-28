@@ -1,9 +1,8 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { config } from 'splice-pulumi-common';
+import { config, ServiceAccount } from 'splice-pulumi-common';
 
 import { ImportedSecret } from './importedSecret';
-import { ServiceAccount } from './serviceAccount';
 
 class GcpProject extends pulumi.ComponentResource {
   opts?: pulumi.CustomResourceOptions;

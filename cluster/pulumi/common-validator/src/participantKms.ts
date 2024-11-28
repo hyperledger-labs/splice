@@ -1,8 +1,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as std from '@pulumi/std';
-import { ServiceAccount } from 'gcp-pulumi-deployment/src/serviceAccount';
-import { CLUSTER_BASENAME, ExactNamespace, KmsConfig } from 'splice-pulumi-common';
+import { CLUSTER_BASENAME, ExactNamespace, KmsConfig, ServiceAccount } from 'splice-pulumi-common';
 
 export type ParticipantKmsHelmResources = {
   kms: KmsConfig;
