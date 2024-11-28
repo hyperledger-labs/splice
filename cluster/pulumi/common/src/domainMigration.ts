@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { CnChartVersion } from './artifacts';
 import { spliceConfig } from './config/config';
 import { Config } from './config/configSchema';
 import { MigrationInfoSchema, MigrationProvider } from './config/migrationSchema';
@@ -76,40 +75,6 @@ export class DecentralizedSynchronizerMigrationConfig {
 export type MigrationInfo = z.infer<typeof MigrationInfoSchema>;
 
 export type DomainMigrationIndex = number;
-
-export function installMigrationIdSpecificComponent<T>(
-  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig,
-  component: (migrationId: DomainMigrationIndex, isActive: boolean, version: CnChartVersion) => T
-): {
-  activeComponent: T;
-  legacyComponent?: T;
-  upgradeComponent?: T;
-} {
-  return {
-    activeComponent: component(
-      decentralizedSynchronizerUpgradeConfig.active.id,
-      true,
-      decentralizedSynchronizerUpgradeConfig.active.version
-    ),
-    legacyComponent:
-      decentralizedSynchronizerUpgradeConfig.legacy != undefined
-        ? component(
-            decentralizedSynchronizerUpgradeConfig.legacy.id,
-            false,
-            decentralizedSynchronizerUpgradeConfig.legacy.version
-          )
-        : undefined,
-    upgradeComponent:
-      decentralizedSynchronizerUpgradeConfig.upgrade != undefined
-        ? component(
-            decentralizedSynchronizerUpgradeConfig.upgrade.id,
-            false,
-            decentralizedSynchronizerUpgradeConfig.upgrade.version
-          )
-        : undefined,
-  };
-}
-
 export const DecentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
   new DecentralizedSynchronizerMigrationConfig(spliceConfig.configuration);
 
