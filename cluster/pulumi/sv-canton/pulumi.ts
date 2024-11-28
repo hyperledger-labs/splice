@@ -1,4 +1,5 @@
 import * as automation from '@pulumi/pulumi/automation';
+import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
 import { config } from 'splice-pulumi-common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
 // as we have no pulumi runtime
@@ -40,7 +41,6 @@ export async function stackForMigration(
 }
 
 const onlyRunbook = config.envFlag('SPLICE_DEPLOY_ONLY_SV_RUNBOOK');
-const dsoSize = parseInt(config.requireEnv('DSO_SIZE'));
 const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
 const coreSvs = onlyRunbook ? [] : Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
 export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
@@ -65,7 +65,9 @@ export async function runForAllMigrations<T>(
         ret.set([migration, sv], result);
       })
     );
-    const rejected = (data.find((res) => res.status === "rejected") as PromiseRejectedResult | undefined)?.reason
+    const rejected = (
+      data.find(res => res.status === 'rejected') as PromiseRejectedResult | undefined
+    )?.reason;
     if (rejected) {
       throw new Error(rejected);
     }

@@ -5,3 +5,4 @@ export * from './synchronizer/decentralizedSynchronizerNode';
 export * from './canton';
 export * from './participant';
 export * from './svConfigs';
+export * from './dsoConfig';

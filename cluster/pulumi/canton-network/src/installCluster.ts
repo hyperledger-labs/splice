@@ -11,7 +11,7 @@ import {
   svOnboardingPollingInterval,
   svValidatorTopupConfig,
 } from 'splice-pulumi-common';
-import { getDsoSize } from 'splice-pulumi-common-sv';
+import { dsoSize } from 'splice-pulumi-common-sv';
 import { readBackupConfig } from 'splice-pulumi-common-validator/src/backup';
 import {
   mustInstallSplitwell,
@@ -76,8 +76,7 @@ export async function installCluster(
   }
 
   const dso = new Dso('dso', {
-    dsoSize: getDsoSize(),
-
+    dsoSize: dsoSize,
     auth0Client,
     approvedSvIdentities: approveSvRunbook ? svRunbookApprovedSvIdentities : [],
     expectedValidatorOnboardings,
