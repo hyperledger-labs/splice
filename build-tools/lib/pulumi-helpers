@@ -55,10 +55,77 @@ function _cluster_reset() {
     export CHARTS_VERSION="local"
     _info "Uninstalling Pulumi canton-network and runbook stacks"
 
-    _pulumi_automation_run_down
+    # Array to hold the PIDs of background jobs
+    pids=()
+    # Array to hold the exit statuses of background jobs
+    statuses=()
+
+    # Function to down a stack in the background and capture its PID
+    bg_down_stack() {
+      _down_stack "$1" &
+      pids+=($!)
+    }
+
+    _pulumi_automation_run_down &
+    pids+=($!)
+    bg_down_stack multi-validator
+    bg_down_stack sv-runbook
+    bg_down_stack validator-runbook
+    bg_down_stack deployment
+
+    # Wait for all background jobs and capture their exit statuses
+    for pid in "${pids[@]}"; do
+      wait "$pid"
+      statuses+=($?)
+    done
+
+    # Run this afterwards as most resources will be removed with the namespace, and we run refresh beforehand, so it should be fast
+    subcmd_pulumi_down_canton
+
+    for status in "${statuses[@]}"; do
+      if [ "$status" -ne 0 ]; then
+        exit "$status"
+      fi
+    done
 
     _info "Cluster in reset/idle state."
 }
+
+function _down_stack() {
+    PROJECT=$1
+
+    _info "Uninstalling Pulumi ${PROJECT} stack"
+
+    RETCODE=0
+    ERRFILE="./.tmp_ERRFILE"
+    ERRMSG=""
+
+    touch "$ERRFILE"
+
+    subcmd_pulumi "$PROJECT" down --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || { RETCODE="$?"; ERRMSG=$(cat "$ERRFILE")
+    }
+
+    rm -rf "$ERRFILE"
+
+    if [ "$RETCODE" -ne 0 ]; then
+        case "${ERRMSG}" in
+            *"the stack is currently locked"*)
+                echo "Retrying because of lock on stack $PROJECT"
+                subcmd_pulumi "$PROJECT" cancel --yes
+                subcmd_pulumi "$PROJECT" refresh --yes --skip-preview
+                _down_stack "$PROJECT"
+
+                echo "Reset complete. In case a subsequent 'cncluster apply' fails, refer to the documentation on manual cleanup (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
+                ;;
+
+            *)
+                _error "Failed uninstalling stack $PROJECT, aborting"
+                exit 1
+                ;;
+        esac
+    fi
+}
+
 
 function _infra_up() {
       _info "Activating infrastructure Pulumi stack"
