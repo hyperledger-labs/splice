@@ -23,6 +23,13 @@ class CnConfig {
         maxStringLength: null,
       })
     );
+    console.error(
+      'Loaded project configuration',
+      util.inspect(this.pulumiProjectConfig, {
+        depth: null,
+        maxStringLength: null,
+      })
+    );
   }
 }
 

@@ -5,4 +5,16 @@
 #      snapshotName: "nicu-test-cometbft-cloning"
 infra:
   ipWhitelisting:
-    extraWhitelistedIngress: []
+    extraWhitelistedIngress: [ ]
+# configs specific for the pulumi project
+# will be applied to all the stacks in the project
+pulumiProjectConfig:
+  default:
+    # skip helm installs and create only non helm resources.
+    # this for example lets you create the cloud sql instances without having deployments using them, and restoring them from other sources
+    installDataOnly: false
+## in the form <pulumi-project>:
+##                <settings>
+## ex:
+#  canton-network:
+#    installDataOnly: true

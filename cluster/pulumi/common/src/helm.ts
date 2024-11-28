@@ -15,7 +15,7 @@ import {
 } from './config';
 import { spliceConfig } from './config/config';
 import { activeVersion } from './domainMigration';
-import { PulumiPlaceholderResource } from './pulumiUtilResources';
+import { SplicePlaceholderResource } from './pulumiUtilResources';
 import {
   ChartValues,
   CLUSTER_HOSTNAME,
@@ -29,7 +29,7 @@ import {
   REPO_ROOT,
 } from './utils';
 
-export type InstalledHelmChart = Release | PulumiPlaceholderResource;
+export type InstalledHelmChart = Release | SplicePlaceholderResource;
 
 // The default type of dependsOn is an unworkable abonimation.
 export type SpliceCustomResourceOptions = Omit<pulumi.CustomResourceOptions, 'dependsOn'> & {
@@ -79,24 +79,28 @@ function installSpliceHelmChartByNamespaceName(
   affinityAndTolerations = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): InstalledHelmChart {
-  return new k8s.helm.v3.Release(
-    includeNamespaceInName ? `${nsLogicalName}-${name}` : name,
-    {
-      name,
-      namespace: nsMetadataName,
-      chart: chartPath(chartName, version),
-      version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
-      repositoryOpts: repositoryOpts(version),
-      values: {
-        ...cnChartValues(version, chartName, values),
-        ...affinityAndTolerations,
-        ...imagePullPolicy,
+  if (spliceConfig.pulumiProjectConfig.installDataOnly) {
+    return new SplicePlaceholderResource(name);
+  } else {
+    return new k8s.helm.v3.Release(
+      includeNamespaceInName ? `${nsLogicalName}-${name}` : name,
+      {
+        name,
+        namespace: nsMetadataName,
+        chart: chartPath(chartName, version),
+        version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
+        repositoryOpts: repositoryOpts(version),
+        values: {
+          ...cnChartValues(version, chartName, values),
+          ...affinityAndTolerations,
+          ...imagePullPolicy,
+        },
+        timeout,
+        maxHistory: HELM_MAX_HISTORY_SIZE,
       },
-      timeout,
-      maxHistory: HELM_MAX_HISTORY_SIZE,
-    },
-    opts
-  );
+      opts
+    );
+  }
 }
 
 export function installSpliceHelmChart(
@@ -169,7 +173,7 @@ export function installSpliceRunbookHelmChartByNamespaceName(
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): InstalledHelmChart {
   if (spliceConfig.pulumiProjectConfig.installDataOnly) {
-    return new PulumiPlaceholderResource(name);
+    return new SplicePlaceholderResource(name);
   } else {
     return new k8s.helm.v3.Release(
       name,

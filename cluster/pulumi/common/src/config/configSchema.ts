@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { defaultActiveMigration, SynchronizerMigrationSchema } from './migrationSchema';
 
 const PulumiProjectConfigSchema = z.object({
-  installDataOnly: z.boolean().default(false),
+  installDataOnly: z.boolean(),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
 export const ConfigSchema = z.object({
@@ -12,13 +12,10 @@ export const ConfigSchema = z.object({
   }),
   persistentSequencerHeapDumps: z.boolean().default(false),
   pulumiProjectConfig: z
-    .record(z.string(), PulumiProjectConfigSchema)
-    .and(
-      z.object({
-        default: PulumiProjectConfigSchema,
-      })
-    )
-    .default({ default: {} }),
+    .object({
+      default: PulumiProjectConfigSchema,
+    })
+    .and(z.record(PulumiProjectConfigSchema)),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
