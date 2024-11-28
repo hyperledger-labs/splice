@@ -1,5 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
+  DeploySvRunbook,
   isDevNet,
   isMainNet,
   SvCometBftKeys,
@@ -9,6 +10,7 @@ import { SweepConfig } from 'splice-pulumi-common-validator';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 import { StaticSvConfig } from './config';
+import { dsoSize } from './dsoConfig';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
 const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
@@ -392,3 +394,6 @@ export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
   const asJson = spliceEnvConfig.optionalEnv(`${nodeName}_SWEEP`);
   return asJson && JSON.parse(asJson);
 }
+
+export const coreSvsToDeploy = svConfigs.slice(0, dsoSize);
+export const allSvsToDeploy = coreSvsToDeploy.concat(DeploySvRunbook ? [svRunbookConfig] : []);

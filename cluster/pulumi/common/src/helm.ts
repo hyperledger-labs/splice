@@ -7,21 +7,23 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
 import { CnChartVersion, repositories } from './artifacts';
-import { config } from './config';
+import {
+  artifactsRepository,
+  config,
+  dockerImageArtifactsRepository,
+  imagePullPolicy,
+} from './config';
 import { spliceConfig } from './config/config';
 import { activeVersion } from './domainMigration';
 import { PulumiPlaceholderResource } from './pulumiUtilResources';
 import {
-  artifactsRepository,
   ChartValues,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
-  dockerImageArtifactsRepository,
   ExactNamespace,
   fixedTokens,
   HELM_CHART_TIMEOUT_SEC,
   HELM_MAX_HISTORY_SIZE,
-  imagePullPolicy,
   loadJsonFromFile,
   loadYamlFromFile,
   REPO_ROOT,

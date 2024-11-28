@@ -6,7 +6,7 @@ import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
 import { CnChartVersion } from './artifacts';
-import { config } from './config';
+import { config, isDevNet, isMainNet } from './config';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 300;
@@ -56,11 +56,6 @@ export type ApprovedSvIdentity = {
   publicKey: string | pulumi.Output<string>;
   rewardWeightBps: number;
 };
-
-export const isMainNet = config.envFlag('IS_MAINNET', false);
-export const isDevNet = config.envFlag('IS_DEVNET', true) && !isMainNet;
-export const clusterSmallDisk = config.envFlag('CLUSTER_SMALL_DISK', false);
-export const publicPrometheusRemoteWrite = config.envFlag('PUBLIC_PROMETHEUS_REMOTE_WRITE', false);
 
 const enableSequencerPruning = config.envFlag('ENABLE_SEQUENCER_PRUNING', false);
 export const sequencerPruningConfig = enableSequencerPruning
@@ -250,29 +245,3 @@ export const autoInitValues = (
     };
   }
 };
-
-export const splitwellDarPath = 'splice-node/dars/splitwell-current.dar';
-
-export const DeploySvRunbook = config.envFlag('SPLICE_DEPLOY_SV_RUNBOOK', false);
-
-export const artifactsRepository = config.optionalEnv('SPLICE_ARTIFACTS_REPOSITORY');
-
-export const dockerImageArtifactsRepository = config.optionalEnv(
-  'SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY'
-);
-
-// This flag determines whether to split postgres instances per app, or have one per namespace.
-// By default, we split instances on CloudSQL (where we expect longer-living environments, thus want to support backup&recovery),
-// but not on k8s-deployed postgres (where we optimize for faster deployment).
-// One can force splitting them by setting SPLIT_POSTGRES_INSTANCES to true.
-export const SplitPostgresInstances =
-  config.envFlag('SPLIT_POSTGRES_INSTANCES') || config.envFlag('ENABLE_CLOUD_SQL');
-
-export const clusterProdLike = config.envFlag('GCP_CLUSTER_PROD_LIKE');
-
-// During development we often overwrite the same tag so we use imagePullPolicy: Always.
-// Outside of development, we use the default which corresponds to IfNotPresent
-// (unless the tag is LATEST which it never is in our setup).
-export const imagePullPolicy = clusterProdLike ? {} : { imagePullPolicy: 'Always' };
-
-export const supportsSvRunbookReset = config.envFlag('SUPPORTS_SV_RUNBOOK_RESET', false);

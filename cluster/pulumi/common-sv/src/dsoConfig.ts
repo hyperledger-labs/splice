@@ -1,7 +1,4 @@
-import { config } from 'splice-pulumi-common/src/config';
-import { DeploySvRunbook, isDevNet } from 'splice-pulumi-common/src/utils';
-
-import { svConfigs, svRunbookConfig } from './svConfigs';
+import { config, isDevNet } from 'splice-pulumi-common/src/config';
 
 function getDsoSize(): number {
   // If not devnet, enforce 1 sv
@@ -9,7 +6,7 @@ function getDsoSize(): number {
     return 1;
   }
 
-  const maxDsoSize = svConfigs.length;
+  const maxDsoSize = 16;
   const dsoSize = parseInt(
     config.requireEnv(
       'DSO_SIZE',
@@ -29,6 +26,3 @@ function getDsoSize(): number {
 }
 
 export const dsoSize = getDsoSize();
-
-export const coreSvsToDeploy = svConfigs.slice(0, dsoSize);
-export const allSvsToDeploy = coreSvsToDeploy.concat(DeploySvRunbook ? [svRunbookConfig] : []);

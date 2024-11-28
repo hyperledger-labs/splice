@@ -1,6 +1,6 @@
 import * as automation from '@pulumi/pulumi/automation';
 import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
-import { config } from 'splice-pulumi-common/src/config';
+import { config, DeploySvRunbook } from 'splice-pulumi-common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
 // as we have no pulumi runtime
 import {
@@ -8,7 +8,6 @@ import {
   DomainMigrationIndex,
   MigrationInfo,
 } from 'splice-pulumi-common/src/domainMigration';
-import { DeploySvRunbook } from 'splice-pulumi-common/src/utils';
 
 import { pulumiOptsWithPrefix, stack } from '../pulumi';
 

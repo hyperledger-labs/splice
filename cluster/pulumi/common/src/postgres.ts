@@ -4,11 +4,11 @@ import * as random from '@pulumi/random';
 import * as _ from 'lodash';
 import { Resource } from '@pulumi/pulumi';
 
-import { config } from './config';
+import { clusterSmallDisk, config } from './config';
 import { activeVersion } from './domainMigration';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
-import { ChartValues, CLUSTER_BASENAME, clusterSmallDisk, ExactNamespace, GCP_ZONE } from './utils';
+import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
 
 const enableCloudSql = config.envFlag('ENABLE_CLOUD_SQL', false);
 const protectCloudSql = !config.envFlag('DISABLE_CLOUD_SQL_PROTECT', false);

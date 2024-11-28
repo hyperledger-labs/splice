@@ -8,7 +8,8 @@ import {
   installBootstrapDataBucketSecret,
   readAndInstallParticipantBootstrapDump,
 } from './backup';
-import { ExactNamespace, isDevNet } from './utils';
+import { isDevNet } from './config';
+import { ExactNamespace } from './utils';
 
 type BootstrapCliConfig = {
   cluster: string;
