@@ -29,7 +29,7 @@ COPY target/monitoring.conf target/parameters.conf target/entrypoint.sh target/b
 
 RUN ln -s bin/canton splice-image-bin
 
-FROM fullstorydev/grpcurl:v1.9.1 AS grpcurl
+FROM fullstorydev/grpcurl:v1.9.2 AS grpcurl
 
 FROM eclipse-temurin:17-jdk-jammy
 COPY --from=build /usr/bin/tini /usr/bin/tini
