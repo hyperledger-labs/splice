@@ -102,8 +102,7 @@ export async function installNode(
 
   const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
 
-  // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = imagePullSecret(xns);
 
   const svKey = svKeyFromSecret('sv');
 
@@ -127,9 +126,7 @@ export async function installNode(
     resolveValidator1PartyId
   );
 
-  // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
-  const ingressImagePullDeps =
-    activeVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
+  const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
   installSpliceRunbookHelmChartByNamespaceName(
     xns.logicalName,
     xns.logicalName,

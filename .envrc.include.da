@@ -1,6 +1,8 @@
 # Do not tag local docker images with a git commit to simplify referencing these images from helm charts
 export SPLICECLUSTER_STATIC_DIRTY_VERSION=1
-
+export DEV_ARTIFACTORY_DOCKER_REGISTRY=digitalasset-canton-network-docker-dev.jfrog.io
+export PUBLIC_ARTIFACTORY_DOCKER_REGISTRY=digitalasset-canton-network-docker.jfrog.io
+export ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY=digitalasset-canton-enterprise-docker.jfrog.io
 # Configure docker access for cluster and integration tests
 ## Read current credentials
 function read_docker_creds() {
@@ -14,13 +16,25 @@ function read_docker_creds() {
         echo $(echo $repo | docker-credential-$cred_helper get | jq -r '(.Username + ":" + .Secret)' 2>/dev/null)
     fi
 }
-DOCKER_CREDS=$(read_docker_creds 'digitalasset-canton-enterprise-docker.jfrog.io')
-## If no current credentials are set
-[[ -z "$DOCKER_CREDS" || "$DOCKER_CREDS" == "null" || "$DOCKER_CREDS" != "$ARTIFACTORY_USER:$ARTIFACTORY_PASSWORD" ]] && \
-## And artifactory user and password are set
-[[ -n "$ARTIFACTORY_USER" && -n "$ARTIFACTORY_PASSWORD" ]] && \
-    echo "Configuring docker credentials for cometBFT image" && \
-    docker login digitalasset-canton-enterprise-docker.jfrog.io -u "$ARTIFACTORY_USER" -p "$ARTIFACTORY_PASSWORD"
+
+function check_docker_creds() {
+  local docker_creds="$1"
+  [[ -z "$docker_creds" || "$docker_creds" == "null" || "$docker_creds" != "$ARTIFACTORY_USER:$ARTIFACTORY_PASSWORD" ]] && \
+  ## And artifactory user and password are set
+  [[ -n "$ARTIFACTORY_USER" && -n "$ARTIFACTORY_PASSWORD" ]]
+}
+
+DOCKER_CREDS=$(read_docker_creds "$ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY")
+if check_docker_creds "$DOCKER_CREDS"; then
+  echo "Logging into $ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY"
+  echo $ARTIFACTORY_PASSWORD | docker login "$ENTERPRISE_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin
+fi
+
+DOCKER_CREDS=$(read_docker_creds "$DEV_ARTIFACTORY_DOCKER_REGISTRY")
+if check_docker_creds "$DOCKER_CREDS"; then
+    echo "Logging into $DEV_ARTIFACTORY_DOCKER_REGISTRY"
+    echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin
+fi
 
 # ensure the logs directory exists
 mkdir -p $LOGS_PATH

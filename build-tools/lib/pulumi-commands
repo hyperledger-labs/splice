@@ -72,7 +72,6 @@ function subcmd_pulumi() {
         fi
     }
 
-
     run_pulumi "${args[@]}" "$pulumi_cmd" "$@"
 }
 
@@ -122,11 +121,11 @@ function subcmd_apply() {
 
         if ! (env-bool CNCLUSTER_SKIP_DOCKER_CHECK); then
             _docker_must_be_running
-            if ! make -C "${REPO_ROOT}" docker-check -j; then
-                _error "Images missing from artifact registry, cannot apply."
+            if ! make -C "${REPO_ROOT}" docker-image-reference-exists --err-missing -j; then
+                _error "Images missing, cannot apply."
             fi
         else
-            _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
+            _warning "docker-image-reference-exists bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
         fi
 
         if [ -z "${skipInfra:-}" ]; then

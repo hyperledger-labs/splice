@@ -1,16 +1,21 @@
 import { spliceEnvConfig } from './config/envConfig';
 
 export type Repository = {
+  registry: string;
   dockerImages: string;
   helm: string;
 };
+const devDockerReg = 'digitalasset-canton-network-docker-dev.jfrog.io';
+const pubDockerReg = 'digitalasset-canton-network-docker.jfrog.io';
 export const repositories = {
-  google: {
-    dockerImages: 'us-central1-docker.pkg.dev/da-cn-shared/cn-images',
-    helm: 'oci://us-central1-docker.pkg.dev/da-cn-shared/cn-images',
+  private: {
+    registry: devDockerReg,
+    dockerImages: devDockerReg + '/digitalasset',
+    helm: 'https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm-dev',
   },
-  artifactory: {
-    dockerImages: 'digitalasset-canton-network-docker.jfrog.io/digitalasset',
+  public: {
+    registry: pubDockerReg,
+    dockerImages: pubDockerReg + '/digitalasset',
     helm: 'https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm',
   },
 };
@@ -33,16 +38,16 @@ export function parsedVersion(
         version: version,
         repository: repository(repositoryValue),
       }
-    : { type: 'local', repository: { dockerImages: repositories.google.dockerImages } };
+    : { type: 'local', repository: repository(repositoryValue) };
 }
 
-function repository(repositoryValue?: string) {
+export function repository(repositoryValue?: string): Repository {
   if (repositoryValue === undefined) {
-    return repositories.artifactory;
-  } else if (repositoryValue === 'google') {
-    return repositories.google;
-  } else if (repositoryValue === 'artifactory') {
-    return repositories.artifactory;
+    return repositories.public;
+  } else if (repositoryValue === 'private') {
+    return repositories.private;
+  } else if (repositoryValue === 'public') {
+    return repositories.public;
   } else {
     throw new Error(`Unknown artifacts repository: ${repositoryValue}`);
   }

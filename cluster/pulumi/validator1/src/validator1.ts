@@ -58,7 +58,7 @@ export async function installValidator1(
 
   const kmsConfig = validator1Config?.kms;
 
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
     ? postgres.installPostgres(xns, 'postgres', 'postgres', false)

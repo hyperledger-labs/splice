@@ -137,7 +137,7 @@ export async function installSvNode(
     activeVersion,
     { dependsOn: [xns.ns] }
   );
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
     await installAuth0Secret(

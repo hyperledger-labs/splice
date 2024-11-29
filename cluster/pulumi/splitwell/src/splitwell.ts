@@ -51,7 +51,7 @@ export async function installSplitwell(
     { dependsOn: [xns.ns] }
   );
 
-  const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+  const imagePullDeps = imagePullSecret(xns);
 
   installIngress(xns, imagePullDeps);
 

@@ -16,11 +16,8 @@ docker-build: $(foreach image,$(images),cluster/images/$(image)/$(docker-build))
 .PHONY: docker-push
 docker-push: $(foreach image,$(images),cluster/images/$(image)/$(docker-push))
 
-.PHONY: docker-promote
-docker-promote: $(foreach image,$(images),cluster/images/$(image)/$(docker-promote))
-
-.PHONY: docker-check
-docker-check: $(foreach image,$(images),cluster/images/$(image)/docker-check)
+.PHONY: docker-image-reference-exists
+docker-image-reference-exists: $(foreach image,$(images),cluster/images/$(image)/docker-image-reference-exists)
 
 .PHONY: cluster/images/clean
 cluster/images/clean: $(foreach image,$(images),cluster/images/$(image)/clean)

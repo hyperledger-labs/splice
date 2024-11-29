@@ -1061,6 +1061,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -1918,6 +1919,7 @@
           "svNamespace": "sv-1"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -1980,6 +1982,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -2158,6 +2161,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "isFirstSv": true,
         "metrics": {
           "enable": true
@@ -2419,6 +2423,7 @@
           },
           "prefix": "dev/sv-1"
         },
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 400000,
           "baseRateBurstWindowMins": 20,
@@ -2525,6 +2530,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },
@@ -2779,6 +2785,7 @@
           "svNamespace": "sv-2"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -2841,6 +2848,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3019,6 +3027,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -3259,6 +3268,7 @@
           },
           "prefix": "dev/sv-2"
         },
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -3359,6 +3369,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },
@@ -3606,6 +3617,7 @@
           "svNamespace": "sv-3"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -3668,6 +3680,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -3846,6 +3859,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -4086,6 +4100,7 @@
           },
           "prefix": "dev/sv-3"
         },
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -4186,6 +4201,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },
@@ -4433,6 +4449,7 @@
           "svNamespace": "sv-4"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
@@ -4495,6 +4512,7 @@
           "name": "cn-devnet"
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -4673,6 +4691,7 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "isFirstSv": false,
         "metrics": {
           "enable": true
@@ -4913,6 +4932,7 @@
           },
           "prefix": "dev/sv-4"
         },
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -5013,6 +5033,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
+        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "metrics": {
           "enable": true
         },

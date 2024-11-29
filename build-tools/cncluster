@@ -109,7 +109,6 @@ function _needs_auth0_validator_management_api_creds() {
 function _cluster_show() {
     _log "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
     _log "CLOUDSDK_CORE_PROJECT   : ${CLOUDSDK_CORE_PROJECT}"
-    _log "GCP_REPO_NAME           : ${GCP_REPO_NAME}"
 
     _log "GCP_MASTER_IPV4_CIDR    : ${GCP_MASTER_IPV4_CIDR}"
     _log "GCP_CLUSTER_BASENAME    : ${GCP_CLUSTER_BASENAME}"
@@ -1311,6 +1310,29 @@ function subcmd_debug_shell() {
   _cluster_must_exist
 
   VERSION_NUMBER=$(get-snapshot-version)
+  repo="digitalasset-canton-network-docker.jfrog.io"
+
+  if [[ "$VERSION_NUMBER" == *-dirty ]]; then
+    repo="digitalasset-canton-network-docker-dev.jfrog.io"
+  else
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
+      repo="digitalasset-canton-network-docker.jfrog.io"
+    else
+      repo="digitalasset-canton-network-docker-dev.jfrog.io"
+    fi
+  fi
+
+  if ! kubectl get secret docker-reg-cred -n default > /dev/null 2>&1; then
+    kubectl create secret docker-registry docker-reg-cred \
+        --docker-server=$repo \
+        --docker-username="${ARTIFACTORY_USER}" \
+        --docker-password="${ARTIFACTORY_PASSWORD}" \
+        -n default
+
+    kubectl patch serviceaccount default -n default \
+        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
+  fi
 
   _info "Deploying debug pod"
   kubectl apply --wait -f - <<EOF
@@ -1323,7 +1345,7 @@ metadata:
 spec:
   containers:
   - name: splice-debug
-    image: us-central1-docker.pkg.dev/da-cn-shared/cn-images/splice-debug:${VERSION_NUMBER}
+    image: $repo/digitalasset/splice-debug:${VERSION_NUMBER}
     command: ["/bin/sleep", "2h"]
     imagePullPolicy: Always
   restartPolicy: Never

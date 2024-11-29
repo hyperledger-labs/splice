@@ -17,7 +17,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
   if (config.envFlag('K6_ENABLE_LOAD_GENERATOR')) {
     const xns = exactNamespace('load-tester', true);
 
-    const imagePullDeps = activeVersion.type === 'local' ? [] : imagePullSecret(xns);
+    const imagePullDeps = imagePullSecret(xns);
 
     const clusterHostname = `${CLUSTER_HOSTNAME}`;
 

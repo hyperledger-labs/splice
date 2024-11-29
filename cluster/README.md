@@ -328,12 +328,12 @@ The `pulumi/deployment` project controls the deployment of production clusters u
 #### Deployment stack configuration
 
 The pulumi operator uses a custom docker image to allow us to use a specific pulumi version and to configure the default pulumi arguments (like parallelism).
-The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the the migration specific git reference configured under the key `releaseReference` and applies that git deployment code
+The operator is configured using a [flux source](https://fluxcd.io/flux/components/source/). The source watches the migration specific git reference configured under the key `releaseReference` and applies that git deployment code
 to the cluster.
 Each migration can follow a different release that is upgraded independent of the other migrations. The key `synchronizerMigration.active.releaseReference` controls the release used for all our main deployments and the infra stack.
 The deployment uses `dotenv` to read the cluster specific env configuration files.
 The version used for the deployment is set using `synchronizerMigration.active.version` in `config.yaml` or defaults to `CHARTS_VERSION`.
-The use of artifactory/google release artifacts can be controlled through `SPLICE_ARTIFACTS_REPOSITORY`.
+The use of artifactory release artifacts can be controlled through `SPLICE_ARTIFACTS_REPOSITORY`.
 
 The infra stack and the canton network stack are included by default.
 The other stacks can be included through the use of env variables:
@@ -407,7 +407,7 @@ infrastructure script.
 1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
    - Note: helm charts built locally reference the docker images using just your username.
      Make sure to `make docker-push`, whenever you want to propagate local changes.
-   - If this fails with an error `Unauthenticated requests do not have permission "artifactregistry.repositories.uploadArtifacts"`, you may need to run `gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev` to set the proper credentials.
+   - If this fails, you may need to run `echo $ARTIFACTORY_PASSWORD | docker login "$DEV_ARTIFACTORY_DOCKER_REGISTRY" -u "$ARTIFACTORY_USER" --password-stdin` to login to the Artifactory docker registry for development.
 1. If you plan on using manual `pulumi` commands for deployment (i.e., calling `cncluster pulumi ...` instead of `cncluster apply`),
    ensure that pulumi is set up: `make -C $REPO_ROOT cluster/build -j`
    - This step is handled automatically by `cncluster apply`.
@@ -438,21 +438,20 @@ created within GCE that will host a Canton Network cluster, the
 following grants must be made within `da-cn-shared` to the default
 compute service account within the new cluster.
 
-* The service account must have access to the [Google Artifact Registry](https://console.cloud.google.com/artifacts?&project=da-cn-shared) within `da-cn-shared`.
 * The service account must have Read-Only access to the `cn-release-bundles` Google Storage bucket.
 
 ### Docker Image Hosting
 
-Docker images for both local and GCE clusters are stored in the Google
-Cloud [Artifact Registry](https://cloud.google.com/artifact-registry).
-The specific registry is identified with the following environment
-variables, which are defined in [`.envrc.vars`](.envrc.vars):
+Docker images for both local and GCE clusters are stored in the [private development artifactory docker registry](digitalasset-canton-network-docker-dev.jfrog.io) and
+the [public releases artifactory docker registry](digitalasset-canton-network-docker.jfrog.io).
+
+Amongst others, the following environment
+variables are defined in [`.envrc.vars`](.envrc.vars):
 
 | Variable Name             | Meaning                                                               |
 | ------------------        | --------------------------------------------------------------------- |
 | `CLOUDSDK_COMPUTE_REGION` | Google Cloud Region in which resources will be created                |
 | `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
-| `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
 The `.envrc` mechanism is also used to ensure that the current user is
 authenticated properly against GCE.
@@ -522,7 +521,6 @@ variables. As stated above, these are usually populated via `.envrc`.
 | `CLOUDSDK_COMPUTE_REGION` | Google Cloud Region in which resources will be created                |
 | `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
 | `GCP_CLUSTER_BASENAME`        | Base of the cluster within the cloud project.  Used to compute the cluster's full name and DNS name.                   |
-| `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
 `cncluster` also has basic autocompletion for bash. To install that, add a line: `source <this script>` to your ~/.bashrc
 

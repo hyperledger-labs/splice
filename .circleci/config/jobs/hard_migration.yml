@@ -149,7 +149,7 @@ jobs:
       - setup_vpn
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
-      - docker_login_internal
+      - docker_login_artifactory
       - run_bash_command_in_nix:
           cluster: << parameters.cluster >>
           cmd_name: Wait for SV app to be responsive
@@ -251,7 +251,7 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Restore the migration dump into a docker volume
           cmd: build-tools/splice-compose.sh restore_volume splice-validator_domain-upgrade-dump workspace/domain-upgrade-dump.tar
-      - docker_login_internal
+      - docker_login_artifactory
       - run_bash_command_in_nix:
           cmd: /tmp/vpn-scripts/create-docker-network-on-vpn.sh onvpn
       - run_bash_command_in_nix:
