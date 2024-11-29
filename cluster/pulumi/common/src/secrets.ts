@@ -48,8 +48,14 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
     };
   });
 }
-
 export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
+  return imagePullSecretByNamespaceNameForServiceAccount(ns, 'default');
+}
+
+export function imagePullSecretByNamespaceNameForServiceAccount(
+  ns: string,
+  serviceAccountName: string
+): pulumi.Resource[] {
   const publicArtifactory = 'digitalasset-canton-network-docker.jfrog.io';
   const privateArtifactory = 'digitalasset-canton-network-docker-dev.jfrog.io';
   const username = config.requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
@@ -95,7 +101,7 @@ export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
     },
   });
   const patch = new k8s.core.v1.ServiceAccountPatch(
-    ns + '-default',
+    ns + '-' + serviceAccountName,
     {
       imagePullSecrets: [
         {
@@ -103,7 +109,7 @@ export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
         },
       ],
       metadata: {
-        name: 'default',
+        name: serviceAccountName,
         namespace: ns,
       },
     },
@@ -117,6 +123,13 @@ export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
 
 export function imagePullSecret(ns: ExactNamespace): CnInput<pulumi.Resource>[] {
   return imagePullSecretByNamespaceName(ns.logicalName);
+}
+
+export function imagePullSecretForServiceAccount(
+  ns: ExactNamespace,
+  serviceAccountName: string
+): CnInput<pulumi.Resource>[] {
+  return imagePullSecretByNamespaceNameForServiceAccount(ns.logicalName, serviceAccountName);
 }
 
 export function uiSecret(
