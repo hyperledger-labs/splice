@@ -216,11 +216,12 @@ jobs:
            --keep DOCKER_HOST \
            --keep DOCKER_MACHINE_NAME \
            --keep DOCKER_TLS_VERIFY \
-           --keep NO_PROXY"
+           --keep NO_PROXY \
+           --keep CIRCLE_BRANCH"
           cmd: make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
-          additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
+          additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLE_BRANCH"
           cmd_name: Push Helm Artifacts
           cmd: |
             make cluster/helm/build -j

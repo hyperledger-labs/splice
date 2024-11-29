@@ -237,11 +237,19 @@ function subcmd_start {
     if [[ "$IMAGE_TAG" == *-dirty ]]; then
       export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
     else
-      current_branch=$(git rev-parse --abbrev-ref HEAD)
-      if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
-        export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
+      if [ -n "$CIRCLE_BRANCH" ]; then
+        if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
+          export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
+        else
+          export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
+        fi
       else
-        export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
+        current_branch=$(git rev-parse --abbrev-ref HEAD)
+        if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
+          export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
+        else
+          export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
+        fi
       fi
     fi
   else

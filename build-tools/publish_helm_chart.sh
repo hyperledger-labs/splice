@@ -36,12 +36,20 @@ repo="canton-network-helm"
 if [[ "$chart" == *-dirty.tgz ]]; then
   repo="canton-network-helm-dev"
 else
-  current_branch=$(git rev-parse --abbrev-ref HEAD)
-  echo "Current branch: ${current_branch}"
-  if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
-    repo="canton-network-helm"
+  if [ -n "${CIRCLE_BRANCH}" ]; then
+    if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
+      repo="canton-network-helm"
+    else
+      repo="canton-network-helm-dev"
+    fi
   else
-    repo="canton-network-helm-dev"
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    echo "Current branch: ${current_branch}"
+    if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
+      repo="canton-network-helm"
+    else
+      repo="canton-network-helm-dev"
+    fi
   fi
 fi
 
