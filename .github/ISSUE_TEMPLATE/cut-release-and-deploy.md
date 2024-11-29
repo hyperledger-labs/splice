@@ -57,11 +57,15 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
   - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
         This will upgrade our periodic health checks to use the new release version.
         Old health checks may not work against the upgraded cluster, so expect some failures until this PR is merged.
-
-## Tell our partners
-
 - [ ] Communicate to partners that a new version is available
 
-## Persist lessons learned
+## Upgrade our own nodes on TestNet and MainNet
 
-- [ ] ...
+- [ ] One week after DevNet: TestNet
+- [ ] One week after TestNet: MainNet
+
+## Follow up
+
+- [ ] Remind next person in the [rotation](https://docs.google.com/document/d/1f0nVeRnnxKQxwPi5nI2TiMq6qtHPwgiOjtUPUVJMKIk/edit?tab=t.0) that they are up next week.
+- [ ] Persist any lessons learned and fix (documentation) bugs hit
+  - [ ] ...
