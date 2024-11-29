@@ -2,6 +2,12 @@ infra:
   ipWhitelisting:
     extraWhitelistedIngress:
       - "35.225.102.103/32" # CI GKE cluster for CCI
+validator1:
+  kms:
+    type: gcp
+    locationId: us-central1
+    projectId: da-cn-ci-2
+    keyRingId: validator1_validator
 synchronizerMigration:
   active:
     id: 4
