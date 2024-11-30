@@ -49,7 +49,6 @@ endif
 
 docker-build := target/docker.id
 docker-push := target/docker.push
-docker-promote := target/docker.promote
 docker-local-image-tag := target/local-image-tag
 docker-image-tag := target/image-tag
 
@@ -73,12 +72,13 @@ $$(prefix)/docker-build: $$(prefix)/$(docker-build)
 .PHONY: $$(prefix)/docker-push
 $$(prefix)/docker-push: $$(prefix)/$(docker-push)
 
-.PHONY: $$(prefix)/docker-promote
-$$(prefix)/docker-promote: $$(prefix)/$(docker-promote)
+.PHONY: $$(prefix)/docker-image-reference-exists
+$$(prefix)/docker-image-reference-exists: $$(prefix)/$(docker-image-tag)
+	docker-image-reference-exists $$$$(cat $$(abspath $$<))
 
-.PHONY: $$(prefix)/docker-check
-$$(prefix)/docker-check: $$(prefix)/$(docker-image-tag)
-	docker-check $$$$(cat $$(abspath $$<))
+.PHONY: $$(prefix)/get-docker-image-id
+$$(prefix)/get-docker-image-id: $$(prefix)/$(docker-image-tag)
+	get-docker-image-id $$$$(cat $$(abspath $$<))
 
 .PHONY: $$(prefix)/clean
 $$(prefix)/clean:
@@ -98,7 +98,7 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 
 %/$(docker-image-tag): force-update-version
 	mkdir -p $(@D)
-	get-docker-image-name $$(basename $$(dirname $(@D))) > $@
+	get-docker-image-reference $$(basename $$(dirname $(@D))) > $@
 
 %/$(docker-build): %/$(docker-local-image-tag) %/Dockerfile
 	docker-check-multi-arch
@@ -108,6 +108,3 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
 	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
-
-%/$(docker-promote):  %/$(docker-image-tag)
-	cd $(@D)/.. && docker-promote $$(cat $(abspath $<)) $(shell get-docker-image-name $$(basename $$(dirname $(@D))) --artifactory)
