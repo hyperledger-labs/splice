@@ -352,7 +352,244 @@ export const dsoInfo = {
     domain_id:
       'global-domain::1220fb89d62774bd5b3fd8a11c1b22c8c5453e8286c3cf7add515c98d7bca192ef18',
   },
-  sv_node_states: [], // TODO(tech-debt): add better mock data
+  sv_node_states: [
+    {
+      contract: {
+        template_id:
+          '9ee83bfd872f91e659b8a8439c5b4eaf240bcf6f19698f884d7d7993ab48c401:Splice.DSO.SvState:SvNodeState',
+        contract_id:
+          '002311f0bbf7d7846ea8b3208b912e8048358f114b605a07c64e6ecbbec9f97c53ca101220a53b70ee6ebc55e04a7693ace36f4499a6c9a2ed12294f7e3d11a52e2c446ada',
+        payload: {
+          dso: 'DSO::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+          sv: 'Digital-Asset-2::122089992900e08c1977c986bf27f0a379fb275f0d78f6163c5903ebe7d00f5b1a9c',
+          svName: 'Digital-Asset-2',
+          state: {
+            synchronizerNodes: [
+              [
+                'global-domain::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+                {
+                  legacySequencerConfig: null,
+                  scan: {
+                    publicUrl: 'https://scan.sv-2.scratchb.network.canton.global',
+                  },
+                  mediator: {
+                    mediatorId:
+                      'MED::Digital-Asset-2::122074398c64041fa1828c63262a2f2d18469857637a5b63ac14c3dc03867367d41c',
+                  },
+                  cometBft: {
+                    nodes: [
+                      [
+                        '5af57aa83abcec085c949323ed8538108757be9c',
+                        {
+                          validatorPubKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
+                          votingPower: '1',
+                        },
+                      ],
+                    ],
+                    governanceKeys: [
+                      {
+                        pubKey: 'lXamQ9W3TyTiuchlxlU5SbF/XU+pN+Sa7X5YISC8IzI=',
+                      },
+                    ],
+                    sequencingKeys: [],
+                  },
+                  sequencer: {
+                    migrationId: '0',
+                    sequencerId:
+                      'SEQ::Digital-Asset-2::12205cf06db9df8850669575f9eecf2a29c272ea68c5cf7b473dc08566142be4256c',
+                    url: 'https://sequencer-0.sv-2.scratchb.network.canton.global',
+                    availableAfter: '2024-11-25T17:25:34.675291Z',
+                  },
+                },
+              ],
+            ],
+          },
+        },
+        created_event_blob:
+          'CgMyLjESqgkKRQAjEfC799eEbqizIIuRLoBINY8RS2BaB8ZObsu+yfl8U8oQEiClO3DubrxV4Ep2k6zjb0SZpsmi7RIpT349EaUuLERq2hIVc3BsaWNlLWRzby1nb3Zlcm5hbmNlGmUKQDllZTgzYmZkODcyZjkxZTY1OWI4YTg0MzljNWI0ZWFmMjQwYmNmNmYxOTY5OGY4ODRkN2Q3OTkzYWI0OGM0MDESBlNwbGljZRIDRFNPEgdTdlN0YXRlGgtTdk5vZGVTdGF0ZSLiBmrfBgpNCks6SURTTzo6MTIyMDU1YTQ3NjY0ZmVkYjA5NmVhZTE4Nzk5NGRmYmY4ZDIzMjFhMTc3OGI0M2JhYzU2NzIwNmQzZWJiZTllYjA5YjkKWQpXOlVEaWdpdGFsLUFzc2V0LTI6OjEyMjA4OTk5MjkwMGUwOGMxOTc3Yzk4NmJmMjdmMGEzNzlmYjI3NWYwZDc4ZjYxNjNjNTkwM2ViZTdkMDBmNWIxYTljChMKEUIPRGlnaXRhbC1Bc3NldC0yCp0FCpoFapcFCpQFCpEFYo4FCosFClVCU2dsb2JhbC1kb21haW46OjEyMjA1NWE0NzY2NGZlZGIwOTZlYWUxODc5OTRkZmJmOGQyMzIxYTE3NzhiNDNiYWM1NjcyMDZkM2ViYmU5ZWIwOWI5ErEEaq4ECrgBCrUBarIBCm4KbGJqCmgKKkIoNWFmNTdhYTgzYWJjZWMwODVjOTQ5MzIzZWQ4NTM4MTA4NzU3YmU5YxI6ajgKMAouQixncGt3YzFXQ3R0TDhaQVRCSVBXSUJSQ3JiMGVWNEp3TUNualJhNTZSRVB3PQoECgIYAgo6CjhaNgo0ajIKMAouQixsWGFtUTlXM1R5VGl1Y2hseGxVNVNiRi9YVStwTitTYTdYNVlJU0M4SXpJPQoECgJaAArAAQq9AVK6AQq3AWq0AQoECgIYAApeClxCWlNFUTo6RGlnaXRhbC1Bc3NldC0yOjoxMjIwNWNmMDZkYjlkZjg4NTA2Njk1NzVmOWVlY2YyYTI5YzI3MmVhNjhjNWNmN2I0NzNkYzA4NTY2MTQyYmU0MjU2Ywo7CjlCN2h0dHBzOi8vc2VxdWVuY2VyLTAuc3YtMi5zY3JhdGNoYi5uZXR3b3JrLmNhbnRvbi5nbG9iYWwKDwoNUgsKCSlbrTIFwCcGAApoCmZSZApiamAKXgpcQlpNRUQ6OkRpZ2l0YWwtQXNzZXQtMjo6MTIyMDc0Mzk4YzY0MDQxZmExODI4YzYzMjYyYTJmMmQxODQ2OTg1NzYzN2E1YjYzYWMxNGMzZGMwMzg2NzM2N2Q0MWMKPgo8UjoKOGo2CjQKMkIwaHR0cHM6Ly9zY2FuLnN2LTIuc2NyYXRjaGIubmV0d29yay5jYW50b24uZ2xvYmFsCgQKAlIAKklEU086OjEyMjA1NWE0NzY2NGZlZGIwOTZlYWUxODc5OTRkZmJmOGQyMzIxYTE3NzhiNDNiYWM1NjcyMDZkM2ViYmU5ZWIwOWI5OUWXNQXAJwYAQioKJgokCAESIAArYmuAO2RiF5ZKKcpd0i72LroVVtWKqxw7PedDNuUMEB4=',
+        created_at: '2024-11-25T17:25:34.866245Z',
+      },
+      domain_id:
+        'global-domain::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+    },
+    {
+      contract: {
+        template_id:
+          '9ee83bfd872f91e659b8a8439c5b4eaf240bcf6f19698f884d7d7993ab48c401:Splice.DSO.SvState:SvNodeState',
+        contract_id:
+          '004a771716fbbe9c22df6df56dac2bd6b98063d2809ab3331eb4c375c0333cf2eeca101220fef2331eb4cb2af603d17ee3130a42323fbe5c645d1be029880fdbd53ae559e6',
+        payload: {
+          dso: 'DSO::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+          sv: 'Digital-Asset-Eng-2::122049b3317c5f7e9f6e640e3bfcf2827cbd3c80e369da8933ba6e114e5f6a9a839b',
+          svName: 'Digital-Asset-Eng-2',
+          state: {
+            synchronizerNodes: [
+              [
+                'global-domain::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+                {
+                  legacySequencerConfig: null,
+                  scan: {
+                    publicUrl: 'https://scan.sv-2-eng.scratchb.network.canton.global',
+                  },
+                  mediator: {
+                    mediatorId:
+                      'MED::Digital-Asset-Eng-2::122098ee18212029eccbd9df8f70103fe0ba54695ee6bf7400dbbdf577d570d37aa3',
+                  },
+                  cometBft: {
+                    nodes: [
+                      [
+                        'c36b3bbd969d993ba0b4809d1f587a3a341f22c1',
+                        {
+                          validatorPubKey: 'BVSM9/uPGLU7lJj72SUw1a261z2L6Yy2XKLhpUvbxqE=',
+                          votingPower: '1',
+                        },
+                      ],
+                    ],
+                    governanceKeys: [
+                      {
+                        pubKey: 'zubNUAd9Ak2AOfWZgQC1ffyUh7g4GU4IFD1VcFidLlc=',
+                      },
+                    ],
+                    sequencingKeys: [],
+                  },
+                  sequencer: {
+                    migrationId: '0',
+                    sequencerId:
+                      'SEQ::Digital-Asset-Eng-2::1220c54f9490b7ad34c8ac188eee9fcc6c0d593f29d9937697d3aa47d8503b366045',
+                    url: 'https://sequencer-0.sv-2-eng.scratchb.network.canton.global',
+                    availableAfter: '2024-11-25T17:29:46.670204Z',
+                  },
+                },
+              ],
+            ],
+          },
+        },
+        created_event_blob:
+          'CgMyLjESwgkKRQBKdxcW+76cIt9t9W2sK9a5gGPSgJqzMx60w3XAMzzy7soQEiD+8jMetMsq9gPRfuMTCkIyP75cZF0b4CmID9vVOuVZ5hIVc3BsaWNlLWRzby1nb3Zlcm5hbmNlGmUKQDllZTgzYmZkODcyZjkxZTY1OWI4YTg0MzljNWI0ZWFmMjQwYmNmNmYxOTY5OGY4ODRkN2Q3OTkzYWI0OGM0MDESBlNwbGljZRIDRFNPEgdTdlN0YXRlGgtTdk5vZGVTdGF0ZSL6Bmr3BgpNCks6SURTTzo6MTIyMDU1YTQ3NjY0ZmVkYjA5NmVhZTE4Nzk5NGRmYmY4ZDIzMjFhMTc3OGI0M2JhYzU2NzIwNmQzZWJiZTllYjA5YjkKXQpbOllEaWdpdGFsLUFzc2V0LUVuZy0yOjoxMjIwNDliMzMxN2M1ZjdlOWY2ZTY0MGUzYmZjZjI4MjdjYmQzYzgwZTM2OWRhODkzM2JhNmUxMTRlNWY2YTlhODM5YgoXChVCE0RpZ2l0YWwtQXNzZXQtRW5nLTIKrQUKqgVqpwUKpAUKoQVingUKmwUKVUJTZ2xvYmFsLWRvbWFpbjo6MTIyMDU1YTQ3NjY0ZmVkYjA5NmVhZTE4Nzk5NGRmYmY4ZDIzMjFhMTc3OGI0M2JhYzU2NzIwNmQzZWJiZTllYjA5YjkSwQRqvgQKuAEKtQFqsgEKbgpsYmoKaAoqQihjMzZiM2JiZDk2OWQ5OTNiYTBiNDgwOWQxZjU4N2EzYTM0MWYyMmMxEjpqOAowCi5CLEJWU005L3VQR0xVN2xKajcyU1V3MWEyNjF6Mkw2WXkyWEtMaHBVdmJ4cUU9CgQKAhgCCjoKOFo2CjRqMgowCi5CLHp1Yk5VQWQ5QWsyQU9mV1pnUUMxZmZ5VWg3ZzRHVTRJRkQxVmNGaWRMbGM9CgQKAloACsgBCsUBUsIBCr8BarwBCgQKAhgACmIKYEJeU0VROjpEaWdpdGFsLUFzc2V0LUVuZy0yOjoxMjIwYzU0Zjk0OTBiN2FkMzRjOGFjMTg4ZWVlOWZjYzZjMGQ1OTNmMjlkOTkzNzY5N2QzYWE0N2Q4NTAzYjM2NjA0NQo/Cj1CO2h0dHBzOi8vc2VxdWVuY2VyLTAuc3YtMi1lbmcuc2NyYXRjaGIubmV0d29yay5jYW50b24uZ2xvYmFsCg8KDVILCgkpfNA3FMAnBgAKbApqUmgKZmpkCmIKYEJeTUVEOjpEaWdpdGFsLUFzc2V0LUVuZy0yOjoxMjIwOThlZTE4MjEyMDI5ZWNjYmQ5ZGY4ZjcwMTAzZmUwYmE1NDY5NWVlNmJmNzQwMGRiYmRmNTc3ZDU3MGQzN2FhMwpCCkBSPgo8ajoKOAo2QjRodHRwczovL3NjYW4uc3YtMi1lbmcuc2NyYXRjaGIubmV0d29yay5jYW50b24uZ2xvYmFsCgQKAlIAKklEU086OjEyMjA1NWE0NzY2NGZlZGIwOTZlYWUxODc5OTRkZmJmOGQyMzIxYTE3NzhiNDNiYWM1NjcyMDZkM2ViYmU5ZWIwOWI5OfzYHhTAJwYAQioKJgokCAESIB9gaX7HnWDAkQ71Kg8x3CNGTxTQTyc1Xr/uBU01MMxfEB4=',
+        created_at: '2024-11-25T17:29:45.033980Z',
+      },
+      domain_id:
+        'global-domain::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+    },
+    {
+      contract: {
+        template_id:
+          '9ee83bfd872f91e659b8a8439c5b4eaf240bcf6f19698f884d7d7993ab48c401:Splice.DSO.SvState:SvNodeState',
+        contract_id:
+          '00c9a1199139c869c581c8e63a897d495645b117e9575e62289bb2d879c311bc7eca10122008520fdd5ff566497b0f5a56970f997d356e51fba0799333fea8e62a4d87faeb',
+        payload: {
+          dso: 'DSO::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+          sv: 'Digital-Asset-Eng-3::1220d01c67da3a76e93a51b5a781608a31d5ad04df220a475cbe779a0a04e0fa282c',
+          svName: 'Digital-Asset-Eng-3',
+          state: {
+            synchronizerNodes: [
+              [
+                'global-domain::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+                {
+                  legacySequencerConfig: null,
+                  scan: {
+                    publicUrl: 'https://scan.sv-3-eng.scratchb.network.canton.global',
+                  },
+                  mediator: {
+                    mediatorId:
+                      'MED::Digital-Asset-Eng-3::1220eb526bb1d6355a6be13e2fa6f3ef5c067d305ed0b7ac050a639002e88ad8a5c6',
+                  },
+                  cometBft: {
+                    nodes: [
+                      [
+                        '0d8e87c54d199e85548ccec123c9d92966ec458c',
+                        {
+                          validatorPubKey: 'dxm4n1MRP/GuSEkJIwbdB4zVcGAeacohFKNtbKK8oRA=',
+                          votingPower: '1',
+                        },
+                      ],
+                    ],
+                    governanceKeys: [
+                      {
+                        pubKey: 'Pv3OYwMuFx0pngv3/OBIcADCtLr/a3k+7FnROCDVM+8=',
+                      },
+                    ],
+                    sequencingKeys: [],
+                  },
+                  sequencer: {
+                    migrationId: '0',
+                    sequencerId:
+                      'SEQ::Digital-Asset-Eng-3::12200b0757499fa814ed402b19670c1b94341bcdb61cd46a69d4fdd27cbbc3ea4f47',
+                    url: 'https://sequencer-0.sv-3-eng.scratchb.network.canton.global',
+                    availableAfter: '2024-11-25T17:30:54.548218Z',
+                  },
+                },
+              ],
+            ],
+          },
+        },
+        created_event_blob:
+          'CgMyLjESwgkKRQDJoRmROchpxYHI5jqJfUlWRbEX6VdeYiibsth5wxG8fsoQEiAIUg/dX/VmSXsPWlaXD5l9NW5R+6B5kzP+qOYqTYf66xIVc3BsaWNlLWRzby1nb3Zlcm5hbmNlGmUKQDllZTgzYmZkODcyZjkxZTY1OWI4YTg0MzljNWI0ZWFmMjQwYmNmNmYxOTY5OGY4ODRkN2Q3OTkzYWI0OGM0MDESBlNwbGljZRIDRFNPEgdTdlN0YXRlGgtTdk5vZGVTdGF0ZSL6Bmr3BgpNCks6SURTTzo6MTIyMDU1YTQ3NjY0ZmVkYjA5NmVhZTE4Nzk5NGRmYmY4ZDIzMjFhMTc3OGI0M2JhYzU2NzIwNmQzZWJiZTllYjA5YjkKXQpbOllEaWdpdGFsLUFzc2V0LUVuZy0zOjoxMjIwZDAxYzY3ZGEzYTc2ZTkzYTUxYjVhNzgxNjA4YTMxZDVhZDA0ZGYyMjBhNDc1Y2JlNzc5YTBhMDRlMGZhMjgyYwoXChVCE0RpZ2l0YWwtQXNzZXQtRW5nLTMKrQUKqgVqpwUKpAUKoQVingUKmwUKVUJTZ2xvYmFsLWRvbWFpbjo6MTIyMDU1YTQ3NjY0ZmVkYjA5NmVhZTE4Nzk5NGRmYmY4ZDIzMjFhMTc3OGI0M2JhYzU2NzIwNmQzZWJiZTllYjA5YjkSwQRqvgQKuAEKtQFqsgEKbgpsYmoKaAoqQigwZDhlODdjNTRkMTk5ZTg1NTQ4Y2NlYzEyM2M5ZDkyOTY2ZWM0NThjEjpqOAowCi5CLGR4bTRuMU1SUC9HdVNFa0pJd2JkQjR6VmNHQWVhY29oRktOdGJLSzhvUkE9CgQKAhgCCjoKOFo2CjRqMgowCi5CLFB2M09Zd011RngwcG5ndjMvT0JJY0FEQ3RMci9hM2srN0ZuUk9DRFZNKzg9CgQKAloACsgBCsUBUsIBCr8BarwBCgQKAhgACmIKYEJeU0VROjpEaWdpdGFsLUFzc2V0LUVuZy0zOjoxMjIwMGIwNzU3NDk5ZmE4MTRlZDQwMmIxOTY3MGMxYjk0MzQxYmNkYjYxY2Q0NmE2OWQ0ZmRkMjdjYmJjM2VhNGY0Nwo/Cj1CO2h0dHBzOi8vc2VxdWVuY2VyLTAuc3YtMy1lbmcuc2NyYXRjaGIubmV0d29yay5jYW50b24uZ2xvYmFsCg8KDVILCgkp+oxDGMAnBgAKbApqUmgKZmpkCmIKYEJeTUVEOjpEaWdpdGFsLUFzc2V0LUVuZy0zOjoxMjIwZWI1MjZiYjFkNjM1NWE2YmUxM2UyZmE2ZjNlZjVjMDY3ZDMwNWVkMGI3YWMwNTBhNjM5MDAyZTg4YWQ4YTVjNgpCCkBSPgo8ajoKOAo2QjRodHRwczovL3NjYW4uc3YtMy1lbmcuc2NyYXRjaGIubmV0d29yay5jYW50b24uZ2xvYmFsCgQKAlIAKklEU086OjEyMjA1NWE0NzY2NGZlZGIwOTZlYWUxODc5OTRkZmJmOGQyMzIxYTE3NzhiNDNiYWM1NjcyMDZkM2ViYmU5ZWIwOWI5OX+cUBjAJwYAQioKJgokCAESIGP+LkrhahOSYFVXTX378Sb7NlmnHaFWwSK/7Vz5bcicEB4=',
+        created_at: '2024-11-25T17:30:55.404159Z',
+      },
+      domain_id:
+        'global-domain::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+    },
+    {
+      contract: {
+        template_id:
+          '9ee83bfd872f91e659b8a8439c5b4eaf240bcf6f19698f884d7d7993ab48c401:Splice.DSO.SvState:SvNodeState',
+        contract_id:
+          '0030d77775e8e6b2193734ae3173ce7e989dcc294800a68bbd8e6a37dd75dec1f6ca101220c351bd58c15381da98ba1e8249a5acbb04105974a96e1e4ef61a1e504e774475',
+        payload: {
+          dso: 'DSO::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+          sv: 'Digital-Asset-Eng-4::1220618dc358eca6926dc4ef4c56fde36bacdd4b5c2418a00737cbace26cfe508267',
+          svName: 'Digital-Asset-Eng-4',
+          state: {
+            synchronizerNodes: [
+              [
+                'global-domain::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+                {
+                  legacySequencerConfig: null,
+                  scan: {
+                    publicUrl: 'https://scan.sv-4-eng.scratchb.network.canton.global',
+                  },
+                  mediator: {
+                    mediatorId:
+                      'MED::Digital-Asset-Eng-4::1220896e1c3f789d4917ada7174ad2046f8fd08e877cacd4bfb52a3ef99893319fd5',
+                  },
+                  cometBft: {
+                    nodes: [
+                      [
+                        'ee738517c030b42c3ff626d9f80b41dfc4b1a3b8',
+                        {
+                          validatorPubKey: '2umZdUS97a6VUXMGsgKJ/VbQbanxWaFUxK1QimhlEjo=',
+                          votingPower: '1',
+                        },
+                      ],
+                    ],
+                    governanceKeys: [
+                      {
+                        pubKey: '1oD1eXhb5eFzSwvQqy6afM7OyUhuR+IKwZ/oo+QxceY=',
+                      },
+                    ],
+                    sequencingKeys: [],
+                  },
+                  sequencer: {
+                    migrationId: '0',
+                    sequencerId:
+                      'SEQ::Digital-Asset-Eng-4::122071eafec16a3980bf402dacd3294864765d5124793b1dba47f418101719c8d7dd',
+                    url: 'https://sequencer-0.sv-4-eng.scratchb.network.canton.global',
+                    availableAfter: '2024-11-25T17:30:54.869228Z',
+                  },
+                },
+              ],
+            ],
+          },
+        },
+        created_event_blob:
+          'CgMyLjESwgkKRQAw13d16OayGTc0rjFzzn6YncwpSACmi72Oajfddd7B9soQEiDDUb1YwVOB2pi6HoJJpay7BBBZdKluHk72Gh5QTndEdRIVc3BsaWNlLWRzby1nb3Zlcm5hbmNlGmUKQDllZTgzYmZkODcyZjkxZTY1OWI4YTg0MzljNWI0ZWFmMjQwYmNmNmYxOTY5OGY4ODRkN2Q3OTkzYWI0OGM0MDESBlNwbGljZRIDRFNPEgdTdlN0YXRlGgtTdk5vZGVTdGF0ZSL6Bmr3BgpNCks6SURTTzo6MTIyMDU1YTQ3NjY0ZmVkYjA5NmVhZTE4Nzk5NGRmYmY4ZDIzMjFhMTc3OGI0M2JhYzU2NzIwNmQzZWJiZTllYjA5YjkKXQpbOllEaWdpdGFsLUFzc2V0LUVuZy00OjoxMjIwNjE4ZGMzNThlY2E2OTI2ZGM0ZWY0YzU2ZmRlMzZiYWNkZDRiNWMyNDE4YTAwNzM3Y2JhY2UyNmNmZTUwODI2NwoXChVCE0RpZ2l0YWwtQXNzZXQtRW5nLTQKrQUKqgVqpwUKpAUKoQVingUKmwUKVUJTZ2xvYmFsLWRvbWFpbjo6MTIyMDU1YTQ3NjY0ZmVkYjA5NmVhZTE4Nzk5NGRmYmY4ZDIzMjFhMTc3OGI0M2JhYzU2NzIwNmQzZWJiZTllYjA5YjkSwQRqvgQKuAEKtQFqsgEKbgpsYmoKaAoqQihlZTczODUxN2MwMzBiNDJjM2ZmNjI2ZDlmODBiNDFkZmM0YjFhM2I4EjpqOAowCi5CLDJ1bVpkVVM5N2E2VlVYTUdzZ0tKL1ZiUWJhbnhXYUZVeEsxUWltaGxFam89CgQKAhgCCjoKOFo2CjRqMgowCi5CLDFvRDFlWGhiNWVGelN3dlFxeTZhZk03T3lVaHVSK0lLd1ovb28rUXhjZVk9CgQKAloACsgBCsUBUsIBCr8BarwBCgQKAhgACmIKYEJeU0VROjpEaWdpdGFsLUFzc2V0LUVuZy00OjoxMjIwNzFlYWZlYzE2YTM5ODBiZjQwMmRhY2QzMjk0ODY0NzY1ZDUxMjQ3OTNiMWRiYTQ3ZjQxODEwMTcxOWM4ZDdkZAo/Cj1CO2h0dHBzOi8vc2VxdWVuY2VyLTAuc3YtNC1lbmcuc2NyYXRjaGIubmV0d29yay5jYW50b24uZ2xvYmFsCg8KDVILCgkp7HJIGMAnBgAKbApqUmgKZmpkCmIKYEJeTUVEOjpEaWdpdGFsLUFzc2V0LUVuZy00OjoxMjIwODk2ZTFjM2Y3ODlkNDkxN2FkYTcxNzRhZDIwNDZmOGZkMDhlODc3Y2FjZDRiZmI1MmEzZWY5OTg5MzMxOWZkNQpCCkBSPgo8ajoKOAo2QjRodHRwczovL3NjYW4uc3YtNC1lbmcuc2NyYXRjaGIubmV0d29yay5jYW50b24uZ2xvYmFsCgQKAlIAKklEU086OjEyMjA1NWE0NzY2NGZlZGIwOTZlYWUxODc5OTRkZmJmOGQyMzIxYTE3NzhiNDNiYWM1NjcyMDZkM2ViYmU5ZWIwOWI5OeiORhjAJwYAQioKJgokCAESIO2jRGkNJBdOKdWrmWGMWB/+hktJL2zKw6EnEfktp/SoEB4=',
+        created_at: '2024-11-25T17:30:54.745320Z',
+      },
+      domain_id:
+        'global-domain::122055a47664fedb096eae187994dfbf8d2321a1778b43bac567206d3ebbe9eb09b9',
+    },
+  ],
 };
 
 export function dsoInfoHandler(baseUrl: string): RestHandler {

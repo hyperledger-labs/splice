@@ -4,10 +4,11 @@ import * as React from 'react';
 import { Header, useUserState } from 'common-frontend';
 
 import { Logout } from '@mui/icons-material';
-import { Box, Button, Divider, Stack } from '@mui/material';
+import { Box, Button, Divider, Stack, Typography } from '@mui/material';
 import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 
+import { useNetworkInstanceName } from '../hooks/index';
 import { useSvConfig } from '../utils';
 
 interface LayoutProps {
@@ -17,9 +18,30 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const config = useSvConfig();
   const { logout } = useUserState();
+  const networkInstanceName = useNetworkInstanceName();
+  const networkInstanceNameColor = `colors.${networkInstanceName?.toLowerCase()}`;
 
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
+      {networkInstanceName === undefined ? (
+        <></>
+      ) : (
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="center"
+          sx={{
+            backgroundColor: `${networkInstanceNameColor}`,
+            color: 'black',
+            height: '50px',
+            width: '100%',
+          }}
+        >
+          <Typography id="network-instance-name" data-testid="network-instance-name" variant="h6">
+            <b>You are on {networkInstanceName} </b>
+          </Typography>
+        </Stack>
+      )}
       <Container maxWidth="xl">
         <Header
           title="Super Validator Operations"

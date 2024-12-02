@@ -26,6 +26,10 @@ declare module '@mui/material/styles' {
     colors: {
       neutral: Record<string, string>;
       primary: Record<string, string>;
+      mainnet: string;
+      testnet: string;
+      devnet: string;
+      scratchnet: string;
     };
   }
   // allow configuration using `createTheme`
@@ -33,6 +37,10 @@ declare module '@mui/material/styles' {
     colors?: {
       neutral?: Record<string, string>;
       primary?: Record<string, string>;
+      mainnet: string;
+      testnet: string;
+      devnet: string;
+      scratchnet: string;
     };
   }
 }
@@ -67,6 +75,10 @@ let theme = createTheme({
     colors: {
       neutral: generateHslPalette(0, 0, [0, 10, 15, 25, 30, 40, 50, 60, 70, 80]),
       primary: generateHslPalette(195, 96, [79, 89]),
+      mainnet: '#F8FDCD',
+      testnet: '#C8F1FE',
+      devnet: '#C6B2FF',
+      scratchnet: '#FFFFFF',
     },
   },
 });
