@@ -306,14 +306,19 @@ class ParticipantAdminConnection(
   def uploadAcsSnapshot(acsBytes: ByteString)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    runCmd(
-      ParticipantAdminCommands.ParticipantRepairManagement
-        .ImportAcs(
-          acsBytes,
-          IMPORT_ACS_WORKFLOW_ID_PREFIX,
-          allowContractIdSuffixRecomputation = false,
-        )
-    ).map(_ => ())
+    retryProvider.retryForClientCalls(
+      "import_acs",
+      "Imports the acs in the participantl",
+      runCmd(
+        ParticipantAdminCommands.ParticipantRepairManagement
+          .ImportAcs(
+            acsBytes,
+            IMPORT_ACS_WORKFLOW_ID_PREFIX,
+            allowContractIdSuffixRecomputation = false,
+          )
+      ).map(_ => ()),
+      logger,
+    )
   }
 
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
