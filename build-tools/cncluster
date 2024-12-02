@@ -1315,7 +1315,7 @@ function subcmd_debug_shell() {
   if [[ "$VERSION_NUMBER" == *-dirty ]]; then
     repo="digitalasset-canton-network-docker-dev.jfrog.io"
   else
-    if [ -n "$CIRCLE_BRANCH" ]; then
+    if [ -n "${CIRCLE_BRANCH:-}" ]; then
       if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
         repo="digitalasset-canton-network-docker.jfrog.io"
       else

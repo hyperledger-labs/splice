@@ -237,7 +237,7 @@ function subcmd_start {
     if [[ "$IMAGE_TAG" == *-dirty ]]; then
       export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
     else
-      if [ -n "$CIRCLE_BRANCH" ]; then
+      if [ -n "${CIRCLE_BRANCH:-}" ]; then
         if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
           export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
         else

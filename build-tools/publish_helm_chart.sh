@@ -36,7 +36,7 @@ repo="canton-network-helm"
 if [[ "$chart" == *-dirty.tgz ]]; then
   repo="canton-network-helm-dev"
 else
-  if [ -n "${CIRCLE_BRANCH}" ]; then
+  if [ -n "${CIRCLE_BRANCH:-}" ]; then
     if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
       repo="canton-network-helm"
     else
