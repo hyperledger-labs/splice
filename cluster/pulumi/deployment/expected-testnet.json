@@ -72,7 +72,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "test"
+              "value": "testzrh"
             },
             "type": "Literal"
           },
@@ -99,7 +99,7 @@
           }
         },
         "retryOnUpdateConflict": true,
-        "stack": "organization/canton-network/canton-network.test",
+        "stack": "organization/canton-network/canton-network.testzrh",
         "useLocalStackOnly": true
       }
     },
@@ -127,7 +127,7 @@
       },
       "spec": {
         "eventMetadata": {
-          "cluster": "test"
+          "cluster": "testzrh"
         },
         "eventSeverity": "info",
         "eventSources": [
@@ -406,7 +406,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "test"
+              "value": "testzrh"
             },
             "type": "Literal"
           },
@@ -433,7 +433,7 @@
           }
         },
         "retryOnUpdateConflict": true,
-        "stack": "organization/infra/infra.test",
+        "stack": "organization/infra/infra.testzrh",
         "useLocalStackOnly": true
       }
     },
@@ -510,11 +510,11 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.test",
+    "id": "organization/infra/infra.testzrh",
     "inputs": {
-      "name": "organization/infra/infra.test"
+      "name": "organization/infra/infra.testzrh"
     },
-    "name": "organization/infra/infra.test",
+    "name": "organization/infra/infra.testzrh",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -559,7 +559,7 @@
           },
           {
             "name": "CLOUDSDK_COMPUTE_REGION",
-            "value": "us-central1"
+            "value": "europe-west6"
           },
           {
             "name": "GOOGLE_APPLICATION_CREDENTIALS",
@@ -808,7 +808,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "test"
+              "value": "testzrh"
             },
             "type": "Literal"
           },
@@ -835,7 +835,7 @@
           }
         },
         "retryOnUpdateConflict": true,
-        "stack": "organization/splitwell/splitwell.test",
+        "stack": "organization/splitwell/splitwell.testzrh",
         "useLocalStackOnly": true
       }
     },
@@ -916,7 +916,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "test"
+              "value": "testzrh"
             },
             "type": "Literal"
           },
@@ -955,7 +955,7 @@
           }
         },
         "retryOnUpdateConflict": true,
-        "stack": "organization/sv-canton/sv-canton.sv-1-migration-0.test",
+        "stack": "organization/sv-canton/sv-canton.sv-1-migration-0.testzrh",
         "useLocalStackOnly": true
       }
     },
@@ -1036,7 +1036,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "test"
+              "value": "testzrh"
             },
             "type": "Literal"
           },
@@ -1063,7 +1063,7 @@
           }
         },
         "retryOnUpdateConflict": true,
-        "stack": "organization/validator1/validator1.test",
+        "stack": "organization/validator1/validator1.testzrh",
         "useLocalStackOnly": true
       }
     },

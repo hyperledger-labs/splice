@@ -101,7 +101,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "db": {},
@@ -112,7 +112,7 @@
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "test-0",
+          "chainId": "testzrh-0",
           "chainIdSuffix": "4"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -251,7 +251,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
@@ -325,7 +325,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": true,
-      "region": "us-central1",
+      "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
         "backupConfiguration": {
@@ -351,7 +351,7 @@
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "test",
+          "cluster": "testzrh",
           "migration_id": "0"
         }
       }
@@ -386,7 +386,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": true,
-      "region": "us-central1",
+      "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
         "backupConfiguration": {
@@ -412,7 +412,7 @@
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "test",
+          "cluster": "testzrh",
           "migration_id": "0"
         }
       }
@@ -462,7 +462,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
@@ -530,7 +530,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": true,
-      "region": "us-central1",
+      "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
         "backupConfiguration": {
@@ -556,7 +556,7 @@
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "test",
+          "cluster": "testzrh",
           "migration_id": "0"
         }
       }

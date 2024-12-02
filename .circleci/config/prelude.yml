@@ -119,8 +119,7 @@ channel-notify-parameter: &channel-notify-parameter
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum
-    enum:
-      [
+    enum: [
         "cimain",
         "cidaily",
         "cilr",
@@ -169,10 +168,7 @@ executors:
         environment:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-        command: [
-          "postgres",
-          "-c", "max_connections=16000"
-        ]
+        command: ["postgres", "-c", "max_connections=16000"]
     environment:
       COURSIER_CACHE: "/cache/coursier"
   self_hosted:

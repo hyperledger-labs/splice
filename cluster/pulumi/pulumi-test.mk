@@ -24,7 +24,7 @@ $(dir)/test-testnet.json: $(dir $(dir)).build
 	    . "${REPO_ROOT}/cluster/deployment/testnet/.envrc.vars"; \
     	npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     else \
-        env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="test" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+        env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="testzrh" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     fi
 
 .PHONY: $(dir)/test-mainnet.json

@@ -176,11 +176,11 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.test",
+    "id": "organization/infra/infra.testzrh",
     "inputs": {
-      "name": "organization/infra/infra.test"
+      "name": "organization/infra/infra.testzrh"
     },
-    "name": "organization/infra/infra.test",
+    "name": "organization/infra/infra.testzrh",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -361,7 +361,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet",
+          "name": "cn-testzrhnet",
           "svNamespace": "validator1"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
@@ -485,7 +485,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -544,7 +544,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
@@ -610,7 +610,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": true,
-      "region": "us-central1",
+      "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
         "backupConfiguration": {
@@ -636,7 +636,7 @@
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "test"
+          "cluster": "testzrh"
         }
       }
     },
@@ -683,7 +683,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -735,7 +735,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": true,
-      "region": "us-central1",
+      "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
         "backupConfiguration": {
@@ -761,7 +761,7 @@
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "test"
+          "cluster": "testzrh"
         }
       }
     },
@@ -814,7 +814,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
@@ -846,7 +846,7 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "test/validator1"
+            "prefix": "testzrh/validator1"
           }
         },
         "persistence": {

@@ -623,7 +623,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "db": {
@@ -924,7 +924,7 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "test/sv"
+            "prefix": "testzrh/sv"
           }
         },
         "persistence": {

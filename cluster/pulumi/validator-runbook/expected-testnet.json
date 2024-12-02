@@ -288,11 +288,11 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.test",
+    "id": "organization/infra/infra.testzrh",
     "inputs": {
-      "name": "organization/infra/infra.test"
+      "name": "organization/infra/infra.testzrh"
     },
-    "name": "organization/infra/infra.test",
+    "name": "organization/infra/infra.testzrh",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -448,7 +448,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
@@ -545,7 +545,7 @@
           "dnsName": "test.global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "test.global.canton.network.digitalasset.com",
-          "name": "cn-testnet"
+          "name": "cn-testzrhnet"
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "db": {
@@ -647,7 +647,7 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "test/validator"
+            "prefix": "testzrh/validator"
           }
         },
         "persistence": {

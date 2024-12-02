@@ -13,20 +13,24 @@ export class SpliceConfigContext {
       'GCP_CLUSTER_BASENAME',
       'Cluster must be specified'
     );
+
+    const clusterToDirectoryNames: Record<string, string> = {
+      dev: 'devnet',
+      main: 'mainnet',
+      test: 'testnet-old',
+      testzrh: 'testnet',
+    };
+
+    if (Object.keys(clusterToDirectoryNames).includes(gcpclusterbasename)) {
+      return clusterToDirectoryNames[gcpclusterbasename];
+    }
+
     if (gcpclusterbasename?.includes('scratch')) {
       // fix difference between deployment folder name and cluster name
       return gcpclusterbasename.replace('scratch', 'scratchnet');
-    } else {
-      const netSuffixedClusters = ['test', 'testzrh', 'dev', 'main', 'mainzrh'];
-      if (
-        netSuffixedClusters.some(cluster => {
-          return cluster == gcpclusterbasename;
-        })
-      ) {
-        return gcpclusterbasename + 'net';
-      }
-      return gcpclusterbasename;
     }
+
+    return gcpclusterbasename;
   }
 
   clusterPath(): string {
