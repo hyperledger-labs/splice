@@ -259,28 +259,15 @@ class SvApp(
     val cometBftClient = newCometBftClient
 
     for {
-      (_, participantId) <- (
-        // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
-        // reconnect all domains at the beginning of SV initialization just in case.
-        appInitStep("Reconnect all domains") {
-          retryProvider.retry(
-            RetryFor.WaitingOnInitDependency,
-            "reconect_domains",
-            "Reconnect all domains",
-            participantAdminConnection.reconnectAllDomains(),
-            logger,
-          )
-        },
-        appInitStep("Get participant ID") {
-          retryProvider.getValueWithRetries(
-            RetryFor.WaitingOnInitDependency,
-            "get_participant_id",
-            "Participant ID",
-            participantAdminConnection.getParticipantId(),
-            logger,
-          )
-        },
-      ).tupled
+      participantId <- appInitStep("Get participant ID") {
+        retryProvider.getValueWithRetries(
+          RetryFor.WaitingOnInitDependency,
+          "get_participant_id",
+          "Participant ID",
+          participantAdminConnection.getParticipantId(),
+          logger,
+        )
+      }
       domainTimeAutomationService = new DomainTimeAutomationService(
         config.domains.global.alias,
         participantAdminConnection,
@@ -375,6 +362,17 @@ class SvApp(
           } yield res
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           for {
+            // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
+            // reconnect all domains at the beginning of SV initialization just in case.
+            _ <- appInitStep("Reconnect all domains") {
+              retryProvider.retry(
+                RetryFor.WaitingOnInitDependency,
+                "reconect_domains",
+                "Reconnect all domains",
+                participantAdminConnection.reconnectAllDomains(),
+                logger,
+              )
+            }
             signer <- CometBftRequestSigner.getOrGenerateSigner(
               "cometbft-governance-keys",
               participantAdminConnection,
