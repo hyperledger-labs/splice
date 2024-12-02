@@ -129,9 +129,6 @@ jobs:
       base_version:
         type: string
         default: ""
-      deploy_retry_count:
-        type: integer
-        default: 10
       send_notifications:
         type: boolean
         default: true
@@ -174,7 +171,14 @@ jobs:
           cluster: << parameters.cluster >>
           cmd: |
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1"
-          cmd_retry_count: << parameters.deploy_retry_count >>
+          # retry on vpn disconnects.
+          # Note that this might break the assumption that the validator spinup is fast enough for the
+          # migration not to have to wait for it, but for now we don't want to add more complexity to the workflow.
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_HOSTNAME}; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
       # these do NOT show the logs of the compose validator, but might help debug onboarding errors
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
