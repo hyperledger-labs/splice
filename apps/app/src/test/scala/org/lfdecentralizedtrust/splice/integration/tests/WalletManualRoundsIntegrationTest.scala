@@ -171,16 +171,22 @@ class WalletManualRoundsIntegrationTest
 
       advanceRoundsByOneTickViaAutomation()
 
-      lockAmulets(
-        aliceValidatorBackend,
-        aliceUserParty,
-        aliceValidatorParty,
-        aliceWalletClient.list().amulets,
-        lockedQty,
-        sv1ScanBackend,
-        Duration.ofHours(60),
-        CantonTimestamp.now(),
-      )
+      eventuallySucceeds() {
+        // The lockAmulets function is not atomic, it first fetches round data from Scan, and then
+        // uses it to submit ledger transactions directly to the participant. It therefore might fail
+        // when rounds are advancing. We do the same thing we expect an app to do, which is simply retry
+        // on such failures.
+        lockAmulets(
+          aliceValidatorBackend,
+          aliceUserParty,
+          aliceValidatorParty,
+          aliceWalletClient.list().amulets,
+          lockedQty,
+          sv1ScanBackend,
+          Duration.ofHours(60),
+          CantonTimestamp.now(),
+        )
+      }
 
       clue("Check balance after advancing round and locking amulets") {
         val feeCeiling = walletUsdToAmulet(1)
