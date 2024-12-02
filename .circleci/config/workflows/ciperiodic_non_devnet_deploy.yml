@@ -36,6 +36,7 @@ workflow:
           <<: *main-branch-only
           context:
             - artifactory
+            - autoscaler_prevent_scaledown
             - slack-context
           cluster: "ciperiodic"
           update_deployment_branch: false
@@ -54,8 +55,7 @@ workflow:
           cluster: "ciperiodic"
           force_non_devnet: true
           requires:
-            - wait_for_previous_pipeline
-            - artifacts_push
+            - deploy_cluster
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:

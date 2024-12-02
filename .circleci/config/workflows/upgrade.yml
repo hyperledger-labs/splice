@@ -40,6 +40,7 @@ workflow:
           run_upgrade_workarounds: true
           requires:
             - reset_cluster
+            - autoscaler_prevent_scaledown
       - preflight_check:
           name: "preflight_check_initial"
           cluster_version: << pipeline.parameters.base-version >>
@@ -50,7 +51,7 @@ workflow:
           cluster: << pipeline.parameters.cluster >>
           wait_for_sv: false
           requires:
-            - reset_cluster
+            - deploy_cluster_for_upgrade
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
           deploy_version: << pipeline.parameters.base-version >>

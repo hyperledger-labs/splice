@@ -42,6 +42,7 @@ workflow:
           cancel_workflow_on_failure: true
           requires:
             - artifacts_push
+            - autoscaler_prevent_scaledown
             - reset_initially
       - deploy_sv_runbook:
           <<: *main-branch-only

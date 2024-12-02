@@ -38,6 +38,7 @@ workflow:
           update_deployment_branch: false  # No need to create a deployment branch for cimain
           cancel_workflow_on_failure: true
           requires:
+            - autoscaler_prevent_scaledown
             - reset_cluster
             - artifacts_push
       - preflight_check:
@@ -48,8 +49,7 @@ workflow:
           cluster: "cimain"
           wait_for_sv: false
           requires:
-            - wait_for_previous_pipeline
-            - artifacts_push
+            - deploy_cluster
       - preflight_check_docker:
           <<: *main-branch-only
           context:
@@ -59,8 +59,7 @@ workflow:
           cluster: "cimain"
           wait_for_sv: false
           requires:
-            - wait_for_previous_pipeline
-            - artifacts_push
+            - deploy_cluster
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:

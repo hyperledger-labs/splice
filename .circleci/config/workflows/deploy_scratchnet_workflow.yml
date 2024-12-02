@@ -87,8 +87,7 @@
           cluster: "user-selected-scratchnet"
           wait_for_sv: false
           requires:
-            - artifacts_push
-            - set_scratchnet
+            - deploy_cluster
       - preflight_check_docker:
           <<: *main-branch-never
           context:
@@ -98,8 +97,7 @@
           cluster: "user-selected-scratchnet"
           wait_for_sv: false
           requires:
-            - artifacts_push
-            - set_scratchnet
+            - deploy_cluster
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"

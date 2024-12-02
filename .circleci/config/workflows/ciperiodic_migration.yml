@@ -38,6 +38,7 @@ workflow:
           cancel_workflow_on_failure: true
           deploy_version: << pipeline.parameters.base-version >>
           requires:
+            - autoscaler_prevent_scaledown
             - reset_initially
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
