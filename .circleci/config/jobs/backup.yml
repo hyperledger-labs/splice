@@ -100,7 +100,7 @@ jobs:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "10m"
-          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "<< parameters.cluster >>" "<< parameters.migration_id >>"
+          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "${GCP_CLUSTER_BASENAME}" "<< parameters.migration_id >>"
       - run:
           name: Add snapshot_array to env
           command: |
