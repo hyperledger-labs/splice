@@ -346,7 +346,7 @@
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "ingress": {
           "decentralizedSynchronizer": {
-            "activeMigrationId": "3"
+            "activeMigrationId": "4"
           },
           "splitwell": true
         },
@@ -359,7 +359,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -475,7 +475,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -488,7 +488,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-3",
+      "name": "participant-4",
       "namespace": "validator1",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -532,7 +532,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 3
+            "id": 4
           }
         },
         "participantAdminUserNameFrom": {
@@ -543,7 +543,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_3",
+          "databaseName": "participant_4",
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
@@ -556,9 +556,9 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
-    "name": "validator1-participant-3",
+    "name": "validator1-participant-4",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -681,7 +681,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -803,7 +803,8 @@
           "enable": true
         },
         "migration": {
-          "id": 3,
+          "id": 4,
+          "legacyId": 3,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -814,7 +815,7 @@
             "optional": false
           }
         },
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-4",
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,
@@ -850,7 +851,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

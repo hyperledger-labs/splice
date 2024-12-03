@@ -198,8 +198,8 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "3",
-              "4"
+              "4",
+              "3"
             ]
           }
         },
@@ -211,7 +211,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -416,7 +416,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "loopback",
     "provider": "",
@@ -461,14 +461,14 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": "4"
         },
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-4",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "sequencerAddress": "global-domain-3-sequencer",
+        "sequencerAddress": "global-domain-4-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -489,7 +489,7 @@
           "enabled": true
         }
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "scan",
     "provider": "",
@@ -776,22 +776,22 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-3-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-4-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-4.sv-2.dev.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-3-mediator",
-          "sequencerAddress": "global-domain-3-sequencer",
+          "mediatorAddress": "global-domain-4-mediator",
+          "sequencerAddress": "global-domain-4-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-3.sv.dev.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-4.sv.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
@@ -809,11 +809,11 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": "4"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-4",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
@@ -838,7 +838,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "sv-app",
     "provider": "",
@@ -1217,7 +1217,7 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.dev.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-4.sv-2.dev.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -1225,10 +1225,10 @@
           "enable": true
         },
         "migration": {
-          "id": "3"
+          "id": "4"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-3",
+        "participantAddress": "participant-4",
         "persistence": {
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
@@ -1258,7 +1258,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "validator",
     "provider": "",
