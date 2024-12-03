@@ -112,7 +112,7 @@
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "testzrh-0",
+          "chainId": "test-0",
           "chainIdSuffix": "4"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",

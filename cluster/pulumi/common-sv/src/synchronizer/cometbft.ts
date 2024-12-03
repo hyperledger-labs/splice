@@ -30,6 +30,18 @@ export type Cometbft = {
   release: InstalledHelmChart;
 };
 
+const getChainId = (migrationId: number): string => {
+  if (`${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet) {
+    return 'test';
+  }
+
+  if (CLUSTER_BASENAME === 'testzrh') {
+    return `test-${migrationId}`;
+  }
+
+  return `${CLUSTER_BASENAME}-${migrationId}`;
+};
+
 /**
  * The CometBft deployment uses a different port for the istio VirtualService for each node
  * Then all the ports must be added to the gateway so that we can forward the traffic as expected.
@@ -107,10 +119,7 @@ export function installCometBftNode(
     },
     genesis: {
       // for TestNet-like deployments on scratchnet, set the chainId to 'test'
-      chainId:
-        `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
-          ? 'test'
-          : `${CLUSTER_BASENAME}-${migrationId}`,
+      chainId: getChainId(migrationId),
       chainIdSuffix: config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || '0',
     },
     metrics: {
