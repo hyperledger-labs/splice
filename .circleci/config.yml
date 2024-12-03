@@ -772,7 +772,7 @@ commands:
       clone_command:
         type: string
         # order by name, mixed to try to reduce conflicts when running in multiple jobs at the same time
-        default: "rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=64 --transfers=64 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
+        default: "rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
     steps:
       - run:
           name: Restore nix
@@ -810,38 +810,40 @@ commands:
             fi
       - run_setup_nix:
           include_binary_cache: true
-      # required as the first nix invocation still needs a writeable /nix/store
+      # required as the first nix invocation (why? not sure tbh, we should look into that)
       - run_bash_command_in_nix:
           cmd: |
             echo "Validated nix"
-            ls -al
-      - run:
-          name: Save Nix
-          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
-          no_output_timeout: "20m"
-          # We don't run this in nix because we need to run rclone as sudo to preserve all the permissions for the store
-          command: |
-            set -euxo pipefail
-            cache_key=($(md5sum "/tmp/nix-cache-key"))
-            if [ ! -f "/cache/nix/$cache_key/cached" ]; then
-              echo "Saving nix"
+      - when:
+          condition: << parameters.save >>
+          steps:
+            - run:
+                name: Save Nix
+                # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+                no_output_timeout: "20m"
+                # We don't run this in nix because we need to run rclone as sudo to preserve all the permissions for the store
+                command: |
+                  set -euxo pipefail
+                  cache_key=($(md5sum "/tmp/nix-cache-key"))
+                  if [ ! -f "/cache/nix/$cache_key/cached" ]; then
+                    echo "Saving nix"
 
-              sudo -v ; curl https://rclone.org/install.sh | sudo bash
+                    sudo -v ; curl https://rclone.org/install.sh | sudo bash
 
-              nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
+                    nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
 
-              << parameters.clone_command >> "$HOME/" "/cache/nix/$cache_key/" --include ".nix-*/**" --include ".nix-*"
-              << parameters.clone_command >> $HOME/.config/nix "/cache/nix/$cache_key/nix"
+                    << parameters.clone_command >> "$HOME/" "/cache/nix/$cache_key/" --include ".nix-*/**" --include ".nix-*"
+                    << parameters.clone_command >> $HOME/.config/nix "/cache/nix/$cache_key/nix"
 
-              mkdir -p "/cache/nix/$cache_key/nix_store/store"
-              mkdir -p "/cache/nix/$cache_key/nix_store/var"
+                    mkdir -p "/cache/nix/$cache_key/nix_store/store"
+                    mkdir -p "/cache/nix/$cache_key/nix_store/var"
 
-              #requires sudo to preserve read only during clone
-              sudo << parameters.clone_command >> /nix/store/ /cache/nix/$cache_key/nix_store/store
-              << parameters.clone_command >> /nix/var/ "/cache/nix/$cache_key/nix_store/var"
+                    #requires sudo to preserve read only during clone
+                    sudo << parameters.clone_command >> /nix/store/ /cache/nix/$cache_key/nix_store/store
+                    << parameters.clone_command >> /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
-              echo "done" > "/cache/nix/$cache_key/cached"
-            fi
+                    echo "done" > "/cache/nix/$cache_key/cached"
+                  fi
 
   run_bash_command_in_nix:
     parameters:
@@ -3153,7 +3155,7 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in one place
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
           save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3181,7 +3183,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -3198,7 +3201,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -3217,7 +3221,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -3256,7 +3261,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          save: true
       - run_bash_command_in_nix:
           cmd_name: Deployment Test
           cmd_retry_count: 5 # Retry in case of dependency download errors

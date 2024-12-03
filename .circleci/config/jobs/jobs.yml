@@ -8,7 +8,7 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in one place
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
           save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -36,7 +36,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -53,7 +54,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -72,7 +74,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -111,7 +114,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          save: true
       - run_bash_command_in_nix:
           cmd_name: Deployment Test
           cmd_retry_count: 5 # Retry in case of dependency download errors
