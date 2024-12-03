@@ -24,43 +24,44 @@ const Header: React.FC<HeaderProps> = ({ children, title, titleVariant, navLinks
   };
 
   return (
-    <Toolbar
-      sx={{
-        borderBottom: noBorder ? 0 : 1,
-        borderColor: 'divider',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: { xs: 0, sm: 0, md: 0, lg: 0, xl: 0 },
-      }}
-    >
-      <Typography
-        id="app-title"
-        textTransform="uppercase"
-        variant={titleVariant || 'h5'}
-        fontFamily={theme => theme.fonts.monospace.fontFamily}
-        fontWeight={theme => theme.fonts.monospace.fontWeight}
+    <>
+      <Toolbar
+        sx={{
+          borderBottom: noBorder ? 0 : 1,
+          borderColor: 'divider',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: { xs: 0, sm: 0, md: 0, lg: 0, xl: 0 },
+        }}
       >
-        {title}
-      </Typography>
+        <Typography
+          id="app-title"
+          textTransform="uppercase"
+          variant={titleVariant || 'h5'}
+          fontFamily={theme => theme.fonts.monospace.fontFamily}
+          fontWeight={theme => theme.fonts.monospace.fontWeight}
+        >
+          {title}
+        </Typography>
 
-      {navLinks && (
-        <Stack direction="row" spacing={4} alignItems="center">
-          {navLinks.map((navLink, index) => (
-            <NavLink
-              key={index}
-              id={`navlink-${navLink.path}`}
-              to={navLink.path}
-              style={p => applyNavStyle(p.isActive)}
-            >
-              {navLink.name}
-            </NavLink>
-          ))}
-        </Stack>
-      )}
-
-      {children}
-    </Toolbar>
+        {navLinks && (
+          <Stack direction="row" spacing={4} alignItems="center">
+            {navLinks.map((navLink, index) => (
+              <NavLink
+                key={index}
+                id={`navlink-${navLink.path}`}
+                to={navLink.path}
+                style={p => applyNavStyle(p.isActive)}
+              >
+                {navLink.name}
+              </NavLink>
+            ))}
+          </Stack>
+        )}
+        {children}
+      </Toolbar>
+    </>
   );
 };
 

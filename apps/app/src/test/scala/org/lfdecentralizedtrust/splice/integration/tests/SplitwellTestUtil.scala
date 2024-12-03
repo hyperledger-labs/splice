@@ -39,15 +39,21 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
         topEndpoint.toURI(false).toString
     }
 
-    participant.domains.connect(splitwellUpgradeAlias, url)
-
     // This can be a bit slow since it first pushes all vetting transactions before pushing
     // the PartyToParticipant transaction.
-    eventually(40.seconds) {
-      splitwellBackend
-        .getConnectedDomains(ensurePartyIsOnNewDomain)
-        .map(_.uid.identifier.str) should contain("splitwellUpgrade")
-    }
+    actAndCheck(
+      timeUntilSuccess = 40.seconds
+    )(
+      "Connect splitwell upgrade domain",
+      participant.domains.connect(splitwellUpgradeAlias, url),
+    )(
+      s"Wait for splitwell upgrade domain to be connected for party $ensurePartyIsOnNewDomain",
+      _ => {
+        splitwellBackend
+          .getConnectedDomains(ensurePartyIsOnNewDomain)
+          .map(_.uid.identifier.str) should contain("splitwellUpgrade")
+      },
+    )
   }
 
   protected def disconnectSplitwellUpgradeDomain(participant: ParticipantClientReference) =

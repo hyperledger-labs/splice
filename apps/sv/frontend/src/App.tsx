@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, ErrorBoundary, ErrorRouterPage, UserProvider, theme } from 'common-frontend';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import {
+  AuthProvider,
+  ErrorBoundary,
+  ErrorRouterPage,
+  UserProvider,
+  theme,
+  SvClientProvider,
+} from 'common-frontend';
 import { replaceEqualDeep } from 'common-frontend-utils';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
@@ -31,8 +39,8 @@ import { useConfigPollInterval, useSvConfig } from './utils';
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const config = useSvConfig();
   const refetchInterval = useConfigPollInterval();
-
   const navigate = useNavigate();
+
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -46,15 +54,19 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
       warn: () => {},
     },
   });
+
   return (
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
       <QueryClientProvider client={queryClient}>
+        <ReactQueryDevtools initialIsOpen={false} />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-          <SvAppVotesHooksProvider>
-            <SvAdminClientProvider url={config.services.sv.url}>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
-            </SvAdminClientProvider>
-          </SvAppVotesHooksProvider>
+          <SvClientProvider url={config.services.sv.url}>
+            <SvAppVotesHooksProvider>
+              <SvAdminClientProvider url={config.services.sv.url}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
+              </SvAdminClientProvider>
+            </SvAppVotesHooksProvider>
+          </SvClientProvider>
         </UserProvider>
       </QueryClientProvider>
     </AuthProvider>
@@ -84,6 +96,7 @@ const App: React.FC = () => {
       </Route>
     )
   );
+
   return (
     <ErrorBoundary>
       <ThemeProvider theme={theme}>

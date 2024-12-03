@@ -5,6 +5,7 @@ import { useCometBftDebug } from './useCometBftDebug';
 import { useListVoteRequestResult, useListDsoRulesVoteRequests } from './useListVoteRequests';
 import { useListVotes } from './useListVotes';
 import { useMediatorStatus } from './useMediatorStatus';
+import { useNetworkInstanceName } from './useNetworkInstanceName';
 import { useOpenMiningRounds } from './useOpenMiningRounds';
 import { useSequencerStatus } from './useSequencerStatus';
 import { useValidatorLicenses } from './useValidatorLicenses';
@@ -14,10 +15,11 @@ import { useVoteRequest } from './useVoteRequest';
 export {
   useAmuletPriceVotes,
   useCometBftDebug,
-  useListVoteRequestResult,
   useListDsoRulesVoteRequests,
+  useListVoteRequestResult,
   useListVotes,
   useMediatorStatus,
+  useNetworkInstanceName,
   useOpenMiningRounds,
   useSequencerStatus,
   useValidatorLicenses,
