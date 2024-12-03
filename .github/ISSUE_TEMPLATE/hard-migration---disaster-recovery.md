@@ -25,6 +25,8 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 - [ ] (only if hard migration) vote on scheduled downtime
 - [ ] disable periodic CI jobs (including sv and validator runbook resets) on `main`
 - [ ] (only if DevNet) take down multi-validator stack (does not handle hard domain migrations in its current form): `cncluster pulumi multi-validator down` from release branch
+- [ ] take backups with `cncluster backup_nodes` (all nodes in parallel!) as you would during the meeting - to confirm that the commands work for you and to have them ready
+- [ ] (shortly before the call) request PAM in case you'll need it later
 
 ### Call with all SVs (hard migrations version; remove me if DR)
 
