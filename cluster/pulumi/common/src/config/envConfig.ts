@@ -17,7 +17,6 @@ export class SpliceConfigContext {
     const clusterToDirectoryNames: Record<string, string> = {
       dev: 'devnet',
       main: 'mainnet',
-      test: 'testnet-old',
       testzrh: 'testnet',
     };
 
