@@ -32,6 +32,13 @@ describe('SV user can', () => {
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
 
+  test('can see the network name banner', async () => {
+    userEvent.setup();
+    render(<AppWithConfig />);
+
+    await screen.findByText('You are on ScratchNet');
+  });
+
   test('browse to the governance tab', async () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);

@@ -145,7 +145,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Action Needed', action, user);
+    await goToGovernanceTabAndClickOnAction('Action Needed', action, user, 1);
     const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1600', '2100');
     await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent);
 
@@ -157,7 +157,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Executed', 'SRARC_SetConfig', user, 0);
+    await goToGovernanceTabAndClickOnAction('Executed', action, user, 1);
 
     const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1800', '2200');
 
@@ -171,7 +171,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Executed', 'SRARC_SetConfig', user, 1);
+    await goToGovernanceTabAndClickOnAction('Executed', action, user, 2);
 
     const mockJsonContent = getMockJsonContentForDsoRules('1800');
 
@@ -184,7 +184,7 @@ describe('SV can see config diffs of SRARC_SetConfig', () => {
     const user = userEvent.setup();
     render(<AppWithConfig />);
 
-    await goToGovernanceTabAndClickOnAction('Rejected', action, user);
+    await goToGovernanceTabAndClickOnAction('Rejected', action, user, 1);
 
     const mockHtmlContent = getMockJsonContentForDsoRules('2000');
 
@@ -218,7 +218,11 @@ async function goToGovernanceTabAndClickOnAction(
   await user.click(screen.getByText(tableType));
 
   expect(await screen.findAllByText(action)).toBeDefined();
-  await user.click(screen.getAllByText(action)[index]);
+
+  // eslint-disable-next-line testing-library/no-node-access
+  const row = document.querySelector(`[data-id="${index}"]`);
+
+  await user.click(row!);
 }
 
 function getMockJsonContentForDsoRules(acsCommitmentReconciliationInterval: string): string {
