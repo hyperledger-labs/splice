@@ -1,0 +1,2 @@
+secretsprovider: gcpkms://projects/da-cn-devnet/locations/europe-west6/keyRings/pulumi/cryptoKeys/testzrh
+encryptedkey: CiQAQEuyQ6T1NWXODzuBb9RDlUzwCILbr+I3eZUQCWCATIT3ovQSSQB7vsRAerukQBn50SAC8wvdoo5jySB4iKO4blfWX60whrFI8gS908RdrB5DC7VB+9GbN0s/MUZebuqA35m8Ghx6hGm30NC1nKo=
