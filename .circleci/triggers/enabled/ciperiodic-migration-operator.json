@@ -9,7 +9,7 @@
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
-        2, 10, 18
+        2, 6, 10, 14, 18, 22
       ],
       "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],
