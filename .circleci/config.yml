@@ -130,6 +130,7 @@ cluster-parameter: &cluster-parameter
         "ciupgrade",
         "devnet",
         "mainnet",
+        "mainzrhnet", # TODO(#16518): remove after post mainzrhnet directory rename
         "testnet",
         "testnet-preview",
         "observability",
@@ -7095,6 +7096,17 @@ workflows:
           deployment_only: false
           requires:
             - set_previews_mainnet
+      # TODO(#16518): remove after post mainzrhnet directory rename
+      - preview_pulumi_changes:
+          name: Preview pulumi changes for ZHMainNet
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "mainzrhnet"
+          deployment_only: false
+          requires:
+            - set_previews_mainnet
       - preview_pulumi_changes:
           name: Preview pulumi changes for CILR
           context:
@@ -7142,6 +7154,17 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "mainnet"
+          deployment_only: true
+          requires:
+            - set_previews_deployment
+      # TODO(#16518): remove after post mainzrhnet directory rename
+      - preview_pulumi_changes:
+          name: Preview operator pulumi changes for ZHMainNet
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "mainzrhnet"
           deployment_only: true
           requires:
             - set_previews_deployment

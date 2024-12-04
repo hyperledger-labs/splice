@@ -18,6 +18,7 @@ export class SpliceConfigContext {
       dev: 'devnet',
       main: 'mainnet',
       testzrh: 'testnet',
+      mainzrh: 'mainzrhnet',
     };
 
     if (Object.keys(clusterToDirectoryNames).includes(gcpclusterbasename)) {

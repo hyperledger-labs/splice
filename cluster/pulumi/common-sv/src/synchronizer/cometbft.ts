@@ -30,6 +30,7 @@ export type Cometbft = {
   release: InstalledHelmChart;
 };
 
+// TODO(#16510) -- retrieve exact chain id directly from an env var / external config
 const getChainId = (migrationId: number): string => {
   if (`${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet) {
     return 'test';
@@ -37,6 +38,10 @@ const getChainId = (migrationId: number): string => {
 
   if (CLUSTER_BASENAME === 'testzrh') {
     return `test-${migrationId}`;
+  }
+
+  if (CLUSTER_BASENAME === 'mainzrh') {
+    return `main-${migrationId}`;
   }
 
   return `${CLUSTER_BASENAME}-${migrationId}`;

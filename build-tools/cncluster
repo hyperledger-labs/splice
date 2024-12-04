@@ -723,14 +723,13 @@ function subcmd_create() {
       fi
     fi
 
-    subcmd_pulumi cluster up --yes --skip-preview
-
-    _infra_up
-
-
     for stack in infra canton-network sv-runbook validator-runbook; do
       _uses_pulumi_stack $stack
     done
+
+    subcmd_pulumi cluster up --yes --skip-preview
+
+    _infra_up
 
     _log "Determining cluster ingress IP address"
     IPADDR=$(_cluster_ip)
