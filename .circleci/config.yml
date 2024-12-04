@@ -2447,6 +2447,8 @@ jobs:
           cluster: << parameters.cluster >>
           additional_nix_args: >
             --keep GITHUB_TOKEN
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD
             --keep AUTH0_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
             --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
