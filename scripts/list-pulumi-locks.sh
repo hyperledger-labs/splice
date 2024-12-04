@@ -5,7 +5,7 @@
 
 pattern=${1:-""}
 allLocks=$(curl -s -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" "https://storage.googleapis.com/storage/v1/b/cn-pulumi-stacks/o?prefix=.pulumi/locks")
-output=$(echo $allLocks | jq -r ".items[] | select(.name | test(\"$pattern\")) | [.name,.timeCreated] | @tsv")
+output=$(echo "$allLocks" | jq -r ".items[] | select(.name | test(\"$pattern\")) | [.name,.timeCreated] | @tsv")
 if [ -z "$output" ]; then
   exit 0
 else
