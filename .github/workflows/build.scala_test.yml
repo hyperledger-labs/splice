@@ -20,10 +20,6 @@ jobs:
       # We also can't simply use ubuntu:latest because its default user is root, and building
       # nix as root fails.
       image: cimg/base:current
-      volumes:
-        - /cache:/cache
-      # TODO(#15988): running as privileged for now for the bind-mount of /nix/store.
-      options: --privileged
 
     services:
       postgres:
@@ -60,18 +56,14 @@ jobs:
       - name: Start Canton
         uses: ./.github/actions/nix/run_bash_command_in_nix
         env:
-          POSTGRES_HOST: postgres
-          CANTON_DB_HOST: postgres
+          POSTGRES_HOST: localhost
+          CANTON_DB_HOST: localhost
           POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         with:
           cmd: |
             mkdir -p log
-            # re-exporting POSTGRES_HOST because it is hardcoded to localhost
-            # in .envrc.vars, thus overwritten when nix starts, so here we are
-            # inside nix and can re-export it to the value we want.
-            export POSTGRES_HOST=postgres
             ./start-canton.sh -p external -D ${{ inputs.start_canton_options }}
           additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
           cmd_retry_count: 3
@@ -101,7 +93,7 @@ jobs:
           # TODO(#15988): move this into an image that we can use for all jobs
           COURSIER_CACHE: /cache/coursier
         with:
-            extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=postgres POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres
+            extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres
             artifactory_user: ${{ vars.ARTIFACTORY_USER }}
             artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
             # TODO(#15988): For now just two arbitrarily chosen tests out of 'scala_test sim time'

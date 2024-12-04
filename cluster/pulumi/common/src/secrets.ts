@@ -54,7 +54,8 @@ export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
 
 export function imagePullSecretByNamespaceNameForServiceAccount(
   ns: string,
-  serviceAccountName: string
+  serviceAccountName: string,
+  dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource[] {
   const publicArtifactory = 'digitalasset-canton-network-docker.jfrog.io';
   const privateArtifactory = 'digitalasset-canton-network-docker-dev.jfrog.io';
@@ -62,6 +63,8 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
   const password = config.requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
   const clusterBaseName = config.requireEnv('GCP_CLUSTER_BASENAME');
   const k8sProvider = new k8s.Provider('k8s-imgpull-' + ns, { enableServerSideApply: true });
+  const supportPrivateArtifactory =
+    clusterBaseName.startsWith('scratch') || config.envFlag('SUPPORT_PRIVATE_ARTIFACTORY');
 
   const prodDockerConfig = JSON.stringify({
     auths: {
@@ -73,7 +76,7 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
     },
   });
 
-  const scratchDockerConfig = JSON.stringify({
+  const withPrivDockerConfig = JSON.stringify({
     auths: {
       [publicArtifactory]: {
         auth: btoa(username + ':' + password),
@@ -87,25 +90,41 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
       },
     },
   });
-  const dockerConfigJson = clusterBaseName.startsWith('scratch')
-    ? scratchDockerConfig
-    : prodDockerConfig;
-  const secret = new k8s.core.v1.Secret(ns + '-docker-reg-cred', {
-    metadata: {
-      name: 'docker-reg-cred',
-      namespace: ns,
+  const dockerConfigJson = supportPrivateArtifactory ? withPrivDockerConfig : prodDockerConfig;
+  const secret = new k8s.core.v1.Secret(
+    ns + '-docker-reg-cred',
+    {
+      metadata: {
+        name: 'docker-reg-cred',
+        namespace: ns,
+      },
+      type: 'kubernetes.io/dockerconfigjson',
+      stringData: {
+        '.dockerconfigjson': dockerConfigJson,
+      },
     },
-    type: 'kubernetes.io/dockerconfigjson',
-    stringData: {
-      '.dockerconfigjson': dockerConfigJson,
-    },
-  });
+    {
+      dependsOn,
+    }
+  );
+  return [
+    secret,
+    patchServiceAccountWithImagePullSecret(ns, serviceAccountName, 'docker-reg-cred', k8sProvider),
+  ];
+}
+
+function patchServiceAccountWithImagePullSecret(
+  ns: string,
+  serviceAccountName: string,
+  secretName: string,
+  k8sProvider: k8s.Provider
+): pulumi.Resource {
   const patch = new k8s.core.v1.ServiceAccountPatch(
     ns + '-' + serviceAccountName,
     {
       imagePullSecrets: [
         {
-          name: secret.metadata.name,
+          name: secretName,
         },
       ],
       metadata: {
@@ -118,7 +137,7 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
     }
   );
 
-  return [secret, patch];
+  return patch;
 }
 
 export function imagePullSecret(ns: ExactNamespace): CnInput<pulumi.Resource>[] {

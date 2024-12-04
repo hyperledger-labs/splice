@@ -23,7 +23,6 @@ jobs:
     with:
       # For now, the two tests that we are running here seem to work
       # just fine on the smaller runners
-      runs_on: self-hosted-docker
-#      runs_on: self-hosted-docker-large
+      runs_on: self-hosted-k8s
       start_canton_options: -s
     secrets: inherit

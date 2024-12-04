@@ -3,7 +3,7 @@ on: workflow_call
 
 jobs:
   static_tests:
-    runs-on: self-hosted-docker
+    runs-on: self-hosted-k8s
     # Docker Hub image that `container-job` executes in
     container:
       # TODO(#15988): We're currently (ab)using the cimg/base image as a base image for our self-hosted runners.
@@ -12,10 +12,6 @@ jobs:
       # We also can't simply use ubuntu:latest because its default user is root, and building
       # nix as root fails.
       image: cimg/base:current
-      volumes:
-        - /cache:/cache
-      # TODO(#15988): running as privileged for now for the bind-mount of /nix/store.
-      options: --privileged
 
     steps:
 

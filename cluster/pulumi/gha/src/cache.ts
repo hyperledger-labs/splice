@@ -6,7 +6,8 @@ import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 // TODO(#15988): consider sharing the NFS drive between CCI and GHA runners
 
 export function createCachePvc(
-  runnersNamespace: k8s.core.v1.Namespace
+  runnersNamespace: k8s.core.v1.Namespace,
+  cachePvcName: string
 ): k8s.core.v1.PersistentVolumeClaim {
   // A filestore for the cache drives that are mounted directly to the runners
   // filestore minimum capacity to provision an ssd instance is 2.5TB
@@ -48,7 +49,6 @@ export function createCachePvc(
       },
     },
   });
-  const cachePvcName = 'gha-cache-pvc';
   const cachePvc = new k8s.core.v1.PersistentVolumeClaim(cachePvcName, {
     metadata: {
       name: cachePvcName,
