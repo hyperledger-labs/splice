@@ -6,6 +6,7 @@ import * as semver from 'semver';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
+import { ArtifactoryCreds } from './artifactory';
 import { CnChartVersion, repositories } from './artifacts';
 import { config, imagePullPolicy } from './config';
 import { spliceConfig } from './config/config';
@@ -238,12 +239,11 @@ export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.Reposito
   if (version.type === 'local' || version.repository === repositories.private) {
     return undefined;
   } else {
-    const username = config.requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
-    const password = config.requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
+    const creds = ArtifactoryCreds.getCreds().creds;
     return {
       repo: version.repository.helm,
-      username: username,
-      password: password,
+      username: creds.username,
+      password: creds.password,
     };
   }
 }

@@ -9,6 +9,7 @@ import {
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
 } from 'splice-pulumi-common';
+import { ArtifactoryCreds } from 'splice-pulumi-common/src/artifactory';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 import yaml from 'yaml';
 
@@ -222,10 +223,11 @@ function installDockerRunnerScaleSets(
       dependsOn: runnersNamespace,
     }
   );
-  // TODO(#15988): for now, this uses the token of the person running the pulumi command.
-  // It should be a service account instead.
-  const artifactoryCreds = `${spliceEnvConfig.requireEnv('ARTIFACTORY_USER')}:${spliceEnvConfig.requireEnv(`ARTIFACTORY_PASSWORD`)}`;
-  const artifactoryCredsBase64 = Buffer.from(artifactoryCreds).toString('base64');
+  const artifactoryCreds = ArtifactoryCreds.getCreds().creds;
+  const artifactoryCredsBase64 = artifactoryCreds.apply(keys => {
+    const creds = `${keys.username}:${keys.password}`;
+    return Buffer.from(creds).toString('base64');
+  });
   const dockerConfigSecret = new k8s.core.v1.Secret('docker-config-secret', {
     metadata: {
       namespace: runnersNamespace.metadata.name,

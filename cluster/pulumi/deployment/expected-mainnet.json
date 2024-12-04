@@ -14,20 +14,6 @@
         "continueResyncOnCommitMatch": false,
         "destroyOnFinalize": false,
         "envRefs": {
-          "ARTIFACTORY_PASSWORD": {
-            "secret": {
-              "key": "ARTIFACTORY_PASSWORD",
-              "name": "env"
-            },
-            "type": "Secret"
-          },
-          "ARTIFACTORY_USER": {
-            "secret": {
-              "key": "ARTIFACTORY_USER",
-              "name": "env"
-            },
-            "type": "Secret"
-          },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
@@ -173,8 +159,6 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ARTIFACTORY_PASSWORD": "s3cr3t",
-          "ARTIFACTORY_USER": "art_user",
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": "mgmt",
           "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
           "AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID": "mgmt",
@@ -364,20 +348,6 @@
         "continueResyncOnCommitMatch": false,
         "destroyOnFinalize": false,
         "envRefs": {
-          "ARTIFACTORY_PASSWORD": {
-            "secret": {
-              "key": "ARTIFACTORY_PASSWORD",
-              "name": "env"
-            },
-            "type": "Secret"
-          },
-          "ARTIFACTORY_USER": {
-            "secret": {
-              "key": "ARTIFACTORY_USER",
-              "name": "env"
-            },
-            "type": "Secret"
-          },
           "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
             "secret": {
               "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",

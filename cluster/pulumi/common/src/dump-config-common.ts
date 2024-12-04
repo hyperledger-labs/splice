@@ -117,8 +117,6 @@ export async function initDumpConfig(): Promise<void> {
   process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
   process.env.AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
-  process.env.ARTIFACTORY_USER = 'art_user';
-  process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
   // StackReferences cannot be mocked in tests currently
   // (see https://github.com/pulumi/pulumi/issues/9212)
   sinon
@@ -198,6 +196,15 @@ export async function initDumpConfig(): Promise<void> {
                 bucketName: 'data-export-bucket-name',
                 secretName: 'data-export-bucket-sa-key-secret',
                 jsonCredentials: 'data-export-bucket-sa-key-secret-creds',
+              });
+              return {
+                ...args.inputs,
+                secretData,
+              };
+            } else if (args.inputs.secret == 'artifactory-keys') {
+              const secretData = JSON.stringify({
+                username: 'art_user',
+                password: 's3cr3t',
               });
               return {
                 ...args.inputs,

@@ -6,9 +6,6 @@ import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-com
 
 async function main() {
   await initDumpConfig();
-  process.env.ARTIFACTORY_USER = 'artie';
-  process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
-
   const installNode = await import('./src/installNode');
   const auth0Cfg: Auth0Config = {
     appToClientId: {

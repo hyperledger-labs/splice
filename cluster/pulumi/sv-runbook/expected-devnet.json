@@ -148,7 +148,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0aWU6czNjcjN0\",\"username\":\"artie\",\"password\":\"s3cr3t\"}}}"
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
         }
       },
       "type": "kubernetes.io/dockerconfigjson"
@@ -169,7 +169,7 @@
       "repositoryOpts": {
         "password": "s3cr3t",
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "artie"
+        "username": "art_user"
       },
       "timeout": 300,
       "values": {
@@ -383,7 +383,7 @@
       "repositoryOpts": {
         "password": "s3cr3t",
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "artie"
+        "username": "art_user"
       },
       "timeout": 300,
       "values": {
@@ -434,7 +434,7 @@
       "repositoryOpts": {
         "password": "s3cr3t",
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "artie"
+        "username": "art_user"
       },
       "timeout": 300,
       "values": {
@@ -683,7 +683,7 @@
       "repositoryOpts": {
         "password": "s3cr3t",
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "artie"
+        "username": "art_user"
       },
       "timeout": 300,
       "values": {
@@ -917,7 +917,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0aWU6czNjcjN0\",\"username\":\"artie\",\"password\":\"s3cr3t\"}}}"
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
         }
       },
       "type": "kubernetes.io/dockerconfigjson"
@@ -1191,7 +1191,7 @@
       "repositoryOpts": {
         "password": "s3cr3t",
         "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "artie"
+        "username": "art_user"
       },
       "timeout": 300,
       "values": {
