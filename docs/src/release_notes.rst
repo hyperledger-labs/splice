@@ -8,12 +8,17 @@
 Release Notes
 =============
 
+* All UIs (except the experimental app manager and splitwell UIs)
+
+  Added the ``openid`` scope to their authorization requests to comply with the `OpenID Connect specification <https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest>`_.
+
 0.3.2
 -----
 
 * Bugfixes
 
   * Fix JSON API bug that was causing UNAUTHENTICATED responses on calls to GetLedgerEnd
+
 
 0.3.1
 -----
