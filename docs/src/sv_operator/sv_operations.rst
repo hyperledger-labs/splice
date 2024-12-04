@@ -55,7 +55,7 @@ This section gives a brief overview over some of the most important identities a
 and for each type of identity: its role and relevance for quorums (if any), under what circumstance it can be reused,
 and the implications of losing it (e.g., by loss or compromise of relevant cryptographic keys).
 
-Each identity is relevant on different layers, or within different subsystems, of the Canton Network software stack.
+Each identity is relevant on different layers, or within different subsystems, of the Canton & Global Synchronizer software stack.
 We strive to reduce coupling between layers, so that in general it is possible to rotate identities independently of each other.
 
 SV identity

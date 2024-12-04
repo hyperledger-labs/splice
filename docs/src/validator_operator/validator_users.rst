@@ -5,8 +5,8 @@
 
 .. _validator-users:
 
-Users, Parties and Wallets in the Canton Network Wallet
-=======================================================
+Users, Parties and Wallets in the Splice Wallet
+===============================================
 
 Canton distinguishes between parties and users, as documented in detail in the
 [Canton docs](https://docs.daml.com/app-dev/parties-users.html). In essence,

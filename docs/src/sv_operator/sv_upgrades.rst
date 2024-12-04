@@ -8,14 +8,14 @@
 Synchronizer Upgrades with Downtime
 ===================================
 
-For supporting non-backwards-compatible major version upgrades of the Canton software the Canton Network will implement a procedure for synchronizer (i.e., domain) upgrades with downtime.
+For supporting non-backwards-compatible major version upgrades of the Canton software the Global Synchronizer will implement a procedure for synchronizer (i.e., domain) upgrades with downtime.
 
 .. _sv-upgrades-overview:
 
 Overview
 --------
 
-1. Canton releases containing breaking changes become available and Canton Network Node releases compatible with these Canton releases become available.
+1. Canton releases containing breaking changes become available and Splice releases compatible with these Canton releases become available.
 2. SVs agree and eventually confirm via an on-ledger vote (cast via the SV UI) on which specific date and time the network downtime necessary for the upgrade will start. It is the responsibility of the DSO to make sure that validator operators are informed about planned upgrades and upgrade timelines.
 3. Once the downtime has been scheduled, all SVs deploy new Kubernetes pods containing the new versions of the Canton components of their Super Validator node (participant, sequencer, and mediator) as well as a new CometBFT node, alongside the old versioned ones which are not yet deleted. See :ref:`sv-upgrades-deploying-domain`.
 4. At the start of the downtime window, the SV app of SVs automatically pauses all traffic on the operating version of the global synchronizer.

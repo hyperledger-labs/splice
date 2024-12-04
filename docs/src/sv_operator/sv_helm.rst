@@ -51,7 +51,7 @@ Generating an SV identity
 -------------------------
 
 SV operators are identified by a human-readable name and an EC public key.
-This identification is stable across deployments of the Canton network.
+This identification is stable across deployments of the Global Synchronizer.
 You are, for example, expected to reuse your SV name and public key between (test-)network resets.
 
 Use the following shell commands to generate a keypair in the format expected by the SV node software: ::
@@ -79,7 +79,7 @@ These commands should result in an output similar to ::
   private-key = "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCBsFuFa7Eumkdg4dcf/vxIXgAje2ULVz+qTKP3s/tHqKw=="
 
 Store both keys in a safe location.
-You will be using them every time you want to deploy a new SV node, i.e., also when deploying an SV node to a different deployment of the Canton Network and for redeploying an SV node after a (test-)network reset.
+You will be using them every time you want to deploy a new SV node, i.e., also when deploying an SV node to a different deployment of the Global Synchronizer and for redeploying an SV node after a (test-)network reset.
 
 The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
 For `DevNet` and the current early version of `TestNet`, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
@@ -357,7 +357,7 @@ To setup the wallet, CNS and SV UI, create the following two secrets.
 Configuring your CometBft node
 ------------------------------
 
-Every SV node also deploys a CometBft node. This node must be configured to join the existing Canton network BFT chain.
+Every SV node also deploys a CometBft node. This node must be configured to join the existing Global Synchronizer BFT chain.
 To do that, you first must generate the keys that will identify the node.
 
 .. note::

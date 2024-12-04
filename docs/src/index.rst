@@ -3,8 +3,8 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-Canton Network Documentation
-============================
+Global Synchronizer for the Canton Network
+==========================================
 
 .. list-table:: Current Version Information
    :header-rows: 0
