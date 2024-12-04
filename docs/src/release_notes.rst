@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+0.3.2
+-----
+
+* Bugfixes
+
+  * Fix JSON API bug that was causing UNAUTHENTICATED responses on calls to GetLedgerEnd
+
 0.3.1
 -----
 
