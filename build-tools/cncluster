@@ -1972,7 +1972,7 @@ subcommand_whitelist[request_pam]="Request PAM for the current cluster"
 # mostly stolen from https://github.com/DACH-NY/hub-sv/blob/main/tools/bin/request-access
 function subcmd_request_pam() {
     local folder_id
-    if [ "$GCP_CLUSTER_BASENAME" == "dev" ] || [ "$GCP_CLUSTER_BASENAME" == "test" ]; then
+    if [ "$CLOUDSDK_CORE_PROJECT" == "da-cn-devnet" ]; then
       folder_id="98574387291"
       entitlement_name="cn-devnet-admin-entitlement"
     elif (env-bool IS_MAINNET); then
