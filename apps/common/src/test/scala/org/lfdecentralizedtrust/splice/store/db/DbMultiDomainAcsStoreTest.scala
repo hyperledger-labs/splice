@@ -18,6 +18,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import slick.jdbc.JdbcProfile
 
@@ -196,7 +197,9 @@ class DbMultiDomainAcsStoreTest
     )
   }
 
-  override protected def cleanDb(storage: DbStorage): Future[?] = {
+  override protected def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): Future[?] = {
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

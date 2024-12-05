@@ -39,6 +39,7 @@ import com.digitalasset.canton.store.IndexedDomain
 import com.digitalasset.canton.store.db.{DbTest, PostgresTest}
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, UniqueIdentifier}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, CloseableTest, DomainAlias, HasExecutionContext}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
@@ -57,7 +58,7 @@ sealed trait SyncStateInspectionTest
   lazy val srip: SortedReconciliationIntervalsProvider =
     constantSortedReconciliationIntervalsProvider(interval)
 
-  override def cleanDb(storage: DbStorage): Future[Unit] = {
+  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[Unit] = {
     import storage.api.*
     storage.update(
       DBIO.seq(

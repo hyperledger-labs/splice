@@ -651,7 +651,7 @@ class ScanAggregatorTest
       .toMap
   }
 
-  override protected def cleanDb(storage: DbStorage) =
+  override protected def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext) =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

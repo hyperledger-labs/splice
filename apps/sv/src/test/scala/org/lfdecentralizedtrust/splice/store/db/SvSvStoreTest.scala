@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 
 import java.time.Instant
@@ -170,7 +171,9 @@ class DbSvSvStoreTest
     } yield store
   }
 
-  override protected def cleanDb(storage: DbStorage): Future[?] =
+  override protected def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): Future[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

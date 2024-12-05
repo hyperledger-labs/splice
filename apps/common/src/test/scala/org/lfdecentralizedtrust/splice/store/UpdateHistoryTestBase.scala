@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, Splice
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
 import org.scalatest.Assertion
@@ -221,7 +222,7 @@ abstract class UpdateHistoryTestBase
     )
   }
 
-  override def cleanDb(storage: DbStorage): Future[?] =
+  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

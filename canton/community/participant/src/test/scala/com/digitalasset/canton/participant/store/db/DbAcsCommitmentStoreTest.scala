@@ -12,12 +12,13 @@ import com.digitalasset.canton.participant.store.{
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.IndexedDomain
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
 trait DbAcsCommitmentStoreTest extends AcsCommitmentStoreTest { this: DbTest =>
 
-  override def cleanDb(storage: DbStorage): Future[Unit] = {
+  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[Unit] = {
     import storage.api.*
     storage.update(
       DBIO.seq(
@@ -47,7 +48,7 @@ trait DbAcsCommitmentStoreTest extends AcsCommitmentStoreTest { this: DbTest =>
 }
 
 trait DbIncrementalCommitmentStoreTest extends IncrementalCommitmentStoreTest { this: DbTest =>
-  override def cleanDb(storage: DbStorage): Future[Unit] = {
+  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[Unit] = {
     import storage.api.*
     storage.update(
       DBIO.seq(
@@ -72,7 +73,7 @@ trait DbIncrementalCommitmentStoreTest extends IncrementalCommitmentStoreTest { 
 }
 
 trait DbCommitmentQueueTest extends CommitmentQueueTest { this: DbTest =>
-  override def cleanDb(storage: DbStorage): Future[Unit] = {
+  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[Unit] = {
     import storage.api.*
     storage.update(
       DBIO.seq(

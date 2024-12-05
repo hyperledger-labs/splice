@@ -9,6 +9,7 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import org.scalatest.wordspec.AsyncWordSpec
 import slick.jdbc.{JdbcProfile, PostgresProfile}
@@ -151,7 +152,7 @@ class AcsJdbcTypesTest
     )
   }
 
-  override def cleanDb(storage: DbStorage): Future[Unit] = {
+  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[Unit] = {
     storage.update(
       DBIO.seq(
         sqlu"drop table if exists jdbc_types_test_table;"
