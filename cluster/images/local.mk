@@ -32,6 +32,7 @@ images := \
 	pulumi-kubernetes-operator \
 	\
 	splice-test-postgres \
+	splice-test-ci \
 
 canton-image := cluster/images/canton
 splice-image := cluster/images/splice-app

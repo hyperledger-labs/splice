@@ -17,12 +17,8 @@ runs:
       uses: actions/cache/restore@v4
       with:
         path: |
-          # ~/.ivy2/cache
-          # ~/.sbt
-          # I'm not clear where /home/circleci comes from, but it will probably go away once
-          # we switch away from the CCI image, so not worth cleaning up now.
-          /home/circleci/.ivy2/cache
-          /home/circleci/.sbt
+          /github/home/.ivy2/cache
+          /github/home/.sbt
         key: sbt-${{ inputs.cache_version }} job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala') }}-${{ hashFiles('project/BuildCommon.scala', 'project/build.properties', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt') }}
         restore-keys: |
           sbt-${{ inputs.cache_version }} job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala') }}

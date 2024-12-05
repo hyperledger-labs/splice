@@ -6,12 +6,10 @@ jobs:
     runs-on: self-hosted-k8s
     # Docker Hub image that `container-job` executes in
     container:
-      # TODO(#15988): We're currently (ab)using the cimg/base image as a base image for our self-hosted runners.
-      # Ideally, we'd build our own image that includes the necessary dependencies. But then
-      # we need to either push it somewhere public or grant access to the runner to pull it.
-      # We also can't simply use ubuntu:latest because its default user is root, and building
-      # nix as root fails.
-      image: cimg/base:current
+      # TODO(#15988): clean this up, use a proper released image instead:
+      #               - Once this is in a snapshot, use the snapshot version.
+      #               - Once this is in a release, use the release version.
+      image: digitalasset-canton-network-docker-dev.jfrog.io/splice-test-ci:0.3.0-itai-dirty
 
     steps:
 
