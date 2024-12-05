@@ -3408,6 +3408,7 @@ jobs:
           additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLE_BRANCH"
           cmd_name: Push Helm Artifacts
           cmd: |
+            make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
             make cluster/helm/write-digests
             make cluster/helm/build -j
             make cluster/helm/push -j
