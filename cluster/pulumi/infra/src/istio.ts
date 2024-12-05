@@ -5,13 +5,13 @@ import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 import {
   activeVersion,
   ExactNamespace,
+  getDnsNames,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
   InstalledHelmChart,
   installSpliceHelmChart,
-  isMainNet,
 } from '../../common';
-import { clusterBaseDomain, clusterBasename, loadIPRanges } from './config';
+import { clusterBasename, loadIPRanges } from './config';
 
 export const istioVersion = {
   istio: '1.22.2',
@@ -378,12 +378,8 @@ function configureGateway(
     'splice-istio-gateway',
     {
       cluster: {
-        cantonHostname: isMainNet
-          ? 'network.canton.global'
-          : `${clusterBaseDomain}.network.canton.global`,
-        daHostname: isMainNet
-          ? 'global.canton.network.digitalasset.com'
-          : `${clusterBaseDomain}.global.canton.network.digitalasset.com`,
+        cantonHostname: getDnsNames().cantonDnsName,
+        daHostname: getDnsNames().daDnsName,
         basename: clusterBasename,
       },
     },

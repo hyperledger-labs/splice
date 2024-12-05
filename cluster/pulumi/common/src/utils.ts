@@ -15,6 +15,29 @@ export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY
 export const REPO_ROOT = config.requireEnv('REPO_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
+
+export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
+  const daUrlScheme = 'global.canton.network.digitalasset.com';
+  const cantonUrlScheme = 'network.canton.global';
+
+  if (CLUSTER_HOSTNAME.includes(daUrlScheme)) {
+    return {
+      daDnsName: CLUSTER_HOSTNAME,
+      cantonDnsName: CLUSTER_HOSTNAME.replace(daUrlScheme, cantonUrlScheme),
+    };
+  } else if (CLUSTER_HOSTNAME.includes(cantonUrlScheme)) {
+    return {
+      daDnsName: CLUSTER_HOSTNAME.replace(cantonUrlScheme, daUrlScheme),
+      cantonDnsName: CLUSTER_HOSTNAME,
+    };
+  } else {
+    throw new Error(
+      'Expected hostname to conform to either DA URL scheme or Canton URL scheme, but got: ' +
+        CLUSTER_HOSTNAME
+    );
+  }
+}
+
 export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
 export const GCP_ZONE = config.optionalEnv('CLOUDSDK_COMPUTE_ZONE');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;

@@ -2,14 +2,13 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as certmanager from '@pulumi/kubernetes-cert-manager';
 import * as pulumi from '@pulumi/pulumi';
-import { RecordSet } from '@pulumi/gcp/dns/recordSet';
 import {
   btoa,
   config,
   exactNamespace,
   ExactNamespace,
   GCP_PROJECT,
-  isMainNet,
+  getDnsNames,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
@@ -286,36 +285,16 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const ingressNs = exactNamespace('cluster-ingress');
 
-    let cantonGlobalDnsName: string;
-    let cantonGlobalDnsEntries: RecordSet[];
+    const { cantonDnsName, daDnsName } = getDnsNames();
+    const cantonGlobalDnsEntries = clusterDnsEntries(
+      cantonDnsName,
+      'canton-global',
+      ingressIp,
+      publicIngressIp
+    );
 
-    let daDnsName: string;
-    let daDnsEntries: RecordSet[];
-    if (isMainNet) {
-      cantonGlobalDnsName = `network.canton.global`;
-      cantonGlobalDnsEntries = clusterDnsEntries(
-        cantonGlobalDnsName,
-        'canton-global',
-        ingressIp,
-        publicIngressIp
-      );
-
-      daDnsName = `global.canton.network.digitalasset.com`;
-      daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
-    } else {
-      cantonGlobalDnsName = `${clusterBaseDomain}.network.canton.global`;
-      cantonGlobalDnsEntries = clusterDnsEntries(
-        cantonGlobalDnsName,
-        'canton-global',
-        ingressIp,
-        publicIngressIp
-      );
-
-      daDnsName = `${clusterBaseDomain}.global.canton.network.digitalasset.com`;
-      daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
-    }
-
-    this.dnsNames = [cantonGlobalDnsName, daDnsName];
+    const daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
+    this.dnsNames = [cantonDnsName, daDnsName];
 
     clusterCertificate(clusterName, this.dnsNames, ingressNs.ns, certManagerDeployment, [
       ...cantonGlobalDnsEntries,
