@@ -61,7 +61,7 @@ groups:
           panelId: 11
           noDataState: OK
           execErrState: OK
-          for: 2m
+          for: 5m
           annotations:
             __dashboardUid__: QP_wDqDnz
             __panelId__: "11"
@@ -94,7 +94,7 @@ groups:
           panelId: 27
           noDataState: OK
           execErrState: Error
-          for: 2m
+          for: 5m
           annotations:
             __dashboardUid__: QP_wDqDnz
             __panelId__: "27"
@@ -105,4 +105,3 @@ groups:
           labels:
             "": ""
           isPaused: false
-
