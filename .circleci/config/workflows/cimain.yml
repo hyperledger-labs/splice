@@ -99,7 +99,6 @@ workflow:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -112,7 +111,6 @@ workflow:
           <<: *main-branch-only
           cluster: "cimain"
           namespace_name: "sv-3"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn

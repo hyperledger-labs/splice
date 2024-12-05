@@ -365,6 +365,33 @@ commands:
           path: todo-out/todos
           destination: todos
 
+  export_migration_id:
+    parameters:
+      <<: *cluster-parameter
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Export active migration ID
+          cluster: << parameters.cluster >>
+          when: always
+          cmd:  |
+            CONFIG_FILE=cluster/deployment/<< parameters.cluster >>/config.yaml
+            ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE")
+            if [ "$ACTIVE_MIGRATION_ID" = "null" ]; then
+              ACTIVE_MIGRATION_ID=0
+              echo "DEFAULT ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+            elif [ -z "$ACTIVE_MIGRATION_ID" ]; then
+              echo "Error: ACTIVE_MIGRATION_ID is empty" >&2
+            else
+              echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+            fi
+            echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" > tmp-migration-id-env
+      - run:
+          name: Save migration ID to env
+          command: |
+            source tmp-migration-id-env
+            echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" >> "$BASH_ENV"
+            rm tmp-migration-id-env
+
   run_trailing_whitespace_check:
     steps:
       - run_bash_command_in_nix:
@@ -1877,8 +1904,6 @@ jobs:
       parallelism:
         type: integer
         default: 3
-      migration_id:
-        type: integer
       internal_stack:
         type: boolean
         default: true
@@ -1889,9 +1914,12 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
+      - export_migration_id:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Listing nodes for backup
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
           cmd: |
             nodes=""
             if [[ << parameters.include_sv >> != false ]]; then
@@ -1930,9 +1958,9 @@ jobs:
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
             for ns in $(cat tests-to-run.txt); do
-              cncluster wait $ns validator-app << parameters.migration_id >>
+              cncluster wait $ns validator-app ${ACTIVE_MIGRATION_ID}
             done
-            cncluster backup_nodes << parameters.migration_id >> << parameters.internal_stack >> $(cat tests-to-run.txt)
+            cncluster backup_nodes ${ACTIVE_MIGRATION_ID} << parameters.internal_stack >> $(cat tests-to-run.txt)
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
@@ -1949,20 +1977,21 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
-      migration_id:
-        type: integer
     executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
+      - export_migration_id:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Check backup status
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "10m"
-          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "${GCP_CLUSTER_BASENAME}" "<< parameters.migration_id >>"
+          additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
+          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "${GCP_CLUSTER_BASENAME}" "${ACTIVE_MIGRATION_ID}"
       - run:
           name: Add snapshot_array to env
           command: |
@@ -1990,8 +2019,6 @@ jobs:
       <<: *channel-notify-parameter
       namespace_name:
         type: string
-      migration_id:
-        type: integer
       internal_stack:
         type: boolean
         default: true
@@ -2003,11 +2030,14 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
+      - export_migration_id:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Restoring node
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "20m"
+          additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
           cmd: |
             cncluster activate
 
@@ -2016,16 +2046,16 @@ jobs:
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
-            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >> << parameters.internal_stack >>
+            cncluster restore_node --force << parameters.namespace_name >> ${ACTIVE_MIGRATION_ID} << parameters.internal_stack >>
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app << parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> sv-app << parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> scan-app ${ACTIVE_MIGRATION_ID}
+                cncluster wait << parameters.namespace_name >> sv-app ${ACTIVE_MIGRATION_ID}
+                cncluster wait << parameters.namespace_name >> validator-app ${ACTIVE_MIGRATION_ID}
                 ;;
               "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app ${ACTIVE_MIGRATION_ID}
                 ;;
             esac
       - print_gcloud_logs_commands:
@@ -5686,7 +5716,6 @@ workflows:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -5699,7 +5728,6 @@ workflows:
           <<: *main-branch-only
           cluster: "cimain"
           namespace_name: "sv-3"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -6288,7 +6316,6 @@ workflows:
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -6300,7 +6327,6 @@ workflows:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           namespace_name: "sv-3"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -6317,7 +6343,6 @@ workflows:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           namespace_name: "validator1"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -6551,7 +6576,6 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 4
           context:
             - artifactory
             - canton-network-vpn
@@ -6639,7 +6663,6 @@ workflows:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 4
           requires:
             - wait_for_previous_pipeline
 
@@ -6683,7 +6706,6 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 4
           internal_stack: false
           context:
             - artifactory
@@ -6696,7 +6718,6 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "devnet"
-          migration_id: 4
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context
@@ -7005,7 +7026,6 @@ workflows:
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           cluster: "mainnet"
           parallelism: 1
-          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -7017,7 +7037,6 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "mainnet"
-          migration_id: 1
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           alert_threshold: "4 hours ago"
           context:
@@ -7185,7 +7204,6 @@ workflows:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "testnet"
-          migration_id: 1
           internal_stack: false
           context:
             - artifactory
@@ -7198,7 +7216,6 @@ workflows:
     jobs:
       - backup_status_cluster:
           cluster: "testnet"
-          migration_id: 1
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context

@@ -10,7 +10,6 @@ workflow:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 4
           context:
             - artifactory
             - canton-network-vpn
@@ -98,7 +97,6 @@ workflow:
             - slack-context
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 4
           requires:
             - wait_for_previous_pipeline
 
@@ -142,7 +140,6 @@ workflow:
                 - /release-line-.*/
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           cluster: "devnet"
-          migration_id: 4
           internal_stack: false
           context:
             - artifactory
@@ -155,7 +152,6 @@ workflow:
     jobs:
       - backup_status_cluster:
           cluster: "devnet"
-          migration_id: 4
           channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
           context:
             - slack-context

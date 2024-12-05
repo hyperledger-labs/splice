@@ -101,7 +101,6 @@
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -113,7 +112,6 @@
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           namespace_name: "sv-3"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn
@@ -130,7 +128,6 @@
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
           namespace_name: "validator1"
-          migration_id: 0
           context:
             - artifactory
             - canton-network-vpn

@@ -176,6 +176,33 @@ commands:
           path: todo-out/todos
           destination: todos
 
+  export_migration_id:
+    parameters:
+      <<: *cluster-parameter
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Export active migration ID
+          cluster: << parameters.cluster >>
+          when: always
+          cmd:  |
+            CONFIG_FILE=cluster/deployment/<< parameters.cluster >>/config.yaml
+            ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE")
+            if [ "$ACTIVE_MIGRATION_ID" = "null" ]; then
+              ACTIVE_MIGRATION_ID=0
+              echo "DEFAULT ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+            elif [ -z "$ACTIVE_MIGRATION_ID" ]; then
+              echo "Error: ACTIVE_MIGRATION_ID is empty" >&2
+            else
+              echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+            fi
+            echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" > tmp-migration-id-env
+      - run:
+          name: Save migration ID to env
+          command: |
+            source tmp-migration-id-env
+            echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" >> "$BASH_ENV"
+            rm tmp-migration-id-env
+
   run_trailing_whitespace_check:
     steps:
       - run_bash_command_in_nix:

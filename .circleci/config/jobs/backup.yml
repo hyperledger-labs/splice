@@ -15,8 +15,6 @@ jobs:
       parallelism:
         type: integer
         default: 3
-      migration_id:
-        type: integer
       internal_stack:
         type: boolean
         default: true
@@ -27,9 +25,12 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
+      - export_migration_id:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Listing nodes for backup
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
           cmd: |
             nodes=""
             if [[ << parameters.include_sv >> != false ]]; then
@@ -68,9 +69,9 @@ jobs:
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
             for ns in $(cat tests-to-run.txt); do
-              cncluster wait $ns validator-app << parameters.migration_id >>
+              cncluster wait $ns validator-app ${ACTIVE_MIGRATION_ID}
             done
-            cncluster backup_nodes << parameters.migration_id >> << parameters.internal_stack >> $(cat tests-to-run.txt)
+            cncluster backup_nodes ${ACTIVE_MIGRATION_ID} << parameters.internal_stack >> $(cat tests-to-run.txt)
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - notify-cluster-fail:
@@ -87,20 +88,21 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
-      migration_id:
-        type: integer
     executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
+      - export_migration_id:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Check backup status
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "10m"
-          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "${GCP_CLUSTER_BASENAME}" "<< parameters.migration_id >>"
+          additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
+          cmd: .circleci/cn-scripts/check-backups-status.sh "<< parameters.alert_threshold >>" "${GCP_CLUSTER_BASENAME}" "${ACTIVE_MIGRATION_ID}"
       - run:
           name: Add snapshot_array to env
           command: |
@@ -128,8 +130,6 @@ jobs:
       <<: *channel-notify-parameter
       namespace_name:
         type: string
-      migration_id:
-        type: integer
       internal_stack:
         type: boolean
         default: true
@@ -141,11 +141,14 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
+      - export_migration_id:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Restoring node
           cluster: << parameters.cluster >>
           gce_authenticate: true
           no_output_timeout: "20m"
+          additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
           cmd: |
             cncluster activate
 
@@ -154,16 +157,16 @@ jobs:
               cncluster silence_grafana_alerts "10 minutes" -f "$REPO_ROOT/.circleci/silences/deployment_grafana.json"
             fi
 
-            cncluster restore_node --force << parameters.namespace_name >> << parameters.migration_id >> << parameters.internal_stack >>
+            cncluster restore_node --force << parameters.namespace_name >> ${ACTIVE_MIGRATION_ID} << parameters.internal_stack >>
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app << parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> sv-app << parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> scan-app ${ACTIVE_MIGRATION_ID}
+                cncluster wait << parameters.namespace_name >> sv-app ${ACTIVE_MIGRATION_ID}
+                cncluster wait << parameters.namespace_name >> validator-app ${ACTIVE_MIGRATION_ID}
                 ;;
               "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app << parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app ${ACTIVE_MIGRATION_ID}
                 ;;
             esac
       - print_gcloud_logs_commands:

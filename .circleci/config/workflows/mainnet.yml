@@ -13,7 +13,6 @@ workflow:
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           cluster: "mainnet"
           parallelism: 1
-          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -25,7 +24,6 @@ workflow:
     jobs:
       - backup_status_cluster:
           cluster: "mainnet"
-          migration_id: 1
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           alert_threshold: "4 hours ago"
           context:
