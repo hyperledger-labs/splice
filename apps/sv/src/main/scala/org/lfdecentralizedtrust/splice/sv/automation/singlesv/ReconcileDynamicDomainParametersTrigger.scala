@@ -17,15 +17,13 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReconcileSynchroni
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
-import com.digitalasset.canton.admin.api.client.data.{
-  DynamicDomainParameters as ConsoleDynamicDomainParameters
-}
+import com.digitalasset.canton.admin.api.client.data.DynamicDomainParameters as ConsoleDynamicDomainParameters
 import com.digitalasset.canton.time.{PositiveFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.time.{NonNegativeFiniteDuration as InternalNonNegativeFiniteDuration}
+import com.digitalasset.canton.time.NonNegativeFiniteDuration as InternalNonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
 import com.digitalasset.canton.topology.transaction.DomainParametersState
 import com.digitalasset.canton.tracing.TraceContext
@@ -142,7 +140,6 @@ class ReconcileDynamicDomainParametersTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       decentralizedSynchronizerId <- store.getAmuletRulesDomain()(tc)
-      participantId <- participantAdminConnection.getId()
       _ <- participantAdminConnection.ensureDomainParameters(
         decentralizedSynchronizerId,
         updateDomainParameters(
@@ -151,7 +148,6 @@ class ReconcileDynamicDomainParametersTrigger(
           task.synchronizerConfig,
           task.submissionTimeRecordTimeToleranceTarget,
         ),
-        participantId.namespace.fingerprint,
         forceChanges =
           if (task.submissionTimeRecordTimeToleranceTarget.isDefined)
             // Canton's validation is not very clever and requires a force flag for all increases

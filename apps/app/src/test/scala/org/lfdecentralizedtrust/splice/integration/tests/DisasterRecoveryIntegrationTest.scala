@@ -606,8 +606,8 @@ class DisasterRecoveryIntegrationTest
 
   private def waitForSvParticipantsToCatchup(timestamp: Instant)(implicit
       env: SpliceTestConsoleEnvironment
-  ) = {
-    clue(s"Waiting for all SVs participants to be caught up to ${timestamp}") {
+  ): Unit = {
+    clue(s"Waiting for all SVs participants to be caught up to $timestamp") {
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(svBackend =>
         eventuallySucceeds() {
           svBackend.getDomainDataSnapshot(timestamp, force = true)

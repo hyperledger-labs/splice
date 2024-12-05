@@ -138,7 +138,6 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
         TopologyStoreId.DomainStore(globalUpgradeId),
         dsoParty,
         sv1Backend.participantClientWithAdminToken.id,
-        sv1Party.uid.namespace.fingerprint,
       )
       .futureValue
       .discard

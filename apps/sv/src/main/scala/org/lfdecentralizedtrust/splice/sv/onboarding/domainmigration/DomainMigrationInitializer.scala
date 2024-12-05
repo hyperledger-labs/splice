@@ -266,7 +266,6 @@ class DomainMigrationInitializer(
           _.tryUpdate(confirmationRequestsMaxRate =
             DynamicDomainParameters.defaultConfirmationRequestsMaxRate
           ),
-          signedBy = domainMigrationDump.nodeIdentities.participant.id.uid.namespace.fingerprint,
         )
       _ = logger.info("resumed domain")
     } yield {}

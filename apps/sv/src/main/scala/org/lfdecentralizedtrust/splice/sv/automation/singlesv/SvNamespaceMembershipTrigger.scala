@@ -24,7 +24,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 private class NamespaceMembership(
-    svParty: PartyId,
     dsoParty: PartyId,
     participantAdminConnection: ParticipantAdminConnection,
     logger: TracedLogger,
@@ -83,7 +82,6 @@ private class NamespaceMembership(
           domain,
           dsoParty.uid.namespace,
           partyId.uid.namespace,
-          svParty.uid.namespace.fingerprint,
           // use lower retry number to just allow the trigger to retry instead of blocking
           RetryFor.ClientCalls,
         )
@@ -101,7 +99,6 @@ private class NamespaceMembership(
           domain,
           dsoParty.uid.namespace,
           partyId.uid.namespace,
-          svParty.uid.namespace.fingerprint,
           // use lower retry number to just allow the trigger to retry instead of blocking
           RetryFor.ClientCalls,
         )
@@ -135,7 +132,6 @@ class SvNamespaceMembershipTrigger(
 
   override val reconciler: DsoRulesTopologyStateReconciler[NamespaceDiff] =
     new NamespaceMembership(
-      store.key.svParty,
       store.key.dsoParty,
       participantAdminConnection,
       logger,

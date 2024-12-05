@@ -155,7 +155,7 @@ class HttpSvSoftDomainMigrationPocHandler(
       extracted: TracedUser
   ): Future[SvSoftDomainMigrationPocResource.SignSynchronizerBootstrappingStateResponse] = {
     implicit val TracedUser(_, traceContext) = extracted
-    withSpan(s"$workflowId.$signSynchronizerBootstrappingState") { _ => _ =>
+    withSpan(s"$workflowId.signSynchronizerBootstrappingState") { _ => _ =>
       for {
         scanUrls <- getScanUrls()
         synchronizerIdentities <- scanUrls.traverse { url =>
@@ -241,7 +241,6 @@ class HttpSvSoftDomainMigrationPocHandler(
             .proposeMapping(
               TopologyStoreId.AuthorizedStore,
               domainParameters,
-              signedBy = signedBy,
               serial = PositiveInt.one,
               isProposal = true,
             )
@@ -281,7 +280,6 @@ class HttpSvSoftDomainMigrationPocHandler(
             .proposeMapping(
               TopologyStoreId.AuthorizedStore,
               sequencerDomainState,
-              signedBy = signedBy,
               serial = PositiveInt.one,
               isProposal = true,
             )
@@ -319,7 +317,6 @@ class HttpSvSoftDomainMigrationPocHandler(
             .proposeMapping(
               TopologyStoreId.AuthorizedStore,
               mediatorDomainState,
-              signedBy = signedBy,
               serial = PositiveInt.one,
               isProposal = true,
             )
@@ -483,7 +480,6 @@ class HttpSvSoftDomainMigrationPocHandler(
       participantIds = dsoRules.payload.svs.values.asScala
         .map(sv => ParticipantId.tryFromProtoPrimitive(sv.participantId))
         .toSeq
-      participantId <- participantAdminConnection.getParticipantId()
       // We resign the PartyToParticipant mapping instead of replaying it to limit the topology
       // transactions that need to be transferred across protocol versions to the bare minimum.
       // We retry as it might take a bit until the SV participants are all known on the new domain
@@ -495,7 +491,6 @@ class HttpSvSoftDomainMigrationPocHandler(
           TopologyStoreId.DomainStore(domainId),
           dsoStore.key.dsoParty,
           participantIds,
-          participantId.uid.namespace.fingerprint,
           isProposal = true,
         ),
         logger,

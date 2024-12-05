@@ -114,13 +114,11 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       sv1Backend.appState.participantAdminConnection,
       sv2Backend.appState.participantAdminConnection,
     ).parTraverse { connection =>
-      val id = connection.getId().futureValue
       connection
         .ensureDecentralizedNamespaceDefinitionProposalAccepted(
           decentralizedSynchronizerId,
           dsoParty.uid.namespace,
           sv1SequencerId.uid.namespace,
-          id.namespace.fingerprint,
           RetryFor.WaitingOnInitDependency,
         )
     }.futureValue
@@ -158,13 +156,11 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         sv3Backend.appState.participantAdminConnection,
         sv4Backend.appState.participantAdminConnection,
       ).parTraverse { connection =>
-        val id = connection.getId().futureValue
         connection
           .ensureDecentralizedNamespaceDefinitionRemovalProposal(
             decentralizedSynchronizerId,
             dsoParty.uid.namespace,
             sv1SequencerId.uid.namespace,
-            id.namespace.fingerprint,
             RetryFor.WaitingOnInitDependency,
           )
       }.futureValue

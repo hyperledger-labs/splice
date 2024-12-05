@@ -12,6 +12,10 @@ Release Notes
 
   Added the ``openid`` scope to their authorization requests to comply with the `OpenID Connect specification <https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest>`_.
 
+* Security
+
+  * Add support for operating a validator with an offline participant root namespace key, with manual setup as per the `Canton documentation <https://docs.daml.com/canton/usermanual/security.html#namespace-intermediate-key-management>`_.
+
 0.3.2
 -----
 

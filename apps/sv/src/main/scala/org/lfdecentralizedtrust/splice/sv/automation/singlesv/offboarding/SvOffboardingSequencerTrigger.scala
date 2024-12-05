@@ -39,8 +39,6 @@ class SvOffboardingSequencerTrigger(
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[SequencerId] {
 
-  private val svParty = dsoStore.key.svParty
-
   // TODO(tech-debt): this is an almost exact copy of SvOffboardingMediatorTrigger => share the code to avoid missed bugfixes
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -85,7 +83,6 @@ class SvOffboardingSequencerTrigger(
       _ <- participantAdminConnection.ensureSequencerDomainStateRemoval(
         dsoRules.domain,
         task,
-        svParty.uid.namespace.fingerprint,
         RetryFor.Automation,
       )
     } yield {

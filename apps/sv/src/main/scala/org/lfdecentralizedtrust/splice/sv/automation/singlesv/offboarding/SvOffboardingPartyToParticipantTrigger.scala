@@ -4,6 +4,10 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding
 
 import cats.implicits.showInterpolator
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -12,13 +16,9 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.{CollectionHasAsScala}
+import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 /** Offboard a participant from the hosting of the DSO party.
   * - Runs when one of offboardedSvs still exist on the PartyToParticipant mapping
@@ -33,7 +33,6 @@ class SvOffboardingPartyToParticipantProposalTrigger(
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[ParticipantId] {
 
-  private val svParty = dsoStore.key.svParty
   private val dsoParty: PartyId = dsoStore.key.dsoParty
 
   override protected def retrieveTasks()(implicit
@@ -69,7 +68,6 @@ class SvOffboardingPartyToParticipantProposalTrigger(
         dsoRules.domain,
         dsoParty,
         task,
-        svParty.uid.namespace.fingerprint,
       )
     } yield {
       TaskSuccess(show"Removed $task from the participant hosting the DSO party $dsoParty")

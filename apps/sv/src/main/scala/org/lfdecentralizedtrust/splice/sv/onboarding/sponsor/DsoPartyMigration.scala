@@ -54,13 +54,11 @@ class DsoPartyMigration(
     logger.info(s"Sponsor SV authorizing DSO party to participant $participantId")
     for {
       dsoRules <- EitherT.liftF(dsoStore.getDsoRules())
-      ourParticipant <- EitherT.liftF(participantAdminConnection.getParticipantId())
       // this will wait until the PartyToParticipant state change completed
       authorizedAt <- partyHosting
         .authorizeDsoPartyToParticipant(
           dsoRules.domain,
           participantId,
-          ourParticipant.uid.namespace.fingerprint,
         )
       _ = logger.info(
         s"DSO party was authorized on $participantId, downloading snapshot at time $authorizedAt."

@@ -749,7 +749,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                         decentralizedSynchronizerId,
                         dsoPartyDecentralizedNamespace,
                         _ => NonEmpty(Set, sv1Party.uid.namespace),
-                        id.namespace.fingerprint,
                         RetryFor.WaitingOnInitDependency,
                       )
                   } yield result
@@ -1162,12 +1161,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
   ): Unit = {
     nodes
       .parTraverse { node =>
-        val id = node.getId().futureValue
         node
           .ensureDomainParameters(
             decentralizedSynchronizerId,
             _.tryUpdate(confirmationRequestsMaxRate = rate),
-            signedBy = id.namespace.fingerprint,
           )
       }
       .futureValue

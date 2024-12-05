@@ -4,28 +4,27 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 
 import cats.implicits.showInterpolator
-import org.lfdecentralizedtrust.splice.automation.{TaskOutcome, TaskSuccess, TriggerContext}
-import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SequencerOnboarding.SequencerToOnboard
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
-  SvTopologyStatePollingAndAssignedTrigger,
-  DsoRulesTopologyStateReconciler,
-}
-import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{DomainId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.{TaskOutcome, TaskSuccess, TriggerContext}
+import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SequencerOnboarding.SequencerToOnboard
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
+  DsoRulesTopologyStateReconciler,
+  SvTopologyStatePollingAndAssignedTrigger,
+}
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOptional
 
 class SequencerOnboarding(
-    svParty: PartyId,
     val svDsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
     logger: TracedLogger,
@@ -88,7 +87,6 @@ class SequencerOnboarding(
       .ensureSequencerDomainStateAddition(
         task.domainId,
         task.sequencerId,
-        svParty.uid.namespace.fingerprint,
         RetryFor.Automation,
       )
       .map(_ => TaskSuccess(s"Added sequencer $task"))
@@ -128,7 +126,6 @@ class SvOnboardingSequencerTrigger(
   override val reconciler
       : org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SequencerOnboarding =
     new SequencerOnboarding(
-      store.key.svParty,
       store,
       participantAdminConnection,
       logger,
