@@ -3378,6 +3378,7 @@ jobs:
           additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLE_BRANCH"
           cmd_name: Push Helm Artifacts
           cmd: |
+            make cluster/helm/write-digests
             make cluster/helm/build -j
             make cluster/helm/push -j
           cmd_retry_count: 5
