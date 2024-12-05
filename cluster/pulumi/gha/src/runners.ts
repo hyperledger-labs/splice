@@ -224,27 +224,28 @@ function installDockerRunnerScaleSets(
     }
   );
   const artifactoryCreds = ArtifactoryCreds.getCreds().creds;
-  const artifactoryCredsBase64 = artifactoryCreds.apply(keys => {
+  const configJsonBas64 = artifactoryCreds.apply(keys => {
     const creds = `${keys.username}:${keys.password}`;
-    return Buffer.from(creds).toString('base64');
+    const artifactoryCredsBase64 = Buffer.from(creds).toString('base64');
+    return Buffer.from(
+      JSON.stringify({
+        auths: {
+          'digitalasset-canton-network-docker.jfrog.io': {
+            auth: artifactoryCredsBase64,
+          },
+          'digitalasset-canton-network-docker-dev.jfrog.io': {
+            auth: artifactoryCredsBase64,
+          },
+        },
+      })
+    ).toString('base64');
   });
   const dockerConfigSecret = new k8s.core.v1.Secret('docker-config-secret', {
     metadata: {
       namespace: runnersNamespace.metadata.name,
     },
     data: {
-      'config.json': Buffer.from(
-        JSON.stringify({
-          auths: {
-            'digitalasset-canton-network-docker.jfrog.io': {
-              auth: artifactoryCredsBase64,
-            },
-            'digitalasset-canton-network-docker-dev.jfrog.io': {
-              auth: artifactoryCredsBase64,
-            },
-          },
-        })
-      ).toString('base64'),
+      'config.json': configJsonBas64,
     },
   });
 
@@ -359,7 +360,6 @@ function installK8sRunnerScaleSet(
             ...infraAffinityAndTolerations,
           },
         },
-        minRunners: 1,
         template: {
           spec: {
             metadata: {
