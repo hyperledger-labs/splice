@@ -1,13 +1,19 @@
+import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
 import {
   activeVersion,
+  CnInput,
   ExactNamespace,
   installSpliceRunbookHelmChart,
   installPostgresPasswordSecret,
   InstalledHelmChart,
 } from 'splice-pulumi-common';
 
-export function installPostgres(xns: ExactNamespace, name: string): InstalledHelmChart {
+export function installPostgres(
+  xns: ExactNamespace,
+  name: string,
+  dependsOn: CnInput<pulumi.Resource>[]
+): InstalledHelmChart {
   const password = new random.RandomPassword(`${xns.logicalName}-${name}-passwd`, {
     length: 16,
     overrideSpecial: '_%@',
@@ -29,6 +35,6 @@ export function installPostgres(xns: ExactNamespace, name: string): InstalledHel
       },
     },
     activeVersion,
-    { dependsOn: [passwordSecret] }
+    { dependsOn: [passwordSecret, ...dependsOn] }
   );
 }

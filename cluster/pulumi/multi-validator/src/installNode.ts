@@ -4,6 +4,7 @@ import {
   installLoopback,
   numInstances,
   activeVersion,
+  imagePullSecret,
 } from 'splice-pulumi-common';
 
 import { MultiParticipant } from './multiParticipant';
@@ -14,8 +15,10 @@ export async function installNode(): Promise<void> {
   const namespace = exactNamespace('multi-validator', true);
   installLoopback(namespace, CLUSTER_HOSTNAME, activeVersion);
 
+  const imagePullDeps = imagePullSecret(namespace);
+
   for (let i = 0; i < numInstances; i++) {
-    const postgres = installPostgres(namespace, `postgres-${i}`);
+    const postgres = installPostgres(namespace, `postgres-${i}`, imagePullDeps);
     const postgresConf = {
       host: `postgres-${i}`,
       port: '5432',
