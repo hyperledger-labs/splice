@@ -2212,39 +2212,42 @@ afterwards since you lack the other SVs but it is enough to go through
 the validation of the topology state in Canton. The concrete steps are:
 
 1. create a directory to store the state export: `mkdir -p /tmp/state-export/keys`
-2. Start sequencer console on the version currently on the cluster connected to the target
+2. Switch to the current release branch of the cluster you are migrating
+3. Start sequencer console on the version currently on the cluster connected to the target
    cluster, e.g. `cncluster sequencer_console sv-1 <migration id>` run from
-   `cluster/deployment/devnet`. Adjust migration id to the current
+   `cluster/deployment/<cluster>`. Adjust migration id to the current
    migration id on the cluster and the directory to the cluster you
    want to test. Note that you need to request PAM for that.
-3. Export the keys
+4. Export the keys
    ```
    sequencer.keys.secret.list().foreach(k => sequencer.keys.secret.download_to(k.publicKey.fingerprint, s"/tmp/state-export/keys/${k.publicKey.fingerprint}"))
    ```
    Note: We only export the sequencer keys which are relatively harmless and do not provide access to coin holdings. We also
    delete them afterwards and this is only possible after requesting PAM.
-4. Export the genesis state (roughly the synchronizer topology state)
+5. Export the genesis state (roughly the synchronizer topology state)
    ```
    val synchronizerTopologyBytes = sequencer.topology.transactions.genesis_state(filterDomainStore = sequencer.domain_id.filterString)
    ```
-5. Write the export to a file
+6. Write the export to a file
    ```
    synchronizerTopologyBytes.writeTo(new java.io.FileOutputStream("/tmp/state-export/genesis-state"))
    ```
-6. Export the authorized topology store snapshot
+7. Export the authorized topology store snapshot
    ```
    val authorizedBytes = sequencer.topology.transactions.export_topology_snapshot("Authorized", filterMappings = Seq(TopologyMapping.Code.NamespaceDelegation, TopologyMapping.Code.OwnerToKeyMapping, TopologyMapping.Code.IdentifierDelegation, TopologyMapping.Code.VettedPackages), filterNamespace = sequencer.id.namespace.filterString)
    ```
-7. Write the export to a file
+8. Write the export to a file
    ```
    authorizedBytes.writeTo(new java.io.FileOutputStream("/tmp/state-export/authorized"))
    ```
-8. Get the sequencer id from `sequencer.id.toProtoPrimitive` and save it
-9. Switch to the target version you want to migrate to
-10. Disable auto-init of globalSequencerSv1 by tweaking `simple-topology-canton.conf` and removing `${_autoInit_enabled}` and `globalSequencerSv1.init.identity.node-identifier.name = "sv1"`.
-11. Start canton using `./start-canton.sh -w` and switch to the tmux session running the Canton console.
-12. Double check the version using `com.digitalasset.canton.buildinfo.BuildInfo.version`. This should be the version you are migrating to.
-13. Check that sequencer is not initialized
+9. Get the sequencer id from `sequencer.id.toProtoPrimitive` and save it
+10. Switch to the branch of the target version you want to migrate to
+11. Disable auto-init of `globalSequencerSv1` by tweaking the canton sequencers config in `simple-topology-canton.conf`.
+    1. Delete the entire entry `globalSequencerSv1.init.identity.node-identifier.name = "sv1"`
+    2. Delete `${_autoInit_enabled}` from the value under `globalSequencerSv1` key
+12. Start canton using `./start-canton.sh -w` and switch to the tmux session running the Canton console.
+13. Double check the version using `com.digitalasset.canton.buildinfo.BuildInfo.version`. This should be the canton version for the CN version you are migrating to.
+14. Check that sequencer is not initialized
     ```
     @ globalSequencerSv1.id
     {"@timestamp":"2024-10-31T07:46:10.258Z","@version":"1","message":"Node is not initialized and therefore does not have an Id assigned yet.\n  Command SequencerReference.id invoked from cmd0.sc:1","logger_name":"c.d.c.c.EnterpriseConsoleEnvironment","thread_name":"main","level":"ERROR","level_value":40000}
