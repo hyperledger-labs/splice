@@ -11,11 +11,10 @@ synchronizerMigration:
       provider: external
       version: 0.2.6
       releaseReference: "refs/heads/release-line-0.2.6"
-  legacy:
-    id: 3
-    provider: external
-    version: 0.2.8
-    releaseReference: "refs/heads/release-line-0.2.8"
+    - id: 3
+      provider: external
+      version: 0.2.8
+      releaseReference: "refs/heads/release-line-0.2.8"
   active:
     id: 4
     provider: external
