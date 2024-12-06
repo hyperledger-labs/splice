@@ -52,6 +52,9 @@ jobs:
                 name: Checkout commit << parameters.cluster_version >>
                 command: git checkout << parameters.cluster_version >>
       - setup_nix
+      - export_migration_id:
+          cluster: << parameters.cluster >>
+          migration_id: << parameters.migration_id >>
       - setup_sbt_test_job:
           runner_type: "circleci"
       - run_bash_command_in_nix:
@@ -68,7 +71,7 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: wait for deployment to finish
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP --keep ACTIVE_MIGRATION_ID"
           cmd: |
             if [[ << parameters.check_cluster_version >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -77,17 +80,17 @@ jobs:
             validator_app="validator-app"
             # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
             if [[ << parameters.wait_for_splitwell >> == true ]]; then
-              cncluster wait splitwell $validator_app << parameters.migration_id >>
+              cncluster wait splitwell $validator_app ${ACTIVE_MIGRATION_ID}
             fi
-            cncluster wait sv-1 $validator_app << parameters.migration_id >>
-            cncluster wait validator1 $validator_app << parameters.migration_id >>
+            cncluster wait sv-1 $validator_app ${ACTIVE_MIGRATION_ID}
+            cncluster wait validator1 $validator_app ${ACTIVE_MIGRATION_ID}
             if (env-bool IS_DEVNET) && [ << parameters.force_non_devnet >> == false ]; then
-              cncluster wait sv-2 $validator_app << parameters.migration_id >>
-              cncluster wait sv-3 $validator_app << parameters.migration_id >>
-              cncluster wait sv-4 $validator_app << parameters.migration_id >>
+              cncluster wait sv-2 $validator_app ${ACTIVE_MIGRATION_ID}
+              cncluster wait sv-3 $validator_app ${ACTIVE_MIGRATION_ID}
+              cncluster wait sv-4 $validator_app ${ACTIVE_MIGRATION_ID}
             fi
             if [[ << parameters.wait_for_sv >> == true ]] && ( env-bool APPROVE_SV_RUNBOOK || env-bool IS_DEVNET ); then
-              cncluster wait sv $validator_app << parameters.migration_id >>
+              cncluster wait sv $validator_app ${ACTIVE_MIGRATION_ID}
             fi
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
@@ -106,8 +109,8 @@ jobs:
             set -eou pipefail
             . cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
-          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
-          extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=<< parameters.migration_id >> << parameters.extra_env_vars >>
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP --keep ACTIVE_MIGRATION_ID"
+          extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=${ACTIVE_MIGRATION_ID} << parameters.extra_env_vars >>
           timeout: "15m"
           cmd_retry_count: 3
           # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
@@ -191,6 +194,9 @@ jobs:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
             - setup_nix_self_hosted
+            - export_migration_id:
+                cluster: << parameters.cluster >>
+                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -204,6 +210,7 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: wait for deployment to finish
                 cluster: << parameters.cluster >>
+                additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
                 cmd: |
                   if [[ << parameters.check_cluster_version >> == true ]]; then
                     VERSION=$(get-snapshot-version)
@@ -212,17 +219,17 @@ jobs:
                   validator_app="validator-app"
                   # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
                   if [[ << parameters.wait_for_splitwell >> == true ]]; then
-                    cncluster wait splitwell $validator_app << parameters.migration_id >>
+                    cncluster wait splitwell $validator_app ${ACTIVE_MIGRATION_ID}
                   fi
-                  cncluster wait sv-1 $validator_app << parameters.migration_id >>
-                  cncluster wait validator1 $validator_app << parameters.migration_id >>
+                  cncluster wait sv-1 $validator_app ${ACTIVE_MIGRATION_ID}
+                  cncluster wait validator1 $validator_app ${ACTIVE_MIGRATION_ID}
                   if (env-bool IS_DEVNET) && [ << parameters.force_non_devnet >> == false ]; then
-                    cncluster wait sv-2 $validator_app << parameters.migration_id >>
-                    cncluster wait sv-3 $validator_app << parameters.migration_id >>
-                    cncluster wait sv-4 $validator_app << parameters.migration_id >>
+                    cncluster wait sv-2 $validator_app ${ACTIVE_MIGRATION_ID}
+                    cncluster wait sv-3 $validator_app ${ACTIVE_MIGRATION_ID}
+                    cncluster wait sv-4 $validator_app ${ACTIVE_MIGRATION_ID}
                   fi
                   if [[ << parameters.wait_for_sv >> == true ]] && ( env-bool APPROVE_SV_RUNBOOK || env-bool IS_DEVNET ); then
-                    cncluster wait sv $validator_app << parameters.migration_id >>
+                    cncluster wait sv $validator_app ${ACTIVE_MIGRATION_ID}
                   fi
                   echo "Done waiting. All pods in the cluster are:"
                   kubectl get pods -A
@@ -234,8 +241,8 @@ jobs:
                   set -eou pipefail
                   . cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
                 cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
-                additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
-                extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=<< parameters.migration_id >> << parameters.extra_env_vars >>
+                additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep ACTIVE_MIGRATION_ID"
+                extra_env_vars: POSTGRES_DB=postgres NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" MIGRATION_ID=${ACTIVE_MIGRATION_ID} << parameters.extra_env_vars >>
                 timeout: "15m"
             - print_gcloud_logs_commands:
                 cluster: <<parameters.cluster>>
@@ -288,6 +295,9 @@ jobs:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
             - setup_nix_self_hosted
+            - export_migration_id:
+                cluster: << parameters.cluster >>
+                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -320,10 +330,11 @@ jobs:
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD \
                   --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID \
-                  --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+                  --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
+                  --keep ACTIVE_MIGRATION_ID"
                 cluster: << parameters.cluster >>
                 cmd: |
-                  export MIGRATION_ID=<< parameters.migration_id >>
+                  export MIGRATION_ID=${ACTIVE_MIGRATION_ID}
                   if [[ << parameters.force_non_devnet >> == true ]]; then
                     export IS_DEVNET=0
                     export APPROVE_SV_RUNBOOK=true
@@ -381,6 +392,9 @@ jobs:
                       name: Checkout commit << parameters.cluster_version >>
                       command: git checkout << parameters.cluster_version >>
             - setup_nix_self_hosted
+            - export_migration_id:
+                cluster: << parameters.cluster >>
+                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -394,13 +408,14 @@ jobs:
             - run_bash_command_in_nix:
                 cmd_name: wait for validator-runbook deployment to finish
                 cluster: << parameters.cluster >>
+                additional_nix_args: "--keep ACTIVE_MIGRATION_ID"
                 cmd: |
                   if [[ << parameters.check_cluster_version >> == true ]]; then
                     VERSION=$(get-snapshot-version)
                     cncluster wait_version $VERSION
                   fi
                   # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
-                  cncluster wait validator validator-app << parameters.migration_id >>
+                  cncluster wait validator validator-app ${ACTIVE_MIGRATION_ID}
                   echo "Done waiting. All pods in the cluster are:"
                   kubectl get pods -A
             # TODO(#8300): remove this dependency and check once canton handles sequencer connections more gracefully
@@ -427,10 +442,11 @@ jobs:
                   --keep ARTIFACTORY_USER \
                   --keep ARTIFACTORY_PASSWORD \
                   --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID \
-                  --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET"
+                  --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET \
+                  --keep ACTIVE_MIGRATION_ID"
                 cluster: << parameters.cluster >>
                 cmd: |
-                  export MIGRATION_ID=<< parameters.migration_id >>
+                  export MIGRATION_ID=${ACTIVE_MIGRATION_ID}
                   if [[ << parameters.force_non_devnet >> == true ]]; then
                     export IS_DEVNET=0
                     export APPROVE_SV_RUNBOOK=true
