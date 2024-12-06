@@ -208,7 +208,6 @@ workflow:
             - migrate_cluster
       - backup_cluster:
           name: "backup_cluster_after_migration"
-          migration_id: 1
           cluster: << pipeline.parameters.cluster >>
           context:
             - artifactory
@@ -222,7 +221,6 @@ workflow:
       - restore_node:
           cluster: << pipeline.parameters.cluster >>
           namespace_name: "sv-3"
-          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn

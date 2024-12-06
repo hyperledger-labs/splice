@@ -134,7 +134,6 @@ workflow:
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: "ciperiodic"
-          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -146,7 +145,6 @@ workflow:
       - restore_node:
           cluster: "ciperiodic"
           namespace_name: "sv-3"
-          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
