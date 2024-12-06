@@ -9,6 +9,7 @@ import {
   ExactNamespace,
   GCP_PROJECT,
   getDnsNames,
+  isDevNet,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
@@ -27,31 +28,47 @@ function clusterDnsEntries(
   ingressIp: gcp.compute.Address,
   publicIngressIp: gcp.compute.Address
 ): gcp.dns.RecordSet[] {
+  const opts: pulumi.CustomResourceOptions = {
+    // for safety we leave dns cleanup to be done manually in prod clusters
+    retainOnDelete: !isDevNet,
+  };
   return [
-    new gcp.dns.RecordSet(dnsName, {
-      name: dnsName + '.',
-      ttl: 60,
-      type: 'A',
-      project: gcpDnsProject,
-      managedZone: managedZone,
-      rrdatas: [ingressIp.address],
-    }),
-    new gcp.dns.RecordSet(dnsName + '-subdomains', {
-      name: `*.${dnsName}.`,
-      ttl: 60,
-      type: 'A',
-      project: gcpDnsProject,
-      managedZone: managedZone,
-      rrdatas: [ingressIp.address],
-    }),
-    new gcp.dns.RecordSet(dnsName + '-public', {
-      name: `public.${dnsName}.`,
-      ttl: 60,
-      type: 'A',
-      project: gcpDnsProject,
-      managedZone: managedZone,
-      rrdatas: [publicIngressIp.address],
-    }),
+    new gcp.dns.RecordSet(
+      dnsName,
+      {
+        name: dnsName + '.',
+        ttl: 60,
+        type: 'A',
+        project: gcpDnsProject,
+        managedZone: managedZone,
+        rrdatas: [ingressIp.address],
+      },
+      opts
+    ),
+    new gcp.dns.RecordSet(
+      dnsName + '-subdomains',
+      {
+        name: `*.${dnsName}.`,
+        ttl: 60,
+        type: 'A',
+        project: gcpDnsProject,
+        managedZone: managedZone,
+        rrdatas: [ingressIp.address],
+      },
+      opts
+    ),
+    new gcp.dns.RecordSet(
+      dnsName + '-public',
+      {
+        name: `public.${dnsName}.`,
+        ttl: 60,
+        type: 'A',
+        project: gcpDnsProject,
+        managedZone: managedZone,
+        rrdatas: [publicIngressIp.address],
+      },
+      opts
+    ),
   ];
 }
 
