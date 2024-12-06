@@ -5,7 +5,8 @@ import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersi
 import { ArtifactoryCreds } from './artifactory';
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';
-import { config } from './config';
+import { spliceConfig } from './config/config';
+import { artifactories } from './config/consts';
 import { CnInput } from './helm';
 import { btoa, ExactNamespace } from './utils';
 
@@ -59,43 +60,28 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
   serviceAccountName: string,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource[] {
-  const publicArtifactory = 'digitalasset-canton-network-docker.jfrog.io';
-  const privateArtifactory = 'digitalasset-canton-network-docker-dev.jfrog.io';
   const keys = ArtifactoryCreds.getCreds().creds;
-  const clusterBaseName = config.requireEnv('GCP_CLUSTER_BASENAME');
   const k8sProvider = new k8s.Provider('k8s-imgpull-' + ns, { enableServerSideApply: true });
-  const supportPrivateArtifactory =
-    clusterBaseName.startsWith('scratch') || config.envFlag('SUPPORT_PRIVATE_ARTIFACTORY');
 
-  const prodDockerConfig = keys.apply(creds =>
-    JSON.stringify({
-      auths: {
-        [publicArtifactory]: {
-          auth: btoa(creds.username + ':' + creds.password),
-          username: creds.username,
-          password: creds.password,
-        },
-      },
-    })
-  );
+  const allowedArtifactories = spliceConfig.pulumiProjectConfig.allowedArtifactories;
 
-  const withPrivDockerConfig = keys.apply(creds =>
-    JSON.stringify({
-      auths: {
-        [publicArtifactory]: {
-          auth: btoa(creds.username + ':' + creds.password),
-          username: creds.username,
-          password: creds.password,
-        },
-        [privateArtifactory]: {
-          auth: btoa(creds.username + ':' + creds.password),
-          username: creds.username,
-          password: creds.password,
-        },
-      },
-    })
-  );
-  const dockerConfigJson = supportPrivateArtifactory ? withPrivDockerConfig : prodDockerConfig;
+  type DockerConfig = { [key: string]: { auth: string; username: string; password: string } };
+
+  const dockerConfigJson = pulumi.output(keys).apply(creds => {
+    const auths: DockerConfig = {};
+
+    allowedArtifactories.forEach(artName => {
+      const art = artifactories[artName];
+      auths[art] = {
+        auth: btoa(creds.username + ':' + creds.password),
+        username: creds.username,
+        password: creds.password,
+      };
+    });
+    console.error('dockerConfigJson', JSON.stringify({ auths }));
+    return JSON.stringify({ auths });
+  });
+
   const secret = new k8s.core.v1.Secret(
     ns + '-docker-reg-cred',
     {
