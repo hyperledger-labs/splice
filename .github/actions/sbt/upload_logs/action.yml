@@ -5,6 +5,12 @@ description: |
   only upon failure. Conditioning a single step inside the action on `failure()` does not
   seem to capture the failure condition of the whole workflow :(
 
+inputs:
+  name:
+    description: "Name of the artifact"
+    required: false
+    default: log
+
 runs:
   using: 'composite'
   steps:
@@ -19,7 +25,7 @@ runs:
     - name: Upload logs
       uses: actions/upload-artifact@v4
       with:
-        name: log
+        name: ${{ inputs.name }}
         path: log
 
 

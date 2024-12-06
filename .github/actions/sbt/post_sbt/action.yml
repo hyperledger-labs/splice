@@ -33,3 +33,14 @@ runs:
       with:
         cache_version: ${{ inputs.cache_version }}
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).daml }}
+
+    - name: Collect test reports
+      shell: bash
+      run: |
+        sudo mkdir -p /cache/test-reports
+        sudo chown $(whoami):$(whoami) "/cache/test-reports"
+        for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
+        do
+          # `|| true` to avoid failing if there are no test reports
+          cp -v "$subproject"/target/test-reports/TEST-*.xml /cache/test-reports/ || true
+        done

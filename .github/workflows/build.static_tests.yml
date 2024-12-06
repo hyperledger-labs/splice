@@ -9,7 +9,7 @@ jobs:
       # TODO(#15988): clean this up, use a proper released image instead:
       #               - Once this is in a snapshot, use the snapshot version.
       #               - Once this is in a release, use the release version.
-      image: digitalasset-canton-network-docker-dev.jfrog.io/splice-test-ci:0.3.0-itai-dirty
+      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.3-itai-dirty
 
     steps:
 

@@ -252,6 +252,22 @@ function installDockerRunnerScaleSets(
   const dependsOn = [tokenSecret, controller, configMap, cachePvc, dockerConfigSecret];
 
   installDockerRunnerScaleSet(
+    'self-hosted-docker-tiny',
+    runnersNamespace,
+    tokenSecret,
+    cachePvc,
+    configMap,
+    dockerConfigSecret,
+    {
+      requests: {
+        cpu: '0.1',
+        memory: '256Mi',
+      },
+    },
+    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerConfigSecret]
+  );
+
+  installDockerRunnerScaleSet(
     'self-hosted-docker',
     runnersNamespace,
     tokenSecret,
@@ -433,7 +449,7 @@ function installK8sRunnerScaleSet(
                       storageClassName: 'standard-rwo',
                       resources: {
                         requests: {
-                          storage: '8Gi',
+                          storage: '16Gi',
                         },
                       },
                     },

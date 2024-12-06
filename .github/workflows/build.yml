@@ -21,8 +21,7 @@ jobs:
   scala_test_sim_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      # For now, the two tests that we are running here seem to work
-      # just fine on the smaller runners
-      runs_on: self-hosted-k8s
+      runs_on: self-hosted-k8s-large
       start_canton_options: -s
+      parallelism: 4
     secrets: inherit
