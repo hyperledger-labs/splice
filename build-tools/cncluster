@@ -2004,17 +2004,34 @@ function subcmd_dump_identities() {
             domain="$i-eng"
         fi
         token=$(subcmd_get_token $i sv)
-        full_identities=$(curl -sSLf -H "authorization: Bearer $token" "https://sv.${domain}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump")
+        url="https://sv.${domain}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump"
+        echo "Getting identities from $url"
+        full_identities=$(curl -sSLf -H "authorization: Bearer $token" "$url")
         identities=$(echo "$full_identities" | jq "{\"$i\": {participant: .identities.participant.id, sequencer: .identities.sequencer.id, mediator: .identities.mediator.id}}")
         all=$(echo "$all" "$identities" | jq -s add)
     done
 
-    token=$(subcmd_get_token validator validator)
-    full_identities=$(curl -sSLf -H "authorization: Bearer $token" "https://wallet.validator.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities")
-    identities=$(echo "$full_identities" | jq '{"validator": {participant: .id}}')
-    all=$(echo "$all" "$identities" | jq -s add)
+    _add_validator_identities validator
+    _add_validator_identities validator1
+    _add_validator_identities splitwell
 
     echo "$all" | jq -S .
+}
+
+function _add_validator_identities() {
+    local namespace="$1"
+    local token
+    local url
+    local full_identities
+    local identities
+
+    token=$(subcmd_get_token "$namespace" validator)
+    url="https://wallet.${namespace}.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities"
+    echo "Getting identities from $url"
+    full_identities=$(curl -sSLf -H "authorization: Bearer $token" "$url")
+    identities=$(echo "$full_identities" | jq "{\"${namespace}\": {participant: .id}}")
+
+    all=$(echo "$all" "$identities" | jq -s add)
 }
 
 ###
