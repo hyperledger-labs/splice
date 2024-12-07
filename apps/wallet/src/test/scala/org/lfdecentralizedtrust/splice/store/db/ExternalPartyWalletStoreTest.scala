@@ -4,6 +4,7 @@ import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -164,7 +165,9 @@ class DbExternalPartyWalletStoreTest
     } yield store
   }
 
-  override protected def cleanDb(storage: DbStorage): Future[?] =
+  override protected def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): Future[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

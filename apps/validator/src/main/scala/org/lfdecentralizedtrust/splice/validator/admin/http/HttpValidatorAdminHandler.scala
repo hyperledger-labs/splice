@@ -372,7 +372,6 @@ class HttpValidatorAdminHandler(
           _ <- participantAdminConnection.proposeMapping(
             AuthorizedStore,
             partyToParticipant,
-            signedBy = participantId.fingerprint,
             serial = PositiveInt.one,
             isProposal = true,
             change = TopologyChangeOp.Replace,

@@ -530,7 +530,6 @@ class HttpSvAdminHandler(
       .ensureDomainParameters(
         decentralizedSynchronizerId,
         _.tryUpdate(confirmationRequestsMaxRate = rate),
-        signedBy = id.namespace.fingerprint,
       )
   } yield result
 

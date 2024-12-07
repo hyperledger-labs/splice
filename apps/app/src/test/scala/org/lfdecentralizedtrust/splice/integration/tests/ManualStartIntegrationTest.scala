@@ -246,7 +246,6 @@ class ManualStartIntegrationTest
                   namespace = namespace,
                   target = signingKey,
                   isRootDelegation = true,
-                  signedBy = namespace.fingerprint,
                   retryFor = RetryFor.Automation,
                 )
                 .futureValue
@@ -256,7 +255,6 @@ class ManualStartIntegrationTest
                 .ensureInitialOwnerToKeyMapping(
                   member = nodeId,
                   keys = NonEmpty(Seq, signingKey, encryptionKey),
-                  signedBy = Seq(namespace.fingerprint),
                   retryFor = RetryFor.Automation,
                 )
                 .futureValue

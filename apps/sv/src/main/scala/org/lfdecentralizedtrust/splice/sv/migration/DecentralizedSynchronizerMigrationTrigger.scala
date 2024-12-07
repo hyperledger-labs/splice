@@ -42,7 +42,7 @@ final class DecentralizedSynchronizerMigrationTrigger(
 ) extends DomainMigrationTrigger[DomainMigrationDump] {
 
   // Disabling domain time and domain paused sync, as it runs after the domain is paused
-  override protected lazy val context =
+  override protected lazy val context: TriggerContext =
     baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
   override val sequencerAdminConnection
@@ -90,12 +90,10 @@ final class DecentralizedSynchronizerMigrationTrigger(
   private def ensureDomainIsPaused(
       decentralizedSynchronizerId: DomainId
   )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersState]] = for {
-    id <- participantAdminConnection.getId()
     domainParamsTopologyResult <- participantAdminConnection
       .ensureDomainParameters(
         decentralizedSynchronizerId,
         _.tryUpdate(confirmationRequestsMaxRate = NonNegativeInt.zero),
-        signedBy = id.namespace.fingerprint,
       )
   } yield domainParamsTopologyResult
 

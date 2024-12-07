@@ -6,16 +6,16 @@ package org.lfdecentralizedtrust.splice.environment
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
-  MediatorAdministrationCommands,
   MediatorAdminCommands,
+  MediatorAdministrationCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{MediatorStatus, NodeStatus}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.sequencing.{
   SequencerConnection,
-  SequencerConnections,
   SequencerConnectionValidation,
+  SequencerConnections,
 }
 import com.digitalasset.canton.topology.{DomainId, MediatorId, NodeIdentity}
 import com.digitalasset.canton.tracing.TraceContext
@@ -74,5 +74,4 @@ class MediatorAdminConnection(
       case NodeStatus.Success(_) => true
     }
   }
-
 }

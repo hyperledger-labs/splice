@@ -4,6 +4,16 @@
 package org.lfdecentralizedtrust.splice.setup
 
 import cats.implicits.{showInterpolator, toFoldableOps}
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
+import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
+import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.{
   RetryFor,
   RetryProvider,
@@ -12,16 +22,6 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.prettyString
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
-import com.digitalasset.canton.crypto.{KeyPurpose, SigningKeyUsage, SigningPublicKey}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
-import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
-import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
-import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -56,7 +56,7 @@ class NodeInitializer(
 
   // Note: this method is not idempotent or crash fault tolerant. We accept that it may brick a node if initialization
   // fails, since we can easily recover by resetting the node.
-  def initializeWithNewIdentity(
+  private def initializeWithNewIdentity(
       identifierName: String,
       nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
@@ -85,7 +85,6 @@ class NodeInitializer(
         namespace = namespace,
         target = namespaceKey,
         isRootDelegation = true,
-        signedBy = namespace.fingerprint,
         retryFor = RetryFor.Automation,
       )
 
@@ -93,7 +92,6 @@ class NodeInitializer(
       _ <- connection.ensureInitialOwnerToKeyMapping(
         member = nodeId,
         keys = NonEmpty(Seq, signingKey, encryptionKey),
-        signedBy = Seq(namespace.fingerprint, signingKey.fingerprint).distinct,
         retryFor = RetryFor.Automation,
       )
     } yield {
@@ -256,9 +254,6 @@ class NodeInitializer(
                 connection.ensureInitialOwnerToKeyMapping(
                   expectedId.member,
                   keysNE.map(_.publicKey),
-                  (expectedId.uid.namespace.fingerprint +: keysNE
-                    .filter(_.purpose == KeyPurpose.Signing)
-                    .map(_.publicKey.fingerprint)).distinct,
                   RetryFor.Automation,
                 )
             }
