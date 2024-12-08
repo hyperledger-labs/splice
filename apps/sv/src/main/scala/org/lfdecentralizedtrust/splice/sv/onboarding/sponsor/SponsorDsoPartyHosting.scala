@@ -16,7 +16,6 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.{
   DsoPartyMigrationFailure,
 }
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.transaction.PartyToParticipant
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
@@ -37,14 +36,12 @@ class SponsorDsoPartyHosting(
   def authorizeDsoPartyToParticipant(
       domain: DomainId,
       participantId: ParticipantId,
-      signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): EitherT[Future, DsoPartyMigrationFailure, Instant] =
     for {
       _ <- proposePartyHostingAndEnsureAuthorized(
         domain,
         dsoParty,
         participantId,
-        signedBy,
       )
       authorizedAt <- EitherT.liftF(
         dsoPartyHosting.waitForDsoPartyToParticipantAuthorization(
@@ -64,7 +61,6 @@ class SponsorDsoPartyHosting(
       domainId: DomainId,
       party: PartyId,
       newParticipant: ParticipantId,
-      signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, DsoPartyMigrationFailure, TopologyResult[PartyToParticipant]] = {
@@ -79,7 +75,6 @@ class SponsorDsoPartyHosting(
               party,
               newParticipant,
               PositiveInt.tryCreate(proposal.base.serial.value - 1),
-              signedBy,
             )
             .map(Right(_))
             .recover { case AuthorizedStateChanged(serial) =>

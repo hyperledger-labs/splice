@@ -17,6 +17,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.IndexedDomain
 import com.digitalasset.canton.store.db.{DbStorageIdempotency, DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -28,7 +29,7 @@ trait DbContractStoreTest extends AsyncWordSpec with BaseTest with ContractStore
   // Ensure this test can't interfere with the ActiveContractStoreTest
   lazy val domainIndex: Int = DbActiveContractStoreTest.maxDomainIndex + 1
 
-  override def cleanDb(storage: DbStorage): Future[Int] = {
+  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[Int] = {
     import storage.api.*
     storage.update(
       sqlu"delete from par_contracts where domain_idx = $domainIndex",

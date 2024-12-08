@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQ
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.scalatest.Succeeded
@@ -787,7 +788,9 @@ class AcsSnapshotStoreTest
     )
   }
 
-  override protected def cleanDb(storage: DbStorage): Future[?] =
+  override protected def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): Future[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

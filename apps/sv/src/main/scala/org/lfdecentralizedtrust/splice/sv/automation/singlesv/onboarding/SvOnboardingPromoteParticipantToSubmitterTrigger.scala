@@ -47,7 +47,6 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
     ] {
 
   private val dsoParty = dsoStore.key.dsoParty
-  private val svParty = dsoStore.key.svParty
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -178,7 +177,6 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         task.domainId,
         dsoParty,
         task.participantId,
-        svParty.uid.namespace.fingerprint,
         RetryFor.ClientCalls,
       )
       .map(_ =>
