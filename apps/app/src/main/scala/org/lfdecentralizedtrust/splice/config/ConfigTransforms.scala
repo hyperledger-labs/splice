@@ -230,12 +230,17 @@ object ConfigTransforms {
         updateAllSvAppConfigs_(c => c.focus(_.initialAmuletPriceVote).replace(Some(price))),
       ).foldLeft(config)((c, tf) => tf(c))
 
+  def updateAllWalletAppClientConfigs(
+      update: (String, WalletAppClientConfig) => WalletAppClientConfig
+  ): ConfigTransform =
+    _.focus(_.walletAppClients).modify(_.map { case (name, config) =>
+      name -> update(name.unwrap, config)
+    })
+
   def updateAllWalletAppClientConfigs_(
       update: WalletAppClientTransform
   ): ConfigTransform =
-    _.focus(_.walletAppClients).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
+    updateAllWalletAppClientConfigs((_, config) => update(config))
 
   def updateAllAnsAppExternalClientConfigs_(
       update: AnsExternalClientConfigReader
@@ -474,9 +479,12 @@ object ConfigTransforms {
     })
   }
 
+  def bumpUrl(bump: Int, uri: Uri): Uri = {
+    uri.withPort(uri.effectivePort + bump)
+  }
   def bumpUrl(bump: Int, s: String): String = {
     val uri = Uri(s)
-    uri.withPort(uri.effectivePort + bump).toString
+    bumpUrl(bump, uri).toString
   }
 
   private def setPortPrefix(range: Int): Port => Port = { port =>
@@ -564,6 +572,18 @@ object ConfigTransforms {
           .modify(portTransform(bump, _))
           .focus(_.adminApi)
           .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    })
+  }
+
+  def bumpSomeWalletClientPortsBy(bump: Int, wallets: Seq[String]): ConfigTransform = {
+    updateAllWalletAppClientConfigs((name, config) => {
+      if (wallets.contains(name)) {
+        config
+          .focus(_.adminApi.url)
+          .modify(bumpUrl(bump, _))
       } else {
         config
       }

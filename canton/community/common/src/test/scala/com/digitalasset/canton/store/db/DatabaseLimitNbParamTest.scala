@@ -11,8 +11,8 @@ import org.scalatest.BeforeAndAfterAll
 import slick.sql.SqlAction
 
 import scala.concurrent.Future
-
 import DbStorage.Implicits.BuilderChain.*
+import com.digitalasset.canton.tracing.TraceContext
 
 trait DatabaseLimitNbParamTest
     extends BaseTestWordSpec
@@ -39,7 +39,7 @@ trait DatabaseLimitNbParamTest
       .futureValue
   }
 
-  override def cleanDb(storage: DbStorage): Future[Unit] =
+  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[Unit] =
     rawStorage.update_(
       sqlu"truncate table database_limit_nb_param_test",
       functionFullName,

@@ -103,7 +103,6 @@ class ParticipantPartyMigrator(
             _ <- ensurePartiesUnhosted(
               domainAlias,
               partyIdsToMigrate.toSeq,
-              participantId,
             )
             // Remove the domain trust certificate of the old participant.
             // This is required to migrate the admin party of that node.
@@ -113,7 +112,6 @@ class ParticipantPartyMigrator(
               RetryFor.WaitingOnInitDependency,
               domainId,
               oldParticipantId.member,
-              participantId.uid.namespace.fingerprint,
             )
             _ = logger.info(s"Hosting $partyIdsToMigrate on $participantId")
             _ <- ensurePartiesMigrated(
@@ -184,7 +182,6 @@ class ParticipantPartyMigrator(
                     Seq(HostingParticipant(participantId, ParticipantPermission.Submission)),
                 )
               ),
-            signedBy = participantId.uid.namespace.fingerprint,
             retryFor = RetryFor.WaitingOnInitDependency,
           )
         } yield ()
@@ -195,7 +192,6 @@ class ParticipantPartyMigrator(
   private def ensurePartiesUnhosted(
       domainAlias: DomainAlias,
       partyIds: Seq[PartyId],
-      participantId: ParticipantId,
   ): Future[Unit] = {
     participantAdminConnection.getDomainId(domainAlias).flatMap { domainId =>
       Future
@@ -205,7 +201,6 @@ class ParticipantPartyMigrator(
               RetryFor.WaitingOnInitDependency,
               domainId,
               partyId,
-              participantId.uid.namespace.fingerprint,
             )
           } yield ()
         }

@@ -385,7 +385,6 @@ class SV1Initializer(
           mediatorDeduplicationTimeout =
             NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
         )
-        val svKeyFingerprint = participantId.uid.namespace.fingerprint
         for {
           _ <- retryProvider.ensureThatO(
             RetryFor.WaitingOnInitDependency,
@@ -400,7 +399,6 @@ class SV1Initializer(
                   namespace,
                   NonEmpty.mk(Set, participantId.uid.namespace),
                   threshold = PositiveInt.one,
-                  signedBy = svKeyFingerprint,
                 )
               (
                 identityTransactions,
@@ -420,20 +418,17 @@ class SV1Initializer(
                 participantAdminConnection.proposeInitialDomainParameters(
                   domainId,
                   values,
-                  signedBy = svKeyFingerprint,
                 ),
                 participantAdminConnection.proposeInitialSequencerDomainState(
                   domainId,
                   active = Seq(sequencerId),
                   observers = Seq.empty,
-                  signedBy = svKeyFingerprint,
                 ),
                 participantAdminConnection.proposeInitialMediatorDomainState(
                   domainId,
                   group = NonNegativeInt.zero,
                   active = Seq(mediatorId),
                   observers = Seq.empty,
-                  signedBy = svKeyFingerprint,
                 ),
               ).tupled
               bootstrapTransactions =

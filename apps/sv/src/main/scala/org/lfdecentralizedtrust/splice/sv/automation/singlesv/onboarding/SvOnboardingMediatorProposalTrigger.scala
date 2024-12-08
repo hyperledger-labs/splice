@@ -44,8 +44,6 @@ class SvOnboardingMediatorProposalTrigger(
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[MediatorToOnboard] {
 
-  private val svParty = dsoStore.key.svParty
-
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[MediatorToOnboard]] = {
@@ -111,7 +109,6 @@ class SvOnboardingMediatorProposalTrigger(
       _ <- participantAdminConnection.ensureMediatorDomainStateAdditionProposal(
         task.domainId,
         task.mediatorId,
-        svParty.uid.namespace.fingerprint,
         RetryFor.Automation,
       )
     } yield {

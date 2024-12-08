@@ -68,7 +68,6 @@ class JoiningNodeDsoPartyHosting(
                     domainId,
                     dsoParty,
                     participantId,
-                    svParty.uid.namespace.fingerprint,
                   )
                 _ = logger.info("Disconnecting from all domains")
                 _ <- participantAdminConnection.disconnectFromAllDomains()

@@ -239,7 +239,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                 domainId,
                 dsoStore.key.dsoParty.uid.namespace,
                 dsoStore.key.svParty.uid.namespace,
-                dsoStore.key.svParty.uid.namespace.fingerprint,
                 RetryFor.WaitingOnInitDependency,
               )
           } yield ()

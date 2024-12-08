@@ -1546,7 +1546,9 @@ class DbUserWalletStoreTest
     } yield store
   }
 
-  override protected def cleanDb(storage: DbStorage): Future[?] =
+  override protected def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): Future[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

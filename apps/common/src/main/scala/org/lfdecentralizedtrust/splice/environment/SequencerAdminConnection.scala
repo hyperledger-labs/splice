@@ -146,7 +146,7 @@ class SequencerAdminConnection(
     lookupSequencerTrafficControlState(member).map(
       _.getOrElse(
         throw Status.NOT_FOUND
-          .withDescription(s"No traffic state found for member ${member}")
+          .withDescription(s"No traffic state found for member $member")
           .asRuntimeException()
       )
     )
@@ -161,7 +161,7 @@ class SequencerAdminConnection(
       case memberList =>
         throw Status.INTERNAL
           .withDescription(
-            s"Received more than one traffic status response for member ${member}: ${memberList}"
+            s"Received more than one traffic status response for member $member: $memberList"
           )
           .asRuntimeException()
     }
@@ -218,7 +218,7 @@ class SequencerAdminConnection(
       ) {
         val now = clock.now
         if (now.isAfter(deadline)) {
-          Some(Status.DEADLINE_EXCEEDED.withDescription(s"$msgPrefix timed out after ${timeout}"))
+          Some(Status.DEADLINE_EXCEEDED.withDescription(s"$msgPrefix timed out after $timeout"))
         } else {
           None // we did not yet manage to advance the traffic state serial, but there's still time left
         }
@@ -291,6 +291,7 @@ class SequencerAdminConnection(
       case NodeStatus.Success(_) => true
     }
   }
+
 }
 
 object SequencerAdminConnection {

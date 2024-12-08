@@ -119,7 +119,6 @@ class SvOnboardingPartyToParticipantProposalTrigger(
           dsoParty,
           task.participantId,
           task.serial,
-          svParty.uid.namespace.fingerprint,
         )
         .recover { case ex: TopologyAdminConnection.AuthorizedStateChanged =>
           // Turn this into a retryable exception.

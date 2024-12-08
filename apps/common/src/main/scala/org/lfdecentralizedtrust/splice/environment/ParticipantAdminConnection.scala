@@ -85,7 +85,7 @@ class ParticipantAdminConnection(
   override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
 
-  private val hashOps = new HashOps {
+  private val hashOps: HashOps = new HashOps {
     override def defaultHashAlgorithm: com.digitalasset.canton.crypto.HashAlgorithm.Sha256.type =
       HashAlgorithm.Sha256
   }
@@ -553,7 +553,6 @@ class ParticipantAdminConnection(
       store: TopologyStoreId,
       partyId: PartyId,
       participantId: ParticipantId,
-      signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       _ <- retryProvider.ensureThatB(
@@ -568,7 +567,6 @@ class ParticipantAdminConnection(
           store,
           partyId,
           participantId,
-          signedBy,
         ).map(_ => ()),
         logger,
       )
@@ -580,17 +578,15 @@ class ParticipantAdminConnection(
       store: TopologyStoreId,
       partyId: PartyId,
       participantId: ParticipantId,
-      signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
-    proposeInitialPartyToParticipant(store, partyId, Seq(participantId), signedBy)
+    proposeInitialPartyToParticipant(store, partyId, Seq(participantId))
   }
   def proposeInitialPartyToParticipant(
       store: TopologyStoreId,
       partyId: PartyId,
       participants: Seq[ParticipantId],
-      signedBy: Fingerprint,
       isProposal: Boolean = false,
   )(implicit
       traceContext: TraceContext
@@ -608,7 +604,6 @@ class ParticipantAdminConnection(
         Thresholds.partyToParticipantThreshold(hostingParticipants),
         hostingParticipants,
       ),
-      signedBy = signedBy,
       serial = PositiveInt.one,
       isProposal = isProposal,
     )
@@ -618,7 +613,6 @@ class ParticipantAdminConnection(
       domainId: DomainId,
       party: PartyId,
       participantToRemove: ParticipantId,
-      signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[PartyToParticipant]] = {
@@ -630,7 +624,6 @@ class ParticipantAdminConnection(
       domainId,
       party,
       removeParticipant,
-      signedBy,
     )
   }
 
@@ -638,7 +631,6 @@ class ParticipantAdminConnection(
       domainId: DomainId,
       party: PartyId,
       newParticipant: ParticipantId,
-      signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
       // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
@@ -656,7 +648,6 @@ class ParticipantAdminConnection(
       domainId,
       party,
       addParticipant,
-      signedBy,
     )
   }
 
@@ -665,7 +656,6 @@ class ParticipantAdminConnection(
       party: PartyId,
       newParticipant: ParticipantId,
       expectedSerial: PositiveInt,
-      signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.DomainStore(domainId),
@@ -699,7 +689,6 @@ class ParticipantAdminConnection(
         )
       },
       RetryFor.ClientCalls,
-      signedBy,
       isProposal = true,
       recreateOnAuthorizedStateChange = RecreateOnAuthorizedStateChange.Abort(expectedSerial),
     )
@@ -713,7 +702,6 @@ class ParticipantAdminConnection(
       participantChange: Seq[HostingParticipant] => Seq[
         HostingParticipant
       ], // participantChange must be idempotent
-      signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def findPartyToParticipant(topologyTransactionType: TopologyTransactionType) = EitherT {
       topologyTransactionType match {
@@ -775,7 +763,6 @@ class ParticipantAdminConnection(
         )
       },
       RetryFor.WaitingOnInitDependency,
-      signedBy,
     )
   }
 
@@ -783,7 +770,6 @@ class ParticipantAdminConnection(
       domainId: DomainId,
       party: PartyId,
       participantId: ParticipantId,
-      signedBy: Fingerprint,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def promoteParticipantToSubmitter(
@@ -819,7 +805,6 @@ class ParticipantAdminConnection(
         )
       },
       retryFor,
-      signedBy,
       isProposal = true,
     )
   }
@@ -834,7 +819,6 @@ class ParticipantAdminConnection(
       check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
       update: M => Either[String, M],
       retryFor: RetryFor,
-      signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
     ensureTopologyMapping(
       store,
@@ -842,18 +826,20 @@ class ParticipantAdminConnection(
       check(TopologyTransactionType.AuthorizedState)
         .leftFlatMap { authorizedState =>
           EitherT(
-            check(TopologyTransactionType.ProposalSignedBy(signedBy))
-              .leftMap(_ => authorizedState)
-              .value
-              .recover {
-                case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
-                  Left(authorizedState)
-              }
+            getParticipantId().flatMap { pid =>
+              check(TopologyTransactionType.ProposalSignedBy(pid.namespace.fingerprint))
+                .leftMap(_ => authorizedState)
+                .value
+                .recover {
+                  case ex: StatusRuntimeException
+                      if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
+                    Left(authorizedState)
+                }
+            }
           )
         },
       update,
       retryFor,
-      signedBy,
       isProposal = true,
     )
   }
