@@ -38,16 +38,14 @@ jobs:
       fail-fast: false
     container:
       # TODO(#15988): clean this up, use a proper released image instead:
-      #               - Once this is in a snapshot, use the snapshot version.
       #               - Once this is in a release, use the release version.
-      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.3-itai-dirty
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
 
     services:
       postgres:
         # TODO(#15988): clean this up, use a proper released image instead:
-        #               - Once this is in a snapshot, use the snapshot version.
         #               - Once this is in a release, use the release version.
-        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-postgres:0.3.3-itai-dirty
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
         env:
           POSTGRES_PASSWORD: postgres
         # Set health checks to wait until postgres has started
