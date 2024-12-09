@@ -9,6 +9,8 @@ set -eou pipefail
 # Used to be implemented as a preflight test, but loading all the environment for it took forever.
 # See #14665
 
+# curl uses --retry-all-errors because some 4xx returned by canton are transient errors that must be retried
+
 function usage() {
   echo "Usage: ./vote-for-migration.sh <migration_id>"
 }
@@ -24,14 +26,9 @@ echo "Creating vote request for migration id $migration_id"
 
 sv1_token=$(cncluster get_token sv-1 sv)
 
-current_dso_config=$(curl -s --fail-with-body --show-error -X GET "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME/api/sv/v0/dso")
+current_dso_config=$(curl -s --fail-with-body --show-error --retry 10 --retry-delay 10 --retry-all-errors -X GET "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME/api/sv/v0/dso")
 echo "DSO: $current_dso_config"
 current_config=$(echo "$current_dso_config" | jq -r '.dso_rules.contract.payload.config')
-# TODO (#15348): remove this workaround
-if [ "$current_config" == "null" ]; then
-  echo "Endpoint appears to be on an older version where the dso_rules don't have a 'contract' key, correcting."
-  current_config=$(echo "$current_dso_config" | jq -r '.dso_rules.payload.config')
-fi
 echo "Current config: $current_config"
 
 requester=$(echo "$current_dso_config" | jq '.sv_party_id')
@@ -63,13 +60,13 @@ data='
 
 echo "Sending vote request: $data"
 
-curl -s --fail-with-body --show-error \
+curl -s --fail-with-body --show-error --retry 10 --retry-delay 10 --retry-all-errors \
   -X POST "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME/api/sv/v0/admin/sv/voterequest/create" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $sv1_token" \
   --data-raw "$data"
 
-vote_requests=$(curl -s --fail-with-body --show-error \
+vote_requests=$(curl -s --fail-with-body --show-error --retry 10 --retry-delay 10 --retry-all-errors \
   -X GET "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME/api/sv/v0/admin/sv/voterequests" \
   -H "Authorization: Bearer $sv1_token")
 echo "Found vote requests: $vote_requests"
@@ -89,7 +86,7 @@ for sv in "${other_svs[@]}"
 do
   token=$(cncluster get_token "$sv" sv)
   echo "Casting vote on $sv"
-  curl -s --fail-with-body --show-error \
+  curl -s --fail-with-body --show-error --retry 10 --retry-delay 10 --retry-all-errors \
     -X POST "https://sv.$sv-eng.$GCP_CLUSTER_HOSTNAME/api/sv/v0/admin/sv/votes" \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer $token" \
@@ -113,10 +110,6 @@ until [ $retry_count -gt $MAX_RETRIES ]; do
   new_dso_config=$(curl -s -X GET "https://sv.sv-2.$GCP_CLUSTER_HOSTNAME/api/sv/v0/dso")
   echo "DSO info: $new_dso_config"
   next_migration_id=$(echo "$new_dso_config" | jq -r '.dso_rules.contract.payload.config.nextScheduledSynchronizerUpgrade.migrationId')
-  # TODO (#15348): remove this workaround
-  if [ "$next_migration_id" == "null" ]; then
-    next_migration_id=$(echo "$new_dso_config" | jq -r '.dso_rules.payload.config.nextScheduledSynchronizerUpgrade.migrationId')
-  fi
   set -e
   echo "Migration id: $next_migration_id"
 
