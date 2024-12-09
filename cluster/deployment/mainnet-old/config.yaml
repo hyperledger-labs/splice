@@ -1,0 +1,6 @@
+synchronizerMigration:
+  active:
+    id: 1
+    provider: internal
+    version: 0.2.8
+    releaseReference: "refs/heads/release-line-0.2.8"

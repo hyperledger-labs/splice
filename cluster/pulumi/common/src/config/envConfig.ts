@@ -16,9 +16,8 @@ export class SpliceConfigContext {
 
     const clusterToDirectoryNames: Record<string, string> = {
       dev: 'devnet',
-      main: 'mainnet',
       testzrh: 'testnet',
-      mainzrh: 'mainzrhnet',
+      mainzrh: 'mainnet',
     };
 
     if (Object.keys(clusterToDirectoryNames).includes(gcpclusterbasename)) {

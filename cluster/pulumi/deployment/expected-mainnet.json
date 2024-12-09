@@ -72,7 +72,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "main"
+              "value": "mainzrh"
             },
             "type": "Literal"
           },
@@ -99,7 +99,7 @@
           }
         },
         "retryOnUpdateConflict": true,
-        "stack": "organization/canton-network/canton-network.main",
+        "stack": "organization/canton-network/canton-network.mainzrh",
         "useLocalStackOnly": true
       }
     },
@@ -127,7 +127,7 @@
       },
       "spec": {
         "eventMetadata": {
-          "cluster": "main"
+          "cluster": "mainzrh"
         },
         "eventSeverity": "info",
         "eventSources": [
@@ -406,7 +406,7 @@
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
-              "value": "main"
+              "value": "mainzrh"
             },
             "type": "Literal"
           },
@@ -433,7 +433,7 @@
           }
         },
         "retryOnUpdateConflict": true,
-        "stack": "organization/infra/infra.main",
+        "stack": "organization/infra/infra.mainzrh",
         "useLocalStackOnly": true
       }
     },
@@ -510,11 +510,11 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.main",
+    "id": "organization/infra/infra.mainzrh",
     "inputs": {
-      "name": "organization/infra/infra.main"
+      "name": "organization/infra/infra.mainzrh"
     },
-    "name": "organization/infra/infra.main",
+    "name": "organization/infra/infra.mainzrh",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -559,7 +559,7 @@
           },
           {
             "name": "CLOUDSDK_COMPUTE_REGION",
-            "value": "europe-west4"
+            "value": "europe-west6"
           },
           {
             "name": "GOOGLE_APPLICATION_CREDENTIALS",

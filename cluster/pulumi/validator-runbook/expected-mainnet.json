@@ -288,11 +288,11 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.main",
+    "id": "organization/infra/infra.mainzrh",
     "inputs": {
-      "name": "organization/infra/infra.main"
+      "name": "organization/infra/infra.mainzrh"
     },
-    "name": "organization/infra/infra.main",
+    "name": "organization/infra/infra.mainzrh",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -448,7 +448,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
@@ -545,7 +545,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {
@@ -647,7 +647,7 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "main/validator"
+            "prefix": "mainzrh/validator"
           }
         },
         "persistence": {

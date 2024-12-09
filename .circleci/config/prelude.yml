@@ -125,7 +125,6 @@ cluster-parameter: &cluster-parameter
         "ciupgrade",
         "devnet",
         "mainnet",
-        "mainzrhnet", # TODO(#16518): remove after post mainzrhnet directory rename
         "testnet",
         "testnet-preview",
         "observability",

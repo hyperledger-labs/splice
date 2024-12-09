@@ -35,7 +35,7 @@ $(dir)/test-mainnet.json: $(dir $(dir)).build
 	    . "${REPO_ROOT}/cluster/deployment/mainnet/.envrc.vars"; \
     	npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     else \
-        env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="main" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+        env -i PATH="$$PATH" HOME="$$HOME" REPO_ROOT="$$REPO_ROOT" GCP_CLUSTER_BASENAME="mainzrh" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
     fi
 
 .PHONY: $(dir)/test

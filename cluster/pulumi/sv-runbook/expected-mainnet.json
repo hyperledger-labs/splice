@@ -689,7 +689,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {
@@ -908,7 +908,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
@@ -1064,7 +1064,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
@@ -1170,7 +1170,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {
@@ -1235,7 +1235,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
@@ -1334,7 +1334,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
@@ -1412,7 +1412,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "db": {},
@@ -1510,7 +1510,7 @@
               "projectId": "da-cn-devnet",
               "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
             },
-            "prefix": "main/sv"
+            "prefix": "mainzrh/sv"
           }
         },
         "persistence": {

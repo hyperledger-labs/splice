@@ -7,7 +7,7 @@
         "maxNodeCount": 20,
         "minNodeCount": 0
       },
-      "cluster": "projects/da-cn-mainnet/locations/europe-west4-a/clusters/cn-mainnet",
+      "cluster": "projects/da-cn-mainnet/locations/europe-west6-a/clusters/cn-mainzrhnet",
       "initialNodeCount": 0,
       "name": "cn-apps-pool",
       "nodeConfig": {
@@ -15,7 +15,7 @@
           "cn_apps": "true"
         },
         "loggingVariant": "MAX_THROUGHPUT",
-        "machineType": "c3d-standard-16",
+        "machineType": "n2-standard-16",
         "taints": [
           {
             "effect": "NO_SCHEDULE",
@@ -37,7 +37,7 @@
         "maxNodeCount": 3,
         "minNodeCount": 1
       },
-      "cluster": "projects/da-cn-mainnet/locations/europe-west4-a/clusters/cn-mainnet",
+      "cluster": "projects/da-cn-mainnet/locations/europe-west6-a/clusters/cn-mainzrhnet",
       "initialNodeCount": 1,
       "name": "cn-infra-pool",
       "nodeConfig": {
@@ -67,7 +67,7 @@
         "maxNodeCount": 3,
         "minNodeCount": 1
       },
-      "cluster": "projects/da-cn-mainnet/locations/europe-west4-a/clusters/cn-mainnet",
+      "cluster": "projects/da-cn-mainnet/locations/europe-west6-a/clusters/cn-mainzrhnet",
       "initialNodeCount": 1,
       "name": "gke-pool",
       "nodeConfig": {
@@ -88,11 +88,11 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.main",
+    "id": "organization/infra/infra.mainzrh",
     "inputs": {
-      "name": "organization/infra/infra.main"
+      "name": "organization/infra/infra.mainzrh"
     },
-    "name": "organization/infra/infra.main",
+    "name": "organization/infra/infra.mainzrh",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   }

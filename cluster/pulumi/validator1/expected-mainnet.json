@@ -154,11 +154,11 @@
   },
   {
     "custom": true,
-    "id": "organization/infra/infra.main",
+    "id": "organization/infra/infra.mainzrh",
     "inputs": {
-      "name": "organization/infra/infra.main"
+      "name": "organization/infra/infra.mainzrh"
     },
-    "name": "organization/infra/infra.main",
+    "name": "organization/infra/infra.mainzrh",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -317,7 +317,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet",
+          "name": "cn-mainzrhnet",
           "svNamespace": "validator1"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
@@ -441,7 +441,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -500,7 +500,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
@@ -566,7 +566,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": true,
-      "region": "europe-west4",
+      "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
         "backupConfiguration": {
@@ -588,11 +588,11 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "europe-west4-a"
+          "zone": "europe-west6-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "main"
+          "cluster": "mainzrh"
         }
       }
     },
@@ -626,7 +626,7 @@
     "inputs": {
       "databaseVersion": "POSTGRES_14",
       "deletionProtection": true,
-      "region": "europe-west4",
+      "region": "europe-west6",
       "settings": {
         "activationPolicy": "ALWAYS",
         "backupConfiguration": {
@@ -648,11 +648,11 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "europe-west4-a"
+          "zone": "europe-west6-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
-          "cluster": "main"
+          "cluster": "mainzrh"
         }
       }
     },
@@ -705,7 +705,7 @@
           "dnsName": "global.canton.network.digitalasset.com",
           "fixedTokens": false,
           "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainnet"
+          "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
@@ -737,7 +737,7 @@
               "projectId": "da-cn-mainnet",
               "secretName": "cn-gcp-bucket-da-cn-mainnet-da-cn-main-data-dumps"
             },
-            "prefix": "main/validator1"
+            "prefix": "mainzrh/validator1"
           }
         },
         "persistence": {
