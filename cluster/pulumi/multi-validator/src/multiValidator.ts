@@ -112,7 +112,7 @@ export class MultiValidator extends MultiNodeDeployment {
               command: ['/bin/bash', '/app/health-check.sh', 'api/validator/readyz'],
             },
             initialDelaySeconds: 5,
-            periodSeconds: 5,
+            periodSeconds: 15,
             failureThreshold: 5,
             timeoutSeconds: 10,
           },
