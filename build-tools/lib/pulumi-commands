@@ -121,7 +121,7 @@ function subcmd_apply() {
 
         if ! (env-bool CNCLUSTER_SKIP_DOCKER_CHECK); then
             _docker_must_be_running
-            if ! make -C "${REPO_ROOT}" docker-image-reference-exists --err-missing -j; then
+            if ! make -C "${REPO_ROOT}" docker-image-reference-exists IMG_REF_EXISTS_ARG=--err-missing -j; then
                 _error "Images missing, cannot apply."
             fi
         else

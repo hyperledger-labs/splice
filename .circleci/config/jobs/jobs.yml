@@ -192,7 +192,7 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Check if images already exist
           cmd: |
-            if make docker-image-reference-exists --err-missing; then
+            if make docker-image-reference-exists IMG_REF_EXISTS_ARG=--err-missing; then
               echo "Docker images already exist"
               # Running a circleci-agent command from within run_bash_command_in_nix does not work, so we create a file
               # that represents the need to halt, and call `circleci-agent step halt` in a separate `run` step
