@@ -1,15 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
+import { Fragment } from 'react';
 import { NavLink } from 'react-router-dom';
 
-import { Stack, Toolbar } from '@mui/material';
+import { Badge, Stack, Toolbar } from '@mui/material';
 import Typography, { TypographyOwnProps } from '@mui/material/Typography';
 
 interface HeaderProps extends React.PropsWithChildren {
   title: string;
   titleVariant?: TypographyOwnProps['variant'];
-  navLinks?: { name: string; path: string }[];
+  navLinks?: { name: string; path: string; badgeCount?: number }[];
   noBorder?: boolean;
 }
 
@@ -46,16 +47,24 @@ const Header: React.FC<HeaderProps> = ({ children, title, titleVariant, navLinks
         </Typography>
 
         {navLinks && (
-          <Stack direction="row" spacing={4} alignItems="center">
+          <Stack direction="row" spacing={3} alignItems="center">
             {navLinks.map((navLink, index) => (
-              <NavLink
-                key={index}
-                id={`navlink-${navLink.path}`}
-                to={navLink.path}
-                style={p => applyNavStyle(p.isActive)}
-              >
-                {navLink.name}
-              </NavLink>
+              <Fragment key={`nav-link-${index}`}>
+                <NavLink
+                  key={index}
+                  id={`navlink-${navLink.path}`}
+                  to={navLink.path}
+                  style={p => applyNavStyle(p.isActive)}
+                >
+                  {navLink.name}
+                </NavLink>
+                <Badge
+                  key={`nav-badge-${index}`}
+                  id={`nav-badge-${navLink.path}-count`}
+                  color="error"
+                  badgeContent={navLink.badgeCount}
+                />
+              </Fragment>
             ))}
           </Stack>
         )}

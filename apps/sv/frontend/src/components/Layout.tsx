@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { Header, useUserState } from 'common-frontend';
+import { Header, useUserState, useVotesHooks } from 'common-frontend';
 
 import { Logout } from '@mui/icons-material';
 import { Box, Button, Divider, Stack, Typography } from '@mui/material';
@@ -20,6 +20,14 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const { logout } = useUserState();
   const networkInstanceName = useNetworkInstanceName();
   const networkInstanceNameColor = `colors.${networkInstanceName?.toLowerCase()}`;
+
+  const votesHooks = useVotesHooks();
+  const dsoInfosQuery = votesHooks.useDsoInfos();
+  const listVoteRequestsQuery = votesHooks.useListDsoRulesVoteRequests();
+  const svPartyId = dsoInfosQuery.data?.svPartyId;
+  const actionsPending = listVoteRequestsQuery.data?.filter(
+    vr => vr.payload.votes.entriesArray().find(e => e[1].sv === svPartyId) === undefined
+  );
 
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
@@ -50,7 +58,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: 'Validator Onboarding', path: 'validator-onboarding' },
             { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'amulet-price' },
             { name: 'Delegate Election', path: 'delegate' },
-            { name: 'Governance', path: 'votes' },
+            { name: 'Governance', path: 'votes', badgeCount: actionsPending?.length },
           ]}
         >
           <Stack direction="row" alignItems="center" spacing={1}>
