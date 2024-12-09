@@ -2,7 +2,7 @@
 FROM --platform=$BUILDPLATFORM ubuntu:24.04
 
 RUN apt-get update && \
-    apt-get install -y sudo git curl xz-utils pigz rsync jq && \
+    apt-get install -y sudo git curl xz-utils pigz rsync jq unzip && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid=1002 ci && \
