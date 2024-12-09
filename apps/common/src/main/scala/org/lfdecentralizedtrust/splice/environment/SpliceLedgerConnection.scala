@@ -242,7 +242,6 @@ class BaseLedgerConnection(
           store,
           partyId,
           participantId,
-          participantId.uid.namespace.fingerprint,
         )
       _ <- waitForPartyOnLedgerApi(partyId)
     } yield partyId
