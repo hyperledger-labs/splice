@@ -18,12 +18,16 @@ jobs:
       internal_stack:
         type: boolean
         default: true
+      checkout-branch:
+        type: string
+        default: "" # Default set to $CIRCLE_SHA1
     executor: self_hosted
     environment:
       <<: *env
     parallelism: << parameters.parallelism >>
     steps:
-      - checkout_with_retry
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>
@@ -136,10 +140,14 @@ jobs:
       silence_deployment_alerts:
         type: boolean
         default: false
+      checkout-branch:
+        type: string
+        default: "" # Default set to $CIRCLE_SHA1
     environment:
       <<: *env
     steps:
-      - checkout_with_retry
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>

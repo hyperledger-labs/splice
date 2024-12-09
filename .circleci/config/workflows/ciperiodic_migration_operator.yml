@@ -134,6 +134,7 @@ workflow:
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: "ciperiodic"
+          checkout-branch: "ciperiodic-migration-upgrade"
           context:
             - artifactory
             - canton-network-vpn
@@ -144,6 +145,7 @@ workflow:
             - preflight_check_migrated
       - restore_node:
           cluster: "ciperiodic"
+          checkout-branch: "ciperiodic-migration-upgrade"
           namespace_name: "sv-3"
           context:
             - artifactory

@@ -1696,6 +1696,10 @@ commands:
 #          cmd_retry_count: 3
 
   checkout_with_retry:
+    parameters:
+      checkout-branch:
+        type: string
+        default: "" # Default set to $CIRCLE_SHA1
     steps:
       - run:
           name: Checkout (with retries)
@@ -1733,8 +1737,15 @@ commands:
               git checkout "$CIRCLE_BRANCH"
 
               git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
-
-              git checkout "$CIRCLE_SHA1"
+            
+              if [ << parameters.checkout-branch >> != "" ]; then
+                echo "Checking out branch << parameters.checkout-branch >>."
+                git fetch origin << parameters.checkout-branch >>
+                git checkout << parameters.checkout-branch >>
+              else
+                echo "No branch set, staying on default branch."
+                git checkout "$CIRCLE_SHA1"
+              fi
             }
 
             for i in $(seq 1 10); do checkout && s=0 && break || s=$? && sleep 10; done; (exit $s)
@@ -1928,12 +1939,16 @@ jobs:
       internal_stack:
         type: boolean
         default: true
+      checkout-branch:
+        type: string
+        default: "" # Default set to $CIRCLE_SHA1
     executor: self_hosted
     environment:
       <<: *env
     parallelism: << parameters.parallelism >>
     steps:
-      - checkout_with_retry
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>
@@ -2046,10 +2061,14 @@ jobs:
       silence_deployment_alerts:
         type: boolean
         default: false
+      checkout-branch:
+        type: string
+        default: "" # Default set to $CIRCLE_SHA1
     environment:
       <<: *env
     steps:
-      - checkout_with_retry
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>
@@ -5924,6 +5943,7 @@ workflows:
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: "ciperiodic"
+          checkout-branch: "ciperiodic-migration-upgrade"
           context:
             - artifactory
             - canton-network-vpn
@@ -5934,6 +5954,7 @@ workflows:
             - preflight_check_migrated
       - restore_node:
           cluster: "ciperiodic"
+          checkout-branch: "ciperiodic-migration-upgrade"
           namespace_name: "sv-3"
           context:
             - artifactory

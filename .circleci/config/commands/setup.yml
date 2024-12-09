@@ -1,5 +1,9 @@
 commands:
   checkout_with_retry:
+    parameters:
+      checkout-branch:
+        type: string
+        default: "" # Default set to $CIRCLE_SHA1
     steps:
       - run:
           name: Checkout (with retries)
@@ -37,8 +41,15 @@ commands:
               git checkout "$CIRCLE_BRANCH"
 
               git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
-
-              git checkout "$CIRCLE_SHA1"
+            
+              if [ << parameters.checkout-branch >> != "" ]; then
+                echo "Checking out branch << parameters.checkout-branch >>."
+                git fetch origin << parameters.checkout-branch >>
+                git checkout << parameters.checkout-branch >>
+              else
+                echo "No branch set, staying on default branch."
+                git checkout "$CIRCLE_SHA1"
+              fi
             }
 
             for i in $(seq 1 10); do checkout && s=0 && break || s=$? && sleep 10; done; (exit $s)
