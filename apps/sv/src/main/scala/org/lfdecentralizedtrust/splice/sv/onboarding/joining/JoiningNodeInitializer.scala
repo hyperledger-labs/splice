@@ -699,7 +699,6 @@ class JoiningNodeInitializer(
               domainId,
               dsoParty.uid.namespace,
               svParty.uid.namespace,
-              svParty.uid.namespace.fingerprint,
               RetryFor.WaitingOnInitDependency,
             )
         } yield ()
