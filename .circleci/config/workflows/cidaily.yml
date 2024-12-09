@@ -73,7 +73,6 @@ workflow:
           requires:
             - deploy_cluster_cidaily
             - publish_public_release
-            - artifacts_push
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -84,7 +83,6 @@ workflow:
           requires:
             - deploy_cluster_cidaily
             - publish_public_release
-            - artifacts_push
       - preflight_sv_check:
           <<: *main-branch-only
           context:
@@ -211,7 +209,6 @@ workflow:
           silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
-            - artifacts_push
       - preflight_sv_check:
           filters:
             branches:
@@ -264,7 +261,6 @@ workflow:
           silence_deployment_alerts: true
           requires:
             - wait_for_previous_pipeline
-            - artifacts_push
       - preflight_validator_check:
           filters:
             branches:
