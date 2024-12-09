@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ClickAwayListener } from '@mui/base';
 import CloseIcon from '@mui/icons-material/Close';
 import {
+  Badge,
   Box,
   Card,
   CardHeader,
@@ -146,7 +147,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
 
   const svPartyId = dsoInfosQuery.data?.svPartyId;
 
-  const alreadyVotedRequestIds = useMemo(() => {
+  const alreadyVotedRequestIds: Set<ContractId<VoteRequest>> = useMemo(() => {
     return svPartyId && votesQuery.data
       ? new Set(votesQuery.data.filter(v => v.voter === svPartyId).map(v => v.requestCid))
       : new Set();
@@ -189,6 +190,17 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
                 label="Action Needed"
                 {...tabProps('action-needed')}
                 id={'tab-panel-action-needed'}
+                icon={
+                  <Box sx={{ marginLeft: 2 }}>
+                    <Badge
+                      id="tab-badge-action-needed-count"
+                      badgeContent={voteRequestsNotVoted.length}
+                      color="error"
+                      sx={{ mx: '10px' }}
+                    />
+                  </Box>
+                }
+                iconPosition="end"
               />
             ),
             () => (
