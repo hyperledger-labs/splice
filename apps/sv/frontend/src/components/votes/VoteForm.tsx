@@ -203,6 +203,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                       <DisableConditionally
                         conditions={[
                           { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                          { disabled: voteEditing === undefined, reason: 'No vote to edit' },
                         ]}
                       >
                         <Button
