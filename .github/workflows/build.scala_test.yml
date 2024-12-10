@@ -48,12 +48,6 @@ jobs:
         image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
         env:
           POSTGRES_PASSWORD: postgres
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Check out repository code
@@ -70,6 +64,17 @@ jobs:
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           # TODO(#15988): consider this trick for setting cache_version globally: https://stackoverflow.com/a/74217028
           cache_version: 0
+
+      - name: Wait for postgres
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        with:
+          cmd: ./scripts/postgres.sh external wait
+          additional_nix_args: "--keep POSTGRES_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
 
       # Starting canton before setting up SBT, to gain a bit of time doing both in parallel
       - name: Start Canton

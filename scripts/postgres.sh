@@ -154,6 +154,9 @@ case "$1_$2" in
         export CANTON_DB_USER=$POSTGRES_CANTON_USER
         export CANTON_DB_PASSWORD=$POSTGRES_CANTON_PASSWORD
     ;;
+    docker_wait)
+        docker_wait
+    ;;
     local_start)
         pgctl_start
         psql_wait
@@ -163,6 +166,9 @@ case "$1_$2" in
         export CANTON_DB_USER=$POSTGRES_CANTON_USER
         export CANTON_DB_PASSWORD=$POSTGRES_CANTON_PASSWORD
     ;;
+    local_wait)
+        psql_wait
+    ;;
     external_start)
         psql_wait
         psql_create_user
@@ -170,6 +176,9 @@ case "$1_$2" in
         # These environment variables are used by the Canton configuration file mixin for Postgres
         export CANTON_DB_USER=$POSTGRES_CANTON_USER
         export CANTON_DB_PASSWORD=$POSTGRES_CANTON_PASSWORD
+    ;;
+    external_wait)
+        psql_wait
     ;;
     docker_createdb)
         docker_createdb "$3"
@@ -214,6 +223,7 @@ case "$1_$2" in
         echo ""
         echo "  COMMAND"
         echo "    start            makes sure the postgres instance is running"
+        echo "    wait             waits for a postgres instance to be ready"
         echo "    createdb <name>  creates a new database with the given name"
         echo "    dropdb   <name>  drops an existing database with the given name"
         echo "    stop             removes the postgres instance along with all data"
