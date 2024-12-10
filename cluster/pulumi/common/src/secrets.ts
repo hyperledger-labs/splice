@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
+import { Output } from '@pulumi/pulumi';
 
 import { ArtifactoryCreds } from './artifactory';
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
@@ -78,7 +79,6 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
         password: creds.password,
       };
     });
-    console.error('dockerConfigJson', JSON.stringify({ auths }));
     return JSON.stringify({ auths });
   });
 
@@ -100,14 +100,19 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
   );
   return [
     secret,
-    patchServiceAccountWithImagePullSecret(ns, serviceAccountName, 'docker-reg-cred', k8sProvider),
+    patchServiceAccountWithImagePullSecret(
+      ns,
+      serviceAccountName,
+      secret.metadata.name,
+      k8sProvider
+    ),
   ];
 }
 
 function patchServiceAccountWithImagePullSecret(
   ns: string,
   serviceAccountName: string,
-  secretName: string,
+  secretName: Output<string>,
   k8sProvider: k8s.Provider
 ): pulumi.Resource {
   const patch = new k8s.core.v1.ServiceAccountPatch(
