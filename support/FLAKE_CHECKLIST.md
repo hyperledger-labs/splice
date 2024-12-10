@@ -173,9 +173,8 @@ In order to use their time effectively, create an GitHub issue for your problem 
 (or a comment on it) contains:
 
 - [ ] All logs that are potentially relevant to analyzing the problem, as lnav-readable files (or one big zip file).
-      Upload the logs themselves, not just links to our CI runs or gcloud logs.
-      The Canton team doesn't have access to our gcloud and they don't have the necessary context to download the right logs from our CI runs.
-      You can use `cncluster gcloud_logs --download-only` to obtain lnav-readable logs from gcloud.
+      Upload the logs themselves, not just links to our CI runs.
+      The Canton team has access to our gcloud logs so gcloud log links (with carefully curated filters and time ranges) are fine too.
 - [ ] A *concise* summary of your analysis and your best hypotheses about what the root cause might be.
 - [ ] The context in which the error happened; e.g.:
   - Which nodes (participants, sequencer nodes, mediator nodes) are involved?
@@ -202,3 +201,12 @@ the corresponding Canton team member that is on the support rotation
 this week. This can be found in the description of the
 [#team-canton](https://daholdings.slack.com/archives/C044LUG7CKT) channel.
 Don't forget to reference your GH issue.
+
+**Addendum 1:**
+If the issue you are investigating affects a long-running cluster and/or an important externally communicated timeline,
+it is OK to escalate to the Canton team more quickly to speed up resolution.
+I.e., in some cases (use your judgement) it is OK to grab attention from Canton engineers *before* writing up our analysis nicely.
+
+**Addendum 2:**
+In the future this process might change and we might be asked to open support tickets instead of reaching out directly via Slack.
+For high-priority issues (see Addendum 1 above) we can open tickets with up to SEV1 priority.
