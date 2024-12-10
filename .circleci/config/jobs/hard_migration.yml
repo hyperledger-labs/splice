@@ -329,6 +329,8 @@ jobs:
             - notify-cluster-fail:
                 channel_notify: << parameters.channel_notify >>
                 cluster: << parameters.cluster >>
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
 
   trigger_global_domain_migration:
     executor: self_hosted
@@ -416,6 +418,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - when:
@@ -463,6 +468,15 @@ jobs:
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,sv-runbook,validator-runbook"
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
+
   prepare_cluster_for_migration:
     executor: self_hosted
     environment:
@@ -479,6 +493,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - when:
@@ -528,6 +545,14 @@ jobs:
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
   migrate_cluster:
     executor: self_hosted
     environment:
@@ -538,6 +563,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
@@ -568,6 +596,14 @@ jobs:
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
   archive_legacy_migration:
     executor: self_hosted
     environment:
@@ -578,6 +614,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
@@ -609,6 +648,14 @@ jobs:
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
   reset_and_wait_for_operator_to_redeploy_sv_runbook:
     executor: self_hosted
     environment:
@@ -620,6 +667,9 @@ jobs:
       deploy_retry_count:
         type: integer
         default: 2
+      send_notifications:
+        type: boolean
+        default: true
     steps:
       - checkout_with_retry
       - setup_nix_self_hosted
@@ -671,3 +721,11 @@ jobs:
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - when:
+          condition: << parameters.send_notifications >>
+          steps:
+            - notify-cluster-fail:
+                channel_notify: << parameters.channel_notify >>
+                cluster: << parameters.cluster >>
