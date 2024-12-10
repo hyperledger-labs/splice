@@ -7,4 +7,4 @@ type: application
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER
 
-description: Canton Network Self-Hosted PGSQL
+description: Splice Self-Hosted PGSQL

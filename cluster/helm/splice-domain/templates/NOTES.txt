@@ -1,1 +1,1 @@
-Canton Network Ledger Domain
+Splice Ledger Domain

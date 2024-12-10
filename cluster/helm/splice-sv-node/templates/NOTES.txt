@@ -1,1 +1,1 @@
-Canton Network SV App Backend and Web UI
+Global Synchronizer SV App Backend and Web UI

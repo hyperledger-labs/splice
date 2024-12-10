@@ -1,1 +1,1 @@
-Canton Network Self-Hosted PGSQL
+Splice Self-Hosted PGSQL

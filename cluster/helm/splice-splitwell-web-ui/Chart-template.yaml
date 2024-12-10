@@ -7,7 +7,7 @@ type: application
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER
 
-description: Canton Network Splitwell Web UI
+description: Splice Splitwell Web UI
 
 dependencies:
 - name: splice-util-lib

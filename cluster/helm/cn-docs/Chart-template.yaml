@@ -4,7 +4,7 @@
 apiVersion: v2
 name: cn-docs
 type: application
-description: Canton Network Documentation Server
+description: Splice Documentation Server
 
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER

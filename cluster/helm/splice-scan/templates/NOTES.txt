@@ -1,1 +1,1 @@
-Canton Network Scan App Backend and Web UI
+Splice Scan App Backend and Web UI

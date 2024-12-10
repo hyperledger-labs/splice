@@ -1,1 +1,1 @@
-Canton Network Ledger Participant
+Splice Ledger Participant

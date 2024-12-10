@@ -1,4 +1,4 @@
-Canton Network gateway that loops back traffic to the same cluster without hitting the firewall
+Splice gateway that loops back traffic to the same cluster without hitting the firewall
 
 This chart solves the following problem: In our clusters, only traffic originating from a given
 list of IPs is allowed (AKA a whitelist). This restriction prevents also traffic originating from

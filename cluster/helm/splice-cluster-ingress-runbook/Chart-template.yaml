@@ -4,7 +4,7 @@
 apiVersion: v2
 name: splice-cluster-ingress-runbook
 type: application
-description: Canton Network Cluster Ingress
+description: Splice Cluster Ingress
 
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER

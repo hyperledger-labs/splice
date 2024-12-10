@@ -7,7 +7,7 @@ type: application
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER
 
-description: Canton Network Validator
+description: Global Synchronizer Validator
 
 dependencies:
 - name: splice-util-lib
