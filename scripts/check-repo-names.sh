@@ -33,7 +33,6 @@ function check_patterns_locally() {
     '(\b|[`_])cn-docs'
     '@cn-load-tester\.com'
     '^[^:]+(grafana-dashboards|WalletMetricsTest).*cn[._]|MetricName."cn"' # TODO (#15708) replace metrics prefix cn with splice
-    'grafana-dashboards.*("(title|description)": "CN|by CN Apps)' # TODO (#15737) grafana descriptions
     'grafana-dashboards.*("cn"|"cn,daml")' # TODO (#15738) grafana cn query identifiers
     'grafana-dashboards.*postgres_exporter\.json:.*"pge-cn-apps-pg-scan-sv-3"' # TODO (#15746) grafana pulumi pg reference
     'databaseName = "cn_apps"|"cn_apps_reonboard"' # TODO (#15709) rename database to splice_apps
