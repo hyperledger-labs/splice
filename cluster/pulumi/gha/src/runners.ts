@@ -54,12 +54,6 @@ function installDockerRunnerScaleSet(
         },
         template: {
           spec: {
-            metadata: {
-              // prevent eviction by the gke autoscaler
-              annotations: {
-                'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
-              },
-            },
             initContainers: [
               {
                 name: 'init-dind-externals',
@@ -179,6 +173,12 @@ function installDockerRunnerScaleSet(
               },
             ],
             ...appsAffinityAndTolerations,
+          },
+          metadata: {
+            // prevent eviction by the gke autoscaler
+            annotations: {
+              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
           },
         },
         ...infraAffinityAndTolerations,
@@ -305,6 +305,12 @@ function installDockerRunnerScaleSets(
   );
 }
 
+// A note about resources: We create two pods per workflow: the runner pod and the workflow pod.
+// They have implicit affinity between them as they communicate via a shared local PVC.
+// The runner starts first, so even though it is quite lightweight, it already pins the node
+// on which both will run. We therefore set the resource requests of the runner pod to be the
+// request we actually need for the workflow. The limits are set on the workflow pod, to actually
+// have the higher bound on actual usage.
 function installK8sRunnerScaleSet(
   runnersNamespace: Namespace,
   name: string,
@@ -347,10 +353,26 @@ function installK8sRunnerScaleSet(
                 securityContext: {
                   privileged: true,
                 },
-                resources,
+                resources: {
+                  // See note above on resource requests and limits.
+                  requests: {
+                    // We set the requests to a tiny non-zero number, just to prevent k8s from
+                    // using the limits as the requests values.
+                    cpu: '1m',
+                    memory: '1m',
+                  },
+                  limits: resources?.limits,
+                },
               },
             ],
             serviceAccountName: serviceAccountName,
+            ...appsAffinityAndTolerations,
+          },
+          metadata: {
+            // prevent eviction by the gke autoscaler
+            annotations: {
+              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
           },
         }),
       },
@@ -378,12 +400,6 @@ function installK8sRunnerScaleSet(
         },
         template: {
           spec: {
-            metadata: {
-              // prevent eviction by the gke autoscaler
-              annotations: {
-                'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
-              },
-            },
             containers: [
               {
                 name: 'runner',
@@ -427,10 +443,14 @@ function installK8sRunnerScaleSet(
                 ],
                 resources: {
                   // These are resources for the runner pod itself, not the workflow ones.
-                  requests: {
-                    cpu: '0.1',
-                    memory: '2Gi',
-                  },
+                  // See note above on resource requests and limits on why we set the requests
+                  // on the runner pod.
+                  requests: resources
+                    ? resources.requests
+                    : {
+                        cpu: '0.1',
+                        memory: '2Gi',
+                      },
                 },
               },
             ],
@@ -464,6 +484,12 @@ function installK8sRunnerScaleSet(
               },
             ],
             serviceAccountName: serviceAccountName,
+          },
+          metadata: {
+            // prevent eviction by the gke autoscaler
+            annotations: {
+              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+            },
           },
         },
         ...infraAffinityAndTolerations,
@@ -579,6 +605,10 @@ function installK8sRunnerScaleSets(
         // TODO(#15988) This is smaller than on CCI runners, but seems to suffice at least for now
         cpu: '1',
         memory: '4Gi',
+      },
+      limits: {
+        cpu: '2',
+        memory: '8Gi',
       },
     },
     saName,
