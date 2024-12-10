@@ -73,9 +73,11 @@ $$(prefix)/docker-build: $$(prefix)/$(docker-build)
 .PHONY: $$(prefix)/docker-push
 $$(prefix)/docker-push: $$(prefix)/$(docker-push)
 
+IMG_REF_EXISTS_ARG ?= ""
+
 .PHONY: $$(prefix)/docker-image-reference-exists
 $$(prefix)/docker-image-reference-exists: $$(prefix)/$(docker-image-tag)
-	docker-image-reference-exists $$$$(cat $$(abspath $$<))
+	docker-image-reference-exists $$$$(cat $$(abspath $$<)) ${IMG_REF_EXISTS_ARG}
 
 .PHONY: $$(prefix)/get-docker-image-id
 $$(prefix)/get-docker-image-id: $$(prefix)/$(docker-image-tag)

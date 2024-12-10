@@ -413,6 +413,9 @@ class SvFrontendIntegrationTest
         )(
           "sv2 can see the new vote request",
           _ => {
+            find(id("tab-badge-action-needed-count")).value.text shouldBe "1"
+            find(id("nav-badge-votes-count")).value.text shouldBe "1"
+
             click on "tab-panel-action-needed"
 
             val tbody = find(id("sv-voting-action-needed-table-body"))
