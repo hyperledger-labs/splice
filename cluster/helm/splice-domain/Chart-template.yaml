@@ -7,7 +7,7 @@ type: application
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER
 
-description: Canton Network Domain
+description: Splice Domain
 
 dependencies:
 - name: splice-util-lib

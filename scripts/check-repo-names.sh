@@ -33,17 +33,14 @@ function check_patterns_locally() {
     '(\b|[`_])cn-docs'
     '@cn-load-tester\.com'
     '^[^:]+(grafana-dashboards|WalletMetricsTest).*cn[._]|MetricName."cn"' # TODO (#15708) replace metrics prefix cn with splice
-    'grafana-dashboards.*("(title|description)": "CN|by CN Apps)' # TODO (#15737) grafana descriptions
     'grafana-dashboards.*("cn"|"cn,daml")' # TODO (#15738) grafana cn query identifiers
     'grafana-dashboards.*postgres_exporter\.json:.*"pge-cn-apps-pg-scan-sv-3"' # TODO (#15746) grafana pulumi pg reference
     'databaseName = "cn_apps"|"cn_apps_reonboard"' # TODO (#15709) rename database to splice_apps
-    '(Chart-template\.yaml|helm/.*/NOTES.txt):.*Canton Network' # TODO (#15710) remove Canton Network from helm descriptions
     '^[^:]+V001__create_schema\.sql:' # TODO (#15491) avoiding changing hashes
     'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (#15747) auth0 env names
     '/helm/.*(Values\.ingress\.cns|cns: |name: cns-|- "cns\.)' # TODO (#15739) cns in splice-cluster-ingress-runbook
     'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (#15741) new secret
     'Headers.scala:.*"cn-svc-configs"' # TODO (#15742) references to missing project subdirectory
-    '(Validator|Sv)App\.scala:.*"canton network.*realm"' # TODO (#15744) remove 'canton network' from realm names
     'istio-gateway/.*gateway\.yaml:.*credentialName: cn-' # TODO (#15745) TLS credential names in istio-gateway
     'GcpConfig\.scala:' # cluster-specific
     '/da-cn-shared/cn-images|GOOGLE_CLOUD_PROJECT=da-cn-shared|"KMS_PROJECT_ID" -> "da-cn-shared"' # gcp

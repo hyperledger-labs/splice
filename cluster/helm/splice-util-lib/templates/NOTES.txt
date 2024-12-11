@@ -1,1 +1,1 @@
-Canton Network Documentation Server
+Splice Documentation Server
