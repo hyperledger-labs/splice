@@ -157,7 +157,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -280,7 +280,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "loopback",
     "provider": "",
@@ -414,7 +414,7 @@
       "chart": "splice-participant",
       "compat": "true",
       "maxHistory": 10,
-      "name": "participant-1",
+      "name": "participant-2",
       "namespace": "validator",
       "repositoryOpts": {
         "password": "s3cr3t",
@@ -458,7 +458,7 @@
           "enable": true,
           "migration": {
             "active": true,
-            "id": 1
+            "id": 2
           }
         },
         "participantAdminUserNameFrom": {
@@ -469,7 +469,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant_1",
+          "databaseName": "participant_2",
           "host": "postgres.validator.svc.cluster.local",
           "postgresName": "postgres",
           "schema": "participant",
@@ -483,9 +483,9 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
-    "name": "validator-participant-1",
+    "name": "validator-participant-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -563,7 +563,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -634,10 +634,10 @@
         },
         "migrateValidatorParty": false,
         "migration": {
-          "id": "1"
+          "id": "2"
         },
         "nodeIdentifier": "validator-runbook",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -680,7 +680,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "validator",
     "provider": "",

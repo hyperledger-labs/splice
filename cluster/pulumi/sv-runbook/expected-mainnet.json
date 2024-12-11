@@ -198,6 +198,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
+              "2",
               "1"
             ]
           }
@@ -210,7 +211,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -437,7 +438,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "loopback",
     "provider": "",
@@ -482,15 +483,15 @@
           "enable": true
         },
         "migration": {
-          "id": "1"
+          "id": "2"
         },
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "sequencerAddress": "global-domain-1-sequencer",
+        "sequencerAddress": "global-domain-2-sequencer",
         "spliceInstanceNames": {
           "amuletName": "Canton Coin",
           "amuletNameAcronym": "CC",
@@ -507,7 +508,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "scan",
     "provider": "",
@@ -703,7 +704,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -799,22 +800,22 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "cometBFT": {
-          "connectionUri": "http://global-domain-1-cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-2-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.global.canton.network.digitalasset.com",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
-          "mediatorAddress": "global-domain-1-mediator",
-          "sequencerAddress": "global-domain-1-sequencer",
+          "mediatorAddress": "global-domain-2-mediator",
+          "sequencerAddress": "global-domain-2-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-1.sv.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-2.sv.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
@@ -832,11 +833,11 @@
           "enable": true
         },
         "migration": {
-          "id": "1"
+          "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "onboardingName": "DA-Helm-Test-Node",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "persistence": {
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
@@ -862,7 +863,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "sv-app",
     "provider": "",
@@ -930,11 +931,11 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": true
+              "value": false
             }
           ],
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -950,7 +951,7 @@
         "nodeName": "DA-Helm-Test-Node",
         "peers": [],
         "stateSync": {
-          "enable": true,
+          "enable": false,
           "rpcServers": "https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
@@ -1078,7 +1079,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -1184,7 +1185,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "sv-mediator-pg",
     "provider": "",
@@ -1241,7 +1242,7 @@
         "metrics": {
           "enable": true,
           "migration": {
-            "active": true,
+            "active": false,
             "id": 1
           }
         },
@@ -1346,7 +1347,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1424,7 +1425,7 @@
           }
         ]
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1485,7 +1486,7 @@
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-1.sv-2.global.canton.network.digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-2.sv-2.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
@@ -1493,10 +1494,10 @@
           "enable": true
         },
         "migration": {
-          "id": "1"
+          "id": "2"
         },
         "nodeIdentifier": "DA-Helm-Test-Node",
-        "participantAddress": "participant-1",
+        "participantAddress": "participant-2",
         "participantIdentitiesDumpPeriodicBackup": {
           "backupInterval": "10m",
           "location": {
@@ -1539,7 +1540,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.2.8"
+      "version": "0.3.1"
     },
     "name": "validator",
     "provider": "",
