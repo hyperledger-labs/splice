@@ -47,8 +47,7 @@ case class ScanAppBackendConfig(
     // TODO(#13301) Remove this flag
     supportsSoftDomainMigrationPoc: Boolean = false,
     spliceInstanceNames: SpliceInstanceNamesConfig,
-    // TODO(#15528): Enable by default
-    updateHistoryBackfillEnabled: Boolean = false,
+    updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.

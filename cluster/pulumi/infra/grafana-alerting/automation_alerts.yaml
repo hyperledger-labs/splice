@@ -355,8 +355,7 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        # TODO(#16117) Replace this with $NODATA once backfilling is enabled by default
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Error
         for: 5m
         annotations:

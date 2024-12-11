@@ -38,7 +38,6 @@ import {
   spliceInstanceNames,
   DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
-  UPDATE_HISTORY_BACKFILLING_BATCH_SIZE,
   InstalledHelmChart,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
@@ -337,10 +336,6 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
-    updateHistoryBackfilling: {
-      enabled: true,
-      batchSize: UPDATE_HISTORY_BACKFILLING_BATCH_SIZE,
-    },
     metrics: {
       enable: true,
     },

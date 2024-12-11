@@ -18,6 +18,13 @@ Release Notes
 
 * Scan
 
+  * Scan instances will now run a background process that replicates the history of the network from before their SV node joined.
+    This affects data returned by the ``/v1/updates`` endpoints, missing data for other API endpoints (such as ``/v0/transactions``)
+    will be backfilled in a future update.
+    This one-time process is expected to take up to a few days to complete, depending on the size of the missing history.
+    During this time, scan instances will consume slightly more compute and networking resources than usual,
+    and the ``/v1/updates`` endpoint will return an error until the replication has finished on that particular instance.
+    Progress on your own scan instance can be monitored through the ``cn_history_backfilling_*`` metrics.
   * The `/v1/updates` endpoint now excludes updates resulting from ACS imports.
     This change was already mentioned in the 0.2.5 release notes, but due to a bug was not actually implemented until now.
 
