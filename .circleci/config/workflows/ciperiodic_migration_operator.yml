@@ -88,7 +88,6 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
           requires:
             - migrate_cluster
       - preflight_sv_check:
@@ -99,7 +98,6 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
           requires:
             - migrate_cluster
       - post_migration_verify_identities:
@@ -119,7 +117,6 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
           requires:
             - migrate_cluster
       - post_migration_compose_validator:
@@ -134,7 +131,7 @@ workflow:
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: "ciperiodic"
-          checkout-branch: "ciperiodic-migration-upgrade"
+          checkout_git_reference: << pipeline.parameters.upgrade-version >>
           context:
             - artifactory
             - canton-network-vpn
@@ -145,7 +142,7 @@ workflow:
             - preflight_check_migrated
       - restore_node:
           cluster: "ciperiodic"
-          checkout-branch: "ciperiodic-migration-upgrade"
+          checkout_git_reference: << pipeline.parameters.upgrade-version >>
           namespace_name: "sv-3"
           context:
             - artifactory
@@ -171,7 +168,6 @@ workflow:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
-          migration_id: 1
           requires:
             # We wait for the runbook to redeploy to make sure we're not testing the original deployment
             - deploy_fresh_sv_runbook_after_migration

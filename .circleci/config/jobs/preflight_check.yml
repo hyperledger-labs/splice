@@ -54,7 +54,6 @@ jobs:
       - setup_nix
       - export_migration_id:
           cluster: << parameters.cluster >>
-          migration_id: << parameters.migration_id >>
       - setup_sbt_test_job:
           runner_type: "circleci"
       - run_bash_command_in_nix:
@@ -196,7 +195,6 @@ jobs:
             - setup_nix_self_hosted
             - export_migration_id:
                 cluster: << parameters.cluster >>
-                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -297,7 +295,6 @@ jobs:
             - setup_nix_self_hosted
             - export_migration_id:
                 cluster: << parameters.cluster >>
-                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -309,7 +306,6 @@ jobs:
             - wait_for_sv_runbook_deployment:
                 cluster: << parameters.cluster >>
                 check_cluster_version: << parameters.check_cluster_version >>
-                migration_id: << parameters.migration_id >>
             - when:
                 condition: << parameters.delay_mins >>
                 steps:
@@ -394,7 +390,6 @@ jobs:
             - setup_nix_self_hosted
             - export_migration_id:
                 cluster: << parameters.cluster >>
-                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -422,7 +417,6 @@ jobs:
             - wait_for_sv_runbook_deployment:
                 cluster: << parameters.cluster >>
                 check_cluster_version: << parameters.check_cluster_version >>
-                migration_id: << parameters.migration_id >>
             - when:
                 condition: << parameters.delay_mins >>
                 steps:

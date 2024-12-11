@@ -179,38 +179,26 @@ commands:
   export_migration_id:
     parameters:
       <<: *cluster-parameter
-      migration_id:
-        type: integer
-        default: 0
     steps:
       - run_bash_command_in_nix:
           cmd_name: Export active migration ID
           cluster: << parameters.cluster >>
           when: always
           cmd:  |
-            if [ << parameters.migration_id >> -ne 0 ]; then
-              echo "migration_id is not set to 0, use the parameter value"
-            
-              ACTIVE_MIGRATION_ID=<< parameters.migration_id >>
-              
+            CONFIG_FILE="cluster/deployment/<< parameters.cluster >>/config.yaml"
+          
+            if [[ -f "$CONFIG_FILE" ]]; then
+              ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE" 2>/dev/null)
             else
-              echo "migration_id is not set, use the one defined in the config.yaml file"
+              echo "Configuration file not found: $CONFIG_FILE"
+              ACTIVE_MIGRATION_ID=0
+            fi
             
-              CONFIG_FILE="cluster/deployment/<< parameters.cluster >>/config.yaml"
-            
-              if [[ -f "$CONFIG_FILE" ]]; then
-                ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE" 2>/dev/null)
-              else
-                echo "Error: Configuration file not found: $CONFIG_FILE"
-                ACTIVE_MIGRATION_ID=0
-              fi
-              
-              if [[ "$ACTIVE_MIGRATION_ID" == "null" || -z "$ACTIVE_MIGRATION_ID" ]]; then
-                ACTIVE_MIGRATION_ID=0
-                echo "Default ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
-              else
-                echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
-              fi
+            if [[ "$ACTIVE_MIGRATION_ID" == "null" || -z "$ACTIVE_MIGRATION_ID" ]]; then
+              ACTIVE_MIGRATION_ID=0
+              echo "Default ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+            else
+              echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
             fi
             
             echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" > tmp-migration-id-env
@@ -479,7 +467,6 @@ commands:
     steps:
       - export_migration_id:
           cluster: << parameters.cluster >>
-          migration_id: << parameters.migration_id >>
       - run_bash_command_in_nix:
           cmd_name: wait for sv-runbook deployment to finish
           cluster: << parameters.cluster >>
