@@ -7121,6 +7121,7 @@ workflows:
           include_validator1: false
           channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
           cluster: "mainnet"
+          internal_stack: false
           parallelism: 1
           context:
             - artifactory
