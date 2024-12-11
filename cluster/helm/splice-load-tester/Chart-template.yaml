@@ -7,7 +7,7 @@ type: application
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER
 
-description: Canton Network Load Tester
+description: Splice Load Tester
 
 dependencies:
   - name: splice-util-lib

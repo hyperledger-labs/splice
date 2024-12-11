@@ -4,7 +4,7 @@
 apiVersion: v2
 name: splice-istio-gateway
 type: application
-description: Canton Network Istio Gateway
+description: Splice Istio Gateway
 
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER

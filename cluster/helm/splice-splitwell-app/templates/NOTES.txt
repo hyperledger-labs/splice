@@ -1,1 +1,1 @@
-Canton Network Splitwell App Backend
+Splice Splitwell App Backend

@@ -595,7 +595,7 @@ class SvApp(
                       svStore.key.svParty,
                       svAutomation.connection,
                       loggerFactory,
-                      "canton network sv admin realm",
+                      "splice sv admin realm",
                     )(traceContext),
                   ) +:
                   softDomainMigrationPocHandler.map(handler =>
@@ -608,7 +608,7 @@ class SvApp(
                           svStore.key.svParty,
                           svAutomation.connection,
                           loggerFactory,
-                          "canton network sv admin realm",
+                          "splice sv admin realm",
                         )(traceContext),
                       )
                     }

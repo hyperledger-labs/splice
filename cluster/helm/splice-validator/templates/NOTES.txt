@@ -1,1 +1,1 @@
-Canton Network Validator Backend, Wallet Web UI and ANS Web UI
+Global Synchronizer Validator Backend, Wallet Web UI and ANS Web UI

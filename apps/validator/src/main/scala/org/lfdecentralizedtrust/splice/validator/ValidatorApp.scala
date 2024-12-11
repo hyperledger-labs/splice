@@ -987,11 +987,11 @@ class ValidatorApp(
                 (Seq(
                   ValidatorResource.routes(
                     handler,
-                    AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+                    AuthExtractor(verifier, loggerFactory, "splice validator realm"),
                   ),
                   ScanproxyResource.routes(
                     scanProxyHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network scan proxy realm"),
+                    AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
                   ),
                   ValidatorAdminResource.routes(
                     adminHandler,
@@ -1001,7 +1001,7 @@ class ValidatorApp(
                         validatorParty,
                         automation.connection,
                         loggerFactory,
-                        "canton network validator operator realm",
+                        "splice validator operator realm",
                       )(traceContext)(operationId),
                   ),
                   ValidatorPublicResource.routes(
@@ -1011,17 +1011,17 @@ class ValidatorApp(
                 ) ++ walletInternalHandler.toList.map { walletHandler =>
                   InternalWalletResource.routes(
                     walletHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+                    AuthExtractor(verifier, loggerFactory, "splice wallet realm"),
                   )
                 } ++ walletExternalHandler.toList.map { walletHandler =>
                   ExternalWalletResource.routes(
                     walletHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+                    AuthExtractor(verifier, loggerFactory, "splice wallet realm"),
                   )
                 } ++ ansExternalHandler.toList.map { ansHandler =>
                   AnsResource.routes(
                     ansHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network ans realm"),
+                    AuthExtractor(verifier, loggerFactory, "splice ans realm"),
                   )
                 } ++
                   appManagerHandlersO.toList.flatMap {
