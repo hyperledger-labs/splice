@@ -79,7 +79,7 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     with SynchronizerFeesTestUtil
     with UpdateHistoryTestUtil {
 
-  // Does not currently handle multiple synchronizers.
+  // TODO(#16608): scan txlog script doesn't handle multiple synchronizers
   override def runUpdateHistorySanityCheck = false
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"

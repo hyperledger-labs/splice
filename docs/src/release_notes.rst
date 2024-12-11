@@ -16,6 +16,11 @@ Release Notes
 
   * Add support for operating a validator with an offline participant root namespace key, with manual setup as per the `Canton documentation <https://docs.daml.com/canton/usermanual/security.html#namespace-intermediate-key-management>`_.
 
+* Scan
+
+  * The `/v1/updates` endpoint now excludes updates resulting from ACS imports.
+    This change was already mentioned in the 0.2.5 release notes, but due to a bug was not actually implemented until now.
+
 0.3.2
 -----
 

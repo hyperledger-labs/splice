@@ -722,6 +722,7 @@ class HttpScanHandler(
       pageSize: Int,
       encoding: definitions.DamlValueEncoding,
       consistentResponses: Boolean,
+      includeImportUpdates: Boolean,
       extracted: TraceContext,
   ): Future[Vector[definitions.UpdateHistoryItem]] = {
     implicit val tc: TraceContext = extracted
@@ -746,7 +747,7 @@ class HttpScanHandler(
       for {
         txs <- updateHistory.getUpdates(
           afterO,
-          includeImportUpdates = true,
+          includeImportUpdates = includeImportUpdates,
           PageLimit.tryCreate(pageSize),
         )
       } yield {
@@ -803,6 +804,12 @@ class HttpScanHandler(
       pageSize = request.pageSize,
       encoding = encoding,
       consistentResponses = false,
+      // Originally this endpoint included import updates. This is changed in the V1 endpoint.
+      // Almost all clients will want to filter them out to prevent duplicate contracts
+      // (once from the actual create event and once from the import update).
+      // Also, all import updates have a record time of 0 and thus don't work with pagination by record time.
+      // In this v0 version, we keep `includeImportUpdates = true` to maintain backward compatibility.
+      includeImportUpdates = true,
       extracted,
     ).map(
       definitions.UpdateHistoryResponse(_)
@@ -817,6 +824,7 @@ class HttpScanHandler(
       pageSize = request.pageSize,
       encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
       consistentResponses = true,
+      includeImportUpdates = false,
       extracted,
     )
       .map(
