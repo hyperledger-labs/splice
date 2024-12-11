@@ -492,6 +492,7 @@ commands:
         type: integer
         default: 2
     steps:
+      - checkout_with_retry
       - run_bash_command_in_nix:
           cmd_name: Install pulumi dependencies
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
