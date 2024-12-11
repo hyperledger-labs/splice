@@ -1,4 +1,0 @@
-org.lfdecentralizedtrust.splice.integration.tests.SvCometBftIntegrationTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClientIntegrationTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftRequestSignerTest

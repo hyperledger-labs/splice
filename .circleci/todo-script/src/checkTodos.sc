@@ -248,7 +248,13 @@ val allRegexps: List[RegexCategory] = tags ++ List(Issue, Milestone)
 val identifierRegex = "(TODO)(.*?)\\((.+?)\\)".r
 
 val todoStyleExcludePrefixes =
-  Seq("canton/", "project/CantonDependencies.scala", "experiments/", "README.md")
+  Seq(
+    "canton/",
+    "project/CantonDependencies.scala",
+    "experiments/",
+    "README.md",
+    "cluster/images/splice-test-temp-runner-hook/index.js",
+  )
 val todoStyleExcludeSuffixes =
   Seq("/checkTodos.sc", "/build.static_tests.yml")
 

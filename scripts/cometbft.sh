@@ -22,6 +22,14 @@ function delete_docker_network() {
 
 function docker_start() {
   local container_sv_index=$1
+
+  local port_offset
+  if [[ $container_sv_index == "2Local" ]]; then
+    port_offset=5
+  else
+    port_offset=$container_sv_index
+  fi
+
   local current_container_name="${DOCKER_COMETBFT_CONTAINER_NAME}_${container_sv_index}"
   echo "Starting Cometbft docker container $current_container_name"
   docker create \
@@ -31,8 +39,8 @@ function docker_start() {
     --rm \
     --expose 26656 \
     --expose 26657 \
-    -p "266${1}7:26657" \
-    -p "266${1}0:26660" \
+    -p "266${port_offset}7:26657" \
+    -p "266${port_offset}0:26660" \
     --network $DOCKER_COMEBFT_NETWORK_NAME \
     --hostname "sv${container_sv_index}" \
     "$COMETBFT_DOCKER_IMAGE" start --home /cometbft
@@ -77,6 +85,7 @@ case "$1" in
         docker_start 2
         docker_start 3
         docker_start 4
+        docker_start 2Local
         docker ps -a
     ;;
     stop)
@@ -84,6 +93,7 @@ case "$1" in
         docker_stop 2
         docker_stop 3
         docker_stop 4
+        docker_stop 2Local
         delete_docker_network
     ;;
     *)

@@ -1467,7 +1467,7 @@ printTests := {
       name.contains("SvOffboardingIntegrationTest")
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
-  def isDockerBasedTest(name: String): Boolean =
+  def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
     name contains "RecordTimeToleranceTimeBasedIntegrationTest"
@@ -1567,9 +1567,9 @@ printTests := {
       (t: String) => isDockerComposeBasedTest(t),
     ),
     (
-      "tests with wall clock time using docker",
-      "test-docker-full-class-names.log",
-      (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && isDockerBasedTest(t),
+      "tests with wall clock time using CometBFT",
+      "test-cometbft-full-class-names.log",
+      (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && isCometBftTest(t),
     ),
     (
       "tests with wall clock time",

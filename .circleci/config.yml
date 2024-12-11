@@ -5101,8 +5101,8 @@ workflows:
             - artifactory
             - slack-context
             - canton-network-vpn
-          name: "scala_test wall clock time docker"
-          test_names_file: "test-docker-full-class-names.log"
+          name: "scala_test wall clock time cometBFT"
+          test_names_file: "test-cometbft-full-class-names.log"
           start_canton_options: "-w -f"
           resource_class: "xlarge"
           parallelism: 1

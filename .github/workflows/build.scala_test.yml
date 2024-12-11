@@ -11,6 +11,12 @@ on:
       parallelism:
         type: number
         required: true
+      test_names_file:
+        type: string
+        required: true
+      test_name:
+        type: string
+        required: true
 
 jobs:
 
@@ -107,7 +113,7 @@ jobs:
         uses: ./.github/actions/tests/split_tests
         with:
           test_reports_dir: '/cache/test-reports'
-          test_names_file: 'test-full-class-names-sim-time.log'
+          test_names_file: ${{ inputs.test_names_file }}
           split_total: ${{ inputs.parallelism }}
           split_index: ${{ matrix.runner-index }}
 
@@ -158,4 +164,4 @@ jobs:
         if: ${{ failure() }}
         uses: ./.github/actions/sbt/upload_logs
         with:
-          name: "logs-${{ matrix.runner-index }}"
+          name: "logs-${{ inputs.test_name }}-${{ matrix.runner-index }}"

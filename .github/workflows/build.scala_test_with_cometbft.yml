@@ -1,0 +1,194 @@
+# TODO(#15988): reduce duplication between this and scala_test (wasn't easy to do because I don't think that services can be conditional)
+
+name: Scala Test with CometBFT
+on:
+  workflow_call:
+    inputs:
+      runs_on:
+        type: string
+        required: true
+      parallelism:
+        type: number
+        required: true
+      test_names_file:
+        type: string
+        required: true
+      test_name:
+        type: string
+        required: true
+
+jobs:
+
+  runner-indices:
+    runs-on: self-hosted-docker-tiny
+    name: Generate runner indices
+    outputs:
+      json: ${{ steps.generate-index-list.outputs.json }}
+    steps:
+      - id: generate-index-list
+        run: |
+          MAX_INDEX=$((${{ inputs.parallelism }}-1))
+          INDEX_LIST=$(seq 0 ${MAX_INDEX})
+          INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
+          echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
+
+
+  scala_test:
+    runs-on: ${{ inputs.runs_on }}
+    needs:
+      - runner-indices
+    strategy:
+      matrix:
+        runner-index: ${{ fromjson(needs.runner-indices.outputs.json) }}
+      fail-fast: false
+    container:
+      # TODO(#15988): clean this up, use a proper released image instead:
+      #               - Once this is in a release, use the release version.
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
+
+    services:
+      postgres:
+        # TODO(#15988): clean this up, use a proper released image instead:
+        #               - Once this is in a release, use the release version.
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
+        env:
+          POSTGRES_PASSWORD: postgres
+
+      cometbft1:
+        # TODO(#15988): clean this up, use a proper released image instead:
+        #               - Once this is in a snapshot, use the snapshot version.
+        #               - Once this is in a release, use the release version.
+        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        env:
+          sv_idx: 1
+        options: --name cometbft1
+
+      cometbft2:
+        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        env:
+          sv_idx: 2
+        options: --name cometbft2
+
+      cometbft2Local:
+        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        env:
+          sv_idx: 2Local
+        options: --name cometbft2local
+
+      cometbft3:
+        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        env:
+          sv_idx: 3
+        options: --name cometbft3
+
+      cometbft4:
+        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        env:
+          sv_idx: 4
+        options: --name cometbft4
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup
+        shell: bash
+        run: ./.github/actions/scripts/common_setup.sh
+
+      - name: Set up Nix
+        uses: ./.github/actions/nix/setup_self_hosted_nix
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          # TODO(#15988): consider this trick for setting cache_version globally: https://stackoverflow.com/a/74217028
+          cache_version: 0
+
+      - name: Wait for postgres
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        with:
+          cmd: ./scripts/postgres.sh external wait
+          additional_nix_args: "--keep POSTGRES_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
+
+        # Starting canton before setting up SBT, to gain a bit of time doing both in parallel
+      - name: Start Canton
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        env:
+          POSTGRES_HOST: localhost
+          CANTON_DB_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        with:
+          cmd: |
+            mkdir -p log
+            ./start-canton.sh -p external -D -F -w
+          additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
+          cmd_retry_count: 3
+        # TODO(#15988): GHA does not support background jobs, therefore we introduced the -D flag
+        # and just running in the background, but this means that we are not retrying on all
+        # failures. Consider wrapping start-canton in a script that also retries, and
+        # running that in the background.
+
+      - name: Set up SBT
+        id: setup_sbt
+        uses: ./.github/actions/sbt/setup_sbt
+        with:
+          cache_version: 0
+
+      - name: Compute tests for run ${{ matrix.runner-index }}
+        id: split_tests
+        uses: ./.github/actions/tests/split_tests
+        with:
+          test_reports_dir: '/cache/test-reports'
+          test_names_file: ${{ inputs.test_names_file }}
+          split_total: ${{ inputs.parallelism }}
+          split_index: ${{ matrix.runner-index }}
+
+      - name: Prepare list of tests to run for sbt
+        id: list_tests
+        shell: bash
+        run: |
+          splitted=$(echo "${{ toJson(steps.split_tests.outputs.test_names) }}" | jq -r '.[]')
+          tests=$(echo $splitted | tr '\n' ' ')
+          count=$(echo $tests | wc -w)
+          echo "We are running $count tests in this batch:"
+          echo "$splitted"
+          echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $tests\"" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Canton to be ready
+        shell: bash
+        run: ./wait-for-canton.sh -w
+
+      - name: Run tests
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}
+          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
+
+      - name: Check logs for errors
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          # we don't care if some integration test happened to make the repo dirty
+          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+          cmd: checkErrors
+
+      - name: Post-SBT job
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/sbt/post_sbt
+        with:
+          cache_version: 0
+          setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
+
+      - name: Upload logs
+        if: ${{ failure() }}
+        uses: ./.github/actions/sbt/upload_logs
+        with:
+          name: "logs-${{ inputs.test_name }}-${{ matrix.runner-index }}"

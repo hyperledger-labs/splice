@@ -403,7 +403,13 @@ function installK8sRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image: 'ghcr.io/actions/actions-runner:latest',
+                // image: 'ghcr.io/actions/actions-runner:latest',
+                // TODO(#15988): This is a temporary image that is built from the actions-runner-controller
+                // fork with some additional patches. We should switch to the official image once the patches
+                // are merged upstream.
+                // Upstream PR: https://github.com/actions/runner-container-hooks/pull/200
+                image:
+                  'digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-temp-runner-hook:0.3.3-itai-dirty',
                 imagePullPolicy: 'Always',
                 command: ['/home/runner/run.sh'],
                 env: [
@@ -602,13 +608,12 @@ function installK8sRunnerScaleSets(
     cachePvcName,
     {
       requests: {
-        // TODO(#15988) This is smaller than on CCI runners, but seems to suffice at least for now
         cpu: '1',
         memory: '4Gi',
       },
       limits: {
-        cpu: '2',
-        memory: '8Gi',
+        cpu: '4',
+        memory: '16Gi',
       },
     },
     saName,

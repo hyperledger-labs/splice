@@ -15,6 +15,7 @@ function usage() {
   echo "  -w               only start canton instance with wall clock time"
   echo "  -s               only start canton instance with simulated time"
   echo "  -f               start canton using the CometBFT driver for the global sequencers"
+  echo "  -F               same as -f, but does not start cometBFT, but rather assumes it is already running"
   echo "  -g               start extra global upgrade domain"
   echo "  -m               collect metrics and send them to our CI prometheus instance"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
@@ -28,11 +29,12 @@ POSTGRES_MODE=docker
 CANTON=canton
 globalUpgradeDomain=0
 bootstrapScriptPath=bootstrap-canton.sc
-global_cometbft=0
+start_cometbft=0
+use_cometbft=0
 softDomainMigration=0
 collect_metrics=0
 
-args=$(getopt -o "hdDap:c:wsbtfgm" -l "help,soft-domain-migration" -- "$@")
+args=$(getopt -o "hdDap:c:wsbtfFgm" -l "help,soft-domain-migration" -- "$@")
 
 eval set -- "$args"
 
@@ -75,8 +77,14 @@ do
             echo "using custom canton binary: $CANTON"
             ;;
         -f)
-            global_cometbft=1
-            echo "start canton with the cometbft driver"
+            start_cometbft=1
+            use_cometbft=1
+            echo "start canton with the cometbft driver (and start CometBFT)"
+            ;;
+        -F)
+            start_cometbft=0
+            use_cometbft=1
+            echo "start canton with the cometbft driver (assuming CometBFT is already running)"
             ;;
         -g)
             globalUpgradeDomain=1
@@ -116,7 +124,7 @@ rm -f canton*.tokens
 ./scripts/postgres.sh "$POSTGRES_MODE" start
 
 # Start CometBFT
-if [[ $global_cometbft -eq 1 ]]; then
+if [[ $start_cometbft -eq 1 ]]; then
   # Sourcing this to get exported variables.
   . scripts/cometbft.sh start
 fi;
@@ -214,7 +222,7 @@ JAVA_TOOL_OPTIONS="-Xms6g -Xmx6g -Dlogback.configurationFile=./scripts/canton-lo
 config_overrides=""
 config_overrides_simtime=""
 
-if [[ $global_cometbft -eq 1 ]]; then
+if [[ $use_cometbft -eq 1 ]]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/cometbft-sequencer-global-domain-overrides.conf"
 fi;
 
