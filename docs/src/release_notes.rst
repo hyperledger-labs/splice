@@ -13,7 +13,7 @@ Release Notes
 
 * All UIs (except the experimental app manager and splitwell UIs)
 
-  Added the ``openid`` scope to their authorization requests to comply with the `OpenID Connect specification <https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest>`_.
+  * Added the ``openid`` scope to their authorization requests to comply with the `OpenID Connect specification <https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest>`_.
 
 * Scan
 
