@@ -33,6 +33,8 @@ images := \
 	\
 	splice-test-postgres \
 	splice-test-ci \
+	splice-test-cometbft \
+	splice-test-temp-runner-hook \
 
 canton-image := cluster/images/canton
 splice-image := cluster/images/splice-app
