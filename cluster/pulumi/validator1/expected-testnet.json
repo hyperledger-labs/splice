@@ -826,8 +826,7 @@
         },
         "migration": {
           "id": 1,
-          "legacyId": 0,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "validator1",
         "onboardingSecretFrom": {

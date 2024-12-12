@@ -633,8 +633,7 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "1",
-              "0"
+              "1"
             ]
           }
         },
@@ -931,18 +930,27 @@
           "prefix": "testzrh/sv-1"
         },
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.4\",\"amuletNameServiceVersion\": \"0.1.4\",\"dsoGovernanceVersion\": \"0.1.7\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.4\",\"walletPaymentsVersion\": \"0.1.4\"}",
+        "initialSynchronizerFeesConfig": {
+          "baseRateBurstAmount": 200000,
+          "baseRateBurstWindowMins": 20,
+          "extraTrafficPrice": 16.67,
+          "minTopupAmount": 200000,
+          "readVsWriteScalingFactor": 4
+        },
         "isDevNet": false,
         "metrics": {
           "enable": true
         },
         "migration": {
           "id": 1,
-          "legacyId": 0,
-          "migrating": true
+          "migrating": false
         },
         "nodeIdentifier": "Digital-Asset-2",
+        "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
-        "onboardingType": "domain-migration",
+        "onboardingRoundZeroDuration": "1 h",
+        "onboardingType": "found-dso",
         "participantAddress": "participant-1",
         "persistence": {
           "databaseName": "sv_sv_1",
