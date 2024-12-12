@@ -96,6 +96,7 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
             logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
           }
         ),
+        trafficTopups = IgnoreTopupsDevNet,
       )
     }
   }
