@@ -71,10 +71,6 @@ import org.lfdecentralizedtrust.splice.http.{
   UrlValidator,
 }
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.scan.store.ScanHistoryBackfilling.{
-  FoundingTransactionTreeUpdate,
-  InitialTransactionTreeUpdate,
-}
 import org.lfdecentralizedtrust.splice.store.{
   AppStore,
   PageLimit,
@@ -722,6 +718,7 @@ class HttpScanHandler(
       pageSize: Int,
       encoding: definitions.DamlValueEncoding,
       consistentResponses: Boolean,
+      includeImportUpdates: Boolean,
       extracted: TraceContext,
   ): Future[Vector[definitions.UpdateHistoryItem]] = {
     implicit val tc: TraceContext = extracted
@@ -743,49 +740,39 @@ class HttpScanHandler(
             ),
         )
       }
-      for {
-        txs <- updateHistory.getUpdates(
-          afterO,
-          includeImportUpdates = true,
-          PageLimit.tryCreate(pageSize),
-        )
-      } yield {
-        // TODO(#15528): instead of the below `if`, wait until UpdateHistory.getBackfillingState() says the history is complete
-        // This needs to be done after backfilling is enabled by default, otherwise this endpoint won't even work on
-        // the founding SV.
-        if (
-          afterO.isEmpty && txs.headOption.exists(firstTx => {
-            InitialTransactionTreeUpdate
-              .fromTreeUpdate(
-                dsoParty = store.key.dsoParty,
-                svParty = svParty,
+      updateHistory
+        .getBackfillingState()
+        .flatMap {
+          case None =>
+            throw Status.UNAVAILABLE
+              .withDescription(
+                "This scan instance has not yet loaded its updates history. Wait a short time and retry."
               )
-              .lift(firstTx) match {
-              case Some(FoundingTransactionTreeUpdate(_, _)) =>
-                false
-              case _ =>
-                true
-            }
-          })
-        ) {
-
-          throw Status.UNAVAILABLE
-            .withDescription(
-              s"This scan instance has not yet replicated all data. Wait until replication is complete, or connect to a different scan instance."
-            )
-            .asRuntimeException()
+              .asRuntimeException()
+          case Some(state) if !state.complete =>
+            throw Status.UNAVAILABLE
+              .withDescription(
+                "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
+                  "Wait until replication is complete, or connect to a different scan instance."
+              )
+              .asRuntimeException()
+          case Some(state) =>
+            for {
+              txs <- updateHistory.getUpdates(
+                afterO,
+                includeImportUpdates = includeImportUpdates,
+                PageLimit.tryCreate(pageSize),
+              )
+            } yield txs
+              .map(
+                encodeUpdate(
+                  _,
+                  encoding = encoding,
+                  consistentResponses = consistentResponses,
+                )
+              )
+              .toVector
         }
-
-        txs
-          .map(
-            encodeUpdate(
-              _,
-              encoding = encoding,
-              consistentResponses = consistentResponses,
-            )
-          )
-          .toVector
-      }
     }
   }
 
@@ -803,6 +790,12 @@ class HttpScanHandler(
       pageSize = request.pageSize,
       encoding = encoding,
       consistentResponses = false,
+      // Originally this endpoint included import updates. This is changed in the V1 endpoint.
+      // Almost all clients will want to filter them out to prevent duplicate contracts
+      // (once from the actual create event and once from the import update).
+      // Also, all import updates have a record time of 0 and thus don't work with pagination by record time.
+      // In this v0 version, we keep `includeImportUpdates = true` to maintain backward compatibility.
+      includeImportUpdates = true,
       extracted,
     ).map(
       definitions.UpdateHistoryResponse(_)
@@ -817,6 +810,7 @@ class HttpScanHandler(
       pageSize = request.pageSize,
       encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
       consistentResponses = true,
+      includeImportUpdates = false,
       extracted,
     )
       .map(

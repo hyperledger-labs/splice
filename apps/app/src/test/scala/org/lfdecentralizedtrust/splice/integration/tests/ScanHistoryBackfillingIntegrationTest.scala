@@ -59,6 +59,14 @@ class ScanHistoryBackfillingIntegrationTest
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
+          scanConfig.copy(
+            // Small batch size to force multiple backfilling rounds
+            updateHistoryBackfillBatchSize = 2
+          )
+        )(config)
+      )
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndAmuletMerging
@@ -216,7 +224,12 @@ class ScanHistoryBackfillingIntegrationTest
     clue("SV2 scan HTTP API refuses to return history") {
       assertThrowsAndLogsCommandFailures(
         sv2ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson),
-        _.errorMessage should include("This scan instance has not yet replicated all data"),
+        logEntry => {
+          logEntry.errorMessage should include("HTTP 503 Service Unavailable")
+          logEntry.errorMessage should include(
+            "This scan instance has not yet loaded its updates history"
+          )
+        },
       )
     }
 
@@ -231,7 +244,40 @@ class ScanHistoryBackfillingIntegrationTest
     }
 
     actAndCheck(
-      "Start backfilling on all scans", {
+      "Run backfilling once on all scans", {
+        sv1BackfillTrigger.runOnce().futureValue
+        sv2BackfillTrigger.runOnce().futureValue
+      },
+    )(
+      "Backfilling is complete only on the founding SV",
+      _ => {
+        clue("SV1 backfilling is complete") {
+          sv1ScanBackend.appState.store.updateHistory
+            .getBackfillingState()
+            .futureValue
+            .exists(_.complete) should be(true)
+          sv1ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson) should not be empty
+        }
+        clue("SV2 backfilling is not complete") {
+          sv2ScanBackend.appState.store.updateHistory
+            .getBackfillingState()
+            .futureValue
+            .exists(_.complete) should be(false)
+          assertThrowsAndLogsCommandFailures(
+            sv2ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson),
+            logEntry => {
+              logEntry.errorMessage should include("HTTP 503 Service Unavailable")
+              logEntry.errorMessage should include(
+                "This scan instance has not yet replicated all data"
+              )
+            },
+          )
+        }
+      },
+    )
+
+    actAndCheck(
+      "Resume backfilling on all scans", {
         sv1BackfillTrigger.resume()
         sv2BackfillTrigger.resume()
       },

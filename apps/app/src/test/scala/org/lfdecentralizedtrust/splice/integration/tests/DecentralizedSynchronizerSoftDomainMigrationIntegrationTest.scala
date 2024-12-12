@@ -62,7 +62,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     with WalletTestUtil
     with UpdateHistoryTestUtil {
 
-  // Fails with unexpected CreatedEvent roots
+  // TODO(#16608): scan txlog script doesn't handle multiple synchronizers
   override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition =

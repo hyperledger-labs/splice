@@ -47,10 +47,6 @@ file_handler.setFormatter(
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
-# Matches the prefix defined in ParticipantAdminConnection
-import_acs_workflow_id_prefix = "canton-network-acs-import"
-
-
 def _default_logger(name, loglevel):
     logger = colorlog.getLogger(name)
     logger.addHandler(cli_handler)
@@ -274,7 +270,7 @@ class ScanClient:
         if after:
             payload["after"] = after.to_json()
         response = await self.session.post(
-            f"{self.url}/api/scan/v0/updates", json=payload
+            f"{self.url}/api/scan/v1/updates", json=payload
         )
         response.raise_for_status()
         json = await response.json()
@@ -1235,21 +1231,21 @@ class TransactionTree:
 
     @staticmethod
     def parse(json):
-        return TransactionTree(
-            json["root_event_ids"],
-            {
-                event_id: Event.parse(event, event_id)
-                for event_id, event in json["events_by_id"].items()
-            },
-            json["migration_id"],
-            datetime.fromisoformat(json["record_time"]),
-            json["update_id"],
-            json["workflow_id"],
-            json["synchronizer_id"],
-        )
-
-    def is_acs_import(self):
-        return self.workflow_id.startswith(import_acs_workflow_id_prefix)
+        try:
+            return TransactionTree(
+                json["root_event_ids"],
+                {
+                    event_id: Event.parse(event, event_id)
+                    for event_id, event in json["events_by_id"].items()
+                },
+                json["migration_id"],
+                datetime.fromisoformat(json["record_time"]),
+                json["update_id"],
+                json["workflow_id"],
+                json["synchronizer_id"],
+            )
+        except Exception as e:
+            raise Exception(f"Failed to parse transaction tree: {json}") from e
 
     def acs_diff(self):
         created_events = {}
@@ -3934,16 +3930,6 @@ async def _check_scan_balance_assertions(
 
 
 async def _process_transaction(args, app_state, scan_client, transaction):
-
-    if transaction.is_acs_import():
-        # We need to skip ACS imports for hard domain migrations since those contracts have already been processed on the old migration id.
-        # Note that this also ignores the ACS import of non-sv1 SVs atm. This would be correct once we do backfilling of history
-        # but until then this script can only run against sv1.
-        LOG.debug(
-            f"Skipping ACS import in transaction ${transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
-        )
-        return
-
     LOG.debug(
         f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
     )

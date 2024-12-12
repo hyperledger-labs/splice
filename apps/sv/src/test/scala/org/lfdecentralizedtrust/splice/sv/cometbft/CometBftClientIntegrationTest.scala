@@ -29,10 +29,11 @@ import scalapb.TimestampConverters
 import java.time.Instant
 import scala.concurrent.ExecutionContext
 
-class CometBftClientIntegrationTest
-    extends AsyncWordSpec
-    with BaseTest
-    with CometBftContainerAround {
+class CometBftClientIntegrationTest extends AsyncWordSpec with BaseTest {
+
+  lazy val connectionConfig: CometBftConnectionConfig = CometBftConnectionConfig(
+    "http://127.0.0.1:26617"
+  )
 
   override implicit def executionContext: ExecutionContext = ExecutionContext.global
   lazy val client = new CometBftHttpRpcClient(connectionConfig, NamedLoggerFactory.root)
@@ -128,7 +129,7 @@ class CometBftClientIntegrationTest
 }
 
 object CometBftClientIntegrationTest {
-  private val InitialVotingPower = 10L
+  private val InitialVotingPower = 1L
 
   private val SvNode1 = "Digital-Asset-2"
   private val PubKey2 = "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="

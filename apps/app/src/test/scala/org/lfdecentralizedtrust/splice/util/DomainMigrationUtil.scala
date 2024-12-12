@@ -5,7 +5,6 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
@@ -22,8 +21,6 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.Using
 
 trait DomainMigrationUtil extends BaseTest with TestCommon {
-  override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
-
   def withClueAndLog[T](clueMessage: String)(fun: => T): T = withClue(clueMessage) {
     clue(clueMessage)(fun)
   }
