@@ -472,7 +472,8 @@ function installK8sRunnerScaleSet(
                   volumeClaimTemplate: {
                     spec: {
                       accessModes: ['ReadWriteOnce'],
-                      storageClassName: 'standard-rwo',
+                      // only hyperdisks are supported on c4 nodes
+                      storageClassName: 'hyperdisk-balanced-rwo',
                       resources: {
                         requests: {
                           storage: '16Gi',
