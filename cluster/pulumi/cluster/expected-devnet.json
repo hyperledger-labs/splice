@@ -88,6 +88,27 @@
   },
   {
     "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "storage.k8s.io/v1",
+      "kind": "StorageClass",
+      "metadata": {
+        "name": "hyperdisk-balanced-rwo"
+      },
+      "parameters": {
+        "provisioned-iops-on-create": "7000",
+        "provisioned-throughput-on-create": "250Mi",
+        "type": "hyperdisk-balanced"
+      },
+      "provisioner": "pd.csi.storage.gke.io",
+      "volumeBindingMode": "WaitForFirstConsumer"
+    },
+    "name": "hyperdisk-balanced-rwo",
+    "provider": "",
+    "type": "kubernetes:storage.k8s.io/v1:StorageClass"
+  },
+  {
+    "custom": true,
     "id": "organization/infra/infra.dev",
     "inputs": {
       "name": "organization/infra/infra.dev"
