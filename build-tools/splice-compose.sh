@@ -528,14 +528,20 @@ function subcmd_test_after_migration {
   fi
 
   _info "Check the balance"
-  balance=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/balance' \
-    -H "Authorization: Bearer $TOKEN" \
-    -H 'Content-Type: application/json' | jq -r '.effective_unlocked_qty')
+  for i in {1..30}; do
+    balance=$(curl -sS 'http://wallet.localhost/api/validator/v0/wallet/balance' \
+      -H "Authorization: Bearer $TOKEN" \
+      -H 'Content-Type: application/json' | jq -r '.effective_unlocked_qty')
 
+    if [ -z "$balance" ] || (( $(echo "$balance < 5000" | bc -l) )); then
+      _info "Balance is $balance, expected at least 5000. Retrying."
+    else
+      _info "Balance is $balance"
+      break
+    fi
+  done
   if [ -z "$balance" ] || (( $(echo "$balance < 5000" | bc -l) )); then
-    _error "Balance is $balance, expected at least 5000"
-  else
-    _info "Balance is $balance"
+    _error "Balance is $balance, expected at least 5000. Out of retries."
   fi
 }
 
