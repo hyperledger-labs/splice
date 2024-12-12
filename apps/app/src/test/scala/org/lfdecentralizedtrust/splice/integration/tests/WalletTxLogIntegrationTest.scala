@@ -149,6 +149,7 @@ class WalletTxLogIntegrationTest
             logEntry.amuletPrice shouldBe amuletPrice
           }
         ),
+        trafficTopups = IgnoreTopupsDevNet,
         ignore = {
           case balanceChange: BalanceChangeTxLogEntry =>
             balanceChange.subtype.value == walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
@@ -1179,6 +1180,9 @@ class WalletTxLogIntegrationTest
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
         logEntry.amuletPrice shouldBe amuletPrice
       }
+      val tapTxLog: CheckTxHistoryFn = { case logEntry: BalanceChangeTxLogEntry =>
+        logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+      }
       bobValidatorWalletClient.tap(30.0)
 
       val onboarding = onboardExternalParty(bobValidatorBackend)
@@ -1191,8 +1195,8 @@ class WalletTxLogIntegrationTest
           createAndAcceptExternalPartySetupProposal(bobValidatorBackend, onboarding)
         checkTxHistory(
           bobValidatorWalletClient,
-          Seq(creationTxLog),
-          ignore = isTopupOrTap,
+          Seq(creationTxLog, tapTxLog),
+          trafficTopups = IgnoreTopupsDevNet,
         )
         preapprovalCid
       }
@@ -1218,8 +1222,8 @@ class WalletTxLogIntegrationTest
       }
       checkTxHistory(
         bobValidatorWalletClient,
-        Seq(renewTxLog, creationTxLog),
-        ignore = isTopupOrTap,
+        Seq(renewTxLog, creationTxLog, tapTxLog),
+        trafficTopups = IgnoreTopupsDevNet,
       )
 
     }
@@ -1261,8 +1265,8 @@ class WalletTxLogIntegrationTest
       // Only Alice should see notification (note that aliceValidator is shared between tests)
       val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
 
-      validatorTxLogBefore.filter(e => !isTopupOrTap(e)) should be(
-        validatorTxLogAfter.filter(e => !isTopupOrTap(e))
+      withoutDevNetTopups(validatorTxLogBefore) should be(
+        withoutDevNetTopups(validatorTxLogAfter)
       )
       checkTxHistory(bobWalletClient, Seq.empty)
     }
@@ -1510,7 +1514,9 @@ class WalletTxLogIntegrationTest
           // Validator should not see any notification (note that aliceValidator is shared between tests)
           val validatorTxLogAfter =
             aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
-          validatorTxLogBefore should be(validatorTxLogAfter)
+          withoutDevNetTopups(validatorTxLogBefore) should be(
+            withoutDevNetTopups(validatorTxLogAfter)
+          )
 
           // Charlie (the provider of the subscription) should see a notification
           checkTxHistory(
@@ -1597,7 +1603,8 @@ class WalletTxLogIntegrationTest
             { case _: UnknownTxLogEntry => succeed },
             { case _: UnknownTxLogEntry => succeed },
           ),
-          previousEventId,
+          previousEventId = previousEventId,
+          trafficTopups = IgnoreTopupsDevNet,
           ignore = {
             case balanceChange: BalanceChangeTxLogEntry =>
               balanceChange.subtype.value == walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
@@ -1627,18 +1634,4 @@ class WalletTxLogIntegrationTest
       },
     )
   }
-
-  private def isTopupOrTap(tx: walletLogEntry): Boolean = {
-    tx match {
-      case transfer: TransferTxLogEntry =>
-        transfer.getSubtype.choice == "AmuletRules_BuyMemberTraffic"
-      case balanceChange: BalanceChangeTxLogEntry =>
-        // A traffic purchase in devnet config produces an additional tap.
-        // We just filter out all taps instead of trying to be clever since they don't matter for the tests
-        // where this is used.
-        balanceChange.getSubtype.choice == "AmuletRules_DevNet_Tap"
-      case _ => false
-    }
-  }
-
 }

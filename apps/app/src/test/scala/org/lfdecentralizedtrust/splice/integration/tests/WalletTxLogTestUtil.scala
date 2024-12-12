@@ -1,12 +1,20 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.daml.lf.data.Numeric
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import org.lfdecentralizedtrust.splice.store.Limit
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
+import org.lfdecentralizedtrust.splice.wallet.store.{
+  BalanceChangeTxLogEntry,
+  TransferTxLogEntry,
+  TxLogEntry,
+  TxLogEntry as walletLogEntry,
+}
 import org.scalatest.Assertion
+
+import scala.annotation.tailrec
 
 trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil {
 
@@ -17,18 +25,41 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
 
   type CheckTxHistoryFn = PartialFunction[TxLogEntry, Assertion]
 
+  sealed trait TopupIgnoreStrategy
+
+  /** This is a DevNet-like clusters and traffic topups should be ignored when checking history */
+  final case object IgnoreTopupsDevNet extends TopupIgnoreStrategy
+
+  /** This is a non-DevNet-like clusters and traffic topups should be ignored when checking history */
+  final case object IgnoreTopupsNonDevNet extends TopupIgnoreStrategy
+
+  /** Traffic topups should not be ignored when checking history */
+  final case object KeepTopups extends TopupIgnoreStrategy
+
   def checkTxHistory(
       wallet: WalletAppClientReference,
       expected: Seq[CheckTxHistoryFn],
       previousEventId: Option[String] = None,
+      trafficTopups: TopupIgnoreStrategy = KeepTopups,
       ignore: TxLogEntry => Boolean = _ => false,
   ): Unit = {
 
     val (actual, toCompare) = eventually() {
       val actual = wallet.listTransactions(None, pageSize = Limit.MaxPageSize)
-      val toCompare = actual
+      val withoutIgnored = actual
         .takeWhile(e => !previousEventId.contains(e.eventId))
-        .filter(!ignore(_))
+        .filterNot(ignore)
+
+      // Traffic topups happen in the background and can lead to randomly appearing TxLog entries.
+      // Since we are using shared Canton instances, we can't purchase a large amount of traffic up front
+      // without affecting subsequent tests.
+      // Thus the only option is to ignore all traffic topups in tests where random topups MIGHT appear.
+      // We are using the TopupIgnoreStrategy type to force callers to explicitly state whether topups might appear.
+      val toCompare = trafficTopups match {
+        case IgnoreTopupsDevNet => withoutDevNetTopups(withoutIgnored)
+        case IgnoreTopupsNonDevNet => withoutNonDevNetTopups(withoutIgnored)
+        case KeepTopups => withoutIgnored
+      }
 
       toCompare should have length expected.size.toLong
       (actual, toCompare)
@@ -56,6 +87,37 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
         .flatten
 
       paginatedResult should contain theSameElementsInOrderAs actual
+    }
+  }
+
+  def withoutDevNetTopups(txs: Seq[walletLogEntry]): Seq[walletLogEntry] = {
+    @tailrec
+    def go(txs: List[walletLogEntry], acc: Seq[walletLogEntry]): Seq[walletLogEntry] =
+      txs match {
+        case Nil => acc
+        case (first: TransferTxLogEntry) :: (second: BalanceChangeTxLogEntry) :: tail =>
+          // On DevNet-like clusters, traffic topups auto-tap amulets (in the same transaction).
+          // A traffic topup therefore always generates two TxLog events: one for the traffic topup itself,
+          // and one for the amulet tap. Note that events are in reverse chronological order.
+          if (
+            first.getSubtype.choice == amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_BuyMemberTraffic.name &&
+            second.getSubtype.choice == amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_DevNet_Tap.name
+          ) {
+            go(tail, acc)
+          } else {
+            go(tail, acc :+ first :+ second)
+          }
+        case head :: tail => go(tail, acc :+ head)
+      }
+    go(txs.toList, Seq.empty)
+  }
+
+  def withoutNonDevNetTopups(txs: Seq[walletLogEntry]): Seq[walletLogEntry] = {
+    // On non-DevNet like clusters, traffic topups take input amulets that must have been created beforehand.
+    txs.filterNot {
+      case transfer: TransferTxLogEntry =>
+        transfer.getSubtype.choice == amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_BuyMemberTraffic.name
+      case _ => false
     }
   }
 }

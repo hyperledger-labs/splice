@@ -28,9 +28,6 @@ class WalletTxLogAcsIntegrationTest
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndAmuletMerging
-      // disable top-ups to prevent extra traffic purchase txs entering the tx log non-deterministically
-      // and interfering with the tests in this suite.
-      .withTrafficTopupsDisabled
       // Set a non-unit amulet price to better test CC-USD conversion.
       .addConfigTransform((_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config))
       .withManualStart
@@ -99,6 +96,7 @@ class WalletTxLogAcsIntegrationTest
             logEntry.amuletPrice shouldBe amuletPrice
           }
         ),
+        trafficTopups = IgnoreTopupsDevNet,
       )
     }
   }
