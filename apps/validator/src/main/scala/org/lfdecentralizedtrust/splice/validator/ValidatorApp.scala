@@ -379,7 +379,7 @@ class ValidatorApp(
     if (migrationDump.migrationId != config.domainMigrationId)
       throw Status.INVALID_ARGUMENT
         .withDescription(
-          s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in the validator ${config.domainMigrationId}. Please check if the SV app is configured with the correct migration id"
+          s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in the validator ${config.domainMigrationId}. Please check if the validator app is configured with the correct migration id"
         )
         .asRuntimeException()
     migrationDump
