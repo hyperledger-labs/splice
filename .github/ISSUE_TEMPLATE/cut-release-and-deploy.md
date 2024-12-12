@@ -8,48 +8,30 @@ assignees: ""
 
 ## Cut release
 
-Note: Some commands assume you are using the [fish](https://fishshell.com/) shell. If you are using other shells, you may need to adjust the commands accordingly.
-For example, `foo (bar)` in `fish` is equivalent to `foo $(bar)` in `bash`.
+Note: Some commands assume you are using the [fish](https://fishshell.com/) shell. If you are using other shells, you may need to adjust the commands accordingly. For example, `foo (bar)` in `fish` is equivalent to `foo $(bar)` in `bash`.
 
-The `VERSION` file specifies the release version to build, here referred to as `0.x.z`.
-The previous release is referred to as `0.x.y` in these instructions.
-
-Regular releases are started from `origin/main`, while bugfix / patch releases are started from the previous release.
-For the rest of this checklist, this will be called the _ancestor branch_.
-
-Release versions can only be published from a _release line branch_. The _release line branch_ is `release-line-0.x.z` for release `0.x.z` in these instructions.
-A _release line branch_ is branched from the _ancestor branch_.
-
-- [ ] Choose the _ancestor branch_. This can be `origin/main` or `origin/release-line-0.x.y`.
-- [ ] Wait for everything to be merged in the _ancestor branch_ that we want in `0.x.z`.
+- [ ] Wait for everything to be merged that we want in it
   - [ ] ...
-
-- [ ] Ensure all changes to the previous release branch `origin/release-line-0.x.y` are also included in both the _ancestor branch_ and `origin/main`.
-  (This should be the case but sometimes a change gets missed)
-    - Use one of the following approaches to find changes applied to release line `0.x.y` from the common ancestor of release `0.x.y` and the _release line branch_.
-        - Run `git diff (git merge-base origin/release-line-0.x.y ANCESTOR_BRANCH) origin/release-line-0.x.y` and compare it to the checked out source code of the release line you're upgrading to.
-        - Run `git log (git merge-base origin/release-line-0.x.y ANCESTOR_BRANCH)..origin/release-line-0.x.y` and compare it to the log of the release line you're upgrading to.
-        - Open https://github.com/DACH-NY/canton-network-node/compare/BRANCH_COMMIT...release-line-0.x.y to see the changes in the GitHub UI, where `BRANCH_COMMIT` is the commit that the `release-line-0.x.y` was branched off from.
-          - For instance use `git merge-base origin/release-line-0.x.y ANCESTOR_BRANCH` to find the merge base commit shared by `release-line-0.x.y` and _ancestor branch_.
-- [ ] When releasing a bugfix, create and push the _release line branch_ (branched from the _ancestor branch_). (for a regular release, this will be done later)
-  Note: release line branches are subject to branch protect rules.
-  Once you push to a release line branch, you need to open PRs to make further changes.
-- [ ] Create a PR with the changes described below. The PR should be opened against `origin/main` for a regular release or the _release line branch_ for a bugfix release:
+- [ ] Figure out from which branch we want to release. This can be `origin/main` or `origin/release-line-0.x`.
+      For the rest of this checklist, this will be called the _ancestor branch_.
+- [ ] Ensure all changes to the previous release branch `origin/release-line-0.x.z` are also included in both the _ancestor branch_ and `origin/main`.
+      This should be the case but sometimes a change gets missed.
+    - Use one of the following approaches to find changes applied to release line `0.x.z` after it was branched off its ancestor branch (which may be different from the ancestor branch of the new release).
+        - Run `git diff (git merge-base origin/release-line-0.x.z ANCESTOR_BRANCH) origin/release-line-0.x.z` and compare it to the checked out source code of the release line you're upgrading to.
+        - Run `git log (git merge-base origin/release-line-0.x.z ANCESTOR_BRANCH)..origin/release-line-0.x.z` and compare it to the log of the release line you're upgrading to.
+        - Open https://github.com/DACH-NY/canton-network-node/compare/BRANCH_COMMIT...release-line-0.x.z to see the changes in the GitHub UI, where `BRANCH_COMMIT` is the commit that the release line was branched off from.
+- [ ] Merge a PR into the _ancestor branch_ with the following changes:
   - [ ] Update the release notes (`docs/src/release_notes.rst`):
     - Replace `Upcoming` by the target version
     - Fix any spelling mistakes and make sure the RST rendering is not broken
-    - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.y..`
-  - [ ] Merge the PR (into `origin/main` for a regular release or the _release line branch_ for a bugfix release).
-        Make sure the merge commit has a `[release]` tag so it gets published as a non-snapshot version once it lands on the _release line branch_.
-        You may have to edit the commit message when pressing the merge button in the GitHub UI.
-- [ ] Ensure that the PR you just merged gets to the _release line branch_. This is already the case for a bugfix release at this point since you just merged the PR to it.
-      When releasing a regular release, you still need to ensure this, create the _release line branch_ from `origin/main` and push it.
-- [ ] Trigger a CircleCI pipeline _on the release line branch_ with `run-job: publish-public-artifacts`
-- [ ] Merge a PR into the _release line branch_ with the following changes:
-  - Update `VERSION` and `LATEST_RELEASE`.
-  `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
-- [ ] Merge a PR into the `origin/main` with the same changes, (updating `VERSION` and `LATEST_RELEASE`), so that the next release is correctly set up.
-- [ ] For a bugfix release (ancestor branch is not `origin/main`), forward port all changes made to the ancestor branch as part of this release to `origin/main`
+    - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.z..` (replace `0.x.z` with the prev version)
+  - [ ] Make sure the merge commit has a `[release]` tag so it gets published as a non-snapshot version. You may have to edit the commit message when pressing the merge button in the GitHub UI.
+- [ ] Create a release branch called `release-line-0.x.y` from the merged commit with the `[release]` tag
+  - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
+- [ ] Trigger a CircleCI pipeline on the release branch with `run-job: publish-public-artifacts`
+- [ ] Merge a PR into the _ancestor branch_ with the following changes:
+  - Update `VERSION` and `LATEST_RELEASE`. `VERSION` should be the next planned release (typically bumping the minor version), and `LATEST_RELEASE` should be the version of the newly created release line.
+- [ ] If _ancestor branch_ is not `origin/main`, forward port all changes made to the _ancestor branch_ as part of this release to `origin/main`
 - [ ] Update the Open source repos, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
   - [ ] Merge the auto-generated PR in https://github.com/digital-asset/decentralized-canton-sync
   - [ ] Merge the auto-generated PR in https://github.com/hyperledger-labs/splice
@@ -58,7 +40,7 @@ A _release line branch_ is branched from the _ancestor branch_.
 
 - [ ] If significant time has passed since cutting the release, ensure that there are no changes that need to be backported to the release branch.
       In particular, check for changes to the `cluster/cn-svc-configs` submodule.
-- [ ] Merge a PR into the release branch (`origin/release-line-0.x.z`) with the following changes:
+- [ ] Merge a PR into the release branch (`origin/release-line-0.x.y`) with the following changes:
   - [ ] Update the cluster `config.yaml` file by setting the new reference under `synchronizerMigration.active.releaseReference`.
   - [ ] Update `cluster/deployment/devnet/.envrc.vars`, bumping the release version.
     - Currently, the affected env vars are `OVERRIDE_VERSION`, `CHARTS_VERSION`, and `MULTI_VALIDATOR_IMAGE_VERSION`.
@@ -70,7 +52,7 @@ A _release line branch_ is branched from the _ancestor branch_.
 - [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
     - A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful and on the right commit.
 - [ ] Confirm that we didn't break anything (e.g., via the sv status grafana dashboard)
-- [ ] Forward port the above change that bumped the devnet version to both the _release line branch_ and `origin/main`.
+- [ ] Forward port the above change that bumped the devnet version to both the _ancestor branch_ and `origin/main`.
 - [ ] Merge a PR into `origin/main` with the following changes:
   - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
         This will upgrade our periodic health checks to use the new release version.
