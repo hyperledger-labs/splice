@@ -197,7 +197,6 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
-      enableScanHistoryBackfilling,
     )
   }
 
@@ -753,15 +752,6 @@ object ConfigTransforms {
         else config
       }
     )
-
-  def enableScanHistoryBackfilling: ConfigTransform = config => {
-    ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
-      scanConfig.copy(
-        updateHistoryBackfillEnabled = true,
-        updateHistoryBackfillBatchSize = 5,
-      )
-    )(config)
-  }
 
   def modifyAllANStorageConfigs(
       storageConfigModifier: (
