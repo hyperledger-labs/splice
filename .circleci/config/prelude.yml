@@ -86,7 +86,7 @@ parameters:
   # Empty/default means "latest on branch"
   upgrade-version:
     type: string
-    default: ""
+    default: "ciperiodic-migration-upgrade"
   # branch_filter parameter of wait_for_previous_pipeline
   branch-filter:
     type: string
