@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   CometBftJsonRpcRequestId,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.plugins.CometBftNetworkPlugin
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
@@ -27,7 +26,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import io.circe.Json
-import monocle.macros.syntax.lens.*
+import monocle.Monocle.toAppliedFocusOps
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
@@ -35,7 +34,6 @@ import scala.concurrent.duration.*
 class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment with SvTestUtil {
 
   import ExecutionContext.Implicits.global
-  registerPlugin(new CometBftNetworkPlugin("sv_cometbft_integration_test", NamedLoggerFactory.root))
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
@@ -57,10 +55,22 @@ class SvCometBftIntegrationTest extends IntegrationTestWithSharedEnvironment wit
               .replace(true)
           }(config),
         (_, config) =>
+          ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+            {
+              val svIdx = name.replace("sv", "")
+              config
+                .focus(_.cometBftConfig)
+                .modify(_.map(_.focus(_.connectionUri).replace(s"http://127.0.0.1:266${svIdx}7")))
+            }
+          }(config),
+        (_, config) =>
           config.copy(
             svApps = config.svApps +
               (InstanceName.tryCreate("sv2Local") -> {
-                config.svApps(InstanceName.tryCreate("sv2"))
+                config
+                  .svApps(InstanceName.tryCreate("sv2"))
+                  .focus(_.cometBftConfig)
+                  .modify(_.map(_.focus(_.connectionUri).replace(s"http://127.0.0.1:26657")))
               })
           ),
       )
