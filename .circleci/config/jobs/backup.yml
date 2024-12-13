@@ -18,23 +18,16 @@ jobs:
       internal_stack:
         type: boolean
         default: true
-      checkout_git_reference:
+      checkout-branch:
         type: string
-        default: "" 
+        default: "" # Default set to $CIRCLE_SHA1
     executor: self_hosted
     environment:
       <<: *env
     parallelism: << parameters.parallelism >>
     steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.checkout_git_reference >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.checkout_git_reference >>
-                command: |
-                  echo "Checking out commit << parameters.checkout_git_reference >>"
-                  git checkout << parameters.checkout_git_reference >>
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>
@@ -99,22 +92,11 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
-      checkout_git_reference:
-        type: string
-        default: ""
     executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - when:
-          condition: << parameters.checkout_git_reference >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.checkout_git_reference >>
-                command: |
-                  echo "Checking out commit << parameters.checkout_git_reference >>"
-                  git checkout << parameters.checkout_git_reference >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>
@@ -158,21 +140,14 @@ jobs:
       silence_deployment_alerts:
         type: boolean
         default: false
-      checkout_git_reference:
+      checkout-branch:
         type: string
-        default: ""
+        default: "" # Default set to $CIRCLE_SHA1
     environment:
       <<: *env
     steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.checkout_git_reference >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.checkout_git_reference >>
-                command: |
-                  echo "Checking out commit << parameters.checkout_git_reference >>"
-                  git checkout << parameters.checkout_git_reference >>
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>

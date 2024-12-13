@@ -91,7 +91,7 @@ parameters:
   # Empty/default means "latest on branch"
   upgrade-version:
     type: string
-    default: "ciperiodic-migration-upgrade"
+    default: ""
   # branch_filter parameter of wait_for_previous_pipeline
   branch-filter:
     type: string
@@ -367,26 +367,38 @@ commands:
   export_migration_id:
     parameters:
       <<: *cluster-parameter
+      migration_id:
+        type: integer
+        default: 0
     steps:
       - run_bash_command_in_nix:
           cmd_name: Export active migration ID
           cluster: << parameters.cluster >>
           when: always
           cmd:  |
-            CONFIG_FILE="cluster/deployment/<< parameters.cluster >>/config.yaml"
-          
-            if [[ -f "$CONFIG_FILE" ]]; then
-              ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE" 2>/dev/null)
-            else
-              echo "Configuration file not found: $CONFIG_FILE"
-              ACTIVE_MIGRATION_ID=0
-            fi
+            if [ << parameters.migration_id >> -ne 0 ]; then
+              echo "migration_id is not set to 0, use the parameter value"
             
-            if [[ "$ACTIVE_MIGRATION_ID" == "null" || -z "$ACTIVE_MIGRATION_ID" ]]; then
-              ACTIVE_MIGRATION_ID=0
-              echo "Default ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+              ACTIVE_MIGRATION_ID=<< parameters.migration_id >>
+              
             else
-              echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+              echo "migration_id is not set, use the one defined in the config.yaml file"
+            
+              CONFIG_FILE="cluster/deployment/<< parameters.cluster >>/config.yaml"
+            
+              if [[ -f "$CONFIG_FILE" ]]; then
+                ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE" 2>/dev/null)
+              else
+                echo "Error: Configuration file not found: $CONFIG_FILE"
+                ACTIVE_MIGRATION_ID=0
+              fi
+              
+              if [[ "$ACTIVE_MIGRATION_ID" == "null" || -z "$ACTIVE_MIGRATION_ID" ]]; then
+                ACTIVE_MIGRATION_ID=0
+                echo "Default ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+              else
+                echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
+              fi
             fi
             
             echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" > tmp-migration-id-env
@@ -655,6 +667,7 @@ commands:
     steps:
       - export_migration_id:
           cluster: << parameters.cluster >>
+          migration_id: << parameters.migration_id >>
       - run_bash_command_in_nix:
           cmd_name: wait for sv-runbook deployment to finish
           cluster: << parameters.cluster >>
@@ -1682,6 +1695,10 @@ commands:
 #          cmd_retry_count: 3
 
   checkout_with_retry:
+    parameters:
+      checkout-branch:
+        type: string
+        default: "" # Default set to $CIRCLE_SHA1
     steps:
       - run:
           name: Checkout (with retries)
@@ -1720,7 +1737,14 @@ commands:
 
               git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
             
-              git checkout "$CIRCLE_SHA1"
+              if [ << parameters.checkout-branch >> != "" ]; then
+                echo "Checking out branch << parameters.checkout-branch >>."
+                git fetch origin << parameters.checkout-branch >>
+                git checkout << parameters.checkout-branch >>
+              else
+                echo "No branch set, staying on default branch."
+                git checkout "$CIRCLE_SHA1"
+              fi
             }
 
             for i in $(seq 1 10); do checkout && s=0 && break || s=$? && sleep 10; done; (exit $s)
@@ -1914,23 +1938,16 @@ jobs:
       internal_stack:
         type: boolean
         default: true
-      checkout_git_reference:
+      checkout-branch:
         type: string
-        default: "" 
+        default: "" # Default set to $CIRCLE_SHA1
     executor: self_hosted
     environment:
       <<: *env
     parallelism: << parameters.parallelism >>
     steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.checkout_git_reference >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.checkout_git_reference >>
-                command: |
-                  echo "Checking out commit << parameters.checkout_git_reference >>"
-                  git checkout << parameters.checkout_git_reference >>
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>
@@ -1995,22 +2012,11 @@ jobs:
       alert_threshold:
         type: string
         default: "8 hours ago"
-      checkout_git_reference:
-        type: string
-        default: ""
     executor: self_hosted
     environment:
       <<: *env
     steps:
       - checkout_with_retry
-      - when:
-          condition: << parameters.checkout_git_reference >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.checkout_git_reference >>
-                command: |
-                  echo "Checking out commit << parameters.checkout_git_reference >>"
-                  git checkout << parameters.checkout_git_reference >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>
@@ -2054,21 +2060,14 @@ jobs:
       silence_deployment_alerts:
         type: boolean
         default: false
-      checkout_git_reference:
+      checkout-branch:
         type: string
-        default: ""
+        default: "" # Default set to $CIRCLE_SHA1
     environment:
       <<: *env
     steps:
-      - checkout_with_retry
-      - when:
-          condition: << parameters.checkout_git_reference >>
-          steps:
-            - run:
-                name: Checkout commit << parameters.checkout_git_reference >>
-                command: |
-                  echo "Checking out commit << parameters.checkout_git_reference >>"
-                  git checkout << parameters.checkout_git_reference >>
+      - checkout_with_retry:
+          checkout-branch: << parameters.checkout-branch >>
       - setup_nix_self_hosted
       - export_migration_id:
           cluster: << parameters.cluster >>
@@ -4097,6 +4096,7 @@ jobs:
       - setup_nix
       - export_migration_id:
           cluster: << parameters.cluster >>
+          migration_id: << parameters.migration_id >>
       - setup_sbt_test_job:
           runner_type: "circleci"
       - run_bash_command_in_nix:
@@ -4238,6 +4238,7 @@ jobs:
             - setup_nix_self_hosted
             - export_migration_id:
                 cluster: << parameters.cluster >>
+                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -4338,6 +4339,7 @@ jobs:
             - setup_nix_self_hosted
             - export_migration_id:
                 cluster: << parameters.cluster >>
+                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -4349,6 +4351,7 @@ jobs:
             - wait_for_sv_runbook_deployment:
                 cluster: << parameters.cluster >>
                 check_cluster_version: << parameters.check_cluster_version >>
+                migration_id: << parameters.migration_id >>
             - when:
                 condition: << parameters.delay_mins >>
                 steps:
@@ -4433,6 +4436,7 @@ jobs:
             - setup_nix_self_hosted
             - export_migration_id:
                 cluster: << parameters.cluster >>
+                migration_id: << parameters.migration_id >>
             - setup_sbt_test_job:
                 runner_type: "selfhosted"
             - run_bash_command_in_nix:
@@ -4460,6 +4464,7 @@ jobs:
             - wait_for_sv_runbook_deployment:
                 cluster: << parameters.cluster >>
                 check_cluster_version: << parameters.check_cluster_version >>
+                migration_id: << parameters.migration_id >>
             - when:
                 condition: << parameters.delay_mins >>
                 steps:
@@ -5949,6 +5954,7 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             - migrate_cluster
       - preflight_sv_check:
@@ -5959,6 +5965,7 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             - migrate_cluster
       - post_migration_verify_identities:
@@ -5978,6 +5985,7 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             - migrate_cluster
       - post_migration_compose_validator:
@@ -5992,7 +6000,7 @@ workflows:
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: "ciperiodic"
-          checkout_git_reference: << pipeline.parameters.upgrade-version >>
+          checkout-branch: "ciperiodic-migration-upgrade"
           context:
             - artifactory
             - canton-network-vpn
@@ -6003,7 +6011,7 @@ workflows:
             - preflight_check_migrated
       - restore_node:
           cluster: "ciperiodic"
-          checkout_git_reference: << pipeline.parameters.upgrade-version >>
+          checkout-branch: "ciperiodic-migration-upgrade"
           namespace_name: "sv-3"
           context:
             - artifactory
@@ -6029,6 +6037,7 @@ workflows:
             - slack-context
           cluster: "ciperiodic"
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             # We wait for the runbook to redeploy to make sure we're not testing the original deployment
             - deploy_fresh_sv_runbook_after_migration
@@ -6587,6 +6596,7 @@ workflows:
             - slack-context
             - canton-network-vpn
           cluster: "user-selected-scratchnet"
+          migration_id: 1
           requires:
             - test_DR
       - deploy_sv_runbook:
@@ -6609,6 +6619,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
+          migration_id: 1
           requires:
             - test_DR
       - deploy_validator_runbook:
@@ -6630,6 +6641,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
+          migration_id: 1
           requires:
             - test_DR
       - reset_cluster:
@@ -6957,6 +6969,7 @@ workflows:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             - trigger_global_domain_migration
       - hard_migration:
@@ -6982,6 +6995,7 @@ workflows:
       #            - slack-context
       #          cluster: << pipeline.parameters.cluster >>
       #          cluster_version: << pipeline.parameters.upgrade-version >>
+      #          migration_id: 1
       #          requires:
       #            - migrate_cluster
       - hard_migration:
@@ -7016,6 +7030,7 @@ workflows:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             - migrate_cluster
       - post_migration_compose_validator:
@@ -7082,6 +7097,7 @@ workflows:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             # We wait for the runbook to redeploy to make sure we're not testing the original deployment
             - deploy_fresh_sv_runbook_after_migration

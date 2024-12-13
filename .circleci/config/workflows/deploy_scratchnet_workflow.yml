@@ -267,6 +267,7 @@
             - slack-context
             - canton-network-vpn
           cluster: "user-selected-scratchnet"
+          migration_id: 1
           requires:
             - test_DR
       - deploy_sv_runbook:
@@ -289,6 +290,7 @@
             - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
+          migration_id: 1
           requires:
             - test_DR
       - deploy_validator_runbook:
@@ -310,6 +312,7 @@
             - canton-network-vpn
             - slack-context
           cluster: "user-selected-scratchnet"
+          migration_id: 1
           requires:
             - test_DR
       - reset_cluster:

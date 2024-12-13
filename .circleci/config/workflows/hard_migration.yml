@@ -132,6 +132,7 @@ workflow:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             - trigger_global_domain_migration
       - hard_migration:
@@ -157,6 +158,7 @@ workflow:
       #            - slack-context
       #          cluster: << pipeline.parameters.cluster >>
       #          cluster_version: << pipeline.parameters.upgrade-version >>
+      #          migration_id: 1
       #          requires:
       #            - migrate_cluster
       - hard_migration:
@@ -191,6 +193,7 @@ workflow:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             - migrate_cluster
       - post_migration_compose_validator:
@@ -257,6 +260,7 @@ workflow:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
+          migration_id: 1
           requires:
             # We wait for the runbook to redeploy to make sure we're not testing the original deployment
             - deploy_fresh_sv_runbook_after_migration
