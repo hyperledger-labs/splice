@@ -47,6 +47,9 @@ Attempted to read Testcontainers configuration file at file:
 # we ignore all errors and rely on retry loops.
 \[oidc-client-ts\]
 
+# Selenium has logged this before, and it has no effect on whether the test passes or not.
+NoSuchFileException deleting temporal file.*selenium-manager
+
 # Trying to start a BiDi connection to Firefox repeatedly might fail some attempts with an 405 method not allowed
 Invalid Status code=405 text=Method Not Allowed","logger_name":"o.o.s.remote.http.WebSocket"
 
