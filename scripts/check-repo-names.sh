@@ -49,6 +49,7 @@ function check_patterns_locally() {
     'SpliceTests\.scala.*getMeterProvider\.get."cn_tests"' # test metrics
     '^[^:]+package-lock\.json:.*"integrity"' # appears in hashes
     'Preflight.*Test.*\.scala:.*s"https://cns' # hostnames in preflights
+    'cluster/images/splice-test-temp-runner-hook/index.js' # gha-runner-hook copied over
   )
 
   local exception exceptions_args=()

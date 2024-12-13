@@ -42,7 +42,6 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.HexString
 import monocle.macros.syntax.lens.*
@@ -68,8 +67,6 @@ class ExternalPartySetupProposalIntegrationTest
     TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID,
     amuletCodegen.AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
   )
-
-  override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
