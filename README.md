@@ -1320,7 +1320,7 @@ cncluster pulumi infra config
 
 ### Github Tokens
 
-The `GITHUB_TOKEN` is used by the [TODO checker](.circleci/todo-script/src/checkTodos.sc) to access the issue and PR list
+The `GITHUB_TOKEN` is used by the [TODO checker](.circleci/todo/src/checkTodos.sc) to access the issue and PR list
 of the https://github.com/DACH-NY/canton-network-node repo.
 
 1. Go to https://github.com/settings/tokens, which you can reach by navigating

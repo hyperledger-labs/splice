@@ -1,8 +1,8 @@
 import java.io.PrintWriter
-
 import scala.collection.mutable.ListBuffer
 import scala.collection.{Map, SortedMap}
-import scala.sys.process._
+import scala.sys.process.*
+import scala.util.{Failure, Success, Try}
 import scala.util.matching.Regex
 
 // This script depends on hub, https://github.com/github/hub
@@ -321,7 +321,14 @@ def grepForPattern(pattern: String, caseInsensitive: Boolean = false): Seq[Strin
 
 val grepCommands = Seq(grepForPattern("TODO"), grepForPattern("FIXME", caseInsensitive = true))
 val grepLines = grepCommands.flatMap({ command =>
-  command.lineStream_!(ErrorCollector)
+  Try {
+    command.lazyLines_!(ErrorCollector)
+  } match {
+    case Failure(exception) =>
+      println(s"Failed in running command $command")
+      throw exception
+    case Success(value) => value
+  }
 })
 object ErrorCollector extends ProcessLogger {
   private val allErrors = ListBuffer[String]()
@@ -345,21 +352,21 @@ def pairsToMap(pairs: List[(Bucket, String)]): Map[Bucket, List[String]] =
   }
 
 val todoStyleIssuesTable: List[(Bucket, String)] =
-  grepLines.toList.flatMap(line => processScalaStyleTodo(line))
+  grepLines.toList.flatMap(line => {
+    Try {
+      processScalaStyleTodo(line)
+    } match {
+      case Failure(exception) =>
+        println(s"Failed line $line")
+        throw exception
+      case Success(value) => value
+    }
+  })
 val table = pairsToMap(todoStyleIssuesTable)
 
 // Write all todos to output dir
 new java.io.File("todo-out").mkdirs
 writeToFile(tableToString(table), "todo-out/todos")
-
-val allTodos = table.values.toList.flatten
-// There may be duplicates in allTodos when a TODO occurs in multiple categories
-// For example:
-// TODO(ratko/matthias): this would show up twice
-
-val uniqueTodos = Set.apply(allTodos: _*)
-val todoCount = uniqueTodos.size
-writeToFile(todoCount.toString, "todo-out/count")
 
 // Print problems to stderr
 val problemTable = table.filter(entry => entry._1.shouldNotExist && entry._2.nonEmpty)

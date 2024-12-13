@@ -5,14 +5,11 @@ services:
           ADDITIONAL_CONFIG_SPLICE_APP_VALIDATOR_PARTICIPANT_IDENTITIES_DUMP_IMPORT=
             canton.validator-apps.validator_backend.participant-bootstrapping-dump {
               type = file
-              file = /participant-bootstrapping-dump
+              file = /participant-bootstrapping-dump/identities.json
               new-participant-identifier = ${VALIDATOR_NEW_PARTICIPANT_IDENTIFIER}
             }
         - |
           ADDITIONAL_CONFIG_MIGRATE_VALIDATOR_PARTY=
             canton.validator-apps.validator_backend.migrate-validator-party.scan.admin-api.url = "${SCAN_ADDRESS}"
     volumes:
-      - type: bind
-        source: ${VALIDATOR_PARTICIPANT_IDENTITIES_DUMP}
-        target: /participant-bootstrapping-dump
-        read_only: true
+      - ${VALIDATOR_PARTICIPANT_IDENTITIES_DUMP}:/participant-bootstrapping-dump
