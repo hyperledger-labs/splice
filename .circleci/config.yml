@@ -5406,7 +5406,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for sv runbook deployments and for backup-recovery, concurrent preflight checks are fine.
-          workflow_names: "redeploy_sv_runbook_cidaily redeploy_validator_runbook_cidaily deploy-cidaily"
+          workflow_names: "redeploy_sv_runbook_cidaily redeploy_validator_runbook_cidaily deploy_cidaily"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
