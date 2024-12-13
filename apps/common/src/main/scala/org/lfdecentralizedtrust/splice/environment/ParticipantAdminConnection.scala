@@ -162,15 +162,20 @@ class ParticipantAdminConnection(
   def connectDomain(alias: DomainAlias)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
-    runCmd(ParticipantAdminCommands.DomainConnectivity.ConnectDomain(alias, retry = false)).map(
-      isConnected =>
-        if (!isConnected) {
-          val msg = s"failed to connect to ${alias}"
-          throw Status.Code.FAILED_PRECONDITION.toStatus.withDescription(msg).asRuntimeException()
-        }
+    retryProvider.retryForClientCalls(
+      "connect_domain",
+      s"participant is connected to $alias",
+      runCmd(ParticipantAdminCommands.DomainConnectivity.ConnectDomain(alias, retry = false)).map(
+        isConnected =>
+          if (!isConnected) {
+            val msg = s"failed to connect to ${alias}"
+            throw Status.Code.FAILED_PRECONDITION.toStatus.withDescription(msg).asRuntimeException()
+          }
+      ),
+      logger,
     )
 
-  def disconnectDomain(alias: DomainAlias)(implicit
+  private def disconnectDomain(alias: DomainAlias)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(ParticipantAdminCommands.DomainConnectivity.DisconnectDomain(alias))
@@ -243,30 +248,19 @@ class ParticipantAdminConnection(
           },
         logger,
       )
-    // Albeit Canton auto-connects on registering a domain that auto-connect fails if the domain is
-    // not yet running. So we need to play it safe and ensure connectivity ourselves.
-    // This is particularly important, as without that later party-allocations won't get propagated properly.
-    // TODO(#5784): see whether we can improve Canton so that this kind of connectivity management is less brittle
-    _ <- retryProvider.waitUntil(
-      retryFor,
-      "domain_connected",
-      s"participant is connected to ${config.domain}",
-      // We're slightly abusing 'waitUntil' here, using a side-effecting condition. It's idempotent though, so all good.
-      connectDomain(config.domain),
-      logger,
-    )
+    _ <- connectDomain(config.domain)
   } yield ()
 
-  def reconnectDomain(alias: DomainAlias)(implicit
+  private def reconnectDomain(alias: DomainAlias)(implicit
       traceContext: TraceContext
   ): Future[Unit] = for {
-    _ <- disconnectDomain(alias)
     _ <- retryProvider.retryForClientCalls(
-      "reconnect_domain",
-      s"participant is connected to $alias",
-      connectDomain(alias),
+      "reconnect_domain_disconnect",
+      s"participant is disconnected from $alias",
+      disconnectDomain(alias),
       logger,
     )
+    _ <- connectDomain(alias)
   } yield ()
 
   def getParticipantTrafficState(
@@ -352,7 +346,7 @@ class ParticipantAdminConnection(
       )
     )
 
-  def setDomainConnectionConfig(config: DomainConnectionConfig)(implicit
+  private def setDomainConnectionConfig(config: DomainConnectionConfig)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
@@ -384,7 +378,7 @@ class ParticipantAdminConnection(
       }
     } yield configModified
 
-  def modifyOrRegisterDomainConnectionConfig(
+  private def modifyOrRegisterDomainConnectionConfig(
       config: DomainConnectionConfig,
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
       retryFor: RetryFor,
