@@ -2211,6 +2211,8 @@ export. The resulting sequencer will not be fully functional
 afterwards since you lack the other SVs but it is enough to go through
 the validation of the topology state in Canton. The concrete steps are:
 
+### Export the data from the cluster you're validating 
+
 1. create a directory to store the state export: `mkdir -p /tmp/state-export/keys`
 2. Switch to the current release branch of the cluster you are migrating
 3. Start sequencer console on the version currently on the cluster connected to the target
@@ -2226,50 +2228,67 @@ the validation of the topology state in Canton. The concrete steps are:
    delete them afterwards and this is only possible after requesting PAM.
 5. Export the genesis state (roughly the synchronizer topology state)
    ```
-   val synchronizerTopologyBytes = sequencer.topology.transactions.genesis_state(filterDomainStore = sequencer.domain_id.filterString)
+   sequencer.topology.transactions.genesis_state(filterDomainStore = sequencer.domain_id.filterString).writeTo(new java.io.FileOutputStream("/tmp/state-export/genesis-state"))
    ```
-6. Write the export to a file
+6. Save the number of currently active topology transactions for future validation
    ```
-   synchronizerTopologyBytes.writeTo(new java.io.FileOutputStream("/tmp/state-export/genesis-state"))
+   sequencer.topology.transactions.list(filterStore = sequencer.domain_id.filterString, proposals = false, timeQuery = TimeQuery.HeadState).result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _)
    ```
+   Note: This should be run immediatly after exporting the genesis state to ensure no new topology state is written between the genesis export and the current state calculations. 
 7. Export the authorized topology store snapshot
    ```
-   val authorizedBytes = sequencer.topology.transactions.export_topology_snapshot("Authorized", filterMappings = Seq(TopologyMapping.Code.NamespaceDelegation, TopologyMapping.Code.OwnerToKeyMapping, TopologyMapping.Code.IdentifierDelegation, TopologyMapping.Code.VettedPackages), filterNamespace = sequencer.id.namespace.filterString)
+   sequencer.topology.transactions.export_topology_snapshot("Authorized", filterMappings = Seq(TopologyMapping.Code.NamespaceDelegation, TopologyMapping.Code.OwnerToKeyMapping, TopologyMapping.Code.IdentifierDelegation, TopologyMapping.Code.VettedPackages), filterNamespace = sequencer.id.namespace.filterString).writeTo(new java.io.FileOutputStream("/tmp/state-export/authorized"))
    ```
-8. Write the export to a file
-   ```
-   authorizedBytes.writeTo(new java.io.FileOutputStream("/tmp/state-export/authorized"))
-   ```
-9. Get the sequencer id from `sequencer.id.toProtoPrimitive` and save it
-10. Switch to the branch of the target version you want to migrate to
-11. Disable auto-init of `globalSequencerSv1` by tweaking the canton sequencers config in `simple-topology-canton.conf`.
-    1. Delete the entire entry `globalSequencerSv1.init.identity.node-identifier.name = "sv1"`
-    2. Delete `${_autoInit_enabled}` from the value under `globalSequencerSv1` key
-12. Start canton using `./start-canton.sh -w` and switch to the tmux session running the Canton console.
-13. Double check the version using `com.digitalasset.canton.buildinfo.BuildInfo.version`. This should be the canton version for the CN version you are migrating to.
-14. Check that sequencer is not initialized
+8. Get the sequencer id from `sequencer.id.toProtoPrimitive` and save it
+
+### Initialize the new sequencer from the exports
+1. Switch to the branch of the target version you want to migrate to
+2. Disable auto-init of `globalSequencerSv1` by applying the patch in `simple-topology-canton.conf`.
+```
+Index: apps/app/src/test/resources/simple-topology-canton.conf
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/apps/app/src/test/resources/simple-topology-canton.conf b/apps/app/src/test/resources/simple-topology-canton.conf
+--- a/apps/app/src/test/resources/simple-topology-canton.conf	(revision cf0ada7cbcecbffea34d11a14750ca993430ab89)
++++ b/apps/app/src/test/resources/simple-topology-canton.conf	(date 1734097962508)
+@@ -145,7 +145,8 @@
+     splitwellParticipant.init.identity.node-identifier.name = "splitwellValidator"
+   }
+   sequencers {
+-    globalSequencerSv1 = ${_sequencer_reference_template} ${_sv1Sequencer_client} ${_autoInit_enabled}
++    globalSequencerSv1 = ${_sequencer_reference_template} ${_sv1Sequencer_client}
++    globalSequencerSv1.init.identity.node-identifier.type = "explicit"
+     globalSequencerSv1.storage.config.properties.databaseName = "sequencer_sv1"
+     globalSequencerSv1.sequencer.config.storage.config.properties.databaseName = "sequencer_driver"
+     globalSequencerSv1.init.identity.node-identifier.name = "sv1"
+```
+3. Start canton using `./start-canton.sh -w` and switch to the tmux session running the Canton console.
+4. Double check the version using `com.digitalasset.canton.buildinfo.BuildInfo.version`. This should be the canton version for the CN version you are migrating to.
+5. Check that sequencer is not initialized
     ```
     @ globalSequencerSv1.id
     {"@timestamp":"2024-10-31T07:46:10.258Z","@version":"1","message":"Node is not initialized and therefore does not have an Id assigned yet.\n  Command SequencerReference.id invoked from cmd0.sc:1","logger_name":"c.d.c.c.EnterpriseConsoleEnvironment","thread_name":"main","level":"ERROR","level_value":40000}
     com.digitalasset.canton.console.CommandFailure: Command execution failed.
     ```
-13. Import the keys
+6. Import the keys
     ```
     better.files.File("/tmp/state-export/keys").glob("*").foreach(f => globalSequencerSv1.keys.secret.upload_from(f.toString, None))
     ```
-14. Initialize the sequencer with the sequencer id you previously saved (swap out the ID in the command)
+7. Initialize the sequencer with the sequencer id you previously saved (swap out the ID in the command)
     ```
     globalSequencerSv1.topology.init_id(SequencerId.fromProtoPrimitive("<sequencer ID (SEQ::...)>", "").right.get.uid)
     ```
-15. Import the authorized store snapshot
+8. Import the authorized store snapshot
     ```
     globalSequencerSv1.topology.transactions.import_topology_snapshot_from("/tmp/state-export/authorized", "Authorized")
     ```
-16. Initialize the sequencer from the genesis state
+9. Initialize the sequencer from the genesis state
     ```
     globalSequencerSv1.setup.assign_from_genesis_state(com.google.protobuf.ByteString.readFrom(new java.io.FileInputStream("/tmp/state-export/genesis-state")), StaticDomainParameters.defaults(globalSequencerSv1.config.crypto, ProtocolVersion.latest))
     ```
-17. Verify that the sequencer is initialized
+10. Verify that the sequencer is initialized
     ```
     @ globalSequencerSv1.health.status
     res18: NodeStatus[globalSequencerSv1.Status] = Sequencer id: global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17
@@ -2289,8 +2308,13 @@ the validation of the topology state in Canton. The concrete steps are:
     Version: 3.2.0-SNAPSHOT
     Protocol version: 32
     ```
-18. Check that there are no sketchy warnings or errors in the Canton logs in `log/canton.clog`
-18. Delete the export `rm -r /tmp/state-export`
+11. Calculate the number of currently active topology transactions after full init
+   ```
+   globalSequencerSv1.topology.transactions.list(filterStore = globalSequencerSv1.domain_id.filterString, proposals = false, timeQuery = TimeQuery.HeadState).result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _)
+   ```
+   Compare these numbers with the numbers from the cluster sequencer. The numbers should be identical.
+12. Check that there are no sketchy warnings or errors in the Canton logs in `log/canton.clog`
+13. Delete the export `rm -r /tmp/state-export`
 
 
 ## Appendix: Kubernetes and Other Deployment Resources
