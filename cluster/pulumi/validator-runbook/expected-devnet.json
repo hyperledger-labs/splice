@@ -157,7 +157,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.2"
+      "version": "0.3.3"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -258,7 +258,7 @@
           }
         ]
       },
-      "version": "0.3.2"
+      "version": "0.3.3"
     },
     "name": "loopback",
     "provider": "",
@@ -461,7 +461,7 @@
           }
         ]
       },
-      "version": "0.3.2"
+      "version": "0.3.3"
     },
     "name": "validator-participant-4",
     "provider": "",
@@ -541,7 +541,7 @@
           }
         ]
       },
-      "version": "0.3.2"
+      "version": "0.3.3"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -646,7 +646,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.3.2"
+      "version": "0.3.3"
     },
     "name": "validator",
     "provider": "",
