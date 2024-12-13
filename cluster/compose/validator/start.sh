@@ -206,11 +206,12 @@ for i in {1..30}; do
   else
     splice_instance_names=$(curl -sSLf "${host_scan_address}/api/scan/v0/splice-instance-names") && break
   fi
-  _warning "Failed to fetch splice_instance_names, retrying in 10 seconds (retry #$i)"
+  _info "Failed to fetch splice_instance_names, retrying in 10 seconds (retry #$i)"
   sleep 10
 done
 if [ -z "$splice_instance_names" ]; then
-  _error "Failed to fetch splice_instance_names"
+  _error_msg "Failed to fetch splice_instance_names"
+  exit 1
 fi
 
 SPLICE_APP_UI_NETWORK_NAME=$(echo "${splice_instance_names}" | jq -r '.network_name')
