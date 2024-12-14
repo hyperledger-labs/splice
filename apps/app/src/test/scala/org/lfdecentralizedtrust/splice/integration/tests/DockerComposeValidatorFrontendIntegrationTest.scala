@@ -78,7 +78,9 @@ class DockerComposeValidatorFrontendIntegrationTest
     }
 
     val backupsDir: Path =
-      testDumpDir.resolve("compose-validator-backup").resolve(java.time.Instant.now.toString)
+      testDumpDir
+        .resolve("compose-validator-backup")
+        .resolve(java.time.Instant.now.toEpochMilli.toString)
 
     withComposeValidator() {
       withFrontEnd("frontend") { implicit webDriver =>
@@ -176,6 +178,7 @@ class DockerComposeValidatorFrontendIntegrationTest
         ) {
           fail("Failed to create identities dump")
         }
+        identities.toFile.exists() shouldBe true
       }
     }
 
@@ -183,7 +186,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       "recovering from identities dump",
       Seq(
         "-i",
-        identities.toAbsolutePath.toString,
+        backupsDir.toAbsolutePath.toString,
         "-P",
         "da-composeValidator-13",
       ),
