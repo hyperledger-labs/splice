@@ -209,7 +209,7 @@ class FailureGithubIssue(ABC):
     issue_id = self.create_issue(client, repo_id, title, body)
     issue_project_item_id = self.add_issue_to_project(client, project_id, issue_id)
     if self.args.cluster:
-      self.set_field_value(client, project_id, issue_project_item_id, cluster_field_id, self.sargs.cluster)
+      self.set_field_value(client, project_id, issue_project_item_id, cluster_field_id, self.args.cluster)
     workflow_name = self.get_workflow_name()
     self.set_field_value(client, project_id, issue_project_item_id, job_field_id, f"{workflow_name}:{self.args.job_name}")
 
