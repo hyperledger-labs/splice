@@ -530,6 +530,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       expiry,
       votes.map(e => (e.sv, e)).toMap.asJava,
       Optional.of(cid),
+      Optional.empty(),
     )
 
     contract(

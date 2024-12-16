@@ -316,6 +316,7 @@ initiateAndAcceptVote app (initiator::others) action = do
       requester = initiator
       action
       reason = Reason with url = ""; body = "let's get it done"
+      targetEffectiveAt = None
       voteRequestTimeout = None
     foldlA (castVote dsoRulesCid) requestCid.voteRequest others
     executeAllDefinitiveVotes app
@@ -329,6 +330,19 @@ initiateAndAcceptVote app (initiator::others) action = do
             reason = Reason with url = ""; body = "✓"
       return result.voteRequest
 
+-- cast a vote on a request
+castVote : AmuletApp -> Party -> ContractId VoteRequest -> Bool -> Script (ContractId VoteRequest)
+castVote app sv requestCid vote = do
+    [(dsoRulesCid, _)] <- query @DsoRules app.dso
+    result <- submitMulti [sv, app.dso] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+        requestCid = requestCid
+        vote = Vote with
+            sv = sv
+            accept = vote
+            reason = Reason with
+                url = ""
+                body = ""
+    return result.voteRequest
 
 -- | Update all currently desired prices to the target price
 updateAgreedAmuletPrice : Party -> Decimal -> Script [ContractId AmuletPriceVote]

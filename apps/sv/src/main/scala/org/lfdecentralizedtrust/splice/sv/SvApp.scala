@@ -1027,6 +1027,7 @@ object SvApp {
               decodedAction,
               reason,
               java.util.Optional.of(decodedExpiration),
+              java.util.Optional.empty(),
             )
             cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
             _ <- dsoStoreWithIngestion.connection
