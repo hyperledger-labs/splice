@@ -85,3 +85,11 @@ jobs:
         with:
           cache_version: 0
           setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        shell: bash
+        env:
+          SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+        run: ./.circleci/notification-scripts/failure_notification.py

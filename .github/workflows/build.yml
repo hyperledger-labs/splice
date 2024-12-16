@@ -35,3 +35,4 @@ jobs:
       test_names_file: "test-cometbft-full-class-names.log"
       parallelism: 1
       test_name: cometbft
+    secrets: inherit

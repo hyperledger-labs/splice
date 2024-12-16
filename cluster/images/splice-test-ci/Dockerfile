@@ -2,7 +2,7 @@
 FROM --platform=$BUILDPLATFORM ubuntu:24.04
 
 RUN apt-get update && \
-    apt-get install -y sudo git curl xz-utils pigz rsync jq unzip && \
+    apt-get install -y sudo git curl xz-utils pigz rsync jq unzip python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid=1002 ci && \
@@ -13,6 +13,8 @@ RUN groupadd --gid=1002 ci && \
     sudo -u ci mkdir /github/home/project && \
     sudo -u ci mkdir /github/home/bin && \
     sudo -u ci mkdir -p /github/home/.local/bin
+
+RUN sudo pip3 install GitPython gql humanize marshmallow-dataclass requests requests_toolbelt --break-system-packages
 
 USER ci
 RUN whoami && \

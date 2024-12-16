@@ -165,3 +165,11 @@ jobs:
         uses: ./.github/actions/sbt/upload_logs
         with:
           name: "logs-${{ inputs.test_name }}-${{ matrix.runner-index }}"
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        shell: bash
+        env:
+          SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+        run: ./.circleci/notification-scripts/failure_notification.py
