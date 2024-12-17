@@ -27,6 +27,11 @@ Release Notes
   * The `/v1/updates` endpoint now excludes updates resulting from ACS imports.
     This change was already mentioned in the 0.2.5 release notes, but due to a bug was not actually implemented until now.
 
+* Deployment
+
+  * Add new ``jsonApiServerPathPrefix`` value to the participant helm chart to allow for setting path prefix for json API endpoints.
+      This is to allow ingress routing to the json API server without path rewrite.
+
 0.3.2
 -----
 
