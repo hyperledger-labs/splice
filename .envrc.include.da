@@ -1,3 +1,5 @@
+source "${TOOLS_LIB}/libcli.source"
+
 # Do not tag local docker images with a git commit to simplify referencing these images from helm charts
 export SPLICECLUSTER_STATIC_DIRTY_VERSION=1
 export DEV_ARTIFACTORY_DOCKER_REGISTRY=digitalasset-canton-network-docker-dev.jfrog.io
