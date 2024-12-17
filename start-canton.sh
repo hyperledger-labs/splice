@@ -51,7 +51,6 @@ do
             ;;
         -D)
             daemon=3
-            break
             ;;
         -b)
             daemon=2
