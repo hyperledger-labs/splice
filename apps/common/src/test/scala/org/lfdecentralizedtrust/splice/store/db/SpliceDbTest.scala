@@ -41,14 +41,27 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
     } yield ()
   }
 
+  // TODO(tech-debt): Remove this once we have identified the source of timeouts.
+  private def debugPrintPgActivity()(implicit traceContext: TraceContext) = {
+    import storage.api.jdbcProfile.api.*
+    sql"""SELECT datname, pid, application_name, client_addr, client_port, wait_event, state, query
+          FROM pg_stat_activity"""
+      .as[(String, String, String, String, String, String, String, String)]
+      .map { rows =>
+        logger.debug(s"pg_stat_activity:\n  ${rows.mkString("\n  ")}")
+      }
+  }
+
   protected def resetAllAppTables(
       storage: DbStorage
   )(implicit traceContext: TraceContext): Future[Unit] = {
     import storage.api.jdbcProfile.api.*
     logger.info("Resetting all Splice app database tables")
     for {
-      _ <- storage.update(
-        sql"""TRUNCATE
+      _ <- storage.queryAndUpdate(
+        for {
+          _ <- debugPrintPgActivity()
+          _ <- sql"""TRUNCATE
                 user_wallet_acs_store,
                 user_wallet_txlog_store,
                 scan_acs_store,
@@ -73,7 +86,9 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 update_history_backfilling,
                 acs_snapshot_data,
                 acs_snapshot
-            RESTART IDENTITY CASCADE""".asUpdate,
+            RESTART IDENTITY CASCADE""".asUpdate
+          _ <- debugPrintPgActivity()
+        } yield (),
         "resetAllAppTables",
       )
     } yield {
