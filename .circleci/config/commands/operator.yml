@@ -20,6 +20,7 @@ commands:
     
               START_TIME=$(date +%s)
               TIMEOUT=1800
+              LAST_UNLOCK_AGO=0
               while true; do
                 LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}")
               
@@ -32,6 +33,14 @@ commands:
                 # Check for timeout
                 CURRENT_TIME=$(date +%s)
                 ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+            
+                # TODO(#15978): remove this hack, this is only necessary because the operator restarts and gets stuck with its own lock.
+                LAST_UNLOCK_AGO=$((LAST_UNLOCK_AGO + CURRENT_TIME - START_TIME))
+                if [ $LAST_UNLOCK_AGO -ge 120 ]; then
+                  echo "Force-cancelling pulumi locks under the assumption that the operator got stuck."
+                  cncluster pcancel
+                  LAST_UNLOCK_AGO=0
+                fi
               
                 if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
                   echo "Timeout reached without finding stack $STACK_NAME has the updated with expected commit $EXPECTED_GIT_COMMIT."
