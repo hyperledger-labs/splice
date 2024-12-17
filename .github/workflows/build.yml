@@ -22,8 +22,6 @@ jobs:
       actions: write
       contents: read
     steps:
-      - name: test
-        run: echo '${{ toJSON(github.event) }}'
       - name: Checkout code
         uses: actions/checkout@v4
         with:
