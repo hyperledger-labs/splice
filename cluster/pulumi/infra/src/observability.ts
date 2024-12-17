@@ -2,6 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
+import * as YAML from 'yaml';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Input } from '@pulumi/pulumi';
@@ -32,6 +33,7 @@ import {
   enablePrometheusAlerts,
   grafanaSmtpHost,
   slackAlertNotificationChannel,
+  slackHighPrioAlertNotificationChannel,
   slackToken,
   supportTeamEmail,
 } from './alertings';
@@ -569,6 +571,10 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   // enable the slack alerts only for "prod" clusters
   const slackAccessToken = enableAlerts ? slackToken() : 'None';
   const slackNotificationChannel = enableAlerts ? slackAlertNotificationChannel : 'None';
+  const slackHighPrioNotificationChannel =
+    enableAlerts && slackHighPrioAlertNotificationChannel
+      ? slackHighPrioAlertNotificationChannel
+      : 'None';
   const supportTeamEmailAddress =
     enableAlerts && enableAlertEmailToSupportTeam && supportTeamEmail ? supportTeamEmail : 'None';
 
@@ -576,6 +582,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     namespaceName,
     slackAccessToken,
     slackNotificationChannel,
+    slackHighPrioNotificationChannel,
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
@@ -692,6 +699,7 @@ function grafanaContactPoints(
   namespace: Input<string>,
   slackToken: string,
   slackAlertNotificationChannel: string,
+  slackHighPrioAlertNotificationChannel: string,
   supportTeamEmail: string
 ) {
   new k8s.core.v1.Secret(
@@ -708,6 +716,10 @@ function grafanaContactPoints(
           readGrafanaAlertingFile('contact_points.yaml')
             .replaceAll('$SLACK_ACCESS_TOKEN', slackToken)
             .replaceAll('$SLACK_NOTIFICATION_CHANNEL', slackAlertNotificationChannel)
+            .replaceAll(
+              '$SLACK_HIGH_PRIO_NOTIFICATION_CHANNEL',
+              slackHighPrioAlertNotificationChannel
+            )
             .replaceAll('$SUPPORT_TEAM_EMAIL', supportTeamEmail)
         ).toString('base64'),
       },
@@ -745,11 +757,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
         Object.entries({
           ...(enableAlerts
             ? {
-                'notification_policies.yaml': readGrafanaAlertingFile(
-                  enableAlertEmailToSupportTeam
-                    ? 'support_notification_policies.yaml'
-                    : 'notification_policies.yaml'
-                ),
+                'notification_policies.yaml': grafanaAlertNotificationPolicies(),
               }
             : {}),
           ...{
@@ -766,6 +774,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
             'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
+            'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
@@ -789,6 +798,42 @@ function createGrafanaAlerting(namespace: Input<string>) {
       deleteBeforeReplace: true,
     }
   );
+}
+
+function grafanaAlertNotificationPolicies() {
+  const notificationPolicies = [];
+  const defaultPolicy = YAML.parse(
+    readGrafanaAlertingFile('notification_policies/default_slack.yaml')
+  );
+  if (enableAlertEmailToSupportTeam) {
+    notificationPolicies.push(
+      YAML.parse(readGrafanaAlertingFile('notification_policies/support_team_email.yaml'))
+    );
+  }
+  if (slackHighPrioAlertNotificationChannel) {
+    notificationPolicies.push(
+      YAML.parse(readGrafanaAlertingFile('notification_policies/high_priority_slack.yaml'))
+    );
+  }
+  // The notification policy definition was implemented in this slightly convoluted manner to ensure the generated YAML
+  // is the same as the static files it replaced (to avoid breaking the support team email notifications)
+  if (notificationPolicies.length > 0) {
+    return YAML.stringify({
+      apiVersion: 1,
+      policies: [
+        {
+          orgId: 1,
+          receiver: defaultPolicy.receiver,
+          routes: notificationPolicies.concat(defaultPolicy),
+        },
+      ],
+    });
+  } else {
+    return YAML.stringify({
+      apiVersion: 1,
+      policies: [defaultPolicy],
+    });
+  }
 }
 
 function readGrafanaAlertingFile(file: string) {
