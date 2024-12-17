@@ -628,7 +628,7 @@ function installK8sRunnerScaleSets(
     {
       requests: {
         cpu: '5',
-        memory: '24Gi',
+        memory: '32Gi',
       },
       limits: {
         cpu: '6',
