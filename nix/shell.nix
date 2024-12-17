@@ -50,7 +50,7 @@ in pkgs.mkShell {
     postgresql_14
     pre-commit
     procps
-    protobuf
+    protobuf_25
     ps
     pulumi-bin
     python3
@@ -111,7 +111,7 @@ in pkgs.mkShell {
                         then "${pkgs.glibcLocales}/lib/locale/locale-archive"
                         else null;
 
-  PROTOC = "${pkgs.protobuf}";
+  PROTOC = "${pkgs.protobuf_25}";
 
   PULUMI_VERSION="${pkgs.pulumi-bin.version}";
 
