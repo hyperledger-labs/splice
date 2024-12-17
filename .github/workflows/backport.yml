@@ -80,14 +80,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: get_commit_sha
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.base_branch }}
-          submodules: recursive
       # Add the SSH key to checkout the submodule
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.GH_SSH_KEY }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_branch }}
+          submodules: recursive
       - name: Backport to ${{ inputs.base_branch }} - Create branch & push
         id: create_branch
         shell: bash
