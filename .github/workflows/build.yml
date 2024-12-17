@@ -13,6 +13,33 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+
+  cancel_if_not_opt_in:
+    runs-on: self-hosted-docker-tiny
+    if: github.event_name == 'pull_request'
+    name: Cancel if not opted in
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: test
+        run: echo '${{ toJSON(github.event) }}'
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Cancel if not opted in
+        shell: bash
+        run: |
+          last_commit_msg=$(git log -1 --pretty=%B)
+          echo "Last commit message: $last_commit_msg"
+          if [[ $last_commit_msg != *"[ci]"* ]]; then
+            echo "Cancelling the entire workflow because the current commit does not opt in for CI."
+            curl -fsSL -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
+          else
+            echo "Current commit opts in, letting it run."
+          fi
+
   static_tests:
     uses: ./.github/workflows/build.static_tests.yml
     secrets: inherit
