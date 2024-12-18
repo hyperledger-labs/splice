@@ -952,7 +952,6 @@
         },
         "migration": {
           "id": 2,
-          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "splitwell",
