@@ -16,7 +16,7 @@ function check_endpoint() {
     # S.a. the comment in `cluster/images/splice-app/Dockerfile`.
     # We add the `-O` flag to ensure that `wget` doesn't end up creating huge numbers of `readyz.12345` files,
     # which will slow it down to the point of checks failing.
-    if ! response=$(wget --timeout=0.5 --server-response --quiet "http://127.0.0.1:${validator_admin_port}/$endpoint" -O "$endpoint" 2>&1); then
+    if ! response=$(wget --timeout=0.5 --server-response --quiet "http://127.0.0.1:${validator_admin_port}/$endpoint" -O tmp 2>&1); then
       echo "Connection to $validator_admin_port timed out"
       exit 1
     fi
