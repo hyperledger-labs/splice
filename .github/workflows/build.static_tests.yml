@@ -8,7 +8,7 @@ jobs:
     container:
       # TODO(#15988): clean this up, use a proper released image instead:
       #               - Once this is in a release, use the release version.
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4-snapshot.20241217.7890.0.v95c594bf
 
     steps:
 
