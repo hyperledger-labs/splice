@@ -3,6 +3,7 @@ import { ConfigMap, Namespace, PersistentVolumeClaim, Secret } from '@pulumi/kub
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Role } from '@pulumi/kubernetes/rbac/v1';
 import { Resource } from '@pulumi/pulumi';
+import yaml from 'js-yaml';
 import {
   appsAffinityAndTolerations,
   HELM_MAX_HISTORY_SIZE,
@@ -11,7 +12,6 @@ import {
 } from 'splice-pulumi-common';
 import { ArtifactoryCreds } from 'splice-pulumi-common/src/artifactory';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
-import yaml from 'yaml';
 
 import { createCachePvc } from './cache';
 
@@ -330,7 +330,7 @@ function installK8sRunnerScaleSet(
         namespace: runnersNamespace.metadata.name,
       },
       data: {
-        'pod.yaml': yaml.stringify({
+        'pod.yaml': yaml.dump({
           spec: {
             volumes: [
               {

@@ -2,7 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
-import * as YAML from 'yaml';
+import * as yaml from 'js-yaml';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Input } from '@pulumi/pulumi';
@@ -802,34 +802,34 @@ function createGrafanaAlerting(namespace: Input<string>) {
 
 function grafanaAlertNotificationPolicies() {
   const notificationPolicies = [];
-  const defaultPolicy = YAML.parse(
+  const defaultPolicy = yaml.load(
     readGrafanaAlertingFile('notification_policies/default_slack.yaml')
   );
   if (enableAlertEmailToSupportTeam) {
     notificationPolicies.push(
-      YAML.parse(readGrafanaAlertingFile('notification_policies/support_team_email.yaml'))
+      yaml.load(readGrafanaAlertingFile('notification_policies/support_team_email.yaml'))
     );
   }
   if (slackHighPrioAlertNotificationChannel) {
     notificationPolicies.push(
-      YAML.parse(readGrafanaAlertingFile('notification_policies/high_priority_slack.yaml'))
+      yaml.load(readGrafanaAlertingFile('notification_policies/high_priority_slack.yaml'))
     );
   }
   // The notification policy definition was implemented in this slightly convoluted manner to ensure the generated YAML
   // is the same as the static files it replaced (to avoid breaking the support team email notifications)
   if (notificationPolicies.length > 0) {
-    return YAML.stringify({
+    return yaml.dump({
       apiVersion: 1,
       policies: [
         {
           orgId: 1,
-          receiver: defaultPolicy.receiver,
+          receiver: (defaultPolicy as { receiver: string }).receiver,
           routes: notificationPolicies.concat(defaultPolicy),
         },
       ],
     });
   } else {
-    return YAML.stringify({
+    return yaml.dump({
       apiVersion: 1,
       policies: [defaultPolicy],
     });

@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "splice-pulumi-common": "1.0.0",
-    "yaml": "^2.6.1"
+    "js-yaml": "^4.1.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -14,5 +14,8 @@
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.5"
   }
 }
