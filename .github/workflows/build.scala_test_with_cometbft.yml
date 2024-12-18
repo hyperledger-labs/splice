@@ -122,11 +122,12 @@ jobs:
           POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          COMETBFT_DOCKER_IP: 127.0.0.1
         with:
           cmd: |
             mkdir -p log
             ./start-canton.sh -p external -D -F -w
-          additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
+          additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD --keep COMETBFT_DOCKER_IP"
           cmd_retry_count: 3
         # TODO(#15988): GHA does not support background jobs, therefore we introduced the -D flag
         # and just running in the background, but this means that we are not retrying on all
