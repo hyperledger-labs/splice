@@ -12,7 +12,7 @@ class GHAFailureGithubIssue(FailureGithubIssue):
     GITHUB_REPOSITORY=os.environ.get('GITHUB_REPOSITORY')
     GIT_SHA=os.environ.get('GITHUB_SHA')
     branch_url=f"{GITHUB_SERVER_URL}/{GITHUB_REPOSITORY}/tree/{self.args.branch}"
-    github_url=f"{GITHUB_SERVER_URL}/{GITHUB_REPOSITORY}/commit/${GIT_SHA}"
+    github_url=f"{GITHUB_SERVER_URL}/{GITHUB_REPOSITORY}/commit/{GIT_SHA}"
     # Unfortunately, github does not provide a way to get the job number, s.a. https://github.com/orgs/community/discussions/129314
     # so we can only link to the run, not directly to the failed job
     job_url=f"{GITHUB_SERVER_URL}/{GITHUB_REPOSITORY}/actions/runs/{self.args.gha_run_id}"
