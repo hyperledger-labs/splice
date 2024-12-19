@@ -60,3 +60,21 @@ jobs:
       parallelism: 1
       test_name: cometbft
     secrets: inherit
+
+  final_result:
+    if: always()
+    needs:
+    - cancel_if_not_opt_in
+    - static_tests
+    - scala_test_sim_time
+    - scala_test_with_cometbft
+    runs-on: self-hosted-docker-tiny
+    container:
+      # TODO(#15988): clean this up, use a proper released image instead:
+      #               - Once this is in a release, use the release version.
+      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.4-itai-dirty
+    steps:
+    - name: Decide whether the needed jobs succeeded or failed
+      uses: re-actors/alls-green@release/v1
+      with:
+        jobs: ${{ toJSON(needs) }}
