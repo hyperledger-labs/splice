@@ -17,7 +17,7 @@ groups:
             model:
               disableTextWrap: false
               editorMode: builder
-              expr: delta(cn_sv_dso_store_latest_open_mining_round[30m])
+              expr: max(max_over_time(cn_sv_dso_store_latest_open_mining_round[30m])) by (namespace) - min(min_over_time(cn_sv_dso_store_latest_open_mining_round[30m])) by (namespace)
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
