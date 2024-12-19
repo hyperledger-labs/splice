@@ -93,7 +93,7 @@ trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
         val expiryAfter = timeBeforeAllocate.minusMinutes(1).plusDays(90)
         val expiryBefore = timeAfterAllocate.plusMinutes(1).plusDays(90)
         val parsedExpiresAt =
-          LocalDateTime.from(DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm").parse(expiresAt))
+          LocalDateTime.from(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").parse(expiresAt))
         parsedExpiresAt should (be >= expiryAfter).and(be <= expiryBefore)
       }
     }

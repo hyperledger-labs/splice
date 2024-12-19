@@ -14,7 +14,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.support.ui.Select
-import org.openqa.selenium.{By, Keys}
+import org.openqa.selenium.By
 import org.slf4j.event.Level
 
 import java.time.format.DateTimeFormatter
@@ -381,7 +381,7 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              setExpirationDate("sv1", "07/12/2034 12:12 AM")
+              setExpirationDate("sv1", "2034-07-12 00:12")
 
               clickVoteRequestSubmitButtonOnceEnabled()
             },
@@ -751,7 +751,7 @@ class SvFrontendIntegrationTest
                 setExpirationDate(
                   "sv1",
                   DateTimeFormatter
-                    .ofPattern("MM/dd/yyyy hh:mm a")
+                    .ofPattern("yyyy-MM-dd HH:mm")
                     .format(
                       LocalDateTime
                         .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
@@ -869,18 +869,11 @@ class SvFrontendIntegrationTest
             "sv1 operator can create a request to add a new amulet config schedule", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("CRARC_AddFutureAmuletConfigSchedule")
-              val effectiveDateTimePicker =
-                webDriver.findElement(By.id("datetime-picker-amulet-configuration"))
 
               clue(s"sv1 selects an effective date") {
-                eventually() {
-                  effectiveDateTimePicker.clear()
-                  effectiveDateTimePicker.click()
-                  effectiveDateTimePicker.sendKeys("01/04/2032 08:00 AM")
-                  effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                }
+                setAmuletConfigDate("sv1", "2032-01-04 08:00")
               }
-              setExpirationDate("sv1", "01/04/2032 02:00 AM")
+              setExpirationDate("sv1", "2032-01-04 02:00")
 
               clue("sv1 operator can't click submit before adding a summary") {
                 find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
@@ -950,7 +943,7 @@ class SvFrontendIntegrationTest
                 val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
                 dropDownAction.selectByValue("CRARC_AddFutureAmuletConfigSchedule")
 
-                setAmuletConfigDate("sv1", "07/12/2032 12:12 AM")
+                setAmuletConfigDate("sv1", "2032-07-12 00:12")
 
                 clue("sv1 modifies one value") {
                   val input = find(id("transferConfig.createFee.fee-value")).value.underlying
@@ -989,7 +982,7 @@ class SvFrontendIntegrationTest
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
 
-                setExpirationDate("sv1", "07/11/2032 12:12 AM")
+                setExpirationDate("sv1", "2032-07-11 00:12")
 
                 clue("sv1 creates the vote request") {
                   clickVoteRequestSubmitButtonOnceEnabled()
@@ -1034,7 +1027,7 @@ class SvFrontendIntegrationTest
                 val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
                 dropDownAction.selectByValue("CRARC_AddFutureAmuletConfigSchedule")
 
-                setAmuletConfigDate("sv1", "07/12/2032 12:12 AM")
+                setAmuletConfigDate("sv1", "2032-07-12 00:12")
 
                 clue("sv1 modifies one value") {
                   find(id("transferConfig.createFee.fee-value")).value.underlying
@@ -1045,7 +1038,7 @@ class SvFrontendIntegrationTest
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
 
-                setExpirationDate("sv1", "07/11/2032 12:12 AM")
+                setExpirationDate("sv1", "2032-07-11 00:12")
 
                 clue("sv1 creates the vote request") {
                   clickVoteRequestSubmitButtonOnceEnabled()
@@ -1076,7 +1069,7 @@ class SvFrontendIntegrationTest
                 val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
                 dropDownAction.selectByValue("CRARC_AddFutureAmuletConfigSchedule")
 
-                setAmuletConfigDate("sv1", "07/12/2033 12:12 AM")
+                setAmuletConfigDate("sv1", "2033-07-12 00:12")
 
                 clue("sv1 modifies one value") {
                   find(id("transferConfig.createFee.fee-value")).value.underlying
@@ -1087,7 +1080,7 @@ class SvFrontendIntegrationTest
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
 
-                setExpirationDate("sv1", "07/12/2034 12:12 AM")
+                setExpirationDate("sv1", "2034-07-12 00:12")
 
                 clue("sv1 creates the vote request") {
                   clickVoteRequestSubmitButtonOnceEnabled()
@@ -1138,7 +1131,7 @@ class SvFrontendIntegrationTest
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
 
-                setExpirationDate("sv1", "07/11/2030 12:12 AM")
+                setExpirationDate("sv1", "2030-07-11 00:12")
 
                 clickVoteRequestSubmitButtonOnceEnabled()
               },
@@ -1183,7 +1176,7 @@ class SvFrontendIntegrationTest
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
 
-                setExpirationDate("sv1", "07/11/2030 12:12 AM")
+                setExpirationDate("sv1", "2030-07-11 00:12")
 
                 clickVoteRequestSubmitButtonOnceEnabled()
               },
@@ -1229,7 +1222,7 @@ class SvFrontendIntegrationTest
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
 
-                setExpirationDate("sv1", "07/11/2030 12:12 AM")
+                setExpirationDate("sv1", "2030-07-11 00:12")
 
                 clue("sv1 creates the vote request") {
                   clickVoteRequestSubmitButtonOnceEnabled()
@@ -1271,7 +1264,7 @@ class SvFrontendIntegrationTest
                   find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
                 }
 
-                setExpirationDate("sv1", "07/11/2030 12:12 AM")
+                setExpirationDate("sv1", "2030-07-11 00:12")
 
                 clue("sv1 creates the vote request") {
                   clickVoteRequestSubmitButtonOnceEnabled()
@@ -1390,7 +1383,7 @@ class SvFrontendIntegrationTest
             val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
             dropDownAction.selectByValue("CRARC_AddFutureAmuletConfigSchedule")
 
-            setAmuletConfigDate("sv1", "07/12/2030 12:12 AM")
+            setAmuletConfigDate("sv1", "2030-07-12 00:12")
 
             clue("sv1 modifies one value") {
               find(id("transferConfig.createFee.fee-value")).value.underlying
@@ -1403,7 +1396,7 @@ class SvFrontendIntegrationTest
             clue("sv1 modifies the summary") {
               find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
             }
-            setExpirationDate("sv1", "07/11/2030 12:12 AM")
+            setExpirationDate("sv1", "2030-07-11 00:12")
           }
         }
 
@@ -1423,7 +1416,7 @@ class SvFrontendIntegrationTest
             val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
             dropDownAction.selectByValue("CRARC_AddFutureAmuletConfigSchedule")
 
-            setAmuletConfigDate("sv2", "07/12/2030 12:12 AM")
+            setAmuletConfigDate("sv2", "2030-07-12 00:12")
 
             clue("sv2 modifies one value") {
               find(id("transferConfig.createFee.fee-value")).value.underlying
@@ -1436,7 +1429,7 @@ class SvFrontendIntegrationTest
             clue("sv2 modifies the summary") {
               find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
             }
-            setExpirationDate("sv2", "07/11/2030 12:12 AM")
+            setExpirationDate("sv2", "2030-07-11 00:12")
           }
         }
 

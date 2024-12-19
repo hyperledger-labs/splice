@@ -284,6 +284,8 @@ export const CreateVoteRequest: React.FC = () => {
             <DesktopDateTimePicker
               label={`Enter time in local timezone (${getUTCWithOffset()})`}
               value={expiration}
+              ampm={false}
+              format="YYYY-MM-DD HH:mm"
               minDateTime={dayjs()}
               maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
               readOnly={false}
