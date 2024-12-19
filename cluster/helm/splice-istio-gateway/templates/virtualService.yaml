@@ -18,15 +18,6 @@ spec:
   http:
   - match:
       - port: 443
-        uri:
-          prefix: "/cn-release-bundles"
-    route:
-      - destination:
-          port:
-            number: 8080
-          host: gcs-proxy.docs.svc.cluster.local
-  - match:
-      - port: 443
     route:
       - destination:
           port:
