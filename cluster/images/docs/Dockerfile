@@ -8,5 +8,3 @@ FROM nginx:stable
 ARG version
 
 COPY --from=0 app/splice-node/docs/html /usr/share/nginx/html/
-RUN mkdir /usr/share/nginx/html/cn-release-bundles
-COPY --from=0 app/*_splice-node.tar.gz /usr/share/nginx/html/cn-release-bundles/
