@@ -2588,7 +2588,9 @@
             "enableRemoteWriteReceiver": true,
             "externalUrl": "https://prometheus.test.global.canton.network.digitalasset.com",
             "logFormat": "json",
-            "podMonitorSelectorNilUsesHelmValues": false,
+            "podMonitorSelector": {
+              "matchLabels": null
+            },
             "remoteWriteDashboards": true,
             "resources": {
               "requests": {
@@ -2598,7 +2600,9 @@
             },
             "retention": "1y",
             "retentionSize": "500GB",
-            "serviceMonitorSelectorNilUsesHelmValues": false,
+            "serviceMonitorSelector": {
+              "matchLabels": null
+            },
             "storageSpec": {
               "volumeClaimTemplate": {
                 "spec": {
@@ -2659,7 +2663,7 @@
           ]
         }
       },
-      "version": "62.6.0"
+      "version": "67.3.1"
     },
     "name": "observability-metrics",
     "provider": "",
@@ -3886,9 +3890,9 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "bash prometheus-crd-update.sh 0.76.1"
+      "create": "bash prometheus-crd-update.sh 0.79.0"
     },
-    "name": "update-prometheus-crd-0.76.1",
+    "name": "update-prometheus-crd-0.79.0",
     "provider": "",
     "type": "command:local:Command"
   },

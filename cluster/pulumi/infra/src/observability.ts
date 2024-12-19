@@ -144,8 +144,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   );
   const namespaceName = namespace.metadata.name;
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  const stackVersion = '62.6.0';
-  const prometheusStackCrdVersion = '0.76.1';
+  const stackVersion = '67.3.1';
+  const prometheusStackCrdVersion = '0.79.0';
   const adminPassword = grafanaKeysFromSecret().adminPassword;
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
@@ -264,8 +264,12 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
         prometheus: {
           prometheusSpec: {
             // discover all pod/service monitors across all namespaces
-            podMonitorSelectorNilUsesHelmValues: false,
-            serviceMonitorSelectorNilUsesHelmValues: false,
+            podMonitorSelector: {
+              matchLabels: null,
+            },
+            serviceMonitorSelector: {
+              matchLabels: null,
+            },
             enableFeatures: [
               'native-histograms',
               'memory-snapshot-on-shutdown',
