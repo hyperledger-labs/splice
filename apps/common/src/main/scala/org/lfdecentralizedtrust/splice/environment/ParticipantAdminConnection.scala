@@ -165,7 +165,7 @@ class ParticipantAdminConnection(
     retryProvider.retryForClientCalls(
       "connect_domain",
       s"participant is connected to $alias",
-      runCmd(ParticipantAdminCommands.DomainConnectivity.ConnectDomain(alias, retry = false)).map(
+      runCmd(ParticipantAdminCommands.DomainConnectivity.ReconnectDomain(alias, retry = false)).map(
         isConnected =>
           if (!isConnected) {
             val msg = s"failed to connect to ${alias}"
@@ -329,7 +329,7 @@ class ParticipantAdminConnection(
       domain: DomainAlias
   )(implicit traceContext: TraceContext): Future[Option[DomainConnectionConfig]] =
     for {
-      configuredDomains <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListConfiguredDomains)
+      configuredDomains <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListRegisteredDomains)
     } yield configuredDomains
       .collectFirst {
         case (configuredDomain, _) if configuredDomain.domain == domain => configuredDomain

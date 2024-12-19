@@ -398,12 +398,11 @@ class SoftDomainMigrationTopologySetupIntegrationTest
             sv.config.synchronizerNodes(prefix).sequencer.internalApi,
             SequencerAlias.tryCreate(sv.config.onboarding.value.name),
           )
-        participant.domains.register_with_config(
+        participant.domains.connect_by_config(
           DomainConnectionConfig(
             domainAlias,
             SequencerConnections.single(connection),
-          ),
-          handshakeOnly = false,
+          )
         )
       }
     }
