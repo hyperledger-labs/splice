@@ -184,16 +184,12 @@ class ParticipantAdminConnection(
       config: DomainConnectionConfig,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    require(
-      !config.manualConnect,
-      "manualConnect must be false when trying to register only, otherwise it doesn't even handshake",
-    )
     for {
       _ <- retryProvider
         .ensureThat(
           retryFor,
           "domain_registered_handshake",
-          s"participant registered ${config.domain}",
+          s"participant registered ${config.domain} with handshake only",
           lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
           (_: Unit) => registerDomain(config, handshakeOnly = true),
           logger,
