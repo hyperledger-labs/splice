@@ -844,6 +844,12 @@ At the moment, CI is by default being cancelled on commits, unless explicitly op
 the error `Build was canceled`.) To enable CI for your commit, please include the text `[ci]` in your commit
 message.
 
+### Opting-out of CI
+
+In certain cases, it may be valid to allow a PR to be merged without going through CI.
+While `[skip ci]` is supported, it does not allow the PR to be merged. To skip testing but
+stil allow the PR to be merged, please include the text `[force]` in your commit message.
+
 ### Managing Canton for Tests
 
 To speed up our tests run against a long-running Canton instance.

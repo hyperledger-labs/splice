@@ -190,21 +190,21 @@ commands:
           cmd:  |
             if [ << parameters.migration_id >> -ne 0 ]; then
               echo "migration_id is not set to 0, use the parameter value"
-            
+
               ACTIVE_MIGRATION_ID=<< parameters.migration_id >>
-              
+
             else
               echo "migration_id is not set, use the one defined in the config.yaml file"
-            
+
               CONFIG_FILE="cluster/deployment/<< parameters.cluster >>/config.yaml"
-            
+
               if [[ -f "$CONFIG_FILE" ]]; then
                 ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE" 2>/dev/null)
               else
                 echo "Error: Configuration file not found: $CONFIG_FILE"
                 ACTIVE_MIGRATION_ID=0
               fi
-              
+
               if [[ "$ACTIVE_MIGRATION_ID" == "null" || -z "$ACTIVE_MIGRATION_ID" ]]; then
                 ACTIVE_MIGRATION_ID=0
                 echo "Default ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
@@ -212,7 +212,7 @@ commands:
                 echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
               fi
             fi
-            
+
             echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" > tmp-migration-id-env
       - run:
           name: Save migration ID to env
@@ -543,3 +543,14 @@ commands:
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
             cncluster pulumi deployment up --skip-preview --diff
+
+  skip_if_force_flag_set:
+    steps:
+      - run:
+          name: Skip if force flag is set
+          command: |
+            last_commit_msg=$(git log -1 --pretty=%B)
+            if [[ "$CIRCLE_BRANCH" != "main" && "${last_commit_msg}" == *"[force]"* ]]; then
+              echo "FORCE flag is set, skipping this job"
+              circleci-agent step halt
+            fi

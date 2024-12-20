@@ -45,6 +45,7 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - when:
           condition:
             not:
@@ -155,6 +156,7 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - when:
           condition:
             not:

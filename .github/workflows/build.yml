@@ -74,7 +74,24 @@ jobs:
       #               - Once this is in a release, use the release version.
       image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.4-itai-dirty
     steps:
-    - name: Decide whether the needed jobs succeeded or failed
-      uses: re-actors/alls-green@release/v1
-      with:
-        jobs: ${{ toJSON(needs) }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Check if [force] was specified
+        shell: bash
+        run: |
+          last_commit_msg=$(git log -1 --pretty=%B)
+          echo "Last commit message: $last_commit_msg"
+          if [[ $last_commit_msg == *"[force]"* ]]; then
+            echo "Skipping the check for job success because the current commit opts in for a forced run."
+            echo "FORCE=true" >> $GITHUB_ENV
+          else
+            echo "Checking if all jobs succeeded."
+            echo "FORCE=false" >> $GITHUB_ENV
+          fi
+      - name: Decide whether the needed jobs succeeded or failed
+        if: env.FORCE != 'true'
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

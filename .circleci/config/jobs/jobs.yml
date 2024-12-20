@@ -7,6 +7,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted:
           # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
           save: true
@@ -36,6 +37,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -53,6 +55,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -72,6 +75,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -111,6 +115,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Deployment Test
@@ -275,6 +280,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - restore_frontend_builds
       - setup_nix
       - setup_sbt_test_job:
@@ -417,6 +423,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - run:
           name: Cancel the entire workflow if the current commit does not opt in for CI
           command: |
@@ -651,6 +658,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"

@@ -378,21 +378,21 @@ commands:
           cmd:  |
             if [ << parameters.migration_id >> -ne 0 ]; then
               echo "migration_id is not set to 0, use the parameter value"
-            
+
               ACTIVE_MIGRATION_ID=<< parameters.migration_id >>
-              
+
             else
               echo "migration_id is not set, use the one defined in the config.yaml file"
-            
+
               CONFIG_FILE="cluster/deployment/<< parameters.cluster >>/config.yaml"
-            
+
               if [[ -f "$CONFIG_FILE" ]]; then
                 ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE" 2>/dev/null)
               else
                 echo "Error: Configuration file not found: $CONFIG_FILE"
                 ACTIVE_MIGRATION_ID=0
               fi
-              
+
               if [[ "$ACTIVE_MIGRATION_ID" == "null" || -z "$ACTIVE_MIGRATION_ID" ]]; then
                 ACTIVE_MIGRATION_ID=0
                 echo "Default ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
@@ -400,7 +400,7 @@ commands:
                 echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
               fi
             fi
-            
+
             echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" > tmp-migration-id-env
       - run:
           name: Save migration ID to env
@@ -731,6 +731,17 @@ commands:
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
             cncluster pulumi deployment up --skip-preview --diff
+
+  skip_if_force_flag_set:
+    steps:
+      - run:
+          name: Skip if force flag is set
+          command: |
+            last_commit_msg=$(git log -1 --pretty=%B)
+            if [[ "$CIRCLE_BRANCH" != "main" && "${last_commit_msg}" == *"[force]"* ]]; then
+              echo "FORCE flag is set, skipping this job"
+              circleci-agent step halt
+            fi
 
   run_setup_nix:
     description: Set up Nix without cache
@@ -3297,6 +3308,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted:
           # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
           save: true
@@ -3326,6 +3338,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3343,6 +3356,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3362,6 +3376,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3401,6 +3416,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Deployment Test
@@ -3565,6 +3581,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - restore_frontend_builds
       - setup_nix
       - setup_sbt_test_job:
@@ -3707,6 +3724,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - run:
           name: Cancel the entire workflow if the current commit does not opt in for CI
           command: |
@@ -3941,6 +3959,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -4860,6 +4879,7 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - when:
           condition:
             not:
@@ -4970,6 +4990,7 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
+      - skip_if_force_flag_set
       - when:
           condition:
             not:
