@@ -43,13 +43,9 @@ workflow:
               ignore:
                 - /release-line-.*/
                 - main
-      # Linting and formatting
-      - static_tests:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Daml
+      # TODO(#15988): In this job we currently also save the nix cache, if we migrate this
+      # before others, make sure to enable saving the nix cache in some other job instead.
       - daml_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -71,18 +67,6 @@ workflow:
             export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-creds.json"
           # TODO(#10912) Investigate why things got slower
           parallelism: 10
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test wall clock time cometBFT"
-          test_names_file: "test-cometbft-full-class-names.log"
-          start_canton_options: "-w -f"
-          resource_class: "xlarge"
-          parallelism: 1
       - scala_test_self_hosted:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -93,16 +77,6 @@ workflow:
           test_names_file: "test-full-class-names-resource-intensive.log"
           start_canton_options: "-w"
           parallelism: 2
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test sim time"
-          test_names_file: "test-full-class-names-sim-time.log"
-          start_canton_options: "-s"
-          parallelism: 4
       - scala_test_self_hosted:
           <<: *notify-fail
           context:

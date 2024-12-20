@@ -3309,9 +3309,7 @@ jobs:
     steps:
       - checkout_with_retry
       - skip_if_force_flag_set
-      - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
-          save: true
+      - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - run_bash_command_in_nix:
@@ -3339,7 +3337,9 @@ jobs:
     steps:
       - checkout_with_retry
       - skip_if_force_flag_set
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -5096,13 +5096,9 @@ workflows:
               ignore:
                 - /release-line-.*/
                 - main
-      # Linting and formatting
-      - static_tests:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Daml
+      # TODO(#15988): In this job we currently also save the nix cache, if we migrate this
+      # before others, make sure to enable saving the nix cache in some other job instead.
       - daml_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -5124,18 +5120,6 @@ workflows:
             export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-creds.json"
           # TODO(#10912) Investigate why things got slower
           parallelism: 10
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test wall clock time cometBFT"
-          test_names_file: "test-cometbft-full-class-names.log"
-          start_canton_options: "-w -f"
-          resource_class: "xlarge"
-          parallelism: 1
       - scala_test_self_hosted:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -5146,16 +5130,6 @@ workflows:
           test_names_file: "test-full-class-names-resource-intensive.log"
           start_canton_options: "-w"
           parallelism: 2
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test sim time"
-          test_names_file: "test-full-class-names-sim-time.log"
-          start_canton_options: "-s"
-          parallelism: 4
       - scala_test_self_hosted:
           <<: *notify-fail
           context:
