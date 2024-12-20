@@ -26,6 +26,7 @@ jobs:
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           # TODO(#15988): consider this trick for setting cache_version globally: https://stackoverflow.com/a/74217028
           cache_version: 0
+          should_save: 'true'
 
       - name: Set up SBT
         id: setup_sbt

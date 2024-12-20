@@ -3326,8 +3326,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted:
-          save: true
+      - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -3344,8 +3343,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted:
-          save: true
+      - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -3364,8 +3362,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted:
-          save: true
+      - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - execute_sbt_command:
@@ -3404,8 +3401,7 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted:
-          save: true
+      - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Deployment Test
           cmd_retry_count: 5 # Retry in case of dependency download errors
