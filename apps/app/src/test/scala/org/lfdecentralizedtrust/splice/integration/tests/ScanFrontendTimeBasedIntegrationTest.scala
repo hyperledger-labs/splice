@@ -319,7 +319,7 @@ class ScanFrontendTimeBasedIntegrationTest
       def fmtTime(i: java.time.Instant) = {
         import java.time.*
         format.DateTimeFormatter
-          .ofPattern("MM/dd/yyyy HH:mm")
+          .ofPattern("yyyy-MM-dd HH:mm")
           .format(LocalDateTime.ofInstant(i, ZoneOffset.UTC))
       }
 

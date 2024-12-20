@@ -158,7 +158,7 @@ abstract class TopologyAdminConnection(
           proposals = proposals.proposals,
           timeQuery,
           operation,
-          filterSigningKey = proposals.signingKey.getOrElse(""),
+          filterSigningKey = "",
           protocolVersion = None,
         ),
         filterParty,
@@ -181,7 +181,7 @@ abstract class TopologyAdminConnection(
           proposals = proposals.proposals,
           timeQuery,
           operation,
-          filterSigningKey = proposals.signingKey.getOrElse(""),
+          filterSigningKey = "",
           protocolVersion = None,
         ),
         filterParty.fold("")(_.toProtoPrimitive),
@@ -325,7 +325,7 @@ abstract class TopologyAdminConnection(
           proposals = proposals.proposals,
           timeQuery = timeQuery,
           ops = None,
-          filterSigningKey = proposals.signingKey.getOrElse(""),
+          filterSigningKey = "",
           protocolVersion = None,
         ),
         filterNamespace = decentralizedNamespace.toProtoPrimitive,
@@ -1124,7 +1124,7 @@ abstract class TopologyAdminConnection(
           proposals = proposals.proposals,
           timeQuery,
           None,
-          filterSigningKey = proposals.signingKey.getOrElse(""),
+          filterSigningKey = "",
           protocolVersion = None,
         ),
         domainId.filterString,
@@ -1335,7 +1335,6 @@ abstract class TopologyAdminConnection(
 object TopologyAdminConnection {
   sealed trait TopologyTransactionType {
     def proposals: Boolean
-    def signingKey: Option[String]
   }
 
   object TopologyTransactionType {
@@ -1343,19 +1342,16 @@ object TopologyAdminConnection {
     case object AllProposals extends TopologyTransactionType {
       override def proposals: Boolean = true
 
-      override def signingKey: Option[String] = None
     }
 
-    case class ProposalSignedBy(signature: Fingerprint) extends TopologyTransactionType {
+    case object ProposalSignedByOwnKey extends TopologyTransactionType {
       override def proposals: Boolean = true
 
-      override def signingKey: Option[String] = Some(signature.toProtoPrimitive)
     }
 
     case object AuthorizedState extends TopologyTransactionType {
       override def proposals: Boolean = false
 
-      override def signingKey: Option[String] = None
     }
 
   }

@@ -682,7 +682,6 @@ class ParticipantNodeBootstrap(
           clock,
           resourceManagementService,
           parameterConfig,
-          indexedStringStore,
           pruningProcessor,
           schedulers,
           arguments.metrics,

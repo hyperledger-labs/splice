@@ -56,7 +56,7 @@ class DomainDataRestorer(
             domainAlias,
             domainId = Some(domainId),
             sequencerConnections = sequencerConnections,
-            manualConnect = false,
+            manualConnect = true,
             initializeFromTrustedDomain = true,
             timeTracker = DomainTimeTrackerConfig(
               timeTrackerMinObservationDuration
@@ -77,14 +77,16 @@ class DomainDataRestorer(
             _ = logger.info("Importing the ACS")
             _ <- importAcs(acsSnapshot)
             _ = logger.info("Imported the ACS")
+            _ <- participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
+              domainAlias,
+              config => Some(config.copy(manualConnect = false)),
+            )
             _ <- ledgerConnection.ensureUserMetadataAnnotation(
               userId,
               BaseLedgerConnection.INITIAL_ACS_IMPORT_METADATA_KEY,
               "true",
               RetryFor.ClientCalls,
             )
-            _ <-
-              participantAdminConnection.connectDomain(domainAlias)
           } yield ()
         case Some(_) =>
           logger.info("Domain is already registered and ACS is imported")
