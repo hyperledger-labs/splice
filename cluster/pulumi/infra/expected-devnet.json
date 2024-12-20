@@ -1191,14 +1191,11 @@
         "repo": "https://istio-release.storage.googleapis.com/charts"
       },
       "values": {
-        "defaults": {
-          "global": {
-            "istioNamespace": "cluster-ingress",
-            "platform": "gcp"
-          }
+        "global": {
+          "istioNamespace": "cluster-ingress"
         }
       },
-      "version": "1.22.2"
+      "version": "1.24.2"
     },
     "name": "istio-base",
     "provider": "",
@@ -1345,7 +1342,7 @@
           }
         ]
       },
-      "version": "1.22.2"
+      "version": "1.24.2"
     },
     "name": "istio-ingress-public",
     "provider": "",
@@ -1915,7 +1912,7 @@
           }
         ]
       },
-      "version": "1.22.2"
+      "version": "1.24.2"
     },
     "name": "istio-ingress",
     "provider": "",
@@ -2093,7 +2090,7 @@
           ]
         }
       },
-      "version": "1.22.2"
+      "version": "1.24.2"
     },
     "name": "istiod",
     "provider": "",
@@ -2201,6 +2198,16 @@
     "name": "logsAlert",
     "provider": "",
     "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "bash migrate-istio.sh"
+    },
+    "name": "migrate-istio-crds",
+    "provider": "",
+    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -2393,32 +2400,32 @@
               "control_plane": {
                 "datasource": "Prometheus",
                 "gnetId": 7645,
-                "revision": 220
+                "revision": 239
               },
               "mesh": {
                 "datasource": "Prometheus",
                 "gnetId": 7639,
-                "revision": 220
+                "revision": 239
               },
               "performance": {
                 "datasource": "Prometheus",
                 "gnetId": 11829,
-                "revision": 220
+                "revision": 239
               },
               "service": {
                 "datasource": "Prometheus",
                 "gnetId": 7636,
-                "revision": 220
+                "revision": 239
               },
               "wasm": {
                 "datasource": "Prometheus",
                 "gnetId": 13277,
-                "revision": 177
+                "revision": 196
               },
               "workload": {
                 "datasource": "Prometheus",
                 "gnetId": 7630,
-                "revision": 220
+                "revision": 239
               }
             },
             "k6s": {
