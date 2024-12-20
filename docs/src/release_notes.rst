@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+upcoming
+--------
+
+* Deployment
+
+  * The release bundle is now included in the docs image, for easier hosting by the GSF
+
 0.3.3
 -----
 
