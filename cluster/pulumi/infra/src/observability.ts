@@ -10,6 +10,7 @@ import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
+  clusterProdLike,
   COMETBFT_RETAIN_BLOCKS,
   config,
   ENABLE_COMETBFT_PRUNING,
@@ -27,7 +28,7 @@ import {
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
 import {
-  clusterIsBeingReset,
+  clusterIsResetPeriodically,
   enableAlertEmailToSupportTeam,
   enableAlerts,
   enablePrometheusAlerts,
@@ -129,7 +130,7 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
-const shouldIgnoreNoDataOrDataSourceError = clusterIsBeingReset;
+const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
   const namespace = new k8s.core.v1.Namespace(
@@ -280,8 +281,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             retentionSize: prometheusRetentionSize,
             resources: {
               requests: {
-                memory: '24Gi',
-                cpu: '4',
+                memory: clusterProdLike ? (!clusterIsResetPeriodically ? '24Gi' : '6Gi') : '4Gi',
+                cpu: clusterProdLike ? (!clusterIsResetPeriodically ? '4' : '2') : '1',
               },
             },
             logFormat: 'json',

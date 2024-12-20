@@ -1,4 +1,5 @@
 import { clusterProdLike, config } from 'splice-pulumi-common';
+import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 export const enableAlerts = clusterProdLike || config.envFlag('ENABLE_ALERTS_FOR_TESTING');
 export const slackAlertNotificationChannel =
@@ -15,8 +16,8 @@ export function slackToken(): string {
   return config.requireEnv('SLACK_ACCESS_TOKEN');
 }
 
-export const clusterIsBeingReset = config.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
+export const clusterIsResetPeriodically = spliceEnvConfig.envFlag('GCP_CLUSTER_RESET_PERIODICALLY');
 export const enablePrometheusAlerts = config.envFlag(
   'ENABLE_PROMETHEUS_ALERTS',
-  !clusterIsBeingReset
+  !clusterIsResetPeriodically
 );
