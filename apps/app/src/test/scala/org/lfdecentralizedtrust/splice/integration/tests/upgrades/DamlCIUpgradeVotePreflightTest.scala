@@ -64,7 +64,7 @@ class DamlCIUpgradeVotePreflightTest
               "sv1",
               picker,
               DateTimeFormatter
-                .ofPattern("MM/dd/yyyy hh:mm a")
+                .ofPattern("yyyy-MM-dd hh:mm")
                 .withZone(ZoneOffset.UTC)
                 .format(now.plusSeconds(60L * minutes)),
             )

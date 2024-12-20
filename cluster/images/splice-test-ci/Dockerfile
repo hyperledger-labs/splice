@@ -16,6 +16,8 @@ RUN groupadd --gid=1002 ci && \
 
 RUN sudo pip3 install GitPython gql humanize marshmallow-dataclass requests requests_toolbelt --break-system-packages
 
+RUN sudo ln -s /usr/bin/python3 /usr/bin/python
+
 USER ci
 RUN whoami && \
 	# opt-out of the new security feature, not needed in a CI environment

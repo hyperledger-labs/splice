@@ -8,7 +8,7 @@ interface DateDisplayProps {
 }
 
 const DateDisplay: React.FC<DateDisplayProps> = (props: DateDisplayProps) => {
-  const f = props.format || 'MM/dd/yyyy HH:mm';
+  const f = props.format || 'yyyy-MM-dd HH:mm';
   const dateObj = typeof props.datetime == 'string' ? new Date(props.datetime) : props.datetime;
 
   return <>{format(dateObj, f)}</>;

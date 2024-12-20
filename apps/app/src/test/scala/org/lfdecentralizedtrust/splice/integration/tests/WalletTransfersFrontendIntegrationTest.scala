@@ -135,7 +135,7 @@ class WalletTransfersFrontendIntegrationTest
 
       val expectedExpiry =
         DateTimeFormatter
-          .ofPattern("MM/dd/yyyy HH:mm")
+          .ofPattern("yyyy-MM-dd HH:mm")
           .format(LocalDateTime.ofInstant(transferExpiry.toInstant, ZoneOffset.UTC))
 
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
