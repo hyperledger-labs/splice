@@ -49,6 +49,8 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, Tra
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.slf4j.event.Level
 
+import java.util.Optional
+
 // mock verification triggers this
 @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
 class BftScanConnectionTest
@@ -89,6 +91,13 @@ class BftScanConnectionTest
                     domainId,
                   ),
                   false,
+                  Optional.of(
+                    SpliceUtil.defaultAmuletConfig(
+                      NonNegativeFiniteDuration(Duration.ofMinutes(10)),
+                      10,
+                      domainId,
+                    )
+                  ),
                 ),
                 ByteString.EMPTY,
                 Instant.EPOCH,

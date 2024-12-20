@@ -66,6 +66,7 @@ genericSetupApp dsoPrefix = do
   _ <- submit dso $ createCmd AmuletRules with
     configSchedule = defaultAmuletConfigSchedule
     isDevNet = True
+    config = Some defaultAmuletConfig
     ..
 
   _ <- submit dso $ createCmd ExternalPartyAmuletRules with dso

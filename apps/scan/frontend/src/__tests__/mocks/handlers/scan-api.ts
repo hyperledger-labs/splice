@@ -235,6 +235,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                 futureValues: [],
               },
               isDevNet: true,
+              config: null,
             }),
             created_event_blob: '',
             created_at: '2023-10-06T08:12:16.481271Z',

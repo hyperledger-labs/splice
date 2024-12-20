@@ -88,6 +88,8 @@ data AmuletRules_ActionRequiringConfirmation
     -- ^ Voted action to remove a config schedule from the `AmuletRules`.
   | CRARC_UpdateFutureAmuletConfigSchedule AmuletRules_UpdateFutureAmuletConfigSchedule
     -- ^ Voted action to update a config schedule in the `AmuletRules`.
+  | CRARC_SetConfig AmuletRules_SetConfig
+    -- ^ Voted action to change the `AmuletConfig`. Not idempotent.
   deriving (Eq, Show)
 
 data DsoRules_ActionRequiringConfirmation
@@ -1339,6 +1341,7 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
         case amuletRulesAction of
           CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_MiningRound_Archive choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_SetConfig choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_AddFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
@@ -1450,6 +1453,7 @@ actionRequiringConfirmationEffectiveAt action =
   case action of
     ARC_AmuletRules with .. ->
       case amuletRulesAction of
+        CRARC_SetConfig _ -> None
         CRARC_AddFutureAmuletConfigSchedule choiceArg -> Some choiceArg.newScheduleItem._1
         CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleTime
         CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleItem._1

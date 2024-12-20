@@ -126,6 +126,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       dsoParty.toProtoPrimitive,
       schedule(initialTickDuration),
       false,
+      Optional.empty(),
     )
     contract(
       identifier = templateId,

@@ -535,6 +535,27 @@ testDsoRulesConfigChange = do
   dsoRules.config === newConfig
 
 
+-- | Test AmuletRules configuration changes.
+testAmuletConfigChange : Script ()
+testAmuletConfigChange = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+
+  [(_, amuletRules)] <- query @AmuletRules dso
+
+  -- run the voting process to change the config
+  let newConfig = case amuletRules.config of
+                    Some c -> c with tickDuration = c.tickDuration + (days 2)
+                    None -> error "No config found"
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
+    ARC_AmuletRules with
+      amuletRulesAction = CRARC_SetConfig AmuletRules_SetConfig with
+        newConfig
+
+  -- check that the config change happened
+  [(_, amuletRules)] <- query @AmuletRules dso
+  amuletRules.config === Some newConfig
+
+
 -- | Test SV removal and GC of AmuletPriceVotes
 testOffboardSvAndAmuletPriceVotes : Script ()
 testOffboardSvAndAmuletPriceVotes = do
