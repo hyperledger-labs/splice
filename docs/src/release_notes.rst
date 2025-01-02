@@ -8,12 +8,20 @@
 Release Notes
 =============
 
-upcoming
---------
+0.3.4
+-----
+
+* SV UI
+
+  * Switch to ``YYYY-MM-DD``-based date formatting and 24h-based time formatting.
 
 * Deployment
 
-  * The release bundle is now included in the docs image, for easier hosting by the GSF
+  * The release bundle is now included in the docs image, for easier hosting by the GSF.
+  * Add a new ``jsonApiServerPathPrefix`` value to the participant helm chart that allows setting a path prefix for JSON API endpoints,
+    to simplify configuring ingress routing to the participant JSON API.
+
+* Stability improvements
 
 0.3.3
 -----
@@ -33,11 +41,6 @@ upcoming
     Progress on your own scan instance can be monitored through the ``cn_history_backfilling_*`` metrics.
   * The `/v1/updates` endpoint now excludes updates resulting from ACS imports.
     This change was already mentioned in the 0.2.5 release notes, but due to a bug was not actually implemented until now.
-
-* Deployment
-
-  * Add new ``jsonApiServerPathPrefix`` value to the participant helm chart to allow for setting path prefix for json API endpoints.
-      This is to allow ingress routing to the json API server without path rewrite.
 
 0.3.2
 -----
