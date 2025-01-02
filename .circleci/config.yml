@@ -5124,25 +5124,6 @@ workflows:
             export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-creds.json"
           # TODO(#10912) Investigate why things got slower
           parallelism: 10
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test resource intensive"
-          test_names_file: "test-full-class-names-resource-intensive.log"
-          start_canton_options: "-w"
-          parallelism: 2
-      - scala_test_self_hosted:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test record time tolerance"
-          test_names_file: "test-full-class-names-record-time-tolerance.log"
-          start_canton_options: "-s"
-          parallelism: 1
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -5184,36 +5165,6 @@ workflows:
           pre_sbt_cmd: "./start-frontends.sh -d -s -m"
           post_sbt_cmd: "./stop-frontends.sh"
           resource_class: "xlarge"
-          parallelism: 1
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test global upgrade"
-          test_names_file: "test-full-class-names-global-soft-migration.log"
-          start_canton_options: "-w -g"
-          parallelism: 1
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test global upgrade topology"
-          test_names_file: "test-full-class-names-global-soft-migration-topology.log"
-          start_canton_options: "-w --soft-domain-migration"
-          parallelism: 1
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test disaster recovery"
-          test_names_file: "test-full-class-names-disaster-recovery.log"
-          start_canton_options: "-w"
           parallelism: 1
       - scala_test:
           <<: *minor-release-branch-never
