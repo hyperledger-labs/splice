@@ -21,3 +21,7 @@ export const enablePrometheusAlerts = config.envFlag(
   'ENABLE_PROMETHEUS_ALERTS',
   !clusterIsResetPeriodically
 );
+export const enableMiningRoundAlert = config.envFlag(
+  'ENABLE_MINING_ROUND_ALERT',
+  !clusterIsResetPeriodically
+);

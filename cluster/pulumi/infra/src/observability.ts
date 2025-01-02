@@ -31,6 +31,7 @@ import {
   clusterIsResetPeriodically,
   enableAlertEmailToSupportTeam,
   enableAlerts,
+  enableMiningRoundAlert,
   enablePrometheusAlerts,
   grafanaSmtpHost,
   slackAlertNotificationChannel,
@@ -779,7 +780,11 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
             'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
-            'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
+            ...(enableMiningRoundAlert
+              ? {
+                  'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
+                }
+              : {}),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
