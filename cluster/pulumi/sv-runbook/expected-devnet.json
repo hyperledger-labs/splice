@@ -210,7 +210,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -415,7 +415,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     "name": "loopback",
     "provider": "",
@@ -484,7 +484,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     "name": "scan",
     "provider": "",
@@ -833,7 +833,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     "name": "sv-app",
     "provider": "",
@@ -1253,7 +1253,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     "name": "validator",
     "provider": "",
