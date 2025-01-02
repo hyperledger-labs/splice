@@ -53,20 +53,6 @@ workflow:
             - artifactory
             - slack-context
       # Scala
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test wall clock time"
-          test_names_file: "test-full-class-names.log"
-          start_canton_options: "-w"
-          pre_sbt_cmd: |
-            echo $GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS > /tmp/gcp-creds.json
-            export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-creds.json"
-          # TODO(#10912) Investigate why things got slower
-          parallelism: 10
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail

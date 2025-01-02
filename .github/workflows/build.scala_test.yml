@@ -17,6 +17,10 @@ on:
       test_name:
         type: string
         required: true
+      with_gcp_creds:
+        type: boolean
+        required: false
+        default: false
 
 jobs:
 
@@ -144,7 +148,14 @@ jobs:
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}
-          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET --keep GITHUB_ACTION"
+          pre_sbt_cmd: |
+            if [[ "${{ inputs.with_gcp_creds }}" == "true" ]]; then
+              export GOOGLE_APPLICATION_CREDENTIALS="$(mktemp gcp-creds-XXXXXX.json)"
+              echo '${{ secrets.GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+              export GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS='${{ secrets.GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}'
+            fi
+
 
       - name: Check logs for errors
         uses: ./.github/actions/sbt/execute_sbt_command
