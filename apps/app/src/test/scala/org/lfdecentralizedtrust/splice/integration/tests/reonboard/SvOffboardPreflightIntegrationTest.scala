@@ -107,7 +107,7 @@ class SvOffboardPreflightIntegrationTest
           "sv1",
           "datetime-picker-vote-request-expiration",
           DateTimeFormatter
-            .ofPattern("yyyy-MM-dd hh:mm a")
+            .ofPattern("yyyy-MM-dd HH:mm")
             .withZone(ZoneOffset.UTC)
             .format(
               now.plusSeconds(60)
