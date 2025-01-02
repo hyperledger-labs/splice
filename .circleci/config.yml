@@ -4688,6 +4688,8 @@ jobs:
 
             cncluster ci_pdown_sv
           cmd_retry_count: 3
+          # wait a bit in case the operator is legitimately holding the Pulumi lock
+          cmd_retry_wait: 60
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -4724,6 +4726,8 @@ jobs:
             fi
             cncluster ci_pdown_validator
           cmd_retry_count: 3
+          # wait a bit in case the operator is legitimately holding the Pulumi lock
+          cmd_retry_wait: 60
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
