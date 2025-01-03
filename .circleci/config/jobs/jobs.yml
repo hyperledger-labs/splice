@@ -88,11 +88,11 @@ jobs:
             set -eou pipefail
             mkdir -p /tmp/artifacts
             cp apps/app/target/release/*.tar.gz /tmp/artifacts
-      - run:
-          name: Copy OpenAPI specs
-          command: |
+      - run_bash_command_in_nix:
+          cmd_name: Copy OpenAPI specs
+          cmd: |
             set -eou pipefail
-            .circleci/copy-openapi.sh
+            scripts/copy-openapi.sh /tmp/artifacts/openapi.tar.gz
       - run_bash_command_in_nix:
           cmd_name: Publish release bundles
           additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
