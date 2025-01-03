@@ -4,7 +4,6 @@ org.lfdecentralizedtrust.splice.config.ThresholdsTest
 org.lfdecentralizedtrust.splice.http.UrlValidatorTest
 org.lfdecentralizedtrust.splice.integration.tests.Ans4SvsIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.AnsIntegrationTest
-org.lfdecentralizedtrust.splice.integration.tests.AppManagerIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.AutomationControlIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.AutomationServiceIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.BftScanConnectionIntegrationTest

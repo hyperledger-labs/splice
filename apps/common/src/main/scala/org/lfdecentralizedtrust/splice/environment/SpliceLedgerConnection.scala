@@ -1164,10 +1164,6 @@ object BaseLedgerConnection {
   val DOMAIN_MIGRATION_DOMAIN_WAS_PAUSED_KEY: String =
     "network.canton.global/domain_migration_domain_was_paused"
 
-  val APP_MANAGER_IDENTITY_PROVIDER_ID: String = "app_manager"
-
-  val APP_MANAGER_ISSUER: String = "app_manager"
-
   /** In a number of places we want to use a user id in a place where a `PartyString` expected, e.g.,
     * in party id hints and in workflow ids. However, the allowed set of characters is slightly different so
     * this function can be used to perform the necessary escaping. Note that PartyString is more restrictive than

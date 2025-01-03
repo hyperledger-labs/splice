@@ -44,9 +44,6 @@ class AppUpgradeIntegrationTest
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
-      // We don't currently register the upgrade of splitwell in app manager, just want to test
-      // that we can actually upgrade splitwell and use the new payment APIs in it.
-      .withoutInitialManagerApps
       // TODO(#8300) Consider removing this once domain config updates are less disruptive, particularly
       // to the tests after SVs 2 and 3 have been upgraded
       .withSequencerConnectionsFromScanDisabled()
@@ -104,10 +101,10 @@ class AppUpgradeIntegrationTest
                 true
               ) withClue s"${sv} wallet initialized"
             })
-            Seq("bob", "splitwell").foreach(validator =>
+            forAll(Seq("bob", "splitwell")) { validator =>
               vc(s"${validator}ValidatorClient").httpHealth.successOption
                 .exists(_.active) should be(true)
-            )
+            }
           }
 
           bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPathV1)

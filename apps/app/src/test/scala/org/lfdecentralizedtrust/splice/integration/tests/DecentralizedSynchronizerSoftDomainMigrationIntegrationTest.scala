@@ -21,7 +21,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAllAutomationConfigs,
-  updateAllValidatorConfigs,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState.Assigned
@@ -42,7 +41,6 @@ import org.lfdecentralizedtrust.splice.util.{
   UpdateHistoryTestUtil,
   WalletTestUtil,
 }
-import org.lfdecentralizedtrust.splice.validator.config.AppManagerConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.topology.PartyId
@@ -69,48 +67,25 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     super.environmentDefinition
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
       .withoutAutomaticRewardsCollectionAndAmuletMerging
-      .addConfigTransforms(
-        (_, config) =>
-          (updateAllAutomationConfigs(c =>
-            c.copy(
-              // Need to disable triggers so workflows stay open
-              enableDsoGovernance = false,
-              enableClosedRoundArchival = false,
-            )
-          ) andThen updateAutomationConfig(ConfigurableApp.Sv)(
-            _.withResumedTrigger[AssignTrigger]
-              .withPausedTrigger[AmuletConfigReassignmentTrigger]
-              .withResumedTrigger[TransferFollowTrigger]
-              // DsoRules gets replaced during create phase with this on
-              .withPausedTrigger[ElectionRequestTrigger]
-              // concurrent modification of AmuletRules can cause tests to fail with `LOCAL_VERDICT_INACTIVE_CONTRACTS` (see #13939)
-              .withPausedTrigger[PruneAmuletConfigScheduleTrigger]
-              // TODO(#10297): re-enable once that trigger is compatible with soft domain-migrations
-              .withPausedTrigger[SubmitSvStatusReportTrigger]
-              .withPausedTrigger[ReceiveSvRewardCouponTrigger]
-          ))(config),
-        (_, config) =>
-          updateAllValidatorConfigs { case (name, c) =>
-            // Enable app manager so migration kicks in.
-            // We don't actually use app maager functionality so the URLs are stubs.
-            if (name == "sv1Validator") {
-              c.copy(
-                appManager = Some(
-                  AppManagerConfig(
-                    issuerUrl = "https://example.com",
-                    appManagerUiUrl = "https://example.com",
-                    appManagerApiUrl = "https://example.com",
-                    jsonApiUrl = "https://example.com",
-                    audience = "https://example.com",
-                    initialRegisteredApps = Map.empty,
-                    initialInstalledApps = Map.empty,
-                  )
-                )
-              )
-            } else {
-              c
-            }
-          }(config),
+      .addConfigTransforms((_, config) =>
+        (updateAllAutomationConfigs(c =>
+          c.copy(
+            // Need to disable triggers so workflows stay open
+            enableDsoGovernance = false,
+            enableClosedRoundArchival = false,
+          )
+        ) andThen updateAutomationConfig(ConfigurableApp.Sv)(
+          _.withResumedTrigger[AssignTrigger]
+            .withPausedTrigger[AmuletConfigReassignmentTrigger]
+            .withResumedTrigger[TransferFollowTrigger]
+            // DsoRules gets replaced during create phase with this on
+            .withPausedTrigger[ElectionRequestTrigger]
+            // concurrent modification of AmuletRules can cause tests to fail with `LOCAL_VERDICT_INACTIVE_CONTRACTS` (see #13939)
+            .withPausedTrigger[PruneAmuletConfigScheduleTrigger]
+            // TODO(#10297): re-enable once that trigger is compatible with soft domain-migrations
+            .withPausedTrigger[SubmitSvStatusReportTrigger]
+            .withPausedTrigger[ReceiveSvRewardCouponTrigger]
+        ))(config)
       )
 
   private[this] val globalUpgradeDomain = DomainAlias.tryCreate("global-upgrade")
@@ -365,61 +340,6 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
     val dummyDistantRelTime = new RelTime(1000000000000L)
 
     // TODO (#8386) revert 8315's da0c91c29abf for directory stubs
-
-    clue("create app-manager contracts of various kinds") {
-      import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
-      import org.lfdecentralizedtrust.splice.http.v0.definitions as httpdefs
-      import io.circe.syntax.*
-      val validator = sv1ValidatorBackend.getValidatorPartyId()
-      val provider = validator
-      val version = "0"
-
-      createSampleAndEnsurePresence(appManagerCodegen.AppRelease.COMPANION)(
-        new appManagerCodegen.AppRelease(
-          validator.toProtoPrimitive,
-          provider.toProtoPrimitive,
-          version,
-          httpdefs.AppRelease(version, Vector.empty).asJson.noSpaces,
-        )
-      )
-
-      createSampleAndEnsurePresence(appManagerCodegen.AppConfiguration.COMPANION)(
-        new appManagerCodegen.AppConfiguration(
-          validator.toProtoPrimitive,
-          provider.toProtoPrimitive,
-          0,
-          httpdefs
-            .AppConfiguration(0, "foo", "urn:example.com", Vector.empty, Vector.empty)
-            .asJson
-            .noSpaces,
-        )
-      )
-
-      createSampleAndEnsurePresence(appManagerCodegen.RegisteredApp.COMPANION)(
-        new appManagerCodegen.RegisteredApp(
-          validator.toProtoPrimitive,
-          provider.toProtoPrimitive,
-        )
-      )
-
-      createSampleAndEnsurePresence(appManagerCodegen.InstalledApp.COMPANION)(
-        new appManagerCodegen.InstalledApp(
-          validator.toProtoPrimitive,
-          provider.toProtoPrimitive,
-          "https://example.com/apps/registered/provider::00000",
-        )
-      )
-
-      createSampleAndEnsurePresence(appManagerCodegen.ApprovedReleaseConfiguration.COMPANION)(
-        new appManagerCodegen.ApprovedReleaseConfiguration(
-          validator.toProtoPrimitive,
-          provider.toProtoPrimitive,
-          0,
-          httpdefs.ReleaseConfiguration(Vector.empty, version, httpdefs.Timespan()).asJson.noSpaces,
-          "00000000",
-        )
-      )
-    }
 
     def protectAppRewardCoupons = sv1Backend.dsoDelegateBasedAutomation
       .trigger[
@@ -710,7 +630,7 @@ class DecentralizedSynchronizerSoftDomainMigrationIntegrationTest
       val sv1ValidatorParty = sv1ValidatorBackend.getValidatorPartyId()
       import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore.templatesMovedByMyAutomation as templatesMovedByValidatorAutomation
       allContractsMigrated(
-        (templatesMovedByValidatorAutomation(true) filterNot Set(
+        (templatesMovedByValidatorAutomation filterNot Set(
           splice.amuletrules.ExternalPartySetupProposal.COMPANION
         )) map (c(_, sv1ValidatorParty)): _*
       )

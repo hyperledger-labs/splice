@@ -12,7 +12,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, PeriodicBackupDumpConfig}
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
@@ -20,10 +19,9 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.util.QualifiedName
-import org.lfdecentralizedtrust.splice.validator.config.AppManagerConfig
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.migration.DecentralizedSynchronizerMigrationTrigger
-import org.lfdecentralizedtrust.splice.validator.store.{AppManagerStore, ValidatorStore}
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.automation.{
   OffboardUserPartyTrigger,
@@ -48,7 +46,6 @@ class ValidatorAutomationService(
     backupDumpConfig: Option[PeriodicBackupDumpConfig],
     validatorTopupConfig: ValidatorTopupConfig,
     grpcDeadline: Option[NonNegativeFiniteDuration],
-    appManagerConfig: Option[AppManagerConfig],
     transferPreapprovalConfig: TransferPreapprovalConfig,
     sequencerConnectionFromScan: Boolean,
     prevetDuration: NonNegativeFiniteDuration,
@@ -75,7 +72,6 @@ class ValidatorAutomationService(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpClient,
     mat: Materializer,
     tracer: Tracer,
 ) extends SpliceAppAutomationService(
@@ -98,14 +94,6 @@ class ValidatorAutomationService(
   override def companion
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
-
-  val appManagerStore =
-    new AppManagerStore(
-      scanConnection.getAmuletRulesDomain,
-      this,
-      retryProvider,
-      loggerFactory,
-    )
 
   walletManagerOpt.foreach { walletManager =>
     registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
@@ -200,16 +188,6 @@ class ValidatorAutomationService(
     )
   )
 
-  appManagerConfig.foreach(config =>
-    registerTrigger(
-      new PollInstalledApplicationsTrigger(
-        config,
-        triggerContext,
-        appManagerStore,
-      )
-    )
-  )
-
   if (!supportsSoftDomainMigrationPoc) {
     registerTrigger(
       new TransferFollowTrigger(
@@ -293,8 +271,6 @@ class ValidatorAutomationService(
 object ValidatorAutomationService extends AutomationServiceCompanion {
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
-      // App manager storage is participant local so we can freely choose the package id.
-      case "Splice.AppManager.Store" => Some(DarResources.appManager.bootstrap.packageId)
       // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
       case "Splice.AmuletImport" => Some(DarResources.amulet.bootstrap.packageId)

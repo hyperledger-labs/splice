@@ -15,12 +15,8 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.http.v0.app_manager.AppManagerResource
-import org.lfdecentralizedtrust.splice.http.v0.app_manager_admin.AppManagerAdminResource
-import org.lfdecentralizedtrust.splice.http.v0.app_manager_public.AppManagerPublicResource
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
-import org.lfdecentralizedtrust.splice.http.v0.json_api_public.JsonApiPublicResource
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
 import org.lfdecentralizedtrust.splice.http.v0.validator.ValidatorResource
 import org.lfdecentralizedtrust.splice.http.v0.validator_admin.ValidatorAdminResource
@@ -50,7 +46,6 @@ import org.lfdecentralizedtrust.splice.util.{
   PackageVetting,
   UploadablePackage,
 }
-import org.lfdecentralizedtrust.splice.validator.admin.AppManagerService
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
 import org.lfdecentralizedtrust.splice.validator.automation.{
   ValidatorAutomationService,
@@ -67,7 +62,7 @@ import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
 import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
-import org.lfdecentralizedtrust.splice.validator.util.{OAuth2Manager, ValidatorUtil}
+import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
   HttpExternalWalletHandler,
@@ -127,7 +122,7 @@ class ValidatorApp(
     with BasicDirectives {
 
   override def packages =
-    super.packages ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.appManager.all
+    super.packages ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
@@ -167,16 +162,6 @@ class ValidatorApp(
       ledgerClient: SpliceLedgerClient,
   )(implicit traceContext: TraceContext) =
     for {
-      _ <- config.appManager.traverse_ { appManagerConfig =>
-        appInitStep("Ensuring identity provider config") {
-          connection.ensureIdentityProviderConfig(
-            BaseLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID,
-            appManagerConfig.issuerUrl.toString,
-            appManagerConfig.jwksUri.toString,
-            appManagerConfig.audience,
-          )
-        }
-      }
       _ <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
@@ -607,17 +592,6 @@ class ValidatorApp(
         metrics.grpcClientMetrics,
         retryProvider,
       )
-      // The app manager contracts are local to the validator, and the dar does not have dependencies on others,
-      // so for now we assume that it is kept static and just upload it here.
-      _ <- appInitStep("Setup app manager dars") {
-        config.appManager.traverse_ { _ =>
-          val dar = UploadablePackage.fromResource(DarResources.appManager.bootstrap)
-          participantAdminConnection.uploadDarFiles(
-            Seq(dar),
-            RetryFor.WaitingOnInitDependency,
-          )
-        }
-      }
       participantIdentitiesStore = new NodeIdentitiesStore(
         participantAdminConnection,
         config.participantIdentitiesBackup.map(_ -> clock),
@@ -666,7 +640,6 @@ class ValidatorApp(
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         dsoParty = dsoParty,
-        appManagerEnabled = config.appManager.isDefined,
       )
       domainMigrationInfo <-
         if (config.svValidator) {
@@ -769,7 +742,6 @@ class ValidatorApp(
         config.participantIdentitiesBackup,
         validatorTopupConfig,
         config.domains.global.buyExtraTraffic.grpcDeadline,
-        config.appManager,
         config.transferPreapproval,
         config.domains.global.url.isEmpty,
         config.prevetDuration,
@@ -907,66 +879,6 @@ class ValidatorApp(
         loggerFactory,
       )
 
-      appManagerHandlersO <-
-        config.appManager.traverse { config =>
-          val service = new AppManagerService(
-            validatorParty,
-            automation.connection,
-            participantAdminConnection,
-            automation.appManagerStore,
-          )
-
-          for {
-            _ <- config.initialRegisteredApps.values.toList.traverse { app =>
-              appInitStep(s"Register app ${app.config.name}") {
-                service.registerApp(
-                  app.providerUserId,
-                  app.config,
-                  new java.io.File(app.releaseFile),
-                  RetryFor.WaitingOnInitDependency,
-                  CommandPriority.High,
-                )
-              }
-            }
-            // TODO (#7458): use the endpoint implemented in #7516
-//            _ <- config.initialInstalledApps.values.toList.traverse { app =>
-//            }
-          } yield {
-            val oauth2Manager = new OAuth2Manager(config, loggerFactory)
-            val appManagerAdminHandler = new HttpAppManagerAdminHandler(
-              participantAdminConnection,
-              automation.appManagerStore,
-              service,
-              retryProvider,
-              loggerFactory,
-            )
-            val appManagerHandler = new HttpAppManagerHandler(
-              config,
-              automation.connection,
-              automation.appManagerStore,
-              oauth2Manager,
-              loggerFactory,
-            )
-            val appManagerPublicHandler = new HttpAppManagerPublicHandler(
-              config,
-              participantAdminConnection,
-              automation.appManagerStore,
-              oauth2Manager,
-              loggerFactory,
-            )
-            val jsonApiPublicHandler = new HttpJsonApiPublicHandler(
-              config,
-              loggerFactory,
-            )
-            (
-              appManagerAdminHandler,
-              appManagerHandler,
-              appManagerPublicHandler,
-              jsonApiPublicHandler,
-            )
-          }
-        }
-
       route = cors(
         CorsSettings(ac)
           .withAllowedMethods(
@@ -1023,37 +935,7 @@ class ValidatorApp(
                     ansHandler,
                     AuthExtractor(verifier, loggerFactory, "splice ans realm"),
                   )
-                } ++
-                  appManagerHandlersO.toList.flatMap {
-                    case (adminHandler, handler, publicHandler, jsonApiHandler) =>
-                      Seq(
-                        AppManagerAdminResource.routes(
-                          adminHandler,
-                          operationId =>
-                            AdminAuthExtractor(
-                              verifier,
-                              validatorParty,
-                              automation.connection,
-                              loggerFactory,
-                              "app manager admin realm",
-                            )(traceContext)(
-                              operationId
-                            ),
-                        ),
-                        AppManagerResource.routes(
-                          handler,
-                          AuthExtractor(verifier, loggerFactory, "app manager user realm"),
-                        ),
-                        AppManagerPublicResource.routes(
-                          publicHandler,
-                          _ => provide(()),
-                        ),
-                        JsonApiPublicResource.routes(
-                          jsonApiHandler,
-                          _ => provide(()),
-                        ),
-                      )
-                  })*
+                })*
               )
             }
           }

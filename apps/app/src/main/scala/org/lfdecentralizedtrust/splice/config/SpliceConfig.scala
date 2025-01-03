@@ -86,7 +86,6 @@ case class SpliceConfig(
     scanApps: Map[InstanceName, ScanAppBackendConfig] = Map.empty,
     scanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
-    appManagerAppClients: Map[InstanceName, AppManagerAppClientConfig] = Map.empty,
     ansAppExternalClients: Map[InstanceName, AnsAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
@@ -601,8 +600,6 @@ object SpliceConfig {
       deriveReader[InitialRegisteredApp]
     implicit val initialInstalledAppReader: ConfigReader[InitialInstalledApp] =
       deriveReader[InitialInstalledApp]
-    implicit val appManagerConfigReader: ConfigReader[AppManagerConfig] =
-      deriveReader[AppManagerConfig]
     implicit val transferPreapprovalConfigReader: ConfigReader[TransferPreapprovalConfig] =
       deriveReader[TransferPreapprovalConfig].emap { conf =>
         Either.cond(
@@ -638,8 +635,6 @@ object SpliceConfig {
       deriveReader[WalletSynchronizerConfig]
     implicit val WalletAppClientConfigReader: ConfigReader[WalletAppClientConfig] =
       deriveReader[WalletAppClientConfig]
-    implicit val AppManagerAppClientConfigReader: ConfigReader[AppManagerAppClientConfig] =
-      deriveReader[AppManagerAppClientConfig]
     implicit val ansExternalClientConfigReader: ConfigReader[AnsAppExternalClientConfig] =
       deriveReader[AnsAppExternalClientConfig]
     implicit val splitwellDomainsReader: ConfigReader[SplitwellDomains] =
@@ -866,8 +861,6 @@ object SpliceConfig {
       deriveWriter[InitialRegisteredApp]
     implicit val initialInstalledAppWriter: ConfigWriter[InitialInstalledApp] =
       deriveWriter[InitialInstalledApp]
-    implicit val appManagerConfigWriter: ConfigWriter[AppManagerConfig] =
-      deriveWriter[AppManagerConfig]
     implicit val transferPreapprovalConfigWriter: ConfigWriter[TransferPreapprovalConfig] =
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
@@ -884,8 +877,6 @@ object SpliceConfig {
       deriveWriter[WalletSynchronizerConfig]
     implicit val WalletAppClientConfigWriter: ConfigWriter[WalletAppClientConfig] =
       deriveWriter[WalletAppClientConfig]
-    implicit val AppManagerAppClientConfigWriter: ConfigWriter[AppManagerAppClientConfig] =
-      deriveWriter[AppManagerAppClientConfig]
     implicit val ansExternalClientConfigWriter: ConfigWriter[AnsAppExternalClientConfig] =
       deriveWriter[AnsAppExternalClientConfig]
     implicit val splitwellDomains: ConfigWriter[SplitwellDomains] =

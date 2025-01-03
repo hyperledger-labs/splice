@@ -1150,7 +1150,6 @@ Once this is complete, the front ends will be running on the ports on localhost 
   - 2 for sv UI
   - 3 for scan
   - 4 for splitwell
-  - 5 for app manager
 - <user> is as follows:
   - 00 for alice
   - 01 for bob

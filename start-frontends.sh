@@ -98,7 +98,6 @@ function usage() {
   echo "  -a        run all frontends with canton-network-test auth0 tenant and no test auth"
   echo "  -v        run frontends with a shared validator for all users"
   echo "  -s        run frontends with two super validators for Sv*IntegrationTest in CI"
-  echo "  -m        run frontends with app manager frontends"
   echo "  -t        start interactive/live vitest suites for frontends"
 }
 
@@ -107,7 +106,6 @@ daemon=0
 enable_test_auth="true"
 shared_validator_for_users=0
 two_svs=0
-app_manager=0
 run_tests=0
 
 while getopts "hdapvsmtl" arg; do
@@ -127,9 +125,6 @@ while getopts "hdapvsmtl" arg; do
       ;;
     s)
       two_svs=1
-      ;;
-    m)
-      app_manager=1
       ;;
     t)
       run_tests=1
@@ -208,25 +203,13 @@ function start_local_frontends() {
   start_frontend scan 3311 scan "scan" "false"
 
   # Splitwell
-  if [ $app_manager -eq 1 ]; then
-    start_frontend splitwell 3420 splitwell "splitwell" $enable_test_auth
-  else
-    start_frontend splitwell 3400 alice "alice" $enable_test_auth
-    start_frontend splitwell 3401 bob $validator_for_bob $enable_test_auth
-    start_frontend splitwell 3402 charlie "alice" $enable_test_auth
-  fi
-
-  # App manager
-  if [ $app_manager -eq 1 ]; then
-    start_frontend app-manager 3500 alice "alice" $enable_test_auth
-    start_frontend app-manager 3520 splitwell "splitwell" $enable_test_auth
-  fi
-
+  start_frontend splitwell 3400 alice "alice" $enable_test_auth
+  start_frontend splitwell 3401 bob $validator_for_bob $enable_test_auth
+  start_frontend splitwell 3402 charlie "alice" $enable_test_auth
 }
 
 # The set of tests we want to start for local unit testing
 function start_local_tests() {
-  start_test app-manager
   start_test ans
   start_test scan
   start_test splitwell

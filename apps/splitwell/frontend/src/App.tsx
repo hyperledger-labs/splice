@@ -2,16 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import {
-  AuthProvider,
-  UserProvider,
-  theme,
-  useUserState,
-  PackageIdResolver,
-} from 'common-frontend';
+import { AuthProvider, UserProvider, theme, PackageIdResolver } from 'common-frontend';
 import { replaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   createBrowserRouter,
@@ -99,18 +93,6 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
 const SplitwellAuthCheck: React.FC = () => {
   const config = useConfig();
-  const { loginWithOidc, oidcAuthState } = useUserState();
-  useEffect(() => {
-    // Auth-login after the user launched the app from their app manager.
-    if (
-      config.appManager &&
-      oidcAuthState &&
-      !oidcAuthState.isLoading &&
-      !oidcAuthState.isAuthenticated
-    ) {
-      loginWithOidc();
-    }
-  }, [loginWithOidc, oidcAuthState, config]);
   return <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />;
 };
 

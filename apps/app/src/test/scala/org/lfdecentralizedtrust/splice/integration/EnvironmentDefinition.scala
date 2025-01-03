@@ -118,18 +118,6 @@ case class EnvironmentDefinition(
       setup(env)
     })
 
-  def withoutInitialManagerApps: EnvironmentDefinition = {
-    addConfigTransform((_, config) =>
-      config.copy(validatorApps = config.validatorApps.map { case (name, config) =>
-        name -> config.copy(appManager =
-          config.appManager.map(
-            _.copy(initialInstalledApps = Map.empty, initialRegisteredApps = Map.empty)
-          )
-        )
-      })
-    )
-  }
-
   def withoutAutomaticRewardsCollectionAndAmuletMerging: EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllAutomationConfigs(

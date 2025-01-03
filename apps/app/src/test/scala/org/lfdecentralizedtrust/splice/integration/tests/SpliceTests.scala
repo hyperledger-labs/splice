@@ -235,10 +235,6 @@ object SpliceTests extends LazyLogging {
         env: SpliceTestConsoleEnvironment
     ): WalletAppClientReference = extendLedgerApiUserWithCaseId(super.wc(name))
 
-    override def uamc(name: String)(implicit
-        env: SpliceTestConsoleEnvironment
-    ): AppManagerAppClientReference = extendLedgerApiUserWithCaseId(super.uamc(name))
-
     // make `aliceAns` etc. use updated usernames
     override def rdpe(name: String)(implicit
         env: SpliceTestConsoleEnvironment
@@ -259,17 +255,6 @@ object SpliceTests extends LazyLogging {
     ): WalletAppClientReference = {
       val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
       new WalletAppClientReference(
-        ref.spliceConsoleEnvironment,
-        ref.name,
-        config = ref.config.copy(ledgerApiUser = newLedgerApiUser),
-      )
-    }
-
-    private def extendLedgerApiUserWithCaseId(
-        ref: AppManagerAppClientReference
-    ): AppManagerAppClientReference = {
-      val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
-      new AppManagerAppClientReference(
         ref.spliceConsoleEnvironment,
         ref.name,
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser),

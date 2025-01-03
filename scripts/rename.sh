@@ -844,7 +844,6 @@ function subcmd_all_packages() {
   rename_daml_package 'validator-lifecycle' 'splice-validator-lifecycle' 'ValidatorLifecycle' 'SpliceValidatorLifecycle'
   rename_daml_package 'dso-governance' 'splice-dso-governance' 'DsoGovernance' 'SpliceDsoGovernance'
   rename_daml_package 'canton-amulet' 'splice-amulet' 'CantonAmulet' 'SpliceAmulet'
-  rename_daml_package 'app-manager' 'splice-app-manager' 'AppManager' 'SpliceAppManager'
   rename_daml_package 'canton-name-service' 'splice-amulet-name-service' 'CantonNameService' 'SpliceAmuletNameService'
 }
 

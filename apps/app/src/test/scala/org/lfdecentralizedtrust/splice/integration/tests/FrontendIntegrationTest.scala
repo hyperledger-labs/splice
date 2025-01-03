@@ -174,9 +174,6 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   val charlieSplitwellUIPort = 3402
   val splitwellSplitwellUIPort = 3420
 
-  val aliceAppManagerUIPort = 3500
-  val splitwellAppManagerUIPort = 3520
-
   val options: FirefoxOptions =
     new FirefoxOptions()
       .setLogLevel(FirefoxDriverLogLevel.DEBUG)

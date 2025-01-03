@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.util.ContractWithState
 import org.lfdecentralizedtrust.splice.validator.admin.api.client.commands.*
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService
 import org.lfdecentralizedtrust.splice.validator.config.{
-  AppManagerAppClientConfig,
   ValidatorAppBackendConfig,
   ValidatorAppClientConfig,
 }
@@ -29,9 +28,7 @@ import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationSer
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
-import com.google.protobuf.ByteString
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.model.BodyPartEntity
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 
@@ -317,121 +314,6 @@ abstract class ValidatorAppReference(
     }
   }
 
-  def registerApp(
-      providerUserId: String,
-      configuration: definitions.AppConfiguration,
-      release: BodyPartEntity,
-  ): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAdminAppClient.RegisterApp(providerUserId, configuration, release)
-      )
-    }
-
-  def publishAppRelease(provider: PartyId, release: BodyPartEntity): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAdminAppClient.PublishAppRelease(provider, release)
-      )
-    }
-
-  def updateAppConfiguration(provider: PartyId, configuration: definitions.AppConfiguration): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAdminAppClient.UpdateAppConfiguration(provider, configuration)
-      )
-    }
-
-  def listRegisteredApps(): Seq[definitions.RegisteredApp] =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAppClient.ListRegisteredApps
-      )
-    }
-
-  def getLatestAppConfiguration(provider: PartyId): definitions.AppConfiguration =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerPublicAppClient.GetLatestAppConfiguration(provider)
-      )
-    }
-
-  def getLatestAppConfigurationByName(name: String): definitions.AppConfiguration =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerPublicAppClient.GetLatestAppConfigurationByName(name)
-      )
-    }
-
-  def getAppRelease(provider: PartyId, version: String): definitions.AppRelease =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerPublicAppClient.GetAppRelease(provider, version)
-      )
-    }
-
-  def getDarFile(darHash: String): ByteString =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerPublicAppClient.GetDarFile(darHash)
-      )
-    }
-
-  def installApp(manifestUrl: String): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAdminAppClient.InstallApp(manifestUrl)
-      )
-    }
-
-  def approveAppReleaseConfiguration(
-      provider: PartyId,
-      configurationVersion: Long,
-      releaseConfigurationIndex: Int,
-  ): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAdminAppClient.ApproveAppReleaseConfiguration(
-          provider,
-          configurationVersion,
-          releaseConfigurationIndex,
-        )
-      )
-    }
-
-  def listInstalledApps(): Seq[definitions.InstalledApp] =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAppClient.ListInstalledApps
-      )
-    }
-
-  def oauth2Jwks(): definitions.JwksResponse =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerPublicAppClient.Oauth2Jwks
-      )
-    }
-
-  def oauth2OpenIdConfiguration(): definitions.OpenIdConfigurationResponse =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerPublicAppClient.Oauth2OpenIdConfiguration
-      )
-    }
-
-  def oauth2Token(
-      grantType: String,
-      code: String,
-      redirectUri: String,
-      clientId: String,
-  ): definitions.TokenResponse =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerPublicAppClient.Oauth2Token(grantType, code, redirectUri, clientId)
-      )
-    }
-
   object scanProxy {
 
     def getDsoParty(): PartyId = {
@@ -574,46 +456,4 @@ final case class ValidatorAppClientReference(
   override def httpClientConfig = config.adminApi
 
   override protected val instanceType = "Validator Client"
-}
-
-final case class AppManagerAppClientReference(
-    override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
-    override val name: String,
-    val config: AppManagerAppClientConfig,
-) extends HttpAppReference {
-
-  override def basePath = "/api/validator"
-  override def httpClientConfig = config.adminApi
-
-  override def token: Option[String] = {
-    Some(
-      AuthUtil.testToken(
-        audience = AuthUtil.testAudience,
-        user = config.ledgerApiUser,
-        secret = AuthUtil.testSecret,
-      )
-    )
-  }
-
-  def authorizeApp(
-      provider: PartyId
-  ): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAppClient.AuthorizeApp(provider)
-      )
-    }
-
-  def checkAppAuthorized(
-      provider: PartyId,
-      redirectUri: String,
-      state: String,
-  ): String =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAppClient.CheckAppAuthorized(provider, redirectUri, state)
-      )
-    }
-
-  override protected val instanceType = "App Manager User Client"
 }
