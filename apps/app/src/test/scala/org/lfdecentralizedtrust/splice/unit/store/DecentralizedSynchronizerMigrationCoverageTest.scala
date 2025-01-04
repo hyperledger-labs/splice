@@ -116,11 +116,10 @@ object DecentralizedSynchronizerMigrationCoverageTest {
           ValidatorStore.Key(
             dsoParty = dummyParty,
             validatorParty = dummyParty,
-            appManagerEnabled = true,
           ),
           domainMigrationId,
         ),
-        ValidatorStore.templatesMovedByMyAutomation(true),
+        ValidatorStore.templatesMovedByMyAutomation,
       ),
       (
         SvDsoStore,

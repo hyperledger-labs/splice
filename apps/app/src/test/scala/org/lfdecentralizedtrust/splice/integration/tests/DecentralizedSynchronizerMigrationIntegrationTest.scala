@@ -265,9 +265,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       )
                     )
                   ),
-                  appManager = splitwellValidatorConfig.appManager.map(
-                    _.copy(initialRegisteredApps = Map.empty)
-                  ),
                   domainMigrationId = 1L,
                 )
             }

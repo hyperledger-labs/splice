@@ -287,7 +287,7 @@ class H2DbStorageSetup(
 
 object DbStorageSetup {
 
-  /** If we are running in CI on a docker executor opt to use a separate docker setup for testing postgres
+  /** If we are running in CI on a docker executor or in GHA opt to use a separate docker setup for testing postgres
     * If we are running in CI on a `machine` use a local [org.testcontainers.containers.PostgreSQLContainer.PostgreSQLContainer]
     * If we are running locally use a local [org.testcontainers.containers.PostgreSQLContainer.PostgreSQLContainer]
     */
@@ -301,9 +301,10 @@ object DbStorageSetup {
 
     val isCI = sys.env.contains("CI")
     val isMachine = sys.env.contains("MACHINE")
+    val isGha = sys.env.contains("GITHUB_ACTION")
     val useTestContainerByForce = sys.env.contains("DB_FORCE_TEST_CONTAINER") || forceTestContainer
 
-    if (!useTestContainerByForce && (isCI && !isMachine))
+    if (!useTestContainerByForce && ((isCI && !isMachine) || isGha))
       new PostgresCISetup(migrationMode, mkDbConfig, useDbNameO, loggerFactory).initialized()
     else new PostgresTestContainerSetup(migrationMode, mkDbConfig, loggerFactory).initialized()
   }
