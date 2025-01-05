@@ -3,9 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.store
 
-import cats.syntax.traverseFilter.*
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as walletCodegen,
   topupstate as topUpCodegen,
@@ -18,7 +16,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   validatorlicense as validatorLicenseCodegen,
 }
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
-import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
   ConstrainedTemplate,
@@ -31,7 +28,6 @@ import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
 import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
 import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -157,111 +153,6 @@ trait ValidatorStore extends WalletStore with AppStore {
     ]]
   ]
 
-  def lookupLatestAppConfiguration(
-      provider: PartyId
-  )(implicit tc: TraceContext): Future[Option[ContractWithState[
-    appManagerCodegen.AppConfiguration.ContractId,
-    appManagerCodegen.AppConfiguration,
-  ]]]
-
-  def lookupLatestAppConfigurationByName(
-      name: String
-  )(implicit tc: TraceContext): Future[Option[ContractWithState[
-    appManagerCodegen.AppConfiguration.ContractId,
-    appManagerCodegen.AppConfiguration,
-  ]]]
-
-  def lookupAppConfiguration(
-      provider: PartyId,
-      version: Long,
-  )(implicit tc: TraceContext): Future[QueryResult[Option[ContractWithState[
-    appManagerCodegen.AppConfiguration.ContractId,
-    appManagerCodegen.AppConfiguration,
-  ]]]]
-
-  def lookupAppRelease(
-      provider: PartyId,
-      version: String,
-  )(implicit tc: TraceContext): Future[QueryResult[
-    Option[ContractWithState[appManagerCodegen.AppRelease.ContractId, appManagerCodegen.AppRelease]]
-  ]]
-
-  def lookupRegisteredApp(
-      provider: PartyId
-  )(implicit tc: TraceContext): Future[QueryResult[
-    Option[
-      ContractWithState[appManagerCodegen.RegisteredApp.ContractId, appManagerCodegen.RegisteredApp]
-    ]
-  ]]
-
-  def lookupInstalledApp(
-      provider: PartyId
-  )(implicit tc: TraceContext): Future[QueryResult[
-    Option[
-      ContractWithState[appManagerCodegen.InstalledApp.ContractId, appManagerCodegen.InstalledApp]
-    ]
-  ]]
-
-  def listRegisteredApps(limit: Limit = Limit.DefaultLimit)(implicit
-      traceContext: TraceContext
-  ): Future[Seq[ValidatorStore.RegisteredApp]] =
-    multiDomainAcsStore.listContracts(appManagerCodegen.RegisteredApp.COMPANION, limit).flatMap {
-      apps =>
-        apps.toList.traverseFilter { app =>
-          lookupLatestAppConfiguration(
-            PartyId.tryFromProtoPrimitive(app.contract.payload.provider)
-          ).map(config =>
-            config.map(
-              ValidatorStore.RegisteredApp(
-                app,
-                _,
-              )
-            )
-          )
-        }
-    }
-
-  def listInstalledApps(limit: Limit = Limit.DefaultLimit)(implicit
-      traceContext: TraceContext
-  ): Future[Seq[
-    ValidatorStore.InstalledApp
-  ]] =
-    multiDomainAcsStore
-      .listContracts(appManagerCodegen.InstalledApp.COMPANION, limit)
-      .flatMap(_.toList.traverseFilter { app =>
-        val provider = PartyId.tryFromProtoPrimitive(app.contract.payload.provider)
-        for {
-          approvedReleaseConfigs <- listApprovedReleaseConfigurations(provider, limit)
-          latestConfigO <- lookupLatestAppConfiguration(provider)
-        } yield latestConfigO.map(
-          ValidatorStore.InstalledApp(
-            app,
-            _,
-            approvedReleaseConfigs,
-          )
-        )
-      })
-
-  protected def listApprovedReleaseConfigurations(
-      provider: PartyId,
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Seq[
-    ContractWithState[
-      appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
-      appManagerCodegen.ApprovedReleaseConfiguration,
-    ]
-  ]]
-
-  def lookupApprovedReleaseConfiguration(
-      provider: PartyId,
-      releaseConfigurationHash: Hash,
-  )(implicit traceContext: TraceContext): Future[QueryResult[Option[ContractWithState[
-    appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
-    appManagerCodegen.ApprovedReleaseConfiguration,
-  ]]]]
-
   final def listAmuletRulesTransferFollowers(
       amuletRules: AssignedContract[
         amuletrulesCodegen.AmuletRules.ContractId,
@@ -270,37 +161,11 @@ trait ValidatorStore extends WalletStore with AppStore {
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       amuletRules.domain,
-      templatesMovedByMyAutomation(key.appManagerEnabled),
+      templatesMovedByMyAutomation,
     )
 }
 
 object ValidatorStore {
-
-  final case class RegisteredApp(
-      registered: ContractWithState[
-        appManagerCodegen.RegisteredApp.ContractId,
-        appManagerCodegen.RegisteredApp,
-      ],
-      configuration: ContractWithState[
-        appManagerCodegen.AppConfiguration.ContractId,
-        appManagerCodegen.AppConfiguration,
-      ],
-  )
-
-  final case class InstalledApp(
-      installed: ContractWithState[
-        appManagerCodegen.InstalledApp.ContractId,
-        appManagerCodegen.InstalledApp,
-      ],
-      latestConfiguration: ContractWithState[
-        appManagerCodegen.AppConfiguration.ContractId,
-        appManagerCodegen.AppConfiguration,
-      ],
-      approvedReleaseConfigurations: Seq[ContractWithState[
-        appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
-        appManagerCodegen.ApprovedReleaseConfiguration,
-      ]],
-  )
 
   def apply(
       key: Key,
@@ -332,7 +197,6 @@ object ValidatorStore {
       validatorParty: PartyId,
       /** The party-id of the DSO issuing CC managed by this wallet. */
       dsoParty: PartyId,
-      appManagerEnabled: Boolean,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
       param("validatorParty", _.validatorParty),
@@ -340,22 +204,12 @@ object ValidatorStore {
     )
   }
 
-  private[splice] def templatesMovedByMyAutomation(
-      appManagerEnabled: Boolean
-  ): Seq[ConstrainedTemplate] =
+  private[splice] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
     Seq[ConstrainedTemplate](
       walletCodegen.WalletAppInstall.COMPANION,
       amuletCodegen.ValidatorRight.COMPANION,
       amuletrulesCodegen.ExternalPartySetupProposal.COMPANION,
-    ) ++ (if (appManagerEnabled)
-            Seq[ConstrainedTemplate](
-              appManagerCodegen.AppConfiguration.COMPANION,
-              appManagerCodegen.AppRelease.COMPANION,
-              appManagerCodegen.RegisteredApp.COMPANION,
-              appManagerCodegen.InstalledApp.COMPANION,
-              appManagerCodegen.ApprovedReleaseConfiguration.COMPANION,
-            )
-          else Seq.empty)
+    )
 
   /** Contract of a wallet store for a specific validator party. */
   def contractFilter(
@@ -446,63 +300,7 @@ object ValidatorStore {
           co.payload.dso == dso &&
             co.payload.owner == validator
         )(ValidatorAcsStoreRowData(_)),
-      ) ++ (if (key.appManagerEnabled)
-              Map[PackageQualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]](
-                mkFilter(appManagerCodegen.AppConfiguration.COMPANION)(co =>
-                  co.payload.validatorOperator == validator
-                ) { contract =>
-                  val name = io.circe.parser
-                    .decode[definitions.AppConfiguration](contract.payload.json)
-                    .map(_.name)
-                    .getOrElse(
-                      throw new IllegalArgumentException(
-                        s"Failed to extract name from ${contract.payload.json}"
-                      )
-                    )
-                  ValidatorAcsStoreRowData(
-                    contract = contract,
-                    contractExpiresAt = None,
-                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
-                    appConfigurationVersion = Some(contract.payload.version),
-                    appConfigurationName = Some(name),
-                  )
-                },
-                mkFilter(appManagerCodegen.AppRelease.COMPANION)(co =>
-                  co.payload.validatorOperator == validator
-                ) { contract =>
-                  ValidatorAcsStoreRowData(
-                    contract = contract,
-                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
-                    appReleaseVersion = Some(contract.payload.version),
-                  )
-                },
-                mkFilter(appManagerCodegen.RegisteredApp.COMPANION)(co =>
-                  co.payload.validatorOperator == validator
-                ) { contract =>
-                  ValidatorAcsStoreRowData(
-                    contract = contract,
-                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
-                  )
-                },
-                mkFilter(appManagerCodegen.InstalledApp.COMPANION)(co =>
-                  co.payload.validatorOperator == validator
-                ) { contract =>
-                  ValidatorAcsStoreRowData(
-                    contract = contract,
-                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
-                  )
-                },
-                mkFilter(appManagerCodegen.ApprovedReleaseConfiguration.COMPANION)(co =>
-                  co.payload.validatorOperator == validator
-                ) { contract =>
-                  ValidatorAcsStoreRowData(
-                    contract = contract,
-                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
-                    jsonHash = Some(contract.payload.jsonHash),
-                  )
-                },
-              )
-            else Map.empty[PackageQualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]]),
+      ),
     )
   }
 
