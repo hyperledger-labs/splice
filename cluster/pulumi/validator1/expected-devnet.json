@@ -350,6 +350,9 @@
           },
           "splitwell": true
         },
+        "spliceDomainNames": {
+          "nameServiceDomain": "cns"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",

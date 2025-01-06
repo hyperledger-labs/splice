@@ -5,6 +5,7 @@ import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
+  ansDomainPrefix,
   appsAffinityAndTolerations,
   BackupConfig,
   btoa,
@@ -276,6 +277,9 @@ export async function installSvNode(
             .runningMigrations()
             .map(x => x.id.toString()),
         },
+      },
+      spliceDomainNames: {
+        nameServiceDomain: ansDomainPrefix,
       },
       cluster: {
         hostname: CLUSTER_HOSTNAME,

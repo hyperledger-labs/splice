@@ -465,3 +465,5 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
       }
   }
 }
+
+export const ansDomainPrefix = 'cns';

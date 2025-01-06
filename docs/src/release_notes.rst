@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Deployment
+
+  * The setting ``spliceDomainNames.nameServiceDomain`` must now be supplied for the ``splice-cluster-ingress-runbook`` helm chart.
+    See the ``sv-helm`` example.
+
+
 0.3.4
 -----
 

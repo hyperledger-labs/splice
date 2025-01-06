@@ -551,7 +551,12 @@ To install it, run the following (assuming the environment variable `YOUR_HOSTNA
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
 Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
-Another reference Helm chart is provided for that, which can be installed using:
+Another reference Helm chart is provided for that, which can be installed after
+
+1. replacing ``YOUR_HOSTNAME`` in ``splice-node/examples/sv-helm/validator-cluster-ingress-values.yaml`` and
+2. setting ``nameServiceDomain`` in the same file to ``"cns"``
+
+using:
 
 
 .. code-block:: bash
