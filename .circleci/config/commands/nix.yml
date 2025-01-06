@@ -314,6 +314,10 @@ commands:
                 # GOOGLE_CREDENTIALS variable is used by pulumi
                 export GOOGLE_CREDENTIALS=${CN_ACTIVE_ENVIRONMENT_KEY}
 
+                # GOOGLE_APPLICATION_CREDENTIALS variable is used by gcloud typescript client, it should include the filename of the key
+                export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp gcp-creds-XXXXXX.json)
+                echo ${CN_ACTIVE_ENVIRONMENT_KEY} > ${GOOGLE_APPLICATION_CREDENTIALS}
+
                 # TODO(#7702) Extract retry logic for CI tasks into command/script
                 # gcloud auth with a limited number of retries
                 MAX_AUTH_RETRIES=5

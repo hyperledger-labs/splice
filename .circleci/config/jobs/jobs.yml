@@ -161,6 +161,31 @@ jobs:
       - cluster_lock_reaper:
           cluster: "scratchnete"
 
+  purge_unused_dbs:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      cluster:
+        type: string
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Purge unused databases
+          cmd: |
+            cncluster purge_unused_dbs
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+
   update_pipeline_schedule:
     docker:
       - image: cimg/base:2024.01

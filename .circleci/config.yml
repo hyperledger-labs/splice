@@ -63,6 +63,7 @@ parameters:
         backup-status-testnet,
         backup-status-mainnet,
         preview-operator,
+        purge-unused-dbs-cidaily,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -1057,6 +1058,10 @@ commands:
 
                 # GOOGLE_CREDENTIALS variable is used by pulumi
                 export GOOGLE_CREDENTIALS=${CN_ACTIVE_ENVIRONMENT_KEY}
+
+                # GOOGLE_APPLICATION_CREDENTIALS variable is used by gcloud typescript client, it should include the filename of the key
+                export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp gcp-creds-XXXXXX.json)
+                echo ${CN_ACTIVE_ENVIRONMENT_KEY} > ${GOOGLE_APPLICATION_CREDENTIALS}
 
                 # TODO(#7702) Extract retry logic for CI tasks into command/script
                 # gcloud auth with a limited number of retries
@@ -3461,6 +3466,31 @@ jobs:
           cluster: "scratchnetd"
       - cluster_lock_reaper:
           cluster: "scratchnete"
+
+  purge_unused_dbs:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      cluster:
+        type: string
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Purge unused databases
+          cmd: |
+            cncluster purge_unused_dbs
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
 
   update_pipeline_schedule:
     docker:
@@ -6254,6 +6284,18 @@ workflows:
           context:
             - slack-context
             - artifactory
+
+  purge_unused_dbs_cidaily:
+    when:
+      equal: [ purge-unused-dbs-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - purge_unused_dbs:
+          <<: *main-branch-only
+          <<: *notify-fail
+          context:
+            - slack-context
+            - artifactory
+          cluster: "cidaily"
 
   deploy_scratchnet_basic:
     when:
