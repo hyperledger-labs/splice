@@ -19,8 +19,6 @@ import org.lfdecentralizedtrust.splice.sv.config.*
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.validator.config.{
   AnsAppExternalClientConfig,
-  AppManagerAppClientConfig,
-  AppManagerConfig,
   ValidatorAppBackendConfig,
 }
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
@@ -117,9 +115,6 @@ object ConfigTransforms {
         )
       ),
       updateAllWalletAppClientConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
-      updateAllAppManagerAppClientConfigs_(c =>
-        c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
-      ),
       updateAllSplitwellAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
       updateAllRemoteSplitwellAppConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
@@ -204,7 +199,6 @@ object ConfigTransforms {
   type AnsExternalClientConfigReader = Endo[AnsAppExternalClientConfig]
   type ValidatorAppTransform = Endo[ValidatorAppBackendConfig]
   type WalletAppClientTransform = Endo[WalletAppClientConfig]
-  type AppManagerAppClientTransform = Endo[AppManagerAppClientConfig]
   type ScanAppTransform = Endo[ScanAppBackendConfig]
   type SplitwellAppTransform = Endo[SplitwellAppBackendConfig]
   type RemoteSplitwellAppTransform = Endo[SplitwellAppClientConfig]
@@ -245,13 +239,6 @@ object ConfigTransforms {
       update: AnsExternalClientConfigReader
   ): ConfigTransform =
     _.focus(_.ansAppExternalClients).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
-
-  def updateAllAppManagerAppClientConfigs_(
-      update: AppManagerAppClientTransform
-  ): ConfigTransform =
-    _.focus(_.appManagerAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
@@ -354,13 +341,6 @@ object ConfigTransforms {
           (name, update(config))
         }
         .seq
-    )
-
-  def updateAllAppManagerConfigs_(
-      update: AppManagerConfig => AppManagerConfig
-  ): ConfigTransform =
-    updateAllValidatorConfigs_(
-      _.focus(_.appManager).modify(_.map(update))
     )
 
   def updateAllSplitwellAppConfigs_(
@@ -742,16 +722,6 @@ object ConfigTransforms {
         )
       )
     })
-
-  // Disable default domain connections to splitwell to test that the one established by the app manager works
-  def disableSplitwellUserDomainConnections: ConfigTransform =
-    updateAllValidatorConfigs(
-      { case (name, config) =>
-        if (Seq("aliceValidator", "bobValidator").contains(name))
-          config.focus(_.domains.extra).replace(Seq.empty)
-        else config
-      }
-    )
 
   def modifyAllANStorageConfigs(
       storageConfigModifier: (

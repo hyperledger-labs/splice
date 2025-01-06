@@ -52,29 +52,6 @@ final case class InitialRegisteredApp(
 
 final case class InitialInstalledApp(appUrl: Uri)
 
-final case class AppManagerConfig(
-    issuerUrl: Uri,
-    appManagerUiUrl: Uri,
-    appManagerApiUrl: Uri,
-    jsonApiUrl: Uri,
-    audience: String,
-    // Interval at which the app manager polls installed apps to discover new versions.
-    // Set to 1 minute to avoid spamming logs but still be able to demo things in our cluster.
-    // We may want to consider increasing it to 10min or even an hour.
-    installedAppsPollingInterval: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(1),
-    initialRegisteredApps: Map[String, InitialRegisteredApp],
-    initialInstalledApps: Map[String, InitialInstalledApp],
-) {
-  def authorizationEndpoint: Uri = appManagerUiUrl.withPath(appManagerUiUrl.path / "authorize")
-  def tokenEndpoint: Uri =
-    appManagerApiUrl.withPath(appManagerApiUrl.path / "v0" / "app-manager" / "oauth2" / "token")
-  def jwksUri: Uri =
-    appManagerApiUrl.withPath(
-      appManagerApiUrl.path / "v0" / "app-manager" / "oauth2" / ".well-known" / "jwks.json"
-    )
-}
-
 final case class BuyExtraTrafficConfig(
     /** target throughput in bytes per second
       *
@@ -180,7 +157,6 @@ case class ValidatorAppBackendConfig(
     treasury: TreasuryConfig = TreasuryConfig(),
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     participantIdentitiesBackup: Option[PeriodicBackupDumpConfig] = None,
-    appManager: Option[AppManagerConfig] = None,
     transferPreapproval: TransferPreapprovalConfig = TransferPreapprovalConfig(),
     // Migrate the validator party from an existing participant with the same namespace.
     migrateValidatorParty: Option[MigrateValidatorPartyConfig] = None,
@@ -224,13 +200,6 @@ case class ValidatorAppBackendConfig(
 
 case class ValidatorAppClientConfig(
     adminApi: NetworkAppClientConfig
-) extends HttpClientConfig {
-  override def clientAdminApi: NetworkAppClientConfig = adminApi
-}
-
-case class AppManagerAppClientConfig(
-    adminApi: NetworkAppClientConfig,
-    ledgerApiUser: String,
 ) extends HttpClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

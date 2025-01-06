@@ -7,7 +7,6 @@ import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.ResourceTemplateDecoder
-import org.lfdecentralizedtrust.splice.validator.config.AppManagerAppClientConfig
 import org.lfdecentralizedtrust.splice.validator.config.AnsAppExternalClientConfig
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
@@ -159,9 +158,6 @@ class SpliceConsoleEnvironment(
   lazy val wallets: Seq[WalletAppClientReference] =
     environment.config.walletAppClients.toSeq.map(createWalletAppClientReference)
 
-  lazy val appManagers: Seq[AppManagerAppClientReference] =
-    environment.config.appManagerAppClients.toSeq.map(createAppManagerAppClientReference)
-
   lazy val externalAns: Seq[AnsExternalAppClientReference] =
     environment.config.ansAppExternalClients.toSeq
       .map(createAnsExternalAppClientReference)
@@ -204,11 +200,6 @@ class SpliceConsoleEnvironment(
       conf: (InstanceName, WalletAppClientConfig)
   ): WalletAppClientReference =
     new WalletAppClientReference(this, conf._1.unwrap, conf._2)
-
-  private def createAppManagerAppClientReference(
-      conf: (InstanceName, AppManagerAppClientConfig)
-  ): AppManagerAppClientReference =
-    new AppManagerAppClientReference(this, conf._1.unwrap, conf._2)
 
   private def createAnsExternalAppClientReference(
       conf: (
@@ -273,17 +264,6 @@ class SpliceConsoleEnvironment(
         "walletClients",
         helpText("All wallet app user instances" + genericNodeReferencesDoc, "Wallet Users"),
         wallets,
-        Seq("App References"),
-      ) :++
-      appManagers.map(w =>
-        TopLevelValue(w.name, helpText("app manager app user", w.name), w, Seq("App References"))
-      ) :+ TopLevelValue(
-        "appManagerClients",
-        helpText(
-          "All app manager app user instances" + genericNodeReferencesDoc,
-          "App Manager Users",
-        ),
-        appManagers,
         Seq("App References"),
       ) :++
       externalAns.map(v =>

@@ -100,7 +100,6 @@ lazy val root: Project = (project in file("."))
     `splice-dso-governance-test-daml`,
     `splice-validator-lifecycle-daml`,
     `splice-validator-lifecycle-test-daml`,
-    `splice-app-manager-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
     `canton-community-common`,
@@ -197,8 +196,7 @@ lazy val docs = project
         Set(srcDir / "app_dev" / "api")
       }
       val damlSources =
-        (`splice-app-manager-daml` / Compile / damlBuild).value ++
-          (`splice-amulet-daml` / Compile / damlBuild).value ++
+        (`splice-amulet-daml` / Compile / damlBuild).value ++
           (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value ++
           (`splice-dso-governance-daml` / Compile / damlBuild).value ++
@@ -411,15 +409,6 @@ lazy val `splitwell-test-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `splice-app-manager-daml` =
-  project
-    .in(file("daml/splice-app-manager"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings
-    )
-    .dependsOn(`canton-bindings-java`)
-
 lazy val `apps-common` =
   project
     .in(file("apps/common"))
@@ -430,8 +419,6 @@ lazy val `apps-common` =
       `canton-community-testing` % "test",
       `splice-wartremover-extension` % "compile->compile;test->test",
       // We include all DARs here to make sure they are available as resources.
-      `splice-app-manager-daml`,
-      `splice-app-manager-daml`,
       `splice-amulet-daml`,
       `splice-amulet-name-service-daml`,
       `splitwell-daml`,
@@ -520,7 +507,6 @@ lazy val `apps-validator` =
       `apps-scan` % "compile->compile;test->test",
       `splice-wallet-daml`,
       `apps-wallet`,
-      `splice-app-manager-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(pekko_http_cors, commons_compress, jaxb_abi),
@@ -992,6 +978,7 @@ lazy val `apps-splitwell` =
           baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle-1.0.0.tar.gz"
         val output2_0 =
           baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle-2.0.0.tar.gz"
+        // TODO(#16859) Remove this after bumping the base version
         val createBundle = baseDirectory.value / "../../scripts/create-bundle-for-app-mgr.sh"
         val cacheDir = streams.value.cacheDirectory
         val cache = FileFunction.cached(cacheDir) { _ =>
@@ -1223,7 +1210,6 @@ lazy val bundleTask = {
         (`splice-dso-governance-daml` / Compile / damlBuild).value,
         (`splice-amulet-name-service-daml` / Compile / damlBuild).value,
         (`splice-wallet-payments-daml` / Compile / damlBuild).value,
-        (`splice-app-manager-daml` / Compile / damlBuild).value,
         (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
         (`splice-util-daml` / Compile / damlBuild).value,
       )
@@ -1455,7 +1441,6 @@ printTests := {
     name contains "DecentralizedSynchronizerSoftDomainMigration"
   def isGlobalSoftTopologyMigrationTest(name: String): Boolean =
     name contains "SoftDomainMigrationTopologySetupIntegrationTest"
-  def isAppManagerTest(name: String): Boolean = name contains "AppManager"
   def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
   // These are tests that are particularly resource intensive and need larger runners.
@@ -1589,12 +1574,7 @@ printTests := {
     (
       "frontend tests with wall clock time",
       "test-full-class-names-frontend.log",
-      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t) && !isAppManagerTest(t),
-    ),
-    (
-      "frontend tests with app manager",
-      "test-full-class-names-frontend-app-manager.log",
-      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t) && isAppManagerTest(t),
+      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t),
     ),
     (
       "frontend tests with simulated time",
