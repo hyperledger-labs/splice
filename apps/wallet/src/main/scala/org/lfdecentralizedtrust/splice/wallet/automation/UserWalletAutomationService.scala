@@ -177,12 +177,7 @@ class UserWalletAutomationService(
 }
 
 object UserWalletAutomationService extends AutomationServiceCompanion {
-  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
-    // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
-    // we can hardcode this.
-    Option.when(template.moduleName == "Splice.AmuletImport")(
-      DarResources.amulet.bootstrap.packageId
-    )
+  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] = None
 
   // defined because instances are created by UserWalletService, not immediately
   // available in the app state

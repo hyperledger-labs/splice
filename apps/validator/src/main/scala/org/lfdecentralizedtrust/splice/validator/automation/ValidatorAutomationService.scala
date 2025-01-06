@@ -269,13 +269,7 @@ class ValidatorAutomationService(
 }
 
 object ValidatorAutomationService extends AutomationServiceCompanion {
-  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
-    template.moduleName match {
-      // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
-      // we can hardcode this.
-      case "Splice.AmuletImport" => Some(DarResources.amulet.bootstrap.packageId)
-      case _ => None
-    }
+  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] = None
 
   override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
 }
