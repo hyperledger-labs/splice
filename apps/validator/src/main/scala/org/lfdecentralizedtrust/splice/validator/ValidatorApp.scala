@@ -90,6 +90,7 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 
+import com.google.protobuf.ByteString
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
@@ -259,15 +260,12 @@ class ValidatorApp(
                           config.ledgerApiUser,
                           config.domains.global.alias,
                           partyId =>
-                            SingleScanConnection.withSingleScanConnection(
+                            getAcsSnapshotFromSingleScan(
                               scanConfig,
-                              amuletAppParameters.upgradesConfig,
-                              clock,
+                              partyId,
+                              logger,
                               retryProvider,
-                              loggerFactory,
-                            ) { scanConnection =>
-                              scanConnection.getAcsSnapshot(partyId)
-                            },
+                            ),
                           Seq(
                             DarResources.amulet.bootstrap,
                             DarResources.amuletNameService.bootstrap,
@@ -384,6 +382,28 @@ class ValidatorApp(
       )
     }
   }
+
+  private def getAcsSnapshotFromSingleScan(
+      scanConfig: ScanAppClientConfig,
+      partyId: PartyId,
+      logger: TracedLogger,
+      retryProvider: RetryProvider,
+  )(implicit traceContext: TraceContext): Future[ByteString] =
+    retryProvider.retry(
+      RetryFor.WaitingOnInitDependency,
+      "get_acs_snapshot_from_single_scan",
+      "get ACS snapshot from single scan",
+      SingleScanConnection.withSingleScanConnection(
+        scanConfig,
+        amuletAppParameters.upgradesConfig,
+        clock,
+        retryProvider,
+        loggerFactory,
+      ) { scanConnection =>
+        scanConnection.getAcsSnapshot(partyId)
+      },
+      logger,
+    )
 
   private def setupAppInstance(
       name: String,
