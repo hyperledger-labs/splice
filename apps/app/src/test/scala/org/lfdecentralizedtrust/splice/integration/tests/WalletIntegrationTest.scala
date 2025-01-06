@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletClient
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
   WalletTestUtil,
@@ -402,7 +403,7 @@ class WalletIntegrationTest
       )
     }
 
-    "transfer AppPaymentRequest and DeliveryOffer to global domain" in { implicit env =>
+    "accept AppPaymentRequest created on 3rdparty synchronizer" in { implicit env =>
       val splitwellDomainId = aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
         DomainAlias.tryCreate("splitwell")
       )
@@ -421,13 +422,13 @@ class WalletIntegrationTest
           domainId = Some(splitwellDomainId),
         ),
       )(
-        "request and delivery offer get transferred to global domain",
+        "request and delivery are created on splitwell domain id",
         { case (request, _) =>
           val domains =
             aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
               .lookup_contract_domain(aliceParty, Set(request.contractId))
           domains shouldBe Map[String, DomainId](
-            request.contractId -> decentralizedSynchronizerId
+            request.contractId -> splitwellDomainId
           )
           request
         },
@@ -445,7 +446,7 @@ class WalletIntegrationTest
         "wait for the accepted payment to appear",
         _ =>
           inside(aliceWalletClient.listAcceptedAppPayments()) { case Seq(accepted) =>
-            accepted
+            accepted.state shouldBe ContractState.Assigned(decentralizedSynchronizerId)
           },
       )
     }

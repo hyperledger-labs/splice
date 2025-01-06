@@ -7,7 +7,6 @@ import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data as javab
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger.Task as FollowTask
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules_MiningRound_Archive,
@@ -36,11 +35,7 @@ import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, RetryProv
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import org.lfdecentralizedtrust.splice.store.*
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
-  ConstrainedTemplate,
-  QueryResult,
-  TemplateFilter,
-}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{QueryResult, TemplateFilter}
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData
@@ -66,8 +61,6 @@ trait SvDsoStore
     with DsoRulesStore
     with MiningRoundsStore
     with VotesStore {
-  import SvDsoStore.{amuletRulesFollowers, dsoRulesFollowers}
-
   protected val outerLoggerFactory: NamedLoggerFactory
   protected def templateJsonDecoder: TemplateJsonDecoder
 
@@ -819,44 +812,6 @@ trait SvDsoStore
     splice.dsorules.ElectionRequest,
   ]]]
 
-  private[this] def listLaggingDsoRulesFollowers(
-      targetDomain: DomainId
-  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = for {
-    amuletRulesO <- lookupAmuletRules()
-    otherContracts <- multiDomainAcsStore.listAssignedContractsNotOnDomainN(
-      targetDomain,
-      dsoRulesFollowers,
-    )
-  } yield otherContracts ++ amuletRulesO
-    .filterNot(_.domain == targetDomain)
-    .toList
-
-  final def listDsoRulesTransferFollowers()(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[FollowTask[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules, _, _]]
-  ] = {
-    lookupDsoRules().flatMap(_.map { dsoRules =>
-      listLaggingDsoRulesFollowers(dsoRules.domain)
-        .map(_ map (FollowTask(dsoRules, _)))
-    }.getOrElse(Future successful Seq.empty))
-  }
-
-  def listAmuletRulesTransferFollowers()(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[FollowTask[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules, ?, ?]]
-  ] = {
-    lookupAmuletRules().flatMap(_.map { amuletRules =>
-      multiDomainAcsStore
-        .listAssignedContractsNotOnDomainN(
-          amuletRules.domain,
-          amuletRulesFollowers,
-        )
-        .map(_.map(FollowTask(amuletRules, _)).toSeq)
-    }.getOrElse(Future successful Seq.empty))
-  }
-
   def lookupAnsEntryByNameWithOffset(name: String, now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[
@@ -1031,45 +986,6 @@ object SvDsoStore {
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
   }
-
-  private val dsoRulesFollowers: Seq[ConstrainedTemplate] = {
-    import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules
-    Seq[ConstrainedTemplate](
-      // AmuletRules is specially handled so should *not* be listed here, even
-      // though it follows DsoRules
-      dsorules.VoteRequest.COMPANION,
-      dsorules.Confirmation.COMPANION,
-      dsorules.ElectionRequest.COMPANION,
-      so.SvOnboardingRequest.COMPANION,
-      so.SvOnboardingConfirmed.COMPANION,
-      splice.dso.svstate.SvStatusReport.COMPANION,
-      splice.dso.svstate.SvNodeState.COMPANION,
-      splice.dso.svstate.SvRewardState.COMPANION,
-    )
-  }
-
-  private[splice] val amuletRulesFollowers: Seq[ConstrainedTemplate] = Seq[ConstrainedTemplate](
-    splice.round.OpenMiningRound.COMPANION,
-    splice.round.SummarizingMiningRound.COMPANION,
-    splice.round.IssuingMiningRound.COMPANION,
-    splice.round.ClosedMiningRound.COMPANION,
-    splice.amulet.FeaturedAppRight.COMPANION,
-    splice.amulet.UnclaimedReward.COMPANION,
-    splice.validatorlicense.ValidatorLicense.COMPANION,
-    splice.ans.AnsEntry.COMPANION,
-    splice.ans.AnsEntryContext.COMPANION,
-    splice.ans.AnsRules.COMPANION,
-    splice.amuletrules.TransferPreapproval.COMPANION,
-    splice.dso.amuletprice.AmuletPriceVote.COMPANION,
-    splice.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
-  )
-
-  private[splice] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
-    (dsoRulesFollowers ++ amuletRulesFollowers) ++ Seq[ConstrainedTemplate](
-      // AmuletRules and DsoRules are specially handled, so not listed in followers
-      splice.dsorules.DsoRules.COMPANION,
-      splice.amuletrules.AmuletRules.COMPANION,
-    )
 
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(

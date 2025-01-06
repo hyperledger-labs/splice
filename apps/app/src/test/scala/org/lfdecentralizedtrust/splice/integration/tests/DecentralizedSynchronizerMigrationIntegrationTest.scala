@@ -1082,7 +1082,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 )(
                   "alice sees payment request",
                   _ => {
-                    getSingleRequestOnDecentralizedSynchronizer(uwc("aliceWalletLocal"))
+                    getSingleAppPaymentRequest(uwc("aliceWalletLocal"))
                   },
                 )
 
@@ -1302,7 +1302,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         )(
           "alice sees payment request",
           _ => {
-            getSingleRequestOnDecentralizedSynchronizer(aliceWalletClient)
+            getSingleAppPaymentRequest(aliceWalletClient)
           },
         )
 

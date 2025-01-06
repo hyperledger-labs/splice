@@ -3,12 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
-import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger.Task as FollowTask
 import org.lfdecentralizedtrust.splice.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
-  TransferFollowTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, PeriodicBackupDumpConfig}
 import org.lfdecentralizedtrust.splice.environment.*
@@ -39,7 +37,7 @@ import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
@@ -188,26 +186,6 @@ class ValidatorAutomationService(
     )
   )
 
-  if (!supportsSoftDomainMigrationPoc) {
-    registerTrigger(
-      new TransferFollowTrigger(
-        triggerContext,
-        store,
-        connection,
-        store.key.validatorParty,
-        implicit tc =>
-          scanConnection.getAmuletRulesWithState().flatMap { amuletRulesCWS =>
-            amuletRulesCWS.toAssignedContract
-              .map { amuletRules =>
-                store
-                  .listAmuletRulesTransferFollowers(amuletRules)
-                  .map(_ map (FollowTask(amuletRules, _)))
-              }
-              .getOrElse(Future successful Seq.empty)
-          },
-      )
-    )
-  }
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
   if (sequencerConnectionFromScan)
     registerTrigger(

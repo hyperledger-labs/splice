@@ -16,7 +16,6 @@ function usage() {
   echo "  -s               only start canton instance with simulated time"
   echo "  -f               start canton using the CometBFT driver for the global sequencers"
   echo "  -F               same as -f, but does not start cometBFT, but rather assumes it is already running"
-  echo "  -g               start extra global upgrade domain"
   echo "  -m               collect metrics and send them to our CI prometheus instance"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
@@ -27,7 +26,6 @@ wallclocktime=1
 simtime=1
 POSTGRES_MODE=docker
 CANTON=canton
-globalUpgradeDomain=0
 bootstrapScriptPath=bootstrap-canton.sc
 start_cometbft=0
 use_cometbft=0
@@ -85,10 +83,6 @@ do
             use_cometbft=1
             echo "start canton with the cometbft driver (assuming CometBFT is already running)"
             ;;
-        -g)
-            globalUpgradeDomain=1
-            echo "start extra global upgrade domain"
-            ;;
         -m)
             collect_metrics=1
             ;;
@@ -103,11 +97,6 @@ do
     esac
     shift
 done
-
-if [ $globalUpgradeDomain -ne 0 ] && [ $simtime -ne 0 ]; then
-  >&2 echo "-g requires -w to be passed as well"
-  exit 1
-fi
 
 tmux_session="canton"
 tmux_window=0
@@ -167,14 +156,6 @@ if [ $simtime -eq 1 ]; then
   IFS=' ' read -r -a simtime_db_names <<< \
       "$(echo "${any_time_db_names[@]}" | sed -Ee 's/( |$)/_simtime\1/g')"
   db_names+=("${simtime_db_names[@]}")
-else
-  if [ $globalUpgradeDomain -eq 1 ]; then
-    db_names+=(
-      "sequencer_global_upgrade_1"
-      "mediator_global_upgrade_1"
-      "sequencer_driver_global_upgrade"
-    )
-  fi
 fi
 
 if [ $softDomainMigration -eq 1 ]; then
@@ -225,14 +206,6 @@ if [[ $use_cometbft -eq 1 ]]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/cometbft-sequencer-global-domain-overrides.conf"
 fi;
 
-
-if [ $globalUpgradeDomain -eq 1 ] && [ $simtime -eq 0 ]; then
-  combinedBootstrapScriptPath="$(mktemp --suffix=.sc)"
-  sed -e '/Inserting extra commands here (do not edit this line)/r bootstrap-canton-global-upgrade.sc' \
-      "$bootstrapScriptPath" > "$combinedBootstrapScriptPath"
-  bootstrapScriptPath="$combinedBootstrapScriptPath"
-  config_overrides="$config_overrides -c ./apps/app/src/test/resources/global-upgrade-domain-overrides.conf"
-fi
 
 if [ $softDomainMigration -eq 1 ]; then
 config_overrides="$config_overrides -c ./apps/app/src/test/resources/simple-topology-soft-domain-upgrade-canton.conf"

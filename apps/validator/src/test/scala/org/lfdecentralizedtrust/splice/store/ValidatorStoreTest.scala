@@ -10,11 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install as wal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.topupstate as topUpCodegen
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
-import org.lfdecentralizedtrust.splice.util.{
-  AssignedContract,
-  ResourceTemplateDecoder,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
   ValidatorSynchronizerConfig,
@@ -263,52 +259,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
           result <- store.lookupTransferPreapprovalByReceiverPartyWithOffset(user1)
         } yield {
           result.value.value.contract shouldBe preapproval1
-        }
-      }
-    }
-
-    "listAmuletRulesTransferFollowers" should {
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          amuletRules1 = amuletRules()
-          walletInstall1 = walletInstall(user1, "user1")
-          // TODO (#7822) move to UserWallet
-          amulet1 = amulet(validator, 1, 1L, 0.1)
-          validatorRight1 = validatorRight(user1)
-          validatorFaucetCoupon1 = validatorFaucetCoupon(validator)
-          externalPartySetupProposal1 = externalPartySetupProposal(user1)
-          _ <- dummyDomain.create(walletInstall1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(amulet1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(validatorRight1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(validatorFaucetCoupon1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(
-            externalPartySetupProposal1,
-            createdEventSignatories = signatories,
-          )(
-            store.multiDomainAcsStore
-          )
-          _ <- dummy2Domain.create(amuletRules1)(
-            store.multiDomainAcsStore
-          )
-          tfResult <- store.listAmuletRulesTransferFollowers(
-            AssignedContract(amuletRules1, dummy2Domain)
-          )
-        } yield {
-          val actual = tfResult.map(_.contract.identifier.getEntityName)
-          val expected =
-            ValidatorStore.templatesMovedByMyAutomation
-              .map(_.getTemplateIdWithPackageId.getEntityName)
-          actual should contain theSameElementsAs expected
         }
       }
     }

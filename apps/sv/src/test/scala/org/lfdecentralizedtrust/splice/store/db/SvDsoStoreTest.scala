@@ -1073,52 +1073,6 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listLaggingDsoRulesFollowers" should {
-      "list followers" in {
-
-        val leaderContract = dsoRules()
-        val followerContract1 = amuletRules()
-        val followerContract2 = svRewardState("sv1")
-        val alreadyReassigned = svRewardState("sv2")
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(leaderContract)(store.multiDomainAcsStore)
-          _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
-          _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
-          result <- store.listDsoRulesTransferFollowers()
-        } yield result.map(x =>
-          x.leader.contractId -> x.follower.contractId
-        ) should contain theSameElementsAs Seq(
-          leaderContract.contractId -> followerContract1.contractId,
-          leaderContract.contractId -> followerContract2.contractId,
-        )
-      }
-    }
-
-    "listAmuletRulesTransferFollowers" should {
-      "list followers" in {
-
-        val leaderContract = amuletRules()
-        val followerContract1 = openMiningRound(dsoParty, 3, 1.0)
-        val followerContract2 = closedMiningRound(dsoParty, 1)
-        val alreadyReassigned = closedMiningRound(dsoParty, 2)
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(leaderContract)(store.multiDomainAcsStore)
-          _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
-          _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
-          result <- store.listAmuletRulesTransferFollowers()
-        } yield result.map(x =>
-          x.leader.contractId -> x.follower.contractId
-        ) should contain theSameElementsAs Seq(
-          leaderContract.contractId -> followerContract1.contractId,
-          leaderContract.contractId -> followerContract2.contractId,
-        )
-      }
-    }
-
     "listInitialPaymentConfirmationByAnsName" should {
 
       "find the confirmation by the ans name" in {

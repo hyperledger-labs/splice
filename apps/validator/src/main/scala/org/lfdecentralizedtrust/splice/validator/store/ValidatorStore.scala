@@ -17,11 +17,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
 }
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
-  ConstrainedTemplate,
-  QueryResult,
-  TemplateFilter,
-}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{QueryResult, TemplateFilter}
 import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
@@ -39,7 +35,6 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 import scala.concurrent.{ExecutionContext, Future}
 
 trait ValidatorStore extends WalletStore with AppStore {
-  import ValidatorStore.templatesMovedByMyAutomation
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
@@ -152,17 +147,6 @@ trait ValidatorStore extends WalletStore with AppStore {
       ]
     ]]
   ]
-
-  final def listAmuletRulesTransferFollowers(
-      amuletRules: AssignedContract[
-        amuletrulesCodegen.AmuletRules.ContractId,
-        amuletrulesCodegen.AmuletRules,
-      ]
-  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
-    multiDomainAcsStore.listAssignedContractsNotOnDomainN(
-      amuletRules.domain,
-      templatesMovedByMyAutomation,
-    )
 }
 
 object ValidatorStore {
@@ -203,13 +187,6 @@ object ValidatorStore {
       param("dsoParty", _.dsoParty),
     )
   }
-
-  private[splice] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
-    Seq[ConstrainedTemplate](
-      walletCodegen.WalletAppInstall.COMPANION,
-      amuletCodegen.ValidatorRight.COMPANION,
-      amuletrulesCodegen.ExternalPartySetupProposal.COMPANION,
-    )
 
   /** Contract of a wallet store for a specific validator party. */
   def contractFilter(
