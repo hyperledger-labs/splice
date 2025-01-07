@@ -517,7 +517,7 @@ An SV node includes a CometBft node so you also need to configure
 that. Please modify the file ``splice-node/examples/sv-helm/cometbft-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |splice_cluster|, per the cluster to which you are connecting.
-- Replace all instances of ``TARGET_HOSTNAME`` with |splice_url_prefix|global.canton.network.digitalasset.com, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |splice_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster. Note that ``MIGRATION_ID`` is also used within port numbers in URLs here!
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBft node
@@ -562,7 +562,7 @@ that. Please modify the file ``splice-node/examples/sv-helm/validator-values.yam
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/sv-validator-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_HOSTNAME`` with |splice_url_prefix|global.canton.network.digitalasset.com, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |splice_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 The private and public key for your SV are defined in a K8s secret.
@@ -581,7 +581,7 @@ identity.
 
 For configuring your sv app, please modify the file ``splice-node/examples/sv-helm/sv-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_HOSTNAME`` with |splice_url_prefix|global.canton.network.digitalasset.com, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |splice_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
