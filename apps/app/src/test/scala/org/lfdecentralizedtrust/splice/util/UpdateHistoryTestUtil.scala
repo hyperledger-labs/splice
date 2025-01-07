@@ -6,6 +6,7 @@ import org.lfdecentralizedtrust.splice.console.{
   ScanAppClientReference,
   SvAppBackendReference,
 }
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -230,7 +231,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       }
 
     val totalMetrics = Seq("transactions", "assignments", "unassignments")
-      .map(m => s"cn.history.updates.$m")
+      .map(m => s"$MetricsPrefix.history.updates.$m")
       .map(getValue(_))
       .reduce(_ + _)
 

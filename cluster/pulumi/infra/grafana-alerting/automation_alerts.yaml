@@ -16,7 +16,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum by(namespace, node_type, trigger_name, migration) (delta(cn_trigger_completed_total{trigger_name=~".+", outcome=~".+"}[10m]))
+              expr: sum by(namespace, node_type, trigger_name, migration) (delta(splice_trigger_completed_total{trigger_name=~".+", outcome=~".+"}[10m]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -33,7 +33,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: sum by(namespace, node_type, trigger_name, migration) (delta(cn_trigger_completed_total{trigger_name=~".+", outcome=~"failure"}[10m])) or on() vector(0)
+              expr: sum by(namespace, node_type, trigger_name, migration) (delta(splice_trigger_completed_total{trigger_name=~".+", outcome=~"failure"}[10m])) or on() vector(0)
               hide: false
               instant: true
               intervalMs: 1000
@@ -125,7 +125,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: histogram_quantile(0.99, rate(cn_trigger_latency_duration_seconds{trigger_name="AcsSnapshotTrigger", namespace="sv-1"}[$__rate_interval]))
+              expr: histogram_quantile(0.99, rate(splice_trigger_latency_duration_seconds{trigger_name="AcsSnapshotTrigger", namespace="sv-1"}[$__rate_interval]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -184,7 +184,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(cn_trigger_completed_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger"}[5m]))
+              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(splice_trigger_completed_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger"}[5m]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -252,7 +252,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(cn_trigger_iterations_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger"}[5m]))
+              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(splice_trigger_iterations_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger"}[5m]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -320,7 +320,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by(namespace)(cn_history_backfilling_completed + rate(cn_history_backfilling_transaction_count[5m]))
+              expr: max by(namespace)(splice_history_backfilling_completed + rate(splice_history_backfilling_transaction_count[5m]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto

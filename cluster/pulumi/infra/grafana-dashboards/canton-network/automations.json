@@ -19,9 +19,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2205,
+  "id": 2412,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "datasource": {
@@ -120,6 +119,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -128,7 +128,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(cn_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", outcome=~\"success|failure\"}[$__rate_interval])",
+          "expr": "rate(splice_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", outcome=~\"success|failure\"}[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -152,7 +152,6 @@
       "id": 3,
       "panels": [],
       "repeat": "trigger_type",
-      "repeatDirection": "h",
       "title": "Triggers $trigger_type",
       "type": "row"
     },
@@ -205,7 +204,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -214,7 +213,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(histogram_sum(rate(cn_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"}[$__rate_interval])))",
+          "expr": "sum(histogram_sum(rate(splice_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"}[$__rate_interval])))",
           "hide": false,
           "instant": true,
           "range": false,
@@ -272,7 +271,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -280,7 +279,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cn_retries_failures{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\", error_kind=\"transient\"}[$__rate_interval]))",
+          "expr": "sum(rate(splice_retries_failures{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\", error_kind=\"transient\"}[$__rate_interval]))",
           "instant": false,
           "range": true,
           "refId": "A"
@@ -337,7 +336,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -345,7 +344,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cn_retries_failures{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\", error_kind=\"fatal\"}[$__rate_interval]))",
+          "expr": "sum(rate(splice_retries_failures{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\", error_kind=\"fatal\"}[$__rate_interval]))",
           "instant": false,
           "range": true,
           "refId": "A"
@@ -435,7 +434,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -443,7 +442,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, rate(cn_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"}[$__rate_interval]))",
+          "expr": "histogram_quantile(0.95, rate(splice_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{namespace}} {{node_type}} {{service}} {{trigger_name}}",
           "range": true,
@@ -525,7 +524,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -534,7 +533,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(trigger_name) (histogram_count(rate(cn_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_type=\"$trigger_type\"}[$__rate_interval])))",
+          "expr": "sum by(trigger_name) (histogram_count(rate(splice_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_type=\"$trigger_type\"}[$__rate_interval])))",
           "format": "time_series",
           "instant": false,
           "range": true,
@@ -669,7 +668,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -678,7 +677,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(trigger_name, instance, node_type, trigger_type) (histogram_sum(rate(cn_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"}[$__rate_interval])))",
+          "expr": "sum by(trigger_name, instance, node_type, trigger_type) (histogram_sum(rate(splice_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"}[$__rate_interval])))",
           "instant": false,
           "legendFormat": "{{node_type}} {{instance}} {{trigger_name}}",
           "range": true,
@@ -689,69 +688,14 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "sv-1",
-          "value": "sv-1"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "definition": "label_values(cn_trigger_completed_total,namespace)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Namespace",
-        "multi": false,
-        "name": "namespace",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(cn_trigger_completed_total,namespace)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "current": {
-          "selected": false,
-          "text": "validator",
-          "value": "validator"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "definition": "label_values(cn_trigger_completed_total{namespace=~\"$namespace\"},node_type)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "App",
-        "multi": false,
-        "name": "app",
-        "options": [],
-        "query": {
-          "query": "label_values(cn_trigger_completed_total{namespace=~\"$namespace\"},node_type)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "current": {
-          "selected": false,
           "text": "All",
           "value": "$__all"
         },
@@ -759,26 +703,68 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\"},trigger_name)",
-        "hide": 0,
+        "definition": "label_values(splice_trigger_completed_total,namespace)",
         "includeAll": true,
-        "label": "Trigger Name",
-        "multi": false,
-        "name": "trigger_name",
+        "label": "Namespace",
+        "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(cn_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\"},trigger_name)",
+          "qryType": 1,
+          "query": "label_values(splice_trigger_completed_total,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(splice_trigger_completed_total{namespace=~\"$namespace\"},node_type)",
+        "includeAll": true,
+        "label": "App",
+        "name": "app",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(splice_trigger_completed_total{namespace=~\"$namespace\"},node_type)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(splice_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\"},trigger_name)",
+        "includeAll": true,
+        "label": "Trigger Name",
+        "name": "trigger_name",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(splice_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\"},trigger_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
           "text": [
             "taskbased",
             "polling"
@@ -788,7 +774,6 @@
             "polling"
           ]
         },
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "trigger_type",
@@ -805,8 +790,6 @@
           }
         ],
         "query": "taskbased, polling",
-        "queryValue": "",
-        "skipUrlSync": false,
         "type": "custom"
       }
     ]
@@ -819,6 +802,6 @@
   "timezone": "",
   "title": "Automations",
   "uid": "a3e1385f-6f03-46d9-908c-34aca0f507a6",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }

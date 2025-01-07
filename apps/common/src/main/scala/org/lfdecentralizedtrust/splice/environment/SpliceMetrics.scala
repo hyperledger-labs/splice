@@ -7,6 +7,6 @@ import com.daml.metrics.api.MetricName
 
 object SpliceMetrics {
 
-  val MetricsPrefix: MetricName = MetricName("cn")
+  val MetricsPrefix: MetricName = MetricName("splice")
 
 }

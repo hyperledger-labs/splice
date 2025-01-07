@@ -20,6 +20,11 @@ Upcoming
   * The setting ``spliceDomainNames.nameServiceDomain`` must now be supplied for the ``splice-cluster-ingress-runbook`` helm chart.
     See the ``sv-helm`` example.
 
+* Metrics
+
+  * All metrics named starting with ``cn_`` now start with ``splice_`` instead.
+    Example Grafana configuration has been updated to match, but any custom consumers of these metrics must be updated manually.
+
 
 0.3.4
 -----

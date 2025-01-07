@@ -544,7 +544,7 @@ groups:
             model:
               disableTextWrap: false
               editorMode: builder
-              expr: cn_sv_cometbft_latest_block_height - cn_sv_cometbft_earliest_block_height
+              expr: splice_sv_cometbft_latest_block_height - splice_sv_cometbft_earliest_block_height
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true

@@ -20,7 +20,7 @@ groups:
                     uid: prometheus
                 editorMode: code
                 exemplar: true
-                expr: cn_deployment_pulumi_stack_status{state="failed"}
+                expr: splice_deployment_pulumi_stack_status{state="failed"}
                 format: time_series
                 instant: true
                 interval: ""
@@ -83,7 +83,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: cn_deployment_pulumi_stack_condition{type="Reconciling"}
+                expr: splice_deployment_pulumi_stack_condition{type="Reconciling"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
