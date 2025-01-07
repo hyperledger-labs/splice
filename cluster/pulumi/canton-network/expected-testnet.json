@@ -875,6 +875,11 @@
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEO3NIzHIIxatGCFHLdONUYNJ3SePvA4lq3EbtMgvpe1CoALZZ+CRNZrHNsj49jdeJNQgcJBPsOcW7XP6VF7Q1YA==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEq2n+E4TtH83Os3hufoPrboBLrv/2dZwamCGP4UMapk8REJdpaXwWKcaNiVxMMbDpUNexCUQ9I7bxCzjPDOR2JA==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {

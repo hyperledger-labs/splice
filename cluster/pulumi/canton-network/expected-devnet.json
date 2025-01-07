@@ -2368,6 +2368,11 @@
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEouadK5UDUKYQ1QjnLNf0CYkK/CAwm3MuXnri2qF2KVIQJ1snAKtDa6AFKB4HgeZcVfrgeg0Z5qJhYTxsm4/nAQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -3239,6 +3244,11 @@
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEouadK5UDUKYQ1QjnLNf0CYkK/CAwm3MuXnri2qF2KVIQJ1snAKtDa6AFKB4HgeZcVfrgeg0Z5qJhYTxsm4/nAQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -4076,6 +4086,11 @@
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEouadK5UDUKYQ1QjnLNf0CYkK/CAwm3MuXnri2qF2KVIQJ1snAKtDa6AFKB4HgeZcVfrgeg0Z5qJhYTxsm4/nAQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -4913,6 +4928,11 @@
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEouadK5UDUKYQ1QjnLNf0CYkK/CAwm3MuXnri2qF2KVIQJ1snAKtDa6AFKB4HgeZcVfrgeg0Z5qJhYTxsm4/nAQ==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
