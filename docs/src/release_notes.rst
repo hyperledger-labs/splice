@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+* Scan
+
+  * Added new metrics for the Scan app to monitor the ingestion of transactions and contract reassignments into the update history.
+
 * Deployment
 
   * The setting ``spliceDomainNames.nameServiceDomain`` must now be supplied for the ``splice-cluster-ingress-runbook`` helm chart.

@@ -33,8 +33,8 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   OpenMiningRoundTxLogEntry,
   ScanStore,
   ScanTxLogParser,
-  TxLogEntry,
   TransferCommandTxLogEntry,
+  TxLogEntry,
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
@@ -73,8 +73,8 @@ import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyI
 import com.digitalasset.canton.tracing.TraceContext
 import com.github.benmanes.caffeine.cache as caffeine
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-
 import io.grpc.Status
+
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -91,6 +91,7 @@ class DbScanStore(
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    storeMetrics: DbScanStoreMetrics,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -113,6 +114,7 @@ class DbScanStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = true,
+      Some(storeMetrics.history),
     )
     with ScanStore
     with AcsTables
@@ -123,7 +125,6 @@ class DbScanStore(
     with DbVotesStoreQueryBuilder {
 
   import multiDomainAcsStore.waitUntilAcsIngested
-  private val storeMetrics = new DbScanStoreMetrics(retryProvider.metricsFactory)
 
   override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
     org.lfdecentralizedtrust.splice.scan.store.TxLogEntry

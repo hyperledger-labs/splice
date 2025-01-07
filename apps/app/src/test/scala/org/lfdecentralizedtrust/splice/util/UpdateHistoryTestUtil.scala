@@ -35,6 +35,8 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.Updat
   TransactionTreeWrapper,
   UnassignedWrapper,
 }
+import com.digitalasset.canton.console.LocalInstanceReference
+import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.scalatest.Assertion
 
@@ -212,6 +214,27 @@ trait UpdateHistoryTestUtil extends TestCommon {
     })
 
     succeed
+  }
+
+  def checkUpdateHistoryMetrics(
+      node: LocalInstanceReference,
+      participant: ParticipantClientReference,
+      party: PartyId,
+  ): Assertion = {
+    val expected = updateHistoryFromParticipant(0, party, participant).size
+
+    def getValue(metric: String): Long =
+      node.metrics.list(metric).get(metric) match {
+        case None => 0
+        case Some(_) => node.metrics.get(metric).select[MetricValue.LongPoint].value.value
+      }
+
+    val totalMetrics = Seq("transactions", "assignments", "unassignments")
+      .map(m => s"cn.history.updates.$m")
+      .map(getValue(_))
+      .reduce(_ + _)
+
+    totalMetrics should equal(expected)
   }
 
   // Minimal, human-readable description of an update

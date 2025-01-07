@@ -217,6 +217,10 @@ class UpdateHistoryIntegrationTest
           ledgerBeginAlice,
         )
       }
+
+      eventually() {
+        checkUpdateHistoryMetrics(sv1ScanBackend, sv1ScanBackend.participantClient, dsoParty)
+      }
     }
   }
 
