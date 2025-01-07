@@ -1,10 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useUserState } from 'common-frontend';
-import { Contract, callWithLogging } from 'common-frontend-utils';
+import { callWithLogging } from 'common-frontend-utils';
 import React, { useContext } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
-import Ledger, { CommandMeta, CreateEvent, DisclosedContract, LedgerOptions } from '@daml/ledger';
+import { DisclosedContract } from '@daml/ledger';
 import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const ANS_LEDGER_NAME = 'ans-ledger';
@@ -41,11 +42,20 @@ export abstract class PackageIdResolver {
 
 // Uses the JSON API (via @daml/ledger) to connect to the ledger.
 export class LedgerApiClient {
-  private ledger: Ledger;
+  private jsonApiUrl: string;
   private userId: string;
   private packageIdResolver: PackageIdResolver;
-  constructor(ledger: Ledger, userId: string, packageIdResolver: PackageIdResolver) {
-    this.ledger = ledger;
+  private headers: Headers;
+  constructor(
+    jsonApiUrl: string,
+    token: string,
+    userId: string,
+    packageIdResolver: PackageIdResolver
+  ) {
+    this.jsonApiUrl = jsonApiUrl;
+    this.headers = new Headers();
+    this.headers.append('content-type', 'application/json');
+    this.headers.append('Authorization', `Bearer ${token}`);
     this.userId = userId;
     this.packageIdResolver = packageIdResolver;
   }
@@ -53,47 +63,18 @@ export class LedgerApiClient {
     const user = await callWithLogging(
       ANS_LEDGER_NAME,
       'getUser',
-      userId => this.ledger.getUser(userId),
+      async userId => {
+        const response = await fetch(`${this.jsonApiUrl}v2/users/${encodeURIComponent(userId)}`, {
+          headers: this.headers,
+        });
+        const responseBody = await response.json();
+        return responseBody.user;
+      },
       this.userId
     );
     return user.primaryParty!;
   }
 
-  async create<T extends object, K>(
-    actAs: string[],
-    unresolvedTemplate: Template<T, K>,
-    payload: T,
-    domainId?: string
-  ): Promise<Contract<T>> {
-    const template = await this.packageIdResolver.resolveTemplate(unresolvedTemplate);
-    console.debug(
-      `Creating template templateId=${template.templateId}, actAs=${JSON.stringify(
-        actAs
-      )}, payload=${JSON.stringify(payload)}`
-    );
-    const meta: CommandMeta = {
-      domainId,
-    };
-    const response = await this.ledger
-      .create(template, payload, meta)
-      .then(r => {
-        console.debug(
-          `Create template: actAs=${JSON.stringify(actAs)}, templateId=${
-            template.templateId
-          } succeeded, contractId=${r.contractId}`
-        );
-        return r;
-      })
-      .catch(e => {
-        console.debug(
-          `Create template: actAs=${JSON.stringify(actAs)}, templateId=${
-            template.templateId
-          } failed: ${JSON.stringify(e)}`
-        );
-        throw e;
-      });
-    return this.toContract(response);
-  }
   async exercise<T extends object, C, R, K>(
     actAs: string[],
     readAs: string[],
@@ -111,12 +92,37 @@ export class LedgerApiClient {
         choice.template().templateId
       }, contractId=${contractId}.`
     );
-    const meta: CommandMeta = {
-      domainId,
-      disclosedContracts,
+    const command = {
+      ExerciseCommand: {
+        template_id: choice.template().templateId,
+        contract_id: contractId,
+        choice: choice.choiceName,
+        choice_argument: choice.argumentEncode(argument),
+      },
     };
-    const result = await this.ledger
-      .exercise(choice, contractId, argument, meta)
+
+    const body = {
+      commands: [command],
+      workflow_id: '',
+      application_id: '',
+      command_id: uuidv4(),
+      deduplication_period: { Empty: {} },
+      act_as: actAs,
+      read_as: readAs,
+      submission_id: '',
+      disclosed_contracts: disclosedContracts.map(c => ({
+        contractId: c.contractId,
+        createdEventBlob: c.createdEventBlob,
+        domainId: '',
+        templateId: c.templateId,
+      })),
+      domain_id: domainId || '',
+      package_id_selection_preference: [],
+    };
+    const responseBody = await fetch(
+      `${this.jsonApiUrl}v2/commands/submit-and-wait-for-transaction-tree`,
+      { headers: this.headers, method: 'POST', body: JSON.stringify(body) }
+    )
       .then(r => {
         console.debug(
           `Exercised choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
@@ -125,7 +131,7 @@ export class LedgerApiClient {
             choice.template().templateId
           }, contractId=${contractId} succeeded.`
         );
-        return r;
+        return r.json();
       })
       .catch(e => {
         console.debug(
@@ -137,21 +143,12 @@ export class LedgerApiClient {
         );
         throw e;
       });
-    return result[0];
-  }
-
-  toContract<T extends object, K, I extends string = string>(
-    ev: CreateEvent<T, K, I>
-  ): Contract<T> {
-    return {
-      templateId: ev.templateId,
-      contractId: ev.contractId,
-      payload: ev.payload,
-      // For now, we set dummy values here because the JSON API does not
-      // yet expose this properly.
-      createdEventBlob: '',
-      createdAt: '',
-    };
+    const tree = responseBody.transaction_tree;
+    const rootEvent = tree.events_by_id[tree.root_event_ids[0]];
+    const exerciseResult = choice.resultDecoder.runWithException(
+      rootEvent.ExercisedTreeEvent.exercise_result
+    );
+    return exerciseResult;
   }
 }
 
@@ -172,8 +169,7 @@ export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApi
   let ledgerApiClient: LedgerApiClient | undefined;
 
   if (userAccessToken && userId) {
-    const ledgerOptions: LedgerOptions = { httpBaseUrl: jsonApiUrl, token: userAccessToken };
-    ledgerApiClient = new LedgerApiClient(new Ledger(ledgerOptions), userId, packageIdResolver);
+    ledgerApiClient = new LedgerApiClient(jsonApiUrl, userAccessToken, userId, packageIdResolver);
   }
 
   return <LedgerApiContext.Provider value={ledgerApiClient}>{children}</LedgerApiContext.Provider>;
