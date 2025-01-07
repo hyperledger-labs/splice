@@ -213,9 +213,6 @@ seeds = ""
 # Comma separated list of nodes to keep persistent connections to
 persistent_peers = "5af57aa83abcec085c949323ed8538108757be9c@sv1:26656"
 
-# UPNP port forwarding
-upnp = false
-
 # Path to address book
 addr_book_file = "config/addrbook.json"
 
