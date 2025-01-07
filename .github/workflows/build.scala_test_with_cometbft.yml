@@ -42,46 +42,40 @@ jobs:
         runner-index: ${{ fromjson(needs.runner-indices.outputs.json) }}
       fail-fast: false
     container:
-      # TODO(#15988): clean this up, use a proper released image instead:
-      #               - Once this is in a release, use the release version.
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4-snapshot.20241217.7890.0.v95c594bf
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4
 
     services:
       postgres:
-        # TODO(#15988): clean this up, use a proper released image instead:
-        #               - Once this is in a release, use the release version.
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.4-snapshot.20241217.7890.0.v95c594bf
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.4
         env:
           POSTGRES_PASSWORD: postgres
 
       cometbft1:
-        # TODO(#15988): clean this up, use a proper released image instead:
-        #               - Once this is in a release, use the release version.
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4-snapshot.20241217.7890.0.v95c594bf
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 1
         options: --name cometbft1
 
       cometbft2:
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4-snapshot.20241217.7890.0.v95c594bf
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 2
         options: --name cometbft2
 
       cometbft2Local:
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4-snapshot.20241217.7890.0.v95c594bf
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 2Local
         options: --name cometbft2local
 
       cometbft3:
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4-snapshot.20241217.7890.0.v95c594bf
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 3
         options: --name cometbft3
 
       cometbft4:
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4-snapshot.20241217.7890.0.v95c594bf
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 4
         options: --name cometbft4
