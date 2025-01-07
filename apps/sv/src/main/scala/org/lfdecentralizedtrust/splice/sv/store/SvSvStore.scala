@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.sv.store
 
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger.Task as FollowTask
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.ValidatorOnboarding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   svonboarding as so,
@@ -13,22 +12,21 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
 }
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore, PageLimit}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvSvStore
 import org.lfdecentralizedtrust.splice.sv.store.db.SvTables.SvAcsStoreRowData
-import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
 /* Store used by the SV app for filtering contracts visible to the SV party. */
 trait SvSvStore extends AppStore {
-  import SvSvStore.templatesMovedByMyAutomation
 
   protected val outerLoggerFactory: NamedLoggerFactory
 
@@ -87,20 +85,6 @@ trait SvSvStore extends AppStore {
       )
       .map(_.headOption map (_.contract))
 
-  private[this] def listLaggingDsoRulesFollowers(
-      targetDomain: DomainId
-  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
-    multiDomainAcsStore.listAssignedContractsNotOnDomainN(
-      targetDomain,
-      templatesMovedByMyAutomation,
-    )
-
-  final def listDsoRulesTransferFollowers[SrCid, Sr](
-      dsoRules: AssignedContract[SrCid, Sr]
-  )(implicit tc: TraceContext): Future[Seq[FollowTask[SrCid, Sr, ?, ?]]] =
-    listLaggingDsoRulesFollowers(dsoRules.domain)
-      .map(_ map (FollowTask(dsoRules, _)))
-
   def key: SvStore.Key
 }
 
@@ -122,12 +106,6 @@ object SvSvStore {
         new DbSvSvStore(key, db, loggerFactory, retryProvider, domainMigrationInfo, participantId)
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
-
-  private[splice] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
-    Seq[ConstrainedTemplate](
-      vo.UsedSecret.COMPANION,
-      vo.ValidatorOnboarding.COMPANION,
-    )
 
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter[SvAcsStoreRowData] = {

@@ -51,7 +51,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
 }
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   ConfigScheduleUtil,
@@ -89,13 +88,15 @@ class SoftDomainMigrationTopologySetupIntegrationTest
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
-      .fromResources(
-        Seq("simple-topology.conf", "simple-topology-soft-domain-upgrade.conf"),
-        this.getClass.getSimpleName,
-      )
-      .withAllocatedUsers()
-      .withInitializedNodes()
-      .withTrafficTopupsEnabled
+      // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
+      // .fromResources(
+      //   Seq("simple-topology.conf", "simple-topology-soft-domain-upgrade.conf"),
+      //   this.getClass.getSimpleName,
+      // )
+      // .withAllocatedUsers()
+      // .withInitializedNodes()
+      // .withTrafficTopupsEnabled
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       // TODO(#15569): Get rid of this once we retry transfer offer creation for this test
       .withTrafficBalanceCacheDisabled
       .addConfigTransformsToFront(
@@ -167,14 +168,22 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     implicit val ec: ExecutionContext = env.executionContext
     val ledgerBeginSv1 = sv1Backend.participantClient.ledger_api.state.end()
     val (alice, bob) = onboardAliceAndBob()
-    env.scans.local should have size 4
+    // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
+    // env.scans.local should have size 4
+    env.scans.local should have size 1
     val prefix = "global-domain-new"
-    clue("DSO info has 4 synchronizer nodes") {
+    // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
+    // clue("DSO info has 4 synchronizer nodes") {
+    clue("DSO info has 1 synchronizer nodes") {
       eventually() {
         val dsoInfo = sv1Backend.getDsoInfo()
+        // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
+        // dsoInfo.svNodeStates.values.flatMap(
+        //   _.payload.state.synchronizerNodes.asScala.values.flatMap(_.scan.toScala)
+        // ) should have size 4
         dsoInfo.svNodeStates.values.flatMap(
           _.payload.state.synchronizerNodes.asScala.values.flatMap(_.scan.toScala)
-        ) should have size 4
+        ) should have size 1
       }
     }
     clue("All synchronizer nodes are initialized") {
@@ -288,24 +297,25 @@ class SoftDomainMigrationTopologySetupIntegrationTest
     )("amulet config vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
     // TODO(#8300) No need to pause once we can't get a timeout on a concurrent sequencer connection change anymore
-    setTriggersWithin(triggersToPauseAtStart =
-      Seq(sv2Backend, sv3Backend, sv4Backend).map(
-        _.dsoAutomation.trigger[LocalSequencerConnectionsTrigger]
-      )
-    ) {
-      clue(s"sv2-4 accept amulet config vote request") {
-        Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
-          eventuallySucceeds() {
-            sv.castVote(
-              voteRequest.contractId,
-              true,
-              "url",
-              "description",
-            )
-          }
-        )
-      }
-    }
+    // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
+    // setTriggersWithin(triggersToPauseAtStart =
+    //   Seq(sv2Backend, sv3Backend, sv4Backend).map(
+    //     _.dsoAutomation.trigger[LocalSequencerConnectionsTrigger]
+    //   )
+    // ) {
+    //   clue(s"sv2-4 accept amulet config vote request") {
+    //     Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+    //       eventuallySucceeds() {
+    //         sv.castVote(
+    //           voteRequest.contractId,
+    //           true,
+    //           "url",
+    //           "description",
+    //         )
+    //       }
+    //     )
+    //   }
+    // }
 
     eventually() {
       sv1ScanBackend.getAmuletRules().payload.configSchedule.futureValues should not be empty
@@ -369,18 +379,19 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           "dsorules config vote request has been created",
           _ => sv1Backend.listVoteRequests().loneElement,
         )
-        clue(s"sv2-4 accept dsorules config vote request") {
-          Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
-            eventuallySucceeds() {
-              sv.castVote(
-                dsoRulesVoteRequest.contractId,
-                true,
-                "url",
-                "description",
-              )
-            }
-          )
-        }
+        // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
+        // clue(s"sv2-4 accept dsorules config vote request") {
+        //   Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+        //     eventuallySucceeds() {
+        //       sv.castVote(
+        //         dsoRulesVoteRequest.contractId,
+        //         true,
+        //         "url",
+        //         "description",
+        //       )
+        //     }
+        //   )
+        // }
       }
       clue("Reconcile Daml synchronizer state") {
         val reconciled = env.svs.local.map { sv =>
@@ -491,7 +502,9 @@ class SoftDomainMigrationTopologySetupIntegrationTest
           .list(filterStore = TopologyStoreId.DomainStore(newDomainId).filterName)
           .loneElement
         val mediators = mediatorState.item.active.forgetNE
-        mediators should have size 4
+        // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
+        // mediators should have size 4
+        mediators should have size 1
         forAll(mediators) { mediator =>
           sv1Backend
             .sequencerClient(newDomainId)

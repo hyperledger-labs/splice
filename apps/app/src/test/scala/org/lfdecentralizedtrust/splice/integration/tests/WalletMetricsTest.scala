@@ -68,7 +68,6 @@ class WalletMetricsTest
         "ExpireBuyTrafficRequestsTrigger",
         "ExpireTransferOfferTrigger",
         "SubscriptionReadyForPaymentTrigger",
-        "TransferFollowTrigger",
       ).foreach(triggerName =>
         clue(s"$triggerName should report polling iterations correctly") {
           aliceValidatorBackend.metrics

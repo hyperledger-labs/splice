@@ -40,7 +40,6 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
-      .withoutInitialManagerApps // TODO (#7539): this should no longer be required once app-instances is removed
       .addConfigTransformToFront((_, config) => {
         val aliceValidatorConfig = config
           .validatorApps(InstanceName.tryCreate("aliceValidator"))

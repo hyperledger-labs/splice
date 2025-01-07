@@ -10,7 +10,6 @@ import {
   isHs256UnsafeAuthConfig,
   TestAuthConfig,
 } from '../config/schema';
-import { APP_MANAGER_LOCAL_STORAGE_KEY } from '../utils/AppManager';
 import { generateToken, isHs256UnsafeToken, tryDecodeTokenSub } from '../utils/auth';
 
 interface UserState {
@@ -148,7 +147,6 @@ export const UserProvider: React.FC<{
           if (authMethod === 'sst' || testAuthConf) {
             window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
           }
-          window.localStorage.removeItem(APP_MANAGER_LOCAL_STORAGE_KEY);
           console.debug('Logout completed');
         },
       }}

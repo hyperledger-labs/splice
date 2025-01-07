@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
   aTrigger,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
@@ -59,7 +58,7 @@ import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
 class SvDsoAutomationService(
     clock: Clock,
@@ -304,48 +303,6 @@ class SvDsoAutomationService(
           (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
         )
       )
-    } else {
-      registerTrigger(
-        new AmuletConfigReassignmentTrigger(
-          triggerContext,
-          dsoStore,
-          connection,
-          dsoStore.key.dsoParty,
-          Seq(DsoRules.COMPANION),
-          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
-        )
-      )
-      registerTrigger(
-        new TransferFollowTrigger(
-          triggerContext,
-          dsoStore,
-          connection,
-          store.key.dsoParty,
-          implicit tc =>
-            dsoStore.listDsoRulesTransferFollowers().flatMap { dsoRulesFollowers =>
-              // don't try to schedule AmuletRules' followers if AmuletRules might move
-              // (i.e. be one of dsoRulesFollowers)
-              if (dsoRulesFollowers.nonEmpty) Future successful dsoRulesFollowers
-              else dsoStore.listAmuletRulesTransferFollowers()
-            },
-        )
-      )
-
-      registerTrigger(
-        new TransferFollowTrigger(
-          triggerContext,
-          svStore,
-          connection,
-          store.key.svParty,
-          implicit tc =>
-            dsoStore
-              .lookupDsoRules()
-              .flatMap(
-                _.map(svStore.listDsoRulesTransferFollowers(_))
-                  .getOrElse(Future successful Seq.empty)
-              ),
-        )
-      )
     }
     registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
     registerTrigger(
@@ -504,10 +461,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
           .orElse(
             Some(DarResources.dsoGovernance.bootstrap.packageId)
           )
-      // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
-      // we can hardcode this.
-      case "Splice.AmuletImport" =>
-        Some(DarResources.amulet.bootstrap.packageId)
       case _ => None
     }
 

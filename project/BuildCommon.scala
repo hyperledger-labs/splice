@@ -222,7 +222,6 @@ object BuildCommon {
             "splice-amulet-name-service-daml/clean",
             "splice-amulet-name-service-test-daml/clean",
             "splice-amulet-test-daml/clean",
-            "splice-app-manager-daml/clean",
             "splice-dso-governance-daml/clean",
             "splice-dso-governance-test-daml/clean",
             "splice-util-daml/clean",

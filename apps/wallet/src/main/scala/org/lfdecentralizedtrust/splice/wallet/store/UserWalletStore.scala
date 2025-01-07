@@ -36,7 +36,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -317,16 +317,6 @@ trait UserWalletStore extends TransferInputStore with NamedLogging {
       tc: TraceContext
   ): Future[Seq[UserWalletStore.AnsEntryWithPayData]]
 
-  final def listLaggingAmuletRulesFollowers(
-      targetDomain: DomainId
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[AssignedContract[?, ?]]] =
-    multiDomainAcsStore.listAssignedContractsNotOnDomainN(
-      targetDomain,
-      templatesMovedByMyAutomation,
-    )
-
   // For cases where `companion` can have multiple contracts, but we just need
   // an arbitrary one; prefer an Assigned contract if available but accept an
   // in-flight contract as fallback.
@@ -456,28 +446,6 @@ object UserWalletStore {
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
-  }
-
-  private[splice] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] = {
-    Seq[ConstrainedTemplate](
-      amuletCodegen.AppRewardCoupon.COMPANION,
-      amuletCodegen.Amulet.COMPANION,
-      amuletCodegen.LockedAmulet.COMPANION,
-      amuletCodegen.ValidatorRewardCoupon.COMPANION,
-      validatorCodegen.ValidatorFaucetCoupon.COMPANION,
-      validatorCodegen.ValidatorLivenessActivityRecord.COMPANION,
-      amuletCodegen.SvRewardCoupon.COMPANION,
-      subsCodegen.Subscription.COMPANION,
-      subsCodegen.SubscriptionRequest.COMPANION,
-      subsCodegen.SubscriptionInitialPayment.COMPANION,
-      subsCodegen.SubscriptionIdleState.COMPANION,
-      subsCodegen.SubscriptionPayment.COMPANION,
-      transferOffersCodegen.AcceptedTransferOffer.COMPANION,
-      transferOffersCodegen.TransferOffer.COMPANION,
-      walletCodegen.AcceptedAppPayment.COMPANION,
-      walletCodegen.AppPaymentRequest.COMPANION,
-      preapprovalCodegen.TransferPreapprovalProposal.COMPANION,
-    )
   }
 
   case class Key(
