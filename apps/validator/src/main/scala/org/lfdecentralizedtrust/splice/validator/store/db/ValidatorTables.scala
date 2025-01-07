@@ -18,22 +18,15 @@ object ValidatorTables extends AcsTables {
       providerParty: Option[PartyId] = None,
       validatorParty: Option[PartyId] = None,
       trafficDomainId: Option[DomainId] = None,
-      appConfigurationVersion: Option[Long] = None,
-      appConfigurationName: Option[String] = None,
-      appReleaseVersion: Option[String] = None,
-      jsonHash: Option[String] = None,
   ) extends AcsRowData {
-    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
-      "user_party" -> userParty,
-      "user_name" -> userName.map(lengthLimited),
-      "provider_party" -> providerParty,
-      "validator_party" -> validatorParty,
-      "traffic_domain_id" -> trafficDomainId,
-      "app_configuration_version" -> appConfigurationVersion,
-      "app_configuration_name" -> appConfigurationName.map(lengthLimited),
-      "app_release_version" -> appReleaseVersion.map(lengthLimited),
-      "json_hash" -> jsonHash.map(lengthLimited),
-    )
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] =
+      Seq[(String, IndexColumnValue[?])](
+        "user_party" -> userParty,
+        "user_name" -> userName.map(lengthLimited),
+        "provider_party" -> providerParty,
+        "validator_party" -> validatorParty,
+        "traffic_domain_id" -> trafficDomainId,
+      )
   }
 
   val acsTableName = "validator_acs_store"

@@ -2,3 +2,5 @@ cluster:
   hostname: "YOUR_HOSTNAME" # value to complete!
   svNamespace: "sv"
 withSvIngress: true
+spliceDomainNames:
+  nameServiceDomain: # Please provide a value as provided in the docs

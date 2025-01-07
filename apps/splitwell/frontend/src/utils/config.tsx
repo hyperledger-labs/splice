@@ -5,8 +5,6 @@ import {
   testAuthSchema,
   serviceSchema,
   spliceInstanceNamesSchema,
-  useAppManagerConfig,
-  appManagerAuthConfig,
   walletSchema,
   ConfigProvider,
   useConfig as useConfigFromContext,
@@ -17,27 +15,27 @@ import React from 'react';
 import { z } from 'zod';
 
 const configScheme = z.object({
-  auth: authSchema.optional(),
+  auth: authSchema,
   testAuth: testAuthSchema.optional(),
   spliceInstanceNames: spliceInstanceNamesSchema,
   pollInterval: pollIntervalSchema,
   services: z.object({
-    wallet: walletSchema.optional(),
+    wallet: walletSchema,
     scan: serviceSchema,
     splitwell: serviceSchema,
-    jsonApi: serviceSchema.optional(),
+    jsonApi: serviceSchema,
   }),
 });
 
 type SplitwellServicesStaticConfig = {
-  wallet?: z.infer<typeof walletSchema>;
+  wallet: z.infer<typeof walletSchema>;
   scan: z.infer<typeof serviceSchema>;
   splitwell: z.infer<typeof serviceSchema>;
-  jsonApi?: z.infer<typeof serviceSchema>;
+  jsonApi: z.infer<typeof serviceSchema>;
 };
 
 type SplitwellStaticConfig = {
-  auth?: z.infer<typeof authSchema>;
+  auth: z.infer<typeof authSchema>;
   testAuth?: z.infer<typeof testAuthSchema>;
   spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
   services: SplitwellServicesStaticConfig;
@@ -56,7 +54,6 @@ type SplitwellConfig = {
   spliceInstanceNames: z.infer<typeof spliceInstanceNamesSchema>;
   pollInterval?: z.infer<typeof pollIntervalSchema>;
   services: SplitwellServicesConfig;
-  appManager: boolean;
 };
 
 export const ConfigContext = React.createContext<SplitwellStaticConfig | undefined>(undefined);
@@ -72,41 +69,7 @@ export const SplitwellStaticConfigProvider: React.FC<{
 };
 
 export const useConfig = (): SplitwellConfig => {
-  const staticConfig = useConfigFromContext<SplitwellStaticConfig>(ConfigContext);
-  const mandatoryConfig: <T>(name: string, config: T | undefined) => T = (name, config) => {
-    if (!config) {
-      throw new Error(`${name} was not specified in app manager config or in static config`);
-    }
-    return config;
-  };
-
-  const appManagerConfig = useAppManagerConfig();
-  const authConfig: z.infer<typeof authSchema> = mandatoryConfig(
-    'auth',
-    appManagerConfig
-      ? appManagerAuthConfig(appManagerConfig.clientId, appManagerConfig.oidcAuthority)
-      : staticConfig.auth
-  );
-  const walletConfig: z.infer<typeof walletSchema> = mandatoryConfig(
-    'wallet',
-    appManagerConfig ? { uiUrl: appManagerConfig.wallet } : staticConfig.services.wallet
-  );
-  const jsonApiConfig: z.infer<typeof serviceSchema> = mandatoryConfig(
-    'json-api',
-    appManagerConfig ? { url: appManagerConfig.jsonApi } : staticConfig.services.jsonApi
-  );
-  return {
-    auth: authConfig,
-    testAuth: staticConfig.testAuth,
-    spliceInstanceNames: staticConfig.spliceInstanceNames,
-    services: {
-      wallet: walletConfig,
-      scan: staticConfig.services.scan,
-      splitwell: staticConfig.services.splitwell,
-      jsonApi: jsonApiConfig,
-    },
-    appManager: !!appManagerConfig,
-  };
+  return useConfigFromContext<SplitwellStaticConfig>(ConfigContext);
 };
 
 export const useConfigPollInterval: () => number = () => {

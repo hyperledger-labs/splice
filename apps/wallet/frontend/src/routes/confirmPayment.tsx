@@ -1,13 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import BigNumber from 'bignumber.js';
-import {
-  AmountDisplay,
-  DisableConditionally,
-  ErrorDisplay,
-  Loading,
-  RateDisplay,
-} from 'common-frontend';
+import { AmountDisplay, ErrorDisplay, Loading, RateDisplay } from 'common-frontend';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -33,7 +27,6 @@ import BftAnsEntry from '../components/BftAnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useAppPaymentRequest } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
-import useGetAmuletRules from '../hooks/scan-proxy/useGetAmuletRules';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmPayment: React.FC = () => {
@@ -50,7 +43,6 @@ export const ConfirmPayment: React.FC = () => {
   }
 
   const appPaymentRequest = appPaymentRequestQuery.data.contract;
-  const appPaymentRequestDomain = appPaymentRequestQuery.data.domainId;
 
   const total = computeTotal(appPaymentRequest.payload.receiverAmounts, amuletPriceQuery.data);
 
@@ -82,7 +74,6 @@ export const ConfirmPayment: React.FC = () => {
         <PaymentDescription description={appPaymentRequest.payload.description} />
         <TotalPaymentContainer
           contractId={appPaymentRequest.contractId}
-          domainId={appPaymentRequestDomain}
           total={total}
           amuletPrice={amuletPriceQuery.data}
         />
@@ -269,7 +260,6 @@ interface PaymentContainerProps {
 }
 const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
   contractId,
-  domainId,
   total,
   amuletPrice,
 }) => {
@@ -298,7 +288,7 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
             </Typography>
             <Typography variant="body2">Fees will be added.</Typography>
           </Stack>
-          <ConfirmPaymentButton contractId={contractId} domainId={domainId} />
+          <ConfirmPaymentButton contractId={contractId} />
         </Stack>
       </Box>
     </Container>
@@ -307,13 +297,10 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
 
 const ConfirmPaymentButton: React.FC<{
   contractId: ContractId<payment.AppPaymentRequest>;
-  domainId?: string;
-}> = ({ contractId, domainId }) => {
+}> = ({ contractId }) => {
   const { acceptAppPaymentRequest } = useWalletClient();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
-  const amuletRules = useGetAmuletRules();
-  const amuletRulesDomain = amuletRules.data && amuletRules.data.domainId;
 
   const onAccept = async () => {
     await acceptAppPaymentRequest(contractId);
@@ -323,18 +310,8 @@ const ConfirmPaymentButton: React.FC<{
   };
 
   return (
-    <DisableConditionally
-      conditions={[
-        { disabled: !domainId, reason: 'No domainId (request is in flight)' },
-        {
-          disabled: domainId !== amuletRulesDomain,
-          reason: `Wrong domainId (request is on domain ${domainId}, amulet rules are on domain ${amuletRulesDomain})`,
-        },
-      ]}
-    >
-      <Button variant="pill" size="large" onClick={onAccept} className="payment-accept">
-        Send Payment
-      </Button>
-    </DisableConditionally>
+    <Button variant="pill" size="large" onClick={onAccept} className="payment-accept">
+      Send Payment
+    </Button>
   );
 };

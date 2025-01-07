@@ -7,12 +7,14 @@ defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8 -XX
 ingress:
   wallet: true
   sv: true
-  cns: true
+  ans: true
   scan: true
   sequencer: true
   splitwell: false
   decentralizedSynchronizer:
     migrationIds: ["0"]
+spliceDomainNames:
+  nameServiceDomain: "ans"
 
 # k8s affinity for all deployed pods (optional)
 # affinity:

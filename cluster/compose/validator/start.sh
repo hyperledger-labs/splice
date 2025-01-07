@@ -256,6 +256,6 @@ fi
 extra_compose_files+=("-f" "${script_dir}/compose-traffic-topups.yaml")
 extra_args=()
 if [ $wait -eq 1 ]; then
-  extra_args+=("--wait")
+  extra_args+=("--wait" "--wait-timeout" "600")
 fi
 docker compose -f "${script_dir}/compose.yaml" "${extra_compose_files[@]}" up -d "${extra_args[@]}"

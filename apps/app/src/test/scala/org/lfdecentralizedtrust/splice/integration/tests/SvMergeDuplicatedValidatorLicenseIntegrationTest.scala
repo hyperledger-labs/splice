@@ -1,10 +1,12 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.Identifier
+import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.MergeValidatorLicenseContractsTrigger
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
+import org.slf4j.event.Level
 
 import scala.jdk.CollectionConverters.*
 
@@ -56,7 +58,8 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
           newValidatorLicenses should have size 2
         },
       )
-      loggerFactory.assertLogs(
+      // The trigger can process both validator licenses in parallel so we might get multiple log messages.
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
           sv1Backend.dsoDelegateBasedAutomation
             .trigger[MergeValidatorLicenseContractsTrigger]
@@ -67,9 +70,16 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
               newValidatorLicenses should have size 1
             }
           }
+          // Pause to make sure we don't get more log messages.
+          sv1Backend.dsoDelegateBasedAutomation
+            .trigger[MergeValidatorLicenseContractsTrigger]
+            .pause()
+            .futureValue
         },
-        _.warningMessage should include(
-          "has 2 Validator License contracts."
+        forAll(_)(
+          _.warningMessage should include(
+            "has 2 Validator License contracts."
+          )
         ),
       )
     }

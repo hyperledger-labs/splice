@@ -18,8 +18,7 @@
     "validator/scan-proxy-openapi-ts-client",
     "wallet/frontend",
     "wallet/openapi-ts-client",
-    "wallet/external-openapi-ts-client",
-    "app-manager/frontend"
+    "wallet/external-openapi-ts-client"
   ],
   "dependencies": {
     "@daml.js/ans": "file:common/frontend/daml.js/splice-amulet-name-service-0.1.6",
