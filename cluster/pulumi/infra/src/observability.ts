@@ -43,8 +43,8 @@ import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
 
 export const prometheusRetentionDuration = config.optionalEnv('PROMETHEUS_RETENTION_TIME') || '1y';
-export const prometheusRetentionSize = config.optionalEnv('PROMETHEUS_RETENTION_SIZE') || '500GB';
-export const prometheusStorageSize = config.optionalEnv('PROMETHEUS_STORAGE_SIZE') || '800Gi';
+export const prometheusRetentionSize = config.optionalEnv('PROMETHEUS_RETENTION_SIZE') || '1500GB';
+export const prometheusStorageSize = config.optionalEnv('PROMETHEUS_STORAGE_SIZE') || '2Ti';
 
 function istioVirtualService(
   ns: k8s.core.v1.Namespace,

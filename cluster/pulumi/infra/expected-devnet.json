@@ -2729,7 +2729,7 @@
               }
             },
             "retention": "1y",
-            "retentionSize": "500GB",
+            "retentionSize": "1500GB",
             "serviceMonitorSelector": {
               "matchLabels": null
             },
@@ -2741,7 +2741,7 @@
                   ],
                   "resources": {
                     "requests": {
-                      "storage": "800Gi"
+                      "storage": "2Ti"
                     }
                   },
                   "storageClassName": "premium-rwo"
