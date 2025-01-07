@@ -145,7 +145,7 @@ export function exactNamespace(
       },
     },
     {
-      retainOnDelete: retainOnDelete,
+      retainOnDelete,
     }
   );
 
