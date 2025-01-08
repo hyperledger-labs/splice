@@ -3,6 +3,7 @@
 
 from collections.abc import Iterator
 from datetime import datetime, timezone, timedelta
+import time
 import os
 import re
 import requests
@@ -99,9 +100,21 @@ class JobsResponse:
 def gen_fetch_paginated(url: str, schema: Schema, params = {}, halt = lambda x: False) -> Iterator:
   items = []
   next_page_token = None
+  tries, max_tries = 0, 5
+  retry_delay = 2  # secs
+  timeout = 3  # secs
   while True:
     request_params = params | ({"page-token": next_page_token} if next_page_token else {})
-    raw_response = requests.get(url, params = request_params, headers = HEADERS)
+    try:
+        raw_response = requests.get(url, params = request_params, headers = HEADERS, timeout = timeout)
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+        print(f"Attempt {tries}: Request to {url} with params {params} failed due to {e}")
+        tries += 1
+        if tries < max_tries:
+            time.sleep(retry_delay)
+            continue
+        else:
+            raise RuntimeError(f"Max attempts {max_tries} exceeded") from e
     raw_response.raise_for_status()
     json_data=raw_response.json()
     try:
