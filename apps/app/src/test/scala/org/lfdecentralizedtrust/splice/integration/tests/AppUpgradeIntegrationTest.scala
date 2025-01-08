@@ -9,7 +9,12 @@ import org.lfdecentralizedtrust.splice.integration.tests.AppUpgradeIntegrationTe
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SplitwellTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  PostgresAroundEach,
+  ProcessTestUtil,
+  SplitwellTestUtil,
+  WalletTestUtil,
+}
 
 import java.nio.file.{Path, Paths}
 import better.files.*
@@ -30,6 +35,7 @@ import scala.concurrent.duration.*
 
 class AppUpgradeIntegrationTest
     extends IntegrationTest
+    with PostgresAroundEach
     with ProcessTestUtil
     with SplitwellTestUtil
     with WalletTestUtil {
@@ -39,18 +45,33 @@ class AppUpgradeIntegrationTest
   private val splitwellDarPathCurrent =
     "daml/splitwell/src/main/resources/dar/splitwell-current.dar"
 
+  // We need to split DBs as we upgrade the nodes independently. Otherwise, the first node runs the DB migrations
+  // and the nodes that have not yet been upgraded will fail if the DB schema is not backwards compatible.
+  override def usesDbs: IndexedSeq[String] = IndexedSeq(
+    "sv1node",
+    "sv2node",
+    "sv3node",
+    "bobsplitwellvalidators",
+  )
+
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
-      .simpleTopology4Svs(this.getClass.getSimpleName)
+      .fromResources(
+        Seq("simple-topology.conf", "include/upgrade-databases.conf"),
+        this.getClass.getSimpleName,
+      )
+      .withAllocatedUsers()
+      .withInitializedNodes()
+      .withTrafficTopupsEnabled
       .withManualStart
       // TODO(#8300) Consider removing this once domain config updates are less disruptive, particularly
       // to the tests after SVs 2 and 3 have been upgraded
       .withSequencerConnectionsFromScanDisabled()
-      .addConfigTransform((_, config) => {
+      .addConfigTransforms((_, config) =>
         // Makes the test a bit faster and easier to debug. See #11488
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
-      })
+      )
       .addConfigTransform((_, config) => {
         config
           .focus(_.validatorApps)
@@ -85,12 +106,29 @@ class AppUpgradeIntegrationTest
           AppUpgradeIntegrationTest.MultiProcessResource("forUpgrade", loggerFactory)
         )(spliceProcs => {
           // Do not start the old sv4 backend nor alice's validators, they will join only after upgrade
-          Seq("sv1-node", "sv2-node", "sv3-node", "bobSplitwellValidators").foreach(conf => {
+          Seq(
+            ("sv1-node", Seq("sv-apps.sv1", "scan-apps.sv1Scan", "validator-apps.sv1Validator")),
+            ("sv2-node", Seq("sv-apps.sv2", "scan-apps.sv2Scan", "validator-apps.sv2Validator")),
+            ("sv3-node", Seq("sv-apps.sv3", "validator-apps.sv3Validator")),
+            (
+              "bobSplitwellValidators",
+              Seq(
+                "splitwell-apps.providerSplitwellBackend",
+                "validator-apps.bobValidator",
+                "validator-apps.splitwellValidator",
+              ),
+            ),
+          ).foreach { case (conf, apps) =>
             val version = getBaseVersion()
             val bundledConfig = getConfigFileFromBundle(version, conf)
-            val inputConfig = generateConfig(bundledConfig, version, testId)
+            val suffix = apps
+              .map(app =>
+                s"canton.$app.storage.config.properties.databaseName = ${conf.replace("-", "").toLowerCase}"
+              )
+              .mkString("\n")
+            val inputConfig = generateConfig(bundledConfig, version, testId, Some(suffix))
             spliceProcs.startBundledSplice(conf, inputConfig)
-          })
+          }
 
           eventually(5.minute) {
             Seq("sv1", "sv2", "sv3").foreach(sv => {
@@ -571,7 +609,12 @@ object AppUpgradeIntegrationTest {
     BuildInfo.compatibleVersion
   }
 
-  def generateConfig(sourceConfig: Path, version: String, testId: String): Path = {
+  def generateConfig(
+      sourceConfig: Path,
+      version: String,
+      testId: String,
+      suffix: Option[String],
+  ): Path = {
     val bundle = bundleDir(version)
     val classpath = bundle.resolve("lib/splice-node.jar")
     val transformConfig = bundle.resolve("testResources/transform-config.sc")
@@ -593,6 +636,7 @@ object AppUpgradeIntegrationTest {
     if (result != 0) {
       throw new RuntimeException(s"Command $cmd returned: $result")
     }
+    suffix.foreach(s => File(generatedPath).appendLine().append(s))
     generatedPath
   }
 }

@@ -8,6 +8,7 @@ import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory}
 import com.daml.metrics.CacheMetrics
 import com.daml.metrics.api.MetricQualification.Latency
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
+import org.lfdecentralizedtrust.splice.store.HistoryMetrics
 
 class DbScanStoreMetrics(metricsFactory: LabeledMetricsFactory) extends AutoCloseable {
 
@@ -36,6 +37,8 @@ class DbScanStoreMetrics(metricsFactory: LabeledMetricsFactory) extends AutoClos
     )(MetricsContext.Empty)
 
   val cache = new CacheMetrics(prefix :+ "cache", metricsFactory)
+
+  val history = new HistoryMetrics(metricsFactory)(MetricsContext.Empty)
 
   override def close() = {
     try earliestAggregatedRound.close()

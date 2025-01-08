@@ -69,7 +69,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class SoftDomainMigrationTopologySetupIntegrationTest
+class SoftDomainMigrationIntegrationTest
     extends IntegrationTest
     with ConfigScheduleUtil
     with SplitwellTestUtil

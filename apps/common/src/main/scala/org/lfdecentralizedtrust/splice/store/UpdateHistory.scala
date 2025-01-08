@@ -61,6 +61,7 @@ class UpdateHistory(
     val updateStreamParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
     enableissue12777Workaround: Boolean,
+    val oMetrics: Option[HistoryMetrics] = None,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
@@ -365,6 +366,7 @@ class UpdateHistory(
     val safeParticipantOffset = lengthLimited(ApiOffset.fromLong(reassignment.offset))
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.contractId.contractId)
+    oMetrics.foreach(_.UpdateHistory.unassignments.mark())
     sqlu"""
       insert into update_history_unassignments(
         history_id,update_id,record_time,
@@ -408,7 +410,7 @@ class UpdateHistory(
     val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
     val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
     val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
-
+    oMetrics.foreach(_.UpdateHistory.assignments.mark())
     sqlu"""
       insert into update_history_assignments(
         history_id,update_id,record_time,
@@ -438,6 +440,7 @@ class UpdateHistory(
       tree: TransactionTree,
       migrationId: Long,
   ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+    oMetrics.foreach(_.UpdateHistory.transactionsTrees.mark())
     insertTransactionUpdateRow(tree, migrationId).flatMap(updateRowId => {
       // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
       // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
