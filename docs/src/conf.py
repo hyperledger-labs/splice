@@ -84,11 +84,6 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 #
 html_theme = "sphinx_rtd_theme"
 
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
-
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
@@ -128,7 +123,9 @@ rst_prolog = f"""
    :format: html
 
 .. |splice_cluster| replace:: :raw-html:`<span class="splice-cluster">unknown_cluster</span>`
-.. |splice_cluster_literal| replace:: :raw-html:`<code class="literal"><span class="splice-cluster">unknown_cluster</span></code>`
+
+.. |da_hostname| replace:: :raw-html:`<span class="splice-url-prefix">unknown_cluster</span>global.canton.network.digitalasset.com`
+.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster</span>global.canton.network.sync.global`
 
 .. |version_literal| replace:: ``{version}``
 .. |chart_version_literal| replace:: ``{chart_version}``
@@ -139,7 +136,6 @@ rst_prolog = f"""
 
 .. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
 .. |image_tag_set| replace:: ``export IMAGE_TAG={version}``
-.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-cluster">unknown_cluster</span>.global.canton.network.sync.global`
 
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_splice-node.tar.gz">Download Bundle</a>`
 .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="/cn-release-bundles/{version}_openapi.tar.gz">Download OpenAPI specs</a>`

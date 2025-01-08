@@ -8,3 +8,6 @@ FROM nginx:stable
 ARG version
 
 COPY --from=0 app/splice-node/docs/html /usr/share/nginx/html/
+COPY script.js /tmpl/script.js.tmpl
+COPY docker-entrypoint.sh /custom-docker-entrypoint.sh
+ENTRYPOINT ["/custom-docker-entrypoint.sh"]

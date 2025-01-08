@@ -38,6 +38,9 @@ spec:
             limits:
               cpu: 1
               memory: "1536Mi"
+          env:
+            - name: SPLICE_CLUSTER
+              value: "{{ .Values.networkName }}"
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

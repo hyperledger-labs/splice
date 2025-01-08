@@ -223,9 +223,6 @@ persistent_peers = "{{ $peers }}"
 persistent_peers = ""
 {{- end }}
 
-# UPNP port forwarding
-upnp = false
-
 # Path to address book
 addr_book_file = "data/addrbook.json"
 

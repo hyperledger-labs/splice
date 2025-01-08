@@ -43,17 +43,18 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   OpenMiningRoundTxLogEntry,
   ReceiverAmount,
   SenderAmount,
-  TransferTxLogEntry,
-  TransferCommandTxLogEntry,
   TransferCommandCreated,
-  TransferCommandSent,
-  TransferCommandFailed,
   TransferCommandExpired,
+  TransferCommandFailed,
+  TransferCommandSent,
+  TransferCommandTxLogEntry,
   TransferCommandWithdrawn,
+  TransferTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanStore,
+  DbScanStoreMetrics,
   ScanAggregatesReader,
   ScanAggregator,
 }
@@ -2211,6 +2212,7 @@ class DbScanStoreTest
         None,
       ),
       participantId = mkParticipantId("ScanStoreTest"),
+      new DbScanStoreMetrics(new NoOpMetricsFactory()),
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {
