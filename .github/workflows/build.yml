@@ -127,9 +127,7 @@ jobs:
     - scala_test_wall_clock_time
     runs-on: self-hosted-docker-tiny
     container:
-      # TODO(#15988): clean this up, use a proper released image instead:
-      #               - Once this is in a release, use the release version.
-      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.4-itai-dirty
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
