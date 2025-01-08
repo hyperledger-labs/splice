@@ -11,7 +11,7 @@ export function installController(): k8s.helm.v3.Release {
 
   return new k8s.helm.v3.Release('gha-runner-scale-set-controller', {
     chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller',
-    version: '0.9.3',
+    version: '0.10.1',
     namespace: controllerNamespace.metadata.name,
     values: {
       ...infraAffinityAndTolerations,

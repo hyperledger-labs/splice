@@ -40,7 +40,7 @@ function installDockerRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.9.3',
+      version: '0.10.1',
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: 'https://github.com/DACH-NY/canton-network-node',
@@ -386,7 +386,7 @@ function installK8sRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.9.3',
+      version: '0.10.1',
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: 'https://github.com/DACH-NY/canton-network-node',
