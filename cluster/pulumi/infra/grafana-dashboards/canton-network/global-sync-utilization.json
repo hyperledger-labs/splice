@@ -110,7 +110,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(increase(daml_mediator_requests_total{namespace=~\"$namespace\"}[30m])) by (namespace) - sum(increase(cn_history_updates_transactions_total{namespace=~\"$namespace\"}[30m])) by (namespace))",
+          "expr": "(sum(increase(daml_mediator_requests_total{namespace=~\"$namespace\"}[30m])) by (namespace) - sum(increase(splice_history_updates_transactions_total{namespace=~\"$namespace\"}[30m])) by (namespace))",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
@@ -205,7 +205,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "(sum(increase(daml_mediator_requests_total{namespace=~\"$namespace\"}[30m])) by (namespace) - sum(increase(cn_history_updates_transactions_total{namespace=~\"$namespace\"}[30m])) by (namespace)) / (sum(increase(daml_mediator_requests_total{namespace=~\"$namespace\"}[30m])) by (namespace) > sum(increase(cn_history_updates_transactions_total{namespace=~\"$namespace\"}[30m])) by (namespace) or sum(increase(cn_history_updates_transactions_total{namespace=~\"$namespace\"}[30m])) by (namespace))",
+          "expr": "(sum(increase(daml_mediator_requests_total{namespace=~\"$namespace\"}[30m])) by (namespace) - sum(increase(splice_history_updates_transactions_total{namespace=~\"$namespace\"}[30m])) by (namespace)) / (sum(increase(daml_mediator_requests_total{namespace=~\"$namespace\"}[30m])) by (namespace) > sum(increase(splice_history_updates_transactions_total{namespace=~\"$namespace\"}[30m])) by (namespace) or sum(increase(splice_history_updates_transactions_total{namespace=~\"$namespace\"}[30m])) by (namespace))",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
