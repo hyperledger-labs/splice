@@ -252,6 +252,7 @@
         },
         "clusterUrl": "test.global.canton.network.digitalasset.com",
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "networkName": "test",
         "tolerations": [
           {
             "effect": "NoSchedule",

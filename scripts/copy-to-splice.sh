@@ -52,7 +52,6 @@ copy_dir "openapi-templates"
 copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
 copy_dir "docs/src/app_dev"
-copy_dir "docs/src/_static"
 cp "${REPO_ROOT}/docs/src/splice-index.rst" "${SPLICE_DIR}/docs/src/index.rst"
 copy_dir "load-tester"
 

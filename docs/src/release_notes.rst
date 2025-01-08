@@ -20,6 +20,9 @@ Upcoming
   * The setting ``spliceDomainNames.nameServiceDomain`` must now be supplied for the ``splice-cluster-ingress-runbook`` helm chart.
     See the ``sv-helm`` example.
 
+  * The docs image expects a new environment variable ``SPLICE_CLUSTER``. In production, that would be one of ``dev``, ``test`` or ``main``.
+    The cn-docs Helm chart takes this value from the ``networkName`` Helm value.
+
 * Metrics
 
   * All metrics named starting with ``cn_`` now start with ``splice_`` instead.
