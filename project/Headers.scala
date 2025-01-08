@@ -90,6 +90,7 @@ object Headers {
     Compile / headerSources := {
       val pySources = (
         ((Compile / baseDirectory).value ** "*.py") ---
+          // TODO (#13695) directory moving/renaming
           ((Compile / baseDirectory).value ** "cn-svc-configs" ** "*") ---
           ((Compile / baseDirectory).value ** "node_modules" ** "*")
       ).get
@@ -97,6 +98,7 @@ object Headers {
       val shSources = (
         ((Compile / baseDirectory).value ** "*.sh") ---
           ((Compile / baseDirectory).value ** "node_modules" ** "*") ---
+          // TODO (#13695) directory moving/renaming
           ((Compile / baseDirectory).value ** "cn-svc-configs" ** "*") ---
           ((Compile / baseDirectory).value ** "community" ** "*") ---
           ((Compile / baseDirectory).value ** "*ts-client" ** "*") ---
