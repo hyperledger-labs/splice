@@ -261,7 +261,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "docs-docs",
     "provider": "",
@@ -528,7 +528,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1-a"
+          "zone": "europe-west6-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -656,7 +656,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -710,7 +710,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -792,7 +792,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -995,7 +995,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1113,7 +1113,7 @@
           }
         }
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

@@ -384,7 +384,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -503,7 +503,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -584,7 +584,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "validator1-participant-1",
     "provider": "",
@@ -638,7 +638,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1-a"
+          "zone": "europe-west6-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -709,7 +709,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -763,7 +763,7 @@
           "privateNetwork": "projects/test-project/global/networks/default"
         },
         "locationPreference": {
-          "zone": "us-central1-a"
+          "zone": "europe-west6-a"
         },
         "tier": "db-custom-2-7680",
         "userLabels": {
@@ -890,7 +890,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "validator1-validator-validator1",
     "provider": "",
