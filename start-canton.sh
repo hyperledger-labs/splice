@@ -176,7 +176,7 @@ fi
 printf '%s\n' "${db_names[@]}" | xargs -P 64 -I {} ./scripts/postgres.sh "$POSTGRES_MODE" createdb {}
 
 echo "Creating DB for CN apps"
-./scripts/postgres.sh "$POSTGRES_MODE" createdb cn_apps
+./scripts/postgres.sh "$POSTGRES_MODE" createdb splice_apps
 
 # Tmux session setup
 function tmux_cmd() {

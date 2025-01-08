@@ -32,7 +32,6 @@ function check_patterns_locally() {
   local exceptions=(
     '(\b|[`_])cn-docs'
     '@cn-load-tester\.com'
-    'databaseName = "cn_apps"|"cn_apps_reonboard"' # TODO (#15709) rename database to splice_apps
     '^[^:]+V001__create_schema\.sql:' # TODO (#15491) avoiding changing hashes
     'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (#15747) auth0 env names
     'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (#15741) new secret
