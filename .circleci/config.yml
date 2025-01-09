@@ -5148,34 +5148,6 @@ workflows:
             - artifactory
             - slack-context
             - canton-network-vpn
-          name: "scala_test frontend wall clock time"
-          test_names_file: "test-full-class-names-frontend.log"
-          start_canton_options: "-w -m"
-          pre_sbt_cmd: "./start-frontends.sh -d -s"
-          post_sbt_cmd: "./stop-frontends.sh"
-          resource_class: "2xlarge"
-          parallelism: 4
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test frontend sim time"
-          test_names_file: "test-full-class-names-frontend-sim-time.log"
-          start_canton_options: "-s"
-          pre_sbt_cmd: "./start-frontends.sh -d -s"
-          post_sbt_cmd: "./stop-frontends.sh"
-          resource_class: "xlarge"
-          parallelism: 1
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
           name: "scala_test app upgrade"
           test_names_file: "test-full-class-names-app-upgrade.log"
           start_canton_options: "-w"

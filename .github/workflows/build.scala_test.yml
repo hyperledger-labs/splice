@@ -21,6 +21,10 @@ on:
         type: boolean
         required: false
         default: false
+      is_frontend_test:
+        type: boolean
+        required: false
+        default: false
 
 jobs:
 
@@ -70,6 +74,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
 
     steps:
+
       - name: Check out repository code
         uses: actions/checkout@v4
 
@@ -133,6 +138,16 @@ jobs:
           echo "$splitted"
           echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $tests\"" >> "$GITHUB_OUTPUT"
 
+      # webpack uses inotify to watch for changes, and we need to increase the limit
+      - name: increase inotify limit
+        if: ${{ inputs.is_frontend_test }}
+        shell: bash
+        run: |
+          echo "Checking watch info..."
+          sysctl fs.inotify
+          echo "Setting max_user_watches..."
+          echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
       - name: Wait for Canton to be ready
         shell: bash
         run: |
@@ -149,12 +164,22 @@ jobs:
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}
-          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET --keep GITHUB_ACTION"
+          additional_nix_args: "--keep GITHUB_ACTION"
+          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID }} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}
           pre_sbt_cmd: |
             if [[ "${{ inputs.with_gcp_creds }}" == "true" ]]; then
               export GOOGLE_APPLICATION_CREDENTIALS="$(mktemp gcp-creds-XXXXXX.json)"
               echo '${{ secrets.GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
               export GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS='${{ secrets.GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}'
+            fi
+            if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
+              export AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID="${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID }}"
+              export AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET="${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}"
+              ./start-frontends.sh -d -s
+            fi
+          post_sbt_cmd: |
+            if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
+              ./stop-frontends.sh
             fi
 
 
