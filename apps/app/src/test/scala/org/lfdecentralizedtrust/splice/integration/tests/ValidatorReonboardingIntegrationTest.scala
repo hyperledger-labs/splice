@@ -43,7 +43,7 @@ class ValidatorReonboardingIntegrationTest
     Seq(
       "participant_alice_validator",
       "participant_alice_validator_reonboard_new",
-      "cn_apps_reonboard",
+      "splice_apps_reonboard",
     ) ++ super.usesDbs
 
   // Runs against a temporary Canton instance.
@@ -111,7 +111,7 @@ class ValidatorReonboardingIntegrationTest
                         config = c.config
                           .withValue(
                             "properties.databaseName",
-                            ConfigValueFactory.fromAnyRef("cn_apps_reonboard"),
+                            ConfigValueFactory.fromAnyRef("splice_apps_reonboard"),
                           )
                       )
                     case _ => throw new IllegalArgumentException("Only Postgres is supported")
