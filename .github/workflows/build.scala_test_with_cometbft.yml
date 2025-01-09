@@ -19,28 +19,41 @@ on:
 
 jobs:
 
-  runner-indices:
+  split_tests:
     runs-on: self-hosted-docker-tiny
-    name: Generate runner indices
+    name: Split the tests into parallel runs
     outputs:
-      json: ${{ steps.generate-index-list.outputs.json }}
+      indices: ${{ steps.generate_index_list.outputs.json }}
+      test_names: ${{ steps.split_tests.outputs.test_names }}
     steps:
-      - id: generate-index-list
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Generate runner indices
+        id: generate_index_list
         run: |
           MAX_INDEX=$((${{ inputs.parallelism }}-1))
           INDEX_LIST=$(seq 0 ${MAX_INDEX})
           INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
           echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
 
+      - name: Split tests
+        id: split_tests
+        uses: ./.github/actions/tests/split_tests
+        with:
+          test_reports_dir: '/cache/test-reports'
+          test_names_file: ${{ inputs.test_names_file }}
+          split_total: ${{ inputs.parallelism }}
+
 
   scala_test:
     runs-on: ${{ inputs.runs_on }}
     timeout-minutes: 30
     needs:
-      - runner-indices
+      - split_tests
     strategy:
       matrix:
-        runner-index: ${{ fromjson(needs.runner-indices.outputs.json) }}
+        runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
     container:
       image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4
@@ -135,20 +148,11 @@ jobs:
         with:
           cache_version: 0
 
-      - name: Compute tests for run ${{ matrix.runner-index }}
-        id: split_tests
-        uses: ./.github/actions/tests/split_tests
-        with:
-          test_reports_dir: '/cache/test-reports'
-          test_names_file: ${{ inputs.test_names_file }}
-          split_total: ${{ inputs.parallelism }}
-          split_index: ${{ matrix.runner-index }}
-
       - name: Prepare list of tests to run for sbt
         id: list_tests
         shell: bash
         run: |
-          splitted=$(echo "${{ toJson(steps.split_tests.outputs.test_names) }}" | jq -r '.[]')
+          splitted=$(echo "${{ toJson(needs.split_tests.outputs.test_names) }}" | jq -r '.[${{ matrix.runner-index }}].[]')
           tests=$(echo $splitted | tr '\n' ' ')
           count=$(echo $tests | wc -w)
           echo "We are running $count tests in this batch:"

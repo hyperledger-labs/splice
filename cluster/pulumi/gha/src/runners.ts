@@ -94,6 +94,10 @@ function installDockerRunnerScaleSet(
                     readOnly: true,
                     subPath: 'config.json',
                   },
+                  {
+                    name: 'cache',
+                    mountPath: '/cache',
+                  },
                 ],
               },
               {
