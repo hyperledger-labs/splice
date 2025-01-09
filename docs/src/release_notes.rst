@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.5
+-----
 
 * Scan
 
@@ -20,8 +20,8 @@ Upcoming
   * The setting ``spliceDomainNames.nameServiceDomain`` must now be supplied for the ``splice-cluster-ingress-runbook`` helm chart.
     See the ``sv-helm`` example.
 
-  * Added a new Grafana dashboard for monitoring utilization of the Global Synchronizer, currently estimated by the comparing the total number
-    of transactions processed to those visible by the DSO party. The larger this delta is, the more likely it is that the Global Synchronizer is
+  * Added a new Grafana dashboard for monitoring utilization of the Global Synchronizer, currently estimated by comparing the total number
+    of transactions processed to those visible to the DSO party. The larger this delta is, the more likely it is that the Global Synchronizer is
     used for private transactions beyond those needed for operating the synchronizer itself.
 
   * The docs image expects a new environment variable ``SPLICE_CLUSTER``. In production, that would be one of ``dev``, ``test`` or ``main``.
