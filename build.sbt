@@ -527,21 +527,20 @@ lazy val `apps-validator` =
         directory = "scan-proxy-openapi-ts-client",
       ),
       Compile / guardrailTasks :=
-        List("validator-internal", "json-api-proxy-internal", "ans-external", "scan-proxy").flatMap(
-          api =>
-            List(
-              ScalaServer(
-                new File(s"apps/validator/src/main/openapi/${api}.yaml"),
-                pkg = "org.lfdecentralizedtrust.splice.http.v0",
-                modules = List("pekko-http-v1.0.0", "circe"),
-                customExtraction = true,
-              ),
-              ScalaClient(
-                new File(s"apps/validator/src/main/openapi/${api}.yaml"),
-                pkg = "org.lfdecentralizedtrust.splice.http.v0",
-                modules = List("pekko-http-v1.0.0", "circe"),
-              ),
-            )
+        List("validator-internal", "ans-external", "scan-proxy").flatMap(api =>
+          List(
+            ScalaServer(
+              new File(s"apps/validator/src/main/openapi/${api}.yaml"),
+              pkg = "org.lfdecentralizedtrust.splice.http.v0",
+              modules = List("pekko-http-v1.0.0", "circe"),
+              customExtraction = true,
+            ),
+            ScalaClient(
+              new File(s"apps/validator/src/main/openapi/${api}.yaml"),
+              pkg = "org.lfdecentralizedtrust.splice.http.v0",
+              modules = List("pekko-http-v1.0.0", "circe"),
+            ),
+          )
         ),
     )
 
