@@ -969,35 +969,6 @@ lazy val `apps-splitwell` =
             modules = List("pekko-http-v1.0.0", "circe"),
           ),
         ),
-      Compile / resourceGenerators += Def.task {
-        val log = streams.value.log
-        val splitwellOutput = (`splitwell-daml` / Compile / damlBuild).value
-        val splitwellDar = ((`splitwell-daml` / Compile / damlBuild).value).head.toString
-        val output1_0 =
-          baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle-1.0.0.tar.gz"
-        val output2_0 =
-          baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle-2.0.0.tar.gz"
-        // TODO(#16859) Remove this after bumping the base version
-        val createBundle = baseDirectory.value / "../../scripts/create-bundle-for-app-mgr.sh"
-        val cacheDir = streams.value.cacheDirectory
-        val cache = FileFunction.cached(cacheDir) { _ =>
-          runCommand(
-            Seq(createBundle.toString, splitwellDar, "splitwell", "1.0.0", output1_0.toString),
-            log,
-            None,
-            None,
-          )
-          runCommand(
-            Seq(createBundle.toString, splitwellDar, "splitwell", "2.0.0", output2_0.toString),
-            log,
-            None,
-            None,
-          )
-          Set(output1_0, output2_0)
-
-        }
-        cache((createBundle +: splitwellOutput).toSet).toSeq
-      }.taskValue,
     )
 
 lazy val pulumi =
