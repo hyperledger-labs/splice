@@ -125,7 +125,7 @@ template AmuletRules
         require "preapprovalExpiresAt is not in the past" (preapprovalExpiresAt > now)
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (preapprovalExpiresAt `subTime` now) configUsd context.context dso
-        transferResult <- chargeTransferPreapprovalFee validator amuletPaid inputs context dso
+        transferResult <- splitAndBurn validator amuletPaid inputs context.context dso
         proposalCid <- create ExternalPartySetupProposal with
           user
           validator
@@ -148,7 +148,7 @@ template AmuletRules
         require "expiresAt is not in the past" (expiresAt > now)
         let configUsd = getValueAsOf now configSchedule
         (amuletPaid, _) <- computeTransferPreapprovalFee (expiresAt `subTime` now) configUsd context.context dso
-        transferResult <- chargeTransferPreapprovalFee provider amuletPaid inputs context dso
+        transferResult <- splitAndBurn provider amuletPaid inputs context.context dso
         transferPreapprovalCid <- create TransferPreapproval with
           receiver
           provider
@@ -179,31 +179,11 @@ template AmuletRules
         case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of
           Left err -> throw (InvalidTransfer err)
           Right _ -> pure ()
+        openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
+        let transferConfigAmulet = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
         (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees provider trafficAmount this context
-        let transfer = Transfer with
-              sender = provider
-              provider
-              inputs
-              outputs = [ TransferOutput with
-                            receiver = dso
-                            amount = trafficCostAmulet
-                            receiverFeeRatio = 1.0 -- ensure the provider pays only the traffic cost
-                            lock = None
-                        ]
-            -- We don't issue any rewards as part of the transfer, as these are only for the burned fees.
-            rewardsConfig = RewardsIssuanceConfig with
-              issueAppRewards = False
-              issueValidatorRewards = False
-        transferResult <- executeTransfer rewardsConfig context dso transfer
-        let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
-        -- burn the amulet created for the DSO party (using fetchAndArchive for extra safety)
-        void $ fetchAndArchive (ForOwner with dso; owner = dso) amuletCid
-        -- issue validator rewards over the whole burn
-        create ValidatorRewardCoupon with
-          dso
-          round = transferResult.round
-          user = provider
-          amount = trafficCostAmulet
+        -- We want to burn exactly trafficCostAmulet, and createFee is already burnt by the self-transfer itself, so we subtract the createFee from the amount we split off and burn explicitly.
+        transferResult <- splitAndBurn provider (trafficCostAmulet - transferConfigAmulet.createFee.fee) inputs context dso
         -- create a new MemberTraffic contract for the purchased traffic
         purchasedTraffic <- create MemberTraffic with
           dso
@@ -1344,7 +1324,7 @@ template TransferPreapproval
          amuletRules <- fetchPublicReferenceData (ForDso dso) context.amuletRules (AmuletRules_Fetch dso)
          let configUsd = getValueAsOf now amuletRules.configSchedule
          (amuletPaid, _) <- computeTransferPreapprovalFee extension configUsd context.context dso
-         transferResult <- chargeTransferPreapprovalFee provider amuletPaid inputs context dso
+         transferResult <- splitAndBurn provider amuletPaid inputs context.context dso
          transferPreapprovalCid <- create this with
            lastRenewedAt = now
            expiresAt = newExpiresAt
@@ -1401,34 +1381,38 @@ computeTransferPreapprovalFee duration amuletConfig context dso = do
   let feeAmulet = feeUsd / contextMiningRound.amuletPrice
   pure (feeAmulet, feeUsd)
 
-chargeTransferPreapprovalFee : Party -> Decimal -> [TransferInput] -> PaymentTransferContext -> Party -> Update TransferResult
-chargeTransferPreapprovalFee provider feeAmount inputs context dso = do
-  -- do not create activity records as part of the transfer, as we'll create them later
+splitAndBurn : Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> Update TransferResult
+splitAndBurn sender amount inputs context dso = do
+-- do not create activity records as part of the transfer. We create a validator activity record for the full burn below.
   let rewardsConfig = RewardsIssuanceConfig with
         issueAppRewards = False
         issueValidatorRewards = False
-  -- do a self-transfer to split the amulet
-  transferResult <- executeTransfer rewardsConfig context.context dso Transfer with
-    sender = provider
-    provider
+  transferResult <- executeTransfer rewardsConfig context dso Transfer with
+    sender
+    provider = sender
     inputs
     outputs =
       [ TransferOutput with
-          receiver = provider
+          receiver = sender
           receiverFeeRatio = 0.0
-          amount = feeAmount
+          amount
           lock = None
       ]
   let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
   -- burn the split amulet containing the fee amount
-  void $ fetchAndArchive (ForOwner with dso; owner = provider) amuletCid
+  amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- create validator activity rewards over the whole burn.
-  -- this serves to incentivize the provider for creating the pre-approval and
-  -- enabling the receiver to interact with more entities on the network,
-  -- thereby contributing to increased network activity.
   create ValidatorRewardCoupon with
     dso
     round = transferResult.round
-    user = provider
-    amount = feeAmount + (sum transferResult.summary.outputFees)
-  pure transferResult
+    user = sender
+    amount = amount + sum transferResult.summary.outputFees
+  let amuletAsOfRoundZero = amulet.amount.initialAmount + amulet.amount.ratePerRound.rate * intToDecimal amulet.amount.createdAt.number
+  -- adjust the balance changes to account for the archival. This primarily matters for the tx log parsers in scan and the wallet.
+  return transferResult with
+    summary.balanceChanges =
+      Map.insertWith
+        (+)
+        sender
+        (BalanceChange (-amuletAsOfRoundZero) (- (amulet.amount.ratePerRound.rate)))
+        transferResult.summary.balanceChanges

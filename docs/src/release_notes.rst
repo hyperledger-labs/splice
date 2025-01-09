@@ -32,6 +32,27 @@ Release Notes
   * All metrics named starting with ``cn_`` now start with ``splice_`` instead.
     Example Grafana configuration has been updated to match, but any custom consumers of these metrics must be updated manually.
 
+* Daml
+
+  * Restructured the Daml code of AmuletRules_BuyMemberTraffic to
+    avoid an intermediate transfer to the DSO party before the amulets
+    were burned. There is no change in the amount that gets burned or
+    the rewards are issued, just a slight change in the transaction
+    structure to accomplish this.
+
+    This requires an upgrade to the following Daml versions:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.7
+    amuletNameService  0.1.7
+    dsoGovernance      0.1.10
+    validatorLifecycle 0.1.1
+    wallet             0.1.7
+    walletPayments     0.1.7
+    ================== =======
+
 
 0.3.4
 -----
