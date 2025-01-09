@@ -9,12 +9,6 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.environment.DarResources
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  AppConfiguration,
-  Domain,
-  ReleaseConfiguration,
-  Timespan,
-}
 import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
@@ -590,16 +584,6 @@ object SpliceConfig {
       deriveReader[ValidatorSynchronizerConfig]
     implicit val offsetDateTimeConfigurationReader: ConfigReader[java.time.OffsetDateTime] =
       implicitly[ConfigReader[String]].map(java.time.OffsetDateTime.parse)
-    implicit val timespanConfigurationReader: ConfigReader[Timespan] = deriveReader[Timespan]
-    implicit val domainConfigurationReader: ConfigReader[Domain] = deriveReader[Domain]
-    implicit val releaseConfigurationReader: ConfigReader[ReleaseConfiguration] =
-      deriveReader[ReleaseConfiguration]
-    implicit val appConfigurationReader: ConfigReader[AppConfiguration] =
-      deriveReader[AppConfiguration]
-    implicit val initialRegisteredAppReader: ConfigReader[InitialRegisteredApp] =
-      deriveReader[InitialRegisteredApp]
-    implicit val initialInstalledAppReader: ConfigReader[InitialInstalledApp] =
-      deriveReader[InitialInstalledApp]
     implicit val transferPreapprovalConfigReader: ConfigReader[TransferPreapprovalConfig] =
       deriveReader[TransferPreapprovalConfig].emap { conf =>
         Either.cond(
@@ -851,16 +835,6 @@ object SpliceConfig {
       deriveWriter[ValidatorSynchronizerConfig]
     implicit val offsetDateTimeConfigurationWriter: ConfigWriter[java.time.OffsetDateTime] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
-    implicit val timespanConfigurationWriter: ConfigWriter[Timespan] = deriveWriter[Timespan]
-    implicit val domainConfigurationWriter: ConfigWriter[Domain] = deriveWriter[Domain]
-    implicit val releaseConfigurationWriter: ConfigWriter[ReleaseConfiguration] =
-      deriveWriter[ReleaseConfiguration]
-    implicit val appConfigurationWriter: ConfigWriter[AppConfiguration] =
-      deriveWriter[AppConfiguration]
-    implicit val initialRegisteredAppWriter: ConfigWriter[InitialRegisteredApp] =
-      deriveWriter[InitialRegisteredApp]
-    implicit val initialInstalledAppWriter: ConfigWriter[InitialInstalledApp] =
-      deriveWriter[InitialInstalledApp]
     implicit val transferPreapprovalConfigWriter: ConfigWriter[TransferPreapprovalConfig] =
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =

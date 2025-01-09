@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.validator.config
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.config.*
-import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
@@ -43,12 +42,6 @@ object ValidatorOnboardingConfig {
     config.copy(secret = hidden)
   }
 }
-
-final case class InitialRegisteredApp(
-    providerUserId: String,
-    config: definitions.AppConfiguration,
-    releaseFile: String,
-)
 
 final case class InitialInstalledApp(appUrl: Uri)
 
