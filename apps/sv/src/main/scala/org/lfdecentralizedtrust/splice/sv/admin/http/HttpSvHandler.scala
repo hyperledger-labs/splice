@@ -90,16 +90,26 @@ class HttpSvHandler(
               }
 
             case Some(vo) =>
-              for {
-                // We retry here because this mutates the AmuletRules and rounds contracts,
-                // which can lead to races.
-                _ <- retryProvider.retryForClientCalls(
-                  "onboard_validator",
-                  "onboard validator via DsoRules",
-                  onboardValidator(partyId, body.secret, vo, body.version, body.contactPoint),
-                  logger,
-                )
-              } yield v0.SvResource.OnboardValidatorResponseOK
+              // Check whether a validator license already exists for this party,
+              // because when recovering from an ACS snapshot "used secret" information will get lost.
+              dsoStore
+                .lookupValidatorLicenseWithOffset(PartyId.tryFromProtoPrimitive(body.partyId))
+                .flatMap {
+                  case QueryResult(_, Some(_)) =>
+                    // This validator is already onboarded - nothing to do
+                    Future.successful(v0.SvResource.OnboardValidatorResponseOK)
+                  case QueryResult(_, None) =>
+                    for {
+                      // We retry here because this mutates the AmuletRules and rounds contracts,
+                      // which can lead to races.
+                      _ <- retryProvider.retryForClientCalls(
+                        "onboard_validator",
+                        "onboard validator via DsoRules",
+                        onboardValidator(partyId, body.secret, vo, body.version, body.contactPoint),
+                        logger,
+                      )
+                    } yield v0.SvResource.OnboardValidatorResponseOK
+                }
           }
         case Left(error) =>
           Future.failed(HttpErrorHandler.badRequest(error))
