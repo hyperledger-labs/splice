@@ -80,11 +80,7 @@ class WalletTxLogWithSynchronizerFeesIntegrationTest
                   -totalCostCc - smallAmount,
                   -totalCostCc,
                 )
-                inside(logEntry.receivers) { case Seq(receiver) =>
-                  receiver.party shouldBe dsoParty.toProtoPrimitive
-                  // domain fees paid is immediately burnt by DSO
-                  receiver.amount shouldBe 0
-                }
+                logEntry.receivers shouldBe empty
               },
               { case logEntry: BalanceChangeTxLogEntry =>
                 logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
@@ -119,11 +115,7 @@ class WalletTxLogWithSynchronizerFeesIntegrationTest
                   -totalCostCc - smallAmount,
                   -totalCostCc,
                 )
-                inside(logEntry.receivers) { case Seq(receiver) =>
-                  receiver.party shouldBe dsoParty.toProtoPrimitive
-                  // domain fees paid is immediately burnt by DSO
-                  receiver.amount shouldBe 0
-                }
+                logEntry.receivers shouldBe empty
               },
               { case logEntry: BalanceChangeTxLogEntry =>
                 logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
