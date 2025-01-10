@@ -41,7 +41,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
 - [ ] If significant time has passed since cutting the release, ensure that there are no changes that need to be backported to the release branch.
       In particular, check for changes to the `cluster/cn-svc-configs` submodule.
 - [ ] Merge a PR into the release branch (`origin/release-line-0.x.y`) with the following changes:
-  - [ ] Update the cluster `config.yaml` file by setting the new reference under `synchronizerMigration.active.releaseReference`.
+  - [ ] Update the cluster `config.yaml` file by setting the new reference under `synchronizerMigration.active.releaseReference` and update the `synchronizerMigration.active.version` to version `0.x.y`.
   - [ ] Update `cluster/deployment/devnet/.envrc.vars`, bumping the release version.
     - Currently, the affected env vars are `OVERRIDE_VERSION`, `CHARTS_VERSION`, and `MULTI_VALIDATOR_IMAGE_VERSION`.
   - [ ] Before merging, open the `preview_pulumi_changes` CircleCi workflow and approve the jobs to generate `deployment` and `devnet` previews.
@@ -51,10 +51,11 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
     - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.
 - [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
     - A good check is `kubectl get stack -n operator -o json | jq '.items | .[] | {name: .metadata.name, status: .status}'` should show all stacks as successful and on the right commit.
+      Remember to check that the `lastSuccessfulCommit` field points to the release line that you expect.
 - [ ] Confirm that we didn't break anything (e.g., via the sv status grafana dashboard)
 - [ ] Forward port the above change that bumped the devnet version to both the _ancestor branch_ and `origin/main`.
 - [ ] Merge a PR into `origin/main` with the following changes:
-  - [ ] Update the branch references in `.circleci/triggers/*/${cluster}-*.json`.
+  - [ ] Update the branch references in `.circleci/triggers/*/devnet-*.json` only for devnet.
         This will upgrade our periodic health checks to use the new release version.
         Old health checks may not work against the upgraded cluster, so expect some failures until this PR is merged.
 - [ ] Communicate to partners that a new version is available
