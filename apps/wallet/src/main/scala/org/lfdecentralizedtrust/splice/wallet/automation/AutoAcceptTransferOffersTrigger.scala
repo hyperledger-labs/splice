@@ -51,7 +51,7 @@ class AutoAcceptTransferOffersTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     if (
-      transferOffer.contract.payload.receiver == store.key.validatorParty.toProtoPrimitive && autoAcceptTransfers.fromParties
+      transferOffer.contract.payload.receiver == store.key.endUserParty.toProtoPrimitive && autoAcceptTransfers.fromParties
         .contains(Codec.tryDecode(Codec.Party)(transferOffer.contract.payload.sender))
     ) {
       for {
@@ -72,7 +72,7 @@ class AutoAcceptTransferOffersTrigger(
         res <- connection
           .submit(
             Seq(store.key.validatorParty),
-            Seq(),
+            Seq(store.key.endUserParty),
             cmd,
             priority = commandPriority,
           )

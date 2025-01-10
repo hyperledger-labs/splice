@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming Release
+----------------
+
+* Wallet sweeps
+
+    * The wallet sweep automation now supports sweeping to end user parties.
+
 0.3.5
 -----
 
