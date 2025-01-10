@@ -46,7 +46,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
     - Currently, the affected env vars are `OVERRIDE_VERSION`, `CHARTS_VERSION`, and `MULTI_VALIDATOR_IMAGE_VERSION`.
   - [ ] Before merging, open the `preview_pulumi_changes` CircleCi workflow and approve the jobs to generate `deployment` and `devnet` previews.
     Review the changes together with someone else, paying particular attention to deleted or newly created resources.
-- [ ] Warn our partners on [#supervalidator-ops](https://daholdings.slack.com/archives/C05E70BCSDA): "We'll be upgrading the DA-2 and DA-Eng nodes on DevNet to test a new version. Some turbulence might be expected."
+- [ ] Warn our partners on [#supervalidator-operations](https://daholdings.slack.com/archives/C085C3ESYCT): "We'll be upgrading the DA-2 and DA-Eng nodes on DevNet to test a new version. Some turbulence might be expected."
 - [ ] Trigger a CircleCI pipeline on the release branch with `run-job: update-deployment` and `cluster: devnet`.
     - This makes the operator track the release branch and kicks off the upgrade of our nodes on the cluster.
 - [ ] Wait for [the operator](https://github.com/DACH-NY/canton-network-node/tree/main/cluster#the-operator) to apply your changes
