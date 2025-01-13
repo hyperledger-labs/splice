@@ -169,6 +169,11 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep VPN_HOST_NAME
+            --keep VPN_HOST_IP
+            --keep VPN_USER
+            --keep VPN_PASSWORD
           cmd: |
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1"
           # retry on vpn disconnects.
