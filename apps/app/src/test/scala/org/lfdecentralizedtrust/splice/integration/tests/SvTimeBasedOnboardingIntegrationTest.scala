@@ -155,7 +155,9 @@ class SvTimeBasedOnboardingIntegrationTest
             _ =>
               sv1Backend
                 .listOngoingValidatorOnboardings()
-                .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 1,
+                .filter(e =>
+                  e.contract.payload.candidateSecret == testCandidateSecret
+                ) should have size 1,
           )
           actAndCheck(
             "No confirmation happens within 2h",
@@ -165,7 +167,9 @@ class SvTimeBasedOnboardingIntegrationTest
             _ =>
               sv1Backend
                 .listOngoingValidatorOnboardings()
-                .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 0,
+                .filter(e =>
+                  e.contract.payload.candidateSecret == testCandidateSecret
+                ) should have size 0,
           )
         }
       }

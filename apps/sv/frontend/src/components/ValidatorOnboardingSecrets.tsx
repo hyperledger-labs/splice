@@ -39,7 +39,10 @@ const ValidatorOnboardingSecrets: React.FC = () => {
   }
 
   const validatorOnboardings = validatorOnboardingsQuery.data.sort((a, b) => {
-    return new Date(b.payload.expiresAt).valueOf() - new Date(a.payload.expiresAt).valueOf();
+    return (
+      new Date(b.contract.payload.expiresAt).valueOf() -
+      new Date(a.contract.payload.expiresAt).valueOf()
+    );
   });
 
   return (
@@ -72,9 +75,9 @@ const ValidatorOnboardingSecrets: React.FC = () => {
             {validatorOnboardings.map(onboarding => {
               return (
                 <OnboardingRow
-                  key={onboarding.payload.candidateSecret}
-                  expiresAt={onboarding.payload.expiresAt}
-                  secret={onboarding.payload.candidateSecret}
+                  key={onboarding.encodedSecret}
+                  expiresAt={onboarding.contract.payload.expiresAt}
+                  secret={onboarding.contract.payload.candidateSecret}
                 />
               );
             })}

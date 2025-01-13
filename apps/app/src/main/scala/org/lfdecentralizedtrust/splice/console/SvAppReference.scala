@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.console
 import com.digitalasset.canton.DomainAlias
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding as vo
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice as cp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
@@ -33,6 +32,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.{
 }
 import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvSynchronizerNodeConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
+import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.console.{BaseInspection, Help}
@@ -328,8 +328,7 @@ class SvAppBackendReference(
   def config: SvAppBackendConfig =
     consoleEnvironment.environment.config.svsByString(name)
 
-  def listOngoingValidatorOnboardings()
-      : Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]] =
+  def listOngoingValidatorOnboardings(): Seq[ValidatorOnboarding] =
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.ListOngoingValidatorOnboardings

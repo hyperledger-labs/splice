@@ -55,6 +55,8 @@ import scala.jdk.OptionConverters.*
 
 object SvUtil {
 
+  val ValidatorOnboardingSecretLength = 32
+
   // Assumption: the sv1 node is run by the foundation
   val DefaultSV1Weight: Long = 10_000L
 
@@ -304,12 +306,16 @@ object SvUtil {
     }
   }
 
-  def generateRandomOnboardingSecret(): String = {
+  def generateRandomOnboardingSecret(sv: PartyId): ValidatorOnboardingSecret = {
     val rng = new SecureRandom();
     // 256 bits of entropy
-    val bytes = new Array[Byte](32)
+    val bytes = new Array[Byte](ValidatorOnboardingSecretLength)
     rng.nextBytes(bytes)
-    Base64.getEncoder().encodeToString(bytes)
+    val secret = Base64.getEncoder().encodeToString(bytes)
+    ValidatorOnboardingSecret(
+      sv,
+      secret,
+    )
   }
 
   def fromRelTime(duration: RelTime): JavaDuration =

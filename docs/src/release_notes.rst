@@ -15,6 +15,13 @@ Upcoming Release
 
     * The wallet sweep automation now supports sweeping to end user parties.
 
+* SV app
+
+    * Onboarding secrets now encode the sponsoring SV party to provide
+      better error messages in case a secret is used to onboard
+      against an SV that did not issue it. Secrets are still just
+      opaque strings so no change is required.
+
 0.3.5
 -----
 
