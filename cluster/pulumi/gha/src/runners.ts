@@ -367,6 +367,13 @@ function installK8sRunnerScaleSet(
                   },
                   limits: resources?.limits,
                 },
+                ports: [
+                  {
+                    name: 'metrics',
+                    containerPort: 8000,
+                    protocol: 'TCP',
+                  },
+                ],
               },
             ],
             serviceAccountName: serviceAccountName,
@@ -413,7 +420,7 @@ function installK8sRunnerScaleSet(
                 // are merged upstream.
                 // Upstream PR: https://github.com/actions/runner-container-hooks/pull/200
                 image:
-                  'digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-temp-runner-hook:0.3.3-itai-dirty',
+                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-temp-runner-hook:0.3.4',
                 imagePullPolicy: 'Always',
                 command: ['/home/runner/run.sh'],
                 env: [
@@ -644,6 +651,40 @@ function installK8sRunnerScaleSets(
   );
 }
 
+function installPodMonitor(runnersNamespace: Namespace) {
+  // Define a PodMonitor to scrape metrics from the workflow runner pods
+  // (identified by the presence of the 'runner-pod' label).
+  return new k8s.apiextensions.CustomResource(
+    'workflow-runner-pod-monitor',
+    {
+      apiVersion: 'monitoring.coreos.com/v1',
+      kind: 'PodMonitor',
+      metadata: {
+        namespace: runnersNamespace.metadata.name,
+        labels: { release: 'prometheus-grafana-monitoring' },
+      },
+      spec: {
+        selector: {
+          matchExpressions: [
+            {
+              key: 'runner-pod',
+              operator: 'Exists',
+            },
+          ],
+        },
+        podMetricsEndpoints: [
+          {
+            port: 'metrics',
+            interval: '28s',
+            path: '/',
+          },
+        ],
+      },
+    },
+    { dependsOn: runnersNamespace }
+  );
+}
+
 export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
   const runnersNamespace = new Namespace('gha-runners', {
     metadata: {
@@ -674,4 +715,5 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
 
   installDockerRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvc);
   installK8sRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvcName);
+  installPodMonitor(runnersNamespace);
 }

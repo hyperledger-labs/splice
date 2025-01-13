@@ -57,6 +57,7 @@ jobs:
 
   scala_test:
     runs-on: ${{ inputs.runs_on }}
+    name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
     timeout-minutes: 30
     needs:
       - split_tests
@@ -65,7 +66,7 @@ jobs:
         runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4
+      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.6-itai-dirty
 
     services:
       postgres:
@@ -77,6 +78,13 @@ jobs:
 
       - name: Check out repository code
         uses: actions/checkout@v4
+
+      # TODO(#15988): try to move this into common_setup.sh (naively putting the
+      # process in the background in bash didn't work and still blocked the step)
+      - name: Publish test name metric
+        uses: miguelteixeiraa/action-run-in-background@v1
+        with:
+          script: ./.github/actions/scripts/publish_gha_metrics.py --test_suite ${{ inputs.test_name }}
 
       - name: Setup
         shell: bash
