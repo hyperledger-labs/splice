@@ -20,38 +20,30 @@ const SetDsoRulesConfig: React.FC<{
   const [configuration, setConfiguration] = useState<Record<string, JSONValue> | undefined>(
     undefined
   );
-  const [nextScheduledSynchronizerUpgrade, setNextScheduledSynchronizerUpgrade] =
-    useState<boolean>(false);
 
   const dateFormat = 'YYYY-MM-DDTHH:mm:ss[Z]';
-
-  const addDefaultSynchronizerUpgradeSchedule = () => {
-    const nextScheduledSynchronizerUpgrade = {
-      // default schedule an domain upgrade in 3 days
-      time: dayjs.utc().add(3, 'day').format(dateFormat),
-      migrationId: '1',
-    };
-    setDsoRulesConfigAction({
-      ...configuration,
-      nextScheduledSynchronizerUpgrade,
-    });
+  const defaultNextScheduledSynchronizerUpgrade = {
+    time: dayjs.utc().add(3, 'day').format(dateFormat),
+    migrationId: '1',
   };
-
-  const removeSynchronizerUpgradeSchedule = () => {
-    setDsoRulesConfigAction({
-      ...configuration,
-      nextScheduledSynchronizerUpgrade: null,
-    });
-  };
+  const [nextScheduledSynchronizerUpgrade, setNextScheduledSynchronizerUpgrade] = useState(
+    defaultNextScheduledSynchronizerUpgrade
+  );
+  const [shouldScheduleDomainUpgrade] = useState<boolean>(false);
 
   const handleSynchronizerUpgradeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
     if (checked) {
-      addDefaultSynchronizerUpgradeSchedule();
+      setDsoRulesConfigAction({
+        ...configuration,
+        nextScheduledSynchronizerUpgrade,
+      });
     } else {
-      removeSynchronizerUpgradeSchedule();
+      setDsoRulesConfigAction({
+        ...configuration,
+        nextScheduledSynchronizerUpgrade: null,
+      });
     }
-    setNextScheduledSynchronizerUpgrade(checked);
   };
 
   const isScheduledDateValid = (scheduledDate: string) => {
@@ -66,9 +58,11 @@ const SetDsoRulesConfig: React.FC<{
           JSONValue
         >
       );
-      setNextScheduledSynchronizerUpgrade(
-        !!dsoInfosQuery.data?.dsoRules.payload.config.nextScheduledSynchronizerUpgrade
-      );
+      const upgradeConfig =
+        dsoInfosQuery.data?.dsoRules.payload.config.nextScheduledSynchronizerUpgrade;
+      if (upgradeConfig) {
+        setNextScheduledSynchronizerUpgrade(upgradeConfig);
+      }
     }
   }, [configuration, dsoInfosQuery]);
 
@@ -123,7 +117,7 @@ const SetDsoRulesConfig: React.FC<{
           control={
             <Checkbox
               id={'enable-next-scheduled-domain-upgrade'}
-              checked={nextScheduledSynchronizerUpgrade}
+              value={shouldScheduleDomainUpgrade}
               onChange={handleSynchronizerUpgradeChange}
               inputProps={{ 'aria-label': 'controlled' }}
               data-testid="enable-next-scheduled-domain-upgrade"
