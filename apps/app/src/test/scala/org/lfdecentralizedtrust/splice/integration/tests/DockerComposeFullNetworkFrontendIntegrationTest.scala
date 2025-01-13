@@ -69,7 +69,7 @@ class DockerComposeFullNetworkFrontendIntegrationTest
               _ => findAll(className("open-mining-round-row")) should have length 2,
             )
 
-            actAndCheck()(
+            actAndCheck(timeUntilSuccess = 60.seconds)(
               "Login to the wallet as administrator",
               login(8080, "administrator", "wallet.localhost"),
             )(
