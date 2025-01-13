@@ -736,8 +736,9 @@ testBuyMemberTraffic = script do
 
   -- test that creating the initial traffic contract works
   before <- query @Amulet aliceValidator.primaryParty
-  COO_BuyMemberTraffic trafficCid1 <- executeAmuletOperation app aliceValidator $
+  r <- executeAmuletOperation app aliceValidator $
     CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid)
+  COO_BuyMemberTraffic trafficCid1 <- pure r
   after <- query @Amulet aliceValidator.primaryParty
   before === after
 
