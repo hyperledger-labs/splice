@@ -22,7 +22,7 @@ commands:
               TIMEOUT=1800
               LAST_UNLOCK_TIME=$START_TIME
               while true; do
-                LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}")
+                LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}" || true)
 
                 if echo "$LAST_SUCCESSFUL_COMMIT" | grep -q "$EXPECTED_GIT_COMMIT"; then
                   echo "stack $STACK_NAME is successfully updated with commit $EXPECTED_GIT_COMMIT"
