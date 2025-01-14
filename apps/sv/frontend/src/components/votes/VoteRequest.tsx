@@ -406,6 +406,7 @@ export const CreateVoteRequest: React.FC = () => {
         onAccept={handleConfirmationAccept}
         onClose={() => setConfirmDialogOpen(false)}
         title="Confirm Your Vote Request"
+        attributePrefix="vote"
       >
         <Typography variant="h6">Are you sure you want to create this vote request?</Typography>
         <br />

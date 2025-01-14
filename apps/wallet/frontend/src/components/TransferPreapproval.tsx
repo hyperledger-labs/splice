@@ -85,6 +85,7 @@ const TransferPreapproval: React.FC = () => {
           onAccept={handleConfirmationAccept}
           onClose={handleConfirmationClose}
           title="Pre-approve incoming direct transfers"
+          attributePrefix="preapproval"
         >
           <Typography variant="h5">
             Are you sure you want to pre-approve direct transfers of{' '}

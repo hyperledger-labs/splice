@@ -232,6 +232,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
           onClose={handleConfirmationClose}
           onAccept={handleConfirmationAccept}
           title="Confirm Your Vote"
+          attributePrefix="vote"
         >
           <Typography variant="h5">
             Are you sure you want to {voteEditing} the changes proposed in this vote?

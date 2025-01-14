@@ -121,7 +121,7 @@ class SvOffboardPreflightIntegrationTest
         }
         clue("click the submit button") {
           click on "create-voterequest-submit-button"
-          click on "confirmation-dialog-accept-button"
+          click on "vote-confirmation-dialog-accept-button"
         }
 
         eventually() {
@@ -180,7 +180,7 @@ class SvOffboardPreflightIntegrationTest
                   element.underlying.sendKeys(voteReasonBody)
                 }
                 click on "save-vote-button"
-                click on "confirmation-dialog-accept-button"
+                click on "vote-confirmation-dialog-accept-button"
               },
             )(
               "sv can see the new vote request detail",

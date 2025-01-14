@@ -7,6 +7,7 @@ interface ConfirmationDialogProps {
   onAccept: () => void;
   onClose: () => void;
   title: string;
+  attributePrefix: string;
   children: React.ReactNode;
 }
 
@@ -15,11 +16,16 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   onAccept,
   onClose,
   title,
+  attributePrefix,
   children,
 }) => {
   return (
-    <Dialog open={showDialog} onClose={onClose} aria-labelledby="confirmation-dialog-title">
-      <DialogTitle id="confirmation-dialog-title">
+    <Dialog
+      open={showDialog}
+      onClose={onClose}
+      aria-labelledby={`${attributePrefix}-confirmation-dialog-title`}
+    >
+      <DialogTitle id={`${attributePrefix}-confirmation-dialog-title`}>
         {title}
         <hr />
       </DialogTitle>
@@ -28,7 +34,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         <Button autoFocus onClick={onClose}>
           Cancel
         </Button>
-        <Button id="confirmation-dialog-accept-button" onClick={onAccept}>
+        <Button id={`${attributePrefix}-confirmation-dialog-accept-button`} onClick={onAccept}>
           Proceed
         </Button>
       </DialogActions>

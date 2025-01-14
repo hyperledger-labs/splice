@@ -483,7 +483,7 @@ class SvFrontendIntegrationTest
               element.underlying.sendKeys(voteReasonBody)
             }
             click on "save-vote-button"
-            click on "confirmation-dialog-accept-button"
+            click on "vote-confirmation-dialog-accept-button"
           },
         )(
           "sv2 can see the new vote request detail",
@@ -540,7 +540,7 @@ class SvFrontendIntegrationTest
               element.underlying.sendKeys(updatedVoteReasonBody)
             }
             click on "save-vote-button"
-            click on "confirmation-dialog-accept-button"
+            click on "vote-confirmation-dialog-accept-button"
           },
         )(
           "sv2 can see the new updated vote",
@@ -1303,7 +1303,7 @@ class SvFrontendIntegrationTest
                 click on "cast-vote-button"
                 click on "accept-vote-button"
                 click on "save-vote-button"
-                click on "confirmation-dialog-accept-button"
+                click on "vote-confirmation-dialog-accept-button"
               },
             )(
               "sv2's modal closes as all SVs voted before the expiration date",
