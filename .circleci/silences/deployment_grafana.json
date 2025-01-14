@@ -28,6 +28,12 @@
         "isRegex": false
       },
       {
+        "name": "alertname",
+        "value": "Reached Expected Maximum CometBFT Block Rate",
+        "isEqual": true,
+        "isRegex": false
+      },
+      {
         "name": "report_publisher",
         "value": ".*",
         "isEqual": true,
