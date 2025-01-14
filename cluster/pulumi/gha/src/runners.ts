@@ -700,10 +700,13 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         namespace: runnersNamespace.metadata.name,
       },
       stringData: {
-        // TODO(#15988): for now, this uses the token of the person running the pulumi command.
-        // It should instead be canton-network-da's token, or that of some other service account.
-        // (that didn't work originally, so worked around it with the personal token for now)
-        github_token: spliceEnvConfig.requireEnv('GITHUB_TOKEN'),
+        // This is the 'Actions Runner' token for canton-network-da GH user.
+        // Note that the user needs admin rights on the repo for this to work, since the controller and
+        // listeners use the actions/runners/registration-token endpoint to create a temporary token
+        // for registration, and this endpoint seems to require admin rights.
+        // TODO(#15988): The recommended thing to do is use a GitHub App. See here for a guide
+        // on setting it up: https://medium.com/@timburkhardt8/registering-github-self-hosted-runners-using-github-app-9cc952ea6ca
+        github_token: spliceEnvConfig.requireEnv('GITHUB_RUNNERS_ACCESS_TOKEN'),
       },
     },
     {
