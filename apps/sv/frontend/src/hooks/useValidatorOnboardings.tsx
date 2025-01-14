@@ -7,13 +7,21 @@ import { ValidatorOnboarding } from '@daml.js/splice-validator-lifecycle/lib/Spl
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
-export const useValidatorOnboardings = (): UseQueryResult<Contract<ValidatorOnboarding>[]> => {
+export type ValidatorOnboardingSecret = {
+  encodedSecret: string;
+  contract: Contract<ValidatorOnboarding>;
+};
+
+export const useValidatorOnboardings = (): UseQueryResult<ValidatorOnboardingSecret[]> => {
   const { listOngoingValidatorOnboardings } = useSvAdminClient();
   return useQuery({
     queryKey: ['listOngoingValidatorOnboardings'],
     queryFn: async () => {
       const { ongoing_validator_onboardings } = await listOngoingValidatorOnboardings();
-      return ongoing_validator_onboardings.map(c => Contract.decodeOpenAPI(c, ValidatorOnboarding));
+      return ongoing_validator_onboardings.map(c => ({
+        encodedSecret: c.encoded_secret,
+        contract: Contract.decodeOpenAPI(c.contract, ValidatorOnboarding),
+      }));
     },
   });
 };

@@ -661,7 +661,25 @@ components:
         ongoing_validator_onboardings:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+            $ref: "#/components/schemas/ValidatorOnboarding"
+
+    ValidatorOnboarding:
+      type: object
+      required:
+        - encoded_secret
+        - contract
+      properties:
+        # We return the encoded secret as a separate value so that the
+        # UI can treat it as an opaque value and does not have to recompute it
+        # based on the contract payload.
+        encoded_secret:
+          description: |
+            The encoded secret in a form that can be directly used when making an onboarding request.
+          type: string
+        contract:
+          description: |
+            The contract storing the onboarding secret.
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     PrepareValidatorOnboardingRequest:
       type: object

@@ -6,11 +6,12 @@ package org.lfdecentralizedtrust.splice.sv.util
 import com.auth0.jwt.{JWT, JWTVerifier}
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
-import org.lfdecentralizedtrust.splice.util.{Codec, CodecCompanion}
+import org.lfdecentralizedtrust.splice.util.Codec
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import io.circe.parser.decode as circeDecode
 import io.circe.syntax.*
+import JsonCodec.*
 
 import java.security.interfaces.ECPrivateKey
 import scala.util.Try
@@ -27,7 +28,6 @@ private object JsonProtocol {
     )
 
   implicit val SvOnboardingTokenDecoder: Decoder[SvOnboardingToken] = { c =>
-    implicit val partyDecoder: Decoder[PartyId] = codecDecoder(Codec.Party)
     implicit val participantDecoder: Decoder[ParticipantId] = codecDecoder(Codec.Participant)
     for {
       name <- c.downField("name").as[String]
@@ -37,11 +37,6 @@ private object JsonProtocol {
       dso <- c.downField("dso").as[PartyId]
     } yield new SvOnboardingToken(name, key, party, participantId, dso)
   }
-
-  private[this] def codecDecoder[Dec](codec: CodecCompanion[Dec])(implicit
-      json: Decoder[codec.Enc]
-  ): Decoder[Dec] =
-    json emap codec.instance.decode
 }
 import JsonProtocol.*
 

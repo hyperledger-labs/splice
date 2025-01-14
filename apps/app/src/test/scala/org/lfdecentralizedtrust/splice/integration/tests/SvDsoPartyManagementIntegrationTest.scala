@@ -36,7 +36,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
       "sv3's store ingests the contract",
       created =>
         inside(sv3Backend.listOngoingValidatorOnboardings()) { case Seq(visible) =>
-          visible.contractId shouldBe created.contractId
+          visible.contract.contractId shouldBe created.contractId
         },
     )
   }
