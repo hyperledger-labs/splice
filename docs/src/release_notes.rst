@@ -22,6 +22,10 @@ Upcoming Release
       against an SV that did not issue it. Secrets are still just
       opaque strings so no change is required.
 
+* Wallet UI
+
+  * Added a confirmation dialog when enabling preapproval of incoming direct transfers.
+
 0.3.5
 -----
 

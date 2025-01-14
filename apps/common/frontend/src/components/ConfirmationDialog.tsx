@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 
-interface VoteConfirmationDialogProps {
+interface ConfirmationDialogProps {
   showDialog: boolean;
   onAccept: () => void;
   onClose: () => void;
@@ -10,7 +10,7 @@ interface VoteConfirmationDialogProps {
   children: React.ReactNode;
 }
 
-export const VoteConfirmationDialog: React.FC<VoteConfirmationDialogProps> = ({
+export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   showDialog,
   onAccept,
   onClose,
@@ -18,8 +18,8 @@ export const VoteConfirmationDialog: React.FC<VoteConfirmationDialogProps> = ({
   children,
 }) => {
   return (
-    <Dialog open={showDialog} onClose={onClose} aria-labelledby="vote-confirmation-dialog-title">
-      <DialogTitle id="vote-confirmation-dialog-title">
+    <Dialog open={showDialog} onClose={onClose} aria-labelledby="confirmation-dialog-title">
+      <DialogTitle id="confirmation-dialog-title">
         {title}
         <hr />
       </DialogTitle>
@@ -28,7 +28,7 @@ export const VoteConfirmationDialog: React.FC<VoteConfirmationDialogProps> = ({
         <Button autoFocus onClick={onClose}>
           Cancel
         </Button>
-        <Button id="vote-confirmation-dialog-accept-button" onClick={onAccept}>
+        <Button id="confirmation-dialog-accept-button" onClick={onAccept}>
           Proceed
         </Button>
       </DialogActions>

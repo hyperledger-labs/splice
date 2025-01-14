@@ -4,6 +4,7 @@ import AmountDisplay from './AmountDisplay';
 import AnsEntry, { AnsEntryDisplay, AnsEntryProps } from './AnsEntry';
 import AnsField, { BaseAnsField, AnsFieldProps, UserInput } from './AnsField';
 import AuthProvider from './AuthProvider';
+import { ConfirmationDialog } from './ConfirmationDialog';
 import CopyableTypography from './CopyableTypography';
 import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
@@ -44,6 +45,7 @@ export {
   BaseAnsField,
   AnsFieldProps,
   UserInput,
+  ConfirmationDialog,
   CopyableTypography,
   Copyright,
   DateDisplay,

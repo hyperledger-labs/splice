@@ -40,7 +40,7 @@ trait SvFrontendTestUtil extends TestCommon {
       click on "create-voterequest-submit-button"
     }
     clue("click accept on the confirmation dialog") {
-      click on "vote-confirmation-dialog-accept-button"
+      click on "confirmation-dialog-accept-button"
     }
   }
 }

@@ -106,7 +106,7 @@ class DamlCIUpgradeVotePreflightTest
             click on "cast-vote-button"
             click on "accept-vote-button"
             click on "save-vote-button"
-            click on "vote-confirmation-dialog-accept-button"
+            click on "confirmation-dialog-accept-button"
           }
         }
       }
