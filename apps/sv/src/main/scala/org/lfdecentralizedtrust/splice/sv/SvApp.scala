@@ -67,7 +67,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.util.SvOnboardingToken
+import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, ValidatorOnboardingSecret}
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
@@ -742,7 +742,7 @@ class SvApp(
       "Create ValidatorOnboarding contract for preconfigured secret",
       SvApp
         .prepareValidatorOnboarding(
-          secret,
+          ValidatorOnboardingSecret(svStoreWithIngestion.store.key.svParty, secret),
           expiresIn,
           svStoreWithIngestion,
           decentralizedSynchronizer,
@@ -828,7 +828,7 @@ object SvApp {
 
   // TODO(#5364): move this and like functions into appropriate utility namespaces
   def prepareValidatorOnboarding(
-      secret: String,
+      secret: ValidatorOnboardingSecret,
       expiresIn: NonNegativeFiniteDuration,
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
       decentralizedSynchronizer: DomainId,
@@ -839,18 +839,18 @@ object SvApp {
     val svParty = svStore.key.svParty
     val validatorOnboarding = new splice.validatoronboarding.ValidatorOnboarding(
       svParty.toProtoPrimitive,
-      secret,
+      secret.secret,
       (clock.now + expiresIn.toInternal).toInstant,
     ).create()
     for {
-      res <- svStore.lookupUsedSecretWithOffset(secret).flatMap {
+      res <- svStore.lookupUsedSecretWithOffset(secret.secret).flatMap {
         case QueryResult(_, Some(usedSecret)) =>
           val validator = usedSecret.payload.validator
           Future.successful(
             Left(s"This secret has already been used before, for onboarding validator $validator")
           )
         case QueryResult(offset, None) =>
-          svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
+          svStore.lookupValidatorOnboardingBySecretWithOffset(secret.secret).flatMap {
             case QueryResult(_, Some(_)) =>
               Future.successful(
                 Left("A validator onboarding contract with this secret already exists.")
@@ -864,7 +864,7 @@ object SvApp {
                       .CommandId(
                         "org.lfdecentralizedtrust.splice.sv.expectValidatorOnboarding",
                         Seq(svParty),
-                        secret, // not a leak as this gets hashed before it's used
+                        secret.secret, // not a leak as this gets hashed before it's used
                       ),
                     deduplicationOffset = offset,
                   )

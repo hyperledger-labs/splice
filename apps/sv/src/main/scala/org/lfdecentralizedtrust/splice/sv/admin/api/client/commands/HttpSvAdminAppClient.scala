@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.ValidatorOnboarding
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding as vo
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.SpliceStatus
 import org.lfdecentralizedtrust.splice.http.HttpClient
@@ -36,6 +36,7 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
   SynchronizerNodeIdentities,
 }
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.PartyId
@@ -62,9 +63,7 @@ object HttpSvAdminAppClient {
   }
 
   case object ListOngoingValidatorOnboardings
-      extends BaseCommand[http.ListOngoingValidatorOnboardingsResponse, Seq[
-        Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding]
-      ]] {
+      extends BaseCommand[http.ListOngoingValidatorOnboardingsResponse, Seq[ValidatorOnboarding]] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
@@ -78,7 +77,16 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListOngoingValidatorOnboardingsResponse.OK(response) =>
       response.ongoingValidatorOnboardings
-        .traverse(req => Contract.fromHttp(ValidatorOnboarding.COMPANION)(req))
+        .traverse { req =>
+          Contract
+            .fromHttp(vo.ValidatorOnboarding.COMPANION)(req.contract)
+            .map(c =>
+              ValidatorOnboarding(
+                req.encodedSecret,
+                c,
+              )
+            )
+        }
         .leftMap(_.toString)
     }
   }

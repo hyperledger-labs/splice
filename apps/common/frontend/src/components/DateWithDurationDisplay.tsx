@@ -23,7 +23,7 @@ const DateWithDurationDisplay: React.FC<DateWithDurationDisplayProps> = (
     return <>initial</>;
   }
 
-  const f = customFormat || 'PPp O'; // Use custom format if provided, or default to 'PPp O'
+  const f = customFormat || 'yyyy-MM-dd HH:mm';
   const dateObj = typeof datetime === 'string' ? new Date(datetime) : datetime;
 
   const expireDuration = props.enableDuration ? `(${dayjs(dateObj).fromNow()})` : '';

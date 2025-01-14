@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.sys.process.*
 import java.lang.ProcessBuilder
@@ -85,7 +86,7 @@ class DockerComposeValidatorFrontendIntegrationTest
     withComposeValidator() {
       withFrontEnd("frontend") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
-        actAndCheck()(
+        actAndCheck(timeUntilSuccess = 60.seconds)(
           "Login as administrator",
           login(80, "administrator", "wallet.localhost"),
         )(
@@ -193,7 +194,7 @@ class DockerComposeValidatorFrontendIntegrationTest
     ) {
       withFrontEnd("frontend") { implicit webDriver =>
         go to s"http://wallet.localhost"
-        actAndCheck()(
+        actAndCheck(timeUntilSuccess = 60.seconds)(
           "Login as administrator",
           login(80, "administrator", "wallet.localhost"),
         )(
