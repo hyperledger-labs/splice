@@ -11,9 +11,11 @@ Release Notes
 Upcoming Release
 ----------------
 
-* Wallet sweeps
+* Validator app
 
     * The wallet sweep automation now supports sweeping to end user parties.
+    * Fix a bug where the validator operator was unable to preapproval incoming transfers
+      if a user on the same validator preapproved incoming transfers first.
 
 * SV app
 

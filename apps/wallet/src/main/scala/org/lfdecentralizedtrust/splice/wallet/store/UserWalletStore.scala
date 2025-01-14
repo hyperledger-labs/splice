@@ -260,24 +260,21 @@ trait UserWalletStore extends TransferInputStore with NamedLogging {
     lookupArbitraryPreferAssigned(amuletCodegen.FeaturedAppRight.COMPANION)
       .map(_ map (_.contract))
 
-  def lookupTransferPreapprovalProposal()(implicit
+  def lookupTransferPreapprovalProposal(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[QueryResult[Option[Contract[
     preapprovalCodegen.TransferPreapprovalProposal.ContractId,
     preapprovalCodegen.TransferPreapprovalProposal,
-  ]]]] =
-    multiDomainAcsStore
-      .findAnyContractWithOffset(preapprovalCodegen.TransferPreapprovalProposal.COMPANION)
-      .map(_.map(_.map(_.contract)))
+  ]]]]
 
-  def getTransferPreapproval()(implicit
+  def getTransferPreapproval(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Contract[
     amuletrulesCodegen.TransferPreapproval.ContractId,
     amuletrulesCodegen.TransferPreapproval,
-  ]] = lookupTransferPreapproval()
+  ]] = lookupTransferPreapproval(receiver)
     .map(
       _.map(
         _.getOrElse(
@@ -289,16 +286,13 @@ trait UserWalletStore extends TransferInputStore with NamedLogging {
     )
     .map(_.value)
 
-  def lookupTransferPreapproval()(implicit
+  def lookupTransferPreapproval(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[QueryResult[Option[Contract[
     amuletrulesCodegen.TransferPreapproval.ContractId,
     amuletrulesCodegen.TransferPreapproval,
-  ]]]] =
-    multiDomainAcsStore
-      .findAnyContractWithOffset(amuletrulesCodegen.TransferPreapproval.COMPANION)
-      .map(_.map(_.map(_.contract)))
+  ]]]]
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   final def getValidatorRightsWhereUserIsValidator()(implicit
@@ -617,17 +611,25 @@ object UserWalletStore {
         ),
         // Transfer preapprovals
         mkFilter(preapprovalCodegen.TransferPreapprovalProposal.COMPANION)(co =>
+          // We ingest for both the receiver and the provider as the provider
+          // needs the contract in its store for the payment/renewal automation to work.
           co.payload.provider == validator && (co.payload.provider == endUser || co.payload.receiver == endUser)
         )(contract =>
           UserWalletAcsStoreRowData(
-            contract
+            contract,
+            transferPreapprovalReceiver =
+              Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         ),
         mkFilter(amuletrulesCodegen.TransferPreapproval.COMPANION)(co =>
+          // We ingest for both the receiver and the provider as the provider
+          // needs the contract in its store for the payment/renewal automation to work.
           co.payload.dso == dso && co.payload.provider == validator && (co.payload.provider == endUser || co.payload.receiver == endUser)
         )(contract =>
           UserWalletAcsStoreRowData(
-            contract
+            contract,
+            transferPreapprovalReceiver =
+              Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         ),
       ),
