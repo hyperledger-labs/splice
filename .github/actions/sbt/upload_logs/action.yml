@@ -28,7 +28,7 @@ runs:
       uses: ./.github/actions/nix/run_bash_command_in_nix
       with:
         cmd: |
-          rename -a : . log/*
+          rename -a : . log/* || true
 
     - name: Upload logs
       uses: actions/upload-artifact@v4
