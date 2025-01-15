@@ -43,6 +43,11 @@ class SplitwellPackageIdResolver extends PackageIdResolver {
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const refetchInterval = useConfigPollInterval();
 
+  interface JsonApiError {
+    status: number;
+    errors?: string[];
+  }
+
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -50,12 +55,16 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         structuralSharing: replaceEqualDeep,
       },
       mutations: {
-        retry: (failureCount, error) =>
+        retry: (failureCount, error) => {
           // We only retry certain JSON API errors. Retrying everything is more confusing than helpful
           // because that then also retries on invalid user input.
-          // The status field is defined as part of LedgerError in @daml/ledger which is thrown on JSON API errors.
-          /* eslint-disable @typescript-eslint/no-explicit-any */
-          [404, 409].includes((error as any).status) && failureCount < 10,
+          const errResponse = error as JsonApiError;
+          const isDomainConnectionError =
+            errResponse.errors?.some(e => e.includes('NOT_CONNECTED_TO_ANY_DOMAIN')) || false;
+          const is404or409 = [404, 409].includes(errResponse.status);
+
+          return (is404or409 || isDomainConnectionError) && failureCount < 10;
+        },
         retryDelay: 500,
       },
     },

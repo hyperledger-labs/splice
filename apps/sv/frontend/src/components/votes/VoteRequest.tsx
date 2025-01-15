@@ -4,6 +4,7 @@ import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder'
 import { useMutation } from '@tanstack/react-query';
 import {
   ActionView,
+  ConfirmationDialog,
   DateWithDurationDisplay,
   DisableConditionally,
   SvClientProvider,
@@ -40,7 +41,6 @@ import {
   isScheduleDateTimeValid,
   VoteRequestValidity,
 } from '../../utils/validations';
-import { VoteConfirmationDialog } from '../VoteConfirmationDialog';
 import SvListVoteRequests from './SvListVoteRequests';
 import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
@@ -401,11 +401,12 @@ export const CreateVoteRequest: React.FC = () => {
           </Stack>
         </CardContent>
       </Card>
-      <VoteConfirmationDialog
+      <ConfirmationDialog
         showDialog={confirmDialogOpen}
         onAccept={handleConfirmationAccept}
         onClose={() => setConfirmDialogOpen(false)}
         title="Confirm Your Vote Request"
+        attributePrefix="vote"
       >
         <Typography variant="h6">Are you sure you want to create this vote request?</Typography>
         <br />
@@ -416,7 +417,7 @@ export const CreateVoteRequest: React.FC = () => {
           <li>You may only edit your vote after creation.</li>
           <li>The vote request will expire in {expirationInDays} days.</li>
         </ul>
-      </VoteConfirmationDialog>
+      </ConfirmationDialog>
     </Stack>
   );
 };

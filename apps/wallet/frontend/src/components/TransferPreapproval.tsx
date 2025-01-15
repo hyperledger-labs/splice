@@ -1,22 +1,24 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useMutation } from '@tanstack/react-query';
-import { DisableConditionally } from 'common-frontend';
-import React from 'react';
+import { ConfirmationDialog, DisableConditionally } from 'common-frontend';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import ApprovalIcon from '@mui/icons-material/Approval';
-import { Button, Tooltip } from '@mui/material';
+import { Button, Tooltip, Typography } from '@mui/material';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { usePrimaryParty } from '../hooks';
 import useLookupTransferPreapproval from '../hooks/scan-proxy/useLookupTransferPreapproval';
+import { useWalletConfig } from '../utils/config';
 
 const TransferPreapproval: React.FC = () => {
   const primaryPartyId = usePrimaryParty();
   const transferPreapprovalQuery = useLookupTransferPreapproval(primaryPartyId);
+  const config = useWalletConfig();
   const { createTransferPreapproval } = useWalletClient();
   const navigate = useNavigate();
+  const [confirmationDialogOpen, setConfirmationDialogOpen] = useState<boolean>(false);
 
   const createTransferPreapprovalMutation = useMutation({
     mutationFn: async () => {
@@ -31,56 +33,69 @@ const TransferPreapproval: React.FC = () => {
     },
   });
 
+  const handleConfirmationAccept = () => {
+    createTransferPreapprovalMutation.mutate();
+    setConfirmationDialogOpen(false);
+  };
+
+  const handleConfirmationClose = () => {
+    setConfirmationDialogOpen(false);
+  };
+
   if (transferPreapprovalQuery.isLoading) {
     return <></>;
   }
 
-  if (transferPreapprovalQuery.data) {
-    return (
-      <Tooltip
-        title={
-          <div style={{ textAlign: 'center' }}>
-            INCOMING TRANSFERS PRE-APPROVED.
-            <br />
-            Contact validator admin to disable.
-          </div>
-        }
+  const button = (
+    <span>
+      <Button
+        variant="contained"
+        color="info"
+        onClick={() => setConfirmationDialogOpen(true)}
+        id="create-transfer-preapproval"
+        sx={{ textWrap: 'balance' }}
+        disabled={!!transferPreapprovalQuery.data}
       >
-        <ApprovalIcon id="transfer-preapproval-status" />
-      </Tooltip>
-    );
-  } else {
-    return (
-      <DisableConditionally
-        conditions={[
-          {
-            disabled: createTransferPreapprovalMutation.isLoading,
-            reason: 'Loading...',
-          },
-        ]}
-      >
-        <Tooltip
-          title={
-            <div style={{ textAlign: 'center' }}>
-              You will need to contact your validator admin to undo this.
-            </div>
-          }
+        Pre-approve incoming direct transfers of {config.spliceInstanceNames.amuletName}
+      </Button>
+    </span>
+  );
+
+  const buttonWithTooltip = createTransferPreapprovalMutation.data ? (
+    <Tooltip title="Pre-approval of incoming direct transfers to this party are enabled, contact your validator operator to disable.">
+      {button}
+    </Tooltip>
+  ) : (
+    button
+  );
+
+  return (
+    <DisableConditionally
+      conditions={[
+        {
+          disabled: createTransferPreapprovalMutation.isLoading,
+          reason: 'Loading...',
+        },
+      ]}
+    >
+      <div>
+        {buttonWithTooltip}
+        <ConfirmationDialog
+          showDialog={confirmationDialogOpen}
+          onAccept={handleConfirmationAccept}
+          onClose={handleConfirmationClose}
+          title="Pre-approve incoming direct transfers"
+          attributePrefix="preapproval"
         >
-          <span>
-            <Button
-              variant="contained"
-              color="info"
-              onClick={() => createTransferPreapprovalMutation.mutate()}
-              id="create-transfer-preapproval"
-              sx={{ textWrap: 'balance' }}
-            >
-              Pre-approve all incoming transfers
-            </Button>
-          </span>
-        </Tooltip>
-      </DisableConditionally>
-    );
-  }
+          <Typography variant="h5">
+            Are you sure you want to pre-approve direct transfers of{' '}
+            {config.spliceInstanceNames.amuletName} to this party? To disable it later, you need to
+            contact your validator operator.
+          </Typography>
+        </ConfirmationDialog>
+      </div>
+    </DisableConditionally>
+  );
 };
 
 export default TransferPreapproval;

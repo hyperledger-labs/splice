@@ -603,6 +603,39 @@ class WalletIntegrationTest
         )
     }
 
+    "TransferPreapprovals can be created for the validator operator after an end user created one" in {
+      implicit env =>
+        val validatorOperatorParty = aliceValidatorBackend.getValidatorPartyId()
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        aliceValidatorWalletClient.tap(10.0)
+        actAndCheck(
+          "Create TransferPreapproval for end user",
+          aliceWalletClient.createTransferPreapproval(),
+        )(
+          "Scan lookup returns TransferPreapproval for end user",
+          inside(_) {
+            case CreateTransferPreapprovalResponse.Created(c) => {
+              val contractFromScan =
+                sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty).value
+              contractFromScan.contractId shouldBe c
+            }
+          },
+        )
+        actAndCheck(
+          "Create TransferPreapproval for validator operator",
+          aliceValidatorWalletClient.createTransferPreapproval(),
+        )(
+          "Scan lookup returns TransferPreapproval",
+          inside(_) {
+            case CreateTransferPreapprovalResponse.Created(c) => {
+              val contractFromScan =
+                sv1ScanBackend.lookupTransferPreapprovalByParty(validatorOperatorParty).value
+              contractFromScan.contractId shouldBe c
+            }
+          },
+        )
+    }
+
     "Failure to complete TransferPreapproval creation should be handled correctly" in {
       implicit env =>
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
