@@ -74,7 +74,6 @@ export class LedgerApiClient {
     );
     return user.primaryParty!;
   }
-
   async exercise<T extends object, C, R, K>(
     actAs: string[],
     readAs: string[],
@@ -119,6 +118,7 @@ export class LedgerApiClient {
       domain_id: domainId || '',
       package_id_selection_preference: [],
     };
+
     const responseBody = await fetch(
       `${this.jsonApiUrl}v2/commands/submit-and-wait-for-transaction-tree`,
       { headers: this.headers, method: 'POST', body: JSON.stringify(body) }
@@ -143,6 +143,7 @@ export class LedgerApiClient {
         );
         throw e;
       });
+
     const tree = responseBody.transaction_tree;
     const rootEvent = tree.events_by_id[tree.root_event_ids[0]];
     const exerciseResult = choice.resultDecoder.runWithException(

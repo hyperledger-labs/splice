@@ -684,7 +684,7 @@ class HttpWalletHandler(
         wallet <- getUserWallet(user)
         store = wallet.store
         domain <- scanConnection.getAmuletRulesDomain()(traceContext)
-        result <- store.lookupTransferPreapproval() flatMap {
+        result <- store.lookupTransferPreapproval(store.key.endUserParty) flatMap {
           case QueryResult(_, Some(existingPreapproval)) =>
             Future.successful(
               r0.CreateTransferPreapprovalResponse.Conflict(
@@ -695,7 +695,9 @@ class HttpWalletHandler(
             )
           case QueryResult(preapprovalOffset, None) =>
             for {
-              proposalCid <- store.lookupTransferPreapprovalProposal() flatMap {
+              proposalCid <- store.lookupTransferPreapprovalProposal(
+                store.key.endUserParty
+              ) flatMap {
                 case QueryResult(_, Some(proposal)) => Future.successful(proposal.contractId)
                 case QueryResult(proposalOffSet, None) =>
                   val dedupOffset = Ordering[Long].min(preapprovalOffset, proposalOffSet)
@@ -707,7 +709,7 @@ class HttpWalletHandler(
               preapproval <- retryProvider.retryForClientCalls(
                 "getTransferPreapproval",
                 "wait for validator automation to create TransferPreapproval",
-                store.getTransferPreapproval(),
+                store.getTransferPreapproval(store.key.endUserParty),
                 logger,
               ) recover {
                 case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>

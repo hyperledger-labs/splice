@@ -6,11 +6,13 @@ package org.lfdecentralizedtrust.splice.wallet.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as subsCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
@@ -41,7 +43,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import slick.jdbc.canton.SQLActionBuilder
 
 import scala.concurrent.*
@@ -412,4 +414,67 @@ class DbUserWalletStore(
     acsPrefixes
       .map(p => sql"#${p}store_id = $storeId and #${p}migration_id = $domainMigrationId")
       .intercalate(sql" and ")
+
+  def lookupTransferPreapproval(receiver: PartyId)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[QueryResult[Option[Contract[TransferPreapproval.ContractId, TransferPreapproval]]]] =
+    waitUntilAcsIngested {
+      for {
+        resultWithOffset <- storage
+          .querySingle(
+            selectFromAcsTableWithOffset(
+              WalletTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              sql"""
+            template_id_qualified_name = ${QualifiedName(
+                  TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
+              and transfer_preapproval_receiver = ${receiver}
+            """,
+              sql"limit 1",
+            ).headOption,
+            "lookupTransferPreapproval",
+          )
+          .getOrElse(throw offsetExpectedError())
+      } yield QueryResult(
+        resultWithOffset.offset,
+        resultWithOffset.row.map(
+          contractFromRow(TransferPreapproval.COMPANION)(_)
+        ),
+      )
+    }
+
+  def lookupTransferPreapprovalProposal(
+      receiver: PartyId
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[QueryResult[
+    Option[Contract[TransferPreapprovalProposal.ContractId, TransferPreapprovalProposal]]
+  ]] =
+    waitUntilAcsIngested {
+      for {
+        resultWithOffset <- storage
+          .querySingle(
+            selectFromAcsTableWithOffset(
+              WalletTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              sql"""
+            template_id_qualified_name = ${QualifiedName(
+                  TransferPreapprovalProposal.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
+              and transfer_preapproval_receiver = ${receiver}
+            """,
+              sql"limit 1",
+            ).headOption,
+            "lookupTransferPreapprovalProposal",
+          )
+          .getOrElse(throw offsetExpectedError())
+      } yield QueryResult(
+        resultWithOffset.offset,
+        resultWithOffset.row.map(
+          contractFromRow(TransferPreapprovalProposal.COMPANION)(_)
+        ),
+      )
+    }
 }

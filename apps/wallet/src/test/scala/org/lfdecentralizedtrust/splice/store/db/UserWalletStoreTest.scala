@@ -992,9 +992,11 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
         _ <- dummyDomain.create(proposal3, createdEventSignatories = Seq(user1))(
           store.multiDomainAcsStore
         )
-        result <- store.lookupTransferPreapprovalProposal()
+        result <- store.lookupTransferPreapprovalProposal(user1)
+        resultDifferentUser <- store.lookupTransferPreapprovalProposal(validator)
       } yield {
         result.value.value shouldBe proposal1
+        resultDifferentUser.value shouldBe None
       }
     }
   }
