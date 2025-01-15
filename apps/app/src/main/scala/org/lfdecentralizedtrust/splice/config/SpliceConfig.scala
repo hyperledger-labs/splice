@@ -503,6 +503,9 @@ object SpliceConfig {
         // sv1 must alway configure one to bootstrap the domain.
         val sv1NodeHasSynchronizerConfig =
           checkFoundDsoConfig((conf, _) => conf.localSynchronizerNode.isDefined)
+        // SV1 only ever connects to its own sequencer so the url is specified in the localSynchronizerNode config
+        val sv1NodeHasNoSequencerUrl =
+          checkFoundDsoConfig((conf, _) => conf.domains.global.url.isEmpty)
         val initialPackageConfigExists =
           checkFoundDsoConfig((_, foundDsoConf) =>
             doesInitialPackageConfigExists(foundDsoConf.initialPackageConfig)
@@ -516,6 +519,11 @@ object SpliceConfig {
             sv1NodeHasSynchronizerConfig,
             (),
             ConfigValidationFailed("SV1 must always specify a domain config"),
+          )
+          _ <- Either.cond(
+            sv1NodeHasNoSequencerUrl,
+            (),
+            ConfigValidationFailed("SV1 must not specify domains.global.url"),
           )
           _ <- Either.cond(
             initialPackageConfigExists,

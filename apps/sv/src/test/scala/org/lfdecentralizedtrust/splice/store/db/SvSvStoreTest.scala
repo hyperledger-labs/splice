@@ -7,10 +7,6 @@ import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.StoreTest
-import org.lfdecentralizedtrust.splice.sv.config.{
-  SvDecentralizedSynchronizerConfig,
-  SvSynchronizerConfig,
-}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvSvStore
 import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -127,9 +123,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
   lazy val acsOffset = nextOffset()
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val storeSvParty = providerParty(42)
-  lazy val svSynchronizerConfig = SvSynchronizerConfig(
-    SvDecentralizedSynchronizerConfig(DomainAlias.tryCreate(domain), "https://example.com")
-  )
 }
 
 class DbSvSvStoreTest

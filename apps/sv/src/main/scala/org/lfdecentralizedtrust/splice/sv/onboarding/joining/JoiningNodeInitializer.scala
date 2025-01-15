@@ -137,17 +137,19 @@ class JoiningNodeInitializer(
     // We need to connect to the domain here because otherwise we create a circular dependency
     // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
     // before establishing a domain connection, but allocating the SV party requires a domain connection.
-    val domainConfig = DomainConnectionConfig(
-      config.domains.global.alias,
-      SequencerConnections.single(
-        GrpcSequencerConnection.tryCreate(config.domains.global.url)
-      ),
-      // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
-      // This is changed to false after SV onboarding completes.
-      manualConnect = true,
-      timeTracker = DomainTimeTrackerConfig(
-        minObservationDuration = config.timeTrackerMinObservationDuration
-      ),
+    val domainConfigO = config.domains.global.url.map(url =>
+      DomainConnectionConfig(
+        config.domains.global.alias,
+        SequencerConnections.single(
+          GrpcSequencerConnection.tryCreate(url)
+        ),
+        // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
+        // This is changed to false after SV onboarding completes.
+        manualConnect = true,
+        timeTracker = DomainTimeTrackerConfig(
+          minObservationDuration = config.timeTrackerMinObservationDuration
+        ),
+      )
     )
     for {
       (dsoPartyId, darUploads) <- (
@@ -156,9 +158,13 @@ class JoiningNodeInitializer(
         for {
           // Register domain with manualConnect=true. Confusingly, this still connects the first time.
           // However, it won't connect if we crash and get here again which is what we're really after.
-          _ <- participantAdminConnection.ensureDomainRegisteredNoHandshake(
-            domainConfig,
-            RetryFor.WaitingOnInitDependency,
+          // If the url is unset, we skip this step. This is fine if the node has already initialized its
+          // own sequencer.
+          _ <- domainConfigO.traverse_(
+            participantAdminConnection.ensureDomainRegisteredNoHandshake(
+              _,
+              RetryFor.WaitingOnInitDependency,
+            )
           )
           // Have the uploads run in the background while we setup the sv party to save time
         } yield participantAdminConnection.uploadDarFiles(

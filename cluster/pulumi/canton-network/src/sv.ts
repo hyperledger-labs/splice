@@ -389,7 +389,10 @@ function installSvApp(
       enabled: true,
       connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcServiceName}:26657`,
     },
-    decentralizedSynchronizerUrl: decentralizedSynchronizer.sv1InternalSequencerAddress,
+    decentralizedSynchronizerUrl:
+      config.onboarding.type == 'found-dso'
+        ? undefined
+        : decentralizedSynchronizer.sv1InternalSequencerAddress,
     domain:
       // defaults for ports and address are fine,
       // we need to include a dummy value though

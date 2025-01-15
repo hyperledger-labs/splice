@@ -371,7 +371,7 @@ object ConfigTransforms {
   def bumpSvAppCantonDomainPortsBy(bump: Int): ConfigTransform = {
     updateAllSvAppConfigs_(
       _.focus(_.domains.global.url)
-        .modify(bumpUrl(bump, _))
+        .modify(_.map(bumpUrl(bump, _)))
         .focus(_.localSynchronizerNode)
         .modify(
           _.map(d =>
@@ -444,7 +444,7 @@ object ConfigTransforms {
       if (svApps.contains(name)) {
         config
           .focus(_.domains.global.url)
-          .modify(bumpUrl(bump, _))
+          .modify(_.map(bumpUrl(bump, _)))
           .focus(_.localSynchronizerNode)
           .modify(
             _.map(d =>

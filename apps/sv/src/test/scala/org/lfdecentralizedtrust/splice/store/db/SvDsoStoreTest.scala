@@ -51,10 +51,6 @@ import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.{Limit, MiningRoundsStore, PageLimit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.sv.config.{
-  SvDecentralizedSynchronizerConfig,
-  SvSynchronizerConfig,
-}
 import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore.{
@@ -1496,9 +1492,6 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
   lazy val acsOffset = nextOffset()
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val storeSvParty = providerParty(42)
-  lazy val svSynchronizerConfig = SvSynchronizerConfig(
-    SvDecentralizedSynchronizerConfig(DomainAlias.tryCreate(domain), "https://example.com")
-  )
 }
 
 class DbSvDsoStoreTest
