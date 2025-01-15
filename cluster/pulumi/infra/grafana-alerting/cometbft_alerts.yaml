@@ -451,7 +451,7 @@ groups:
             model:
               disableTextWrap: false
               editorMode: builder
-              expr: rate(cometbft_consensus_height[1h])
+              expr: rate(cometbft_consensus_height[30m])
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
@@ -612,7 +612,7 @@ groups:
               type: threshold
         noDataState: $NODATA
         execErrState: OK
-        for: 5m
+        for: 120m
         annotations:
           description: The block height difference of {{ index $values "latest_height_difference" }} is larger than the expected number of retained blocks ($COMETBFT_RETAIN_BLOCKS) in {{ $labels.namespace }}
           runbook_url: ""
