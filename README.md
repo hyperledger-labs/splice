@@ -153,11 +153,11 @@ clusters.)
     _Note_: if you want to skip specific pre-commit hooks, add the hook ids to the `SKIP` variable separated by commas,
             e.g. `export SKIP=scalafmt` (see https://pre-commit.com/#temporarily-disabling-hooks).
             Also, you can bypass running pre-commit hooks altogether using the `--no-verify` / `-n` git commit option.
- 
+
      **Important:** start your IDE and other development tools from a console that
      has this `direnv` loaded; and thus has the proper version of all the
      project dependencies on its `PATH`.
- 
+
      If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
 11. On MacOS, please install the following globally:
@@ -170,7 +170,7 @@ clusters.)
     where `circleci-username` is the username you are using for logging into CircleCI
     (your GitHub username if you are logging into CircleCI using your GitHub account)
     and `local-username` is the local username on your machine (as returned by `whoami`).
- 
+
     Open `./circleci/cluster-lock-slack-ids.json`, and add a line of the format
     ```
     "<local-username>": "<slack-user-id>",
@@ -867,6 +867,10 @@ message.
 In certain cases, it may be valid to allow a PR to be merged without going through CI.
 While `[skip ci]` is supported, it does not allow the PR to be merged. To skip testing but
 stil allow the PR to be merged, please include the text `[force]` in your commit message.
+
+Alternatively, to run only static tests (and skip e.g. integration tests) on your PR,
+include the text `[static]` in your commit message. This is recommended for, e.g. changes in
+Pulumi deployment configurations, deployment scripts, etc.
 
 ### Managing Canton for Tests
 

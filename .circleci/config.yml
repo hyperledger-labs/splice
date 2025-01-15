@@ -733,14 +733,17 @@ commands:
             cncluster activate
             cncluster pulumi deployment up --skip-preview --diff
 
-  skip_if_force_flag_set:
+  skip_if_flag_set:
+    parameters:
+      flag:
+        type: string
     steps:
       - run:
-          name: Skip if force flag is set
+          name: Skip if << parameters.flag >> flag is set
           command: |
             last_commit_msg=$(git log -1 --pretty=%B)
-            if [[ "$CIRCLE_BRANCH" != "main" && "${last_commit_msg}" == *"[force]"* ]]; then
-              echo "FORCE flag is set, skipping this job"
+            if [[ "$CIRCLE_BRANCH" != "main" && "${last_commit_msg}" == *"[<< parameters.flag >>]"* ]]; then
+              echo "<< parameters.flag >> flag is set, skipping this job"
               circleci-agent step halt
             fi
 
@@ -3318,7 +3321,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3346,7 +3350,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
       - setup_nix_self_hosted:
           # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
           save: true
@@ -3366,7 +3371,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3386,7 +3392,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3426,7 +3433,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
       - setup_nix_self_hosted
       - run_bash_command_in_nix:
           cmd_name: Deployment Test
@@ -3617,7 +3625,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
       - restore_frontend_builds
       - setup_nix
       - setup_sbt_test_job:
@@ -3760,12 +3769,13 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
       - run:
           name: Cancel the entire workflow if the current commit does not opt in for CI
           command: |
             last_commit_msg=$(git log -1 --pretty=%B)
-            if [[ "${last_commit_msg}" != *"[ci]"* ]]; then
+            if [[ "${last_commit_msg}" != *"[ci]"* ]] && [[ "${last_commit_msg}" != *"[static]"* ]]; then
               echo "Cancelling the entire workflow because the current commit does not opt in for CI."
               curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
             else
@@ -3995,7 +4005,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -4004,10 +4015,6 @@ jobs:
           cmd: |
             scripts/check-repo-names.sh
       - clone_and_update_open_source
-      - execute_sbt_command:
-          working_dir: "/home/circleci/oss"
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
-          cmd: "bundle"
       - execute_sbt_command:
           working_dir: "/home/circleci/splice"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
@@ -4927,7 +4934,10 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
+      - skip_if_flag_set:
+          flag: static
       - when:
           condition:
             not:
@@ -5026,7 +5036,10 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
-      - skip_if_force_flag_set
+      - skip_if_flag_set:
+          flag: force
+      - skip_if_flag_set:
+          flag: static
       - when:
           condition:
             not:

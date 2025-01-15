@@ -31,7 +31,7 @@ jobs:
         run: |
           last_commit_msg=$(git log -1 --pretty=%B)
           echo "Last commit message: $last_commit_msg"
-          if [[ $last_commit_msg != *"[ci]"* ]]; then
+          if [[ $last_commit_msg != *"[ci]"* ]] && [[ $last_commit_msg != *"[static]"* ]] ; then
             echo "Cancelling the entire workflow because the current commit does not opt in for CI."
             curl -fsSL -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
           else
@@ -157,7 +157,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Check if [force] was specified
+      - name: Handle [force] and [static] labels
         shell: bash
         run: |
           last_commit_msg=$(git log -1 --pretty=%B)
@@ -165,12 +165,22 @@ jobs:
           if [[ $last_commit_msg == *"[force]"* ]]; then
             echo "Skipping the check for job success because the current commit opts in for a forced run."
             echo "FORCE=true" >> $GITHUB_ENV
+          elif [[ $last_commit_msg == *"[static]"* ]]; then
+            echo "Only static tests are required"
+            echo "FORCE=false" >> $GITHUB_ENV
+            echo "JOBS<<EOF" >> $GITHUB_ENV
+            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests"}' >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
           else
             echo "Checking if all jobs succeeded."
             echo "FORCE=false" >> $GITHUB_ENV
+            echo "JOBS<<EOF" >> $GITHUB_ENV
+            echo '${{ toJSON(needs) }}' >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
           fi
-      - name: Decide whether the needed jobs succeeded or failed
+          echo "env file: $(cat $GITHUB_ENV)"
+      - name: check if the required jobs succeeded
         if: env.FORCE != 'true'
         uses: re-actors/alls-green@release/v1
         with:
-          jobs: ${{ toJSON(needs) }}
+          jobs: ${{ env.JOBS }}

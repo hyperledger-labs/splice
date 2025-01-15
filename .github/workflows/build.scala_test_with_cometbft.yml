@@ -28,14 +28,24 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Generate runner indices
         id: generate_index_list
         run: |
-          MAX_INDEX=$((${{ inputs.parallelism }}-1))
-          INDEX_LIST=$(seq 0 ${MAX_INDEX})
-          INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
-          echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
+          last_commit_msg=$(git log -1 --pretty=%B)
+          echo "Last commit message: $last_commit_msg"
+          if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ $last_commit_msg == *"[static]"* ]]; then
+            echo "Only static tests are running, returning an empty array so that no tests are run"
+            echo "json=[]" >> $GITHUB_OUTPUT
+          else
+            echo "Not a static test-only run, generating indices"
+            MAX_INDEX=$((${{ inputs.parallelism }}-1))
+            INDEX_LIST=$(seq 0 ${MAX_INDEX})
+            INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
+            echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Split tests
         id: split_tests
@@ -52,6 +62,7 @@ jobs:
     timeout-minutes: 30
     needs:
       - split_tests
+    if: ${{ needs.split_tests.outputs.indices != '[]' }}
     strategy:
       matrix:
         runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
