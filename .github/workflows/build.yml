@@ -45,7 +45,7 @@ jobs:
   scala_test_sim_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-large
+      runs_on: self-hosted-k8s-medium
       test_names_file: 'test-full-class-names-sim-time.log'
       start_canton_options: -s
       parallelism: 4
@@ -55,7 +55,7 @@ jobs:
   scala_test_resource_intensive:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-large
+      runs_on: self-hosted-k8s-x-large
       test_names_file: 'test-full-class-names-resource-intensive.log'
       start_canton_options: -w
       parallelism: 2
@@ -65,7 +65,7 @@ jobs:
   scala_test_record_time_tolerance:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-large
+      runs_on: self-hosted-k8s-small
       test_names_file: 'test-full-class-names-record-time-tolerance.log'
       start_canton_options: -s
       parallelism: 1
@@ -75,7 +75,7 @@ jobs:
   scala_test_global_soft_migration:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-large
+      runs_on: self-hosted-k8s-medium
       test_names_file: 'test-full-class-names-global-soft-migration.log'
       start_canton_options: -w --soft-domain-migration
       parallelism: 1
@@ -85,7 +85,7 @@ jobs:
   scala_test_disaster_recovery:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-large
+      runs_on: self-hosted-k8s-x-large
       test_names_file: 'test-full-class-names-disaster-recovery.log'
       start_canton_options: -w
       parallelism: 1
@@ -95,7 +95,7 @@ jobs:
   scala_test_with_cometbft:
     uses: ./.github/workflows/build.scala_test_with_cometbft.yml
     with:
-      runs_on: self-hosted-k8s-large
+      runs_on: self-hosted-k8s-medium
       test_names_file: "test-cometbft-full-class-names.log"
       parallelism: 1
       test_name: cometbft

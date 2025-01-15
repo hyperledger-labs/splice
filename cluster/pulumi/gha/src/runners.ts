@@ -26,6 +26,59 @@ type ResourcesSpec = {
   };
 };
 
+const K8sRunnerSpecs = {
+  'x-small': {
+    requests: {
+      cpu: '1',
+      memory: '8Gi',
+    },
+    limits: {
+      cpu: '4',
+      memory: '10Gi',
+    },
+  },
+  small: {
+    requests: {
+      cpu: '2',
+      memory: '16Gi',
+    },
+    limits: {
+      cpu: '4',
+      memory: '18Gi',
+    },
+  },
+  medium: {
+    requests: {
+      cpu: '3',
+      memory: '20Gi',
+    },
+    limits: {
+      cpu: '5',
+      memory: '24Gi',
+    },
+  },
+  large: {
+    requests: {
+      cpu: '5',
+      memory: '24Gi',
+    },
+    limits: {
+      cpu: '6',
+      memory: '32Gi',
+    },
+  },
+  'x-large': {
+    requests: {
+      cpu: '5',
+      memory: '32Gi',
+    },
+    limits: {
+      cpu: '6',
+      memory: '40Gi',
+    },
+  },
+};
+
 function installDockerRunnerScaleSet(
   name: string,
   runnersNamespace: Namespace,
@@ -613,42 +666,17 @@ function installK8sRunnerScaleSets(
   const saName = 'k8s-runners';
   installK8sRunnersServiceAccount(runnersNamespace, saName);
 
-  installK8sRunnerScaleSet(
-    runnersNamespace,
-    'self-hosted-k8s',
-    tokenSecret,
-    cachePvcName,
-    {
-      requests: {
-        cpu: '1',
-        memory: '4Gi',
-      },
-      limits: {
-        cpu: '4',
-        memory: '16Gi',
-      },
-    },
-    saName,
-    dependsOn
-  );
-  installK8sRunnerScaleSet(
-    runnersNamespace,
-    'self-hosted-k8s-large',
-    tokenSecret,
-    cachePvcName,
-    {
-      requests: {
-        cpu: '5',
-        memory: '32Gi',
-      },
-      limits: {
-        cpu: '6',
-        memory: '40Gi', // the high resource tests really use lots all of this
-      },
-    },
-    saName,
-    dependsOn
-  );
+  Object.entries(K8sRunnerSpecs).forEach(([name, resources]) => {
+    installK8sRunnerScaleSet(
+      runnersNamespace,
+      `self-hosted-k8s-${name}`,
+      tokenSecret,
+      cachePvcName,
+      resources,
+      saName,
+      dependsOn
+    );
+  });
 }
 
 function installPodMonitor(runnersNamespace: Namespace) {
