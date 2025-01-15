@@ -386,6 +386,7 @@ function configureGateway(
         daHostname: getDnsNames().daDnsName,
         basename: clusterBasename,
       },
+      enableGcsProxy: true,
     },
     activeVersion,
     {

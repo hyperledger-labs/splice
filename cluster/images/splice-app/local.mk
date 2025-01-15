@@ -11,7 +11,7 @@ target-logback := $(dir)/target/logback.xml
 
 include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
 
-$(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(dir)/target/LICENSE $(target-bundle) $(versioned-bundle) $(target-logback) $(versioned-openapi)
+$(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(dir)/target/LICENSE $(target-bundle) $(target-logback)
 
 $(dir)/target/LICENSE: LICENSE
 	cp $< $@
@@ -19,13 +19,6 @@ $(dir)/target/LICENSE: LICENSE
 $(target-bundle): $(app-bundle)
 	mkdir -p $(@D)
 	cp $< $@
-
-$(versioned-bundle): $(app-bundle)
-	mkdir -p $(@D)
-	cp $< $@
-
-$(versioned-openapi):
-	${REPO_ROOT}/scripts/copy-openapi.sh $@
 
 $(target-logback): ${REPO_ROOT}/scripts/canton-logback.xml
 	cp $< $@

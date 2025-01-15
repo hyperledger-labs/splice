@@ -24,6 +24,7 @@ export function installDocs(): pulumi.Resource {
     'cn-docs',
     {
       networkName: networkName,
+      enableGcsProxy: true,
     },
     activeVersion,
     { dependsOn }

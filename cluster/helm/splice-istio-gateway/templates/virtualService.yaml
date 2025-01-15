@@ -16,6 +16,17 @@ spec:
   gateways:
   - cn-http-gateway
   http:
+  {{- if .Values.enableGcsProxy }}
+  - match:
+      - port: 443
+        uri:
+          prefix: "/cn-release-bundles"
+    route:
+      - destination:
+          port:
+            number: 8080
+          host: gcs-proxy.docs.svc.cluster.local
+  {{- end }}
   - match:
       - port: 443
     route:

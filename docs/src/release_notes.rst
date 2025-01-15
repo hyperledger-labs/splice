@@ -28,6 +28,11 @@ Upcoming Release
 
   * Added a confirmation dialog when enabling preapproval of incoming direct transfers.
 
+* Deployment
+
+  * The release bundle has been removed again from the docs image. The docs instead link to
+    the release bundles publicly available on the OSS GitHub repo.
+
 0.3.5
 -----
 

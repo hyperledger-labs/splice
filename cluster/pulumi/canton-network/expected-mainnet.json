@@ -317,6 +317,7 @@
           "name": "cn-mainzrhnet"
         },
         "clusterUrl": "global.canton.network.digitalasset.com",
+        "enableGcsProxy": true,
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
         "networkName": "main",
         "tolerations": [

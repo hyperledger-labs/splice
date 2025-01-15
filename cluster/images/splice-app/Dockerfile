@@ -31,8 +31,6 @@ ADD target/splice-node.tar.gz .
 
 COPY target/monitoring.conf target/parameters.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml target/LICENSE /app/
 RUN mkdir -p /app/splice-node/docs/html/cn-release-bundles
-COPY target/*_splice-node.tar.gz /app/splice-node/docs/html/cn-release-bundles/
-COPY target/*_openapi.tar.gz /app/splice-node/docs/html/cn-release-bundles/
 
 RUN ln -s splice-node/bin/splice-node splice-image-bin
 
