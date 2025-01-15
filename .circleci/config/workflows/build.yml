@@ -21,6 +21,8 @@ workflow:
           context:
             - artifactory
             - slack-context
+          requires:
+            - artifacts_push
 
   build:
     when:

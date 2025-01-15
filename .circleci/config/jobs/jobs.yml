@@ -722,6 +722,17 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/splice
+      - run_bash_command_in_nix:
+          cmd_name: Create release in DA OSS
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep GCP_DA_CN_SHARED_KEY"
+          working_dir: "/home/circleci/oss"
+          cmd: |
+            if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
+              # Authenticate to shared GCP project for downloading the artifacts
+              echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+              # Create the release draft and upload the artifacts to it
+              /home/circleci/project/.circleci/create-gh-release.sh ${CIRCLE_BRANCH/release-line-/}
+            fi
 
   # TODO(#14845): Currently, building the repo on arm fails, so we cannot run the docker compose
   #               preflight there. We therefore for now only spin up the validator and check that

@@ -35,6 +35,10 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
 - [ ] Update the Open source repos, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
   - [ ] Merge the auto-generated PR in https://github.com/digital-asset/decentralized-canton-sync
   - [ ] Merge the auto-generated PR in https://github.com/hyperledger-labs/splice
+- [ ] After merging the PR on the DA OSS repo, go to Releases in that repo
+      (https://github.com/digital-asset/decentralized-canton-sync/releases), find the draft
+      release for the release you just created and publish it (click the edit pencil icon). This should be done after merging the PR because it will
+      also automatically bundle the sources from the release-line branch.
 
 ## Upgrade our own nodes on DevNet
 
