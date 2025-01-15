@@ -54,15 +54,23 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
 
 export function imagePullSecretByNamespaceName(
   ns: string,
-  retainOnDelete?: boolean
+  retainOnDelete?: boolean,
+  patchForce: 'true' | 'false' = 'true'
 ): pulumi.Resource[] {
-  return imagePullSecretByNamespaceNameForServiceAccount(ns, 'default', [], retainOnDelete);
+  return imagePullSecretByNamespaceNameForServiceAccount(
+    ns,
+    'default',
+    [],
+    patchForce,
+    retainOnDelete
+  );
 }
 
 export function imagePullSecretByNamespaceNameForServiceAccount(
   ns: string,
   serviceAccountName: string,
   dependsOn: pulumi.Resource[] = [],
+  patchForce: 'true' | 'false' = 'true',
   retainOnDelete?: boolean
 ): pulumi.Resource[] {
   const keys = ArtifactoryCreds.getCreds().creds;
@@ -98,7 +106,7 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
         namespace: ns,
         // We may create this secret in multiple stacks; let's not fail on it already existing.
         annotations: {
-          'pulumi.com/patchForce': 'true',
+          'pulumi.com/patchForce': patchForce,
         },
       },
       type: 'kubernetes.io/dockerconfigjson',
@@ -154,16 +162,23 @@ function patchServiceAccountWithImagePullSecret(
 
 export function imagePullSecret(
   ns: ExactNamespace,
-  retainOnDelete: boolean = false
+  retainOnDelete: boolean = false,
+  patchForce: 'true' | 'false' = 'true'
 ): CnInput<pulumi.Resource>[] {
-  return imagePullSecretByNamespaceName(ns.logicalName, retainOnDelete);
+  return imagePullSecretByNamespaceName(ns.logicalName, retainOnDelete, patchForce);
 }
 
 export function imagePullSecretForServiceAccount(
   ns: ExactNamespace,
-  serviceAccountName: string
+  serviceAccountName: string,
+  patchForce: 'true' | 'false' = 'true'
 ): CnInput<pulumi.Resource>[] {
-  return imagePullSecretByNamespaceNameForServiceAccount(ns.logicalName, serviceAccountName);
+  return imagePullSecretByNamespaceNameForServiceAccount(
+    ns.logicalName,
+    serviceAccountName,
+    [],
+    patchForce
+  );
 }
 
 export function uiSecret(

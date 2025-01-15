@@ -24,7 +24,8 @@ const credentialsSecret = new k8s.core.v1.Secret('gke-credentials', {
 
 export const imagePullDeps = imagePullSecretForServiceAccount(
   namespace,
-  'pulumi-kubernetes-operator'
+  'pulumi-kubernetes-operator',
+  'false'
 );
 export const operator = new k8s.helm.v3.Release(
   'pulumi-kubernetes-operator',

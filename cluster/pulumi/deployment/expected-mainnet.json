@@ -459,7 +459,7 @@
       "kind": "Secret",
       "metadata": {
         "annotations": {
-          "pulumi.com/patchForce": "true"
+          "pulumi.com/patchForce": "false"
         },
         "name": "docker-reg-cred",
         "namespace": "operator"
