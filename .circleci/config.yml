@@ -4899,9 +4899,6 @@ jobs:
       skip_if_files_changed:
         type: string
         default: ""
-      with_shared_gcp:
-        type: boolean
-        default: false
       with_docker_images:
         type: boolean
         default: false
@@ -4965,15 +4962,6 @@ jobs:
           runner_type: "circleci"
       - when:
           condition:
-            equal: [ true, "<< parameters.with_shared_gcp >>" ]
-          steps:
-            run_bash_command_in_nix:
-              cmd_name: "Authenticate to shared GCP project"
-              additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-              cmd: |
-                echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-      - when:
-          condition:
             equal: [ true, "<< parameters.with_docker_images >>" ]
           steps:
             - run_bash_command_in_nix:
@@ -5016,9 +5004,6 @@ jobs:
       skip_if_files_changed:
         type: string
         default: ""
-      with_shared_gcp:
-        type: boolean
-        default: false
       additional_nix_args:
         type: string
         default: ""
@@ -5070,15 +5055,6 @@ jobs:
           start_canton_options: << parameters.start_canton_options >> -p external
       - setup_sbt_test_job:
           runner_type: "selfhosted"
-      - when:
-          condition:
-            equal: [ true, "<< parameters.with_shared_gcp >>" ]
-          steps:
-            run_bash_command_in_nix:
-              cmd_name: "Authenticate to shared GCP project"
-              additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-              cmd: |
-                echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_splitted_scala_tests:
@@ -5161,7 +5137,6 @@ workflows:
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
           skip_if_regex: "\\[breaking\\]"
           skip_if_files_changed: "nix/canton-sources.json"
-          with_shared_gcp: true
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail

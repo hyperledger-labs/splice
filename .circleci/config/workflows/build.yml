@@ -68,7 +68,6 @@ workflow:
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
           skip_if_regex: "\\[breaking\\]"
           skip_if_files_changed: "nix/canton-sources.json"
-          with_shared_gcp: true
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
