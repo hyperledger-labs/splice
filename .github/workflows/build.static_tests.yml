@@ -4,7 +4,6 @@ on: workflow_call
 jobs:
   static_tests:
     runs-on: self-hosted-k8s-x-small
-    # Docker Hub image that `container-job` executes in
     container:
       image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.6-snapshot.20250113.8012.0.v6b097acb
 

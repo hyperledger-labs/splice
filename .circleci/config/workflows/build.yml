@@ -88,12 +88,6 @@ workflow:
           with_docker_images: true
           resource_class: "2xlarge"
           parallelism: 2
-      - ui_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       - bundle:
           <<: *notify-fail
           context:
