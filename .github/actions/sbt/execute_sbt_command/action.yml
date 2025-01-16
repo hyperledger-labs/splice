@@ -68,10 +68,10 @@ runs:
 
                echo "After SBT"
 
-                # TODO(#15988): support failing on error in output
+                # TODO(#15988): support disabling failing on error in output
                 # <<# parameters.fail_on_error_in_output >>
                 # # Check and report whether sbt has output errors
-                # .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
+                .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
                 # <</ parameters.fail_on_error_in_output >>
             }
             export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
