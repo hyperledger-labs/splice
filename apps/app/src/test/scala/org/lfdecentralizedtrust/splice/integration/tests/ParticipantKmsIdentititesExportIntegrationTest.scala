@@ -8,51 +8,18 @@ import org.lfdecentralizedtrust.splice.util.StandaloneCanton
 
 import java.nio.file.{Path, Paths}
 
-class ParticipantIdentitiesExportIntegrationTest
+class ParticipantKmsIdentitiesIntegrationTest
     extends ParticipantIdentitiesImportTestBase
     with StandaloneCanton {
 
   override def dbsSuffix = "kms"
 
   override def aliceParticipantDumpFilename =
-    ParticipantIdentitiesExportIntegrationTest.aliceKmsIdIdentityDumpFilePath
+    ParticipantKmsIdentitiesIntegrationTest.aliceKmsIdentitiesDumpFilePath
 
-  "We can export Canton participant identities dumps" in { implicit env =>
-    startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend, aliceValidatorBackend)
-
-    val svParticipantDump = clue("Getting participant identities dump from SV1") {
-      sv1ValidatorBackend.dumpParticipantIdentities()
-    }
-
-    clue("Checking exported key names") {
-      val keyNames = svParticipantDump.keys.map(_.name.value)
-      val prefix = "sv1Participant"
-      keyNames should contain(s"$prefix-namespace")
-      keyNames should contain(s"$prefix-signing")
-      keyNames should contain(s"$prefix-encryption")
-    }
-
-    val validatorParticipantDump =
-      clue("Getting participant identities dump from Alice's validator") {
-        aliceValidatorBackend.dumpParticipantIdentities()
-      }
-
-    clue("Checking exported key names") {
-      val keyNames = validatorParticipantDump.keys.map(_.name.value)
-      val prefix = "aliceParticipant"
-      keyNames should contain(s"$prefix-namespace")
-      keyNames should contain(s"$prefix-signing")
-      keyNames should contain(s"$prefix-encryption")
-    }
-  }
-
-  "We can export and import Canton participant identities dumps with kms enabled" in {
+  "We can import and export Canton participant identities dumps with kms enabled" in {
     implicit env =>
-      startAllSync(
-        sv1Backend,
-        sv1ScanBackend,
-        sv1ValidatorBackend,
-      )
+      startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
       withCanton(
         Seq(
@@ -71,7 +38,7 @@ class ParticipantIdentitiesExportIntegrationTest
       ) {
         val predefinedDump = NodeIdentitiesDump
           .fromJsonFile(
-            ParticipantIdentitiesExportIntegrationTest.aliceKmsIdIdentityDumpFilePath,
+            ParticipantKmsIdentitiesIntegrationTest.aliceKmsIdentitiesDumpFilePath,
             ParticipantId.tryFromProtoPrimitive,
           )
           .value
@@ -110,7 +77,7 @@ class ParticipantIdentitiesExportIntegrationTest
   }
 }
 
-object ParticipantIdentitiesExportIntegrationTest {
+object ParticipantKmsIdentitiesIntegrationTest {
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
-  val aliceKmsIdIdentityDumpFilePath = testDumpDir.resolve("alice-kms-id-identity-dump.json")
+  val aliceKmsIdentitiesDumpFilePath = testDumpDir.resolve("alice-kms-id-identity-dump.json")
 }

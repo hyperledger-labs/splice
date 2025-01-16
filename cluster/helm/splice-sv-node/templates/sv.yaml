@@ -171,8 +171,10 @@ spec:
                   }
                 }
             {{- end }}
+            {{- if .Values.decentralizedSynchronizerUrl }}
             - name: SPLICE_APP_SV_GLOBAL_DOMAIN_URL
               value: {{ .Values.decentralizedSynchronizerUrl | quote }}
+            {{- end }}
             {{- if (.Values.cometBFT).enabled }}
             - name: SPLICE_APP_SV_COMETBFT_ENABLED
               value: {{ (.Values.cometBFT).enabled | quote }}

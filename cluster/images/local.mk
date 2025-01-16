@@ -25,6 +25,7 @@ images := \
 	splitwell-web-ui \
 	\
 	docs \
+	gcs-proxy \
 	load-tester \
 	multi-validator \
 	multi-participant \
