@@ -113,20 +113,6 @@ jobs:
           runner_type: "selfhosted"
           upload_caches: true
 
-  deployment_test:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted
-      - run_bash_command_in_nix:
-          cmd_name: Deployment Test
-          cmd_retry_count: 5 # Retry in case of dependency download errors
-          cmd: make cluster/pulumi/test
-
   auth0_user_cleanup:
     executor: self_hosted
     environment:
