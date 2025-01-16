@@ -49,6 +49,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.DomainTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -151,11 +152,17 @@ class SV1Initializer(
       )
       (namespace, domainId) <- bootstrapDomain(localSynchronizerNode)
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
+      internalSequencerApi = localSynchronizerNode.sequencerInternalConfig
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         DomainConnectionConfig(
           config.domains.global.alias,
           sequencerConnections = SequencerConnections.single(
-            GrpcSequencerConnection.tryCreate(config.domains.global.url)
+            new GrpcSequencerConnection(
+              NonEmpty.mk(Seq, LocalSynchronizerNode.toEndpoint(internalSequencerApi)),
+              transportSecurity = internalSequencerApi.tls.isDefined,
+              customTrustCertificates = None,
+              SequencerAlias.Default,
+            )
           ),
           manualConnect = false,
           domainId = None,

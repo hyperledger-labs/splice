@@ -40,7 +40,6 @@
     {
       "required": [
         "auth",
-        "decentralizedSynchronizerUrl",
         "defaultJvmOptions",
         "domain",
         "imageRepo",

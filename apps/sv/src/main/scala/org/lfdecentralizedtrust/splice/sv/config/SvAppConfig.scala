@@ -167,7 +167,10 @@ final case class SynchronizerFeesConfig(
 
 final case class SvDecentralizedSynchronizerConfig(
     alias: DomainAlias,
-    url: String,
+    /** This must be set for SVs that onboard to initiallly connect to their sponsoring SV’s sequencer.
+      * Afterwards it can be unset.
+      */
+    url: Option[String],
 
     /** amount of extra traffic reserved for high priority transactions
       *
