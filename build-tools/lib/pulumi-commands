@@ -273,6 +273,21 @@ function subcmd_apply_sv(){
 
 ###
 
+subcommand_whitelist[apply_operator]="Apply the deployment Pulumi stack"
+
+function subcmd_apply_operator(){
+
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _uses_pulumi_stack deployment
+
+    subcmd_pulumi deployment up --yes --skip-preview --show-sames "${args[@]}"
+}
+
+###
+
 subcommand_whitelist[ci_apply_sv]='Run only by CircleCI'
 
 function subcmd_ci_apply_sv() {
