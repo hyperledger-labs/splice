@@ -456,6 +456,26 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "operator"
+      }
+    },
+    "name": "operator-default",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-operator::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
         "annotations": {
@@ -475,26 +495,6 @@
     "name": "operator-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "pulumi-kubernetes-operator",
-        "namespace": "operator"
-      }
-    },
-    "name": "operator-pulumi-kubernetes-operator",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-operator::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
     "custom": true,
@@ -607,6 +607,11 @@
           "repository": "digitalasset/pulumi-kubernetes-operator",
           "tag": "0.0.1-deadbeef"
         },
+        "imagePullSecrets": [
+          {
+            "name": "docker-reg-cred"
+          }
+        ],
         "maxHistory": 10,
         "resources": {
           "limits": {
