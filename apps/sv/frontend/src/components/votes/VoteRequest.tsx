@@ -66,7 +66,7 @@ export const CreateVoteRequest: React.FC = () => {
   const [actionName, setActionName] = useState('SRARC_OffboardSv');
   const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
-  const [expiration, setExpiration] = useState<Dayjs | null>(null);
+  const [expiration, setExpiration] = useState<Dayjs>(dayjs());
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   // States related to constraints from vote requests
@@ -79,34 +79,28 @@ export const CreateVoteRequest: React.FC = () => {
   const dsoInfosQuery = useDsoInfos();
   const listVoteRequestsQuery = useListDsoRulesVoteRequests();
 
-  function getDefaultExpiration(): Dayjs {
-    switch (actionName) {
-      case 'CRARC_RemoveFutureAmuletConfigSchedule':
-      case 'CRARC_UpdateFutureAmuletConfigSchedule':
-      case 'CRARC_AddFutureAmuletConfigSchedule': {
-        return dayjs();
-      }
-      default: {
-        const microseconds =
-          parseInt(dsoInfosQuery.data?.dsoRules.payload.config.voteRequestTimeout.microseconds!) /
-          1000;
-        return dayjs().add(Math.floor(microseconds), 'milliseconds');
-      }
-    }
-  }
+  const expirationFromVoteRequestTimeout = dayjs().add(
+    Math.floor(
+      parseInt(dsoInfosQuery.data?.dsoRules.payload.config.voteRequestTimeout.microseconds!) / 1000
+    ),
+    'milliseconds'
+  );
 
   useEffect(() => {
-    setExpiration(getDefaultExpiration);
+    setExpiration(expirationFromVoteRequestTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dsoInfosQuery.isSuccess]);
+  }, [dsoInfosQuery.isInitialLoading]);
 
-  useEffect(() => {
-    setExpiration(getDefaultExpiration);
+  const handleExpirationDateChange = (newDate: Dayjs | null) => {
+    setExpiration(newDate ?? dayjs());
+  };
+
+  const handleActionNameChange = (newActionName: string) => {
     setMaxDateTimeIfAddFutureAmuletConfigSchedule(undefined);
     setUrl('');
     setSummary('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actionName, setActionName]); // same than above
+    setActionName(newActionName);
+  };
 
   const actionNameOptions = [
     { name: 'Offboard Member', value: 'SRARC_OffboardSv' },
@@ -223,7 +217,6 @@ export const CreateVoteRequest: React.FC = () => {
           .then(() => setSummary(''))
           .then(() => setActionName('SRARC_OffboardSv'))
           .then(() => setAction(undefined))
-          .then(() => setExpiration(getDefaultExpiration))
           .then(() => setMaxDateTimeIfAddFutureAmuletConfigSchedule(undefined))
           .then(() => setAlertMessage({}));
       }
@@ -267,7 +260,7 @@ export const CreateVoteRequest: React.FC = () => {
                   'data-testid': 'display-actions',
                 }}
                 value={actionName}
-                onChange={e => setActionName(e.target.value)}
+                onChange={e => handleActionNameChange(e.target.value)}
               >
                 {actionNameOptions.map((actionName, index) => (
                   <option key={'action-option-' + index} value={actionName.value}>
@@ -289,7 +282,7 @@ export const CreateVoteRequest: React.FC = () => {
               minDateTime={dayjs()}
               maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
               readOnly={false}
-              onChange={(newValue: Dayjs | null) => setExpiration(newValue)}
+              onChange={d => handleExpirationDateChange(d)}
               slotProps={{
                 textField: {
                   id: 'datetime-picker-vote-request-expiration',
