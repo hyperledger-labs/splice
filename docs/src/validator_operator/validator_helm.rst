@@ -686,15 +686,9 @@ You can configure to restore the validator and participant with the dump file yo
         --from-file=content=${PARTICIPANT_BOOTSTRAP_DUMP_FILE} \
         -n validator
 
-* Uncomment the following lines in the ``standalone-validator-values.yaml`` file to enable the participant to restore from the dump:
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_DUMP_START
-    :end-before: PARTICIPANT_BOOTSTRAP_DUMP_END
-
 * Uncomment the following lines in the ``standalone-validator-values.yaml`` file.
   This will specify a new participant ID for the validator. Replace ``put-some-new-string-never-used-before`` with a string that was never used before.
+  Make sure to also adjust ``nodeIdentifier`` to match the same value.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml

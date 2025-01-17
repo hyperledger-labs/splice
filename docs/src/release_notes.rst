@@ -11,6 +11,14 @@ Release Notes
 Upcoming Release
 ----------------
 
+* Deployment
+
+  * When recovering a validator from an identities dump
+    ``nodeIdentifier`` must now match
+    ``newParticipantIdentifier``. This was already a requirement when
+    ``newParticipantIdentifier`` was removed again after the restore
+    was complete so this just catches misconfigurations earlier.
+
 0.3.6
 -----
 

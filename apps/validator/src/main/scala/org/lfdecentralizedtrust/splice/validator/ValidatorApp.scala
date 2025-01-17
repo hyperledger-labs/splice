@@ -146,7 +146,7 @@ class ValidatorApp(
             "Ensuring participant is initialized"
           )
           val cantonIdentifierConfig =
-            config.cantonIdentifierConfig.getOrElse(ValidatorCantonIdentifierConfig.default(config))
+            ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
           ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
             cantonIdentifierConfig.participant,
             participantAdminConnection,
