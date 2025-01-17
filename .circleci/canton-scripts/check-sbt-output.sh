@@ -27,7 +27,7 @@ read_sbt_output() {
 }
 
 filter_errors() {
-  grep -i -w -e error -e severe -e warn -e warning -e exception -e critical -e fatal || true
+  grep -i -e error -e severe -e warn -e warning -e exception -e critical -e fatal || true
 }
 
 # Read ignore patterns

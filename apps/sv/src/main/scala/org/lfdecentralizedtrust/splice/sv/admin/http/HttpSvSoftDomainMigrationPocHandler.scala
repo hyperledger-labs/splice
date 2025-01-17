@@ -4,17 +4,8 @@
 package org.lfdecentralizedtrust.splice.sv.admin.http
 
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
-import org.lfdecentralizedtrust.splice.config.{
-  Thresholds,
-  NetworkAppClientConfig,
-  SharedSpliceAppParameters,
-}
-import org.lfdecentralizedtrust.splice.environment.{
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-}
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
+import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.sv_soft_domain_migration_poc as v0
 import org.lfdecentralizedtrust.splice.http.v0.sv_soft_domain_migration_poc.SvSoftDomainMigrationPocResource
@@ -27,11 +18,10 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{CommunityCryptoConfig, CommunityCryptoProvider}
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ForceFlag, ParticipantId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
@@ -40,15 +30,9 @@ import com.digitalasset.canton.topology.store.{
   TopologyStoreId,
 }
 import StoredTopologyTransaction.GenericStoredTopologyTransaction
-import com.digitalasset.canton.topology.transaction.{
-  DomainParametersState,
-  MediatorDomainState,
-  SequencerDomainState,
-  TopologyMapping,
-}
+import com.digitalasset.canton.topology.transaction.TopologyMapping
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import io.opentelemetry.api.trace.Tracer
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -62,7 +46,6 @@ import scala.jdk.OptionConverters.*
 // TODO(#13301) Validate that topology reads return the right amount of data
 class HttpSvSoftDomainMigrationPocHandler(
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
-    localSynchronizerNode: Option[LocalSynchronizerNode],
     synchronizerNodes: Map[String, ExtraSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
     migrationId: Long,
@@ -74,14 +57,12 @@ class HttpSvSoftDomainMigrationPocHandler(
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
-    tracer: Tracer,
     httpClient: HttpClient,
     templateJsonDecoder: TemplateJsonDecoder,
 ) extends v0.SvSoftDomainMigrationPocHandler[TracedUser]
     with Spanning
     with NamedLogging {
 
-  private val workflowId = this.getClass.getSimpleName
   private val dsoStore = dsoStoreWithIngestion.store
 
   private def getScanUrls()(implicit tc: TraceContext): Future[Seq[String]] = {
@@ -146,186 +127,6 @@ class HttpSvSoftDomainMigrationPocHandler(
       includeMappings = Set(TopologyMapping.Code.DecentralizedNamespaceDefinition),
     )
   } yield (identityTransactions ++ decentralizedNamespaceDefinition).map(_.transaction)
-
-  override def signSynchronizerBootstrappingState(
-      respond: SvSoftDomainMigrationPocResource.SignSynchronizerBootstrappingStateResponse.type
-  )(
-      domainIdPrefix: String
-  )(
-      extracted: TracedUser
-  ): Future[SvSoftDomainMigrationPocResource.SignSynchronizerBootstrappingStateResponse] = {
-    implicit val TracedUser(_, traceContext) = extracted
-    withSpan(s"$workflowId.signSynchronizerBootstrappingState") { _ => _ =>
-      for {
-        scanUrls <- getScanUrls()
-        synchronizerIdentities <- scanUrls.traverse { url =>
-          withScanConnection(url)(_.getSynchronizerIdentities(domainIdPrefix))
-        }
-        domainId = DomainId(
-          UniqueIdentifier.tryCreate(
-            domainIdPrefix,
-            dsoStore.key.dsoParty.uid.namespace,
-          )
-        )
-        sequencers = synchronizerIdentities.map(_.sequencerId)
-        mediators = synchronizerIdentities.map(_.mediatorId)
-        existingSynchronizer = localSynchronizerNode.getOrElse(
-          throw Status.INTERNAL.withDescription("Missing synchronizer").asRuntimeException()
-        )
-        decentralizedSynchronizerId <- dsoStore.getAmuletRulesDomain()(traceContext)
-        // for now we just copy the parameters from the existing domain.
-        parameters <- existingSynchronizer.sequencerAdminConnection.getDomainParametersState(
-          decentralizedSynchronizerId
-        )
-        domainParameters = DomainParametersState(
-          domainId,
-          parameters.mapping.parameters,
-        )
-        sequencerDomainState = SequencerDomainState
-          .create(
-            domainId,
-            Thresholds.sequencerConnectionsSizeThreshold(sequencers.size),
-            sequencers,
-            Seq.empty,
-          )
-          .valueOr(err =>
-            throw Status.INTERNAL
-              .withDescription(s"Failed to construct SequencerDomainState: $err")
-              .asRuntimeException
-          )
-        mediatorDomainState = MediatorDomainState
-          .create(
-            domainId,
-            NonNegativeInt.zero,
-            Thresholds.mediatorDomainStateThreshold(mediators.size),
-            mediators,
-            Seq.empty,
-          )
-          .valueOr(err =>
-            throw Status.INTERNAL
-              .withDescription(s"Failed to construct MediatorDomainState: $err")
-              .asRuntimeException
-          )
-        participantId <- participantAdminConnection.getParticipantId()
-        decentralizedNamespaceTxs <- getDecentralizedNamespaceDefinitionTransactions()
-        _ <- participantAdminConnection.addTopologyTransactions(
-          TopologyStoreId.AuthorizedStore,
-          decentralizedNamespaceTxs,
-          ForceFlag.AlienMember,
-        )
-        signedBy = participantId.uid.namespace.fingerprint
-        _ <- retryProvider.ensureThatB(
-          RetryFor.ClientCalls,
-          "domain_parameters",
-          "domain parameters are signed",
-          for {
-            proposalsExist <- participantAdminConnection
-              .listDomainParametersState(
-                TopologyStoreId.AuthorizedStore,
-                domainId,
-                TopologyTransactionType.AllProposals,
-                TimeQuery.HeadState,
-              )
-              .map(_.nonEmpty)
-            authorizedExist <-
-              participantAdminConnection
-                .listDomainParametersState(
-                  TopologyStoreId.AuthorizedStore,
-                  domainId,
-                  TopologyTransactionType.AuthorizedState,
-                  TimeQuery.HeadState,
-                )
-                .map(_.nonEmpty)
-          } yield proposalsExist || authorizedExist,
-          participantAdminConnection
-            .proposeMapping(
-              TopologyStoreId.AuthorizedStore,
-              domainParameters,
-              serial = PositiveInt.one,
-              isProposal = true,
-            )
-            .map(_ => ()),
-          logger,
-        )
-        // add sequencer keys, note that in 3.0 not adding these does not fail but in 3.1 it will
-        _ <- participantAdminConnection.addTopologyTransactions(
-          TopologyStoreId.AuthorizedStore,
-          synchronizerIdentities.flatMap(_.sequencerIdentityTransactions),
-          ForceFlag.AlienMember,
-        )
-        _ <- retryProvider.ensureThatB(
-          RetryFor.ClientCalls,
-          "sequencer_domain_state",
-          "sequencer domain state is signed",
-          for {
-            proposalsExist <- participantAdminConnection
-              .listSequencerDomainState(
-                TopologyStoreId.AuthorizedStore,
-                domainId,
-                TimeQuery.HeadState,
-                true,
-              )
-              .map(_.nonEmpty)
-            authorizedExist <-
-              participantAdminConnection
-                .listSequencerDomainState(
-                  TopologyStoreId.AuthorizedStore,
-                  domainId,
-                  TimeQuery.HeadState,
-                  false,
-                )
-                .map(_.nonEmpty)
-          } yield proposalsExist || authorizedExist,
-          participantAdminConnection
-            .proposeMapping(
-              TopologyStoreId.AuthorizedStore,
-              sequencerDomainState,
-              serial = PositiveInt.one,
-              isProposal = true,
-            )
-            .map(_ => ()),
-          logger,
-        )
-        // add mediator keys, note that in 3.0 not adding these does not fail but in 3.1 it will
-        _ <- participantAdminConnection.addTopologyTransactions(
-          TopologyStoreId.AuthorizedStore,
-          synchronizerIdentities.flatMap(_.mediatorIdentityTransactions),
-          ForceFlag.AlienMember,
-        )
-        _ <- retryProvider.ensureThatB(
-          RetryFor.ClientCalls,
-          "mediator_domain_state",
-          "mediator domain state is signed",
-          for {
-            proposalsExist <- participantAdminConnection
-              .listMediatorDomainState(
-                TopologyStoreId.AuthorizedStore,
-                domainId,
-                true,
-              )
-              .map(_.nonEmpty)
-            authorizedExist <-
-              participantAdminConnection
-                .listMediatorDomainState(
-                  TopologyStoreId.AuthorizedStore,
-                  domainId,
-                  false,
-                )
-                .map(_.nonEmpty)
-          } yield proposalsExist || authorizedExist,
-          participantAdminConnection
-            .proposeMapping(
-              TopologyStoreId.AuthorizedStore,
-              mediatorDomainState,
-              serial = PositiveInt.one,
-              isProposal = true,
-            )
-            .map(_ => ()),
-          logger,
-        )
-      } yield SvSoftDomainMigrationPocResource.SignSynchronizerBootstrappingStateResponse.OK
-    }
-  }
 
   // Takes a list of (ordered) signed topology transactions and turns them into
   // StoredTopologyTransactions ensuring that only the latest serial has validUntil = None
