@@ -229,21 +229,6 @@ jobs:
             make cluster/helm/build -j
             make cluster/helm/push -j
           cmd_retry_count: 5
-      - save_frontend_builds
-      - save_sbt_job_result:
-          runner_type: "circleci"
-
-  publish_public_release:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - docker_login_artifactory
       - run_bash_command_in_nix:
           cmd_name: tag git
           additional_nix_args: "--keep ARTIFACTORY_USER \
@@ -266,6 +251,10 @@ jobs:
               git tag "${RELEASE_TAG}"
               git push origin "${RELEASE_TAG}"
             fi
+
+      - save_frontend_builds
+      - save_sbt_job_result:
+          runner_type: "circleci"
 
   docker_images_build:
     machine:

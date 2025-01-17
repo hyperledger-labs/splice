@@ -9,13 +9,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-      - publish_public_release:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - artifacts_push
       - create_oss_pr:
           <<: *notify-fail
           context:
