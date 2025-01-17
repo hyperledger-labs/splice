@@ -35,6 +35,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequ
 import org.lfdecentralizedtrust.splice.util.{Codec, TriggerTestUtil}
 
 import java.time.Instant
+import java.util.Optional
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
@@ -363,7 +364,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         )
 
         val action: ActionRequiringConfirmation =
-          new ARC_DsoRules(new SRARC_SetConfig(new DsoRules_SetConfig(newConfig)))
+          new ARC_DsoRules(new SRARC_SetConfig(new DsoRules_SetConfig(newConfig, Optional.empty())))
 
         sv1Backend.createVoteRequest(
           sv1Backend.getDsoInfo().svParty.toProtoPrimitive,

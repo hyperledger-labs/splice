@@ -7,6 +7,7 @@ import DA.Assert
 import DA.Foldable (forA_)
 import DA.List
 import qualified DA.Map as Map
+import qualified DA.Set as Set
 import Daml.Script
 import DA.Time
 
@@ -14,9 +15,17 @@ import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Round
 import Splice.Schedule
+import Splice.DSO.DecentralizedSynchronizer
+import Splice.Fees
+import Splice.Scripts.Parameters
+import Splice.Issuance()
+
 
 import Splice.DsoRules
 import Splice.DSO.AmuletPrice
+import Splice.AmuletConfig
+import Splice.CometBft
+import Splice.DecentralizedSynchronizer
 
 import Splice.Scripts.DsoTestUtils
 
@@ -519,42 +528,228 @@ testRacingSvRemoval = do
 -- | Test DsoRules configuration changes.
 testDsoRulesConfigChange : Script ()
 testDsoRulesConfigChange = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  (app, dso, (sv1, sv2, sv3, _)) <- initMainNet
 
+  now <- getTime
   [(_, dsoRules)] <- query @DsoRules dso
 
-  -- run the voting process to change the config
-  let newConfig = dsoRules.config with maxTextLength = dsoRules.config.maxTextLength + 1024 * 1024
-  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
-    ARC_DsoRules with
+  -- first config that changes half of the parameters
+  let newConfig1 = dsoRules.config with
+        numUnclaimedRewardsThreshold = 5 + 1
+        numMemberTrafficContractsThreshold = 5 + 1
+        actionConfirmationTimeout = minutes (5 + 1)
+        svOnboardingRequestTimeout = hours (1 + 1)
+        svOnboardingConfirmedTimeout = hours (1 + 1)
+        voteRequestTimeout = days (7 + 1)
+        dsoDelegateInactiveTimeout = seconds (70 + 1)
+        maxTextLength = 1024 + 1
+        nextScheduledSynchronizerUpgrade = Some (SynchronizerUpgradeSchedule with
+                                                    time = now
+                                                    migrationId = 1)
+
+
+  let initialSynchronizerConfig2 = SynchronizerConfig with
+        state = DS_Operational
+        cometBftGenesisJson = "<genesis-json2>"
+        acsCommitmentReconciliationInterval = Some 1802
+  let initialDsoDecentralizedSynchronizerConfig2 =  DsoDecentralizedSynchronizerConfig with
+        synchronizers = Map.fromList [("synchronizer-id2", initialSynchronizerConfig2)]
+        lastSynchronizerId = "synchronizer-id2"
+        activeSynchronizerId = "synchronizer-2"
+
+  let synchronizerNodeConfigLimits2 = SynchronizerNodeConfigLimits with
+        cometBft = CometBftConfigLimits with
+                      maxNumCometBftNodes = 2 + 1
+                      maxNumGovernanceKeys = 2 + 1
+                      maxNumSequencingKeys = 2 + 1
+                      maxNodeIdLength = 50 + 1
+                      maxPubKeyLength = 256 + 1
+
+  -- second config that changes the other half of the parameters
+  let newConfig2 = dsoRules.config with
+        synchronizerNodeConfigLimits = synchronizerNodeConfigLimits2
+        decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig2
+
+  now <- getTime
+
+  -- creation of two concurrent independent vote requests
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  result1 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+    requester = sv1
+    action = ARC_DsoRules with
       dsoAction = SRARC_SetConfig DsoRules_SetConfig with
-        newConfig
+        newConfig = newConfig1
+        baseConfig = Some dsoRules.config
+    reason = Reason with url = ""; body = "they are not good for us!"
+    targetEffectiveAt = None
+    voteRequestTimeout = Some (days 2)
 
-  -- check that the config change happened
+  result2 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+    requester = sv1
+    action = ARC_DsoRules with
+      dsoAction = SRARC_SetConfig DsoRules_SetConfig with
+        newConfig = newConfig2
+        baseConfig = Some dsoRules.config
+    reason = Reason with url = ""; body = "they are not good for us!"
+    targetEffectiveAt = None
+    voteRequestTimeout = Some (days 2)
+
+  let (req1, req2) = (result1.voteRequest, result2.voteRequest)
+
+  req1 <- castVote app sv2 req1 True
+  req1 <- castVote app sv3 req1 True
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+    requestCid = req1
+    amuletRulesCid = None
+
+  result.completedAt === now
+  result.offboardedVoters === []
+  result.abstainingSvs === ["sv4"]
+  result.outcome === VRO_Accepted with effectiveAt = now
+
+  -- the first request has been accepted and must reflect newConfig1
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+  dsoRules.config === newConfig1
+
+  req2 <- castVote app sv2 req2 True
+  req2 <- castVote app sv3 req2 True
+
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+    requestCid = req2
+    amuletRulesCid = None
+
+  result.completedAt === now
+  result.offboardedVoters === []
+  result.abstainingSvs === ["sv4"]
+  result.outcome === VRO_Accepted with effectiveAt = now
+
+  -- the second request has been accepted and must reflect newConfig1 with the changes introduced by newConfig2
   [(_, dsoRules)] <- query @DsoRules dso
-  dsoRules.config === newConfig
+  dsoRules.config === newConfig1 with
+                      synchronizerNodeConfigLimits = newConfig2.synchronizerNodeConfigLimits
+                      decentralizedSynchronizer = newConfig2.decentralizedSynchronizer
 
 
 -- | Test AmuletRules configuration changes.
-testAmuletConfigChange : Script ()
-testAmuletConfigChange = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+testAmuletRulesConfigChange : Script ()
+testAmuletRulesConfigChange = do
+  (app, dso, (sv1, sv2, sv3, _)) <- initMainNet
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
 
   [(_, amuletRules)] <- query @AmuletRules dso
 
-  -- run the voting process to change the config
-  let newConfig = case amuletRules.config of
-                    Some c -> c with tickDuration = c.tickDuration + (days 2)
-                    None -> error "No config found"
-  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
-    ARC_AmuletRules with
+  let defaultTransferConfig2 = TransferConfig with
+        createFee = FixedFee 0.04
+        holdingFee = RatePerRound 0.00004
+        lockHolderFee = FixedFee 0.007
+        transferFee = SteppedRate with
+          initialRate = 0.06
+          steps = [(100.1, 0.002), (1000.1, 0.0002), (1000000.1, 0.00002)]
+        extraFeaturedAppRewardAmount = 2.0
+        maxNumInputs = 101
+        maxNumOutputs = 101
+        maxNumLockHolders = 11
+
+  let defaultBaseRateTrafficLimits2 = BaseRateTrafficLimits with
+        burstAmount = 10 * 20 * 1000 + 1
+        burstWindow = minutes (10 + 1)
+
+  let defaultSynchronizerFeesConfig2 = SynchronizerFeesConfig with
+        baseRateTrafficLimits = defaultBaseRateTrafficLimits2
+        minTopupAmount = 1_000_001
+        extraTrafficPrice = 2.0
+        readVsWriteScalingFactor = 42
+
+  let defaultAmuletDecentralizedSynchronizerConfig2 = AmuletDecentralizedSynchronizerConfig with
+        requiredSynchronizers = Set.fromList ["decentralized-synchronizer-id-2"]
+        activeSynchronizer = "decentralized-synchronizer-id-2"
+        fees = defaultSynchronizerFeesConfig2
+
+  let issuanceConfig_0p5_1p5_2 = issuanceConfig_10plus with
+        amuletToIssuePerYear = 40e9
+        validatorRewardPercentage = 0.05
+        appRewardPercentage = 0.15
+
+  let defaultIssuanceCurve2 = Schedule with
+        initialValue = issuanceConfig_0p5_1p5_2
+        futureValues =
+          [
+          ]
+
+  -- first config that changes half of the parameters
+  let newConfig1 = amuletRules.configSchedule.initialValue with
+        transferConfig = defaultTransferConfig2
+        issuanceCurve = defaultIssuanceCurve2
+
+  -- second config that changes the other half of the parameters
+  let newConfig2 = amuletRules.configSchedule.initialValue with
+        decentralizedSynchronizer = defaultAmuletDecentralizedSynchronizerConfig2
+
+  now <- getTime
+
+  -- creation of two concurrent independent vote requests
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules dso
+  result1 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+    requester = sv1
+    action = ARC_AmuletRules with
       amuletRulesAction = CRARC_SetConfig AmuletRules_SetConfig with
-        newConfig
+        newConfig = newConfig1
+        baseConfig = amuletRules.configSchedule.initialValue
+    reason = Reason with url = ""; body = "they are not good for us!"
+    targetEffectiveAt = None
+    voteRequestTimeout = Some (days 2)
 
-  -- check that the config change happened
+  result2 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+    requester = sv1
+    action = ARC_AmuletRules with
+      amuletRulesAction = CRARC_SetConfig AmuletRules_SetConfig with
+        newConfig = newConfig2
+        baseConfig = amuletRules.configSchedule.initialValue
+    reason = Reason with url = ""; body = "they are not good for us!"
+    targetEffectiveAt = None
+    voteRequestTimeout = Some (days 2)
+
+  let (req1, req2) = (result1.voteRequest, result2.voteRequest)
+
+  req1 <- castVote app sv2 req1 True
+  req1 <- castVote app sv3 req1 True
+
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+    requestCid = req1
+    amuletRulesCid = Some amuletRulesCid
+
+  result.completedAt === now
+  result.offboardedVoters === []
+  result.abstainingSvs === ["sv4"]
+  result.outcome === VRO_Accepted with effectiveAt = now
+
+  -- the first request has been accepted and must reflect newConfig1
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules dso
+  case amuletRules.config of
+    None -> error("not expected to be None")
+    Some config -> config === newConfig1
+
+  req2 <- castVote app sv2 req2 True
+  req2 <- castVote app sv3 req2 True
+
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+    requestCid = req2
+    amuletRulesCid = Some amuletRulesCid
+
+  result.completedAt === now
+  result.offboardedVoters === []
+  result.abstainingSvs === ["sv4"]
+  result.outcome === VRO_Accepted with effectiveAt = now
+
+  -- the second request has been accepted and must reflect newConfig1 with the changes introduced by newConfig2
   [(_, amuletRules)] <- query @AmuletRules dso
-  amuletRules.config === Some newConfig
-
+  case amuletRules.config of
+    None -> error("not expected to be None")
+    Some config -> config === newConfig1 with
+                                decentralizedSynchronizer = newConfig2.decentralizedSynchronizer
 
 -- | Test SV removal and GC of AmuletPriceVotes
 testOffboardSvAndAmuletPriceVotes : Script ()

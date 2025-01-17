@@ -362,15 +362,15 @@ class ParticipantAdminConnection(
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Boolean] =
     for {
-      oldConfig <- getDomainConnectionConfig(domain)
-      newConfig = f(oldConfig)
+      baseConfig <- getDomainConnectionConfig(domain)
+      newConfig = f(baseConfig)
       configModified <- newConfig match {
         case None =>
           logger.trace("No update to domain connection config required")
           Future.successful(false)
         case Some(config) =>
           logger.info(
-            s"Updating to new domain connection config for domain $domain. Old config: $oldConfig, new config: $config"
+            s"Updating to new domain connection config for domain $domain. base config: $baseConfig, new config: $config"
           )
           for {
             _ <- setDomainConnectionConfig(config)

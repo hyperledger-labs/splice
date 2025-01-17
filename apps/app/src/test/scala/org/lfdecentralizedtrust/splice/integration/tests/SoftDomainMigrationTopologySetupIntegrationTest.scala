@@ -65,6 +65,7 @@ import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerCo
 import org.scalatest.time.{Minute, Span}
 
 import java.time.temporal.ChronoUnit
+import java.util.Optional
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -356,7 +357,8 @@ class SoftDomainMigrationTopologySetupIntegrationTest
                         newDomainId.toProtoPrimitive,
                       ),
                       dsoRules.payload.config.nextScheduledSynchronizerUpgrade,
-                    )
+                    ),
+                    Optional.empty(),
                   )
                 )
               ),

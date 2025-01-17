@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
 
 import java.time.Duration as JavaDuration
+import java.util.Optional
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -188,7 +189,9 @@ class SvTimeBasedOnboardingIntegrationTest
             )
 
             val action: ActionRequiringConfirmation =
-              new ARC_DsoRules(new SRARC_SetConfig(new DsoRules_SetConfig(newConfig)))
+              new ARC_DsoRules(
+                new SRARC_SetConfig(new DsoRules_SetConfig(newConfig, Optional.empty()))
+              )
 
             sv1Backend.createVoteRequest(
               sv1Backend.getDsoInfo().svParty.toProtoPrimitive,

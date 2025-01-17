@@ -32,6 +32,7 @@ import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
+import Splice.CometBft()
 
 
 -- Types
@@ -881,10 +882,14 @@ template DsoRules with
     choice DsoRules_SetConfig : DsoRules_SetConfigResult
       with
         newConfig : DsoRulesConfig
+        baseConfig: Optional DsoRulesConfig
       controller dso
       do
         -- TODO(M3-57): sanity check the newConfig to avoid locking up operations, e.g., by setting `maxTextLength = -1`
-        newDsoRules <- create this with config = newConfig
+        newDsoRules <- case baseConfig of
+          None -> create this with config = newConfig
+          Some baseConfig -> do
+             create this with config = patch newConfig baseConfig this.config
         return DsoRules_SetConfigResult with ..
 
     choice DsoRules_UpdateSvRewardWeight : DsoRules_UpdateSvRewardWeightResult
@@ -1573,3 +1578,22 @@ instance HasCheckedFetch FeaturedAppRight ForDso where
 
 instance HasCheckedFetch Confirmation ForDso where
   contractGroupId Confirmation {..} = ForDso with dso
+
+instance Patchable DsoRulesConfig where
+  patch new base current = DsoRulesConfig with
+    numUnclaimedRewardsThreshold = patch new.numUnclaimedRewardsThreshold base.numUnclaimedRewardsThreshold current.numUnclaimedRewardsThreshold
+    numMemberTrafficContractsThreshold = patch new.numMemberTrafficContractsThreshold base.numMemberTrafficContractsThreshold current.numMemberTrafficContractsThreshold
+    actionConfirmationTimeout = patch new.actionConfirmationTimeout base.actionConfirmationTimeout current.actionConfirmationTimeout
+    svOnboardingRequestTimeout = patch new.svOnboardingRequestTimeout base.svOnboardingRequestTimeout current.svOnboardingRequestTimeout
+    svOnboardingConfirmedTimeout = patch new.svOnboardingConfirmedTimeout base.svOnboardingConfirmedTimeout current.svOnboardingConfirmedTimeout
+    voteRequestTimeout = patch new.voteRequestTimeout base.voteRequestTimeout current.voteRequestTimeout
+    dsoDelegateInactiveTimeout = patch new.dsoDelegateInactiveTimeout base.dsoDelegateInactiveTimeout current.dsoDelegateInactiveTimeout
+    synchronizerNodeConfigLimits = patch new.synchronizerNodeConfigLimits base.synchronizerNodeConfigLimits current.synchronizerNodeConfigLimits
+    maxTextLength = patch new.maxTextLength base.maxTextLength current.maxTextLength
+    decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
+    nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
+
+instance Patchable SynchronizerUpgradeSchedule where
+  patch new base current = SynchronizerUpgradeSchedule with
+        time = patch new.time base.time current.time
+        migrationId = patch new.migrationId base.migrationId current.migrationId

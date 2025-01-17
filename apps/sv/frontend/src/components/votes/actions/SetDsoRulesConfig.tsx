@@ -95,7 +95,7 @@ const SetDsoRulesConfig: React.FC<{
           value: {
             dsoAction: {
               tag: 'SRARC_SetConfig',
-              value: { newConfig: decoded.result },
+              value: { newConfig: decoded.result, baseConfig: null },
             },
           },
         });

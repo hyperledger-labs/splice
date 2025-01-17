@@ -11,7 +11,7 @@ Release Notes
 Upcoming Release
 ----------------
 
-* Governance
+* Governance: voting logic
 
     * Added the optional `targetEffectiveAt` field to the `VoteRequest` template, which allows specifying an effective date and time for the vote request.
       Additionally, the `DsoRules_CloseVoteRequest` now enforces the new semantics for vote requests that include an effective date and time.
@@ -39,17 +39,28 @@ Upcoming Release
 
     * The Daml changes in this release require a governance vote to upgrade the package configs to:
 
-        ================== =======
-        name               version
-        ================== =======
-        amulet             0.1.6
-        amuletNameService  0.1.6
-        dsoGovernance      0.1.10
-        validatorLifecycle 0.1.1
-        wallet             0.1.6
-        walletPayments     0.1.6
-        ================== =======
+* Governance: introducing `CRARC_SetConfig` choice in favor of `CRARC_AddFutureAmuletConfigSchedule`, `CRARC_AddUpdateAmuletConfigSchedule` and `CRARC_AddRemoveAmuletConfigSchedule`
 
+    * The new action `CRARC_SetConfig` allows the SV to set the configuration of AmuletRules configuration in the same way of `SRARC_SetConfig`. This action is only available when the new dars below are vetted.
+
+* Governance: handling parallel proposals
+
+    * Before: concurrent editing proposals (`CRARC_SetConfig`  and `SRARC_SetConfig`) risked overwriting new changes with outdated values because the entire new configuration replaced the old one, regardless of the specific changes.
+
+    * Now: concurrent editing proposals (`CRARC_SetConfig`  and `SRARC_SetConfig`) apply only to the fields that were intented to be changed. A copy of the current configuration is passed along the modified configuration at the creation of a proposal.
+
+* Governance: new dars
+
+      ================== =======
+      name               version
+      ================== =======
+      amulet             0.1.7
+      amuletNameService  0.1.7
+      dsoGovernance      0.1.10
+      validatorLifecycle 0.1.2
+      wallet             0.1.7
+      walletPayments     0.1.7
+      ================== =======
 
 0.3.3
 -----

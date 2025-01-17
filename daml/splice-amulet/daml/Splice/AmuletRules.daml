@@ -567,9 +567,13 @@ template AmuletRules
     choice AmuletRules_SetConfig: AmuletRules_SetConfigResult
       with
         newConfig : AmuletConfig Unit.USD
+        baseConfig : AmuletConfig Unit.USD
       controller dso
       do
-        newAmuletRules <- create this with config = Some newConfig
+        newAmuletRules <- create this with
+          config = case this.config of
+            Some conf -> Some (patch newConfig baseConfig conf)
+            None -> Some (newConfig)
         return AmuletRules_SetConfigResult with ..
 
     -- TODO(#16139): mark these choices as "deprecated"
