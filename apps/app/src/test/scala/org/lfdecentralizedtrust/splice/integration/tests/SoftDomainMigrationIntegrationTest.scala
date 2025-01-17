@@ -324,11 +324,17 @@ class SoftDomainMigrationIntegrationTest
     val dsoRules = sv1Backend.getDsoInfo().dsoRules
 
     clue("Bootstrap new domain") {
-      clue("Sign bootstrapping state") {
-        val signed = env.svs.local.map { sv =>
-          Future { sv.signSynchronizerBootstrappingState(prefix) }
+      clue("Wait for signed topology state to appear") {
+        env.svs.local.map { sv =>
+          eventually() {
+            sv.participantClient.topology.domain_parameters
+              .list(filterDomain = "global-domain-new") should not be empty
+          }
         }
-        signed.foreach(_.futureValue)
+        val initialized = env.svs.local.map { sv =>
+          Future { sv.initializeSynchronizer(prefix) }
+        }
+        initialized.foreach(_.futureValue)
       }
       clue("Initialize synchronizer nodes") {
         val initialized = env.svs.local.map { sv =>
