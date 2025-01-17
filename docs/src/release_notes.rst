@@ -11,6 +11,9 @@ Release Notes
 Upcoming Release
 ----------------
 
+0.3.6
+-----
+
 * Validator app
 
     * The wallet sweep automation now supports sweeping to end user parties.
@@ -32,6 +35,10 @@ Upcoming Release
 
   * The release bundle has been removed again from the docs image. The docs instead link to
     the release bundles publicly available on the OSS GitHub repo.
+
+* CometBFT
+
+  * The CometBFT version has been updated to 0.37.13. No change should be required from SV operators.
 
 0.3.5
 -----
