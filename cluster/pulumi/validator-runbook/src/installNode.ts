@@ -35,6 +35,7 @@ import {
   validatorSecrets,
   ValidatorTopupConfig,
   InstalledHelmChart,
+  ansDomainPrefix,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
@@ -111,6 +112,9 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         svNamespace: RUNBOOK_NAMESPACE,
+      },
+      spliceDomainNames: {
+        nameServiceDomain: ansDomainPrefix,
       },
       withSvIngress: false,
     },
@@ -225,6 +229,10 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     ),
   };
 
+  const newParticipantIdentifier =
+    VALIDATOR_NEW_PARTICIPANT_ID ||
+    validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
+
   const validatorValues: ChartValues = {
     ...validatorValuesFromYamlFiles,
     migration: {
@@ -244,11 +252,10 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? {
           secretName: participantBootstrapDumpSecretName,
-          newParticipantIdentifier:
-            VALIDATOR_NEW_PARTICIPANT_ID ||
-            validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier,
+          newParticipantIdentifier,
         }
       : undefined,
+    ...(participantBootstrapDumpSecret ? { nodeIdentifier: newParticipantIdentifier } : {}),
     persistence: {
       ...validatorValuesFromYamlFiles.persistence,
       postgresName: 'postgres',

@@ -165,7 +165,7 @@ class ParticipantAdminConnection(
     retryProvider.retryForClientCalls(
       "connect_domain",
       s"participant is connected to $alias",
-      runCmd(ParticipantAdminCommands.DomainConnectivity.ConnectDomain(alias, retry = false)).map(
+      runCmd(ParticipantAdminCommands.DomainConnectivity.ReconnectDomain(alias, retry = false)).map(
         isConnected =>
           if (!isConnected) {
             val msg = s"failed to connect to ${alias}"
@@ -184,16 +184,12 @@ class ParticipantAdminConnection(
       config: DomainConnectionConfig,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    require(
-      !config.manualConnect,
-      "manualConnect must be false when trying to register only, otherwise it doesn't even handshake",
-    )
     for {
       _ <- retryProvider
         .ensureThat(
           retryFor,
           "domain_registered_handshake",
-          s"participant registered ${config.domain}",
+          s"participant registered ${config.domain} with handshake only",
           lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
           (_: Unit) => registerDomain(config, handshakeOnly = true),
           logger,
@@ -329,7 +325,7 @@ class ParticipantAdminConnection(
       domain: DomainAlias
   )(implicit traceContext: TraceContext): Future[Option[DomainConnectionConfig]] =
     for {
-      configuredDomains <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListConfiguredDomains)
+      configuredDomains <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListRegisteredDomains)
     } yield configuredDomains
       .collectFirst {
         case (configuredDomain, _) if configuredDomain.domain == domain => configuredDomain
@@ -699,15 +695,32 @@ class ParticipantAdminConnection(
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     def findPartyToParticipant(topologyTransactionType: TopologyTransactionType) = EitherT {
       topologyTransactionType match {
-        case proposals @ (TopologyTransactionType.ProposalSignedBy(_) |
+        case transactionType @ (TopologyTransactionType.ProposalSignedByOwnKey |
             TopologyTransactionType.AllProposals) =>
           listPartyToParticipant(
             filterStore = domainId.filterString,
             filterParty = party.filterString,
-            proposals = proposals,
-          ).map { proposals =>
-            proposals
-              .find(proposal => {
+            proposals = transactionType,
+          ).flatMap { proposals =>
+            val proposalsWithRightSignature = transactionType match {
+              case TopologyTransactionType.ProposalSignedByOwnKey =>
+                for {
+                  participantId <- getParticipantId()
+                  delegations <- listNamespaceDelegation(participantId.namespace, None).map(
+                    _.map(_.mapping.target.fingerprint)
+                  )
+                } yield {
+                  val validSigningKeys = delegations :+ participantId.fingerprint
+                  proposals.filter { proposal =>
+                    proposal.base.signedBy
+                      .intersect(validSigningKeys)
+                      .nonEmpty
+                  }
+                }
+              case _ => Future.successful(proposals)
+            }
+            proposalsWithRightSignature.map {
+              _.find(proposal => {
                 val newHostingParticipants = participantChange(
                   proposal.mapping.participants
                 )
@@ -718,14 +731,15 @@ class ParticipantAdminConnection(
                     newHostingParticipants
                   )
               })
-              .getOrElse(
-                throw Status.NOT_FOUND
-                  .withDescription(
-                    s"No party to participant proposal for party $party on domain $domainId"
-                  )
-                  .asRuntimeException()
-              )
-              .asRight
+                .getOrElse(
+                  throw Status.NOT_FOUND
+                    .withDescription(
+                      s"No party to participant proposal for party $party on domain $domainId"
+                    )
+                    .asRuntimeException()
+                )
+                .asRight
+            }
           }
         case TopologyTransactionType.AuthorizedState =>
           getPartyToParticipant(domainId, party).map(result => {
@@ -820,16 +834,13 @@ class ParticipantAdminConnection(
       check(TopologyTransactionType.AuthorizedState)
         .leftFlatMap { authorizedState =>
           EitherT(
-            getParticipantId().flatMap { pid =>
-              check(TopologyTransactionType.ProposalSignedBy(pid.namespace.fingerprint))
-                .leftMap(_ => authorizedState)
-                .value
-                .recover {
-                  case ex: StatusRuntimeException
-                      if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
-                    Left(authorizedState)
-                }
-            }
+            check(TopologyTransactionType.ProposalSignedByOwnKey)
+              .leftMap(_ => authorizedState)
+              .value
+              .recover {
+                case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
+                  Left(authorizedState)
+              }
           )
         },
       update,

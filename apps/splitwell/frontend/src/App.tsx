@@ -2,16 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import {
-  AuthProvider,
-  UserProvider,
-  theme,
-  useUserState,
-  PackageIdResolver,
-} from 'common-frontend';
+import { AuthProvider, UserProvider, theme, PackageIdResolver } from 'common-frontend';
 import { replaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   createBrowserRouter,
@@ -49,6 +43,11 @@ class SplitwellPackageIdResolver extends PackageIdResolver {
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const refetchInterval = useConfigPollInterval();
 
+  interface JsonApiError {
+    status: number;
+    errors?: string[];
+  }
+
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -56,12 +55,16 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         structuralSharing: replaceEqualDeep,
       },
       mutations: {
-        retry: (failureCount, error) =>
+        retry: (failureCount, error) => {
           // We only retry certain JSON API errors. Retrying everything is more confusing than helpful
           // because that then also retries on invalid user input.
-          // The status field is defined as part of LedgerError in @daml/ledger which is thrown on JSON API errors.
-          /* eslint-disable @typescript-eslint/no-explicit-any */
-          [404, 409].includes((error as any).status) && failureCount < 10,
+          const errResponse = error as JsonApiError;
+          const isDomainConnectionError =
+            errResponse.errors?.some(e => e.includes('NOT_CONNECTED_TO_ANY_DOMAIN')) || false;
+          const is404or409 = [404, 409].includes(errResponse.status);
+
+          return (is404or409 || isDomainConnectionError) && failureCount < 10;
+        },
         retryDelay: 500,
       },
     },
@@ -99,18 +102,6 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
 const SplitwellAuthCheck: React.FC = () => {
   const config = useConfig();
-  const { loginWithOidc, oidcAuthState } = useUserState();
-  useEffect(() => {
-    // Auth-login after the user launched the app from their app manager.
-    if (
-      config.appManager &&
-      oidcAuthState &&
-      !oidcAuthState.isLoading &&
-      !oidcAuthState.isAuthenticated
-    ) {
-      loginWithOidc();
-    }
-  }, [loginWithOidc, oidcAuthState, config]);
   return <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />;
 };
 

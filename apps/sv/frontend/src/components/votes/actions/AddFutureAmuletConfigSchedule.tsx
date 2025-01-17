@@ -86,6 +86,8 @@ const AddFutureAmuletConfigSchedule: React.FC<{
           label={`Enter time in local timezone (${getUTCWithOffset()})`}
           value={date}
           minDateTime={dayjs()}
+          ampm={false}
+          format="YYYY-MM-DD HH:mm"
           readOnly={false}
           onChange={(newValue: Dayjs | null) => {
             try {

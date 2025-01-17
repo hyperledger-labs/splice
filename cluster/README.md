@@ -487,6 +487,10 @@ subcommands. A few highlights include the following:
 
 * `cncluster apply_sv` - Apply the sv-runbook Pulumi stack.
       * You need to provide a `target-domain-cluster` argument, for instance `scratcha` for scratchneta.
+* `cncluster apply_operator` - Apply the deployment Pulumi stack.
+      * To deploy it on a scratchnet, you need to set the following environment variables:
+          * `OPERATOR_IMAGE_VERSION`="X.X.X"
+          * `GOOGLE_CREDENTIALS`=$(cat "$HOME/.config/gcloud/application_default_credentials.json")
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,
@@ -1676,7 +1680,7 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
 
    We expect to get an error here because the sequencer's public API should not be initialized yet. Other errors on this connection might also be fine.
    Results of this check that are certainly not fine include the sequencer reporting to be `SERVING` (check whether the sv app was properly configured to perform a migration) or us hitting an HTML page instead of an gRPC endpoint (possible ingress misconfiguration).
-   If in doubt, reach out to the relevant SV partner on `#supervalidator-ops` or ask for help in the internal channel.
+   If in doubt, reach out to the relevant SV partner on [#supervalidator-operations](https://daholdings.slack.com/archives/C085C3ESYCT) or ask for help in the internal channel.
 
 #### New domain readiness checks
 
@@ -2211,7 +2215,7 @@ export. The resulting sequencer will not be fully functional
 afterwards since you lack the other SVs but it is enough to go through
 the validation of the topology state in Canton. The concrete steps are:
 
-### Export the data from the cluster you're validating 
+### Export the data from the cluster you're validating
 
 1. create a directory to store the state export: `mkdir -p /tmp/state-export/keys`
 2. Switch to the current release branch of the cluster you are migrating
@@ -2234,7 +2238,7 @@ the validation of the topology state in Canton. The concrete steps are:
    ```
    sequencer.topology.transactions.list(filterStore = sequencer.domain_id.filterString, proposals = false, timeQuery = TimeQuery.HeadState).result.groupMapReduce(_.mapping.code)(_ => 1)(_ + _)
    ```
-   Note: This should be run immediatly after exporting the genesis state to ensure no new topology state is written between the genesis export and the current state calculations. 
+   Note: This should be run immediatly after exporting the genesis state to ensure no new topology state is written between the genesis export and the current state calculations.
 7. Export the authorized topology store snapshot
    ```
    sequencer.topology.transactions.export_topology_snapshot("Authorized", filterMappings = Seq(TopologyMapping.Code.NamespaceDelegation, TopologyMapping.Code.OwnerToKeyMapping, TopologyMapping.Code.IdentifierDelegation, TopologyMapping.Code.VettedPackages), filterNamespace = sequencer.id.namespace.filterString).writeTo(new java.io.FileOutputStream("/tmp/state-export/authorized"))

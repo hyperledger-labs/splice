@@ -18,7 +18,7 @@ Internal runbook [here](https://github.com/DACH-NY/canton-network-node/blob/main
 ### Prepare
 
 - [ ] If you are upgrading to a new Canton major version, manually test compatibility of dev/test/mainnet snapshots as described in `cluster/README.md`
-- [ ] open or create corresponding agenda and tracking sheet in [this folder](https://drive.google.com/drive/folders/0ACLduXEo3vM1Uk9PVA)
+- [ ] open or create corresponding agenda and tracking sheet in [this folder](https://drive.google.com/drive/folders/1-HZPAiZ7wVei4nlp-AOyQ5TrZ-S5FVSB)
 - [ ] prepare our staging nodes and tell partners
   - [ ] (later) forward-port to branches that may serve as potential future release sources (e.g. for 0.2.8, 0.2 and `main`; `main` is always included)
 - [ ] a sufficient number of partners have reported that they are ready / prepared (or look as if they are); check once and escalate if check failed

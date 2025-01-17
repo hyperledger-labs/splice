@@ -1,13 +1,13 @@
 // ensure the config is loaded and the ENV is overriden
 import { config } from 'splice-pulumi-common';
 
-import { clusterIsBeingReset, enableAlerts } from './alertings';
+import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
-import { clusterBasename, clusterBaseDomain } from './config';
+import { clusterBaseDomain, clusterBasename } from './config';
 import {
+  getNotificationChannel,
   installGcpLoggingAlerts,
   installMaintenanceUpdateAlerts,
-  getNotificationChannel,
 } from './gcpAlerts';
 import { configureIstio } from './istio';
 import { configureNetwork } from './network';
@@ -25,7 +25,7 @@ const istio = configureIstio(network.ingressNs, ingressIp, network.publicIngress
 // Ensures that images required from Quay for observability can be pulled
 const observabilityDependsOn = [network, istio];
 configureObservability(observabilityDependsOn);
-if (enableAlerts && !clusterIsBeingReset) {
+if (enableAlerts && !clusterIsResetPeriodically) {
   const notificationChannel = getNotificationChannel();
   installGcpLoggingAlerts(notificationChannel);
   installMaintenanceUpdateAlerts(notificationChannel);

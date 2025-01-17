@@ -5,12 +5,14 @@ import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
+  ansDomainPrefix,
   appsAffinityAndTolerations,
   BackupConfig,
   btoa,
   ChartValues,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
+  CnChartVersion,
   CnInput,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
@@ -277,6 +279,9 @@ export async function installSvNode(
             .map(x => x.id.toString()),
         },
       },
+      spliceDomainNames: {
+        nameServiceDomain: ansDomainPrefix,
+      },
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         svNamespace: xns.logicalName,
@@ -356,6 +361,11 @@ function internalScanUrl(config: SvConfig): pulumi.Output<string> {
   return pulumi.interpolate`http://scan-app.${config.nodeName}:5012`;
 }
 
+const withoutFounderDecentralizedSynchronizerUrl = (version: CnChartVersion) =>
+  version.type == 'local' ||
+  version.version.startsWith('0.3.6') ||
+  semver.gt(version.version, '0.3.6');
+
 function installSvApp(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   config: SvConfig,
@@ -385,7 +395,11 @@ function installSvApp(
       enabled: true,
       connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcServiceName}:26657`,
     },
-    decentralizedSynchronizerUrl: decentralizedSynchronizer.sv1InternalSequencerAddress,
+    decentralizedSynchronizerUrl:
+      config.onboarding.type == 'found-dso' &&
+      withoutFounderDecentralizedSynchronizerUrl(activeVersion)
+        ? undefined
+        : decentralizedSynchronizer.sv1InternalSequencerAddress,
     domain:
       // defaults for ports and address are fine,
       // we need to include a dummy value though

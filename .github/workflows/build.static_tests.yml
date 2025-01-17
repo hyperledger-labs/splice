@@ -3,17 +3,19 @@ on: workflow_call
 
 jobs:
   static_tests:
-    runs-on: self-hosted-k8s
-    # Docker Hub image that `container-job` executes in
+    runs-on: self-hosted-k8s-x-small
     container:
-      # TODO(#15988): clean this up, use a proper released image instead:
-      #               - Once this is in a release, use the release version.
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.6-snapshot.20250113.8012.0.v6b097acb
 
     steps:
 
       - name: Check out repository code
         uses: actions/checkout@v4
+
+      - name: Publish test name metric
+        uses: miguelteixeiraa/action-run-in-background@v1
+        with:
+          script: ./.github/actions/scripts/publish_gha_metrics.py --test_suite static_tests
 
       - name: Setup
         shell: bash
@@ -26,6 +28,7 @@ jobs:
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           # TODO(#15988): consider this trick for setting cache_version globally: https://stackoverflow.com/a/74217028
           cache_version: 0
+          should_save: 'true'
 
       - name: Set up SBT
         id: setup_sbt
@@ -85,3 +88,11 @@ jobs:
         with:
           cache_version: 0
           setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        shell: bash
+        env:
+          SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+        run: ./.circleci/notification-scripts/failure_notification.py

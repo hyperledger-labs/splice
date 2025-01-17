@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   TxLogEntry,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.{LengthLimitedString, String3}
+import com.digitalasset.canton.topology.PartyId
 
 object WalletTables extends AcsTables {
 
@@ -25,10 +26,12 @@ object WalletTables extends AcsTables {
       contractExpiresAt: Option[Timestamp] = None,
       rewardCouponRound: Option[Long] = None,
       rewardCouponWeight: Option[Long] = None,
+      transferPreapprovalReceiver: Option[PartyId] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "reward_coupon_round" -> IndexColumnValue(rewardCouponRound),
       "reward_coupon_weight" -> IndexColumnValue(rewardCouponWeight),
+      "transfer_preapproval_receiver" -> IndexColumnValue(transferPreapprovalReceiver),
     )
   }
 

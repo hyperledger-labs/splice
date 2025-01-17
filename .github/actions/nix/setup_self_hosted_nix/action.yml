@@ -13,6 +13,11 @@ inputs:
   cache_version:
     description: 'The cache version'
     required: true
+  should_save:
+    description: 'If the nix cache should be saved'
+    # this should be run just from one job to ensure we avoid multi write conflicts, which makes everything worse
+    default: 'false'
+    type: boolean
 runs:
   using: 'composite'
   steps:
@@ -22,7 +27,7 @@ runs:
         set -euxo pipefail
         git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
         uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
-        echo "cci_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
+        echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
         sudo mkdir -p /nix/store
         sudo chown -R $(whoami):$(whoami) /nix
         cache_key=($(md5sum "/tmp/nix-cache-key"))
@@ -32,7 +37,7 @@ runs:
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
           rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
-          sudo mount --bind -o ro /cache/nix/$cache_key/nix_store/store /nix/store
+          sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
         else
           sudo mkdir -p "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
@@ -100,6 +105,7 @@ runs:
     # The nix cache does not change in the workflow, so we can save it immediately, rather than splitting it into pre-&post- steps
     - name: Save nix cache
       shell: bash
+      if: ${{ inputs.should_save == 'true' }}
       run: |
           set -euxo pipefail
           cache_key=($(md5sum "/tmp/nix-cache-key"))
@@ -114,7 +120,7 @@ runs:
 
             nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
 
-            CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=64 --transfers=64 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
+            CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
             ${CLONE_COMMAND} "$HOME/" "/cache/nix/$cache_key/" --include ".nix-*/**" --include ".nix-*"
             ${CLONE_COMMAND} $HOME/.config/nix "/cache/nix/$cache_key/nix"
 

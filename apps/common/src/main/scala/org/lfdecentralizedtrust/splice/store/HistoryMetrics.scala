@@ -3,13 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory}
+import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory, Meter}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.metrics.api.MetricQualification.{Debug, Traffic}
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import com.digitalasset.canton.data.CantonTimestamp
 
-class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: MetricsContext) {
+class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
+    metricsContext: MetricsContext
+) {
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "history"
 
   object Backfilling {
@@ -54,5 +56,35 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metr
         ),
         initial = 0,
       )(metricsContext)
+  }
+
+  object UpdateHistory {
+    private val updateHistoryPrefix: MetricName = prefix :+ "updates"
+
+    val assignments: Meter = metricsFactory.meter(
+      MetricInfo(
+        name = updateHistoryPrefix :+ "assignments",
+        summary =
+          "Total number of assignments in update history (note that this should be used only for tracking the delta over time, the absolute value may be wrong)",
+        Traffic,
+      )
+    )(metricsContext)
+
+    val unassignments: Meter = metricsFactory.meter(
+      MetricInfo(
+        name = updateHistoryPrefix :+ "unassignments",
+        summary = "Total number of unassignments in update history",
+        Traffic,
+      )
+    )(metricsContext)
+
+    val transactionsTrees: Meter = metricsFactory.meter(
+      MetricInfo(
+        name = updateHistoryPrefix :+ "transactions",
+        summary = "Total number of transaction trees in update history",
+        Traffic,
+      )
+    )(metricsContext)
+
   }
 }

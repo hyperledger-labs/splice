@@ -142,6 +142,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "cluster-ingress"
       },
@@ -198,10 +201,12 @@
         "ingress": {
           "decentralizedSynchronizer": {
             "migrationIds": [
-              "2",
-              "1"
+              "2"
             ]
           }
+        },
+        "spliceDomainNames": {
+          "nameServiceDomain": "cns"
         },
         "tolerations": [
           {
@@ -211,7 +216,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -438,7 +443,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "loopback",
     "provider": "",
@@ -508,7 +513,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "scan",
     "provider": "",
@@ -704,7 +709,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -744,14 +749,9 @@
         },
         "approvedSvIdentities": [
           {
-            "name": "Liberty-City-Ventures",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeZ7ocmkxbNggLzGcSPxSF/pb1SK5lf2ReUxKokBH1KUZLeyQMNn8E5Xr4K3D4buoBxsnupO2IRkjWKQHRgsf0Q==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
-            "rewardWeightBps": 430000
+            "rewardWeightBps": 330000
           },
           {
             "name": "Digital-Asset-1",
@@ -791,6 +791,11 @@
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYMTwBnr8tq7dL7/o5WyzZ1hzm6CvFCWtXHnyTC5zkmXKYcr37d7CQ8+tBBy0JAHvsGvmE33B+tAucEVfJnkBzw==",
+            "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7-Technology-Services-Limited",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdRk0Ef3U0VSxdBo3/azkCY2Y7VFV6sM/7O1u93VHbAgJSqIeQK3B2yklxjKvZJDUyz0jNjuSF4Zvc780nv9IHg==",
             "rewardWeightBps": 0
           }
         ],
@@ -863,114 +868,9 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-app",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "splice-cometbft",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "cometbft-global-domain-1",
-      "namespace": "sv",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
-      "timeout": 300,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "dnsName": "global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainzrhnet"
-        },
-        "clusterUrl": "global.canton.network.digitalasset.com",
-        "db": {},
-        "founder": {
-          "externalAddress": "global.canton.network.digitalasset.com:26116",
-          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
-          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
-          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
-        },
-        "genesis": {
-          "chainId": "main-1",
-          "chainIdSuffix": "2"
-        },
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
-        "istioVirtualService": {
-          "enabled": true,
-          "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26106
-        },
-        "logLevel": "debug",
-        "metrics": {
-          "enable": true,
-          "labels": [
-            {
-              "key": "active_migration",
-              "value": false
-            }
-          ],
-          "migration": {
-            "active": false,
-            "id": 1
-          }
-        },
-        "node": {
-          "enableTimeoutCommit": false,
-          "externalAddress": "global.canton.network.digitalasset.com:26106",
-          "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
-          "identifier": "global-domain-1-cometbft",
-          "istioPort": 26106,
-          "keysSecret": "cometbft-keys",
-          "retainBlocks": 5040000
-        },
-        "nodeName": "DA-Helm-Test-Node",
-        "peers": [],
-        "stateSync": {
-          "enable": false,
-          "rpcServers": "https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
-        },
-        "sv1": {
-          "externalAddress": "global.canton.network.digitalasset.com:26116",
-          "keyAddress": "9473617BBC80C12F68CC25B5A754D1ED9035886C",
-          "nodeId": "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0",
-          "publicKey": "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.2.8"
-    },
-    "name": "sv-cometbft-global-domain-1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1001,6 +901,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "sv"
       },
@@ -1015,101 +918,6 @@
     "name": "sv-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-global-domain-1",
-    "provider": "",
-    "type": "canton:network:domain:global"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "splice-global-domain",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "global-domain-1",
-      "namespace": "sv",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
-      "timeout": 300,
-      "values": {
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "dnsName": "global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainzrhnet"
-        },
-        "clusterUrl": "global.canton.network.digitalasset.com",
-        "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
-        "logLevel": "DEBUG",
-        "mediator": {
-          "persistence": {
-            "databaseName": "mediator_1",
-            "host": "mediator-pg.sv.svc.cluster.local",
-            "port": 5432,
-            "postgresName": "mediator-pg",
-            "secretName": "mediator-pg-secret"
-          }
-        },
-        "metrics": {
-          "enable": true,
-          "migration": {
-            "active": false,
-            "id": 1
-          }
-        },
-        "sequencer": {
-          "driver": {
-            "host": "global-domain-1-cometbft-cometbft-rpc.sv.svc.cluster.local",
-            "port": 26657,
-            "type": "cometbft"
-          },
-          "persistence": {
-            "databaseName": "sequencer_1",
-            "host": "sequencer-pg.sv.svc.cluster.local",
-            "port": 5432,
-            "postgresName": "sequencer-pg",
-            "secretName": "sequencer-pg-secret"
-          }
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.2.8"
-    },
-    "name": "sv-global-domain-1",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
@@ -1185,93 +993,9 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-mediator-pg",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "splice-participant",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "participant-1",
-      "namespace": "sv",
-      "repositoryOpts": {
-        "password": "s3cr3t",
-        "repo": "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
-        "username": "art_user"
-      },
-      "timeout": 300,
-      "values": {
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "auth": {
-          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
-          "targetAudience": "https://ledger_api.example.com"
-        },
-        "cluster": {
-          "dnsName": "global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainzrhnet"
-        },
-        "clusterUrl": "global.canton.network.digitalasset.com",
-        "enableHealthProbes": true,
-        "enablePostgresMetrics": true,
-        "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
-        "logLevel": "DEBUG",
-        "metrics": {
-          "enable": true,
-          "migration": {
-            "active": false,
-            "id": 1
-          }
-        },
-        "participantAdminUserNameFrom": {
-          "secretKeyRef": {
-            "key": "ledger-api-user",
-            "name": "splice-app-sv-ledger-api-auth",
-            "optional": false
-          }
-        },
-        "persistence": {
-          "databaseName": "participant_1",
-          "host": "participant-pg.sv.svc.cluster.local",
-          "port": 5432,
-          "postgresName": "participant-pg",
-          "schema": "participant",
-          "secretName": "participant-pg-secret"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.2.8"
-    },
-    "name": "sv-participant-1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1347,7 +1071,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-participant-pg",
     "provider": "",
@@ -1425,7 +1149,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "sv-sequencer-pg",
     "provider": "",
@@ -1540,7 +1264,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "validator",
     "provider": "",

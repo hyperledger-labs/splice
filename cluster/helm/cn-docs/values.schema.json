@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "required": [
+    "networkName"
+  ],
+  "properties": {
+    "networkName": {
+      "type": "string"
+    }
+  }
+}

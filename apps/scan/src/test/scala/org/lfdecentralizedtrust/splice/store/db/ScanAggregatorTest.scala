@@ -6,6 +6,7 @@ import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.history.Transfer
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanStore,
+  DbScanStoreMetrics,
   ScanAggregatesReader,
   ScanAggregator,
 }
@@ -687,6 +688,7 @@ class ScanAggregatorTest
         None,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
+      new DbScanStoreMetrics(new NoOpMetricsFactory()),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

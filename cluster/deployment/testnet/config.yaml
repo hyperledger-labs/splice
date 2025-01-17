@@ -7,5 +7,5 @@ synchronizerMigration:
   active:
     id: 1
     provider: external
-    version: 0.3.1
-    releaseReference: "refs/heads/release-line-0.3.1"
+    version: 0.3.4
+    releaseReference: "refs/heads/release-line-0.3.4"

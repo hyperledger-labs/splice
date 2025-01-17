@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.util
 
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.console.{
-  AppManagerAppClientReference,
   ScanAppBackendReference,
   ScanAppClientReference,
   SplitwellAppBackendReference,
@@ -73,12 +72,6 @@ trait CommonAppInstanceReferences {
 
   def aliceWalletClient(implicit env: SpliceTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"
-  )
-
-  def aliceAppManagerClient(implicit
-      env: SpliceTestConsoleEnvironment
-  ): AppManagerAppClientReference = uamc(
-    "aliceAppManager"
   )
 
   def aliceValidatorWalletClient(implicit
@@ -249,12 +242,6 @@ trait CommonAppInstanceReferences {
   def uwc(name: String)(implicit env: SpliceTestConsoleEnvironment): WalletAppClientReference = wc(
     name
   )
-
-  // "user app manager client"
-  def uamc(name: String)(implicit env: SpliceTestConsoleEnvironment): AppManagerAppClientReference =
-    env.appManagers
-      .find(_.name == name)
-      .getOrElse(sys.error(s"app manager [$name] not configured"))
 
   def wc(name: String)(implicit env: SpliceTestConsoleEnvironment): WalletAppClientReference =
     env.wallets

@@ -63,7 +63,7 @@ Glossary
     CN Validator
 
       * One node in the CN
-      * consists of canton participant, validator app, wallet app & app manager
+      * consists of canton participant, validator app, wallet app
       * validator app for admin operations by the validator operator like
         user/party management
 

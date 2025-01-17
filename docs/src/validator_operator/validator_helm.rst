@@ -344,7 +344,6 @@ Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` 
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
-- Replace all instances of ``TARGET_CLUSTER`` with |splice_cluster|, per the cluster to which you are connecting.
 - For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-participant-values.yaml`` as follows:
@@ -551,7 +550,12 @@ To install it, run the following (assuming the environment variable `YOUR_HOSTNA
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
 Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
-Another reference Helm chart is provided for that, which can be installed using:
+Another reference Helm chart is provided for that, which can be installed after
+
+1. replacing ``YOUR_HOSTNAME`` in ``splice-node/examples/sv-helm/validator-cluster-ingress-values.yaml`` and
+2. setting ``nameServiceDomain`` in the same file to ``"cns"``
+
+using:
 
 
 .. code-block:: bash
@@ -682,15 +686,9 @@ You can configure to restore the validator and participant with the dump file yo
         --from-file=content=${PARTICIPANT_BOOTSTRAP_DUMP_FILE} \
         -n validator
 
-* Uncomment the following lines in the ``standalone-validator-values.yaml`` file to enable the participant to restore from the dump:
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_DUMP_START
-    :end-before: PARTICIPANT_BOOTSTRAP_DUMP_END
-
 * Uncomment the following lines in the ``standalone-validator-values.yaml`` file.
   This will specify a new participant ID for the validator. Replace ``put-some-new-string-never-used-before`` with a string that was never used before.
+  Make sure to also adjust ``nodeIdentifier`` to match the same value.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml

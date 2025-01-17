@@ -3,8 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.wallet.automation
 
-import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger.Task as FollowTask
-import org.lfdecentralizedtrust.splice.automation.UnassignTrigger.GetTargetDomain
 import org.lfdecentralizedtrust.splice.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
@@ -13,7 +11,6 @@ import org.lfdecentralizedtrust.splice.automation.{
   UnassignTrigger,
 }
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as paymentCodegen
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
@@ -31,15 +28,13 @@ import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
     ledgerClient: SpliceLedgerClient,
-    decentralizedSynchronizer: GetTargetDomain,
     automationConfig: AutomationConfig,
-    supportsSoftDomainMigrationPoc: Boolean,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
@@ -104,36 +99,6 @@ class UserWalletAutomationService(
     )
   }
 
-  if (!supportsSoftDomainMigrationPoc) {
-    registerTrigger(
-      new UnassignTrigger.Template(
-        triggerContext,
-        store,
-        connection,
-        decentralizedSynchronizer,
-        store.key.endUserParty,
-        paymentCodegen.AppPaymentRequest.COMPANION,
-      )
-    )
-    registerTrigger(
-      new TransferFollowTrigger(
-        triggerContext,
-        store,
-        connection,
-        store.key.endUserParty,
-        implicit tc =>
-          scanConnection.getAmuletRulesWithState() flatMap { amuletRules =>
-            amuletRules.toAssignedContract map { amuletRules =>
-              store
-                .listLaggingAmuletRulesFollowers(amuletRules.domain)
-                .map(_ map (FollowTask(amuletRules, _)))
-            } getOrElse Future.successful(Seq.empty)
-          },
-      )
-    )
-    registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.endUserParty))
-  }
-
   walletSweep.foreach { config =>
     if (config.useTransferPreapproval) {
       registerTrigger(
@@ -177,12 +142,7 @@ class UserWalletAutomationService(
 }
 
 object UserWalletAutomationService extends AutomationServiceCompanion {
-  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
-    // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
-    // we can hardcode this.
-    Option.when(template.moduleName == "Splice.AmuletImport")(
-      DarResources.amulet.bootstrap.packageId
-    )
+  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] = None
 
   // defined because instances are created by UserWalletService, not immediately
   // available in the app state

@@ -19,6 +19,10 @@ import {
   splitwellDomainId,
   splitwellProviderPartyId,
 } from './mocks/constants';
+import {
+  domainDisconnectErrorResponse,
+  exerciseCreateInviteResponse,
+} from './mocks/handlers/json-api';
 import { makeAcceptedGroupInvite, makeBalanceUpdate, makeGroupInvite } from './mocks/templates';
 import { config } from './setup/config';
 import { server } from './setup/setup';
@@ -74,8 +78,20 @@ describe('alice can', () => {
     await user.click(createInviteButton);
 
     const fakeGroupInvite = makeGroupInvite(splitwellProviderPartyId, alicePartyId, groupName);
+    const exerciseEndpoint = `${window.splice_config.services.jsonApi.url}/v2/commands/submit-and-wait-for-transaction-tree`;
 
+    server.resetHandlers();
     server.use(
+      // simulating 2 failures here. react-query will retry these
+      rest.post(exerciseEndpoint, (_, res, ctx) => {
+        return res.once(ctx.status(400), ctx.json(domainDisconnectErrorResponse));
+      }),
+      rest.post(exerciseEndpoint, (_, res, ctx) => {
+        return res.once(ctx.status(400), ctx.json(domainDisconnectErrorResponse));
+      }),
+      rest.post(exerciseEndpoint, (_, res, ctx) => {
+        return res(ctx.json(exerciseCreateInviteResponse));
+      }),
       rest.get(`${window.splice_config.services.splitwell.url}/group-invites`, (_, res, ctx) => {
         return res(
           ctx.json<ListGroupInvitesResponse>({

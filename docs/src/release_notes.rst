@@ -54,13 +54,111 @@ Upcoming Release
       ================== =======
       name               version
       ================== =======
-      amulet             0.1.7
-      amuletNameService  0.1.7
-      dsoGovernance      0.1.10
+      amulet             0.1.8
+      amuletNameService  0.1.8
+      dsoGovernance      0.1.11
       validatorLifecycle 0.1.2
-      wallet             0.1.7
-      walletPayments     0.1.7
+      wallet             0.1.8
+      walletPayments     0.1.8
       ================== =======
+
+* Deployment
+
+  * When recovering a validator from an identities dump
+    ``nodeIdentifier`` must now match
+    ``newParticipantIdentifier``. This was already a requirement when
+    ``newParticipantIdentifier`` was removed again after the restore
+    was complete so this just catches misconfigurations earlier.
+
+0.3.6
+-----
+
+* Validator app
+
+    * The wallet sweep automation now supports sweeping to end user parties.
+    * Fix a bug where the validator operator was unable to preapproval incoming transfers
+      if a user on the same validator preapproved incoming transfers first.
+
+* SV app
+
+    * Onboarding secrets now encode the sponsoring SV party to provide
+      better error messages in case a secret is used to onboard
+      against an SV that did not issue it. Secrets are still just
+      opaque strings so no change is required.
+
+* Wallet UI
+
+  * Added a confirmation dialog when enabling preapproval of incoming direct transfers.
+
+* Deployment
+
+  * The release bundle has been removed again from the docs image. The docs instead link to
+    the release bundles publicly available on the OSS GitHub repo.
+
+* CometBFT
+
+  * The CometBFT version has been updated to 0.37.13. No change should be required from SV operators.
+
+0.3.5
+-----
+
+* Scan
+
+  * Added new metrics for the Scan app to monitor the ingestion of transactions and contract reassignments into the update history.
+
+* Deployment
+
+  * The setting ``spliceDomainNames.nameServiceDomain`` must now be supplied for the ``splice-cluster-ingress-runbook`` helm chart.
+    See the ``sv-helm`` example.
+
+  * Added a new Grafana dashboard for monitoring utilization of the Global Synchronizer, currently estimated by comparing the total number
+    of transactions processed to those visible to the DSO party. The larger this delta is, the more likely it is that the Global Synchronizer is
+    used for private transactions beyond those needed for operating the synchronizer itself.
+
+  * The docs image expects a new environment variable ``SPLICE_CLUSTER``. In production, that would be one of ``dev``, ``test`` or ``main``.
+    The cn-docs Helm chart takes this value from the ``networkName`` Helm value.
+
+* Metrics
+
+  * All metrics named starting with ``cn_`` now start with ``splice_`` instead.
+    Example Grafana configuration has been updated to match, but any custom consumers of these metrics must be updated manually.
+
+* Daml
+
+  * Restructured the Daml code of AmuletRules_BuyMemberTraffic to
+    avoid an intermediate transfer to the DSO party before the amulets
+    were burned. There is no change in the amount that gets burned or
+    the rewards are issued, just a slight change in the transaction
+    structure to accomplish this.
+
+    This requires an upgrade to the following Daml versions:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.7
+    amuletNameService  0.1.7
+    dsoGovernance      0.1.10
+    validatorLifecycle 0.1.1
+    wallet             0.1.7
+    walletPayments     0.1.7
+    ================== =======
+
+
+0.3.4
+-----
+
+* SV UI
+
+  * Switch to ``YYYY-MM-DD``-based date formatting and 24h-based time formatting.
+
+* Deployment
+
+  * The release bundle is now included in the docs image, for easier hosting by the GSF.
+  * Add a new ``jsonApiServerPathPrefix`` value to the participant helm chart that allows setting a path prefix for JSON API endpoints,
+    to simplify configuring ingress routing to the participant JSON API.
+
+* Stability improvements
 
 0.3.3
 -----

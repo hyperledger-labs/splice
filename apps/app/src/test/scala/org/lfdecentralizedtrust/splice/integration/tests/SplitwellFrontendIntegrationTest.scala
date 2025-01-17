@@ -82,6 +82,9 @@ class SplitwellFrontendIntegrationTest
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
         eventuallyClickOn(className("add-user-link"))
+        eventually() {
+          findAll(className("balances-table-row")).toSeq should have length 2
+        }
 
         inside(find(className("enter-payment-amount-field"))) { case Some(field) =>
           field.underlying.click()
@@ -221,6 +224,9 @@ class SplitwellFrontendIntegrationTest
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
         eventuallyClickOn(className("add-user-link"))
+        eventually() {
+          findAll(className("balances-table-row")).toSeq should have length 1
+        }
         addTeamLunch(1000)
       }
 

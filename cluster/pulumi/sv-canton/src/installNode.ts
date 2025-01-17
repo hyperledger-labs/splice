@@ -1,8 +1,9 @@
 import {
+  Auth0Client,
   DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   exactNamespace,
-  Auth0Client,
+  imagePullSecret,
   supportsSvRunbookReset,
 } from 'splice-pulumi-common';
 import {
@@ -29,9 +30,13 @@ export function installNode(
   const isCoreSv = nodeConfig.nodeName !== svRunbookConfig.nodeName;
   const isFirstSv = nodeConfig.nodeName === sv1Config.nodeName;
   const isSvRunbook = nodeConfig.nodeName === svRunbookConfig.nodeName;
+
+  // namespace and image pull secret lifecycle managed by the main canton-network stack
+  const xns = exactNamespace(nodeConfig.nodeName, true, true);
+  const imagePullDeps = imagePullSecret(xns, true);
+
   return installCantonComponents(
-    // namespace lifecycle managed by the main canton-network stack
-    exactNamespace(nodeConfig.nodeName, true, true),
+    xns,
     migrationId,
     auth0Client,
     {
@@ -64,7 +69,7 @@ export function installNode(
       },
     },
     undefined,
-    undefined,
+    { dependsOn: imagePullDeps },
     isSvRunbook ? supportsSvRunbookReset : undefined
   );
 }

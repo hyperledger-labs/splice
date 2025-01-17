@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 7184,
+  "id": 2422,
   "links": [],
   "panels": [
     {
@@ -101,6 +101,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -108,7 +109,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by(namespace)(cn_history_backfilling_transaction_count{namespace=~\"$namespace\", migration=~\"$migration\"})",
+          "expr": "max by(namespace)(splice_history_backfilling_transaction_count{namespace=~\"$namespace\", migration=~\"$migration\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -198,6 +199,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -205,7 +207,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by (namespace)(rate(cn_history_backfilling_transaction_count{namespace=~\"$namespace\", migration=~\"$migration\"}[5m]))",
+          "expr": "max by (namespace)(rate(splice_history_backfilling_transaction_count{namespace=~\"$namespace\", migration=~\"$migration\"}[5m]))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -295,6 +297,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -302,7 +305,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by(namespace)(cn_history_backfilling_event_count{namespace=~\"$namespace\", migration=~\"$migration\"})",
+          "expr": "max by(namespace)(splice_history_backfilling_event_count{namespace=~\"$namespace\", migration=~\"$migration\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -392,6 +395,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -399,7 +403,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by(namespace)(rate(cn_history_backfilling_event_count{namespace=~\"$namespace\", migration=~\"$migration\"}[5m]))",
+          "expr": "max by(namespace)(rate(splice_history_backfilling_event_count{namespace=~\"$namespace\", migration=~\"$migration\"}[5m]))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -490,6 +494,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -498,7 +503,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (namespace)(cn_history_backfilling_completed{namespace=~\"$namespace\", migration=~\"$migration\"})",
+          "expr": "max by (namespace)(splice_history_backfilling_completed{namespace=~\"$namespace\", migration=~\"$migration\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -601,6 +606,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -608,7 +614,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "min by(namespace)(cn_history_backfilling_latest_record_time{namespace=~\"$namespace\", migration=~\"$migration\"}/1000)",
+          "expr": "min by(namespace)(splice_history_backfilling_latest_record_time{namespace=~\"$namespace\", migration=~\"$migration\"}/1000)",
           "format": "time_series",
           "instant": false,
           "legendFormat": "__auto",
@@ -620,70 +626,56 @@
       "type": "timeseries"
     }
   ],
-  "schemaVersion": 39,
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_history_backfilling_latest_record_time,namespace)",
-        "hide": 0,
+        "definition": "label_values(splice_history_backfilling_latest_record_time,namespace)",
         "includeAll": true,
         "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(cn_history_backfilling_latest_record_time,namespace)",
+          "query": "label_values(splice_history_backfilling_latest_record_time,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_history_backfilling_transaction_count,migration)",
-        "hide": 0,
+        "definition": "label_values(splice_history_backfilling_transaction_count,migration)",
         "includeAll": true,
         "multi": true,
         "name": "migration",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(cn_history_backfilling_transaction_count,migration)",
+          "query": "label_values(splice_history_backfilling_transaction_count,migration)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
@@ -696,6 +688,6 @@
   "timezone": "UTC",
   "title": "History backfiling",
   "uid": "fe12ejqgwdlvke",
-  "version": 8,
+  "version": 1,
   "weekStart": ""
 }

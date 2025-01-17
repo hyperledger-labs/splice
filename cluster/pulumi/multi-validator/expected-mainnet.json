@@ -54,7 +54,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.3"
     },
     "name": "loopback",
     "provider": "",
@@ -87,6 +87,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "multi-validator"
       },

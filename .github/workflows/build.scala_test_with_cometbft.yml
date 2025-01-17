@@ -19,70 +19,89 @@ on:
 
 jobs:
 
-  runner-indices:
+  split_tests:
     runs-on: self-hosted-docker-tiny
-    name: Generate runner indices
+    name: Split the tests into parallel runs
     outputs:
-      json: ${{ steps.generate-index-list.outputs.json }}
+      indices: ${{ steps.generate_index_list.outputs.json }}
+      test_names: ${{ steps.split_tests.outputs.test_names }}
     steps:
-      - id: generate-index-list
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Generate runner indices
+        id: generate_index_list
         run: |
-          MAX_INDEX=$((${{ inputs.parallelism }}-1))
-          INDEX_LIST=$(seq 0 ${MAX_INDEX})
-          INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
-          echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
+          last_commit_msg=$(git log -1 --pretty=%B)
+          echo "Last commit message: $last_commit_msg"
+          if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
+            echo "Only static tests are running, returning an empty array so that no tests are run"
+            echo "json=[]" >> $GITHUB_OUTPUT
+          else
+            echo "Not a static test-only run, generating indices"
+            MAX_INDEX=$((${{ inputs.parallelism }}-1))
+            INDEX_LIST=$(seq 0 ${MAX_INDEX})
+            INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
+            echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Split tests
+        id: split_tests
+        uses: ./.github/actions/tests/split_tests
+        with:
+          test_reports_dir: '/cache/test-reports'
+          test_names_file: ${{ inputs.test_names_file }}
+          split_total: ${{ inputs.parallelism }}
 
 
   scala_test:
     runs-on: ${{ inputs.runs_on }}
+    name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
+    timeout-minutes: 30
     needs:
-      - runner-indices
+      - split_tests
+    if: ${{ needs.split_tests.outputs.indices != '[]' }}
     strategy:
       matrix:
-        runner-index: ${{ fromjson(needs.runner-indices.outputs.json) }}
+        runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
     container:
-      # TODO(#15988): clean this up, use a proper released image instead:
-      #               - Once this is in a release, use the release version.
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.6-snapshot.20250113.8012.0.v6b097acb
 
     services:
       postgres:
-        # TODO(#15988): clean this up, use a proper released image instead:
-        #               - Once this is in a release, use the release version.
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.4
         env:
           POSTGRES_PASSWORD: postgres
 
       cometbft1:
-        # TODO(#15988): clean this up, use a proper released image instead:
-        #               - Once this is in a snapshot, use the snapshot version.
-        #               - Once this is in a release, use the release version.
-        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 1
         options: --name cometbft1
 
       cometbft2:
-        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 2
         options: --name cometbft2
 
       cometbft2Local:
-        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 2Local
         options: --name cometbft2local
 
       cometbft3:
-        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 3
         options: --name cometbft3
 
       cometbft4:
-        image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-cometbft:0.3.3-itai-dirty
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-cometbft:0.3.4
         env:
           sv_idx: 4
         options: --name cometbft4
@@ -90,6 +109,11 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+
+      - name: Publish test name metric
+        uses: miguelteixeiraa/action-run-in-background@v1
+        with:
+          script: ./.github/actions/scripts/publish_gha_metrics.py --test_suite ${{ inputs.test_name }}
 
       - name: Setup
         shell: bash
@@ -123,11 +147,12 @@ jobs:
           POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          COMETBFT_DOCKER_IP: 127.0.0.1
         with:
           cmd: |
             mkdir -p log
             ./start-canton.sh -p external -D -F -w
-          additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
+          additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD --keep COMETBFT_DOCKER_IP"
           cmd_retry_count: 3
         # TODO(#15988): GHA does not support background jobs, therefore we introduced the -D flag
         # and just running in the background, but this means that we are not retrying on all
@@ -140,20 +165,11 @@ jobs:
         with:
           cache_version: 0
 
-      - name: Compute tests for run ${{ matrix.runner-index }}
-        id: split_tests
-        uses: ./.github/actions/tests/split_tests
-        with:
-          test_reports_dir: '/cache/test-reports'
-          test_names_file: ${{ inputs.test_names_file }}
-          split_total: ${{ inputs.parallelism }}
-          split_index: ${{ matrix.runner-index }}
-
       - name: Prepare list of tests to run for sbt
         id: list_tests
         shell: bash
         run: |
-          splitted=$(echo "${{ toJson(steps.split_tests.outputs.test_names) }}" | jq -r '.[]')
+          splitted=$(echo "${{ toJson(needs.split_tests.outputs.test_names) }}" | jq -r '.[${{ matrix.runner-index }}].[]')
           tests=$(echo $splitted | tr '\n' ' ')
           count=$(echo $tests | wc -w)
           echo "We are running $count tests in this batch:"
@@ -192,3 +208,11 @@ jobs:
         uses: ./.github/actions/sbt/upload_logs
         with:
           name: "logs-${{ inputs.test_name }}-${{ matrix.runner-index }}"
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        shell: bash
+        env:
+          SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+        run: ./.circleci/notification-scripts/failure_notification.py

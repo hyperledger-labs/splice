@@ -18,9 +18,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 76,
+  "id": 2415,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "datasource": {
@@ -33,11 +32,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -99,6 +100,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -107,7 +109,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "cn_sv_dso_store_latest_open_mining_round",
+          "expr": "splice_sv_dso_store_latest_open_mining_round",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -121,9 +123,9 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 38,
-  "style": "dark",
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": []

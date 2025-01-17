@@ -142,6 +142,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "cluster-ingress"
       },
@@ -202,6 +205,9 @@
             ]
           }
         },
+        "spliceDomainNames": {
+          "nameServiceDomain": "cns"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -210,7 +216,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -415,7 +421,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "loopback",
     "provider": "",
@@ -484,7 +490,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "scan",
     "provider": "",
@@ -760,9 +766,19 @@
             "rewardWeightBps": 100000
           },
           {
+            "name": "Tradeweb-Markets-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
+            "rewardWeightBps": 0
+          },
+          {
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7-Technology-Services-Limited",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
+            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -833,7 +849,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "sv-app",
     "provider": "",
@@ -906,6 +922,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "sv"
       },
@@ -1253,7 +1272,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "validator",
     "provider": "",

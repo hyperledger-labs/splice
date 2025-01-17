@@ -2,6 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
+import * as yaml from 'js-yaml';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Input } from '@pulumi/pulumi';
@@ -9,6 +10,7 @@ import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
+  clusterProdLike,
   COMETBFT_RETAIN_BLOCKS,
   config,
   ENABLE_COMETBFT_PRUNING,
@@ -26,12 +28,14 @@ import {
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
 import {
-  clusterIsBeingReset,
+  clusterIsResetPeriodically,
   enableAlertEmailToSupportTeam,
   enableAlerts,
+  enableMiningRoundAlert,
   enablePrometheusAlerts,
   grafanaSmtpHost,
   slackAlertNotificationChannel,
+  slackHighPrioAlertNotificationChannel,
   slackToken,
   supportTeamEmail,
 } from './alertings';
@@ -39,8 +43,8 @@ import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
 
 export const prometheusRetentionDuration = config.optionalEnv('PROMETHEUS_RETENTION_TIME') || '1y';
-export const prometheusRetentionSize = config.optionalEnv('PROMETHEUS_RETENTION_SIZE') || '500GB';
-export const prometheusStorageSize = config.optionalEnv('PROMETHEUS_STORAGE_SIZE') || '800Gi';
+export const prometheusRetentionSize = config.optionalEnv('PROMETHEUS_RETENTION_SIZE') || '1500GB';
+export const prometheusStorageSize = config.optionalEnv('PROMETHEUS_STORAGE_SIZE') || '2Ti';
 
 function istioVirtualService(
   ns: k8s.core.v1.Namespace,
@@ -127,7 +131,7 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
-const shouldIgnoreNoDataOrDataSourceError = clusterIsBeingReset;
+const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
   const namespace = new k8s.core.v1.Namespace(
@@ -142,8 +146,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   );
   const namespaceName = namespace.metadata.name;
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  const stackVersion = '62.6.0';
-  const prometheusStackCrdVersion = '0.76.1';
+  const stackVersion = '67.3.1';
+  const prometheusStackCrdVersion = '0.79.0';
   const adminPassword = grafanaKeysFromSecret().adminPassword;
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
@@ -262,8 +266,12 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
         prometheus: {
           prometheusSpec: {
             // discover all pod/service monitors across all namespaces
-            podMonitorSelectorNilUsesHelmValues: false,
-            serviceMonitorSelectorNilUsesHelmValues: false,
+            podMonitorSelector: {
+              matchLabels: null,
+            },
+            serviceMonitorSelector: {
+              matchLabels: null,
+            },
             enableFeatures: [
               'native-histograms',
               'memory-snapshot-on-shutdown',
@@ -274,8 +282,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             retentionSize: prometheusRetentionSize,
             resources: {
               requests: {
-                memory: '24Gi',
-                cpu: '4',
+                memory: clusterProdLike ? (!clusterIsResetPeriodically ? '24Gi' : '6Gi') : '4Gi',
+                cpu: clusterProdLike ? (!clusterIsResetPeriodically ? '4' : '2') : '1',
               },
             },
             logFormat: 'json',
@@ -569,6 +577,10 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   // enable the slack alerts only for "prod" clusters
   const slackAccessToken = enableAlerts ? slackToken() : 'None';
   const slackNotificationChannel = enableAlerts ? slackAlertNotificationChannel : 'None';
+  const slackHighPrioNotificationChannel =
+    enableAlerts && slackHighPrioAlertNotificationChannel
+      ? slackHighPrioAlertNotificationChannel
+      : 'None';
   const supportTeamEmailAddress =
     enableAlerts && enableAlertEmailToSupportTeam && supportTeamEmail ? supportTeamEmail : 'None';
 
@@ -576,6 +588,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     namespaceName,
     slackAccessToken,
     slackNotificationChannel,
+    slackHighPrioNotificationChannel,
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
@@ -692,6 +705,7 @@ function grafanaContactPoints(
   namespace: Input<string>,
   slackToken: string,
   slackAlertNotificationChannel: string,
+  slackHighPrioAlertNotificationChannel: string,
   supportTeamEmail: string
 ) {
   new k8s.core.v1.Secret(
@@ -708,6 +722,10 @@ function grafanaContactPoints(
           readGrafanaAlertingFile('contact_points.yaml')
             .replaceAll('$SLACK_ACCESS_TOKEN', slackToken)
             .replaceAll('$SLACK_NOTIFICATION_CHANNEL', slackAlertNotificationChannel)
+            .replaceAll(
+              '$SLACK_HIGH_PRIO_NOTIFICATION_CHANNEL',
+              slackHighPrioAlertNotificationChannel
+            )
             .replaceAll('$SUPPORT_TEAM_EMAIL', supportTeamEmail)
         ).toString('base64'),
       },
@@ -745,11 +763,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
         Object.entries({
           ...(enableAlerts
             ? {
-                'notification_policies.yaml': readGrafanaAlertingFile(
-                  enableAlertEmailToSupportTeam
-                    ? 'support_notification_policies.yaml'
-                    : 'notification_policies.yaml'
-                ),
+                'notification_policies.yaml': grafanaAlertNotificationPolicies(),
               }
             : {}),
           ...{
@@ -766,6 +780,11 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
             'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
+            ...(enableMiningRoundAlert
+              ? {
+                  'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
+                }
+              : {}),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
@@ -789,6 +808,42 @@ function createGrafanaAlerting(namespace: Input<string>) {
       deleteBeforeReplace: true,
     }
   );
+}
+
+function grafanaAlertNotificationPolicies() {
+  const notificationPolicies = [];
+  const defaultPolicy = yaml.load(
+    readGrafanaAlertingFile('notification_policies/default_slack.yaml')
+  );
+  if (enableAlertEmailToSupportTeam) {
+    notificationPolicies.push(
+      yaml.load(readGrafanaAlertingFile('notification_policies/support_team_email.yaml'))
+    );
+  }
+  if (slackHighPrioAlertNotificationChannel) {
+    notificationPolicies.push(
+      yaml.load(readGrafanaAlertingFile('notification_policies/high_priority_slack.yaml'))
+    );
+  }
+  // The notification policy definition was implemented in this slightly convoluted manner to ensure the generated YAML
+  // is the same as the static files it replaced (to avoid breaking the support team email notifications)
+  if (notificationPolicies.length > 0) {
+    return yaml.dump({
+      apiVersion: 1,
+      policies: [
+        {
+          orgId: 1,
+          receiver: (defaultPolicy as { receiver: string }).receiver,
+          routes: notificationPolicies.concat(defaultPolicy),
+        },
+      ],
+    });
+  } else {
+    return yaml.dump({
+      apiVersion: 1,
+      policies: [defaultPolicy],
+    });
+  }
 }
 
 function readGrafanaAlertingFile(file: string) {

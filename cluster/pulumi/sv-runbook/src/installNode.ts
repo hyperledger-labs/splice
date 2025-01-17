@@ -39,6 +39,7 @@ import {
   DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
   InstalledHelmChart,
+  ansDomainPrefix,
 } from 'splice-pulumi-common';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
@@ -135,6 +136,9 @@ export async function installNode(
       cluster: {
         hostname: CLUSTER_HOSTNAME,
         svNamespace: svNamespaceStr,
+      },
+      spliceDomainNames: {
+        nameServiceDomain: ansDomainPrefix,
       },
       ingress: {
         decentralizedSynchronizer: {

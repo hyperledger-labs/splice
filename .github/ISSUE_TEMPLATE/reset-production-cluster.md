@@ -8,7 +8,7 @@ assignees: ""
 
 Scheduled for: *date + time*
 
-- [ ] (a few days before the scheduled time) Remind people on [#supervalidator-ops](https://daholdings.slack.com/archives/C05E70BCSDA) and [#validator-ops](https://daholdings.slack.com/archives/C06QB1ZEGCE) that the reset is planned.
+- [ ] (a few days before the scheduled time) Remind people on [#supervalidator-operations](https://daholdings.slack.com/archives/C085C3ESYCT) and [#validator-ops](https://daholdings.slack.com/archives/C06QB1ZEGCE) that the reset is planned.
 - [ ] Merge a PR to the correct release branch that unprotects the databases so they can be deleted. Wait for this change to be applied (you can check [grafana](https://grafana.test.global.canton.network.digitalasset.com/d/QP_wDqDnz/pulumi-operator-stacks-dashboard?orgId=1) for example). Example PR: #16323
 - [ ] Prepare (don't merge yet!) a PR against the release branch for bootstrapping the new cluster (example: #16324). This includes but might not be limited to:
   - [ ] Set migration ID to 0

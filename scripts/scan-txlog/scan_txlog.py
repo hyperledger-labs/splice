@@ -1716,12 +1716,10 @@ class State:
         msg = message.split("\n", 1)
 
         round_flag = f":r{self.for_round}" if self.for_round else ""
-        LOG.info(
-            f"{transaction.record_time} {get_transaction_id(transaction)} ({operation}{round_flag}) - {msg[0]}"
-        )
-
+        full_log_message = f"{transaction.record_time} {get_transaction_id(transaction)} ({operation}{round_flag}) - {msg[0]}"
         if len(msg) > 1 and not self.args.hide_details:
-            LOG.info(textwrap.indent(msg[1], "    "))
+            full_log_message += "\n" + textwrap.indent(msg[1], "    ")
+        LOG.info(full_log_message)
 
         return True
 

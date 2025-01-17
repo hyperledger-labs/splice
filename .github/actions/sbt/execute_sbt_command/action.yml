@@ -37,6 +37,10 @@ inputs:
     description: "Additional arguments to pass to the Nix command"
     required: false
     default: ""
+  fail_on_error_in_output:
+    description: "Whether to fail if the SBT command output contains errors"
+    required: false
+    default: "true"
 
 runs:
   using: 'composite'
@@ -50,29 +54,27 @@ runs:
             export PROTOCBRIDGE_NO_CLEANUP="1"
 
             run_sbt() {
-               export ${{ inputs.extra_env_vars }}
-               # Define sbt command
-               SBT_CMD=(sbt)
+              export ${{ inputs.extra_env_vars }}
+              # Define sbt command
+              SBT_CMD=(sbt)
 
-               # Add extra parameters
-               SBT_CMD+=(${{ inputs.extra_parameters }})
+              # Add extra parameters
+              SBT_CMD+=(${{ inputs.extra_parameters }})
 
-               # Add sbt commands.
-               # Do not quote this, to allow the caller to pass in several commands.
-               # The caller needs to take care of quoting, if a command contains spaces.
-               SBT_CMD+=(${{ inputs.cmd }})
+              # Add sbt commands.
+              # Do not quote this, to allow the caller to pass in several commands.
+              # The caller needs to take care of quoting, if a command contains spaces.
+              SBT_CMD+=(${{ inputs.cmd }})
 
-               # Run command
-               timeout --kill-after=30s ${{ inputs.timeout }} "${SBT_CMD[@]}" 2>&1 |
-                 tee sbt_output
+              # Run command
+              timeout --kill-after=30s ${{ inputs.timeout }} "${SBT_CMD[@]}" 2>&1 |
+                tee sbt_output
 
-               echo "After SBT"
+              echo "After SBT"
 
-                # TODO(#15988): support failing on error in output
-                # <<# parameters.fail_on_error_in_output >>
-                # # Check and report whether sbt has output errors
-                # .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
-                # <</ parameters.fail_on_error_in_output >>
+              if [[ "${{ inputs.fail_on_error_in_output }}" == "true" ]]; then
+                .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
+              fi
             }
             export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
             export ARTIFACTORY_PASSWORD="${{ inputs.artifactory_password }}"

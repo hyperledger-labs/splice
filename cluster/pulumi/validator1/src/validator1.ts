@@ -16,6 +16,7 @@ import {
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
+  ansDomainPrefix,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import {
@@ -168,6 +169,9 @@ function installIngress(
         svNamespace: xns.logicalName,
       },
       withSvIngress: false,
+      spliceDomainNames: {
+        nameServiceDomain: ansDomainPrefix,
+      },
       ingress: {
         splitwell: splitwell,
         decentralizedSynchronizer: {

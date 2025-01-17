@@ -456,8 +456,31 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "operator"
+      }
+    },
+    "name": "operator-default",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-operator::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "false"
+        },
         "name": "docker-reg-cred",
         "namespace": "operator"
       },
@@ -472,26 +495,6 @@
     "name": "operator-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "imagePullSecrets": [
-        {
-          "name": "docker-reg-cred"
-        }
-      ],
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "pulumi-kubernetes-operator",
-        "namespace": "operator"
-      }
-    },
-    "name": "operator-pulumi-kubernetes-operator",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-operator::undefined_id",
-    "type": "kubernetes:core/v1:ServiceAccountPatch"
   },
   {
     "custom": true,
@@ -604,6 +607,11 @@
           "repository": "digitalasset/pulumi-kubernetes-operator",
           "tag": "0.0.1-deadbeef"
         },
+        "imagePullSecrets": [
+          {
+            "name": "docker-reg-cred"
+          }
+        ],
         "maxHistory": 10,
         "resources": {
           "limits": {
@@ -697,7 +705,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.1"
+          "name": "refs/heads/release-line-0.3.3"
         },
         "secretRef": {
           "name": "github"
@@ -723,7 +731,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.1"
+          "name": "refs/heads/release-line-0.3.3"
         },
         "secretRef": {
           "name": "github"

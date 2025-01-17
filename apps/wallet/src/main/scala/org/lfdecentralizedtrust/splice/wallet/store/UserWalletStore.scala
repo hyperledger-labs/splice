@@ -36,7 +36,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -260,24 +260,21 @@ trait UserWalletStore extends TransferInputStore with NamedLogging {
     lookupArbitraryPreferAssigned(amuletCodegen.FeaturedAppRight.COMPANION)
       .map(_ map (_.contract))
 
-  def lookupTransferPreapprovalProposal()(implicit
+  def lookupTransferPreapprovalProposal(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[QueryResult[Option[Contract[
     preapprovalCodegen.TransferPreapprovalProposal.ContractId,
     preapprovalCodegen.TransferPreapprovalProposal,
-  ]]]] =
-    multiDomainAcsStore
-      .findAnyContractWithOffset(preapprovalCodegen.TransferPreapprovalProposal.COMPANION)
-      .map(_.map(_.map(_.contract)))
+  ]]]]
 
-  def getTransferPreapproval()(implicit
+  def getTransferPreapproval(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Contract[
     amuletrulesCodegen.TransferPreapproval.ContractId,
     amuletrulesCodegen.TransferPreapproval,
-  ]] = lookupTransferPreapproval()
+  ]] = lookupTransferPreapproval(receiver)
     .map(
       _.map(
         _.getOrElse(
@@ -289,16 +286,13 @@ trait UserWalletStore extends TransferInputStore with NamedLogging {
     )
     .map(_.value)
 
-  def lookupTransferPreapproval()(implicit
+  def lookupTransferPreapproval(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[QueryResult[Option[Contract[
     amuletrulesCodegen.TransferPreapproval.ContractId,
     amuletrulesCodegen.TransferPreapproval,
-  ]]]] =
-    multiDomainAcsStore
-      .findAnyContractWithOffset(amuletrulesCodegen.TransferPreapproval.COMPANION)
-      .map(_.map(_.map(_.contract)))
+  ]]]]
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   final def getValidatorRightsWhereUserIsValidator()(implicit
@@ -316,16 +310,6 @@ trait UserWalletStore extends TransferInputStore with NamedLogging {
   def listAnsEntries(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[UserWalletStore.AnsEntryWithPayData]]
-
-  final def listLaggingAmuletRulesFollowers(
-      targetDomain: DomainId
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[AssignedContract[?, ?]]] =
-    multiDomainAcsStore.listAssignedContractsNotOnDomainN(
-      targetDomain,
-      templatesMovedByMyAutomation,
-    )
 
   // For cases where `companion` can have multiple contracts, but we just need
   // an arbitrary one; prefer an Assigned contract if available but accept an
@@ -456,28 +440,6 @@ object UserWalletStore {
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
-  }
-
-  private[splice] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] = {
-    Seq[ConstrainedTemplate](
-      amuletCodegen.AppRewardCoupon.COMPANION,
-      amuletCodegen.Amulet.COMPANION,
-      amuletCodegen.LockedAmulet.COMPANION,
-      amuletCodegen.ValidatorRewardCoupon.COMPANION,
-      validatorCodegen.ValidatorFaucetCoupon.COMPANION,
-      validatorCodegen.ValidatorLivenessActivityRecord.COMPANION,
-      amuletCodegen.SvRewardCoupon.COMPANION,
-      subsCodegen.Subscription.COMPANION,
-      subsCodegen.SubscriptionRequest.COMPANION,
-      subsCodegen.SubscriptionInitialPayment.COMPANION,
-      subsCodegen.SubscriptionIdleState.COMPANION,
-      subsCodegen.SubscriptionPayment.COMPANION,
-      transferOffersCodegen.AcceptedTransferOffer.COMPANION,
-      transferOffersCodegen.TransferOffer.COMPANION,
-      walletCodegen.AcceptedAppPayment.COMPANION,
-      walletCodegen.AppPaymentRequest.COMPANION,
-      preapprovalCodegen.TransferPreapprovalProposal.COMPANION,
-    )
   }
 
   case class Key(
@@ -649,17 +611,25 @@ object UserWalletStore {
         ),
         // Transfer preapprovals
         mkFilter(preapprovalCodegen.TransferPreapprovalProposal.COMPANION)(co =>
+          // We ingest for both the receiver and the provider as the provider
+          // needs the contract in its store for the payment/renewal automation to work.
           co.payload.provider == validator && (co.payload.provider == endUser || co.payload.receiver == endUser)
         )(contract =>
           UserWalletAcsStoreRowData(
-            contract
+            contract,
+            transferPreapprovalReceiver =
+              Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         ),
         mkFilter(amuletrulesCodegen.TransferPreapproval.COMPANION)(co =>
+          // We ingest for both the receiver and the provider as the provider
+          // needs the contract in its store for the payment/renewal automation to work.
           co.payload.dso == dso && co.payload.provider == validator && (co.payload.provider == endUser || co.payload.receiver == endUser)
         )(contract =>
           UserWalletAcsStoreRowData(
-            contract
+            contract,
+            transferPreapprovalReceiver =
+              Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         ),
       ),

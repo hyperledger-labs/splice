@@ -7,6 +7,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestC
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import scala.concurrent.duration.*
 import scala.sys.process.*
 
 class DockerComposeValidatorPreflightIntegrationTest
@@ -30,7 +31,7 @@ class DockerComposeValidatorPreflightIntegrationTest
     try {
       withFrontEnd("alice-selfhosted") { implicit webDriver =>
         eventuallySucceeds()(go to s"http://wallet.localhost")
-        actAndCheck()(
+        actAndCheck(timeUntilSuccess = 60.seconds)(
           "Login as administrator",
           login(80, "administrator", "wallet.localhost"),
         )(

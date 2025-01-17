@@ -95,6 +95,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "cluster-ingress"
       },
@@ -148,6 +151,9 @@
         },
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "spliceDomainNames": {
+          "nameServiceDomain": "cns"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -157,7 +163,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -258,7 +264,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "loopback",
     "provider": "",
@@ -370,6 +376,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "validator"
       },
@@ -461,7 +470,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "validator-participant-4",
     "provider": "",
@@ -541,7 +550,7 @@
           }
         ]
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -646,7 +655,7 @@
         "validatorPartyHint": "digitalasset-testValidator-1",
         "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
       },
-      "version": "0.3.3"
+      "version": "0.3.5"
     },
     "name": "validator",
     "provider": "",

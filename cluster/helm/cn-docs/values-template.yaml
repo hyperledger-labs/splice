@@ -3,6 +3,8 @@
 
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 
+enableGcsProxy: false
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

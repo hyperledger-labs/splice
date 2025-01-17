@@ -4,7 +4,6 @@ org.lfdecentralizedtrust.splice.config.ThresholdsTest
 org.lfdecentralizedtrust.splice.http.UrlValidatorTest
 org.lfdecentralizedtrust.splice.integration.tests.Ans4SvsIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.AnsIntegrationTest
-org.lfdecentralizedtrust.splice.integration.tests.AppManagerIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.AutomationControlIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.AutomationServiceIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.BftScanConnectionIntegrationTest
@@ -17,7 +16,8 @@ org.lfdecentralizedtrust.splice.integration.tests.ExternallySignedPartyOnboardin
 org.lfdecentralizedtrust.splice.integration.tests.GcpBucketPeriodicBackupIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ManualStartIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.MemberTrafficIntegrationTest
-org.lfdecentralizedtrust.splice.integration.tests.ParticipantIdentitiesExportIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.ParticipantKmsIdentitiesIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.ParticipantPlaintextIdentitiesIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ScanConnectionIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ScanHistoryBackfillingIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ScanIntegrationTest
@@ -39,7 +39,6 @@ org.lfdecentralizedtrust.splice.integration.tests.SvReconcileSynchronizerConfigI
 org.lfdecentralizedtrust.splice.integration.tests.SvStateManagementIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.UpdateHistoryIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ValidatorIntegrationTest
-org.lfdecentralizedtrust.splice.integration.tests.ValidatorOfflineRootNamespaceKeyIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ValidatorReonboardingIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletBuyTrafficRequestIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletExpirationsIntegrationTest
@@ -49,7 +48,8 @@ org.lfdecentralizedtrust.splice.integration.tests.WalletMetricsTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletPaymentIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletSubscriptionsIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletSurviveCantonRestartIntegrationTest
-org.lfdecentralizedtrust.splice.integration.tests.WalletSweepIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.WalletSweepToEndUserIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.WalletSweepToValidatorOperatorIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletTransferOfferStatusIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletTxLogAcsIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletTxLogIntegrationTest
@@ -57,6 +57,8 @@ org.lfdecentralizedtrust.splice.integration.tests.WalletTxLogWithSynchronizerFee
 org.lfdecentralizedtrust.splice.integration.tests.connectivity.HealthEndpointsConnectivityIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.connectivity.SvAppLedgerApiConnectivityIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.connectivity.WalletAppConnectivityIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.offlinekey.SvOfflineRootNamespaceKeyIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.offlinekey.ValidatorOfflineRootNamespaceKeyIntegrationTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest
 org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodingsTest
 org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest
@@ -76,7 +78,6 @@ org.lfdecentralizedtrust.splice.store.db.DbUserWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.ScanAggregatorTest
 org.lfdecentralizedtrust.splice.sv.util.SvOnboardingTokenTest
 org.lfdecentralizedtrust.splice.sv.util.WeightDistributionForSvTest
-org.lfdecentralizedtrust.splice.unit.store.DecentralizedSynchronizerMigrationCoverageTest
 org.lfdecentralizedtrust.splice.unit.store.db.AcsJdbcTypesTest
 org.lfdecentralizedtrust.splice.util.AmuletConfigScheduleTest
 org.lfdecentralizedtrust.splice.util.PolicyTest

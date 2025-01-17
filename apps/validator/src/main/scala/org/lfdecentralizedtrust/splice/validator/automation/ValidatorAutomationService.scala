@@ -3,16 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
-import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger.Task as FollowTask
 import org.lfdecentralizedtrust.splice.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
-  TransferFollowTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, PeriodicBackupDumpConfig}
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
@@ -20,10 +17,9 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.util.QualifiedName
-import org.lfdecentralizedtrust.splice.validator.config.AppManagerConfig
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.migration.DecentralizedSynchronizerMigrationTrigger
-import org.lfdecentralizedtrust.splice.validator.store.{AppManagerStore, ValidatorStore}
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.automation.{
   OffboardUserPartyTrigger,
@@ -41,14 +37,13 @@ import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
     backupDumpConfig: Option[PeriodicBackupDumpConfig],
     validatorTopupConfig: ValidatorTopupConfig,
     grpcDeadline: Option[NonNegativeFiniteDuration],
-    appManagerConfig: Option[AppManagerConfig],
     transferPreapprovalConfig: TransferPreapprovalConfig,
     sequencerConnectionFromScan: Boolean,
     prevetDuration: NonNegativeFiniteDuration,
@@ -75,7 +70,6 @@ class ValidatorAutomationService(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpClient,
     mat: Materializer,
     tracer: Tracer,
 ) extends SpliceAppAutomationService(
@@ -98,14 +92,6 @@ class ValidatorAutomationService(
   override def companion
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
-
-  val appManagerStore =
-    new AppManagerStore(
-      scanConnection.getAmuletRulesDomain,
-      this,
-      retryProvider,
-      loggerFactory,
-    )
 
   walletManagerOpt.foreach { walletManager =>
     registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
@@ -200,36 +186,6 @@ class ValidatorAutomationService(
     )
   )
 
-  appManagerConfig.foreach(config =>
-    registerTrigger(
-      new PollInstalledApplicationsTrigger(
-        config,
-        triggerContext,
-        appManagerStore,
-      )
-    )
-  )
-
-  if (!supportsSoftDomainMigrationPoc) {
-    registerTrigger(
-      new TransferFollowTrigger(
-        triggerContext,
-        store,
-        connection,
-        store.key.validatorParty,
-        implicit tc =>
-          scanConnection.getAmuletRulesWithState().flatMap { amuletRulesCWS =>
-            amuletRulesCWS.toAssignedContract
-              .map { amuletRules =>
-                store
-                  .listAmuletRulesTransferFollowers(amuletRules)
-                  .map(_ map (FollowTask(amuletRules, _)))
-              }
-              .getOrElse(Future successful Seq.empty)
-          },
-      )
-    )
-  }
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
   if (sequencerConnectionFromScan)
     registerTrigger(
@@ -291,15 +247,7 @@ class ValidatorAutomationService(
 }
 
 object ValidatorAutomationService extends AutomationServiceCompanion {
-  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
-    template.moduleName match {
-      // App manager storage is participant local so we can freely choose the package id.
-      case "Splice.AppManager.Store" => Some(DarResources.appManager.bootstrap.packageId)
-      // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
-      // we can hardcode this.
-      case "Splice.AmuletImport" => Some(DarResources.amulet.bootstrap.packageId)
-      case _ => None
-    }
+  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] = None
 
   override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
 }

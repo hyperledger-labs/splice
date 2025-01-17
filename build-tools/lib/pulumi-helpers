@@ -22,13 +22,13 @@ function _uses_pulumi_stack() {
     pulumi_project=$1
     pulumi_stack=$(_resolve_pulumi_stack "$pulumi_project")
 
-    _pulumi --stack "organization/${pulumi_project}/$pulumi_stack" \
-            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
-            stack init \
-            --secrets-provider="gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}" \
-            2> /dev/null || true
-
     if [ ! -f "${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.$pulumi_stack.yaml" ]; then
+        _pulumi --stack "organization/${pulumi_project}/$pulumi_stack" \
+                --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
+                stack init \
+                --secrets-provider="gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}" \
+                2> /dev/null || true
+
         # Even though we do not use pulumi configs, pulumi insists on creating a local settings file, and on having a secrets-provider for it. We therefore create it here if it doesn't exist.
         _info "Creating Pulumi stack for ${pulumi_project} project (file ${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.$pulumi_stack.yaml does not exist)"
         local -x PULUMI_CONFIG_PASSPHRASE=''

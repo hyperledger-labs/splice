@@ -1,10 +1,10 @@
 synchronizerMigration:
-  legacy:
-    id: 1
-    provider: internal
-    version: 0.2.8
+  archived:
+    - id: 1
+      provider: internal
+      version: 0.2.8
   active:
     id: 2
     provider: external
-    version: 0.3.1
-    releaseReference: "refs/heads/release-line-0.3.1"
+    version: 0.3.3
+    releaseReference: "refs/heads/release-line-0.3.3"

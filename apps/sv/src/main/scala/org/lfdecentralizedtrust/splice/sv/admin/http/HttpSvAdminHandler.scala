@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
 }
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
+import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -83,7 +84,17 @@ class HttpSvAdminHandler(
         validatorOnboardings <- svStore.listValidatorOnboardings()
       } yield {
         definitions.ListOngoingValidatorOnboardingsResponse(
-          validatorOnboardings.map(_.toHttp).toVector
+          validatorOnboardings
+            .map(onboarding =>
+              definitions.ValidatorOnboarding(
+                ValidatorOnboardingSecret(
+                  svStore.key.svParty,
+                  onboarding.payload.candidateSecret,
+                ).toApiResponse,
+                onboarding.toHttp,
+              )
+            )
+            .toVector
         )
       }
     }
@@ -106,7 +117,7 @@ class HttpSvAdminHandler(
   )(tuser: TracedUser): Future[v0.SvAdminResource.PrepareValidatorOnboardingResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.prepareValidatorOnboarding") { _ => _ =>
-      val secret = generateRandomOnboardingSecret()
+      val secret = generateRandomOnboardingSecret(svStore.key.svParty)
       val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
       dsoStore
         .getDsoRules()
@@ -127,7 +138,7 @@ class HttpSvAdminHandler(
               HttpErrorHandler.internalServerError(s"Could not prepare onboarding: $reason")
             )
           case Right(()) =>
-            Future.successful(definitions.PrepareValidatorOnboardingResponse(secret))
+            Future.successful(definitions.PrepareValidatorOnboardingResponse(secret.toApiResponse))
         }
     }
   }

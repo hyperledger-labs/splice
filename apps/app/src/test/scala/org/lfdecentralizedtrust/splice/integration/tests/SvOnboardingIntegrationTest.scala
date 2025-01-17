@@ -8,6 +8,7 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
@@ -104,8 +105,9 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     initDso()
     val sv = sv4Backend // not a delegate
     val svParty = sv.getDsoInfo().svParty
+    val sv1Party = sv1Backend.getDsoInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
-    val secret = actAndCheck(
+    val (secret, onboardingContract) = actAndCheck(
       "the sv operator prepares the onboarding", {
         sv.prepareValidatorOnboarding(1.hour)
       },
@@ -114,11 +116,12 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       { secret =>
         {
           inside(sv.listOngoingValidatorOnboardings()) { case Seq(vo) =>
-            vo.payload.candidateSecret shouldBe secret
+            vo.encodedSecret shouldBe secret
+            vo.contract
           }
         }
       },
-    )._1
+    )
     // Not starting validator so we need to connect the participant manually.
     val config =
       sv1Backend.participantClient.domains.config(sv1Backend.config.domains.global.alias).value
@@ -141,6 +144,21 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         )
       )
     }
+    clue("try to onboarding with a secret for the wrong SV party") {
+      assertThrowsAndLogsCommandFailures(
+        sv.onboardValidator(
+          candidate,
+          ValidatorOnboardingSecret(
+            sv1Party,
+            onboardingContract.payload.candidateSecret,
+          ).toApiResponse,
+          contactPoint,
+        ),
+        _.errorMessage should include(
+          s"Secret is for SV $sv1Party but this SV is $svParty, validate your SV sponsor URL"
+        ),
+      )
+    }
     actAndCheck(
       "request to onboard the candidate",
       sv.onboardValidator(candidate, secret, s"${candidate.uid.identifier}@example.com"),
@@ -152,7 +170,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
             .filterJava(splice.validatoronboarding.UsedSecret.COMPANION)(svParty)
         ) {
           case Seq(usedSecret) => {
-            usedSecret.data.secret shouldBe secret
+            usedSecret.data.secret shouldBe onboardingContract.payload.candidateSecret
             usedSecret.data.validator shouldBe candidate.toProtoPrimitive
           }
         }
@@ -170,6 +188,13 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         sv.onboardValidator(candidate, secret, contactPoint)
       }
     }
+    clue(
+      "try to reuse the same secret in the legacy format without SV party id, which should succeed"
+    ) {
+      eventuallySucceeds() {
+        sv.onboardValidator(candidate, onboardingContract.payload.candidateSecret, contactPoint)
+      }
+    }
   }
 
   "Validator candidates can self-service at the validator onboarding tap" in { implicit env =>
@@ -185,7 +210,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       { secret =>
         {
           inside(sv.listOngoingValidatorOnboardings()) { case Seq(vo) =>
-            vo.payload.candidateSecret shouldBe secret
+            vo.encodedSecret shouldBe secret
           }
         }
       },

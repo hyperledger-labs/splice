@@ -15,13 +15,11 @@ import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
   aTrigger,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import org.lfdecentralizedtrust.splice.config.UpgradesConfig
-import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
+import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.store.{
@@ -54,12 +52,13 @@ import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
 class SvDsoAutomationService(
     clock: Clock,
@@ -304,46 +303,19 @@ class SvDsoAutomationService(
           (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
         )
       )
-    } else {
-      registerTrigger(
-        new AmuletConfigReassignmentTrigger(
-          triggerContext,
-          dsoStore,
-          connection,
-          dsoStore.key.dsoParty,
-          Seq(DsoRules.COMPANION),
-          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
-        )
-      )
-      registerTrigger(
-        new TransferFollowTrigger(
-          triggerContext,
-          dsoStore,
-          connection,
-          store.key.dsoParty,
-          implicit tc =>
-            dsoStore.listDsoRulesTransferFollowers().flatMap { dsoRulesFollowers =>
-              // don't try to schedule AmuletRules' followers if AmuletRules might move
-              // (i.e. be one of dsoRulesFollowers)
-              if (dsoRulesFollowers.nonEmpty) Future successful dsoRulesFollowers
-              else dsoStore.listAmuletRulesTransferFollowers()
-            },
-        )
-      )
 
       registerTrigger(
-        new TransferFollowTrigger(
+        new SignSynchronizerBootstrappingStateTrigger(
+          dsoStore,
+          participantAdminConnection,
           triggerContext,
-          svStore,
-          connection,
-          store.key.svParty,
-          implicit tc =>
-            dsoStore
-              .lookupDsoRules()
-              .flatMap(
-                _.map(svStore.listDsoRulesTransferFollowers(_))
-                  .getOrElse(Future successful Seq.empty)
-              ),
+          localSynchronizerNode.getOrElse(
+            throw Status.INTERNAL
+              .withDescription("Soft domain migrations require a configured synchronizer node")
+              .asRuntimeException
+          ),
+          extraSynchronizerNodes,
+          upgradesConfig,
         )
       )
     }
@@ -418,7 +390,6 @@ class SvDsoAutomationService(
         )
       )
     }
-
   }
 
   private val localSequencerClientContext: Option[LocalSequencerClientContext] =
@@ -504,10 +475,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
           .orElse(
             Some(DarResources.dsoGovernance.bootstrap.packageId)
           )
-      // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
-      // we can hardcode this.
-      case "Splice.AmuletImport" =>
-        Some(DarResources.amulet.bootstrap.packageId)
       case _ => None
     }
 
@@ -548,5 +515,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReconcileDynamicDomainParametersTrigger],
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[ExternalPartyAmuletRulesTrigger],
+      aTrigger[SignSynchronizerBootstrappingStateTrigger],
     )
 }

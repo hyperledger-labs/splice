@@ -1,6 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   activeVersion,
+  config,
   exactNamespace,
   imagePullSecret,
   installSpliceHelmChart,
@@ -13,5 +14,19 @@ export function installDocs(): pulumi.Resource {
 
   const dependsOn = imagePullDeps.concat([xns.ns]);
 
-  return installSpliceHelmChart(xns, 'docs', 'cn-docs', {}, activeVersion, { dependsOn });
+  const networkName = config.requireEnv('GCP_CLUSTER_BASENAME').endsWith('zrh')
+    ? config.requireEnv('GCP_CLUSTER_BASENAME').replace('zrh', '')
+    : config.requireEnv('GCP_CLUSTER_BASENAME');
+
+  return installSpliceHelmChart(
+    xns,
+    'docs',
+    'cn-docs',
+    {
+      networkName: networkName,
+      enableGcsProxy: true,
+    },
+    activeVersion,
+    { dependsOn }
+  );
 }

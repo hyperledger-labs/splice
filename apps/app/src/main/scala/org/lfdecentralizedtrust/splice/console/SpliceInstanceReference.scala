@@ -8,7 +8,7 @@ import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2Bearer
 import com.digitalasset.daml.lf.archive.DarParser
 import org.lfdecentralizedtrust.splice.admin.api.client.HttpAdminAppClient
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
-import org.lfdecentralizedtrust.splice.config.{SpliceBackendConfig, NetworkAppClientConfig}
+import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SpliceBackendConfig}
 import org.lfdecentralizedtrust.splice.environment.{
   NodeBase,
   SpliceConsoleEnvironment,
@@ -31,9 +31,11 @@ import com.digitalasset.canton.console.{
   Help,
   InstanceReference,
   LocalInstanceReference,
+  RemoteMediatorReference,
   RemoteParticipantReference,
   RemoteSequencerReference,
 }
+import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
@@ -258,3 +260,9 @@ class SequencerClientReference(
     override val name: String,
     override val config: RemoteSequencerConfig,
 ) extends RemoteSequencerReference(consoleEnvironment, name) {}
+
+class MediatorClientReference(
+    consoleEnvironment: SpliceConsoleEnvironment,
+    override val name: String,
+    override val config: RemoteMediatorConfig,
+) extends RemoteMediatorReference(consoleEnvironment, name) {}

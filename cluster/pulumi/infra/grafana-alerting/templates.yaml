@@ -56,16 +56,18 @@ templates:
       {{ define "slack_alert_firing" }}
         *{{ .Labels.alertname }}*
         {{ .Annotations.summary }}
-        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end -}}
-        {{ if .Labels.service }}{{ .Labels.service }}{{- end }}
+        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+        {{- if .Labels.service }}
+        Service: {{ .Labels.service }}
+        {{- end }}
         {{ template "slack_gcloud_log_link" . }}
       {{ end }}
 
       {{ define "slack_alert_resolved" }}
         *{{ .Labels.alertname }}*
-        {{ if .Annotations.severity }}{{ .Annotations.severity }}{{ end -}}
+        {{ if .Annotations.severity }}{{ .Annotations.severity }}{{ end }}
         {{ .Annotations.summary }}
-        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end -}}
+        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
       {{ end }}
 
       {{ define "slack_gcloud_log_link" }}<https://console.cloud.google.com/logs/query;startTime={{ (.StartsAt.Add -600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};endTime={{ (.StartsAt.Add 600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};query=resource.labels.cluster_name%3D%22cn-$CLUSTER_BASENAMEnet%22%0A{{ .Labels.gcloud_filter }}?project=$GCP_PROJECT|cloud logs>{{ end }}
@@ -95,7 +97,7 @@ templates:
           good
         {{- end }}
       {{- end }}
-      
+
       {{ define "support_email_message" }}
       [ MAINNET-DA2-SVN-CRITICAL-ALERT 9f2b7e1a-4c3d-58b9-9f1e-df9c4a5b6e7d ]
       {{ if gt (len .Alerts.Firing) 0 }}**Firing**

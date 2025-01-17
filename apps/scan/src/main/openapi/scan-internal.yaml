@@ -1386,15 +1386,6 @@ components:
         lastPurchasedInRound:
           type: integer
           format: int64
-    ListImportCratesResponse:
-      type: object
-      required: ["crates"]
-      properties:
-        crates:
-          type: array
-          items:
-            # TODO(#6073): consider using a more precise type; i.e., no 'MaybeCached'
-            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
     ListDsoSequencersResponse:
       type: object
       required: ["domainSequencers"]

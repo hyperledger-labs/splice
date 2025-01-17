@@ -142,6 +142,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "cluster-ingress"
       },
@@ -202,6 +205,9 @@
             ]
           }
         },
+        "spliceDomainNames": {
+          "nameServiceDomain": "cns"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -210,7 +216,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -371,7 +377,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "loopback",
     "provider": "",
@@ -441,7 +447,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "scan",
     "provider": "",
@@ -637,7 +643,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -704,7 +710,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 430000
+            "rewardWeightBps": 330000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -719,6 +725,11 @@
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEO3NIzHIIxatGCFHLdONUYNJ3SePvA4lq3EbtMgvpe1CoALZZ+CRNZrHNsj49jdeJNQgcJBPsOcW7XP6VF7Q1YA==",
+            "rewardWeightBps": 100000
+          },
+          {
+            "name": "C7-Technology-Services-Limited",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEIyvyNX23/fxKnCkKArjOWxi+OBUtIXw4GoEGFMG4JXZBeVYYU6s4hBA5heMKDVaFszYEQQP1bBfjSQwWJ8PLDA==",
             "rewardWeightBps": 0
           }
         ],
@@ -791,7 +802,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "sv-app",
     "provider": "",
@@ -824,6 +835,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "sv"
       },
@@ -948,7 +962,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "validator",
     "provider": "",

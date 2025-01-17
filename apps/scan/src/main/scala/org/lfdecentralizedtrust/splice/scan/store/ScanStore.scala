@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletru
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanStore,
+  DbScanStoreMetrics,
   ScanAggregatesReader,
   ScanAggregator,
 }
@@ -302,6 +303,7 @@ object ScanStore {
       createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      metrics: DbScanStoreMetrics,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -318,6 +320,7 @@ object ScanStore {
           createScanAggregatesReader,
           domainMigrationInfo,
           participantId,
+          metrics,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }

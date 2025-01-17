@@ -2052,7 +2052,12 @@ subcommand_whitelist[purge_unused_dbs]="Purges all unused DBs (those labeled wit
 function subcmd_purge_unused_dbs() {
     _cluster_must_exist
 
-    npx --prefix "${REPO_ROOT}/cluster/pulumi" ts-node "${REPO_ROOT}/cluster/pulumi/purge_unused_dbs.ts"
+    args=()
+    if [ -n "${CI:-}" ]; then
+        args=("--yes")
+    fi
+
+    npx --prefix "${REPO_ROOT}/cluster/pulumi" ts-node "${REPO_ROOT}/cluster/pulumi/purge_unused_dbs.ts" "${args[@]}"
 }
 
 ################################

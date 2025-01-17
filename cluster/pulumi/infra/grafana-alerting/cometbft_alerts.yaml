@@ -451,7 +451,7 @@ groups:
             model:
               disableTextWrap: false
               editorMode: builder
-              expr: rate(cometbft_consensus_height[1h])
+              expr: rate(cometbft_consensus_height[30m])
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
@@ -521,7 +521,7 @@ groups:
         panelId: 68
         noDataState: $NODATA
         execErrState: OK
-        for: 5m
+        for: 120m
         annotations:
           __dashboardUid__: UJyurCTWz
           __panelId__: "68"
@@ -544,7 +544,7 @@ groups:
             model:
               disableTextWrap: false
               editorMode: builder
-              expr: cn_sv_cometbft_latest_block_height - cn_sv_cometbft_earliest_block_height
+              expr: splice_sv_cometbft_latest_block_height - splice_sv_cometbft_earliest_block_height
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true

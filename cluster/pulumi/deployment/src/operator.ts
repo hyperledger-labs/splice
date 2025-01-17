@@ -1,9 +1,10 @@
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import {
   artifactsRepository,
   config,
   HELM_MAX_HISTORY_SIZE,
-  imagePullSecretForServiceAccount,
+  imagePullSecret,
   infraAffinityAndTolerations,
   repository,
 } from 'splice-pulumi-common';
@@ -22,10 +23,14 @@ const credentialsSecret = new k8s.core.v1.Secret('gke-credentials', {
   },
 });
 
-export const imagePullDeps = imagePullSecretForServiceAccount(
-  namespace,
-  'pulumi-kubernetes-operator'
-);
+export const imagePullDeps = imagePullSecret(namespace, false, 'false');
+
+const secretName = (
+  (imagePullDeps as pulumi.Resource[])
+    .filter(e => e instanceof k8s.core.v1.Secret)
+    .pop() as k8s.core.v1.Secret
+).metadata.name;
+
 export const operator = new k8s.helm.v3.Release(
   'pulumi-kubernetes-operator',
   {
@@ -44,6 +49,7 @@ export const operator = new k8s.helm.v3.Release(
           memory: config.optionalEnv('OPERATOR_MEMORY_REQUESTS') || '2G',
         },
       },
+      imagePullSecrets: [{ name: secretName }],
       terminationGracePeriodSeconds: 1800,
       image: {
         registry: repository(artifactsRepository).registry,

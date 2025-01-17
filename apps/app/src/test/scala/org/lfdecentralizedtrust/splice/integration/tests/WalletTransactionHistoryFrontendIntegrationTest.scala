@@ -17,7 +17,6 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   NotificationTxLogEntry,
   TxLogEntry as walletLogEntry,
 }
-import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.scalatest.Assertion
 
@@ -190,6 +189,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
     "show extra traffic purchases" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
+        val sv1Party = sv1ValidatorBackend.getValidatorPartyId()
         browseToSv1Wallet(sv1WalletUser)
         val trafficAmount = 10_000_000L
         val (_, trafficCostCc) = computeSynchronizerFees(trafficAmount)
@@ -201,7 +201,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
           _ => {
             val txs = findAll(className("tx-row")).toSeq
             val sv1ValidatorParty = sv1WalletClient.userStatus().party
-            val dsoParty = sv1ScanBackend.getDsoPartyId()
             val sv1Name =
               sv1Backend
                 .getDsoInfo()
@@ -218,7 +217,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
                 expectedPartyDescription = Some(
-                  s"${expectedAns(dsoParty, s"dso.$ansAcronym")} ${expectedAns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
+                  s"Automation ${expectedAns(sv1Party, s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
                 ),
                 expectedAmountAmulet = -trafficCostCc,
               )

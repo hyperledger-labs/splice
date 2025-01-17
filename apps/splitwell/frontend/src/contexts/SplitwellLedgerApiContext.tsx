@@ -20,7 +20,6 @@ import {
   GroupInvite,
   SplitwellRules,
 } from '@daml.js/splitwell/lib/Splice/Splitwell';
-import Ledger, { LedgerOptions } from '@daml/ledger';
 import { ContractId } from '@daml/types';
 
 class SplitwellLedgerApiClient extends LedgerApiClient {
@@ -215,9 +214,9 @@ export const SplitwellLedgerApiClientProvider: React.FC<
   let ledgerApiClient: SplitwellLedgerApiClient | undefined;
 
   if (userAccessToken && userId) {
-    const ledgerOptions: LedgerOptions = { httpBaseUrl: jsonApiUrl, token: userAccessToken };
     ledgerApiClient = new SplitwellLedgerApiClient(
-      new Ledger(ledgerOptions),
+      jsonApiUrl,
+      userAccessToken,
       userId,
       packageIdResolver
     );

@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { LookupTransferPreapprovalByPartyResponse } from 'scan-openapi';
@@ -58,11 +58,14 @@ describe('Wallet user can', () => {
       </WalletConfigProvider>
     );
     const preapproveTransfersBtn = await screen.findByRole('button', {
-      name: 'Pre-approve all incoming transfers',
+      name: /Pre-approve incoming direct transfers/,
     });
     expect(preapproveTransfersBtn).toBeEnabled();
-    // Check that clicking the button calls the correct backend endpoint
     await user.click(preapproveTransfersBtn);
+    // Click in confirmation dialog
+    const proceedBtn = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedBtn);
+    // Check that clicking the button calls the correct backend endpoint
     expect(requestMocks.createTransferPreapproval).toHaveBeenCalled();
     // Mock the request to fetch the created pre-approval
     server.use(
@@ -82,9 +85,10 @@ describe('Wallet user can', () => {
         }
       )
     );
-    // Check that the UI responds to the newly created pre-approval
-    await vi.waitFor(() => expect(screen.getByTestId('ApprovalIcon')).toBeInTheDocument(), 2000);
-    expect(preapproveTransfersBtn).not.toBeInTheDocument();
+    const disabledPreapproveTransfersBtn = await screen.findByRole('button', {
+      name: /Pre-approve incoming direct transfers/,
+    });
+    await waitFor(() => expect(disabledPreapproveTransfersBtn).toBeDisabled());
   });
 
   test('not see dso in list of transfer-offer receivers', async () => {

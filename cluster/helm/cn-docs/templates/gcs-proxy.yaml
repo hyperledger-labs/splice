@@ -1,0 +1,65 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if .Values.enableGcsProxy }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gcs-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: gcs-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gcs-proxy
+  strategy:
+    type: "Recreate"
+  template:
+    metadata:
+      labels:
+        app: gcs-proxy
+    spec:
+      containers:
+        - name: gcs-proxy
+          image: "{{ .Values.imageRepo }}/gcs-proxy:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).gcs_proxy) }}"
+          {{- with .Values.imagePullPolicy }}
+          imagePullPolicy: {{ . }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 1
+              memory: "512Mi"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gcs-proxy
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: gcs-proxy
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+
+{{- end }}
