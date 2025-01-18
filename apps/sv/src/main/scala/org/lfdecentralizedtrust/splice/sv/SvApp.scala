@@ -553,7 +553,6 @@ class SvApp(
           Seq(
             new HttpSvSoftDomainMigrationPocHandler(
               dsoAutomation,
-              localSynchronizerNode,
               extraSynchronizerNodes,
               participantAdminConnection,
               config.domainMigrationId,
