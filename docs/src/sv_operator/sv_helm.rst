@@ -432,7 +432,7 @@ if:
 - the block chain is mature enough for at least 1 state snapshot to have been taken i.e.
   the height of the latest block is greater than or equal to the configured interval between snapshots
 
-The snapshots are fetched from sv1 which exposes its CometBft RPC API at `https://sv.sv-2.TARGET_HOSTNAME:443/cometbft-rpc/`.
+The snapshots are fetched from sv1 which exposes its CometBft RPC API at `https://sv.sv-1.TARGET_HOSTNAME:443/cometbft-rpc/`.
 This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
 and setting them explicitly should not be required and is not currently supported.
 
@@ -858,11 +858,11 @@ This list is useful for an SV that wishes to limit egress to only allow the mini
 ====================== ================================================================================================ ========= ==============
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
-Sponsor SV             sv.sv-2.<TARGET_HOSTNAME>:443                                                                    HTTPS     sv-app
-Sponsor SV Sequencer   sequencer-<M>.sv-2.<TARGET_HOSTNAME>:443                                                         HTTPS     participant-<M>
-Sponsor SV Scan        scan.sv-2.<TARGET_HOSTNAME>:443                                                                  HTTPS     validator-app
+Sponsor SV             sv.sv-1.<TARGET_HOSTNAME>:443                                                                    HTTPS     sv-app
+Sponsor SV Sequencer   sequencer-<M>.sv-1.<TARGET_HOSTNAME>:443                                                         HTTPS     participant-<M>
+Sponsor SV Scan        scan.sv-1.<TARGET_HOSTNAME>:443                                                                  HTTPS     validator-app
 CometBft P2P           CometBft p2p IPs and ports 26<M>16, 26<M>26, 26<M>36, 26<M>46, 26<M>56                           TCP       global-domain-<M>-cometbft
-CometBft JSON RPC      sv.sv-2.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<M>-cometbft
+CometBft JSON RPC      sv.sv-1.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<M>-cometbft
 ====================== ================================================================================================ ========= ==============
 
 At present, we designate sv1 as the sponsor SV. However, in the long term, any onboarded SV can function as a sponsor SV.
