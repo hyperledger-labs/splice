@@ -7,6 +7,11 @@ inputs:
   setup_sbt_cache_hits:
     description: "Cache hits from the setup SBT job (should be the cache_hits output from the setup SBT job)"
     required: true
+  save_caches:
+    description: "If set to false, no caches will be saved"
+    required: false
+    default: "true"
+
 runs:
   using: 'composite'
   steps:

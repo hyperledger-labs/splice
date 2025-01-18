@@ -46,6 +46,10 @@ jobs:
     uses: ./.github/workflows/build.deployment_test.yml
     secrets: inherit
 
+  bundle:
+    uses: ./.github/workflows/build.bundle.yml
+    secrets: inherit
+
   scala_test_sim_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
@@ -148,6 +152,8 @@ jobs:
     needs:
     - cancel_if_not_opt_in
     - static_tests
+    - deployment_test
+    - bundle
     - scala_test_sim_time
     - scala_test_resource_intensive
     - scala_test_record_time_tolerance
@@ -178,7 +184,7 @@ jobs:
             echo "Only static tests are required"
             echo "FORCE=false" >> $GITHUB_ENV
             echo "JOBS<<EOF" >> $GITHUB_ENV
-            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests"}' >> $GITHUB_ENV
+            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests", "deployment_test", "bundle"}' >> $GITHUB_ENV
             echo "EOF" >> $GITHUB_ENV
           else
             echo "Checking if all jobs succeeded."

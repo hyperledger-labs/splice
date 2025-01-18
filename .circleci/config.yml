@@ -3364,24 +3364,6 @@ jobs:
       - save_sbt_job_result:
           runner_type: "selfhosted"
 
-  bundle:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
-          cmd: "Test/compile bundle"
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-          upload_caches: true
-
   auth0_user_cleanup:
     executor: self_hosted
     environment:
@@ -5127,11 +5109,6 @@ workflows:
           with_docker_images: true
           resource_class: "2xlarge"
           parallelism: 2
-      - bundle:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail

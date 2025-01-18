@@ -1,15 +1,13 @@
-name: Deployment Test
+name: Bundle
 on: workflow_call
 
 jobs:
-  deployment_test:
-    runs-on: self-hosted-k8s-x-small
-
+  bundle:
+    runs-on: self-hosted-k8s-small
     container:
       image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.6-snapshot.20250113.8012.0.v6b097acb
 
     steps:
-
       - name: Check out repository code
         uses: actions/checkout@v4
         with:
@@ -17,15 +15,22 @@ jobs:
           submodules: recursive
 
       - name: Setup
+        id: setup
         uses: ./.github/actions/tests/common_test_setup
         with:
-          test_name: deployment_test
-          with_sbt: false
+          test_name: bundle
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
-      - name: Deployment test
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+      - name: Bundle
+        uses: ./.github/actions/sbt/execute_sbt_command
         with:
-          cmd_retry_count: 5 # Retry in case of dependency download errors
-          cmd: make cluster/pulumi/test
+          # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
+          cmd: "Test/compile bundle"
+          fail_on_error_in_output: false
+
+      - name: Post-SBT job
+        uses: ./.github/actions/sbt/post_sbt
+        with:
+          cache_version: 0
+          setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
