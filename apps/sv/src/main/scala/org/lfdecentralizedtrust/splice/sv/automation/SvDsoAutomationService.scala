@@ -19,8 +19,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import org.lfdecentralizedtrust.splice.config.UpgradesConfig
-import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
+import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.store.{
@@ -53,6 +52,7 @@ import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
@@ -303,6 +303,21 @@ class SvDsoAutomationService(
           (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
         )
       )
+
+      registerTrigger(
+        new SignSynchronizerBootstrappingStateTrigger(
+          dsoStore,
+          participantAdminConnection,
+          triggerContext,
+          localSynchronizerNode.getOrElse(
+            throw Status.INTERNAL
+              .withDescription("Soft domain migrations require a configured synchronizer node")
+              .asRuntimeException
+          ),
+          extraSynchronizerNodes,
+          upgradesConfig,
+        )
+      )
     }
     registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
     registerTrigger(
@@ -375,7 +390,6 @@ class SvDsoAutomationService(
         )
       )
     }
-
   }
 
   private val localSequencerClientContext: Option[LocalSequencerClientContext] =
@@ -501,5 +515,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReconcileDynamicDomainParametersTrigger],
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[ExternalPartyAmuletRulesTrigger],
+      aTrigger[SignSynchronizerBootstrappingStateTrigger],
     )
 }
