@@ -126,7 +126,7 @@ class DisasterRecoveryIntegrationTest
                           SvDecentralizedSynchronizerConfig(
                             alias = DomainAlias.tryCreate("global"),
                             // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
-                            url = s"http://localhost:28${sv}08",
+                            url = Some(s"http://localhost:28${sv}08"),
                           )
                         ),
                         domainMigrationId = 1L,

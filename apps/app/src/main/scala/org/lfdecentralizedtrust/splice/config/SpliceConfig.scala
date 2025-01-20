@@ -9,12 +9,6 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.environment.DarResources
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  AppConfiguration,
-  Domain,
-  ReleaseConfiguration,
-  Timespan,
-}
 import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
@@ -86,7 +80,6 @@ case class SpliceConfig(
     scanApps: Map[InstanceName, ScanAppBackendConfig] = Map.empty,
     scanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
-    appManagerAppClients: Map[InstanceName, AppManagerAppClientConfig] = Map.empty,
     ansAppExternalClients: Map[InstanceName, AnsAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
@@ -510,6 +503,9 @@ object SpliceConfig {
         // sv1 must alway configure one to bootstrap the domain.
         val sv1NodeHasSynchronizerConfig =
           checkFoundDsoConfig((conf, _) => conf.localSynchronizerNode.isDefined)
+        // SV1 only ever connects to its own sequencer so the url is specified in the localSynchronizerNode config
+        val sv1NodeHasNoSequencerUrl =
+          checkFoundDsoConfig((conf, _) => conf.domains.global.url.isEmpty)
         val initialPackageConfigExists =
           checkFoundDsoConfig((_, foundDsoConf) =>
             doesInitialPackageConfigExists(foundDsoConf.initialPackageConfig)
@@ -523,6 +519,11 @@ object SpliceConfig {
             sv1NodeHasSynchronizerConfig,
             (),
             ConfigValidationFailed("SV1 must always specify a domain config"),
+          )
+          _ <- Either.cond(
+            sv1NodeHasNoSequencerUrl,
+            (),
+            ConfigValidationFailed("SV1 must not specify domains.global.url"),
           )
           _ <- Either.cond(
             initialPackageConfigExists,
@@ -591,18 +592,6 @@ object SpliceConfig {
       deriveReader[ValidatorSynchronizerConfig]
     implicit val offsetDateTimeConfigurationReader: ConfigReader[java.time.OffsetDateTime] =
       implicitly[ConfigReader[String]].map(java.time.OffsetDateTime.parse)
-    implicit val timespanConfigurationReader: ConfigReader[Timespan] = deriveReader[Timespan]
-    implicit val domainConfigurationReader: ConfigReader[Domain] = deriveReader[Domain]
-    implicit val releaseConfigurationReader: ConfigReader[ReleaseConfiguration] =
-      deriveReader[ReleaseConfiguration]
-    implicit val appConfigurationReader: ConfigReader[AppConfiguration] =
-      deriveReader[AppConfiguration]
-    implicit val initialRegisteredAppReader: ConfigReader[InitialRegisteredApp] =
-      deriveReader[InitialRegisteredApp]
-    implicit val initialInstalledAppReader: ConfigReader[InitialInstalledApp] =
-      deriveReader[InitialInstalledApp]
-    implicit val appManagerConfigReader: ConfigReader[AppManagerConfig] =
-      deriveReader[AppManagerConfig]
     implicit val transferPreapprovalConfigReader: ConfigReader[TransferPreapprovalConfig] =
       deriveReader[TransferPreapprovalConfig].emap { conf =>
         Either.cond(
@@ -617,6 +606,8 @@ object SpliceConfig {
       deriveReader[MigrateValidatorPartyConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig].emap { conf =>
+        val participantIdentifier =
+          ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
           _ <- Either.cond(
             !conf.svValidator || conf.validatorPartyHint.isEmpty,
@@ -628,6 +619,16 @@ object SpliceConfig {
             (),
             ConfigValidationFailed("Validator party hint must be specified for non-SV validators"),
           )
+          _ <- Either.cond(
+            conf.participantBootstrappingDump.forall(
+              _.newParticipantIdentifier == Some(participantIdentifier)
+            ),
+            (),
+            ConfigValidationFailed(
+              s"New participant identifier in bootstrap dump config ${conf.participantBootstrappingDump
+                  .map(_.newParticipantIdentifier)} must match participant node identifier $participantIdentifier"
+            ),
+          )
         } yield conf
       }
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
@@ -638,8 +639,6 @@ object SpliceConfig {
       deriveReader[WalletSynchronizerConfig]
     implicit val WalletAppClientConfigReader: ConfigReader[WalletAppClientConfig] =
       deriveReader[WalletAppClientConfig]
-    implicit val AppManagerAppClientConfigReader: ConfigReader[AppManagerAppClientConfig] =
-      deriveReader[AppManagerAppClientConfig]
     implicit val ansExternalClientConfigReader: ConfigReader[AnsAppExternalClientConfig] =
       deriveReader[AnsAppExternalClientConfig]
     implicit val splitwellDomainsReader: ConfigReader[SplitwellDomains] =
@@ -856,18 +855,6 @@ object SpliceConfig {
       deriveWriter[ValidatorSynchronizerConfig]
     implicit val offsetDateTimeConfigurationWriter: ConfigWriter[java.time.OffsetDateTime] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
-    implicit val timespanConfigurationWriter: ConfigWriter[Timespan] = deriveWriter[Timespan]
-    implicit val domainConfigurationWriter: ConfigWriter[Domain] = deriveWriter[Domain]
-    implicit val releaseConfigurationWriter: ConfigWriter[ReleaseConfiguration] =
-      deriveWriter[ReleaseConfiguration]
-    implicit val appConfigurationWriter: ConfigWriter[AppConfiguration] =
-      deriveWriter[AppConfiguration]
-    implicit val initialRegisteredAppWriter: ConfigWriter[InitialRegisteredApp] =
-      deriveWriter[InitialRegisteredApp]
-    implicit val initialInstalledAppWriter: ConfigWriter[InitialInstalledApp] =
-      deriveWriter[InitialInstalledApp]
-    implicit val appManagerConfigWriter: ConfigWriter[AppManagerConfig] =
-      deriveWriter[AppManagerConfig]
     implicit val transferPreapprovalConfigWriter: ConfigWriter[TransferPreapprovalConfig] =
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
@@ -884,8 +871,6 @@ object SpliceConfig {
       deriveWriter[WalletSynchronizerConfig]
     implicit val WalletAppClientConfigWriter: ConfigWriter[WalletAppClientConfig] =
       deriveWriter[WalletAppClientConfig]
-    implicit val AppManagerAppClientConfigWriter: ConfigWriter[AppManagerAppClientConfig] =
-      deriveWriter[AppManagerAppClientConfig]
     implicit val ansExternalClientConfigWriter: ConfigWriter[AnsAppExternalClientConfig] =
       deriveWriter[AnsAppExternalClientConfig]
     implicit val splitwellDomains: ConfigWriter[SplitwellDomains] =

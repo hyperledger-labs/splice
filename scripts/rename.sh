@@ -844,7 +844,6 @@ function subcmd_all_packages() {
   rename_daml_package 'validator-lifecycle' 'splice-validator-lifecycle' 'ValidatorLifecycle' 'SpliceValidatorLifecycle'
   rename_daml_package 'dso-governance' 'splice-dso-governance' 'DsoGovernance' 'SpliceDsoGovernance'
   rename_daml_package 'canton-amulet' 'splice-amulet' 'CantonAmulet' 'SpliceAmulet'
-  rename_daml_package 'app-manager' 'splice-app-manager' 'AppManager' 'SpliceAppManager'
   rename_daml_package 'canton-name-service' 'splice-amulet-name-service' 'CantonNameService' 'SpliceAmuletNameService'
 }
 
@@ -1220,7 +1219,7 @@ function subcmd_no_illegal_daml_references() {
 subcommand_whitelist[no_amulet_in_ui]='Check for Amulet and ANS in user UI'
 function subcmd_no_amulet_in_ui() {
     local illegal_patterns=(
-      'ANS(?!_LEDGER_NAME)'
+      '(?<!TR)ANS(?!_LEDGER_NAME)'
       "(?<!Splice[./])\bAmulet\b"
       )
     for pattern in "${illegal_patterns[@]}"; do

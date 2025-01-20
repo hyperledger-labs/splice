@@ -5,6 +5,7 @@ import { stack } from './pulumi';
 import { runForAllMigrations } from './sv-canton/pulumi';
 import { CLUSTER_BASENAME, config } from 'splice-pulumi-common';
 import * as readline from 'readline';
+import { program } from 'commander';
 
 const gcpSqlClient = new cloudsql.SqlInstancesServiceClient({
   fallback: 'rest',
@@ -67,6 +68,14 @@ async function deleteDb(db: cloudsql.protos.google.cloud.sql.v1.IDatabaseInstanc
 }
 
 async function runPurgeUnusedDbs() {
+
+  program
+    .option('-y, --yes', 'Auto-accept all prompts')
+    .parse(process.argv);
+
+  const options = program.opts();
+  const autoAccept = options.yes;
+
   const usedDbs = await getAllPulumiDbs();
   // DatabaseInstance.id is a string, but ts insists on it being an Output<string>, so we force-cast it via an unknown cast
   const usedDbNames: string[] = usedDbs.map((db: gcp.sql.DatabaseInstance) => db.id) as unknown as string[];
@@ -86,19 +95,25 @@ async function runPurgeUnusedDbs() {
   console.log(`About to delete the following ${unusedDbs.length} database instances:`);
   unusedDbs.forEach(db => prettyPrintDb(db));
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  rl.question('\nDo you want to proceed with deleting these DB instances? [y/n] ', async (answer) => {
-    if (answer === 'y') {
-      console.log('Deleting databases');
-      unusedDbs.forEach(async db => { deleteDb(db); });
-    } else {
-      console.log('Aborting');
-    }
-    rl.close();
-  });
+  if (autoAccept) {
+    console.log('Auto-accepting');
+    unusedDbs.forEach(async db => { deleteDb(db); });
+  } else {
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    rl.question('\nDo you want to proceed with deleting these DB instances? [y/n] ', async (answer) => {
+      if (answer === 'y') {
+        console.log('Deleting databases');
+        unusedDbs.forEach(async db => { deleteDb(db); });
+      } else {
+        console.log('Aborting');
+      }
+      rl.close();
+    });
+  }
 }
 
 runPurgeUnusedDbs().catch(e => {

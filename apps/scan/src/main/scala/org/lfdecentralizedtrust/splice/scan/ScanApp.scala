@@ -150,6 +150,7 @@ class ScanApp(
         },
         migrationInfo,
         participantId,
+        nodeMetrics.dbScanStore,
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,

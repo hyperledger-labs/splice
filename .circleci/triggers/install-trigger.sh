@@ -44,9 +44,36 @@ fi
 verb=POST
 endpoint="https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/schedule"
 
-existing_schedule=$(curl -s "$endpoint" \
-    -H "Content-Type: application/json" \
-    -H "circle-token: $CIRCLECI_TOKEN" | jq -c '.items[] | select(.name == $ARGS.positional[0])' --jsonargs "${TRIGGER_NAME}")
+existing_schedule=""
+next_page_token=""
+
+while true; do
+  if [ -n "$next_page_token" ]; then
+      paginated_endpoint="${endpoint}?page-token=${next_page_token}"
+  else
+      paginated_endpoint="$endpoint"
+  fi
+
+  response=$(curl -s "$paginated_endpoint" \
+      -H "Content-Type: application/json" \
+      -H "circle-token: $CIRCLECI_TOKEN")
+
+  filtered_items=$(echo "$response" | jq -c '.items[] | select(.name == $ARGS.positional[0])' --jsonargs "${TRIGGER_NAME}")
+
+  if [ -n "$filtered_items" ]; then
+      existing_schedule="${existing_schedule}${filtered_items}"
+  fi
+
+  next_page_token=$(echo "$response" | jq -r '.next_page_token // empty')
+
+  if [ -z "$next_page_token" ]; then
+      break
+  fi
+
+  echo "Loading next page with next_page_token: $next_page_token"
+done
+
+echo "Existing schedules: $existing_schedule"
 
 if [[ -n $existing_schedule ]]; then
     echo "Trigger ${TRIGGER_NAME} already exists... patching"
@@ -61,4 +88,5 @@ fi
 curl -X "$verb" "$endpoint" \
     -d "@$TRIGGER_DEFINITION_FILE" \
     -H "Content-Type: application/json" \
-    -H "circle-token: $CIRCLECI_TOKEN"
+    -H "circle-token: $CIRCLECI_TOKEN" || {
+      echo "Failed to create trigger"; exit 1;}

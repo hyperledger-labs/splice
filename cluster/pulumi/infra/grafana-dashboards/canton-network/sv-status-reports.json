@@ -19,9 +19,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 113,
+  "id": 2420,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -97,7 +96,7 @@
         "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "10.4.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -106,7 +105,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "time() - max by(report_publisher) (cn_sv_status_report_creation_time_us) / 1000000",
+          "expr": "time() - max by(report_publisher) (splice_sv_status_report_creation_time_us) / 1000000",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -138,6 +137,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -205,6 +205,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -212,7 +213,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "time() - max by (report_publisher) (cn_sv_status_report_creation_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}) / 1000000",
+          "expr": "time() - max by (report_publisher) (splice_sv_status_report_creation_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}) / 1000000",
           "instant": false,
           "legendFormat": "{{report_publisher}}",
           "range": true,
@@ -283,7 +284,7 @@
         "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "10.4.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -292,7 +293,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(max by(report_publisher) (cn_sv_status_report_number{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"})[5m:30s]) * 60",
+          "expr": "rate(max by(report_publisher) (splice_sv_status_report_number{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"})[5m:30s]) * 60",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -326,6 +327,7 @@
             "axisSoftMax": 2,
             "axisSoftMin": 0,
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -392,6 +394,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -400,7 +403,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(max by(report_publisher) (cn_sv_status_report_number{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"})[5m:30s]) * 60",
+          "expr": "rate(max by(report_publisher) (splice_sv_status_report_number{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"})[5m:30s]) * 60",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -442,6 +445,7 @@
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -472,7 +476,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -503,6 +508,7 @@
               "sort": "desc"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -510,7 +516,7 @@
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "max by (namespace, report_publisher) (cn_sv_status_report_creation_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}) / 1000",
+              "expr": "max by (namespace, report_publisher) (splice_sv_status_report_creation_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}) / 1000",
               "instant": false,
               "legendFormat": "{{report_publisher}} @ {{namespace}}",
               "range": true,
@@ -551,6 +557,7 @@
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -581,7 +588,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -597,7 +605,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 22
+            "y": 81
           },
           "id": 4,
           "options": {
@@ -612,6 +620,7 @@
               "sort": "desc"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -620,7 +629,7 @@
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "max by (namespace, report_publisher) (cn_sv_status_report_cometbft_height{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"})",
+              "expr": "max by (namespace, report_publisher) (splice_sv_status_report_cometbft_height{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"})",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "instant": false,
@@ -652,6 +661,7 @@
                 "axisPlacement": "auto",
                 "axisSoftMax": 600,
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -682,7 +692,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "orange",
@@ -701,7 +712,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 30
+            "y": 89
           },
           "id": 15,
           "options": {
@@ -716,6 +727,7 @@
               "sort": "none"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -723,7 +735,7 @@
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "max by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_cometbft_height{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}) ) - min by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_cometbft_height{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}))",
+              "expr": "max by (namespace) (max by (report_publisher, namespace) (splice_sv_status_report_cometbft_height{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}) ) - min by (namespace) (max by (report_publisher, namespace) (splice_sv_status_report_cometbft_height{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}))",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
@@ -764,6 +776,7 @@
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -794,7 +807,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -825,6 +839,7 @@
               "sort": "desc"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -832,7 +847,7 @@
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "cn_sv_status_report_domain_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"} / 1000",
+              "expr": "splice_sv_status_report_domain_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"} / 1000",
               "instant": false,
               "legendFormat": "{{target_node}} - {{ report_publisher }}  {{ report_publisher_party }}",
               "range": true,
@@ -862,6 +877,7 @@
                 "axisSoftMax": 1.6,
                 "axisSoftMin": 0.4,
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -892,7 +908,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-red"
+                    "color": "dark-red",
+                    "value": null
                   },
                   {
                     "color": "orange",
@@ -916,7 +933,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 48
+            "y": 65
           },
           "id": 9,
           "options": {
@@ -933,6 +950,7 @@
               "sort": "asc"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -942,7 +960,7 @@
               "disableTextWrap": false,
               "editorMode": "code",
               "exemplar": false,
-              "expr": "max by (namespace, report_publisher, target_node) (rate(cn_sv_status_report_domain_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}[10m])) / 1000000",
+              "expr": "max by (namespace, report_publisher, target_node) (rate(splice_sv_status_report_domain_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}[10m])) / 1000000",
               "fullMetaSearch": false,
               "hide": false,
               "includeNullMetadata": true,
@@ -987,6 +1005,7 @@
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -1017,7 +1036,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -1033,7 +1053,7 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 24
+            "y": 41
           },
           "id": 13,
           "options": {
@@ -1048,6 +1068,7 @@
               "sort": "desc"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -1056,7 +1077,7 @@
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "max by (namespace, report_publisher) (cn_sv_status_report_latest_open_round{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"})",
+              "expr": "max by (namespace, report_publisher) (splice_sv_status_report_latest_open_round{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"})",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "instant": false,
@@ -1087,6 +1108,7 @@
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -1118,7 +1140,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "orange",
@@ -1137,7 +1160,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 33
+            "y": 50
           },
           "id": 5,
           "options": {
@@ -1152,6 +1175,7 @@
               "sort": "none"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -1159,7 +1183,7 @@
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "max by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_latest_open_round{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}) ) - min by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_latest_open_round{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}))",
+              "expr": "max by (namespace) (max by (report_publisher, namespace) (splice_sv_status_report_latest_open_round{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}) ) - min by (namespace) (max by (report_publisher, namespace) (splice_sv_status_report_latest_open_round{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"}))",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
@@ -1174,104 +1198,84 @@
       "type": "row"
     }
   ],
+  "preload": false,
   "refresh": "30s",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_sv_status_report_creation_time_us,namespace)",
-        "hide": 0,
+        "definition": "label_values(splice_sv_status_report_creation_time_us,namespace)",
         "includeAll": true,
         "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(cn_sv_status_report_creation_time_us,namespace)",
+          "qryType": 1,
+          "query": "label_values(splice_sv_status_report_creation_time_us,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_sv_status_report_creation_time_us,report_publisher)",
+        "definition": "label_values(splice_sv_status_report_creation_time_us,report_publisher)",
         "description": "The SV whose node published the status report.",
-        "hide": 0,
         "includeAll": true,
         "label": "report publisher",
         "multi": true,
         "name": "sv_party",
         "options": [],
         "query": {
-          "query": "label_values(cn_sv_status_report_creation_time_us,report_publisher)",
+          "qryType": 1,
+          "query": "label_values(splice_sv_status_report_creation_time_us,report_publisher)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_sv_status_report_creation_time_us,canton_version)",
-        "hide": 0,
+        "definition": "label_values(splice_sv_status_report_creation_time_us,canton_version)",
         "includeAll": true,
         "multi": true,
         "name": "version",
         "options": [],
         "query": {
-          "query": "label_values(cn_sv_status_report_creation_time_us,canton_version)",
+          "qryType": 1,
+          "query": "label_values(splice_sv_status_report_creation_time_us,canton_version)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]

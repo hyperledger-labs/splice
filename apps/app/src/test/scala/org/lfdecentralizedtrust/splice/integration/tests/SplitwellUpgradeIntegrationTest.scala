@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import SpliceTests.BracketSynchronous.*
 import org.lfdecentralizedtrust.splice.util.{MultiDomainTestUtil, SplitwellTestUtil, WalletTestUtil}
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -206,8 +205,6 @@ class SplitwellUpgradeIntegrationTest
       }
     }
 
-    val globalAlias = DomainAlias tryCreate "global"
-
     "fully upgrade an active model" in { implicit env =>
       val (alice, bob) = clue("Setup some users on the old domain") {
         val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
@@ -320,15 +317,18 @@ class SplitwellUpgradeIntegrationTest
         val aBalanceUpdate = clue("Alice enters another payment") {
           aliceSplitwellClient.enterPayment(aGroupKey, BigDecimal("33.33"), "time left")
         }
-        eventually() { assertAllOn(globalAlias)(bobPyReqId) }
-        assertAllOn(splitwellAlias)(
-          newAbGroup.contract.contractId,
-          aGroup.contract.contractId,
-          bGroup.contract.contractId,
-          invite.contract.contractId,
-          abBalanceUpdate,
-          aBalanceUpdate,
-        )
+        eventually() {
+          assertAllOn(splitwellAlias)(
+            newAbGroup.contract.contractId,
+            aGroup.contract.contractId,
+            bGroup.contract.contractId,
+            invite.contract.contractId,
+            abBalanceUpdate,
+            aBalanceUpdate,
+            // Only gets reassigned on usage so still on splitwell domain
+            bobPyReqId,
+          )
+        }
         (newAbGroup, aGroup, bGroup, abBalanceUpdate, aBalanceUpdate, bobPyReq)
       }
 

@@ -328,6 +328,9 @@
           },
           "splitwell": false
         },
+        "spliceDomainNames": {
+          "nameServiceDomain": "cns"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -337,7 +340,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -390,6 +393,9 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "annotations": {
+          "pulumi.com/patchForce": "true"
+        },
         "name": "docker-reg-cred",
         "namespace": "validator1"
       },
@@ -453,7 +459,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -534,7 +540,7 @@
           }
         ]
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "validator1-participant-2",
     "provider": "",
@@ -717,7 +723,6 @@
         },
         "migration": {
           "id": 2,
-          "legacyId": 1,
           "migrating": false
         },
         "nodeIdentifier": "validator1",
@@ -776,7 +781,7 @@
         "validatorPartyHint": "digitalasset-validator1-1",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       },
-      "version": "0.3.1"
+      "version": "0.3.4"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

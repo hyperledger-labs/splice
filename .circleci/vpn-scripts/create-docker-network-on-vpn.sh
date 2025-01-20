@@ -21,7 +21,7 @@ docker network create "${DOCKER_NETWORK}" -o com.docker.network.bridge.name="${D
 echo "Dumping iptables rules before changes, for debugging"
 /usr/bin/sudo /usr/sbin/iptables --list-rules -t nat
 
-VPN_IP=$(/usr/bin/sudo ip --json addr show dev ens5 | tee /dev/stderr | jq -r '.[0].addr_info | .[] | select(.family == "inet" and (has("broadcast") | not)) | .local')
+VPN_IP=$(/usr/bin/sudo ip --json addr show | tee /dev/stderr | jq -r '.[] | select(.ifname | test("en[ps].*")) | .addr_info | .[] | select(.family == "inet" and (has("broadcast") | not)) | .local')
 SUBNET=$(docker network inspect "${DOCKER_NETWORK}" | jq -r '.[0].IPAM.Config[0].Subnet')
 /usr/bin/sudo iptables -D POSTROUTING -t nat -s "$SUBNET" ! -o "${DOCKER_BRIDGE}" -j MASQUERADE -t nat
 /usr/bin/sudo iptables -I POSTROUTING -t nat -s "$SUBNET" ! -o "${DOCKER_BRIDGE}" -j SNAT --to-source "$VPN_IP" -t nat

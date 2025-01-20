@@ -22,6 +22,14 @@ runs:
           pigz -r log/* || true
         fi
 
+    # Certain characters are disallowed in artifact filenames in GHA, so we need to sanitize them
+    - name: Sanitize filenames
+      # Runs in nix to have access to `rename`
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          rename -a : . log/* || true
+
     - name: Upload logs
       uses: actions/upload-artifact@v4
       with:

@@ -3,6 +3,7 @@ import { ConfigMap, Namespace, PersistentVolumeClaim, Secret } from '@pulumi/kub
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Role } from '@pulumi/kubernetes/rbac/v1';
 import { Resource } from '@pulumi/pulumi';
+import yaml from 'js-yaml';
 import {
   appsAffinityAndTolerations,
   HELM_MAX_HISTORY_SIZE,
@@ -11,7 +12,6 @@ import {
 } from 'splice-pulumi-common';
 import { ArtifactoryCreds } from 'splice-pulumi-common/src/artifactory';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
-import yaml from 'yaml';
 
 import { createCachePvc } from './cache';
 
@@ -24,6 +24,59 @@ type ResourcesSpec = {
     cpu?: string;
     memory?: string;
   };
+};
+
+const K8sRunnerSpecs = {
+  'x-small': {
+    requests: {
+      cpu: '1',
+      memory: '8Gi',
+    },
+    limits: {
+      cpu: '4',
+      memory: '10Gi',
+    },
+  },
+  small: {
+    requests: {
+      cpu: '2',
+      memory: '16Gi',
+    },
+    limits: {
+      cpu: '4',
+      memory: '18Gi',
+    },
+  },
+  medium: {
+    requests: {
+      cpu: '3',
+      memory: '20Gi',
+    },
+    limits: {
+      cpu: '5',
+      memory: '24Gi',
+    },
+  },
+  large: {
+    requests: {
+      cpu: '5',
+      memory: '24Gi',
+    },
+    limits: {
+      cpu: '6',
+      memory: '32Gi',
+    },
+  },
+  'x-large': {
+    requests: {
+      cpu: '5',
+      memory: '32Gi',
+    },
+    limits: {
+      cpu: '6',
+      memory: '40Gi',
+    },
+  },
 };
 
 function installDockerRunnerScaleSet(
@@ -40,7 +93,7 @@ function installDockerRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.9.3',
+      version: '0.10.1',
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: 'https://github.com/DACH-NY/canton-network-node',
@@ -93,6 +146,10 @@ function installDockerRunnerScaleSet(
                     mountPath: '/home/runner/.docker/config.json',
                     readOnly: true,
                     subPath: 'config.json',
+                  },
+                  {
+                    name: 'cache',
+                    mountPath: '/cache',
                   },
                 ],
               },
@@ -330,7 +387,7 @@ function installK8sRunnerScaleSet(
         namespace: runnersNamespace.metadata.name,
       },
       data: {
-        'pod.yaml': yaml.stringify({
+        'pod.yaml': yaml.dump({
           spec: {
             volumes: [
               {
@@ -363,6 +420,13 @@ function installK8sRunnerScaleSet(
                   },
                   limits: resources?.limits,
                 },
+                ports: [
+                  {
+                    name: 'metrics',
+                    containerPort: 8000,
+                    protocol: 'TCP',
+                  },
+                ],
               },
             ],
             serviceAccountName: serviceAccountName,
@@ -386,7 +450,7 @@ function installK8sRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.9.3',
+      version: '0.10.1',
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: 'https://github.com/DACH-NY/canton-network-node',
@@ -409,7 +473,7 @@ function installK8sRunnerScaleSet(
                 // are merged upstream.
                 // Upstream PR: https://github.com/actions/runner-container-hooks/pull/200
                 image:
-                  'digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-temp-runner-hook:0.3.3-itai-dirty',
+                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-temp-runner-hook:0.3.4',
                 imagePullPolicy: 'Always',
                 command: ['/home/runner/run.sh'],
                 env: [
@@ -602,41 +666,50 @@ function installK8sRunnerScaleSets(
   const saName = 'k8s-runners';
   installK8sRunnersServiceAccount(runnersNamespace, saName);
 
-  installK8sRunnerScaleSet(
-    runnersNamespace,
-    'self-hosted-k8s',
-    tokenSecret,
-    cachePvcName,
+  Object.entries(K8sRunnerSpecs).forEach(([name, resources]) => {
+    installK8sRunnerScaleSet(
+      runnersNamespace,
+      `self-hosted-k8s-${name}`,
+      tokenSecret,
+      cachePvcName,
+      resources,
+      saName,
+      dependsOn
+    );
+  });
+}
+
+function installPodMonitor(runnersNamespace: Namespace) {
+  // Define a PodMonitor to scrape metrics from the workflow runner pods
+  // (identified by the presence of the 'runner-pod' label).
+  return new k8s.apiextensions.CustomResource(
+    'workflow-runner-pod-monitor',
     {
-      requests: {
-        cpu: '1',
-        memory: '4Gi',
+      apiVersion: 'monitoring.coreos.com/v1',
+      kind: 'PodMonitor',
+      metadata: {
+        namespace: runnersNamespace.metadata.name,
+        labels: { release: 'prometheus-grafana-monitoring' },
       },
-      limits: {
-        cpu: '4',
-        memory: '16Gi',
+      spec: {
+        selector: {
+          matchExpressions: [
+            {
+              key: 'runner-pod',
+              operator: 'Exists',
+            },
+          ],
+        },
+        podMetricsEndpoints: [
+          {
+            port: 'metrics',
+            interval: '28s',
+            path: '/',
+          },
+        ],
       },
     },
-    saName,
-    dependsOn
-  );
-  installK8sRunnerScaleSet(
-    runnersNamespace,
-    'self-hosted-k8s-large',
-    tokenSecret,
-    cachePvcName,
-    {
-      requests: {
-        cpu: '5',
-        memory: '24Gi',
-      },
-      limits: {
-        cpu: '6',
-        memory: '40Gi', // the high resource tests really use lots all of this
-      },
-    },
-    saName,
-    dependsOn
+    { dependsOn: runnersNamespace }
   );
 }
 
@@ -655,10 +728,13 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         namespace: runnersNamespace.metadata.name,
       },
       stringData: {
-        // TODO(#15988): for now, this uses the token of the person running the pulumi command.
-        // It should instead be canton-network-da's token, or that of some other service account.
-        // (that didn't work originally, so worked around it with the personal token for now)
-        github_token: spliceEnvConfig.requireEnv('GITHUB_TOKEN'),
+        // This is the 'Actions Runner' token for canton-network-da GH user.
+        // Note that the user needs admin rights on the repo for this to work, since the controller and
+        // listeners use the actions/runners/registration-token endpoint to create a temporary token
+        // for registration, and this endpoint seems to require admin rights.
+        // TODO(#15988): The recommended thing to do is use a GitHub App. See here for a guide
+        // on setting it up: https://medium.com/@timburkhardt8/registering-github-self-hosted-runners-using-github-app-9cc952ea6ca
+        github_token: spliceEnvConfig.requireEnv('GITHUB_RUNNERS_ACCESS_TOKEN'),
       },
     },
     {
@@ -670,4 +746,5 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
 
   installDockerRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvc);
   installK8sRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvcName);
+  installPodMonitor(runnersNamespace);
 }

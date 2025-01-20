@@ -17,6 +17,7 @@ import {
   imagePullSecret,
   CnInput,
   activeVersion,
+  ansDomainPrefix,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
@@ -164,6 +165,9 @@ function installIngress(xns: ExactNamespace, dependsOn: CnInput<pulumi.Resource>
     cluster: {
       hostname: CLUSTER_HOSTNAME,
       svNamespace: xns.logicalName,
+    },
+    spliceDomainNames: {
+      nameServiceDomain: ansDomainPrefix,
     },
     withSvIngress: false,
     opts: {

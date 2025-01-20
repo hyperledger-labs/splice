@@ -145,39 +145,45 @@ clusters.)
       nix develop --debug --verbose path:nix
       ```
 10. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
-   ```
-   pre-commit install
-   # or:
-   pre-commit install -t pre-push
-   ```
-   _Note_: if you want to skip specific pre-commit hooks, add the hook ids to the `SKIP` variable separated by commas,
-           e.g. `export SKIP=scalafmt` (see https://pre-commit.com/#temporarily-disabling-hooks).
+    ```
+    pre-commit install
+    # or:
+    pre-commit install -t pre-push
+    ```
+    _Note_: if you want to skip specific pre-commit hooks, add the hook ids to the `SKIP` variable separated by commas,
+            e.g. `export SKIP=scalafmt` (see https://pre-commit.com/#temporarily-disabling-hooks).
+            Also, you can bypass running pre-commit hooks altogether using the `--no-verify` / `-n` git commit option.
 
-           Also, you can bypass running pre-commit hooks altogether using the `--no-verify` / `-n` git commit option.
+     **Important:** start your IDE and other development tools from a console that
+     has this `direnv` loaded; and thus has the proper version of all the
+     project dependencies on its `PATH`.
 
-    **Important:** start your IDE and other development tools from a console that
-    has this `direnv` loaded; and thus has the proper version of all the
-    project dependencies on its `PATH`.
-
-    If you encounter issues, try exiting and reentering the directory to reactivate direnv.
+     If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
 11. On MacOS, please install the following globally:
    1. Firefox, by following the process here: <https://www.firefox.com>
 12. Configure CircleCI.
-   Open `./.circleci/cluster-lock-users.json`, and add a line of the format
-   ```
-   "<circleci-username>": ["<local-username>"],
-   ```
-   where `circleci-username` is the username you are using for logging into CircleCI
-   (your GitHub username if you are logging into CircleCI using your GitHub account)
-   and `local-username` is the local username on your machine (as returned by `whoami`).
+    Open `./.circleci/cluster-lock-users.json`, and add a line of the format
+    ```
+    "<circleci-username>": ["<local-username>"],
+    ```
+    where `circleci-username` is the username you are using for logging into CircleCI
+    (your GitHub username if you are logging into CircleCI using your GitHub account)
+    and `local-username` is the local username on your machine (as returned by `whoami`).
 
-   Open `./circleci/cluster-lock-slack-ids.json`, and add a line of the format
-   ```
-   "<local-username>": "<slack-user-id>",
-   ```
-   to receive slack pings when your cluster lock is ~1hr away from expiring. Determine your user ID
-   from your profile settings, as described [here](https://www.workast.com/help/article/how-to-find-a-slack-user-id/).
+    Open `./circleci/cluster-lock-slack-ids.json`, and add a line of the format
+    ```
+    "<local-username>": "<slack-user-id>",
+    ```
+    to receive slack pings when your cluster lock is ~1hr away from expiring. Determine your user ID
+    from your profile settings, as described [here](https://www.workast.com/help/article/how-to-find-a-slack-user-id/).
+13. On MacOS, activate admin privileges using the lock icon (🔒 → 🔓) in the Dock, go to
+    System Settings → General → AirDrop & Handoff, and disable AirPlay Receiver. Otherwise
+    you will see on `start-canton.sh` runs
+    ```
+    Exception in thread "main" java.io.UncheckedIOException: Could not create Prometheus HTTP server
+    Caused by: java.net.BindException: Address already in use
+    ```
 
 ### Private Environment Variables
 
@@ -358,6 +364,18 @@ Test:
 Things sometimes go wrong with `sbt` in ways that are hard to debug. This section will list common tips&tricks for getting `sbt` to do what we want it to.
 - In case you see unexpected build failures after switching branches, run `sbt reload` to have sbt update its internal state.
 - In case you continue to see unexpected build failures, despite following every other trick in this section, you probably need to delete the sbt build files. If you suspect the build failures come from CN build files, run `sbt clean-splice` to delete all CN build files. If the error might come from the build files of the OS Canton dependency, run `sbt clean` to delete all build files managed by sbt. Subsequent `sbt Test/compile`s should then succeed.
+- 
+
+### Troubleshooting
+- MacOS: If you previously installed nix and suddenly have no access to the command. As a result, when reloading the project environment, you may see something like `./.envrc:8: nix: command not found`. To fix this, first verify that the executable is available in `/nix/var/nix/profiles/default/bin/nix`. If yes, then you may want to add the folowing as seen [here](https://github.com/NixOS/nix/issues/3616#issuecomment-903869569) to your (bash|zsh)rc file.
+  
+```
+  # Nix
+    if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+      source '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+    fi
+  # End Nix
+```
 
 ## Contributing Changes
 
@@ -844,6 +862,16 @@ At the moment, CI is by default being cancelled on commits, unless explicitly op
 the error `Build was canceled`.) To enable CI for your commit, please include the text `[ci]` in your commit
 message.
 
+### Opting-out of CI
+
+In certain cases, it may be valid to allow a PR to be merged without going through CI.
+While `[skip ci]` is supported, it does not allow the PR to be merged. To skip testing but
+stil allow the PR to be merged, please include the text `[force]` in your commit message.
+
+Alternatively, to run only static tests (and skip e.g. integration tests) on your PR,
+include the text `[static]` in your commit message. This is recommended for, e.g. changes in
+Pulumi deployment configurations, deployment scripts, etc.
+
 ### Managing Canton for Tests
 
 To speed up our tests run against a long-running Canton instance.
@@ -1144,7 +1172,6 @@ Once this is complete, the front ends will be running on the ports on localhost 
   - 2 for sv UI
   - 3 for scan
   - 4 for splitwell
-  - 5 for app manager
 - <user> is as follows:
   - 00 for alice
   - 01 for bob

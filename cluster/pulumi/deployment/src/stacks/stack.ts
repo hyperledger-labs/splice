@@ -6,7 +6,6 @@ import { namespace } from '../namespace';
 import { operator } from '../operator';
 
 const requiredEnvs = Array.from([
-  'SLACK_ACCESS_TOKEN',
   'AUTH0_CN_MANAGEMENT_API_CLIENT_ID',
   'AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET',
   'AUTH0_SV_MANAGEMENT_API_CLIENT_ID',
@@ -14,7 +13,12 @@ const requiredEnvs = Array.from([
   'AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID',
   'AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET',
 ]);
-const optionalEnvs = Array.from(['K6_USERS_PASSWORD', 'K6_VALIDATOR_ADMIN_PASSWORD']).concat(
+
+const optionalEnvs = Array.from([
+  'K6_USERS_PASSWORD',
+  'K6_VALIDATOR_ADMIN_PASSWORD',
+  'SLACK_ACCESS_TOKEN',
+]).concat(
   isMainNet
     ? ['AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET', 'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID']
     : []

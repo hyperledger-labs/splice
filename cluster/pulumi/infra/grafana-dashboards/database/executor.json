@@ -18,9 +18,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 1760,
+  "id": 2462,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -33,7 +32,6 @@
       "id": 4,
       "panels": [],
       "repeat": "libs",
-      "repeatDirection": "h",
       "title": "Db $libs",
       "type": "row"
     },
@@ -99,7 +97,7 @@
       },
       "gridPos": {
         "h": 15,
-        "w": 8,
+        "w": 24,
         "x": 0,
         "y": 1
       },
@@ -233,7 +231,7 @@
       },
       "gridPos": {
         "h": 10,
-        "w": 8,
+        "w": 24,
         "x": 0,
         "y": 16
       },
@@ -330,7 +328,7 @@
       },
       "gridPos": {
         "h": 10,
-        "w": 8,
+        "w": 24,
         "x": 0,
         "y": 26
       },
@@ -367,15 +365,15 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
           "text": [
             "sv-1"
           ],
@@ -388,7 +386,6 @@
           "uid": "prometheus"
         },
         "definition": "label_values(daml_db_commit_duration_seconds,namespace)",
-        "hide": 0,
         "includeAll": true,
         "multi": true,
         "name": "namespace",
@@ -400,31 +397,27 @@
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": [
             "daml",
-            "cn"
+            "splice"
           ],
           "value": [
             "daml",
-            "cn"
+            "splice"
           ]
         },
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "libs",
         "options": [
           {
             "selected": true,
-            "text": "cn",
-            "value": "cn"
+            "text": "splice",
+            "value": "splice"
           },
           {
             "selected": true,
@@ -432,14 +425,11 @@
             "value": "daml"
           }
         ],
-        "query": "cn,daml",
-        "queryValue": "",
-        "skipUrlSync": false,
+        "query": "splice,daml",
         "type": "custom"
       },
       {
         "current": {
-          "selected": true,
           "text": [
             "general",
             "write",
@@ -451,7 +441,6 @@
             "locks"
           ]
         },
-        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "db_pool",
@@ -473,8 +462,6 @@
           }
         ],
         "query": "general,write,locks",
-        "queryValue": "",
-        "skipUrlSync": false,
         "type": "custom"
       }
     ]

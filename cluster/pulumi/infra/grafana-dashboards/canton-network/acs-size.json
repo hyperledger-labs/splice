@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2199,
+  "id": 2418,
   "links": [],
   "panels": [
     {
@@ -93,7 +93,7 @@
           }
         ]
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -101,7 +101,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (namespace, store_name, store_party) (cn_store_acs_size{namespace=~\"$namespace\",store_name=~\"$store_name\"})",
+          "expr": "sum by (namespace, store_name, store_party) (splice_store_acs_size{namespace=~\"$namespace\",store_name=~\"$store_name\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -201,6 +201,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -208,7 +209,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum without (__name__,endpoint,instance,job,migration,otel_scope) (cn_store_acs_size{namespace=~\"$namespace\",store_name=~\"$store_name\"})",
+          "expr": "sum without (__name__,endpoint,instance,job,migration,otel_scope) (splice_store_acs_size{namespace=~\"$namespace\",store_name=~\"$store_name\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -219,73 +220,58 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_store_acs_size,namespace)",
-        "hide": 0,
+        "definition": "label_values(splice_store_acs_size,namespace)",
         "includeAll": true,
         "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(cn_store_acs_size,namespace)",
+          "query": "label_values(splice_store_acs_size,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_store_acs_size,store_name)",
-        "hide": 0,
+        "definition": "label_values(splice_store_acs_size,store_name)",
         "includeAll": true,
         "multi": true,
         "name": "store_name",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(cn_store_acs_size,store_name)",
+          "query": "label_values(splice_store_acs_size,store_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
@@ -298,6 +284,6 @@
   "timezone": "browser",
   "title": "Splice Store ACS Size",
   "uid": "dduss3xr5or28c",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }

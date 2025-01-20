@@ -18,9 +18,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1212,
+  "id": 2419,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "datasource": {
@@ -39,6 +38,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -101,6 +101,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -108,7 +109,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_avg(rate(cn_sequencer_pruning_latency_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "histogram_avg(rate(splice_sequencer_pruning_latency_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -135,6 +136,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -196,6 +198,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -204,7 +207,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "cn_sequencer_pruning_disabled_members{namespace=~\"$namespace\"}",
+          "expr": "splice_sequencer_pruning_disabled_members{namespace=~\"$namespace\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -218,40 +221,34 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_sequencer_pruning_disabled_members,namespace)",
-        "hide": 0,
+        "definition": "label_values(splice_sequencer_pruning_disabled_members,namespace)",
         "includeAll": true,
         "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(cn_sequencer_pruning_disabled_members,namespace)",
+          "qryType": 1,
+          "query": "label_values(splice_sequencer_pruning_disabled_members,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
@@ -264,6 +261,6 @@
   "timezone": "",
   "title": "Sequencer Pruning",
   "uid": "bc8fea13-0bf5-488b-ac31-76e4ec7f4c1f",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }

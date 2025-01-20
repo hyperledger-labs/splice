@@ -16,7 +16,6 @@ import org.lfdecentralizedtrust.splice.console.{
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
@@ -156,7 +155,7 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
       receiver: PartyId,
       amount: BigDecimal,
       key: HttpSplitwellAppClient.GroupKey,
-  )(implicit env: SpliceTestConsoleEnvironment): AcceptedAppPayment.ContractId =
+  ): AcceptedAppPayment.ContractId =
     splitwellTransfer(
       senderSplitwell,
       senderWallet,
@@ -174,22 +173,18 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
       senderWallet: WalletAppClientReference,
       key: HttpSplitwellAppClient.GroupKey,
       receiverAmounts: Seq[ReceiverAmuletAmount],
-  )(implicit env: SpliceTestConsoleEnvironment): AcceptedAppPayment.ContractId = {
+  ): AcceptedAppPayment.ContractId = {
     senderSplitwell.initiateTransfer(key, receiverAmounts)
-    val request = eventually()(getSingleRequestOnDecentralizedSynchronizer(senderWallet))
+    val request = eventually()(getSingleAppPaymentRequest(senderWallet))
     senderWallet.acceptAppPaymentRequest(request.contractId)
   }
 
-  protected def getSingleRequestOnDecentralizedSynchronizer(
+  protected def getSingleAppPaymentRequest(
       walletClient: WalletAppClientReference
-  )(implicit env: SpliceTestConsoleEnvironment) = {
-    val request = walletClient
+  ) = {
+    walletClient
       .listAppPaymentRequests()
       .loneElement
-    inside(request.state) { case ContractState.Assigned(domain) =>
-      domain should be(decentralizedSynchronizerId)
-    }
-    request
   }
 
 }

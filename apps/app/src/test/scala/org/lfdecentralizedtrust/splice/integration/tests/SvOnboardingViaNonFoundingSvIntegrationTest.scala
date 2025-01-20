@@ -58,14 +58,12 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             case _ => throw new IllegalStateException("JoinWithKey configuration not found.")
           }
         val sv2BootstrapSequencerUrl =
-          bumpUrl(
-            sv1ToSv2Bump,
-            configuration
-              .svApps(InstanceName.tryCreate("sv2"))
-              .domains
-              .global
-              .url,
-          )
+          configuration
+            .svApps(InstanceName.tryCreate("sv2"))
+            .domains
+            .global
+            .url
+            .map(bumpUrl(sv1ToSv2Bump, _))
         ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
           if (name == "sv3") {
             config.copy(

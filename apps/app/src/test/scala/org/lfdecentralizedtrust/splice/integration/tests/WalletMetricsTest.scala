@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.{WalletTestUtil}
@@ -25,7 +26,7 @@ class WalletMetricsTest
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val before = aliceValidatorBackend.metrics
         .get(
-          "cn.wallet.unlocked-amulet-balance",
+          s"$MetricsPrefix.wallet.unlocked-amulet-balance",
           Map("owner" -> aliceUserParty.toString),
         )
         .select[MetricValue.DoublePoint]
@@ -39,7 +40,10 @@ class WalletMetricsTest
         "metrics update to reflect new coins",
         _ => {
           val after = aliceValidatorBackend.metrics
-            .get("cn.wallet.unlocked-amulet-balance", Map("owner" -> aliceUserParty.toString))
+            .get(
+              s"$MetricsPrefix.wallet.unlocked-amulet-balance",
+              Map("owner" -> aliceUserParty.toString),
+            )
             .select[MetricValue.DoublePoint]
             .value
             .value
@@ -68,12 +72,11 @@ class WalletMetricsTest
         "ExpireBuyTrafficRequestsTrigger",
         "ExpireTransferOfferTrigger",
         "SubscriptionReadyForPaymentTrigger",
-        "TransferFollowTrigger",
       ).foreach(triggerName =>
         clue(s"$triggerName should report polling iterations correctly") {
           aliceValidatorBackend.metrics
             .get(
-              "cn.trigger.iterations",
+              s"$MetricsPrefix.trigger.iterations",
               Map(
                 "trigger_name" -> triggerName,
                 "party" -> aliceUserParty.toString,
@@ -95,7 +98,7 @@ class WalletMetricsTest
         clue(s"$triggerName should report task completions correctly") {
           aliceValidatorBackend.metrics
             .get(
-              "cn.trigger.completed",
+              s"$MetricsPrefix.trigger.completed",
               Map(
                 "trigger_name" -> triggerName,
                 "party" -> aliceUserParty.toString,

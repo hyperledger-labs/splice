@@ -32,7 +32,10 @@ const commandPromise = automation.PulumiCommand.get({
   skipVersionCheck: false,
 });
 
-export function pulumiOptsWithPrefix(prefix: string, abortSignal: AbortSignal): {
+export function pulumiOptsWithPrefix(
+  prefix: string,
+  abortSignal: AbortSignal
+): {
   parallel: 128;
   onOutput: (output: string) => void;
   signal: AbortSignal;
@@ -68,7 +71,11 @@ export async function stack(
     stackName: fullStackName,
   };
   const workspaceOpts: automation.LocalWorkspaceOptions = {
-    secretsProvider: `gcpkms://projects/${config.requireEnv('PULUMI_BACKEND_GCPKMS_PROJECT')}/locations/${config.requireEnv('CLOUDSDK_COMPUTE_REGION')}/keyRings/pulumi/cryptoKeys/${config.requireEnv('PULUMI_BACKEND_GCPKMS_NAME')}`,
+    secretsProvider: `gcpkms://projects/${config.requireEnv(
+      'PULUMI_BACKEND_GCPKMS_PROJECT'
+    )}/locations/${config.requireEnv(
+      'CLOUDSDK_COMPUTE_REGION'
+    )}/keyRings/pulumi/cryptoKeys/${config.requireEnv('PULUMI_BACKEND_GCPKMS_NAME')}`,
     envVars: envVars,
     workDir: projectDirectory,
     pulumiCommand: command,
@@ -80,7 +87,10 @@ export async function stack(
     : await automation.LocalWorkspace.createOrSelectStack(stackOpts, workspaceOpts);
 }
 
-export async function refreshStack(stack: automation.Stack, abortController: PulumiAbortController): Promise<void> {
+export async function refreshStack(
+  stack: automation.Stack,
+  abortController: PulumiAbortController
+): Promise<void> {
   const name = stack.name;
   console.log(`${name} - Refreshing stack`);
   await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
@@ -89,22 +99,32 @@ export async function refreshStack(stack: automation.Stack, abortController: Pul
   });
 }
 
-export async function downStack(stack: automation.Stack, abortController: PulumiAbortController): Promise<void> {
+export async function downStack(
+  stack: automation.Stack,
+  abortController: PulumiAbortController
+): Promise<void> {
   const name = stack.name;
   console.error(`${name} - Refreshing & Destroying stack`);
-  await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).then(() =>
-    stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortController.signal))).catch(e => {
+  await stack
+    .refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal))
+    .then(() => stack.destroy(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)))
+    .catch(e => {
       abortController.abort(`Aborting because of caught exception`);
       throw e;
     });
 }
 
-export async function upStack(stack: automation.Stack, abortController: PulumiAbortController): Promise<void> {
+export async function upStack(
+  stack: automation.Stack,
+  abortController: PulumiAbortController
+): Promise<void> {
   const name = stack.name;
-  const result = await stack.up(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
-    abortController.abort(`Aborting because of caught exception`);
-    throw e;
-  });
+  const result = await stack
+    .up(pulumiOptsWithPrefix(`[${name}]`, abortController.signal))
+    .catch(e => {
+      abortController.abort(`Aborting because of caught exception`);
+      throw e;
+    });
   console.log(util.inspect(result.summary, { colors: true, depth: null, maxStringLength: null }));
 }
 
@@ -115,16 +135,16 @@ export async function upStack(stack: automation.Stack, abortController: PulumiAb
 // 3. Waits a few seconds before actually signalling, see https://github.com/DACH-NY/canton-network-node/issues/15519
 //    for the reason (the gist is: aborting pulumi actions too early causes pulumi to terminate without releasing the lock)
 export class PulumiAbortController {
-
   constructor() {
-    ['SIGINT', 'SIGTERM']
-      .forEach(signal =>
-        // We assume here that an external abort signal will not come immediately, and do not
-        // wait before sending the actual signal to Pulumi. This is because we do not want to
-        // add delays to cleaning up when CCI terminates us, to try to avoid CCI timing out and
-        // hard-killing us.
-        process.on(signal, () => { this.abort("Aborting due to caught signal"); })
-      );
+    ['SIGINT', 'SIGTERM'].forEach(signal =>
+      // We assume here that an external abort signal will not come immediately, and do not
+      // wait before sending the actual signal to Pulumi. This is because we do not want to
+      // add delays to cleaning up when CCI terminates us, to try to avoid CCI timing out and
+      // hard-killing us.
+      process.on(signal, () => {
+        this.abort('Aborting due to caught signal');
+      })
+    );
   }
 
   private controller = new AbortController();
@@ -134,7 +154,7 @@ export class PulumiAbortController {
 
   public abort(reason?: any): void {
     if (!this.aborted) {
-      new Promise((f) => setTimeout(f, this.WAIT_BEFORE_ABORT)).then(() =>
+      new Promise(f => setTimeout(f, this.WAIT_BEFORE_ABORT)).then(() =>
         this.controller.abort(reason)
       );
     }
@@ -146,10 +166,30 @@ export class PulumiAbortController {
   }
 }
 
-export async function awaitAllOrThrowAllExceptions(operations: Promise<void>[]): Promise<void> {
-  const data = await Promise.allSettled(operations);
-  const rejectionReasons = (data.filter((res) => res.status === "rejected") as PromiseRejectedResult[]).map(res => res.reason);
+export interface Operation {
+  name: string;
+  promise: Promise<void>;
+}
+export function operation(name: string, promise: Promise<void>) {
+  return { name, promise };
+}
+export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Promise<void> {
+  const data = await Promise.allSettled(
+    operations.map(op => {
+      console.error(`Running operation ${op.name}`);
+      op.promise.then(
+        ok => console.error(`Operation ${op.name} succeeded.`),
+        err => {
+          console.error(`Operation ${op.name} failed.`, err);
+          throw err;
+        }
+      );
+    })
+  );
+  const rejectionReasons = (
+    data.filter(res => res.status === 'rejected') as PromiseRejectedResult[]
+  ).map(res => res.reason);
   if (rejectionReasons.length > 0) {
-    throw new Error(rejectionReasons.join("\n"));
+    throw new Error(rejectionReasons.join('\n'));
   }
-};
+}

@@ -4,7 +4,9 @@
 dir := $(call current_dir)
 
 target-bundle := $(dir)/target/splice-node.tar.gz
+versioned-bundle := $(dir)/target/$(shell get-snapshot-version)_splice-node.tar.gz
 app-bundle := ${REPO_ROOT}/apps/app/target/release/splice-node.tar.gz
+versioned-openapi := $(dir)/target/$(shell get-snapshot-version)_openapi.tar.gz
 target-logback := $(dir)/target/logback.xml
 
 include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk

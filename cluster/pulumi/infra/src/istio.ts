@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { local } from '@pulumi/command';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
@@ -14,11 +15,11 @@ import {
 import { clusterBasename, loadIPRanges } from './config';
 
 export const istioVersion = {
-  istio: '1.22.2',
+  istio: '1.24.2',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 220,
-    wasm: 177,
+    general: 239,
+    wasm: 196,
   },
 };
 
@@ -26,6 +27,10 @@ function configureIstioBase(
   ns: k8s.core.v1.Namespace,
   istioDNamespace: k8s.core.v1.Namespace
 ): k8s.helm.v3.Release {
+  const migration = new local.Command(`migrate-istio-crds`, {
+    create: `bash migrate-istio.sh`,
+  });
+
   return new k8s.helm.v3.Release(
     'istio-base',
     {
@@ -37,17 +42,16 @@ function configureIstioBase(
         repo: 'https://istio-release.storage.googleapis.com/charts',
       },
       values: {
-        defaults: {
-          global: {
-            istioNamespace: istioDNamespace.metadata.name,
-            platform: 'gcp',
-          },
+        global: {
+          istioNamespace: istioDNamespace.metadata.name,
+          // uncomment when the version is > 1.24.2
+          // platform: 'gke',
         },
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      dependsOn: [ns],
+      dependsOn: [ns, migration],
     }
   );
 }
@@ -382,6 +386,7 @@ function configureGateway(
         daHostname: getDnsNames().daDnsName,
         basename: clusterBasename,
       },
+      enableGcsProxy: true,
     },
     activeVersion,
     {

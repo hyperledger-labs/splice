@@ -19,7 +19,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: time() - max by (report_publisher) (cn_sv_status_report_creation_time_us{namespace=~".*", report_publisher=~".*", canton_version=~".*"}) / 1000000
+              expr: time() - max by (report_publisher) (splice_sv_status_report_creation_time_us{namespace=~".*", report_publisher=~".*", canton_version=~".*"}) / 1000000
               instant: false
               interval: ""
               intervalMs: 30000

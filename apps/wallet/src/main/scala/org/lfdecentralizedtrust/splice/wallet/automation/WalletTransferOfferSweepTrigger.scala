@@ -94,7 +94,7 @@ class WalletTransferOfferSweepTrigger(
           connection
             .submit(
               Seq(store.key.validatorParty),
-              Seq(),
+              Seq(store.key.endUserParty),
               cmd,
             )
             .noDedup

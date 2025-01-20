@@ -432,7 +432,7 @@ if:
 - the block chain is mature enough for at least 1 state snapshot to have been taken i.e.
   the height of the latest block is greater than or equal to the configured interval between snapshots
 
-The snapshots are fetched from sv1 which exposes its CometBft RPC API at `https://sv.sv-2.TARGET_HOSTNAME:443/cometbft-rpc/`.
+The snapshots are fetched from sv1 which exposes its CometBft RPC API at `https://sv.sv-1.TARGET_HOSTNAME:443/cometbft-rpc/`.
 This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
 and setting them explicitly should not be required and is not currently supported.
 
@@ -517,7 +517,7 @@ An SV node includes a CometBft node so you also need to configure
 that. Please modify the file ``splice-node/examples/sv-helm/cometbft-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |splice_cluster|, per the cluster to which you are connecting.
-- Replace all instances of ``TARGET_HOSTNAME`` with |splice_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |da_hostname|, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster. Note that ``MIGRATION_ID`` is also used within port numbers in URLs here!
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBft node
@@ -562,7 +562,7 @@ that. Please modify the file ``splice-node/examples/sv-helm/validator-values.yam
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/sv-validator-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_HOSTNAME`` with |splice_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |da_hostname|, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 The private and public key for your SV are defined in a K8s secret.
@@ -581,7 +581,7 @@ identity.
 
 For configuring your sv app, please modify the file ``splice-node/examples/sv-helm/sv-values.yaml`` as follows:
 
-- Replace all instances of ``TARGET_HOSTNAME`` with |splice_cluster|.global.canton.network.digitalasset.com, per the cluster to which you are connecting.
+- Replace all instances of ``TARGET_HOSTNAME`` with |da_hostname|, per the cluster to which you are connecting.
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
@@ -834,7 +834,12 @@ To install it, run the following (assuming the environment variable `YOUR_HOSTNA
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
 Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
-Another reference Helm chart is provided for that, which can be installed using:
+Another reference Helm chart is provided for that, which can be installed after
+
+1. replacing ``YOUR_HOSTNAME`` in ``splice-node/examples/sv-helm/sv-cluster-ingress-values.yaml`` and
+2. setting ``nameServiceDomain`` in the same file to ``"cns"``
+
+using:
 
 
 .. code-block:: bash
@@ -853,11 +858,11 @@ This list is useful for an SV that wishes to limit egress to only allow the mini
 ====================== ================================================================================================ ========= ==============
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
-Sponsor SV             sv.sv-2.<TARGET_HOSTNAME>:443                                                                    HTTPS     sv-app
-Sponsor SV Sequencer   sequencer-<M>.sv-2.<TARGET_HOSTNAME>:443                                                         HTTPS     participant-<M>
-Sponsor SV Scan        scan.sv-2.<TARGET_HOSTNAME>:443                                                                  HTTPS     validator-app
+Sponsor SV             sv.sv-1.<TARGET_HOSTNAME>:443                                                                    HTTPS     sv-app
+Sponsor SV Sequencer   sequencer-<M>.sv-1.<TARGET_HOSTNAME>:443                                                         HTTPS     participant-<M>
+Sponsor SV Scan        scan.sv-1.<TARGET_HOSTNAME>:443                                                                  HTTPS     validator-app
 CometBft P2P           CometBft p2p IPs and ports 26<M>16, 26<M>26, 26<M>36, 26<M>46, 26<M>56                           TCP       global-domain-<M>-cometbft
-CometBft JSON RPC      sv.sv-2.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<M>-cometbft
+CometBft JSON RPC      sv.sv-1.<TARGET_HOSTNAME>:443/api/sv/v0/admin/domain/cometbft/json-rpc                           HTTPS     global-domain-<M>-cometbft
 ====================== ================================================================================================ ========= ==============
 
 At present, we designate sv1 as the sponsor SV. However, in the long term, any onboarded SV can function as a sponsor SV.
@@ -934,81 +939,3 @@ Note that as of now, each instance of the Scan app backend aggregates only Canto
 This will be changed in future updates, where the Scan app will guarantee correctness against all data since network start.
 At that point, data in different instances of the Scan app (hosted by different Super Validators) will always be consistent.
 This allows the public to inspect multiple Scan UIs and compare their data, so that they do not need to trust a single Super Validator.
-
-.. _sv_backups:
-
-Backups
--------
-
-Backup of Node Identities
-+++++++++++++++++++++++++
-
-Once your SV node is up and onboarded, please make sure to backup the node identities of your SV node. **Note that this information
-is highly sensitive, and contains the private keys of your participant, sequencer and mediator,** so make sure to store it in
-a secure location, such as a Secret Manager. On the other hand, it is crucial for maintaining your identity (and thus, e.g.
-access to your Canton Coin holdings), so must be backed up outside of the cluster.
-
-Your identites may be fetched from your node through the following endpoint:
-
-.. code-block:: bash
-
-    curl "https://sv.sv.YOUR_HOSTNAME/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer <token>"
-
-where `<token>` is an OAuth2 Bearer Token obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
-
-Backup of Postgres Instances
-++++++++++++++++++++++++++++
-
-Please make sure your Postgres instances are backed up at least every 4 hours. We will provide guidelines on retention of older backups
-at a later point in time.
-
-While most backups can be taken independently, there is one strict ordering requirement between them:
-The backup of the apps postgres instance must be taken at a point in time strictly earlier than that of the participant.
-Please make sure the apps instance backup is completed before starting the participant one.
-
-If you are running your own Postgres instances in the cluster, backups can be taken either using tools like `pgdump`, or through snapshots of the underlying Persistent Volume.
-Similarly, if you are using Cloud-hosted Postgres, you can either use tools like `pgdump` or backup tools provided by the Cloud provider.
-
-Backup of CometBFT
-++++++++++++++++++
-
-In addition to the Postgres instances, the storage used by CometBFT should also be backed up every 4 hours.
-CometBFT does not use Postgres.
-We recommend backing up its storage by creating snapshots of the underlying Persistent Volume.
-
-Re-onboard an SV and recover Amulets with a validator
------------------------------------------------------
-
-In the case of a catastrophic failure of the SV node, the amulets owned by the SV can be recovered via deploying a standalone validator node with control over the SV's participant keys.
-The SV node can be re-onboarded with a new identity and the amulets can be transferred from the validator to the new SV node.
-
-In order to be able to recover the amulet, the backup of the identities of your SV node is required.
-The details of fetching the identities are provided in the :ref:`Backup of Node Identities <sv_backups>` section.
-
-From the backup of Node Identities, copy the content of the field ``identities.participant`` and save it as a separate JSON file.
-This file will be used as identities bootstrap dump for the validator runbook.
-
-.. code-block:: bash
-
-    jq '.identities.participant' backup.json > dump.json
-
-
-Once the failed SV node is offboarded by a majority of SVs (via a governance vote on a ``OffboardMember`` action), we can deploy a standalone validator node for recovering the SV's amulets.
-
-Repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant,
-
-While doing so, please note the following:
-
-* Modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` so that ``validatorPartyHint`` is set to the name you chose when creating the SV identity.
-* Follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
-  Use the separate JSON file prepared previously.
-
-Once the validator is up and running, login to the wallet of the validator ``https://wallet.validator.YOUR_HOSTNAME`` with the validator user account setup in :ref:`helm-validator-auth0`.
-Confirm that the wallet balance is as expected. It should be the same as the amount that the original SV owned.
-
-You can now deploy and onboard a fresh SV node (reusing your SV identity but otherwise starting with a clean slate) by following the steps in :ref:`helm-sv-install`.
-
-Login to the wallet of the new SV node, copy the new party ID.
-Switch to the wallet of the validator, create a new transfer offer sending the amulets to the new SV node with the copied party ID.
-
-Switch to the wallet of the new SV node, accept the transfer offer from the wallet of the new SV node, and verify that the amulets have arrived as expected.

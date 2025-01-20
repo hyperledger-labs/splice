@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.validator.config
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.config.*
-import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
@@ -44,36 +43,7 @@ object ValidatorOnboardingConfig {
   }
 }
 
-final case class InitialRegisteredApp(
-    providerUserId: String,
-    config: definitions.AppConfiguration,
-    releaseFile: String,
-)
-
 final case class InitialInstalledApp(appUrl: Uri)
-
-final case class AppManagerConfig(
-    issuerUrl: Uri,
-    appManagerUiUrl: Uri,
-    appManagerApiUrl: Uri,
-    jsonApiUrl: Uri,
-    audience: String,
-    // Interval at which the app manager polls installed apps to discover new versions.
-    // Set to 1 minute to avoid spamming logs but still be able to demo things in our cluster.
-    // We may want to consider increasing it to 10min or even an hour.
-    installedAppsPollingInterval: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(1),
-    initialRegisteredApps: Map[String, InitialRegisteredApp],
-    initialInstalledApps: Map[String, InitialInstalledApp],
-) {
-  def authorizationEndpoint: Uri = appManagerUiUrl.withPath(appManagerUiUrl.path / "authorize")
-  def tokenEndpoint: Uri =
-    appManagerApiUrl.withPath(appManagerApiUrl.path / "v0" / "app-manager" / "oauth2" / "token")
-  def jwksUri: Uri =
-    appManagerApiUrl.withPath(
-      appManagerApiUrl.path / "v0" / "app-manager" / "oauth2" / ".well-known" / "jwks.json"
-    )
-}
 
 final case class BuyExtraTrafficConfig(
     /** target throughput in bytes per second
@@ -180,7 +150,6 @@ case class ValidatorAppBackendConfig(
     treasury: TreasuryConfig = TreasuryConfig(),
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     participantIdentitiesBackup: Option[PeriodicBackupDumpConfig] = None,
-    appManager: Option[AppManagerConfig] = None,
     transferPreapproval: TransferPreapprovalConfig = TransferPreapprovalConfig(),
     // Migrate the validator party from an existing participant with the same namespace.
     migrateValidatorParty: Option[MigrateValidatorPartyConfig] = None,
@@ -228,13 +197,6 @@ case class ValidatorAppClientConfig(
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
 
-case class AppManagerAppClientConfig(
-    adminApi: NetworkAppClientConfig,
-    ledgerApiUser: String,
-) extends HttpClientConfig {
-  override def clientAdminApi: NetworkAppClientConfig = adminApi
-}
-
 case class AnsAppExternalClientConfig(
     adminApi: NetworkAppClientConfig,
     ledgerApiUser: String,
@@ -246,10 +208,16 @@ final case class ValidatorCantonIdentifierConfig(
     participant: String
 )
 object ValidatorCantonIdentifierConfig {
-  def default(config: ValidatorAppBackendConfig): ValidatorCantonIdentifierConfig = {
+  private def default(config: ValidatorAppBackendConfig): ValidatorCantonIdentifierConfig = {
     val identifier = config.validatorPartyHint.getOrElse("unnamedValidator")
     ValidatorCantonIdentifierConfig(
       participant = identifier
     )
   }
+
+  // The config reader/writer derivation fails if we make this a method on the config class so we keep it here on the companion
+  def resolvedNodeIdentifierConfig(
+      config: ValidatorAppBackendConfig
+  ): ValidatorCantonIdentifierConfig =
+    config.cantonIdentifierConfig.getOrElse(ValidatorCantonIdentifierConfig.default(config))
 }

@@ -1,7 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useMutation } from '@tanstack/react-query';
-import { DisableConditionally, SvClientProvider, SvVote } from 'common-frontend';
+import {
+  ConfirmationDialog,
+  DisableConditionally,
+  SvClientProvider,
+  SvVote,
+} from 'common-frontend';
 import React, { useState } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';
@@ -28,7 +33,6 @@ import { ContractId } from '@daml/types';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useSvConfig } from '../../utils';
-import { VoteConfirmationDialog } from '../VoteConfirmationDialog';
 
 interface VoteFormProps {
   vote?: SvVote;
@@ -223,16 +227,17 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
           </Table>
         </TableContainer>
 
-        <VoteConfirmationDialog
+        <ConfirmationDialog
           showDialog={confirmDialogOpen}
           onClose={handleConfirmationClose}
           onAccept={handleConfirmationAccept}
           title="Confirm Your Vote"
+          attributePrefix="vote"
         >
           <Typography variant="h5">
             Are you sure you want to {voteEditing} the changes proposed in this vote?
           </Typography>
-        </VoteConfirmationDialog>
+        </ConfirmationDialog>
       </Stack>
     </>
   );

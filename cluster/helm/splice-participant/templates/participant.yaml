@@ -56,6 +56,10 @@ spec:
         - name: CANTON_PARTICIPANT_POSTGRES_DB
           value: {{ .Values.persistence.databaseName }}
         {{- end }}
+        {{- if .Values.jsonApiServerPathPrefix }}
+        - name: CANTON_PARTICIPANT_JSON_API_SERVER_PATH_PREFIX
+          value: {{ .Values.jsonApiServerPathPrefix }}
+        {{- end }}
         {{- if .Values.kms }}
         - name: ADDITIONAL_CONFIG_SPLICE_PARTICIPANT_CRYPTO_PROVIDER_KMS
           value: |

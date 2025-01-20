@@ -80,11 +80,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: get_commit_sha
     steps:
-      - uses: actions/checkout@v4
       # Add the SSH key to checkout the submodule
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.GH_SSH_KEY }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_branch }}
+          submodules: recursive
       - name: Backport to ${{ inputs.base_branch }} - Create branch & push
         id: create_branch
         shell: bash
@@ -93,8 +96,6 @@ jobs:
           base_branch=$(echo ${{ inputs.base_branch }})
           new_branch=$(echo "automation/backport-$commit_sha-$base_branch")
           echo "Backporting commit $commit_sha to branch $base_branch (using branch $new_branch)"
-          git submodule update --init --recursive
-          git config submodule.recurse true
           git fetch origin $base_branch
           git fetch origin $commit_sha
           # TODO(#16006): should this be the original author instead?

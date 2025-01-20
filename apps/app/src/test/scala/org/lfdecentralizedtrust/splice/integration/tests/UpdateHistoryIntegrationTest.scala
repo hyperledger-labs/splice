@@ -135,7 +135,7 @@ class UpdateHistoryIntegrationTest
       )(
         "alice sees payment request on global domain",
         _ => {
-          getSingleRequestOnDecentralizedSynchronizer(aliceWalletClient)
+          getSingleAppPaymentRequest(aliceWalletClient)
         },
       )
 
@@ -216,6 +216,10 @@ class UpdateHistoryIntegrationTest
           aliceValidatorBackend.appState.store.updateHistory,
           ledgerBeginAlice,
         )
+      }
+
+      eventually() {
+        checkUpdateHistoryMetrics(sv1ScanBackend, sv1ScanBackend.participantClient, dsoParty)
       }
     }
   }

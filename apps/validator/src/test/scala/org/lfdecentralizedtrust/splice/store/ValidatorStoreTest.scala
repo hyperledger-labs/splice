@@ -6,16 +6,11 @@ import com.digitalasset.canton.topology.DomainId
 
 import java.time.Instant
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.appmanager.store as appManagerCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install as walletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.topupstate as topUpCodegen
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
-import org.lfdecentralizedtrust.splice.util.{
-  AssignedContract,
-  ResourceTemplateDecoder,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorDecentralizedSynchronizerConfig,
   ValidatorSynchronizerConfig,
@@ -28,12 +23,10 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 
 import scala.concurrent.Future
-import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.syntax.*
 
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 
@@ -269,322 +262,15 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         }
       }
     }
-
-    "lookup*AppConfiguration" should {
-
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          contractP1V1 = appConfiguration(provider1, 1, "a")
-          contractP1V2 = appConfiguration(provider1, 2, "a")
-          contractP2V1 = appConfiguration(provider2, 1, "b")
-          contractP2V2 = appConfiguration(provider2, 2, "b")
-          _ <- dummyDomain.create(contractP1V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(contractP1V2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(contractP2V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(contractP2V2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          latest1 <- store.lookupLatestAppConfiguration(provider1)
-          latest2 <- store.lookupLatestAppConfiguration(provider2)
-          resultP1V1 <- store.lookupAppConfiguration(provider1, 1)
-          resultP2V2 <- store.lookupAppConfiguration(provider2, 2)
-          nameResult <- store.lookupLatestAppConfigurationByName("a")
-        } yield {
-          latest1.value.contract.contractId should be(
-            contractP1V2.contractId
-          )
-          latest2.value.contract.contractId should be(
-            contractP2V2.contractId
-          )
-          resultP1V1.value.value.contractId should be(
-            contractP1V1.contractId
-          )
-          resultP2V2.value.value.contractId should be(
-            contractP2V2.contractId
-          )
-          nameResult.value.contract.contractId should be(
-            contractP1V2.contractId
-          )
-        }
-      }
-    }
-
-    "lookupAppRelease" should {
-
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          releaseP1V1 = appRelease(provider1, "v1")
-          releaseP1V2 = appRelease(provider1, "v2")
-          releaseP2V1 = appRelease(provider2, "v1")
-          releaseP2V2 = appRelease(provider2, "v2")
-          _ <- dummyDomain.create(releaseP1V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(releaseP1V2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(releaseP2V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(releaseP2V2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          resultP1V2 <- store.lookupAppRelease(provider1, "v2")
-          resultP2V1 <- store.lookupAppRelease(provider2, "v1")
-        } yield {
-          resultP1V2.value.value.contractId should be(
-            releaseP1V2.contractId
-          )
-          resultP2V1.value.value.contractId should be(
-            releaseP2V1.contractId
-          )
-        }
-      }
-    }
-
-    "lookupRegisteredApp" should {
-
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          app1 = registeredApp(provider1)
-          app2 = registeredApp(provider2)
-          _ <- dummyDomain.create(app1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(app2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          result1 <- store.lookupRegisteredApp(provider1)
-        } yield {
-          result1.value.value.contractId should be(
-            app1.contractId
-          )
-        }
-      }
-    }
-
-    "lookupInstalledApp" should {
-
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          app1 = installedApp(provider1)
-          app2 = installedApp(provider2)
-          _ <- dummyDomain.create(app1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(app2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          result1 <- store.lookupInstalledApp(provider1)
-        } yield {
-          result1.value.value.contractId should be(
-            app1.contractId
-          )
-        }
-      }
-    }
-
-    "listRegisteredApps" should {
-
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          app1 = registeredApp(provider1)
-          configP1V1 = appConfiguration(provider1, 1, "a")
-          configP1V2 = appConfiguration(provider1, 2, "a")
-          app2 = registeredApp(provider2)
-          app3 = registeredApp(provider3)
-          configP3V1 = appConfiguration(provider3, 1, "b")
-          _ <- dummyDomain.create(app1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(app2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(app3, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(configP1V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(configP1V2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(configP3V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          result <- store.listRegisteredApps()
-        } yield {
-          result.map(a =>
-            (a.registered.contractId, a.configuration.contractId)
-          ) should contain theSameElementsAs Seq(
-            (app1.contractId, configP1V2.contractId),
-            (app3.contractId, configP3V1.contractId),
-          )
-        }
-      }
-    }
-
-    "listInstalledApps" should {
-
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          app1 = registeredApp(provider1)
-          configP1V1 = appConfiguration(provider1, 1, "a")
-          configP1V2 = appConfiguration(provider1, 2, "a")
-          approvedConfigP1V1 = approvedReleaseConfig(provider1, 1)
-          approvedConfigP1V2 = approvedReleaseConfig(provider1, 2)
-          installedApp1 = installedApp(provider1)
-          app2 = registeredApp(provider2)
-          configP2V1 = appConfiguration(provider2, 1, "b")
-          installedApp2 = installedApp(provider2)
-          _ <- dummyDomain.create(app1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(configP1V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(configP1V2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(approvedConfigP1V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(approvedConfigP1V2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(installedApp1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(app2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(configP2V1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(installedApp2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          result <- store.listInstalledApps()
-        } yield {
-          result.map(a =>
-            (
-              a.installed.contractId,
-              a.latestConfiguration.contractId,
-              a.approvedReleaseConfigurations.map(_.contractId).toSet,
-            )
-          ) should contain theSameElementsAs Seq(
-            (
-              installedApp1.contractId,
-              configP1V2.contractId,
-              Set(approvedConfigP1V1.contractId, approvedConfigP1V2.contractId),
-            ),
-            (
-              installedApp2.contractId,
-              configP2V1.contractId,
-              Set.empty,
-            ),
-          )
-        }
-      }
-    }
-
-    "listAmuletRulesTransferFollowers" should {
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          amuletRules1 = amuletRules()
-          walletInstall1 = walletInstall(user1, "user1")
-          // TODO (#7822) move to UserWallet
-          amulet1 = amulet(validator, 1, 1L, 0.1)
-          validatorRight1 = validatorRight(user1)
-          appConfiguration1 = appConfiguration(provider1, 1L, "config")
-          appRelease1 = appRelease(provider1, "version")
-          registeredApp1 = registeredApp(provider1)
-          installedApp1 = installedApp(provider1)
-          approvedReleaseConfig1 = approvedReleaseConfig(provider1, 1L)
-          validatorFaucetCoupon1 = validatorFaucetCoupon(validator)
-          externalPartySetupProposal1 = externalPartySetupProposal(user1)
-          _ <- dummyDomain.create(walletInstall1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(amulet1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(validatorRight1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(appConfiguration1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(appRelease1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(registeredApp1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(installedApp1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(approvedReleaseConfig1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(validatorFaucetCoupon1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(
-            externalPartySetupProposal1,
-            createdEventSignatories = signatories,
-          )(
-            store.multiDomainAcsStore
-          )
-          _ <- dummy2Domain.create(amuletRules1)(
-            store.multiDomainAcsStore
-          )
-          tfResult <- store.listAmuletRulesTransferFollowers(
-            AssignedContract(amuletRules1, dummy2Domain)
-          )
-        } yield {
-          val actual = tfResult.map(_.contract.identifier.getEntityName)
-          val expected =
-            ValidatorStore
-              .templatesMovedByMyAutomation(true)
-              .map(_.getTemplateIdWithPackageId.getEntityName)
-          actual should contain theSameElementsAs expected
-        }
-      }
-    }
   }
 
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)
-  private lazy val provider1 = providerParty(1)
-  private lazy val provider2 = providerParty(2)
-  private lazy val provider3 = providerParty(3)
   private lazy val validator = mkPartyId(s"validator")
   private lazy val sponsor = mkPartyId(s"sponsor")
   protected lazy val storeKey = ValidatorStore.Key(
     dsoParty = dsoParty,
     validatorParty = validator,
-    appManagerEnabled = true,
   )
 
   private def walletInstall(endUserParty: PartyId, endUserName: String) = {
@@ -651,89 +337,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def appConfiguration(provider: PartyId, version: Long, name: String) = {
-    val templateId = appManagerCodegen.AppConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
-    val json = new definitions.AppConfiguration(
-      version,
-      name,
-      "https://example.com/ui",
-      Vector("https://example.com/ui"),
-    ).asJson
-    val template = new appManagerCodegen.AppConfiguration(
-      validator.toProtoPrimitive,
-      provider.toProtoPrimitive,
-      version,
-      json.noSpaces,
-    )
-    contract(
-      identifier = templateId,
-      contractId = new appManagerCodegen.AppConfiguration.ContractId(nextCid()),
-      payload = template,
-    )
-  }
-
-  private def appRelease(provider: PartyId, version: String) = {
-    val templateId = appManagerCodegen.AppRelease.TEMPLATE_ID_WITH_PACKAGE_ID
-    val json = "{}"
-    val template = new appManagerCodegen.AppRelease(
-      validator.toProtoPrimitive,
-      provider.toProtoPrimitive,
-      version,
-      json,
-    )
-    contract(
-      identifier = templateId,
-      contractId = new appManagerCodegen.AppRelease.ContractId(nextCid()),
-      payload = template,
-    )
-  }
-
-  private def registeredApp(provider: PartyId) = {
-    val templateId = appManagerCodegen.RegisteredApp.TEMPLATE_ID_WITH_PACKAGE_ID
-    val template = new appManagerCodegen.RegisteredApp(
-      validator.toProtoPrimitive,
-      provider.toProtoPrimitive,
-    )
-    contract(
-      identifier = templateId,
-      contractId = new appManagerCodegen.RegisteredApp.ContractId(nextCid()),
-      payload = template,
-    )
-  }
-
-  private def installedApp(provider: PartyId) = {
-    val templateId = appManagerCodegen.InstalledApp.TEMPLATE_ID_WITH_PACKAGE_ID
-    val url = "https://app.canton.network/install"
-    val template = new appManagerCodegen.InstalledApp(
-      validator.toProtoPrimitive,
-      provider.toProtoPrimitive,
-      url,
-    )
-    contract(
-      identifier = templateId,
-      contractId = new appManagerCodegen.InstalledApp.ContractId(nextCid()),
-      payload = template,
-    )
-  }
-
-  private def approvedReleaseConfig(provider: PartyId, version: Long) = {
-    val templateId = appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID
-    val json = "{}"
-    val jsonHash = "abcd"
-    val template = new appManagerCodegen.ApprovedReleaseConfiguration(
-      validator.toProtoPrimitive,
-      provider.toProtoPrimitive,
-      version,
-      json,
-      jsonHash,
-    )
-    contract(
-      identifier = templateId,
-      contractId = new appManagerCodegen.ApprovedReleaseConfiguration.ContractId(nextCid()),
-      payload = template,
-    )
-  }
-
   protected def mkStore(): Future[ValidatorStore]
 
   lazy val domain = dummyDomain.toProtoPrimitive
@@ -756,8 +359,7 @@ class DbValidatorStoreTest
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.amulet.all ++
-          DarResources.wallet.all ++
-          DarResources.appManager.all
+          DarResources.wallet.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

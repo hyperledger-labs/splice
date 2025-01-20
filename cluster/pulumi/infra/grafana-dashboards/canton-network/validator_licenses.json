@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 228,
+  "id": 2417,
   "links": [],
   "panels": [
     {
@@ -93,7 +93,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "10.4.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -101,7 +101,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by(version, contact_point, validator_party) (cn_validator_last_active_at_us{version=~\"$validator_version\",validator_party=~\"$validator_party\",contact_point=~\"$contact_point\"}) / 1000 > $__from",
+          "expr": "max by(version, contact_point, validator_party) (splice_validator_last_active_at_us{version=~\"$validator_version\",validator_party=~\"$validator_party\",contact_point=~\"$contact_point\"}) / 1000 > $__from",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -139,6 +139,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -201,6 +202,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -209,7 +211,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "max by(version, contact_point, validator_party) (cn_validator_last_active_at_us{version=~\"$validator_version\",validator_party=~\"$validator_party\",contact_point=~\"$contact_point\"}) / 1000 > $__from",
+          "expr": "max by(version, contact_point, validator_party) (splice_validator_last_active_at_us{version=~\"$validator_version\",validator_party=~\"$validator_party\",contact_point=~\"$contact_point\"}) / 1000 > $__from",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -223,105 +225,83 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_validator_last_active_at_us,version)",
-        "hide": 0,
+        "definition": "label_values(splice_validator_last_active_at_us,version)",
         "includeAll": true,
         "multi": true,
         "name": "validator_version",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(cn_validator_last_active_at_us,version)",
+          "query": "label_values(splice_validator_last_active_at_us,version)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 2,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_validator_last_active_at_us,validator_party)",
-        "hide": 0,
+        "definition": "label_values(splice_validator_last_active_at_us,validator_party)",
         "includeAll": true,
         "multi": true,
         "name": "validator_party",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(cn_validator_last_active_at_us,validator_party)",
+          "query": "label_values(splice_validator_last_active_at_us,validator_party)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_validator_last_active_at_us,contact_point)",
-        "hide": 0,
+        "definition": "label_values(splice_validator_last_active_at_us,contact_point)",
         "includeAll": true,
         "multi": true,
         "name": "contact_point",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(cn_validator_last_active_at_us,contact_point)",
+          "query": "label_values(splice_validator_last_active_at_us,contact_point)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
@@ -334,6 +314,6 @@
   "timezone": "browser",
   "title": "Validator Licenses",
   "uid": "cdpcj4gxackcga",
-  "version": 3,
+  "version": 1,
   "weekStart": ""
 }

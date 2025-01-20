@@ -55,12 +55,12 @@ class SubmitSvStatusReportTrigger(
       statusReport <- store.getSvStatusReport(store.key.svParty)
       openMiningRounds <- store.getOpenMiningRoundTriple()
       cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
+      // TODO(#17018) Switch to per-synchronizer SV status reports
       mediatorAdminConnection = SvUtil.getMediatorAdminConnection(
         dsoRules.domain,
         mediatorAdminConnectionO,
         extraSynchronizerNodes,
       )
-      // TODO(#10297): make this code work properly with multiple mediators in the case of soft-domain migration
       mediatorSynchronizerTimeLb <- getDomainTimeLowerBound(
         mediatorAdminConnection,
         dsoRules.domain,

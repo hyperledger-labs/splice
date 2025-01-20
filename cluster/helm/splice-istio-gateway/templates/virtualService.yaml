@@ -16,6 +16,7 @@ spec:
   gateways:
   - cn-http-gateway
   http:
+  {{- if .Values.enableGcsProxy }}
   - match:
       - port: 443
         uri:
@@ -25,6 +26,7 @@ spec:
           port:
             number: 8080
           host: gcs-proxy.docs.svc.cluster.local
+  {{- end }}
   - match:
       - port: 443
     route:

@@ -52,17 +52,33 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
   });
 }
 
-export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
-  return imagePullSecretByNamespaceNameForServiceAccount(ns, 'default');
+export function imagePullSecretByNamespaceName(
+  ns: string,
+  retainOnDelete?: boolean,
+  patchForce: 'true' | 'false' = 'true'
+): pulumi.Resource[] {
+  return imagePullSecretByNamespaceNameForServiceAccount(
+    ns,
+    'default',
+    [],
+    patchForce,
+    retainOnDelete
+  );
 }
 
 export function imagePullSecretByNamespaceNameForServiceAccount(
   ns: string,
   serviceAccountName: string,
-  dependsOn: pulumi.Resource[] = []
+  dependsOn: pulumi.Resource[] = [],
+  patchForce: 'true' | 'false' = 'true',
+  retainOnDelete?: boolean
 ): pulumi.Resource[] {
   const keys = ArtifactoryCreds.getCreds().creds;
-  const k8sProvider = new k8s.Provider('k8s-imgpull-' + ns, { enableServerSideApply: true });
+  const k8sProvider = new k8s.Provider(
+    'k8s-imgpull-' + ns,
+    { enableServerSideApply: true },
+    { retainOnDelete }
+  );
 
   const allowedArtifactories = spliceConfig.pulumiProjectConfig.allowedArtifactories;
 
@@ -88,6 +104,10 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
       metadata: {
         name: 'docker-reg-cred',
         namespace: ns,
+        // We may create this secret in multiple stacks; let's not fail on it already existing.
+        annotations: {
+          'pulumi.com/patchForce': patchForce,
+        },
       },
       type: 'kubernetes.io/dockerconfigjson',
       stringData: {
@@ -96,6 +116,7 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
     },
     {
       dependsOn,
+      retainOnDelete,
     }
   );
   return [
@@ -104,7 +125,8 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
       ns,
       serviceAccountName,
       secret.metadata.name,
-      k8sProvider
+      k8sProvider,
+      retainOnDelete
     ),
   ];
 }
@@ -113,7 +135,8 @@ function patchServiceAccountWithImagePullSecret(
   ns: string,
   serviceAccountName: string,
   secretName: Output<string>,
-  k8sProvider: k8s.Provider
+  k8sProvider: k8s.Provider,
+  retainOnDelete?: boolean
 ): pulumi.Resource {
   const patch = new k8s.core.v1.ServiceAccountPatch(
     ns + '-' + serviceAccountName,
@@ -130,21 +153,32 @@ function patchServiceAccountWithImagePullSecret(
     },
     {
       provider: k8sProvider,
+      retainOnDelete,
     }
   );
 
   return patch;
 }
 
-export function imagePullSecret(ns: ExactNamespace): CnInput<pulumi.Resource>[] {
-  return imagePullSecretByNamespaceName(ns.logicalName);
+export function imagePullSecret(
+  ns: ExactNamespace,
+  retainOnDelete: boolean = false,
+  patchForce: 'true' | 'false' = 'true'
+): CnInput<pulumi.Resource>[] {
+  return imagePullSecretByNamespaceName(ns.logicalName, retainOnDelete, patchForce);
 }
 
 export function imagePullSecretForServiceAccount(
   ns: ExactNamespace,
-  serviceAccountName: string
+  serviceAccountName: string,
+  patchForce: 'true' | 'false' = 'true'
 ): CnInput<pulumi.Resource>[] {
-  return imagePullSecretByNamespaceNameForServiceAccount(ns.logicalName, serviceAccountName);
+  return imagePullSecretByNamespaceNameForServiceAccount(
+    ns.logicalName,
+    serviceAccountName,
+    [],
+    patchForce
+  );
 }
 
 export function uiSecret(

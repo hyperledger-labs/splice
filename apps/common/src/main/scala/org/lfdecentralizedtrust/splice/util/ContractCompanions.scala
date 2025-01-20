@@ -7,7 +7,6 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.{Choice, ContractId, DamlRecord}
 import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceAmulet,
-  DecoderSpliceAppManager,
   DecoderSpliceWallet,
   DecoderSpliceWalletPayments,
   DecoderSpliceDsoGovernance,
@@ -35,7 +34,6 @@ object ContractCompanions {
   private val allDecoders = Seq(
     DecoderSpliceAmulet.contractDecoder,
     DecoderSpliceAmuletNameService.contractDecoder,
-    DecoderSpliceAppManager.contractDecoder,
     DecoderSpliceDsoGovernance.contractDecoder,
     DecoderSpliceValidatorLifecycle.contractDecoder,
     DecoderSpliceWallet.contractDecoder,

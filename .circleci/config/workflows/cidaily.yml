@@ -42,18 +42,10 @@ workflow:
             - canton-network-vpn
             - slack-context
           wait_for_sv: false
-          # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
+          # Order: deploy_cluster->preflight_check->deploy_sv_runbook->preflight_sv_check
           requires:
             - artifacts_push
             - deploy_cluster_cidaily
-      - publish_public_release:
-          <<: *main-branch-only
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - preflight_check
       - create_oss_pr:
           <<: *main-branch-only
           <<: *notify-fail
@@ -72,7 +64,6 @@ workflow:
           use_published_artifacts: true
           requires:
             - deploy_cluster_cidaily
-            - publish_public_release
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -82,7 +73,6 @@ workflow:
           use_published_artifacts: true
           requires:
             - deploy_cluster_cidaily
-            - publish_public_release
       - preflight_sv_check:
           <<: *main-branch-only
           context:

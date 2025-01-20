@@ -26,6 +26,7 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveNumeric,
 }
 import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -166,7 +167,10 @@ final case class SynchronizerFeesConfig(
 
 final case class SvDecentralizedSynchronizerConfig(
     alias: DomainAlias,
-    url: String,
+    /** This must be set for SVs that onboard to initiallly connect to their sponsoring SV’s sequencer.
+      * Afterwards it can be unset.
+      */
+    url: Option[String],
 
     /** amount of extra traffic reserved for high priority transactions
       *
@@ -304,7 +308,12 @@ final case class SvSequencerConfig(
 
 final case class SvMediatorConfig(
     adminApi: ClientConfig
-)
+) {
+
+  def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(
+    adminApi
+  )
+}
 
 final case class SvScanConfig(
     publicUrl: Uri,

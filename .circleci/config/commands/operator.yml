@@ -17,12 +17,13 @@ commands:
             wait_for_stack_updated() {
               local STACK_NAME=$1
               echo "waiting for stack $STACK_NAME being updated with commit $EXPECTED_GIT_COMMIT"
-    
+
               START_TIME=$(date +%s)
               TIMEOUT=1800
+              LAST_UNLOCK_TIME=$START_TIME
               while true; do
-                LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}")
-              
+                LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}" || true)
+
                 if echo "$LAST_SUCCESSFUL_COMMIT" | grep -q "$EXPECTED_GIT_COMMIT"; then
                   echo "stack $STACK_NAME is successfully updated with commit $EXPECTED_GIT_COMMIT"
                   break
@@ -32,15 +33,23 @@ commands:
                 # Check for timeout
                 CURRENT_TIME=$(date +%s)
                 ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
-              
                 if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
                   echo "Timeout reached without finding stack $STACK_NAME has the updated with expected commit $EXPECTED_GIT_COMMIT."
                   exit 1
                 fi
-                sleep 5
-              done            
+
+                # TODO(#15978): remove this hack, this is only necessary because the operator restarts and gets stuck with its own lock.
+                LAST_UNLOCK_AGO=$((CURRENT_TIME - LAST_UNLOCK_TIME))
+                if [ $LAST_UNLOCK_AGO -ge 120 ]; then
+                  echo "Force-cancelling pulumi locks under the assumption that the operator got stuck."
+                  cncluster pcancel
+                  LAST_UNLOCK_TIME=$(date +%s)
+                else
+                  sleep 5
+                fi
+              done
             }
-            
+
             echo "<< parameters.pulumi_stack_names >>" | tr ',' '\n' | while read STACK; do
               wait_for_stack_updated "$STACK"
             done

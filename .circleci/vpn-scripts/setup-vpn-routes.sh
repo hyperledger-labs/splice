@@ -8,7 +8,7 @@ set -eoux pipefail
 echo "Dumping full ip config for debugging"
 /usr/bin/sudo ip addr
 echo "Querying for VPN IP"
-VPN_IP=$(/usr/bin/sudo ip --json addr show dev ens5 | tee /dev/stderr | jq -r '.[0].addr_info | .[] | select(.family == "inet" and (has("broadcast") | not)) | .local')
+VPN_IP=$(/usr/bin/sudo ip --json addr show | tee /dev/stderr | jq -r '.[] | select(.ifname | test("en[ps].*")) | .addr_info | .[] | select(.family == "inet" and (has("broadcast") | not)) | .local')
 [[ -z "$VPN_IP" ]] && { echo "Cannot find VPN_IP, please check VPN connectivity" ; exit 1; }
 echo "Querying for network gateway"
 GATEWAY=$(/usr/bin/sudo ip --json route list | tee /dev/stderr | jq -r 'map(select(.gateway)|.gateway)|unique|.[]')

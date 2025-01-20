@@ -22,6 +22,7 @@ abstract class DbTxLogAppStore[TXE](
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     enableissue12777Workaround: Boolean,
+    oHistoryMetrics: Option[HistoryMetrics] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -33,6 +34,7 @@ abstract class DbTxLogAppStore[TXE](
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
       enableissue12777Workaround = enableissue12777Workaround,
+      oHistoryMetrics = oHistoryMetrics,
     )
     with TxLogAppStore[TXE] {
 
@@ -59,6 +61,7 @@ abstract class DbAppStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     enableissue12777Workaround: Boolean,
+    oHistoryMetrics: Option[HistoryMetrics] = None,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -101,6 +104,7 @@ abstract class DbAppStore(
       acsContractFilter.ingestionFilter.primaryParty,
       loggerFactory,
       enableissue12777Workaround,
+      oHistoryMetrics,
     )
 
   override def close(): Unit = {

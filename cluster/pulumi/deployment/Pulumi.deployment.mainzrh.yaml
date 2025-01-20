@@ -1,0 +1,2 @@
+secretsprovider: gcpkms://projects/da-cn-mainnet/locations/europe-west6/keyRings/pulumi/cryptoKeys/mainzrh
+encryptedkey: CiQAQpBnW8UYf4CX0OiDYuvEMDhgxBCC/dQce40tfW7VRSZdlzASSQBReLO3Txefzs9AV6xmoWKVozV5SpNUsXPx/UG4ug0sX9hhv+rsVm8tkuZZsu9R1jaqk1DGIaZaDUApd5DcfkAdL+zwnfFCNyc=

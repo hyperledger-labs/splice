@@ -17,59 +17,86 @@ on:
       test_name:
         type: string
         required: true
+      with_gcp_creds:
+        type: boolean
+        required: false
+        default: false
+      is_frontend_test:
+        type: boolean
+        required: false
+        default: false
 
 jobs:
 
-  runner-indices:
+  split_tests:
     runs-on: self-hosted-docker-tiny
-    name: Generate runner indices
+    name: Split the tests into parallel runs
     outputs:
-      json: ${{ steps.generate-index-list.outputs.json }}
+      indices: ${{ steps.generate_index_list.outputs.json }}
+      test_names: ${{ steps.split_tests.outputs.test_names }}
     steps:
-      - id: generate-index-list
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Generate runner indices
+        id: generate_index_list
         run: |
-          MAX_INDEX=$((${{ inputs.parallelism }}-1))
-          INDEX_LIST=$(seq 0 ${MAX_INDEX})
-          INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
-          echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
+          last_commit_msg=$(git log -1 --pretty=%B)
+          echo "Last commit message: $last_commit_msg"
+          if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
+            echo "Only static tests are running, returning an empty array so that no tests are run"
+            echo "json=[]" >> $GITHUB_OUTPUT
+          else
+            echo "Not a static test-only run, generating indices"
+            MAX_INDEX=$((${{ inputs.parallelism }}-1))
+            INDEX_LIST=$(seq 0 ${MAX_INDEX})
+            INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
+            echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Split tests
+        id: split_tests
+        uses: ./.github/actions/tests/split_tests
+        with:
+          test_reports_dir: '/cache/test-reports'
+          test_names_file: ${{ inputs.test_names_file }}
+          split_total: ${{ inputs.parallelism }}
 
 
   scala_test:
     runs-on: ${{ inputs.runs_on }}
+    name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
+    timeout-minutes: 30
     needs:
-      - runner-indices
+      - split_tests
+    if: ${{ needs.split_tests.outputs.indices != '[]' }}
     strategy:
       matrix:
-        runner-index: ${{ fromjson(needs.runner-indices.outputs.json) }}
+        runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
     container:
-      # TODO(#15988): clean this up, use a proper released image instead:
-      #               - Once this is in a release, use the release version.
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.6-snapshot.20250113.8012.0.v6b097acb
 
     services:
       postgres:
-        # TODO(#15988): clean this up, use a proper released image instead:
-        #               - Once this is in a release, use the release version.
-        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.3-snapshot.20241209.7827.0.vb8f2fd34
+        image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.4
         env:
           POSTGRES_PASSWORD: postgres
 
     steps:
+
       - name: Check out repository code
         uses: actions/checkout@v4
 
       - name: Setup
-        shell: bash
-        run: ./.github/actions/scripts/common_setup.sh
-
-      - name: Set up Nix
-        uses: ./.github/actions/nix/setup_self_hosted_nix
+        uses: ./.github/actions/tests/common_test_setup
         with:
+          test_name: ${{ inputs.test_name }}
+          with_sbt: false # we setup SBT later while canton is starting up
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
-          # TODO(#15988): consider this trick for setting cache_version globally: https://stackoverflow.com/a/74217028
-          cache_version: 0
 
       - name: Wait for postgres
         uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -108,25 +135,26 @@ jobs:
         with:
           cache_version: 0
 
-      - name: Compute tests for run ${{ matrix.runner-index }}
-        id: split_tests
-        uses: ./.github/actions/tests/split_tests
-        with:
-          test_reports_dir: '/cache/test-reports'
-          test_names_file: ${{ inputs.test_names_file }}
-          split_total: ${{ inputs.parallelism }}
-          split_index: ${{ matrix.runner-index }}
-
       - name: Prepare list of tests to run for sbt
         id: list_tests
         shell: bash
         run: |
-          splitted=$(echo "${{ toJson(steps.split_tests.outputs.test_names) }}" | jq -r '.[]')
+          splitted=$(echo "${{ toJson(needs.split_tests.outputs.test_names) }}" | jq -r '.[${{ matrix.runner-index }}].[]')
           tests=$(echo $splitted | tr '\n' ' ')
           count=$(echo $tests | wc -w)
           echo "We are running $count tests in this batch:"
           echo "$splitted"
           echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $tests\"" >> "$GITHUB_OUTPUT"
+
+      # webpack uses inotify to watch for changes, and we need to increase the limit
+      - name: increase inotify limit
+        if: ${{ inputs.is_frontend_test }}
+        shell: bash
+        run: |
+          echo "Checking watch info..."
+          sysctl fs.inotify
+          echo "Setting max_user_watches..."
+          echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
       - name: Wait for Canton to be ready
         shell: bash
@@ -144,7 +172,24 @@ jobs:
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}
-          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep GITHUB_ACTION"
+          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID }} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}
+          pre_sbt_cmd: |
+            if [[ "${{ inputs.with_gcp_creds }}" == "true" ]]; then
+              export GOOGLE_APPLICATION_CREDENTIALS="$(mktemp gcp-creds-XXXXXX.json)"
+              echo '${{ secrets.GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+              export GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS='${{ secrets.GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}'
+            fi
+            if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
+              export AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID="${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID }}"
+              export AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET="${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}"
+              ./start-frontends.sh -d -s
+            fi
+          post_sbt_cmd: |
+            if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
+              ./stop-frontends.sh
+            fi
+
 
       - name: Check logs for errors
         uses: ./.github/actions/sbt/execute_sbt_command
@@ -159,9 +204,19 @@ jobs:
         with:
           cache_version: 0
           setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
+          # Save caches only from one runner, to reduce conflicts on the save
+          save_caches: ${{ matrix.runner-index == 0 && inputs.test.name == 'wall-clock-time' }}
 
       - name: Upload logs
         if: ${{ failure() }}
         uses: ./.github/actions/sbt/upload_logs
         with:
           name: "logs-${{ inputs.test_name }}-${{ matrix.runner-index }}"
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        shell: bash
+        env:
+          SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+        run: ./.circleci/notification-scripts/failure_notification.py

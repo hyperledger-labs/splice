@@ -63,6 +63,7 @@ parameters:
         backup-status-testnet,
         backup-status-mainnet,
         preview-operator,
+        purge-unused-dbs-cidaily,
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -378,21 +379,21 @@ commands:
           cmd:  |
             if [ << parameters.migration_id >> -ne 0 ]; then
               echo "migration_id is not set to 0, use the parameter value"
-            
+
               ACTIVE_MIGRATION_ID=<< parameters.migration_id >>
-              
+
             else
               echo "migration_id is not set, use the one defined in the config.yaml file"
-            
+
               CONFIG_FILE="cluster/deployment/<< parameters.cluster >>/config.yaml"
-            
+
               if [[ -f "$CONFIG_FILE" ]]; then
                 ACTIVE_MIGRATION_ID=$(yq '.synchronizerMigration.active.id' "$CONFIG_FILE" 2>/dev/null)
               else
                 echo "Error: Configuration file not found: $CONFIG_FILE"
                 ACTIVE_MIGRATION_ID=0
               fi
-              
+
               if [[ "$ACTIVE_MIGRATION_ID" == "null" || -z "$ACTIVE_MIGRATION_ID" ]]; then
                 ACTIVE_MIGRATION_ID=0
                 echo "Default ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
@@ -400,7 +401,7 @@ commands:
                 echo "ACTIVE MIGRATION ID: $ACTIVE_MIGRATION_ID"
               fi
             fi
-            
+
             echo "export ACTIVE_MIGRATION_ID=$ACTIVE_MIGRATION_ID" > tmp-migration-id-env
       - run:
           name: Save migration ID to env
@@ -732,6 +733,20 @@ commands:
             cncluster activate
             cncluster pulumi deployment up --skip-preview --diff
 
+  skip_if_flag_set:
+    parameters:
+      flag:
+        type: string
+    steps:
+      - run:
+          name: Skip if << parameters.flag >> flag is set
+          command: |
+            last_commit_msg=$(git log -1 --pretty=%B)
+            if [[ "$CIRCLE_BRANCH" != "main" && "${last_commit_msg}" == *"[<< parameters.flag >>]"* ]]; then
+              echo "<< parameters.flag >> flag is set, skipping this job"
+              circleci-agent step halt
+            fi
+
   run_setup_nix:
     description: Set up Nix without cache
     parameters:
@@ -1047,6 +1062,10 @@ commands:
                 # GOOGLE_CREDENTIALS variable is used by pulumi
                 export GOOGLE_CREDENTIALS=${CN_ACTIVE_ENVIRONMENT_KEY}
 
+                # GOOGLE_APPLICATION_CREDENTIALS variable is used by gcloud typescript client, it should include the filename of the key
+                export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp gcp-creds-XXXXXX.json)
+                echo ${CN_ACTIVE_ENVIRONMENT_KEY} > ${GOOGLE_APPLICATION_CREDENTIALS}
+
                 # TODO(#7702) Extract retry logic for CI tasks into command/script
                 # gcloud auth with a limited number of retries
                 MAX_AUTH_RETRIES=5
@@ -1168,12 +1187,13 @@ commands:
             wait_for_stack_updated() {
               local STACK_NAME=$1
               echo "waiting for stack $STACK_NAME being updated with commit $EXPECTED_GIT_COMMIT"
-    
+
               START_TIME=$(date +%s)
               TIMEOUT=1800
+              LAST_UNLOCK_TIME=$START_TIME
               while true; do
-                LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}")
-              
+                LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}" || true)
+
                 if echo "$LAST_SUCCESSFUL_COMMIT" | grep -q "$EXPECTED_GIT_COMMIT"; then
                   echo "stack $STACK_NAME is successfully updated with commit $EXPECTED_GIT_COMMIT"
                   break
@@ -1183,15 +1203,23 @@ commands:
                 # Check for timeout
                 CURRENT_TIME=$(date +%s)
                 ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
-              
                 if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
                   echo "Timeout reached without finding stack $STACK_NAME has the updated with expected commit $EXPECTED_GIT_COMMIT."
                   exit 1
                 fi
-                sleep 5
-              done            
+
+                # TODO(#15978): remove this hack, this is only necessary because the operator restarts and gets stuck with its own lock.
+                LAST_UNLOCK_AGO=$((CURRENT_TIME - LAST_UNLOCK_TIME))
+                if [ $LAST_UNLOCK_AGO -ge 120 ]; then
+                  echo "Force-cancelling pulumi locks under the assumption that the operator got stuck."
+                  cncluster pcancel
+                  LAST_UNLOCK_TIME=$(date +%s)
+                else
+                  sleep 5
+                fi
+              done
             }
-            
+
             echo "<< parameters.pulumi_stack_names >>" | tr ',' '\n' | while read STACK; do
               wait_for_stack_updated "$STACK"
             done
@@ -2715,6 +2743,11 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Deploy the docker-compose validator
           cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep VPN_HOST_NAME
+            --keep VPN_HOST_IP
+            --keep VPN_USER
+            --keep VPN_PASSWORD
           cmd: |
             build-tools/splice-compose.sh start -d -w -n onvpn -p "da-composeValidator-1"
           # retry on vpn disconnects.
@@ -3288,9 +3321,9 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
-          save: true
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - run_bash_command_in_nix:
@@ -3317,7 +3350,10 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
       - setup_nix_self_hosted:
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
           save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3327,80 +3363,6 @@ jobs:
           extra_env_vars: DAML_DEBUG=1
       - save_sbt_job_result:
           runner_type: "selfhosted"
-
-  # Run UI unit tests
-  ui_test:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix_self_hosted:
-          save: true
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          cmd: "apps-common-frontend/npmTest"
-          fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
-      - execute_sbt_command:
-          cmd: "apps-common-frontend/npmGenerateViteReport"
-          fail_on_error_in_output: false
-          when: "on_fail"
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-
-  bundle:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix_self_hosted:
-          save: true
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
-          cmd: "Test/compile bundle"
-      - run:
-          name: Copy bundle
-          command: |
-            set -eou pipefail
-            mkdir -p /tmp/artifacts
-            cp apps/app/target/release/*.tar.gz /tmp/artifacts
-      - run:
-          name: Copy OpenAPI specs
-          command: |
-            set -eou pipefail
-            .circleci/copy-openapi.sh
-      - run_bash_command_in_nix:
-          cmd_name: Publish release bundles
-          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-          cmd: |
-            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-            export GOOGLE_CLOUD_PROJECT=da-cn-shared
-            VERSION=$(get-snapshot-version)
-            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
-            # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
-            # which would lead to an error due to a misisng `delete` permission
-            gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
-          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-          upload_caches: true
-
-  deployment_test:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix_self_hosted:
-          save: true
-      - run_bash_command_in_nix:
-          cmd_name: Deployment Test
-          cmd_retry_count: 5 # Retry in case of dependency download errors
-          cmd: make cluster/pulumi/test
 
   auth0_user_cleanup:
     executor: self_hosted
@@ -3436,10 +3398,36 @@ jobs:
           cluster: "scratchnetb"
       - cluster_lock_reaper:
           cluster: "scratchnetc"
-      - cluster_lock_reaper:
-          cluster: "scratchnetd"
+# TODO(#16067): Re-enable the reaper for scratchd
+#      - cluster_lock_reaper:
+#          cluster: "scratchnetd"
       - cluster_lock_reaper:
           cluster: "scratchnete"
+
+  purge_unused_dbs:
+    executor: self_hosted
+    environment:
+      <<: *env
+    parameters:
+      cluster:
+        type: string
+    steps:
+      - checkout_with_retry
+      - setup_nix_self_hosted
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make -j cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Purge unused databases
+          cmd: |
+            cncluster purge_unused_dbs
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
 
   update_pipeline_schedule:
     docker:
@@ -3514,21 +3502,29 @@ jobs:
             make cluster/helm/build -j
             make cluster/helm/push -j
           cmd_retry_count: 5
-      - save_frontend_builds
-      - save_sbt_job_result:
-          runner_type: "circleci"
-
-  publish_public_release:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - docker_login_artifactory
+      - run:
+          name: Copy bundle
+          command: |
+            set -eou pipefail
+            mkdir -p /tmp/artifacts
+            cp apps/app/target/release/*.tar.gz /tmp/artifacts
+      - run_bash_command_in_nix:
+          cmd_name: Copy OpenAPI specs
+          cmd: |
+            set -eou pipefail
+            scripts/copy-openapi.sh /tmp/artifacts/openapi.tar.gz
+      - run_bash_command_in_nix:
+          cmd_name: Publish release bundles
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
+          cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            export GOOGLE_CLOUD_PROJECT=da-cn-shared
+            VERSION=$(get-snapshot-version)
+            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
+            # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
+            # which would lead to an error due to a misisng `delete` permission
+            gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
+          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - run_bash_command_in_nix:
           cmd_name: tag git
           additional_nix_args: "--keep ARTIFACTORY_USER \
@@ -3552,6 +3548,10 @@ jobs:
               git push origin "${RELEASE_TAG}"
             fi
 
+      - save_frontend_builds
+      - save_sbt_job_result:
+          runner_type: "circleci"
+
   docker_images_build:
     machine:
       image: ubuntu-2204:2024.01.1
@@ -3560,6 +3560,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
       - restore_frontend_builds
       - setup_nix
       - setup_sbt_test_job:
@@ -3702,11 +3704,13 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
       - run:
           name: Cancel the entire workflow if the current commit does not opt in for CI
           command: |
             last_commit_msg=$(git log -1 --pretty=%B)
-            if [[ "${last_commit_msg}" != *"[ci]"* ]]; then
+            if [[ "${last_commit_msg}" != *"[ci]"* ]] && [[ "${last_commit_msg}" != *"[static]"* ]]; then
               echo "Cancelling the entire workflow because the current commit does not opt in for CI."
               curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
             else
@@ -3936,6 +3940,8 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
       - setup_nix_self_hosted
       - setup_sbt_test_job:
           runner_type: "selfhosted"
@@ -3944,10 +3950,6 @@ jobs:
           cmd: |
             scripts/check-repo-names.sh
       - clone_and_update_open_source
-      - execute_sbt_command:
-          working_dir: "/home/circleci/oss"
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
-          cmd: "bundle"
       - execute_sbt_command:
           working_dir: "/home/circleci/splice"
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
@@ -3973,6 +3975,17 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep SSH_AUTH_SOCK"
           cmd: |
             .circleci/create-splice-pr.sh /home/circleci/splice
+      - run_bash_command_in_nix:
+          cmd_name: Create release in DA OSS
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep GCP_DA_CN_SHARED_KEY"
+          working_dir: "/home/circleci/oss"
+          cmd: |
+            if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
+              # Authenticate to shared GCP project for downloading the artifacts
+              echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+              # Create the release draft and upload the artifacts to it
+              /home/circleci/project/.circleci/create-gh-release.sh ${CIRCLE_BRANCH/release-line-/}
+            fi
 
   # TODO(#14845): Currently, building the repo on arm fails, so we cannot run the docker compose
   #               preflight there. We therefore for now only spin up the validator and check that
@@ -4664,6 +4677,8 @@ jobs:
 
             cncluster ci_pdown_sv
           cmd_retry_count: 3
+          # wait a bit in case the operator is legitimately holding the Pulumi lock
+          cmd_retry_wait: 60
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -4700,6 +4715,8 @@ jobs:
             fi
             cncluster ci_pdown_validator
           cmd_retry_count: 3
+          # wait a bit in case the operator is legitimately holding the Pulumi lock
+          cmd_retry_wait: 60
       - notify-cluster-fail:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
@@ -4835,9 +4852,6 @@ jobs:
       skip_if_files_changed:
         type: string
         default: ""
-      with_shared_gcp:
-        type: boolean
-        default: false
       with_docker_images:
         type: boolean
         default: false
@@ -4855,6 +4869,10 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - skip_if_flag_set:
+          flag: static
       - when:
           condition:
             not:
@@ -4900,15 +4918,6 @@ jobs:
           runner_type: "circleci"
       - when:
           condition:
-            equal: [ true, "<< parameters.with_shared_gcp >>" ]
-          steps:
-            run_bash_command_in_nix:
-              cmd_name: "Authenticate to shared GCP project"
-              additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-              cmd: |
-                echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-      - when:
-          condition:
             equal: [ true, "<< parameters.with_docker_images >>" ]
           steps:
             - run_bash_command_in_nix:
@@ -4951,9 +4960,6 @@ jobs:
       skip_if_files_changed:
         type: string
         default: ""
-      with_shared_gcp:
-        type: boolean
-        default: false
       additional_nix_args:
         type: string
         default: ""
@@ -4965,6 +4971,10 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - skip_if_flag_set:
+          flag: static
       - when:
           condition:
             not:
@@ -5004,15 +5014,6 @@ jobs:
           start_canton_options: << parameters.start_canton_options >> -p external
       - setup_sbt_test_job:
           runner_type: "selfhosted"
-      - when:
-          condition:
-            equal: [ true, "<< parameters.with_shared_gcp >>" ]
-          steps:
-            run_bash_command_in_nix:
-              cmd_name: "Authenticate to shared GCP project"
-              additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-              cmd: |
-                echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_splitted_scala_tests:
@@ -5036,18 +5037,13 @@ workflows:
           context:
             - artifactory
             - slack-context
-      - publish_public_release:
+      - create_oss_pr:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
           requires:
             - artifacts_push
-      - create_oss_pr:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
 
   build:
     when:
@@ -5070,13 +5066,9 @@ workflows:
               ignore:
                 - /release-line-.*/
                 - main
-      # Linting and formatting
-      - static_tests:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Daml
+      # TODO(#15988): In this job we currently also save the nix cache, if we migrate this
+      # before others, make sure to enable saving the nix cache in some other job instead.
       - daml_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -5084,133 +5076,6 @@ workflows:
             - artifactory
             - slack-context
       # Scala
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test wall clock time"
-          test_names_file: "test-full-class-names.log"
-          start_canton_options: "-w"
-          pre_sbt_cmd: |
-            echo $GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS > /tmp/gcp-creds.json
-            export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-creds.json"
-          # TODO(#10912) Investigate why things got slower
-          parallelism: 10
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test wall clock time cometBFT"
-          test_names_file: "test-cometbft-full-class-names.log"
-          start_canton_options: "-w -f"
-          resource_class: "xlarge"
-          parallelism: 1
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test resource intensive"
-          test_names_file: "test-full-class-names-resource-intensive.log"
-          start_canton_options: "-w"
-          parallelism: 2
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test sim time"
-          test_names_file: "test-full-class-names-sim-time.log"
-          start_canton_options: "-s"
-          parallelism: 4
-      - scala_test_self_hosted:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test record time tolerance"
-          test_names_file: "test-full-class-names-record-time-tolerance.log"
-          start_canton_options: "-s"
-          parallelism: 1
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test frontend wall clock time"
-          test_names_file: "test-full-class-names-frontend.log"
-          start_canton_options: "-w -m"
-          pre_sbt_cmd: "./start-frontends.sh -d -s"
-          post_sbt_cmd: "./stop-frontends.sh"
-          resource_class: "2xlarge"
-          parallelism: 4
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test frontend sim time"
-          test_names_file: "test-full-class-names-frontend-sim-time.log"
-          start_canton_options: "-s"
-          pre_sbt_cmd: "./start-frontends.sh -d -s"
-          post_sbt_cmd: "./stop-frontends.sh"
-          resource_class: "xlarge"
-          parallelism: 1
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test frontend app manager"
-          test_names_file: "test-full-class-names-frontend-app-manager.log"
-          start_canton_options: "-w"
-          pre_sbt_cmd: "./start-frontends.sh -d -s -m"
-          post_sbt_cmd: "./stop-frontends.sh"
-          resource_class: "xlarge"
-          parallelism: 1
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test global upgrade"
-          test_names_file: "test-full-class-names-global-soft-migration.log"
-          start_canton_options: "-w -g"
-          parallelism: 1
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test global upgrade topology"
-          test_names_file: "test-full-class-names-global-soft-migration-topology.log"
-          start_canton_options: "-w --soft-domain-migration"
-          parallelism: 1
-      - scala_test_self_hosted:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          name: "scala_test disaster recovery"
-          test_names_file: "test-full-class-names-disaster-recovery.log"
-          start_canton_options: "-w"
-          parallelism: 1
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -5226,7 +5091,6 @@ workflows:
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
           skip_if_regex: "\\[breaking\\]"
           skip_if_files_changed: "nix/canton-sources.json"
-          with_shared_gcp: true
       - scala_test:
           <<: *minor-release-branch-never
           <<: *notify-fail
@@ -5245,26 +5109,10 @@ workflows:
           with_docker_images: true
           resource_class: "2xlarge"
           parallelism: 2
-      - ui_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-      - bundle:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
           <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-      - deployment_test:
-          <<: *notify-fail
           context:
             - artifactory
             - slack-context
@@ -5327,18 +5175,10 @@ workflows:
             - canton-network-vpn
             - slack-context
           wait_for_sv: false
-          # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
+          # Order: deploy_cluster->preflight_check->deploy_sv_runbook->preflight_sv_check
           requires:
             - artifacts_push
             - deploy_cluster_cidaily
-      - publish_public_release:
-          <<: *main-branch-only
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - preflight_check
       - create_oss_pr:
           <<: *main-branch-only
           <<: *notify-fail
@@ -5357,7 +5197,6 @@ workflows:
           use_published_artifacts: true
           requires:
             - deploy_cluster_cidaily
-            - publish_public_release
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -5367,7 +5206,6 @@ workflows:
           use_published_artifacts: true
           requires:
             - deploy_cluster_cidaily
-            - publish_public_release
       - preflight_sv_check:
           <<: *main-branch-only
           context:
@@ -6327,6 +6165,18 @@ workflows:
           context:
             - slack-context
             - artifactory
+
+  purge_unused_dbs_cidaily:
+    when:
+      equal: [ purge-unused-dbs-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - purge_unused_dbs:
+          <<: *main-branch-only
+          <<: *notify-fail
+          context:
+            - slack-context
+            - artifactory
+          cluster: "cidaily"
 
   deploy_scratchnet_basic:
     when:

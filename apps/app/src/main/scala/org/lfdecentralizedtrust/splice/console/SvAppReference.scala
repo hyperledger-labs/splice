@@ -3,14 +3,14 @@
 
 package org.lfdecentralizedtrust.splice.console
 
+import com.digitalasset.canton.DomainAlias
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding as vo
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice as cp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
-  VoteRequest,
   DsoRules_CloseVoteRequestResult,
+  VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
@@ -23,15 +23,16 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.{
   HttpSvAdminAppClient,
-  HttpSvSoftDomainMigrationPocAppClient,
   HttpSvAppClient,
+  HttpSvSoftDomainMigrationPocAppClient,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.{
   DsoDelegateBasedAutomationService,
   SvDsoAutomationService,
 }
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvSynchronizerNodeConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
+import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.console.{BaseInspection, Help}
@@ -327,8 +328,7 @@ class SvAppBackendReference(
   def config: SvAppBackendConfig =
     consoleEnvironment.environment.config.svsByString(name)
 
-  def listOngoingValidatorOnboardings()
-      : Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]] =
+  def listOngoingValidatorOnboardings(): Seq[ValidatorOnboarding] =
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.ListOngoingValidatorOnboardings
@@ -399,13 +399,6 @@ class SvAppBackendReference(
       httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
     }
 
-  def signSynchronizerBootstrappingState(domainIdPrefix: String): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvSoftDomainMigrationPocAppClient.SignSynchronizerBootstrappingState(domainIdPrefix)
-      )
-    }
-
   def initializeSynchronizer(domainIdPrefix: String): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvSoftDomainMigrationPocAppClient.InitializeSynchronizer(domainIdPrefix))
@@ -452,5 +445,34 @@ class SvAppBackendReference(
       s"sequencer client for $name for domain $domainId",
       synchronizerConfig.sequencer.toCantonConfig,
     )
+  }
+
+  def sequencerClient(domainAlias: DomainAlias): SequencerClientReference = {
+    val synchronizerConfig: SvSynchronizerNodeConfig = synchronizerConfigForDomain(domainAlias)
+    new SequencerClientReference(
+      consoleEnvironment,
+      s"sequencer client for $name for domain $domainAlias",
+      synchronizerConfig.sequencer.toCantonConfig,
+    )
+  }
+
+  def mediatorClient(domainAlias: DomainAlias): MediatorClientReference = {
+    val synchronizerConfig: SvSynchronizerNodeConfig = synchronizerConfigForDomain(domainAlias)
+    new MediatorClientReference(
+      consoleEnvironment,
+      s"mediator client for $name",
+      synchronizerConfig.mediator.toCantonConfig,
+    )
+  }
+
+  private def synchronizerConfigForDomain(alias: DomainAlias) = {
+    val synchronizerConfig = config.synchronizerNodes.get(alias.toProtoPrimitive) match {
+      case Some(synchronizer) => synchronizer
+      case None =>
+        config.localSynchronizerNode.getOrElse(
+          throw new RuntimeException("No sequencer admin connection configured for SV App")
+        )
+    }
+    synchronizerConfig
   }
 }

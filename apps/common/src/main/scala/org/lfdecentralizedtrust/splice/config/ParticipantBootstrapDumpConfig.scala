@@ -7,6 +7,7 @@ import java.nio.file.Path
 
 sealed abstract class ParticipantBootstrapDumpConfig {
   def description: String
+  def newParticipantIdentifier: Option[String]
 }
 
 object ParticipantBootstrapDumpConfig {
