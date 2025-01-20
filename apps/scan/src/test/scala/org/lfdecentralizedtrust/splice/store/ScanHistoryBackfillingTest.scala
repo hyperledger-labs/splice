@@ -214,6 +214,14 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       backfiller.backfill().flatMap {
         case HistoryBackfilling.Outcome.MoreWorkAvailableNow => go(i + 1)
         case HistoryBackfilling.Outcome.MoreWorkAvailableLater => Future.successful(false)
+        case HistoryBackfilling.Outcome.BackfillingIsComplete => goImportUpdates(1)
+      }
+    }
+    def goImportUpdates(i: Int): Future[Boolean] = {
+      logger.debug(s"backfillImportUpdates() iteration $i")
+      backfiller.backfillImportUpdates().flatMap {
+        case HistoryBackfilling.Outcome.MoreWorkAvailableNow => goImportUpdates(i + 1)
+        case HistoryBackfilling.Outcome.MoreWorkAvailableLater => Future.successful(false)
         case HistoryBackfilling.Outcome.BackfillingIsComplete => Future.successful(true)
       }
     }
@@ -287,5 +295,17 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
             excludeBefore.get(domainId).fold(false)(b => u.update.recordTime >= b)
           )
         )
+
+    override def getImportUpdates(migrationId: Long, afterUpdateId: String, count: Int)(implicit
+        tc: TraceContext
+    ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = history
+      .getImportUpdates(
+        migrationId,
+        afterUpdateId,
+        PageLimit.tryCreate(count),
+      )(tc)
+      .map(
+        _.map(_.update)
+      )
   }
 }

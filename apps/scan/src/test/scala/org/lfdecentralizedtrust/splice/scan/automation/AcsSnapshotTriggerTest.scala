@@ -540,7 +540,15 @@ class AcsSnapshotTriggerTest
     when(sourceHistory.migrationInfo(anyLong)(any[TraceContext]))
       .thenReturn(
         Future.successful(
-          Some(HistoryBackfilling.SourceMigrationInfo(None, Map.empty, complete = true))
+          Some(
+            HistoryBackfilling.SourceMigrationInfo(
+              previousMigrationId = None,
+              recordTimeRange = Map.empty,
+              lastImportUpdateId = None,
+              complete = true,
+              importUpdatesComplete = true,
+            )
+          )
         )
       )
     when(updateHistory.sourceHistory).thenReturn(sourceHistory)
@@ -617,7 +625,15 @@ class AcsSnapshotTriggerTest
       )
         .thenReturn(
           Future.successful(
-            Some(HistoryBackfilling.SourceMigrationInfo(None, Map.empty, complete))
+            Some(
+              HistoryBackfilling.SourceMigrationInfo(
+                previousMigrationId = None,
+                recordTimeRange = Map.empty,
+                lastImportUpdateId = None,
+                complete = complete,
+                importUpdatesComplete = complete,
+              )
+            )
           )
         )
     }
