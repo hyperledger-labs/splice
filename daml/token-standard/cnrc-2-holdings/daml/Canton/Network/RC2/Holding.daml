@@ -1,0 +1,48 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Types and interfaces for retrieving an investor's holdings.
+module Canton.Network.RC2.Holding where
+
+import Canton.Network.RC1.TokenMetadata
+
+-- | A globally unique identifier for instruments.
+data InstrumentId = InstrumentId
+  with
+    appProvider : Party
+      -- ^ The app provider party of the registry app for managing this instrument.
+    id : Text
+      -- ^ The identifier used for the instrument by the app provider.
+      --
+      -- This identifier MUST be unique and unambiguous per app provider.
+  deriving (Eq, Ord, Show)
+
+-- | Details of a lock.
+data Lock = Lock
+  with
+    holders : [Party]
+      -- ^ Parties which are locking the contract.
+      -- This should  be a `Set` rather than a `List`, but the latter is easier to represent
+      -- in the JSON encoding. Should be deduplicated in the implementing template.
+    expiresAt : Optional Time
+      -- ^ Time at which the lock expires and MAY be released.
+  deriving (Eq, Ord, Show)
+
+-- | Holding interface.
+interface Holding where viewtype HoldingView
+
+-- | View for `Holding`.
+data HoldingView = HoldingView
+  with
+    owner : Party
+      -- ^ Owner of the holding.
+    instrumentId : InstrumentId
+      -- ^ Instrument being held.
+    amount : Decimal
+      -- ^ Size of the holding.
+    lock : Optional Lock
+      -- ^ Lock on the holding.
+    metadata : Metadata
+      -- ^ Metadata.
+  deriving (Eq, Show)
+

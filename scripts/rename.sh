@@ -1174,7 +1174,7 @@ function subcmd_no_illegal_daml_references() {
       )
     for word in "${illegal_words[@]}"; do
         echo "Checking for occurences of '$word' (case-insensitive)"
-        if rg -i "$word" daml/; then
+        if rg -i "$word" daml/ -g '!daml/token-standard' -g '!daml/dars.lock'; then
             echo "$word occurs in Daml code, remove all references"
             exit 1
         fi
@@ -1199,7 +1199,7 @@ function subcmd_no_illegal_daml_references() {
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' (case sensitive, in code other than splitwell)"
-        if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*' -g '!daml/dars.lock'; then
+        if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*' -g '!daml/dars.lock' -g '!daml/token-standard'; then
             echo "$pattern occurs in Daml code (other than splitwell), remove all references"
             exit 1
         fi

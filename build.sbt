@@ -100,6 +100,13 @@ lazy val root: Project = (project in file("."))
     `splice-dso-governance-test-daml`,
     `splice-validator-lifecycle-daml`,
     `splice-validator-lifecycle-test-daml`,
+    `cnrc-utils-daml`,
+    `cnrc-1-token-metadata-daml`,
+    `cnrc-2-holdings-daml`,
+    `cnrc-3-transfer-instruction-daml`,
+    `cnrc-4-allocation-daml`,
+    `cnrc-5-allocation-request-daml`,
+    `cnrc-6-allocation-instruction-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
     `canton-community-common`,
@@ -248,6 +255,102 @@ lazy val docs = project
     cleanFiles += sourceDirectory.value / "app_dev" / "api",
     Headers.ApacheDAHeaderSettings,
   )
+
+// Shared token standard code
+lazy val `cnrc-utils-daml` =
+  project
+    .in(file("daml/token-standard/cnrc-utils"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
+lazy val `cnrc-1-token-metadata-daml` =
+  project
+    .in(file("daml/token-standard/cnrc-1-token-metadata"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cnrc-utils-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
+lazy val `cnrc-2-holdings-daml` =
+  project
+    .in(file("daml/token-standard/cnrc-2-holdings"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
+lazy val `cnrc-3-transfer-instruction-daml` =
+  project
+    .in(file("daml/token-standard/cnrc-3-transfer-instruction"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+          (`cnrc-2-holdings-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
+lazy val `cnrc-4-allocation-daml` =
+  project
+    .in(file("daml/token-standard/cnrc-4-allocation"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+          (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
+lazy val `cnrc-5-allocation-request-daml` =
+  project
+    .in(file("daml/token-standard/cnrc-5-allocation-request"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+          (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
+          (`cnrc-4-allocation-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
+lazy val `cnrc-6-allocation-instruction-daml` =
+  project
+    .in(file("daml/token-standard/cnrc-6-allocation-instruction"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+          (`cnrc-2-holdings-daml` / Compile / damlBuild).value ++
+          (`cnrc-4-allocation-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
 
 // Shared non-template/non-interface code
 // used across our DARs.
@@ -1173,6 +1276,13 @@ lazy val bundleTask = {
       )
     val dars =
       Seq(
+        (`cnrc-utils-daml` / Compile / damlBuild).value,
+        (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value,
+        (`cnrc-2-holdings-daml` / Compile / damlBuild).value,
+        (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value,
+        (`cnrc-4-allocation-daml` / Compile / damlBuild).value,
+        (`cnrc-5-allocation-request-daml` / Compile / damlBuild).value,
+        (`cnrc-6-allocation-instruction-daml` / Compile / damlBuild).value,
         (`splice-amulet-daml` / Compile / damlBuild).value,
         (`splice-wallet-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,

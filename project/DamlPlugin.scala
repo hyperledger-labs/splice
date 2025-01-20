@@ -553,7 +553,9 @@ object DamlPlugin extends AutoPlugin {
       ) match {
         case Success(dir) => dir
         case Failure(e) =>
-          log.error(s"Failed to parse codegen config in daml.yaml file: $damlYaml")
+          log.error(
+            s"Failed to parse codegen config in daml.yaml file: $damlYaml. Did you forget to specify codegen.java?"
+          )
           throw e
       }
       IO.delete(projectDir / codegenDir)
