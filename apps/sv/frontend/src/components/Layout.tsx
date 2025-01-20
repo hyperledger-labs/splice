@@ -30,7 +30,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
     vr => vr.payload.votes.entriesArray().find(e => e[1].sv === svPartyId) === undefined
   );
   const electionContextQuery = useElectionContext();
-  const electionRequests = electionContextQuery?.data?.ranking;
+  const hasElectionRequest = (electionContextQuery?.data?.ranking?.length ?? 0) > 0;
 
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
@@ -60,7 +60,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: 'Information', path: 'dso' },
             { name: 'Validator Onboarding', path: 'validator-onboarding' },
             { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'amulet-price' },
-            { name: 'Delegate Election', path: 'delegate', badgeCount: electionRequests?.length },
+            { name: 'Delegate Election', path: 'delegate', hasAlert: hasElectionRequest },
             { name: 'Governance', path: 'votes', badgeCount: actionsPending?.length },
           ]}
         >
