@@ -46,6 +46,10 @@ import slick.jdbc.{GetResult, JdbcProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
+import org.lfdecentralizedtrust.splice.store.ImportUpdatesBackfilling.{
+  DestinationImportUpdates,
+  DestinationImportUpdatesBackfillingInfo,
+}
 import slick.jdbc.canton.SQLActionBuilder
 
 import java.util.concurrent.atomic.AtomicReference
@@ -71,17 +75,20 @@ class UpdateHistory(
     with NamedLogging {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
+
   import profile.api.jdbcActionExtensionMethods
   import UpdateHistory.*
 
   private[this] def domainMigrationId = domainMigrationInfo.currentMigrationId
 
   private val state = new AtomicReference[State](State.empty())
+
   def historyId: Long =
     state
       .get()
       .historyId
       .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
+
   def isReady: Boolean = state.get().historyId.isDefined
 
   lazy val ingestionSink: MultiDomainAcsStore.IngestionSink =
@@ -128,7 +135,8 @@ class UpdateHistory(
                 d6 <-
                   sqlu"delete from update_history_last_ingested_offsets where history_id = $newHistoryId"
                 d7 <- sqlu"delete from update_history_descriptors where id = $newHistoryId"
-                _ <- sqlu"""
+                _ <-
+                  sqlu"""
                   update update_history_descriptors
                   set store_name = ${lengthLimited(storeName)}
                   where id = $oldHistoryId
@@ -701,7 +709,8 @@ class UpdateHistory(
     logger.info(
       s"Deleting updates before $recordTime on domain $domainId from store $storeName with id $historyId"
     )
-    val filterCondition = sql"""
+    val filterCondition =
+      sql"""
       domain_id = $domainId and
       migration_id = $migrationId and
       history_id = $historyId and
@@ -970,6 +979,25 @@ class UpdateHistory(
       unassignments <- getUnassignmentUpdates(filters, orderBy, limit)
     } yield {
       (txs ++ assignments ++ unassignments).sorted.reverse.take(limit.limit)
+    }
+  }
+
+  def getImportUpdates(
+      migrationId: Long,
+      afterUpdateId: String,
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
+    val filters =
+      sql"""
+      migration_id = $migrationId and
+      record_time = ${CantonTimestamp.MinValue} and
+      update_id > $afterUpdateId
+    """
+    val orderBy = sql"update_id asc"
+    for {
+      txs <- getTxUpdates(NonEmptyList.of(filters), orderBy, limit)
+    } yield {
+      txs.take(limit.limit)
     }
   }
 
@@ -1387,6 +1415,21 @@ class UpdateHistory(
     }
   }
 
+  def getLastImportUpdateId(
+      migrationId: Long
+  )(implicit tc: TraceContext): Future[Option[String]] = {
+    storage.query(
+      sql"""
+        select max(update_id)
+        from update_history_transactions
+        where history_id = $historyId and
+          migration_id = $migrationId and
+          record_time = ${CantonTimestamp.MinValue}
+      """.as[Option[String]].head,
+      s"getLastImportUpdateId",
+    )
+  }
+
   def getPreviousMigrationId(migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[Long]] = {
@@ -1440,19 +1483,22 @@ class UpdateHistory(
       ).flatten.minOption
     }
   }
+
   def getBackfillingState()(implicit
       tc: TraceContext
   ): Future[Option[BackfillingState]] =
     storage
       .query(
         sql"""
-          select complete
+          select complete, import_updates_complete
           from update_history_backfilling
           where history_id = $historyId
-        """.as[Boolean].headOption,
+        """.as[(Boolean, Boolean)].headOption,
         "getBackfillingState",
       )
-      .map(_.map(BackfillingState.apply))
+      .map(_.map { case (complete, import_updates_complete) =>
+        BackfillingState.apply(complete, import_updates_complete)
+      })
 
   private[this] def setBackfillingComplete()(implicit
       tc: TraceContext
@@ -1465,6 +1511,20 @@ class UpdateHistory(
           where history_id = $historyId
         """,
         "setBackfillingComplete",
+      )
+      .map(_ => ())
+
+  private[this] def setBackfillingImportUpdatesComplete()(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    storage
+      .update(
+        sqlu"""
+          update update_history_backfilling
+          set import_updates_complete = true
+          where history_id = $historyId
+        """,
+        "setBackfillingImportUpdatesComplete",
       )
       .map(_ => ())
 
@@ -1483,13 +1543,14 @@ class UpdateHistory(
     storage
       .update(
         sqlu"""
-          insert into update_history_backfilling (history_id, joining_migration_id, joining_domain_id, joining_update_id, complete)
-          values ($historyId, $joiningMigrationId, $joiningDomainId, $safeUpdateId, $complete)
+          insert into update_history_backfilling (history_id, joining_migration_id, joining_domain_id, joining_update_id, complete, import_updates_complete)
+          values ($historyId, $joiningMigrationId, $joiningDomainId, $safeUpdateId, $complete, $complete)
           on conflict (history_id) do update set
             joining_migration_id = $joiningMigrationId,
             joining_domain_id = $joiningDomainId,
             joining_update_id = $safeUpdateId,
-            complete = $complete
+            complete = $complete,
+            import_updates_complete = $complete
         """,
         "initializeBackfilling",
       )
@@ -1508,13 +1569,20 @@ class UpdateHistory(
       )(implicit tc: TraceContext): Future[Option[SourceMigrationInfo]] = for {
         previousMigrationId <- getPreviousMigrationId(migrationId)
         recordTimeRange <- getRecordTimeRange(migrationId)
+        lastImportUpdateId <- getLastImportUpdateId(migrationId)
         state <- getBackfillingState()
       } yield state.flatMap(state =>
         Option.when(recordTimeRange.nonEmpty)(
           SourceMigrationInfo(
             previousMigrationId = previousMigrationId,
             recordTimeRange = recordTimeRange,
-            complete = state.complete,
+            lastImportUpdateId = lastImportUpdateId,
+            // Note: this will only report this migration as "complete" if the backfilling process has completed for
+            // all migration ids (`state` contains global information, across all migrations).
+            // This is not wrong, but we could also report this migration as complete if there exists any data on
+            // the previous migration.
+            complete = state.updates_complete,
+            importUpdatesComplete = state.import_updates_complete,
           )
         )
       )
@@ -1535,97 +1603,148 @@ class UpdateHistory(
       }
     }
 
-  lazy val destinationHistory
-      : HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse] =
-    new HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse] {
-      override def isReady = state
-        .get()
-        .historyId
-        .isDefined
+  class DestinationHistoryImplementation
+      extends HistoryBackfilling.DestinationHistory[
+        LedgerClient.GetTreeUpdatesResponse
+      ]
+      with ImportUpdatesBackfilling.DestinationImportUpdates[LedgerClient.GetTreeUpdatesResponse] {
 
-      override def backfillingInfo(implicit
-          tc: TraceContext
-      ): Future[Option[DestinationBackfillingInfo]] = (for {
-        _ <- OptionT(getBackfillingState())
-        migrationId <- OptionT(getFirstMigrationId())
-        recordTimeRange <- OptionT.liftF(getRecordTimeRange(migrationId))
-      } yield DestinationBackfillingInfo(
-        migrationId = migrationId,
-        backfilledAt = recordTimeRange.view.mapValues(_.min).toMap,
-      )).value
+    override def isReady = state
+      .get()
+      .historyId
+      .isDefined
 
-      override def insert(
-          migrationId: Long,
-          domainId: DomainId,
-          items: Seq[LedgerClient.GetTreeUpdatesResponse],
-      )(implicit
-          tc: TraceContext
-      ): Future[DestinationHistory.InsertResult] = {
-        val nonEmpty = NonEmptyList
-          .fromFoldable(items)
-          .getOrElse(
-            throw new RuntimeException("insert() must not be called with an empty sequence")
-          )
-        // Because DbStorage requires all actions to be idempotent, and we can't just slap a "ON CONFLICT DO NOTHING"
-        // onto all subqueries of ingestUpdate_() because they are using "RETURNING" which doesn't work with the above,
-        // we simply check whether one of the items was already inserted.
-        val (headItemTable, headItemRecordTime) =
-          nonEmpty.head.update match {
-            case TransactionTreeUpdate(tree) =>
-              ("update_history_transactions", CantonTimestamp.assertFromInstant(tree.getRecordTime))
-            case ReassignmentUpdate(update) =>
-              update.event match {
-                case _: ReassignmentEvent.Assign =>
-                  ("update_history_assignments", update.recordTime)
-                case _: ReassignmentEvent.Unassign =>
-                  ("update_history_unassignments", update.recordTime)
-              }
-          }
+    override def backfillingInfo(implicit
+        tc: TraceContext
+    ): Future[Option[DestinationBackfillingInfo]] = (for {
+      _ <- OptionT(getBackfillingState())
+      migrationId <- OptionT(getFirstMigrationId())
+      recordTimeRange <- OptionT.liftF(getRecordTimeRange(migrationId))
+    } yield DestinationBackfillingInfo(
+      migrationId = migrationId,
+      backfilledAt = recordTimeRange.view.mapValues(_.min).toMap,
+    )).value
 
-        val action = for {
-          itemExists <- sql"""
+    override def importUpdatesBackfillingInfo(implicit
+        tc: TraceContext
+    ): Future[Option[DestinationImportUpdatesBackfillingInfo]] = (for {
+      _ <- OptionT(getBackfillingState())
+      migrationId <- OptionT(getFirstMigrationId())
+      lastUpdateId <- OptionT.liftF(getLastImportUpdateId(migrationId))
+    } yield DestinationImportUpdatesBackfillingInfo(
+      migrationId = migrationId,
+      lastUpdateId = lastUpdateId,
+    )).value
+
+    override def insert(
+        migrationId: Long,
+        domainId: DomainId,
+        items: Seq[LedgerClient.GetTreeUpdatesResponse],
+    )(implicit
+        tc: TraceContext
+    ): Future[DestinationHistory.InsertResult] = {
+      insertItems(migrationId, items).map(insertedItems =>
+        DestinationHistory.InsertResult(
+          backfilledUpdates = insertedItems.size.toLong,
+          backfilledEvents = eventCount(insertedItems),
+          lastBackfilledRecordTime = insertedItems.last.update.recordTime,
+        )
+      )
+    }
+
+    override def insertImportUpdates(
+        migrationId: Long,
+        items: Seq[LedgerClient.GetTreeUpdatesResponse],
+    )(implicit
+        tc: TraceContext
+    ): Future[DestinationImportUpdates.InsertResult] = {
+      insertItems(migrationId, items).map(insertedItems =>
+        DestinationImportUpdates.InsertResult(
+          backfilledUpdates = insertedItems.size.toLong,
+          backfilledEvents = eventCount(insertedItems),
+        )
+      )
+    }
+
+    private def eventCount(updates: NonEmptyList[LedgerClient.GetTreeUpdatesResponse]): Long =
+      updates
+        .map(_.update)
+        .collect { case TransactionTreeUpdate(tree) =>
+          tree.getEventsById.size().toLong
+        }
+        .sum
+
+    private def insertItems(
+        migrationId: Long,
+        items: Seq[LedgerClient.GetTreeUpdatesResponse],
+    )(implicit
+        tc: TraceContext
+    ): Future[NonEmptyList[LedgerClient.GetTreeUpdatesResponse]] = {
+      val nonEmpty = NonEmptyList
+        .fromFoldable(items)
+        .getOrElse(
+          throw new RuntimeException("insertItems() must not be called with an empty sequence")
+        )
+      // Because DbStorage requires all actions to be idempotent, and we can't just slap a "ON CONFLICT DO NOTHING"
+      // onto all subqueries of ingestUpdate_() because they are using "RETURNING" which doesn't work with the above,
+      // we simply check whether one of the items was already inserted.
+      val (headItemTable, headItemRecordTime, headItemDomain) =
+        nonEmpty.head.update match {
+          case TransactionTreeUpdate(tree) =>
+            (
+              "update_history_transactions",
+              CantonTimestamp.assertFromInstant(tree.getRecordTime),
+              DomainId.tryFromString(tree.getDomainId),
+            )
+          case ReassignmentUpdate(update) =>
+            update.event match {
+              case _: ReassignmentEvent.Assign =>
+                ("update_history_assignments", update.recordTime, update.event.target)
+              case _: ReassignmentEvent.Unassign =>
+                ("update_history_unassignments", update.recordTime, update.event.source)
+            }
+        }
+
+      val action = for {
+        itemExists <- sql"""
              select exists(
                select row_id
                from #$headItemTable
                where
                  history_id = $historyId and
                  migration_id = $migrationId and
-                 domain_id = $domainId and
+                 domain_id = $headItemDomain and
                  record_time = $headItemRecordTime
              )
            """.as[Boolean].head
-          _ <-
-            if (!itemExists) {
-              DBIOAction
-                .sequence(items.map(item => ingestUpdate_(item.update, migrationId)))
-            } else {
-              DBIOAction.successful(())
-            }
-        } yield ()
+        _ <-
+          if (!itemExists) {
+            DBIOAction
+              .sequence(items.map(item => ingestUpdate_(item.update, migrationId)))
+          } else {
+            DBIOAction.successful(())
+          }
+      } yield nonEmpty
 
-        storage
-          .queryAndUpdate(
-            action.transactionally,
-            "destinationHistory.insert",
-          )
-          .map(_ =>
-            DestinationHistory.InsertResult(
-              backfilledUpdates = nonEmpty.size.toLong,
-              backfilledEvents = nonEmpty
-                .map(_.update)
-                .collect { case TransactionTreeUpdate(tree) =>
-                  tree.getEventsById.size().toLong
-                }
-                .sum,
-              lastBackfilledRecordTime = nonEmpty.last.update.recordTime,
-            )
-          )
-      }
-
-      override def markBackfillingComplete()(implicit
-          tc: TraceContext
-      ): Future[Unit] = setBackfillingComplete()
+      storage
+        .queryAndUpdate(
+          action.transactionally,
+          "destinationHistory.insert",
+        )
     }
+
+    override def markBackfillingComplete()(implicit
+        tc: TraceContext
+    ): Future[Unit] = setBackfillingComplete()
+
+    override def markImportUpdatesBackfillingComplete()(implicit tc: TraceContext): Future[Unit] =
+      setBackfillingImportUpdatesComplete()
+  }
+
+  lazy val destinationHistory: HistoryBackfilling.DestinationHistory[
+    LedgerClient.GetTreeUpdatesResponse
+  ] & ImportUpdatesBackfilling.DestinationImportUpdates[LedgerClient.GetTreeUpdatesResponse] =
+    new DestinationHistoryImplementation()
 }
 
 object UpdateHistory {
@@ -1638,8 +1757,11 @@ object UpdateHistory {
   }
 
   case class BackfillingState(
-      complete: Boolean
-  )
+      updates_complete: Boolean,
+      import_updates_complete: Boolean,
+  ) {
+    def complete: Boolean = updates_complete && import_updates_complete
+  }
 
   private case class SelectFromTransactions(
       rowId: Long,
