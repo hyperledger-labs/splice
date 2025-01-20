@@ -116,6 +116,10 @@ jobs:
           input_commit_sha: ${{ inputs.commit_sha }}
           pr_number: ${{ inputs.pr_number }}
         with:
+          # Switch the GH token from the default repo token to the one for
+          # canton-network-da. This ensures this is treated as a regular pull request
+          # that can trigger CI.
+          github-token: ${{ secrets.GH_ISSUES }}
           retries: 3
           script: |
             const { new_branch, base_branch, input_commit_sha, pr_number } = process.env;
