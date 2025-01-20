@@ -14,64 +14,53 @@ Global Synchronizer for the Canton Network
    * - Helm Chart Version:
      - |chart_version_literal|
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Network Documentation
+.. todo:: Add top-level overview and landing page containing
 
-   overview.rst
-   glossary.rst
+     - overview of the docs and where to go next
+     - where to get the code for splice
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Network Users
 
-   cc_user/wallet.rst
+.. todo:: Add the usual "Edit on GitHub" link to the top of the page
 
 .. toctree::
    :maxdepth: 2
-   :caption: Validator Operators
+   :caption: Deployment and Operations
 
-   validator_operator/validator_compose.rst
-   validator_operator/validator_helm.rst
-   validator_operator/validator_upgrades.rst
-   validator_operator/validator_backups.rst
-   validator_operator/validator_users.rst
+   deployment.rst
+   validator_operator/index.rst
+   sv_operator/index.rst
+   troubleshooting.rst
 
 .. toctree::
    :maxdepth: 2
-   :caption: Application Developers
+   :caption: Application Development
 
    app_dev/index.rst
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Supervalidator Operators
+.. todo:: Add Background section containing
 
-   sv_operator/sv_helm.rst
-   sv_operator/sv_upgrades.rst
-   sv_operator/sv_restore.rst
-   sv_operator/sv_operations.rst
-   sv_operator/sv_scratchnet.rst
-
+          - architecture (possibly starting with the architecture currently in the scan bulk api docs)
+          - security (starting from key usage doc and risk of key compromise)
+          - comparison to other chains
+          - tokenomics
 
 .. toctree::
    :maxdepth: 2
-   :caption: DevNet Architecture
+   :caption: FAQ
 
-   devnet/index.rst
+.. todo:: Add FAQ section to serve as a catch-all for docs that don't fit elsewhere
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Glossary
+
+   glossary.rst
 
 .. toctree::
    :maxdepth: 2
    :caption: Release Notes
 
    release_notes.rst
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Troubleshooting
-
-   troubleshooting.rst
-
 
 .. TODO(M3-17): add back indices and search functionality if required
 

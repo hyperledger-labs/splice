@@ -3364,47 +3364,6 @@ jobs:
       - save_sbt_job_result:
           runner_type: "selfhosted"
 
-  bundle:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
-          cmd: "Test/compile bundle"
-      - run:
-          name: Copy bundle
-          command: |
-            set -eou pipefail
-            mkdir -p /tmp/artifacts
-            cp apps/app/target/release/*.tar.gz /tmp/artifacts
-      - run_bash_command_in_nix:
-          cmd_name: Copy OpenAPI specs
-          cmd: |
-            set -eou pipefail
-            scripts/copy-openapi.sh /tmp/artifacts/openapi.tar.gz
-      - run_bash_command_in_nix:
-          cmd_name: Publish release bundles
-          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-          cmd: |
-            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-            export GOOGLE_CLOUD_PROJECT=da-cn-shared
-            VERSION=$(get-snapshot-version)
-            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
-            # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
-            # which would lead to an error due to a misisng `delete` permission
-            gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
-          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-          upload_caches: true
-
   auth0_user_cleanup:
     executor: self_hosted
     environment:
@@ -3543,21 +3502,29 @@ jobs:
             make cluster/helm/build -j
             make cluster/helm/push -j
           cmd_retry_count: 5
-      - save_frontend_builds
-      - save_sbt_job_result:
-          runner_type: "circleci"
-
-  publish_public_release:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - docker_login_artifactory
+      - run:
+          name: Copy bundle
+          command: |
+            set -eou pipefail
+            mkdir -p /tmp/artifacts
+            cp apps/app/target/release/*.tar.gz /tmp/artifacts
+      - run_bash_command_in_nix:
+          cmd_name: Copy OpenAPI specs
+          cmd: |
+            set -eou pipefail
+            scripts/copy-openapi.sh /tmp/artifacts/openapi.tar.gz
+      - run_bash_command_in_nix:
+          cmd_name: Publish release bundles
+          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
+          cmd: |
+            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+            export GOOGLE_CLOUD_PROJECT=da-cn-shared
+            VERSION=$(get-snapshot-version)
+            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
+            # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
+            # which would lead to an error due to a misisng `delete` permission
+            gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
+          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - run_bash_command_in_nix:
           cmd_name: tag git
           additional_nix_args: "--keep ARTIFACTORY_USER \
@@ -3580,6 +3547,10 @@ jobs:
               git tag "${RELEASE_TAG}"
               git push origin "${RELEASE_TAG}"
             fi
+
+      - save_frontend_builds
+      - save_sbt_job_result:
+          runner_type: "circleci"
 
   docker_images_build:
     machine:
@@ -5066,13 +5037,6 @@ workflows:
           context:
             - artifactory
             - slack-context
-      - publish_public_release:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - artifacts_push
       - create_oss_pr:
           <<: *notify-fail
           context:
@@ -5145,11 +5109,6 @@ workflows:
           with_docker_images: true
           resource_class: "2xlarge"
           parallelism: 2
-      - bundle:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
@@ -5216,18 +5175,10 @@ workflows:
             - canton-network-vpn
             - slack-context
           wait_for_sv: false
-          # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
+          # Order: deploy_cluster->preflight_check->deploy_sv_runbook->preflight_sv_check
           requires:
             - artifacts_push
             - deploy_cluster_cidaily
-      - publish_public_release:
-          <<: *main-branch-only
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - preflight_check
       - create_oss_pr:
           <<: *main-branch-only
           <<: *notify-fail
@@ -5246,7 +5197,6 @@ workflows:
           use_published_artifacts: true
           requires:
             - deploy_cluster_cidaily
-            - publish_public_release
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -5256,7 +5206,6 @@ workflows:
           use_published_artifacts: true
           requires:
             - deploy_cluster_cidaily
-            - publish_public_release
       - preflight_sv_check:
           <<: *main-branch-only
           context:

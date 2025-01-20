@@ -1,3 +1,9 @@
+validator1:
+  kms:
+    type: gcp
+    locationId: us-central1
+    projectId: da-cn-devnet
+    keyRingId: validator1_test
 synchronizerMigration:
   archived:
     - id: 0

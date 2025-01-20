@@ -179,7 +179,10 @@ export async function awaitAllOrThrowAllExceptions(operations: Operation[]): Pro
       console.error(`Running operation ${op.name}`);
       op.promise.then(
         ok => console.error(`Operation ${op.name} succeeded.`),
-        err => console.error(`Operation ${op.name} failed.`, err)
+        err => {
+          console.error(`Operation ${op.name} failed.`, err);
+          throw err;
+        }
       );
     })
   );

@@ -5,8 +5,8 @@
 
 .. _troubleshooting:
 
-Collecting Debug Information
-============================
+Troubleshooting
+===============
 
 This section provides an overview of which information can be collected to debug issues in a Canton Network Node.
 

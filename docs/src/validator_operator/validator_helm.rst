@@ -112,12 +112,14 @@ The onboarding secret is a one-time use secret that expires after 24 hours. If y
 .. admonition:: DevNet-only
 
   On DevNet, you can obtain an onboarding secret automatically by
-  calling the following endpoint on any SV (Digital-Asset-2 used here for illustration):
+  calling the following endpoint on your sponsoring SV (GSF used here for illustration):
 
   .. parsed-literal::
 
-     curl -X POST https://sv.sv-2.TARGET_CLUSTER.global.canton.network.digitalasset.com/api/sv/v0/devnet/onboard/validator/prepare
+     curl -X POST https://sv.sv-1.TARGET_CLUSTER.global.canton.network.sync.global/api/sv/v0/devnet/onboard/validator/prepare
 
+  Note that this most be called on the same SV that sponsors your validator. Please double check the URL
+  with your sponsoring SV.
 
 Ensure that your validator onboarding secret ``VALIDATOR_SECRET`` is set in the namespace you created earlier. The value should be provided by the SV sponsoring the onboarding of your validator.
 
@@ -382,8 +384,9 @@ This does mean that you depend on that single SV and if it is broken or maliciou
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` as follows:
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
-- Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, e.g.,
-  ``https://sv.sv-2.TARGET_CLUSTER.global.canton.network.sync.global``.
+- Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, for example,
+  ``https://sv-1.TARGET_CLUSTER.global.canton.network.sync.global`` for the GSF. Please make sure that you use the URL
+  of your sponsoring SV.
 
 If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
 
@@ -650,47 +653,3 @@ apply this configuration.
 
 Re-onboard a validator and recover balances of all users it hosts
 -----------------------------------------------------------------
-
-In the case of a catastrophic failure of the validator node, some data owned by the validator and users it hosts can be recovered from the SVs. This data includes Canton Coin balance and CNS entries. This is achieved by deploying another validator node with control over the validator's participant keys.
-
-In order to be able to recover the data, you must have a backup of the identities of the
-validator, as created in the :ref:`Backup of Node Identities <validator-backups>` section.
-
-We can deploy a new validator node to which the data will be recovered.
-
-Repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
-
-While doing so, please note the following:
-
-* Follow the notes in :ref:`Restoring from a Participant Identities Dump <validator-restore-from-dump>` to restore the validator with the identities from the backup.
-  Use the identities backup file as the participant bootstrap dump file.
-
-Once the validator is up and running, login to the wallet of the validator ``https://wallet.validator.YOUR_HOSTNAME`` with the validator user account setup in :ref:`helm-validator-auth0`.
-Confirm that the wallet balance is as expected. It should be the same as the amount that the original validator wallet user owned.
-By logging in with users that are hosted by the validator original, they should also see the same balance that they owned previously.
-
-.. _validator-restore-from-dump:
-
-Restoring from a Participant Identities Dump
---------------------------------------------
-
-Before installing the validator app and participant with steps described in :ref:`helm-validator-install`,
-You can configure to restore the validator and participant with the dump file you have prepared previously.
-
-* Create a Kubernetes secret with the content of that dump file.
-  Assuming you set the environment variable ``PARTICIPANT_BOOTSTRAP_DUMP_FILE`` to a dump file path, you can create the secret with the following command:
-
-.. code-block:: bash
-
-    kubectl create secret generic participant-bootstrap-dump \
-        --from-file=content=${PARTICIPANT_BOOTSTRAP_DUMP_FILE} \
-        -n validator
-
-* Uncomment the following lines in the ``standalone-validator-values.yaml`` file.
-  This will specify a new participant ID for the validator. Replace ``put-some-new-string-never-used-before`` with a string that was never used before.
-  Make sure to also adjust ``nodeIdentifier`` to match the same value.
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
-    :end-before: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
