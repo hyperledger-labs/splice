@@ -1680,6 +1680,8 @@ class HttpScanHandler(
             definitions.GetMigrationInfoResponse(
               previousMigrationId = info.previousMigrationId,
               complete = info.complete,
+              importUpdatesComplete = Some(info.importUpdatesComplete),
+              lastImportUpdateId = info.lastImportUpdateId,
               recordTimeRange = info.recordTimeRange.iterator.map { case (domainId, range) =>
                 definitions.RecordTimeRange(
                   synchronizerId = domainId.toProtoPrimitive,
@@ -1714,6 +1716,34 @@ class HttpScanHandler(
         )
         .map { txs =>
           definitions.GetUpdatesBeforeResponse(
+            txs
+              .map(
+                encodeUpdate(
+                  _,
+                  encoding = definitions.DamlValueEncoding.members.ProtobufJson,
+                  consistentResponses = true,
+                )
+              )
+              .toVector
+          )
+        }
+    }
+  }
+
+  override def getImportUpdates(respond: ScanResource.GetImportUpdatesResponse.type)(
+      body: definitions.GetImportUpdatesRequest
+  )(extracted: TraceContext): Future[ScanResource.GetImportUpdatesResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getImportUpdates") { _ => _ =>
+      val updateHistory = store.updateHistory
+      updateHistory
+        .getImportUpdates(
+          migrationId = body.migrationId,
+          afterUpdateId = body.afterUpdateId,
+          limit = PageLimit.tryCreate(body.count),
+        )
+        .map { txs =>
+          definitions.GetImportUpdatesResponse(
             txs
               .map(
                 encodeUpdate(

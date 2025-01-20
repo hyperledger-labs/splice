@@ -7,7 +7,11 @@ import com.daml.ledger.javaapi.data as javaApi
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConnection
-import org.lfdecentralizedtrust.splice.store.{HistoryBackfilling, TreeUpdateWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{
+  HistoryBackfilling,
+  ImportUpdatesBackfilling,
+  TreeUpdateWithMigrationId,
+}
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{Outcome, SourceMigrationInfo}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -19,15 +23,11 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 /** Backfills the scan history by copying data from a remote source history to the destination history.
-  *
-  * The algorithm caches the set of all remote connections, along with "static data" for the remote history.
-  * Some of the data (such as the record time range) is technically not static because remote scans
-  * could be backfilling themselves, but the algorithm is designed to terminate correctly as long as the cache
-  * is eventually updated.
   */
 class ScanHistoryBackfilling(
     connection: BackfillingScanConnection,
-    destinationHistory: HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse],
+    destinationHistory: HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse]
+      with ImportUpdatesBackfilling.DestinationImportUpdates[LedgerClient.GetTreeUpdatesResponse],
     currentMigrationId: Long,
     batchSize: Int = 100,
     override val loggerFactory: NamedLoggerFactory,
@@ -37,21 +37,29 @@ class ScanHistoryBackfilling(
 ) extends NamedLogging {
 
   private val sourceHistory =
-    new HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] {
+    new HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse]
+      with ImportUpdatesBackfilling.SourceImportUpdates[LedgerClient.GetTreeUpdatesResponse] {
       def isReady: Boolean = true
 
-      def migrationInfo(migrationId: Long)(implicit
+      override def migrationInfo(migrationId: Long)(implicit
           tc: TraceContext
       ): Future[Option[SourceMigrationInfo]] =
         connection.getMigrationInfo(migrationId)
 
-      def items(
+      override def items(
           migrationId: Long,
           domainId: DomainId,
           before: CantonTimestamp,
           count: Int,
       )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
         connection.getUpdatesBefore(migrationId, domainId, before, None, count)
+
+      def importUpdates(
+          migrationId: Long,
+          afterUpdateId: String,
+          count: Int,
+      )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
+        connection.getImportUpdates(migrationId, afterUpdateId, count)
     }
 
   private val backfilling =
@@ -64,8 +72,22 @@ class ScanHistoryBackfilling(
       metricsFactory,
     )
 
+  private val importUpdatesBackfilling =
+    new ImportUpdatesBackfilling(
+      destinationHistory,
+      sourceHistory,
+      currentMigrationId = currentMigrationId,
+      batchSize = batchSize,
+      loggerFactory,
+      metricsFactory,
+    )
+
   def backfill()(implicit tc: TraceContext): Future[Outcome] = {
     backfilling.backfill()
+  }
+
+  def backfillImportUpdates()(implicit tc: TraceContext): Future[Outcome] = {
+    importUpdatesBackfilling.backfillImportUpdates()
   }
 }
 

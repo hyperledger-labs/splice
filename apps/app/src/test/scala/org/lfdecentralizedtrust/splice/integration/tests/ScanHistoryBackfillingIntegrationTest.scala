@@ -287,11 +287,11 @@ class ScanHistoryBackfillingIntegrationTest
         sv1ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue
-          .exists(_.complete) should be(true)
+          .exists(s => s.complete) should be(true)
         sv2ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue
-          .exists(_.complete) should be(true)
+          .exists(s => s.complete) should be(true)
       },
     )
 
