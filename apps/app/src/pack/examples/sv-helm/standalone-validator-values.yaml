@@ -23,14 +23,13 @@ persistence:
   secretName: postgres-secrets
   host: postgres
 
-# PARTICIPANT_BOOTSTRAP_DUMP_START
 # Uncomment the following block if you want to restore from a participant dump
-# participantIdentitiesDumpImport:
-# secretName: participant-bootstrap-dump
-# PARTICIPANT_BOOTSTRAP_DUMP_END
+# and recover your balance
 # PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
-# Uncomment the following line if you want to migrate the validator party to a new participant
-# newParticipantIdentifier: put-some-new-string-never-used-before
+# participantIdentitiesDumpImport:
+#   secretName: participant-bootstrap-dump
+#   # Make sure to also adjust nodeIdentifier to the same value
+#   newParticipantIdentifier: put-some-new-string-never-used-before
 # migrateValidatorParty: true
 # PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
 
