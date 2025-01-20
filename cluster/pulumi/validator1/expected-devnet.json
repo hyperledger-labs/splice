@@ -146,11 +146,79 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "gke-credentials",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {}
+      },
+      "type": "Opaque"
+    },
+    "name": "gke-credentials",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "enableServerSideApply": "true"
     },
     "name": "k8s-imgpull-validator1",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/cloudkms.admin"
+    },
+    "name": "kms-dev-validator1-roles/cloudkms.admin-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/cloudkms.cryptoOperator"
+    },
+    "name": "kms-dev-validator1-roles/cloudkms.cryptoOperator-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "accountId": "kms-dev-validator1",
+      "description": "Service account for KMS (managed by Pulumi)",
+      "displayName": "Participant KMS Service Account"
+    },
+    "name": "kms-dev-validator1-sa",
+    "provider": "",
+    "type": "gcp:serviceaccount/account:Account"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "kms-dev-validator1",
+    "provider": "",
+    "type": "cn:gcp:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {},
+    "name": "kmsKey",
+    "provider": "",
+    "type": "gcp:serviceaccount/key:Key"
   },
   {
     "custom": true,
@@ -503,6 +571,12 @@
       },
       "timeout": 300,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "GOOGLE_APPLICATION_CREDENTIALS",
+            "value": "/app/gcp-credentials.json"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
@@ -533,7 +607,28 @@
         "clusterUrl": "dev.global.canton.network.digitalasset.com",
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
+        "extraVolumeMounts": [
+          {
+            "mountPath": "/app/gcp-credentials.json",
+            "name": "gcp-credentials",
+            "subPath": "googleCredentials"
+          }
+        ],
+        "extraVolumes": [
+          {
+            "name": "gcp-credentials",
+            "secret": {
+              "secretName": "gke-credentials"
+            }
+          }
+        ],
         "imageRepo": "digitalasset-canton-network-docker.jfrog.io/digitalasset",
+        "kms": {
+          "keyRingId": "validator1_dev",
+          "locationId": "us-central1",
+          "projectId": "da-cn-devnet",
+          "type": "gcp"
+        },
         "metrics": {
           "enable": true,
           "migration": {

@@ -22,6 +22,7 @@ git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --fo
 echo "GITHUB_SHA: ${GITHUB_SHA:-}"
 if [ -n "${GITHUB_SHA:-}" ]; then
   echo "Checking out $GITHUB_SHA"
+  git fetch origin "$GITHUB_SHA" --force
   git checkout "$GITHUB_SHA"
 fi
 

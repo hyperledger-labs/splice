@@ -12,6 +12,7 @@ import {
   ChartValues,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
+  CnChartVersion,
   CnInput,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
@@ -360,6 +361,11 @@ function internalScanUrl(config: SvConfig): pulumi.Output<string> {
   return pulumi.interpolate`http://scan-app.${config.nodeName}:5012`;
 }
 
+const withoutFounderDecentralizedSynchronizerUrl = (version: CnChartVersion) =>
+  version.type == 'local' ||
+  version.version.startsWith('0.3.6') ||
+  semver.gt(version.version, '0.3.6');
+
 function installSvApp(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   config: SvConfig,
@@ -390,7 +396,8 @@ function installSvApp(
       connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcServiceName}:26657`,
     },
     decentralizedSynchronizerUrl:
-      config.onboarding.type == 'found-dso'
+      config.onboarding.type == 'found-dso' &&
+      withoutFounderDecentralizedSynchronizerUrl(activeVersion)
         ? undefined
         : decentralizedSynchronizer.sv1InternalSequencerAddress,
     domain:

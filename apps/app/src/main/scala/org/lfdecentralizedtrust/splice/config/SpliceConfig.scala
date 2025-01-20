@@ -606,6 +606,8 @@ object SpliceConfig {
       deriveReader[MigrateValidatorPartyConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig].emap { conf =>
+        val participantIdentifier =
+          ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
           _ <- Either.cond(
             !conf.svValidator || conf.validatorPartyHint.isEmpty,
@@ -616,6 +618,16 @@ object SpliceConfig {
             conf.svValidator || conf.validatorPartyHint.isDefined,
             (),
             ConfigValidationFailed("Validator party hint must be specified for non-SV validators"),
+          )
+          _ <- Either.cond(
+            conf.participantBootstrappingDump.forall(
+              _.newParticipantIdentifier == Some(participantIdentifier)
+            ),
+            (),
+            ConfigValidationFailed(
+              s"New participant identifier in bootstrap dump config ${conf.participantBootstrappingDump
+                  .map(_.newParticipantIdentifier)} must match participant node identifier $participantIdentifier"
+            ),
           )
         } yield conf
       }

@@ -229,6 +229,10 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     ),
   };
 
+  const newParticipantIdentifier =
+    VALIDATOR_NEW_PARTICIPANT_ID ||
+    validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
+
   const validatorValues: ChartValues = {
     ...validatorValuesFromYamlFiles,
     migration: {
@@ -248,11 +252,10 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? {
           secretName: participantBootstrapDumpSecretName,
-          newParticipantIdentifier:
-            VALIDATOR_NEW_PARTICIPANT_ID ||
-            validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier,
+          newParticipantIdentifier,
         }
       : undefined,
+    ...(participantBootstrapDumpSecret ? { nodeIdentifier: newParticipantIdentifier } : {}),
     persistence: {
       ...validatorValuesFromYamlFiles.persistence,
       postgresName: 'postgres',

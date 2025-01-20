@@ -9,13 +9,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-      - publish_public_release:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - artifacts_push
       - create_oss_pr:
           <<: *notify-fail
           context:
@@ -88,26 +81,10 @@ workflow:
           with_docker_images: true
           resource_class: "2xlarge"
           parallelism: 2
-      - ui_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-      - bundle:
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
           <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-      - deployment_test:
-          <<: *notify-fail
           context:
             - artifactory
             - slack-context

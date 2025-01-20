@@ -399,13 +399,6 @@ class SvAppBackendReference(
       httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
     }
 
-  def signSynchronizerBootstrappingState(domainIdPrefix: String): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvSoftDomainMigrationPocAppClient.SignSynchronizerBootstrappingState(domainIdPrefix)
-      )
-    }
-
   def initializeSynchronizer(domainIdPrefix: String): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvSoftDomainMigrationPocAppClient.InitializeSynchronizer(domainIdPrefix))
