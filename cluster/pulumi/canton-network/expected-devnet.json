@@ -2367,19 +2367,9 @@
             "rewardWeightBps": 100000
           },
           {
-            "name": "Tradeweb-Markets-1",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
-          },
-          {
-            "name": "C7-Technology-Services-Limited",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
-            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -3248,19 +3238,9 @@
             "rewardWeightBps": 100000
           },
           {
-            "name": "Tradeweb-Markets-1",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
-          },
-          {
-            "name": "C7-Technology-Services-Limited",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
-            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -4095,19 +4075,9 @@
             "rewardWeightBps": 100000
           },
           {
-            "name": "Tradeweb-Markets-1",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
-          },
-          {
-            "name": "C7-Technology-Services-Limited",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
-            "rewardWeightBps": 0
           }
         ],
         "auth": {
@@ -4942,19 +4912,9 @@
             "rewardWeightBps": 100000
           },
           {
-            "name": "Tradeweb-Markets-1",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyKrg8RhVQXq6+EKlwTExaoOOEWMp2JyiA1xRkFZNZo6m5ixBgQwC4vvmkPadDvGsxEniwAfLi0l+1vbnROs04Q==",
-            "rewardWeightBps": 0
-          },
-          {
             "name": "Orb-1-LP-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb73mu4LMvV7PgwhI7VpDi/UhGalALpA3eiia8hN13Er0/X9CAwhWWBpUz7cAdnTIbQQcEp/AyagQjjMNZ+zKvw==",
             "rewardWeightBps": 100000
-          },
-          {
-            "name": "C7-Technology-Services-Limited",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
-            "rewardWeightBps": 0
           }
         ],
         "auth": {

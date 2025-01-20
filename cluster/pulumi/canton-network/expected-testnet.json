@@ -861,7 +861,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 330000
+            "rewardWeightBps": 430000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -876,11 +876,6 @@
           {
             "name": "Tradeweb-Markets-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEO3NIzHIIxatGCFHLdONUYNJ3SePvA4lq3EbtMgvpe1CoALZZ+CRNZrHNsj49jdeJNQgcJBPsOcW7XP6VF7Q1YA==",
-            "rewardWeightBps": 100000
-          },
-          {
-            "name": "C7-Technology-Services-Limited",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEIyvyNX23/fxKnCkKArjOWxi+OBUtIXw4GoEGFMG4JXZBeVYYU6s4hBA5heMKDVaFszYEQQP1bBfjSQwWJ8PLDA==",
             "rewardWeightBps": 0
           }
         ],
