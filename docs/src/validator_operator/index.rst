@@ -22,9 +22,12 @@ are already familiar with kubernetes and are looking to build a
 production-ready deployment but it can be challenging to setup if you
 never used kubernetes before.
 
+You can find hardware requirements for both options in a :ref:`dedicated section <validator_hardware_requirements>`.
+
 .. toctree::
    :maxdepth: 2
 
+   validator_hardware_requirements.rst
    validator_compose.rst
    validator_helm.rst
    validator_upgrades.rst
