@@ -2475,7 +2475,7 @@
                       "kind": "GitRepository",
                       "version": "v1"
                     },
-                    "metricNamePrefix": "cn_deployment_flux",
+                    "metricNamePrefix": "splice_deployment_flux",
                     "metrics": [
                       {
                         "each": {
@@ -2540,7 +2540,7 @@
                         "state"
                       ]
                     },
-                    "metricNamePrefix": "cn_deployment_pulumi",
+                    "metricNamePrefix": "splice_deployment_pulumi",
                     "metrics": [
                       {
                         "each": {
