@@ -3,8 +3,11 @@
 
 module Splice.Wallet.Install where
 
+import Canton.Network.RC1.TokenMetadata as TokenMetadata
+
 import DA.Action (void)
 import DA.Exception
+import DA.Map qualified as Map (fromList)
 import DA.Time
 import DA.Foldable (forA_)
 import DA.Optional (isSome)
@@ -22,6 +25,8 @@ import Splice.Wallet.TopUpState
 import Splice.Wallet.TransferPreapproval
 import Prelude hiding (forA)
 import Splice.Util
+
+import Canton.Network.Token.Standard.Utils.AnyContractId (AnyContractId)
 
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
@@ -394,6 +399,29 @@ template WalletAppInstall
   where
     signatory endUserParty, validatorParty
 
+    -- Metadata Map Text Text
+    -- Choice context Map Text AnyValue --> can be parsed from Daml, keep qualified
+
+    -- 1. map user-specific endpoints for context
+    interface instance TokenMetadata.RegistryAppInstall for WalletAppInstall where
+      view = TokenMetadata.RegistryAppInstallView with
+        appUser = endUserParty
+        appProvider = dsoParty
+        meta = TokenMetadata.Metadata with
+          values = Map.fromList [
+            -- For Amulet the registry URL needs to point to their local validator, so that the proper BFT reads are done.
+            -- TODO: store that URL as part of the `WalletAppInstall` contract, so that it can be updated.
+            ("cnrc-1.global.sync/registryUrl", "https://user-validator-host/api/amulet-registry/")
+            ]
+
+    -- 2. fall back to enpdoints disclosed via ANS (if no user-specific one is available)
+    -- not in alpha
+
+    -- 3. retrieve off-ledger context (currently relying on WalletAppInstall cid for auth)
+    -- not required for Amulet
+    -- probably required for disclosure of Credentials
+
+
     -- Takes a batch of commands manipulating amulets, and tries to execute them sequentially in one large Daml transaction.
     nonconsuming choice WalletAppInstall_ExecuteBatch: WalletAppInstall_ExecuteBatchResult
       with
@@ -565,3 +593,7 @@ template WalletAppInstall
       do result <- exercise amuletRulesCid $ AmuletRules_DevNet_FeatureApp endUserParty
          return WalletAppInstall_FeaturedAppRights_SelfGrantResult with
            featuredAppRight = result.featuredAppRightCid
+
+unpackCid : AnyValue -> AnyContractId
+unpackCid (AV_ContractId cid) = cid
+unpackCid _ = error "Wrong type"

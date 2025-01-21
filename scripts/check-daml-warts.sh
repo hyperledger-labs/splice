@@ -18,7 +18,8 @@ ignored_files=(
 
 # TODO(#9466): also check for naked `Xyz_Fetch` choices
 
-command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--' '*.daml')
+# TODO (#17133): remove the exclude of TradingApp
+command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--exclude=TradingApp.daml' '--' '*.daml')
 for ignored_file in "${ignored_files[@]}"; do
   command+=(":!$ignored_file")
 done

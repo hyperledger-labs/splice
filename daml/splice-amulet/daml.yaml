@@ -6,16 +6,22 @@
 sdk-version: 3.2.0-snapshot.20241111.13401.0.v7e9180fc
 name: splice-amulet
 source: daml
-version: 0.1.7
+version: 0.1.8
 dependencies:
   - daml-prim
   - daml-stdlib
 data-dependencies:
+  - ../token-standard/cnrc-1-token-metadata/.daml/dist/canton-network-token-rc1-0.0.1.dar
+  - ../token-standard/cnrc-2-holdings/.daml/dist/canton-network-token-rc2-0.0.1.dar
+  - ../token-standard/cnrc-3-transfer-instruction/.daml/dist/canton-network-token-rc3-0.0.1.dar
+  - ../token-standard/cnrc-4-allocation/.daml/dist/canton-network-token-rc4-0.0.1.dar
+  - ../token-standard/cnrc-6-allocation-instruction/.daml/dist/canton-network-token-rc6-0.0.1.dar
   - ../splice-util/.daml/dist/splice-util-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
   - --target=2.1
+  - --enable-interfaces=yes
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java

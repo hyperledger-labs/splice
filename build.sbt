@@ -107,6 +107,7 @@ lazy val root: Project = (project in file("."))
     `cnrc-4-allocation-daml`,
     `cnrc-5-allocation-request-daml`,
     `cnrc-6-allocation-instruction-daml`,
+    `cnrc-token-test-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
     `canton-community-common`,
@@ -347,6 +348,25 @@ lazy val `cnrc-6-allocation-instruction-daml` =
         (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
           (`cnrc-2-holdings-daml` / Compile / damlBuild).value ++
           (`cnrc-4-allocation-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
+lazy val `cnrc-token-test-daml` =
+  project
+    .in(file("daml/token-standard/tests"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cnrc-utils-daml` / Compile / damlBuild).value ++
+          (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+          (`cnrc-2-holdings-daml` / Compile / damlBuild).value ++
+          (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
+          (`cnrc-4-allocation-daml` / Compile / damlBuild).value ++
+          (`cnrc-5-allocation-request-daml` / Compile / damlBuild).value ++
+          (`cnrc-6-allocation-instruction-daml` / Compile / damlBuild).value,
     )
     .dependsOn(
       `canton-bindings-java`

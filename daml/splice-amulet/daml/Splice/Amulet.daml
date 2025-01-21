@@ -6,6 +6,10 @@ module Splice.Amulet where
 
 import Prelude hiding (forA)
 import DA.Action (void)
+import DA.Map as Map
+
+import Canton.Network.RC1.TokenMetadata qualified as TokenMetadata
+import Canton.Network.RC2.Holding qualified as Holding
 
 import Splice.Expiry
 import Splice.Fees
@@ -89,12 +93,44 @@ template Amulet
                 changeToHoldingFeesRate = - (amount.ratePerRound.rate)
           return Amulet_ExpireResult with ..
 
+    interface instance Holding.Holding for Amulet where
+      view = Holding.HoldingView with
+        owner
+        instrumentId = Holding.InstrumentId with
+          appProvider = dso
+          id = "Amulet"
+        amount = amount.initialAmount
+        lock = None
+        metadata = TokenMetadata.Metadata
+          with
+            values = Map.fromList [
+              ("splice.lfdecentralizedtrust.org/created-in-round", show amount.createdAt),
+              ("splice.lfdecentralizedtrust.org/rate-per-round", show amount.ratePerRound)
+              ]
+
 template LockedAmulet
   with
     amulet : Amulet
     lock : TimeLock
   where
     signatory lock.holders, signatory amulet
+
+    interface instance Holding.Holding for LockedAmulet where
+      view = Holding.HoldingView with
+        owner = amulet.owner
+        instrumentId = Holding.InstrumentId with
+          appProvider = amulet.dso
+          id = "Amulet"
+        amount = amulet.amount.initialAmount
+        lock = Some Holding.Lock with
+          holders = lock.holders
+          expiresAt = Some lock.expiresAt
+        metadata = TokenMetadata.Metadata
+          with
+            values = Map.fromList [
+              ("splice.lfdecentralizedtrust.org/created-in-round", show amulet.amount.createdAt),
+              ("splice.lfdecentralizedtrust.org/rate-per-round", show amulet.amount.ratePerRound)
+              ]
 
 
     choice LockedAmulet_Unlock : LockedAmulet_UnlockResult
