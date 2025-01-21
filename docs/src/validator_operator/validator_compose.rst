@@ -96,8 +96,6 @@ Deployment
 
    cd splice-node/docker-compose/validator
 
-.. TODO(#14303): get rid of the need to manually export the image tag
-
 2) Export the current version to an environment variable: |image_tag_set|
 
 3) Login to the digitalasset-canton-network-docker.jfrog.io registry:
@@ -131,7 +129,8 @@ Deployment
   d) ``$MIGRATION_ID`` is the migration ID of the synchronizer on the target network, as exported above.
 
 Note that the validator may be stopped with the command `./stop.sh` and restarted again with the same `start`
-command as above. Its data will be retained between invocations.
+command as above. Its data will be retained between invocations. In subseqent invocations, the secret itself may be
+left empty, but the `-o` is still mandatory, so a `-o ""` argument should be provided.
 
 Logging into the wallet UI
 ++++++++++++++++++++++++++
