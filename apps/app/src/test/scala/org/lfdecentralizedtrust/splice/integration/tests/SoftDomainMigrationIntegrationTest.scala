@@ -331,16 +331,14 @@ class SoftDomainMigrationIntegrationTest
               .list(filterDomain = "global-domain-new") should not be empty
           }
         }
-        val initialized = env.svs.local.map { sv =>
-          Future { sv.initializeSynchronizer(prefix) }
-        }
-        initialized.foreach(_.futureValue)
       }
-      clue("Initialize synchronizer nodes") {
-        val initialized = env.svs.local.map { sv =>
-          Future { sv.initializeSynchronizer(prefix) }
+      clue("Wait for synchronizer to be initialized") {
+        env.svs.local.map { sv =>
+          eventually() {
+            sv.sequencerClient(newDomainId).health.status.isActive shouldBe Some(true)
+            sv.mediatorClient(newDomainId).health.status.isActive shouldBe Some(true)
+          }
         }
-        initialized.foreach(_.futureValue)
       }
       clue("New synchronizer is registered in DsoRules config") {
         val (_, dsoRulesVoteRequest) = actAndCheck(

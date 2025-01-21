@@ -245,6 +245,48 @@ class SvDsoAutomationService(
         config.mediatorDeduplicationTimeout,
       )
     )
+
+    if (config.supportsSoftDomainMigrationPoc) {
+      registerTrigger(
+        new AmuletConfigReassignmentTrigger(
+          triggerContext,
+          dsoStore,
+          connection,
+          dsoStore.key.dsoParty,
+          Seq[ConstrainedTemplate](
+            AmuletRules.COMPANION,
+            OpenMiningRound.COMPANION,
+            IssuingMiningRound.COMPANION,
+          ),
+          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
+        )
+      )
+
+      registerTrigger(
+        new SignSynchronizerBootstrappingStateTrigger(
+          dsoStore,
+          participantAdminConnection,
+          triggerContext,
+          localSynchronizerNode.getOrElse(
+            throw Status.INTERNAL
+              .withDescription("Soft domain migrations require a configured synchronizer node")
+              .asRuntimeException
+          ),
+          extraSynchronizerNodes,
+          upgradesConfig,
+        )
+      )
+
+      registerTrigger(
+        new InitializeSynchronizerTrigger(
+          dsoStore,
+          participantAdminConnection,
+          triggerContext,
+          extraSynchronizerNodes,
+          upgradesConfig,
+        )
+      )
+    }
   }
 
   def registerTrafficReconciliationTriggers(): Unit = {
@@ -288,37 +330,6 @@ class SvDsoAutomationService(
 
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
-    if (config.supportsSoftDomainMigrationPoc) {
-      registerTrigger(
-        new AmuletConfigReassignmentTrigger(
-          triggerContext,
-          dsoStore,
-          connection,
-          dsoStore.key.dsoParty,
-          Seq[ConstrainedTemplate](
-            AmuletRules.COMPANION,
-            OpenMiningRound.COMPANION,
-            IssuingMiningRound.COMPANION,
-          ),
-          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
-        )
-      )
-
-      registerTrigger(
-        new SignSynchronizerBootstrappingStateTrigger(
-          dsoStore,
-          participantAdminConnection,
-          triggerContext,
-          localSynchronizerNode.getOrElse(
-            throw Status.INTERNAL
-              .withDescription("Soft domain migrations require a configured synchronizer node")
-              .asRuntimeException
-          ),
-          extraSynchronizerNodes,
-          upgradesConfig,
-        )
-      )
-    }
     registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
     registerTrigger(
       new AnsSubscriptionInitialPaymentTrigger(
@@ -516,5 +527,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[ExternalPartyAmuletRulesTrigger],
       aTrigger[SignSynchronizerBootstrappingStateTrigger],
+      aTrigger[InitializeSynchronizerTrigger],
     )
 }
