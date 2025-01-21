@@ -324,6 +324,7 @@ function installDockerRunnerScaleSets(
     [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerConfigSecret]
   );
 
+  // TODO(#15988): Get rid of this once #17146 is merged and we use -tiny instead of self-hosted-docker for everything that's currently on main
   installDockerRunnerScaleSet(
     'self-hosted-docker',
     runnersNamespace,
@@ -333,16 +334,15 @@ function installDockerRunnerScaleSets(
     dockerConfigSecret,
     {
       requests: {
-        // TODO(#15988) This is smaller than on CCI runners, but seems to suffice at least for now
-        cpu: '1',
-        memory: '4Gi',
+        cpu: '0.1',
+        memory: '256Mi',
       },
     },
     [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerConfigSecret]
   );
 
   installDockerRunnerScaleSet(
-    'self-hosted-docker-large',
+    'self-hosted-docker-small',
     runnersNamespace,
     tokenSecret,
     cachePvc,
@@ -350,15 +350,15 @@ function installDockerRunnerScaleSets(
     dockerConfigSecret,
     {
       requests: {
-        cpu: '5',
-        memory: '24Gi',
+        cpu: '2',
+        memory: '16Gi',
       },
       limits: {
-        cpu: '6',
-        memory: '40Gi', // the high resource tests really use lots all of this
+        cpu: '4',
+        memory: '18Gi',
       },
     },
-    dependsOn
+    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerConfigSecret]
   );
 }
 

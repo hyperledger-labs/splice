@@ -39,7 +39,7 @@ on:
 
 jobs:
   get_commit_sha:
-    runs-on: self-hosted-docker
+    runs-on: self-hosted-docker-tiny
     outputs:
       result: ${{ steps.get_commit_sha.outputs.result }}
     steps:
@@ -152,7 +152,7 @@ jobs:
               reviewers: [process.env.reviewer]
             });
   notify_on_failure:
-    runs-on: self-hosted-docker
+    runs-on: self-hosted-docker-tiny
     needs: do_backport
     # If a PR was given for backporting from, notify on failure as a comment on that PR
     if: ${{ failure() && inputs.pr_number }}
