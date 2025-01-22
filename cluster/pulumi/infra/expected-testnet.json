@@ -2007,7 +2007,7 @@
     "id": "",
     "inputs": {
       "description": "Logs with ClusterUpdate events",
-      "filter": "\nresource.labels.cluster_name=\"cn-testzrhnet\"\nresource.type=~\"(gke_cluster|gke_nodepool)\"\nprotoPayload.metadata.operationType=~\"(UPDATE_CLUSTER|UPGRADE_MASTER|UPGRADE_NODES)\"",
+      "filter": "\nresource.labels.cluster_name=\"cn-testzrhnet\"\nresource.type=~\"(gke_cluster|gke_nodepool)\"\njsonPayload.state=~\"STARTED\"",
       "labelExtractors": {
         "cluster": "EXTRACT(resource.labels.cluster_name)"
       },

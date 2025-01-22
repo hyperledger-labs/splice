@@ -162,7 +162,7 @@ export function installMaintenanceUpdateAlerts(
     filter: `
 resource.labels.cluster_name="${CLUSTER_NAME}"
 resource.type=~"(gke_cluster|gke_nodepool)"
-protoPayload.metadata.operationType=~"(UPDATE_CLUSTER|UPGRADE_MASTER|UPGRADE_NODES)"`,
+jsonPayload.state=~"STARTED"`,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
     },
