@@ -392,7 +392,12 @@ lazy val `splice-amulet-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`splice-util-daml` / Compile / damlBuild).value,
+        (`splice-util-daml` / Compile / damlBuild).value ++
+          (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+          (`cnrc-2-holdings-daml` / Compile / damlBuild).value ++
+          (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
+          (`cnrc-4-allocation-daml` / Compile / damlBuild).value ++
+          (`cnrc-6-allocation-instruction-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -478,7 +483,14 @@ lazy val `splice-wallet-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`splice-amulet-daml` / Compile / damlBuild).value ++ (`splice-wallet-payments-daml` / Compile / damlBuild).value ++ (`splice-amulet-name-service-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies :=
+        (`splice-amulet-daml` / Compile / damlBuild).value ++
+          (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
+          (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
+          (`splice-util-daml` / Compile / damlBuild).value ++
+          (`cnrc-utils-daml` / Compile / damlBuild).value ++
+          (`cnrc-1-token-metadata-daml` / Compile / damlBuild).value ++
+          (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
