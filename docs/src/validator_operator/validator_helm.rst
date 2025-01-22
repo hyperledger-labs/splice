@@ -344,9 +344,11 @@ Please modify the file ``splice-node/examples/sv-helm/participant-values.yaml`` 
 - Replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``. If you are not ready to use a custom audience, you can use the suggested default ``https://canton.network.global``.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
-- Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
-- Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
-- For the initial onboarding of your node only, set ``disableAutoInit`` to ``false``.
+
+If you are using the provided postgres helm chart, modify ``splice-node/examples/sv-helm/postgres-values-validator-participant.yaml`` as follows:
+
+- Add ``db.volumeSize`` and ``db.volumeStorageClass`` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and ``standard-rwo``)
+
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-participant-values.yaml`` as follows:
 
@@ -387,6 +389,10 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-v
 - Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, for example,
   ``https://sv-1.TARGET_CLUSTER.global.canton.network.sync.global`` for the GSF. Please make sure that you use the URL
   of your sponsoring SV.
+- Replace ``YOUR_VALIDATOR_PARTY_HINT`` with the desired name for your
+  validator operator party. It must be of the format
+  ``<organization>-<function>-<enumerator>``.
+- Replace ``YOUR_VALIDATOR_NODE_NAME`` with the name you want your validator node to be represented as on the network. Usually you can use the same value as for your ``validatorPartyHint``.
 
 If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
 
@@ -650,6 +656,3 @@ in the ``validator-values.yaml`` file:
 Whenever the validator receives a transfer offer from `<senderPartyID>` to `<receiverPartyId>`,
 it will automatically accept it. Similarly to sweeps, party IDs must be known in order to
 apply this configuration.
-
-Re-onboard a validator and recover balances of all users it hosts
------------------------------------------------------------------

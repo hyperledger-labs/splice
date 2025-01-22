@@ -35,11 +35,4 @@ You can find hardware requirements for both options in a :ref:`dedicated section
    validator_disaster_recovery.rst
    validator_users.rst
 
-.. todo:: Add sections top-level sections on upgrades, node onboarding, validator functionality, DR
-
-.. todo:: Add section on hardware requirements for
-
-   - basic validator nodes that are just minting or using an app
-   - app provider nodes running app automation for many users
-
-      - use the DA utility node hardware specs as a reference for the hardware requirements
+.. todo:: Add sections top-level sections on node onboarding, validator functionality
