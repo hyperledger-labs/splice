@@ -463,7 +463,7 @@ jobs:
               --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/pipeline \
               --header "Circle-Token: ${CIRCLECI_TOKEN}" \
               --header 'content-type: application/json' \
-              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciperiodic-migration-operator\", \"base-version\": \"$latest_base_version\"}}"
+              --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-hdm-operator\", \"base-version\": \"$latest_base_version\", \"cluster\":\"ciperiodic\"}}"
       - notify-cluster-fail:
           cluster: "ciperiodic"
 
