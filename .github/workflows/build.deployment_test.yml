@@ -30,3 +30,4 @@ jobs:
         with:
           cmd_retry_count: 5 # Retry in case of dependency download errors
           cmd: make cluster/pulumi/test
+          cmd_before_retry: git reset --hard # revert changes before retrying, because make cluster/pulumi/test actually "fixes" the test pulumi files in-place
