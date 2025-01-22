@@ -27,7 +27,7 @@ parameters:
         build,
         deploy-cidaily,
         deploy-upgrade,
-        deploy-ciperiodic-migration-operator,
+        deploy-hdm-operator,
         determine-ciperiodic-migration-operator-work,
         deploy-ciperiodic-sv-reonboard,
         deploy-ciperiodic-non-devnet,
@@ -53,11 +53,10 @@ parameters:
         cluster-lock-reaper,
         apply-infra,
         update-deployment,
-        deploy-hard-migration,
+        preview-operator,
         backup-status-devnet,
         backup-status-testnet,
         backup-status-mainnet,
-        preview-operator,
         purge-unused-dbs-cidaily,
       ]
     default: build
