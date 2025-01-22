@@ -37,3 +37,5 @@ ENV XDG_CACHE_HOME=/tmp/.cache
 ENV XDG_CONFIG_CACHE=/tmp/.cache
 ENV GOCACHE=/tmp/.cache/go-build
 ENV GOPATH=/tmp/.cache/go
+
+COPY target/LICENSE .
