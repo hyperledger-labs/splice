@@ -49,7 +49,7 @@ itself or ingress.
      - 100GB
 
 Database Latency
-================
+----------------
 
 Components are relatively sensitive to database latency. If you use a
 hosted database like GCP CloudSQL, it is recommended that you allocate
