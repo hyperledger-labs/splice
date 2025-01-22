@@ -18,6 +18,10 @@ Upcoming Release
     ``newParticipantIdentifier``. This was already a requirement when
     ``newParticipantIdentifier`` was removed again after the restore
     was complete so this just catches misconfigurations earlier.
+  * In the docker-compose start script, the migration id is now a
+    mandatory argument instead of defaulting to 0. This should not
+    require any changes as no network is on migration id 0 at the
+    moment so you must already have it set.
 
 0.3.6
 -----

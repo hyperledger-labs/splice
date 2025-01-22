@@ -382,7 +382,7 @@ function subcmd_start_network {
   curl -sf "scan.localhost:8080/api/scan/readyz" || _error "Scan is not ready after 5 minutes" || exit 1
 
   _info "Starting validator"
-  _do_start_validator -l -o "$secret" -p "local-composeValidator-1"
+  _do_start_validator -l -o "$secret" -p "local-composeValidator-1" -m 0
 
   _info "The full network is ready"
 }
