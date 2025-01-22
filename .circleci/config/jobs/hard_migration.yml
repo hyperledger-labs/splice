@@ -443,7 +443,7 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
@@ -463,6 +463,10 @@ jobs:
             echo "export SPLICE_DEPLOY_SV_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOY_VALIDATOR_RUNBOOK=true" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
+            # if the base version is a release version ensure we use the public repository
+            if [[ $BASE_VERSION =~ '^[0-9]+\.[0-9]+\.[0-9]+$' ]]; then
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
+            fi
 
             git add **/.envrc.vars
             git add **/config.yaml
@@ -519,7 +523,7 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
@@ -582,7 +586,7 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
@@ -634,7 +638,7 @@ jobs:
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
@@ -692,7 +696,7 @@ jobs:
           cmd_name: Reset SV runbook
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
 
@@ -708,7 +712,7 @@ jobs:
           cmd_name: Push new branch with migration config changes
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          additional_nix_args:  "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_WORKFLOW_ID"
           cmd: |
             cncluster activate
             git config user.email "splice-maintainers@digitalasset.com"
