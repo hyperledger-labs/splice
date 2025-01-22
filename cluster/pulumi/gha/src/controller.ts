@@ -16,6 +16,9 @@ export function installController(): k8s.helm.v3.Release {
     values: {
       ...infraAffinityAndTolerations,
       maxHistory: HELM_MAX_HISTORY_SIZE,
+      flags: {
+        logFormat: 'json',
+      },
     },
   });
 }
