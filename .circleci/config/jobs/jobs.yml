@@ -215,7 +215,10 @@ jobs:
           # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - run_bash_command_in_nix:
           cmd_name: Copy artifacts to Github Container Registry
-          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH"
+          additional_nix_args: "--keep GITHUB_TOKEN \
+            --keep CIRCLE_BRANCH \
+            --keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD"
           cmd: |
             if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
               export GITHUB_USER="canton-network-da"
