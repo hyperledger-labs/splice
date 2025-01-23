@@ -8,7 +8,11 @@ target-logback := $(dir)/target/logback.xml
 
 include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
 
-$(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(target-canton) $(target-logback)
+$(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(target-canton) $(target-logback) $(dir)/target/LICENSE.txt
+
+# We override LICENSE.txt from canton to avoid diversion in the LICENSE file
+$(dir)/target/LICENSE.txt: LICENSE
+	cp $< $@
 
 $(target-canton):
 	rm -f $@ ;\
