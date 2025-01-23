@@ -4,13 +4,14 @@ import * as React from 'react';
 import { Fragment } from 'react';
 import { NavLink } from 'react-router-dom';
 
+import { WarningAmberRounded } from '@mui/icons-material';
 import { Badge, Stack, Toolbar } from '@mui/material';
 import Typography, { TypographyOwnProps } from '@mui/material/Typography';
 
 interface HeaderProps extends React.PropsWithChildren {
   title: string;
   titleVariant?: TypographyOwnProps['variant'];
-  navLinks?: { name: string; path: string; badgeCount?: number }[];
+  navLinks?: { name: string; path: string; badgeCount?: number; hasAlert?: boolean }[];
   noBorder?: boolean;
 }
 
@@ -58,12 +59,23 @@ const Header: React.FC<HeaderProps> = ({ children, title, titleVariant, navLinks
                 >
                   {navLink.name}
                 </NavLink>
-                <Badge
-                  key={`nav-badge-${index}`}
-                  id={`nav-badge-${navLink.path}-count`}
-                  color="error"
-                  badgeContent={navLink.badgeCount}
-                />
+
+                {navLink.badgeCount ? (
+                  <Badge
+                    key={`nav-badge-${index}`}
+                    id={`nav-badge-${navLink.path}-count`}
+                    color="error"
+                    badgeContent={navLink.badgeCount}
+                  />
+                ) : navLink.hasAlert ? (
+                  <Badge
+                    key={`nav-alert-badge-${index}`}
+                    id={`nav-badge-${navLink.path}-alert`}
+                    badgeContent={<WarningAmberRounded fontSize="small" color="secondary" />}
+                  />
+                ) : (
+                  <></>
+                )}
               </Fragment>
             ))}
           </Stack>
