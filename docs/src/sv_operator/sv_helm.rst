@@ -15,29 +15,24 @@ target cluster.
 Requirements
 ------------
 
-1) Access to the following two Artifactory repositories:
-
-    a. `Canton Network Docker repository <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_
-    b. `Canton Network Helm repository <https://digitalasset.jfrog.io/ui/native/canton-network-helm/>`_
-
-2) A running Kubernetes cluster in which you have administrator access to create and manage namespaces.
-3) A development workstation with the following:
+1) A running Kubernetes cluster in which you have administrator access to create and manage namespaces.
+2) A development workstation with the following:
 
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-4) Your cluster either needs to be connected to the GCP DA Canton
+3) Your cluster either needs to be connected to the GCP DA Canton
    VPN or you need a static egress IP. In the latter case,
    please provide that IP address to your contact at Digital Asset to
    add it to the firewall rules.
 
-5) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
+4) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
 .. parsed-literal::
 
   tar xzvf |version|\_splice-node.tar.gz
 
-6) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <sv-upgrades>`.
+5) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <sv-upgrades>`.
    If it has, please record the current migration ID of the synchronizer.
    The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
 
@@ -84,44 +79,15 @@ You will be using them every time you want to deploy a new SV node, i.e., also w
 The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
 For `DevNet` and the current early version of `TestNet`, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
 
-.. _identity-token:
-
 Preparing a Cluster for Installation
 ------------------------------------
 
-In the following, you will need your Artifactory credentials from
-https://digitalasset.jfrog.io/ui/user_profile. Based on that, set the following environment variables.
-
-====================== ==========================================================================================
-Name                   Value
----------------------- ------------------------------------------------------------------------------------------
-ARTIFACTORY_USER       Your Artifactory user name shown at the top right.
-ARTIFACTORY_PASSWORD   Your Artifactory Identity token. If you don't have one you can generate one on your profile page.
-====================== ==========================================================================================
-
-Ensure that your local helm installation has access to the Digital Asset Helm chart repository:
-
-.. code-block:: bash
-
-    helm repo add canton-network-helm \
-        https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm \
-        --username ${ARTIFACTORY_USER} \
-        --password ${ARTIFACTORY_PASSWORD}
-
-Create the application namespace within Kubernetes and ensure it has image pull credentials for fetching images from the Digital Asset Artifactory repository used for Docker images.
+Create the application namespace within Kubernetes.
 
 .. code-block:: bash
 
     kubectl create ns sv
 
-    kubectl create secret docker-registry docker-reg-cred \
-        --docker-server=digitalasset-canton-network-docker.jfrog.io \
-        --docker-username=${ARTIFACTORY_USER} \
-        --docker-password=${ARTIFACTORY_PASSWORD} \
-        -n sv
-
-    kubectl patch serviceaccount default -n sv \
-        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
 .. _helm-sv-auth:
 
@@ -360,18 +326,11 @@ Configuring your CometBft node
 Every SV node also deploys a CometBft node. This node must be configured to join the existing Global Synchronizer BFT chain.
 To do that, you first must generate the keys that will identify the node.
 
-.. note::
-  You need access to the canton `network docker repo <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_ to successfully generate the node identity.
-  You can access your username and get the Identity token for your Artifactory account through the UI, using the top right `Edit profile` option.
-
-  | This can be configured by running:
-  | :code:`docker login -u <your_artifactory_user> -p <your_artifactory_api_key> digitalasset-canton-network-docker.jfrog.io`
-
 .. _cometbft-identity:
 
 Generating your CometBft node keys
 ++++++++++++++++++++++++++++++++++
-To generate the node config you must have access to the CometBft docker image provided through the Canton Network artifacotry (digitalasset-canton-network-docker.jfrog.io).
+To generate the node config you use the CometBft docker image provided through Github Container Registry (ghcr.io/digital-asset/decentralized-canton-sync/docker).
 
 Use the following shell commands to generate the proper keys:
 
@@ -381,9 +340,9 @@ Use the following shell commands to generate the proper keys:
   mkdir cometbft
   cd cometbft
   # Init the node
-  docker run --rm -v "$(pwd):/init" digitalasset-canton-network-docker.jfrog.io/digitalasset/cometbft:|version| init --home /init
+  docker run --rm -v "$(pwd):/init" ghcr.io/digital-asset/decentralized-canton-sync/docker/cometbft:|version| init --home /init
   # Read the node id and keep a note of it for the deployment
-  docker run --rm -v "$(pwd):/init" digitalasset-canton-network-docker.jfrog.io/digitalasset/cometbft:|version| show-node-id --home /init
+  docker run --rm -v "$(pwd):/init" ghcr.io/digital-asset/decentralized-canton-sync/docker/cometbft:|version| show-node-id --home /init
 
 Please keep a note of the node ID printed out above.
 
@@ -768,20 +727,11 @@ In order to install the reference charts, the following must be satisfied in you
 Installation Instructions
 +++++++++++++++++++++++++
 
-Create a `cluster-ingress` namespace with image pull permissions from the Artifactory docker repository:
+Create a `cluster-ingress` namespace:
 
 .. code-block:: bash
 
     kubectl create ns cluster-ingress
-
-    kubectl create secret docker-registry docker-reg-cred \
-        --docker-server=digitalasset-canton-network-docker.jfrog.io \
-        --docker-username=${ARTIFACTORY_USER} \
-        --docker-password=${ARTIFACTORY_PASSWORD} \
-        -n cluster-ingress
-
-    kubectl patch serviceaccount default -n cluster-ingress \
-        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
 
 Ensure that there is a cert-manager certificate available in a secret

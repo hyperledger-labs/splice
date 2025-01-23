@@ -443,7 +443,7 @@ compute service account within the new cluster.
 ### Docker Image Hosting
 
 Docker images for both local and GCE clusters are stored in the [private development artifactory docker registry](digitalasset-canton-network-docker-dev.jfrog.io) and
-the [public releases artifactory docker registry](digitalasset-canton-network-docker.jfrog.io).
+the [releases artifactory docker registry](digitalasset-canton-network-docker.jfrog.io) as well as [public releases Github Container Registry](ghcr.io/digital-asset/decentralized-canton-sync/docker) for public releases, which does not require credentials.
 
 Amongst others, the following environment
 variables are defined in [`.envrc.vars`](.envrc.vars):

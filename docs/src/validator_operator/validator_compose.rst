@@ -42,28 +42,24 @@ This deployment is useful for:
 Requirements
 ++++++++++++
 
-1) Access to the following artifactory:
-
-    a. `Canton Network Docker repository <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_
-
-2) A linux/MacOS machine with the following:
+1) A linux/MacOS machine with the following:
 
    a. ``docker`` - at least version 2.26.0 for Docker Engine, or an up-to-date version of Docker Desktop.
    b. ``curl``
    c. ``jq``
 
-3) Your machine should either be connected to a VPN that is whitelisted on the network
+2) Your machine should either be connected to a VPN that is whitelisted on the network
    (contact your sponsor SV to obtain access), or have a static egress IP address.
    In the latter case, please provide that IP address to your sponsor SV to
    add it to the firewall rules.
 
-4) Please download the release artifacts containing the docker-compose files, from here: |bundle_download_link|, and extract the bundle:
+3) Please download the release artifacts containing the docker-compose files, from here: |bundle_download_link|, and extract the bundle:
 
 .. parsed-literal::
 
   tar xzvf |version|\_splice-node.tar.gz
 
-5) Please inquire for the current migration ID of the synchronizer from your sponsor SV.
+4) Please inquire for the current migration ID of the synchronizer from your sponsor SV.
    The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
 
 .. code-block:: bash
