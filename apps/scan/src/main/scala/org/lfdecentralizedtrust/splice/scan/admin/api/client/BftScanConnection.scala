@@ -795,13 +795,16 @@ object BftScanConnection {
       } yield domainScans
     }
 
-    def getPeerScansFromStore(store: ScanStore, ownSvName: String)(implicit
+    def getPeerScansFromStore(store: ScanStore, ownSvName: String, logger: TracedLogger)(implicit
         tc: TraceContext,
         ec: ExecutionContext,
     ): Future[Seq[DsoScan]] = {
       for {
         decentralizedSynchronizerId <- store.getDecentralizedSynchronizerId()
         scans <- store.listDsoScans()
+        _ = logger.info(
+          s"getPeerScansFromStore(): decentralizedSynchronizerId: $decentralizedSynchronizerId, scans: $scans, ownSvName: $ownSvName"
+        )
         domainScans <- scans
           .find(_._1 == decentralizedSynchronizerId.toProtoPrimitive)
           .map(e => Future.successful(e._2.filter(_.svName != ownSvName)))
@@ -915,14 +918,14 @@ object BftScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[BftScanConnection] = {
     val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
-
+    val logger = loggerFactory.getTracedLogger(classOf[BftScanConnection])
     for {
       scans <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "fetch_scan_list_from_store",
         "Peer scans found in store.",
         Bft
-          .getPeerScansFromStore(store, svName)
+          .getPeerScansFromStore(store, svName, logger)
           .flatMap {
             case Nil =>
               Future.failed(
@@ -932,7 +935,7 @@ object BftScanConnection {
               )
             case scans => Future.successful(scans)
           },
-        loggerFactory.getTracedLogger(classOf[BftScanConnection]),
+        logger,
       )
       bft <- scans
         .traverse(scan =>
@@ -947,7 +950,7 @@ object BftScanConnection {
             connections,
             failed.toMap,
             uri => builder(uri, amuletRulesCacheTimeToLive),
-            _ => Bft.getPeerScansFromStore(store, svName),
+            _ => Bft.getPeerScansFromStore(store, svName, logger),
             scansRefreshInterval,
             retryProvider,
             loggerFactory,
