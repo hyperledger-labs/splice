@@ -63,6 +63,10 @@ for IMAGE_NAME in $IMAGES; do
   SOURCE_IMAGE="$ARTIFACTORY_REGISTRY/$IMAGE_NAME:$TAG"
   TARGET_IMAGE="$GITHUB_REGISTRY/$IMAGE_NAME:$TAG"
 
+  # for skopeo to work, we need to set the XDG_RUNTIME_DIR, in CCI it cannot mkdir /run/containers: permission denied
+  export XDG_RUNTIME_DIR=/tmp/containers
+  mkdir -p "$XDG_RUNTIME_DIR"
+
   for i in {1..10}; do
     # Artifactory has unknown/unknown attestation manifests, which show up as unknown/unknown os/architecture manifests. There is nothing inherently wrong with this.
     # skopeo on nix does not bundle the policy.json file, so we need to provide it.
