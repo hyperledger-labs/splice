@@ -10,7 +10,7 @@ on:
 jobs:
   get_backport_branches:
     if: github.event.pull_request.merged == true
-    runs-on: self-hosted-docker-tiny
+    runs-on: self-hosted-docker
     outputs:
       branches: ${{ steps.get_backport_branches.outputs.result }}
     steps:

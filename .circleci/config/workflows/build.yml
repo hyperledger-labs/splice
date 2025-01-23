@@ -88,6 +88,11 @@ workflow:
           context:
             - artifactory
             - slack-context
+      - docker_images_build:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
       - notify_on_readme_changed:
           <<: *main-branch-only
           context:

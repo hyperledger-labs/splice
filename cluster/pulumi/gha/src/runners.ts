@@ -87,7 +87,6 @@ function installDockerRunnerScaleSet(
   configMap: ConfigMap,
   dockerConfigSecret: Secret,
   resources: ResourcesSpec,
-  serviceAccountName: string,
   dependsOn: Resource[]
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
@@ -124,9 +123,7 @@ function installDockerRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image:
-                  // TODO(#15988): use a snapshot after this is merged, and a release after it's in a release
-                  'digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-docker-runner:0.3.7-itai-dirty',
+                image: 'ghcr.io/actions/actions-runner:latest',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -135,10 +132,6 @@ function installDockerRunnerScaleSet(
                   },
                 ],
                 resources,
-                // required to mount the nix store inside the container from the NFS
-                securityContext: {
-                  privileged: true,
-                },
                 volumeMounts: [
                   {
                     name: 'work',
@@ -149,7 +142,7 @@ function installDockerRunnerScaleSet(
                     mountPath: '/var/run',
                   },
                   {
-                    name: 'docker-client-config',
+                    name: 'docker-config',
                     mountPath: '/home/runner/.docker/config.json',
                     readOnly: true,
                     subPath: 'config.json',
@@ -192,6 +185,10 @@ function installDockerRunnerScaleSet(
                     mountPath: '/home/runner/externals',
                   },
                   {
+                    name: 'cache',
+                    mountPath: '/cache',
+                  },
+                  {
                     name: 'daemon-json',
                     mountPath: '/etc/docker/daemon.json',
                     readOnly: true,
@@ -226,13 +223,12 @@ function installDockerRunnerScaleSet(
                 },
               },
               {
-                name: 'docker-client-config',
+                name: 'docker-config',
                 secret: {
                   secretName: dockerConfigSecret.metadata.name,
                 },
               },
             ],
-            serviceAccountName: serviceAccountName,
             ...appsAffinityAndTolerations,
           },
           metadata: {
@@ -258,9 +254,10 @@ function installDockerRunnerScaleSets(
   controller: k8s.helm.v3.Release,
   runnersNamespace: Namespace,
   tokenSecret: Secret,
-  cachePvc: PersistentVolumeClaim,
-  serviceAccountName: string
+  cachePvc: PersistentVolumeClaim
 ): void {
+  // The internal DiD network is not working with the default MTU of 1500, we need to set it lower.
+  // The solution is borrowed from https://github.com/actions/actions-runner-controller/discussions/2993
   const configMap = new k8s.core.v1.ConfigMap(
     'gha-runner-config',
     {
@@ -270,17 +267,11 @@ function installDockerRunnerScaleSets(
       },
       data: {
         'daemon.json': JSON.stringify({
-          // The internal DiD network is not working with the default MTU of 1500, we need to set it lower.
-          // The solution is borrowed from https://github.com/actions/actions-runner-controller/discussions/2993
           mtu: 1400,
           'default-network-opts': {
             bridge: {
               'com.docker.network.driver.mtu': '1400',
             },
-          },
-          // enable containerd image store, to support multi-platform images (see https://docs.docker.com/desktop/containerd/)
-          features: {
-            'containerd-snapshotter': true,
           },
         }),
       },
@@ -296,9 +287,6 @@ function installDockerRunnerScaleSets(
     return Buffer.from(
       JSON.stringify({
         auths: {
-          'digitalasset-canton-enterprise-docker.jfrog.io': {
-            auth: artifactoryCredsBase64,
-          },
           'digitalasset-canton-network-docker.jfrog.io': {
             auth: artifactoryCredsBase64,
           },
@@ -309,17 +297,16 @@ function installDockerRunnerScaleSets(
       })
     ).toString('base64');
   });
-  const dockerClientConfigSecret = new k8s.core.v1.Secret('docker-client-config', {
+  const dockerConfigSecret = new k8s.core.v1.Secret('docker-config-secret', {
     metadata: {
       namespace: runnersNamespace.metadata.name,
-      name: 'docker-client-config',
     },
     data: {
       'config.json': configJsonBas64,
     },
   });
 
-  const dependsOn = [tokenSecret, controller, configMap, cachePvc, dockerClientConfigSecret];
+  const dependsOn = [tokenSecret, controller, configMap, cachePvc, dockerConfigSecret];
 
   installDockerRunnerScaleSet(
     'self-hosted-docker-tiny',
@@ -327,15 +314,14 @@ function installDockerRunnerScaleSets(
     tokenSecret,
     cachePvc,
     configMap,
-    dockerClientConfigSecret,
+    dockerConfigSecret,
     {
       requests: {
         cpu: '0.1',
         memory: '256Mi',
       },
     },
-    serviceAccountName,
-    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerClientConfigSecret]
+    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerConfigSecret]
   );
 
   // TODO(#15988): Get rid of this once #17146 is merged and we use -tiny instead of self-hosted-docker for everything that's currently on main
@@ -345,15 +331,14 @@ function installDockerRunnerScaleSets(
     tokenSecret,
     cachePvc,
     configMap,
-    dockerClientConfigSecret,
+    dockerConfigSecret,
     {
       requests: {
         cpu: '0.1',
         memory: '256Mi',
       },
     },
-    serviceAccountName,
-    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerClientConfigSecret]
+    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerConfigSecret]
   );
 
   installDockerRunnerScaleSet(
@@ -362,7 +347,7 @@ function installDockerRunnerScaleSets(
     tokenSecret,
     cachePvc,
     configMap,
-    dockerClientConfigSecret,
+    dockerConfigSecret,
     {
       requests: {
         cpu: '2',
@@ -373,29 +358,7 @@ function installDockerRunnerScaleSets(
         memory: '18Gi',
       },
     },
-    serviceAccountName,
-    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerClientConfigSecret]
-  );
-
-  installDockerRunnerScaleSet(
-    'self-hosted-docker-medium',
-    runnersNamespace,
-    tokenSecret,
-    cachePvc,
-    configMap,
-    dockerClientConfigSecret,
-    {
-      requests: {
-        cpu: '5',
-        memory: '24Gi',
-      },
-      limits: {
-        cpu: '5',
-        memory: '24Gi',
-      },
-    },
-    serviceAccountName,
-    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerClientConfigSecret]
+    [...dependsOn, tokenSecret, controller, configMap, cachePvc, dockerConfigSecret]
   );
 }
 
@@ -614,7 +577,7 @@ function installK8sRunnerScaleSet(
   );
 }
 
-function installRunnersServiceAccount(runnersNamespace: Namespace, name: string) {
+function installK8sRunnersServiceAccount(runnersNamespace: Namespace, name: string) {
   // If we leave it to the runners Helm charts to create the service account,
   // it does not allow adding an image pull secret to the service account (and it creates
   // it with un unpredictable name, so also not easy to patch it after-the-fact). We therefore
@@ -696,10 +659,12 @@ function installK8sRunnerScaleSets(
   controller: k8s.helm.v3.Release,
   runnersNamespace: Namespace,
   tokenSecret: Secret,
-  cachePvcName: string,
-  serviceAccountName: string
+  cachePvcName: string
 ): void {
   const dependsOn = [controller, runnersNamespace, tokenSecret];
+
+  const saName = 'k8s-runners';
+  installK8sRunnersServiceAccount(runnersNamespace, saName);
 
   Object.entries(K8sRunnerSpecs).forEach(([name, resources]) => {
     installK8sRunnerScaleSet(
@@ -708,7 +673,7 @@ function installK8sRunnerScaleSets(
       tokenSecret,
       cachePvcName,
       resources,
-      serviceAccountName,
+      saName,
       dependsOn
     );
   });
@@ -730,7 +695,6 @@ function installPodMonitor(runnersNamespace: Namespace) {
         selector: {
           matchExpressions: [
             {
-              // TODO(#15988): This does not work for docker runners
               key: 'runner-pod',
               operator: 'Exists',
             },
@@ -780,10 +744,7 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
   const cachePvcName = 'gha-cache-pvc';
   const cachePvc = createCachePvc(runnersNamespace, cachePvcName);
 
-  const saName = 'k8s-runners';
-  installRunnersServiceAccount(runnersNamespace, saName);
-
-  installDockerRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvc, saName);
-  installK8sRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvcName, saName);
+  installDockerRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvc);
+  installK8sRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvcName);
   installPodMonitor(runnersNamespace);
 }
