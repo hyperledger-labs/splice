@@ -11,6 +11,9 @@ Release Notes
 Upcoming Release
 ----------------
 
+0.3.7
+-----
+
 * Deployment
 
   * When recovering a validator from an identities dump
