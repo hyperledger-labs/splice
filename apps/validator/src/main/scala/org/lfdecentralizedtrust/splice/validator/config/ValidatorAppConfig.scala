@@ -208,10 +208,16 @@ final case class ValidatorCantonIdentifierConfig(
     participant: String
 )
 object ValidatorCantonIdentifierConfig {
-  def default(config: ValidatorAppBackendConfig): ValidatorCantonIdentifierConfig = {
+  private def default(config: ValidatorAppBackendConfig): ValidatorCantonIdentifierConfig = {
     val identifier = config.validatorPartyHint.getOrElse("unnamedValidator")
     ValidatorCantonIdentifierConfig(
       participant = identifier
     )
   }
+
+  // The config reader/writer derivation fails if we make this a method on the config class so we keep it here on the companion
+  def resolvedNodeIdentifierConfig(
+      config: ValidatorAppBackendConfig
+  ): ValidatorCantonIdentifierConfig =
+    config.cantonIdentifierConfig.getOrElse(ValidatorCantonIdentifierConfig.default(config))
 }
