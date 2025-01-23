@@ -134,7 +134,7 @@ jobs:
         id: setup_sbt
         uses: ./.github/actions/sbt/setup_sbt
         with:
-          cache_version: 0
+          cache_version: 1
 
       - name: Prepare list of tests to run for sbt
         id: list_tests
@@ -203,7 +203,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: ./.github/actions/sbt/post_sbt
         with:
-          cache_version: 0
+          cache_version: 1
           setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
           # Save caches only from one runner, to reduce conflicts on the save
           save_caches: ${{ matrix.runner-index == 0 && inputs.test.name == 'wall-clock-time' }}

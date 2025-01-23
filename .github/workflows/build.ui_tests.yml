@@ -53,7 +53,7 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         uses: ./.github/actions/sbt/post_sbt
         with:
-          cache_version: 0
+          cache_version: 1
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Report Failures on Slack & Github
@@ -63,4 +63,3 @@ jobs:
           SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
         run: ./.circleci/notification-scripts/failure_notification.py
-
