@@ -84,6 +84,7 @@ in pkgs.mkShell {
     scala_2_13
     selenium-server-standalone
     shellcheck
+    skopeo
     sphinx
     sphinx-lint
     tmux
