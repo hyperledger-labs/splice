@@ -59,6 +59,7 @@ class UpdateHistorySanityCheckPlugin(
     TraceContext.withNewTraceContext { implicit tc =>
       // A scan might not be initialized if the test uses `manualStart` and it wasn't ever started.
       val initializedScans = environment.scans.local.filter(scan => scan.is_initialized)
+      logger.info(s"Running plugin on scans ${initializedScans.map(_.name).mkString(", ")}")
 
       TriggerTestUtil
         .setTriggersWithin(
