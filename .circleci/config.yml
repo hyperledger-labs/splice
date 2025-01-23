@@ -3532,7 +3532,7 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH"
           cmd: |
             if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
-              export $GITHUB_USER="canton-network-da"
+              export GITHUB_USER="canton-network-da"
               make cluster/helm/copy_release_to_ghcr
               make cluster/docker/copy_release_to_ghcr
             else
