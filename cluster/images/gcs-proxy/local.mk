@@ -3,7 +3,10 @@
 
 dir := $(call current_dir)
 
-$(dir)/$(docker-build): $(dir)/target/LICENSE
+$(dir)/$(docker-build): $(dir)/target/LICENSE $(target-dir)
 
-$(dir)/target/LICENSE: LICENSE
+$(dir)/target/LICENSE: LICENSE $(target-dir)
 	cp $< $@
+
+$(target-dir):
+	mkdir -p $(@D)
