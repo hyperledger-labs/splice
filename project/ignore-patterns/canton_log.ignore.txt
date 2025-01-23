@@ -108,4 +108,8 @@ Failed to send commitment message batch for period CommitmentPeriod.*RequestRefu
 Instrument rpc\.server\.duration has exceeded the maximum allowed cardinality
 Too many log messages detected
 
+
+# TODO(#17081) Figure out why this happens
+Thread starvation or clock leap detected
+
 # Make sure to have a trailing newline

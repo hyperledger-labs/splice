@@ -53,6 +53,12 @@ class ValidatorReonboardingIntegrationTest
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
+  val aliceValidatorLocalRestartName = "aliceValidatorLocalRestart"
+
+  private def aliceValidatorLocalRestart(implicit env: SpliceTestConsoleEnvironment) = v(
+    aliceValidatorLocalRestartName
+  )
+
   private def aliceValidatorLocalWalletClient(implicit env: SpliceTestConsoleEnvironment) =
     wc("aliceValidatorWalletLocal")
 
@@ -97,25 +103,33 @@ class ValidatorReonboardingIntegrationTest
                 ),
               ),
             )
+        val aliceValidatorConfigNewBase = aliceValidatorConfig
+          .copy(
+            adminApi =
+              aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
+            storage = aliceValidatorConfig.storage match {
+              case c: SpliceDbConfig.Postgres =>
+                c.copy(
+                  config = c.config
+                    .withValue(
+                      "properties.databaseName",
+                      ConfigValueFactory.fromAnyRef("splice_apps_reonboard"),
+                    )
+                )
+              case _ => throw new IllegalArgumentException("Only Postgres is supported")
+            },
+            cantonIdentifierConfig = Some(
+              ValidatorCantonIdentifierConfig(
+                participant = "aliceValidatorLocalNewForValidatorReonboardingIT"
+              )
+            ),
+          )
         config.copy(
           validatorApps = config.validatorApps +
             (InstanceName.tryCreate("aliceValidator") -> aliceValidatorConfig) +
             (InstanceName.tryCreate("aliceValidatorLocal") -> {
-              aliceValidatorConfig
+              aliceValidatorConfigNewBase
                 .copy(
-                  adminApi =
-                    aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
-                  storage = aliceValidatorConfig.storage match {
-                    case c: SpliceDbConfig.Postgres =>
-                      c.copy(
-                        config = c.config
-                          .withValue(
-                            "properties.databaseName",
-                            ConfigValueFactory.fromAnyRef("splice_apps_reonboard"),
-                          )
-                      )
-                    case _ => throw new IllegalArgumentException("Only Postgres is supported")
-                  },
                   participantBootstrappingDump = Some(
                     ParticipantBootstrapDumpConfig
                       .File(
@@ -134,7 +148,8 @@ class ValidatorReonboardingIntegrationTest
                     )
                   ),
                 )
-            }),
+            }) +
+            (InstanceName.tryCreate(aliceValidatorLocalRestartName) -> aliceValidatorConfigNewBase),
           walletAppClients = config.walletAppClients + (
             InstanceName.tryCreate("aliceValidatorWalletLocal") -> {
               val aliceValidatorWalletConfig =
@@ -312,6 +327,11 @@ class ValidatorReonboardingIntegrationTest
           .lockedAmulets
           .loneElement
           .effectiveAmount shouldBe lockedAmount
+      }
+
+      clue("Restart validator without migration config") {
+        aliceValidatorLocalBackend.stop()
+        aliceValidatorLocalRestart.startSync()
       }
     }
   }
