@@ -48,7 +48,6 @@ commands:
                 git checkout << parameters.checkout-branch >>
               else
                 echo "No branch set, staying on default branch."
-                git checkout "$CIRCLE_SHA1"
               fi
             }
 
