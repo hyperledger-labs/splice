@@ -62,9 +62,6 @@ redirects = {
 }
 
 
-todo_include_todos = True
-
-
 # Configure the sphinx copy-button plugin as per
 # https://sphinx-copybutton.readthedocs.io/en/latest/use.html#strip-and-configure-input-prompts-for-code-cells
 copybutton_prompt_text = "@ "
