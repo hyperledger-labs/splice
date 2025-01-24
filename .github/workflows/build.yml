@@ -147,6 +147,10 @@ jobs:
     uses: ./.github/workflows/build.ui_tests.yml
     secrets: inherit
 
+  docs:
+    uses: ./.github/workflows/build.docs.yml
+    secrets: inherit
+
   final_result:
     if: ${{ always() && github.event_name == 'pull_request' }}
     needs:
@@ -164,6 +168,7 @@ jobs:
     - scala_test_frontend_wall_clock_time
     - scala_test_frontend_simtime
     - ui_tests
+    - docs
     runs-on: self-hosted-docker-tiny
     container:
       image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4
@@ -199,3 +204,4 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ env.JOBS }}
+          allowed-skips: docs

@@ -364,11 +364,11 @@ Test:
 Things sometimes go wrong with `sbt` in ways that are hard to debug. This section will list common tips&tricks for getting `sbt` to do what we want it to.
 - In case you see unexpected build failures after switching branches, run `sbt reload` to have sbt update its internal state.
 - In case you continue to see unexpected build failures, despite following every other trick in this section, you probably need to delete the sbt build files. If you suspect the build failures come from CN build files, run `sbt clean-splice` to delete all CN build files. If the error might come from the build files of the OS Canton dependency, run `sbt clean` to delete all build files managed by sbt. Subsequent `sbt Test/compile`s should then succeed.
-- 
+-
 
 ### Troubleshooting
 - MacOS: If you previously installed nix and suddenly have no access to the command. As a result, when reloading the project environment, you may see something like `./.envrc:8: nix: command not found`. To fix this, first verify that the executable is available in `/nix/var/nix/profiles/default/bin/nix`. If yes, then you may want to add the folowing as seen [here](https://github.com/NixOS/nix/issues/3616#issuecomment-903869569) to your (bash|zsh)rc file.
-  
+
 ```
   # Nix
     if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
@@ -1379,3 +1379,10 @@ a username/password pair, are stored in the `canton-network-vpn` CircleCI Contex
 
 To rotate the VPN password, send an email to `help@digitalasset.com`, and IT will swap out the password in the context.
 No further changes to the CI config file should be necessary.
+
+### Dev Docs
+
+We publish docs from each commit from `main` to
+https://digital-asset.github.io/decentralized-canton-sync/. This can
+often be useful to answer support requests with a docs link even if
+those docs are still very recent.
