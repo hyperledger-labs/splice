@@ -103,7 +103,7 @@ jobs:
           git config user.name "DA Automation"
           git checkout -b $new_branch origin/$base_branch
           git cherry-pick $commit_sha
-          git commit -m "[ci]" --allow-empty
+          git commit -m "[static]" --allow-empty
           git push origin $new_branch
           # output the backport branch name for use in the next step
           echo "new_branch=$new_branch" >> "$GITHUB_OUTPUT"
