@@ -62,6 +62,12 @@ repos:
         language: system
         entry: ".circleci/build-config.sh --check"
         files: '^.circleci/config/.*[.]yml$'
+      - id: gha_lint
+        name: static check github actions
+        language: system
+        entry: "actionlint"
+        files: '^.github/.*$'
+        pass_filenames: false
       - id: check-trailing-whitespace
         name: Check for trailing whitespace
         language: system

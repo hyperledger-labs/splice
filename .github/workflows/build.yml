@@ -185,21 +185,23 @@ jobs:
           echo "Last commit message: $last_commit_msg"
           if [[ $last_commit_msg == *"[force]"* ]]; then
             echo "Skipping the check for job success because the current commit opts in for a forced run."
-            echo "FORCE=true" >> $GITHUB_ENV
+            echo "FORCE=true" >> "$GITHUB_ENV"
           elif [[ "$last_commit_msg" == *"[static]"* ]]; then
             echo "Only static tests are required"
-            echo "FORCE=false" >> $GITHUB_ENV
-            echo "JOBS<<EOF" >> $GITHUB_ENV
-            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests", "deployment_test", "docker_images"}' >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+            # shellcheck disable=SC2129
+            echo "FORCE=false" >> "$GITHUB_ENV"
+            echo "JOBS<<EOF" >> "$GITHUB_ENV"
+            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests", "deployment_test", "docker_images"}' >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
           else
             echo "Checking if all jobs succeeded."
-            echo "FORCE=false" >> $GITHUB_ENV
-            echo "JOBS<<EOF" >> $GITHUB_ENV
-            echo '${{ toJSON(needs) }}' >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+            # shellcheck disable=SC2129
+            echo "FORCE=false" >> "$GITHUB_ENV"
+            echo "JOBS<<EOF" >> "$GITHUB_ENV"
+            echo '${{ toJSON(needs) }}' >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
           fi
-          echo "env file: $(cat $GITHUB_ENV)"
+          echo "env file: $(cat "$GITHUB_ENV")"
       - name: check if the required jobs succeeded
         if: env.FORCE != 'true'
         uses: re-actors/alls-green@release/v1

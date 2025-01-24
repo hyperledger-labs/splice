@@ -15,6 +15,7 @@ in pkgs.mkShell {
 
     # NOTE: please keep this list sorted for an easy overview and to avoid merge noise.
     istioctl
+    actionlint
     ammonite
     auth0-cli
     bc

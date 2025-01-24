@@ -92,9 +92,9 @@ jobs:
         id: create_branch
         shell: bash
         run: |
-          commit_sha=$(echo ${{ needs.get_commit_sha.outputs.result }})
-          base_branch=$(echo ${{ inputs.base_branch }})
-          new_branch=$(echo "automation/backport-$commit_sha-$base_branch")
+          commit_sha="${{ needs.get_commit_sha.outputs.result }}"
+          base_branch="${{ inputs.base_branch }}"
+          new_branch="automation/backport-$commit_sha-$base_branch"
           echo "Backporting commit $commit_sha to branch $base_branch (using branch $new_branch)"
           git fetch origin $base_branch
           git fetch origin $commit_sha

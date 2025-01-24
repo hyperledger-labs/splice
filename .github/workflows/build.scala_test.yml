@@ -47,13 +47,13 @@ jobs:
           echo "Last commit message: $last_commit_msg"
           if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
             echo "Only static tests are running, returning an empty array so that no tests are run"
-            echo "json=[]" >> $GITHUB_OUTPUT
+            echo "json=[]" >> "$GITHUB_OUTPUT"
           else
             echo "Not a static test-only run, generating indices"
             MAX_INDEX=$((${{ inputs.parallelism }}-1))
             INDEX_LIST=$(seq 0 ${MAX_INDEX})
-            INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< ${INDEX_LIST})
-            echo "json=${INDEX_JSON}" >> $GITHUB_OUTPUT
+            INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< "${INDEX_LIST}")
+            echo "json=${INDEX_JSON}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Split tests
@@ -141,8 +141,8 @@ jobs:
         shell: bash
         run: |
           splitted=$(echo "${{ toJson(needs.split_tests.outputs.test_names) }}" | jq -r '.[${{ matrix.runner-index }}].[]')
-          tests=$(echo $splitted | tr '\n' ' ')
-          count=$(echo $tests | wc -w)
+          tests=$(echo "$splitted" | tr '\n' ' ')
+          count=$(echo "$tests" | wc -w)
           echo "We are running $count tests in this batch:"
           echo "$splitted"
           echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $tests\"" >> "$GITHUB_OUTPUT"
@@ -160,9 +160,10 @@ jobs:
       - name: Wait for Canton to be ready
         shell: bash
         run: |
-            if [[ "${{ inputs.start_canton_options }}" == *"-w"* ]]; then
+            start_canton_options="${{ inputs.start_canton_options }}"
+            if [[ "$start_canton_options" == *"-w"* ]]; then
               ./wait-for-canton.sh -w
-            elif [[ "${{ inputs.start_canton_options }}" == *"-s"* ]]; then
+            elif [[ "$start_canton_options" == *"-s"* ]]; then
               ./wait-for-canton.sh -s
             fi
 
@@ -206,7 +207,7 @@ jobs:
           cache_version: 1
           setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
           # Save caches only from one runner, to reduce conflicts on the save
-          save_caches: ${{ matrix.runner-index == 0 && inputs.test.name == 'wall-clock-time' }}
+          save_caches: ${{ matrix.runner-index == 0 && inputs.test_name == 'wall-clock-time' }}
 
       - name: Upload logs
         if: ${{ failure() }}

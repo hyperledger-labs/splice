@@ -57,6 +57,11 @@ jobs:
           name: todos
           path: todo-out/todos
 
+      - name: Lint GHA
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: actionlint
+
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
         with:

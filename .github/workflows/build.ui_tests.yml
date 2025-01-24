@@ -23,7 +23,7 @@ jobs:
           echo "Last commit message: $last_commit_msg"
           if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
             echo "Skipping UI tests because of [static] label"
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Setup
