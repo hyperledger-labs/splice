@@ -49,6 +49,10 @@ ARTIFACTORY_REGISTRY_SERVER="digitalasset-canton-network-docker.jfrog.io"
 ARTIFACTORY_REGISTRY="$ARTIFACTORY_REGISTRY_SERVER/digitalasset"
 GITHUB_REGISTRY="ghcr.io/digital-asset/decentralized-canton-sync/docker"
 
+# for skopeo to work, we need to set the XDG_RUNTIME_DIR, in CCI it cannot mkdir /run/containers: permission denied
+export XDG_RUNTIME_DIR=/tmp/containers
+mkdir -p "$XDG_RUNTIME_DIR"
+
 echo "$ARTIFACTORY_PASSWORD" | skopeo login "$ARTIFACTORY_REGISTRY_SERVER" --username "$ARTIFACTORY_USER" --password-stdin
 echo "$GITHUB_TOKEN" | skopeo login ghcr.io --username "$GITHUB_USER" --password-stdin
 
