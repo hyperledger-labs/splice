@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming Release
-----------------
+Upcoming
+--------
 
 0.3.7
 -----
