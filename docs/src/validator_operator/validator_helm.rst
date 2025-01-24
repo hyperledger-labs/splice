@@ -32,13 +32,13 @@ Requirements
 
   tar xzvf |version|\_splice-node.tar.gz
 
-5) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <validator-upgrades>`.
-   If it has, please record the current migration ID of the synchronizer.
-   The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
+.. include:: required_network_parameters.rst
 
-.. code-block:: bash
+TRUSTED_SCAN_URL
+    The scan URL of an SV that you trust and that is reachable by your validator. This should be of the form https://scan.sv-1.TARGET_CLUSTER.global.canton.network.YOUR_SV_SPONSOR,
+    e.g., https://scan.sv-1.TARGET_CLUSTER.global.canton.network.sync.global for the GSF SV.
 
-   export MIGRATION_ID=0
+Additional parameters describing your own setup as opposed to the connection to the network are described below.
 
 .. _validator-identity-token:
 
@@ -71,24 +71,7 @@ The password can be setup with the following command, assuming you set the envir
 Preparing for Validator Onboarding
 ----------------------------------
 
-In order to become a validator, you need the sponsorship of an SV.
-Your SV will provide you with a required secret to authorize yourself towards their SV.
-
-The onboarding secret is a one-time use secret that expires after 24 hours. If you don't join before it expires, you need to request a new secret from your SV sponsor.
-
-.. admonition:: DevNet-only
-
-  On DevNet, you can obtain an onboarding secret automatically by
-  calling the following endpoint on your sponsoring SV (GSF used here for illustration):
-
-  .. parsed-literal::
-
-     curl -X POST https://sv.sv-1.TARGET_CLUSTER.global.canton.network.sync.global/api/sv/v0/devnet/onboard/validator/prepare
-
-  Note that this most be called on the same SV that sponsors your validator. Please double check the URL
-  with your sponsoring SV.
-
-Ensure that your validator onboarding secret ``VALIDATOR_SECRET`` is set in the namespace you created earlier. The value should be provided by the SV sponsoring the onboarding of your validator.
+Ensure that your validator onboarding secret ``ONBOARDING_SECRET`` is set in the namespace you created earlier.
 
 .. code-block:: bash
 
@@ -353,9 +336,7 @@ This does mean that you depend on that single SV and if it is broken or maliciou
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` as follows:
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
-- Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, for example,
-  ``https://sv-1.TARGET_CLUSTER.global.canton.network.sync.global`` for the GSF. Please make sure that you use the URL
-  of your sponsoring SV.
+- Replace ``SPONSOR_SV_URL`` with the URL of the SV that provided you your secret.
 - Replace ``YOUR_VALIDATOR_PARTY_HINT`` with the desired name for your
   validator operator party. It must be of the format
   ``<organization>-<function>-<enumerator>``.

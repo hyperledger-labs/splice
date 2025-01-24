@@ -59,12 +59,9 @@ Requirements
 
   tar xzvf |version|\_splice-node.tar.gz
 
-4) Please inquire for the current migration ID of the synchronizer from your sponsor SV.
-   The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
+.. include:: required_network_parameters.rst
 
-.. code-block:: bash
-
-   export MIGRATION_ID=0
+Additional parameters describing your own setup as opposed to the connection to the network are described below.
 
 Preparing for Validator Onboarding
 ++++++++++++++++++++++++++++++++++
@@ -104,25 +101,12 @@ Deployment
 
   .. code-block:: bash
 
-    ./start.sh -s <sponsor_sv_address> -o "<onboarding_secret>" -p <party_hint> -m $MIGRATION_ID -w
-
+    ./start.sh -s "<SPONSOR_SV_URL>" -o "<ONBOARDING_SECRET>" -p "<party_hint>" -m "<MIGRATION_ID>" -w
 
   Where:
 
-  a) ``<sponsor_sv_address>`` is the URL of the sv-app app of the SV that is sponsoring you.
-     You should have received this from your SV sponsor, typically starts with `https://sv.sv-N`
-     for some number N.
-
-     For example, if your sponsor SV is the GSF, this URL would be |gsf_sv_url|
-
-  b) ``<onboarding_secret>``
-     is the onboarding secret you obtained above. Please surround
-     this with quotes to avoid shell interpretation of special characters.
-
-  c) ``<party_hint>`` will be used as the prefix of the Party ID of your validator's administrator.
+  ``<party_hint>`` will be used as the prefix of the Party ID of your validator's administrator.
      This must be of format `<organization>-<function>-<enumerator>`, e.g. `myCompany-myWallet-1`.
-
-  d) ``$MIGRATION_ID`` is the migration ID of the synchronizer on the target network, as exported above.
 
 Note that the validator may be stopped with the command `./stop.sh` and restarted again with the same `start`
 command as above. Its data will be retained between invocations. In subseqent invocations, the secret itself may be
