@@ -6,13 +6,10 @@
 .. TODO(#14303): consider reducing duplication. Some requirements & validator onboarding can be moved to a section before we choose the deployment method
 
 
-Docker-Compose Based Deployment
-===============================
-
 .. _compose_validator:
 
 Docker-Compose Based Deployment of a Validator Node
----------------------------------------------------
+===================================================
 
 This section describes how to deploy a standalone validator node on a local machine
 using Docker-Compose. The deployment consists of the validator node along with associated
