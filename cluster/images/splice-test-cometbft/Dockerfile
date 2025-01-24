@@ -7,4 +7,6 @@ COPY configs /
 
 ENV sv_idx=0
 
+COPY target/LICENSE .
+
 ENTRYPOINT ["sh", "-c", "cometbft-canton-network start --home /sv${sv_idx}" ]
