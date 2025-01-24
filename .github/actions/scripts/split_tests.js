@@ -59,7 +59,7 @@ function splitTests(sortedTestNames, estimatedTestTimes, splitTotal) {
   return buckets;
 }
 
-function main(xmlParser, testReportsDir, testNamesFile, splitTotal) {
+function main(xmlParser, testReportsDir, testNamesFile, splitTotal, splitIndex) {
   testTimes = getTestSuiteTimesFromXml(xmlParser, testReportsDir, testNamesFile);
 
   const testNames = fs.readFileSync(testNamesFile).toString().split('\n').filter(name => name.length > 0);
@@ -76,11 +76,11 @@ function main(xmlParser, testReportsDir, testNamesFile, splitTotal) {
   buckets.forEach((bucket, i) => {
     console.log(`bucket ${i}: ${bucket.length} tests, total time: ${bucket.reduce((acc, testName) => acc + estimatedTestTimes[testName], 0)}`);
   });
-  return buckets;
+  return buckets[splitIndex];
 }
 
-module.exports = async ({ xmlParser, testReportsDir, testNamesFile, splitTotal }) => {
+module.exports = async ({ xmlParser, testReportsDir, testNamesFile, splitTotal, splitIndex }) => {
 
-  return main(xmlParser, testReportsDir, testNamesFile, splitTotal);
+  return main(xmlParser, testReportsDir, testNamesFile, splitTotal, splitIndex);
 
 };

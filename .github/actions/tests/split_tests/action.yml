@@ -10,9 +10,12 @@ inputs:
   split_total:
     description: "Total number of buckets to split into"
     required: true
+  split_index:
+    description: "Index of the bucket to run"
+    required: true
 outputs:
   test_names:
-    description: "Test names to run (an array of size split_total, each element is an array of test names for that bucket)"
+    description: "Test names to run"
     value: ${{ steps.split.outputs.result }}
 
 runs:
@@ -36,4 +39,5 @@ runs:
           const testReportsDir='${{ inputs.test_reports_dir }}'
           const testNamesFile='${{ inputs.test_names_file }}'
           const splitTotal=${{ inputs.split_total }}
-          return await script({xmlParser, testReportsDir, testNamesFile, splitTotal})
+          const splitIndex=${{ inputs.split_index }}
+          return await script({xmlParser, testReportsDir, testNamesFile, splitTotal, splitIndex})

@@ -14,7 +14,7 @@ on:
 
 jobs:
   add_comment:
-    runs-on: self-hosted-docker-tiny
+    runs-on: self-hosted-docker
     steps:
       - uses: actions/checkout@v4
 

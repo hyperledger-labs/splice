@@ -10,7 +10,7 @@ on:
 # Cancel previously runs of this workflow on the same branch, unless it's main
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !endsWith(github.ref, 'heads/main') }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
 
@@ -31,7 +31,7 @@ jobs:
         run: |
           last_commit_msg=$(git log -1 --pretty=%B)
           echo "Last commit message: $last_commit_msg"
-          if [[ $last_commit_msg != *"[ci]"* ]] && [[ "$last_commit_msg" != *"[static]"* ]] ; then
+          if [[ $last_commit_msg != *"[ci]"* ]]; then
             echo "Cancelling the entire workflow because the current commit does not opt in for CI."
             curl -fsSL -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
           else
@@ -42,18 +42,10 @@ jobs:
     uses: ./.github/workflows/build.static_tests.yml
     secrets: inherit
 
-  deployment_test:
-    uses: ./.github/workflows/build.deployment_test.yml
-    secrets: inherit
-
-  bundle:
-    uses: ./.github/workflows/build.bundle.yml
-    secrets: inherit
-
   scala_test_sim_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-medium
+      runs_on: self-hosted-k8s-large
       test_names_file: 'test-full-class-names-sim-time.log'
       start_canton_options: -s
       parallelism: 4
@@ -63,7 +55,7 @@ jobs:
   scala_test_resource_intensive:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-x-large
+      runs_on: self-hosted-k8s-large
       test_names_file: 'test-full-class-names-resource-intensive.log'
       start_canton_options: -w
       parallelism: 2
@@ -73,7 +65,7 @@ jobs:
   scala_test_record_time_tolerance:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-small
+      runs_on: self-hosted-k8s-large
       test_names_file: 'test-full-class-names-record-time-tolerance.log'
       start_canton_options: -s
       parallelism: 1
@@ -83,17 +75,27 @@ jobs:
   scala_test_global_soft_migration:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-medium
+      runs_on: self-hosted-k8s-large
       test_names_file: 'test-full-class-names-global-soft-migration.log'
-      start_canton_options: -w --soft-domain-migration
+      start_canton_options: -w -g
       parallelism: 1
       test_name: global-soft-migration
+    secrets: inherit
+
+  scala_test_global_soft_migration_toplogy:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-large
+      test_names_file: 'test-full-class-names-global-soft-migration-topology.log'
+      start_canton_options: -w --soft-domain-migration
+      parallelism: 1
+      test_name: global-soft-migration-topology
     secrets: inherit
 
   scala_test_disaster_recovery:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-x-large
+      runs_on: self-hosted-k8s-large
       test_names_file: 'test-full-class-names-disaster-recovery.log'
       start_canton_options: -w
       parallelism: 1
@@ -103,52 +105,10 @@ jobs:
   scala_test_with_cometbft:
     uses: ./.github/workflows/build.scala_test_with_cometbft.yml
     with:
-      runs_on: self-hosted-k8s-medium
+      runs_on: self-hosted-k8s-large
       test_names_file: "test-cometbft-full-class-names.log"
       parallelism: 1
       test_name: cometbft
-    secrets: inherit
-
-  scala_test_wall_clock_time:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names.log'
-      start_canton_options: -w
-      # TODO(#10912) Investigate why things got slower
-      parallelism: 10
-      test_name: wall-clock-time
-      with_gcp_creds: true
-    secrets: inherit
-
-  scala_test_frontend_wall_clock_time:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names-frontend.log'
-      start_canton_options: -w
-      parallelism: 4
-      test_name: frontend-wall-clock-time
-      is_frontend_test: true
-    secrets: inherit
-
-  scala_test_frontend_simtime:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names-frontend-sim-time.log'
-      start_canton_options: -s
-      parallelism: 1
-      test_name: frontend-simtime
-      is_frontend_test: true
-    secrets: inherit
-
-  ui_tests:
-    uses: ./.github/workflows/build.ui_tests.yml
-    secrets: inherit
-
-  docs:
-    uses: ./.github/workflows/build.docs.yml
     secrets: inherit
 
   final_result:
@@ -156,28 +116,24 @@ jobs:
     needs:
     - cancel_if_not_opt_in
     - static_tests
-    - deployment_test
-    - bundle
     - scala_test_sim_time
     - scala_test_resource_intensive
     - scala_test_record_time_tolerance
     - scala_test_global_soft_migration
+    - scala_test_global_soft_migration_toplogy
     - scala_test_disaster_recovery
     - scala_test_with_cometbft
-    - scala_test_wall_clock_time
-    - scala_test_frontend_wall_clock_time
-    - scala_test_frontend_simtime
-    - ui_tests
-    - docs
     runs-on: self-hosted-docker-tiny
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4
+      # TODO(#15988): clean this up, use a proper released image instead:
+      #               - Once this is in a release, use the release version.
+      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.4-itai-dirty
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Handle [force] and [static] labels
+      - name: Check if [force] was specified
         shell: bash
         run: |
           last_commit_msg=$(git log -1 --pretty=%B)
@@ -185,23 +141,12 @@ jobs:
           if [[ $last_commit_msg == *"[force]"* ]]; then
             echo "Skipping the check for job success because the current commit opts in for a forced run."
             echo "FORCE=true" >> $GITHUB_ENV
-          elif [[ "$last_commit_msg" == *"[static]"* ]]; then
-            echo "Only static tests are required"
-            echo "FORCE=false" >> $GITHUB_ENV
-            echo "JOBS<<EOF" >> $GITHUB_ENV
-            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests", "deployment_test", "bundle"}' >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
           else
             echo "Checking if all jobs succeeded."
             echo "FORCE=false" >> $GITHUB_ENV
-            echo "JOBS<<EOF" >> $GITHUB_ENV
-            echo '${{ toJSON(needs) }}' >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
           fi
-          echo "env file: $(cat $GITHUB_ENV)"
-      - name: check if the required jobs succeeded
+      - name: Decide whether the needed jobs succeeded or failed
         if: env.FORCE != 'true'
         uses: re-actors/alls-green@release/v1
         with:
-          jobs: ${{ env.JOBS }}
-          allowed-skips: docs
+          jobs: ${{ toJSON(needs) }}

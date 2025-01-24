@@ -30,7 +30,6 @@ runs:
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
         sudo mkdir -p /nix/store
         sudo chown -R $(whoami):$(whoami) /nix
-        cat /tmp/nix-cache-key
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         if [ -f "/cache/nix/$cache_key/cached" ]; then
           echo "Restoring nix cache"
@@ -109,9 +108,6 @@ runs:
       if: ${{ inputs.should_save == 'true' }}
       run: |
           set -euxo pipefail
-          echo ~
-          chown -R $(whoami):$(whoami) ~
-          cat /tmp/nix-cache-key
           cache_key=($(md5sum "/tmp/nix-cache-key"))
           if [ ! -f "/cache/nix/$cache_key/cached" ]; then
             echo "Saving nix"

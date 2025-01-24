@@ -15,10 +15,6 @@ inputs:
     description: 'The number of seconds to wait between retries'
     required: false
     default: "5"
-  cmd_before_retry:
-    description: 'The bash command to run before retrying the command'
-    required: false
-    default: ""
 runs:
   using: 'composite'
   steps:
@@ -87,7 +83,6 @@ runs:
           do
               if [ $n -gt 0 ]; then
                 sleep ${{ inputs.cmd_retry_wait }}
-                ${{ inputs.cmd_before_retry }}
               fi
               cmd_wrapper() {
                 # We write the cmd to a separate file. That way `set -e` statements in the cmd will take effect
