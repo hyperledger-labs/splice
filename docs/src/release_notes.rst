@@ -11,6 +11,9 @@ Release Notes
 Upcoming
 --------
 
+0.3.8
+-----
+
 * Fixes to documentation and scripts around using the publicly available images and Helm charts
 
 0.3.7
