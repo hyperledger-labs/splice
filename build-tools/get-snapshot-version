@@ -9,13 +9,9 @@ fi
 sha=$(git rev-parse HEAD)
 
 # Always use the release version on release branches. This only matters for the ciupgrade tests.
-set +e
-# Note that in CCI we checkout by SHA and not by branch, so we can't rely on the checked out branch name.
-# Instead we check if the current commit is in a release-line branch using `git branch --contains HEAD`.
-release_line_branch=$(git branch --contains HEAD | grep release-line)
-set -e
-if [ -n "$release_line_branch" ]; then
-    OVERRIDE_VERSION="${release_line_branch#release-line-}"
+branch=$(git rev-parse --abbrev-ref HEAD)
+if [[ $branch == release-line-* && -z ${OVERRIDE_VERSION-} ]]; then
+    OVERRIDE_VERSION="${branch#release-line-}"
 fi
 
 if [ -n "${OVERRIDE_VERSION-}" ]; then
@@ -28,6 +24,12 @@ if ! prefix=$(git show "$sha":VERSION 2>&1); then
     prefix=$(cat VERSION)
 fi
 set -e
+git_commit_message=$(git log -1 --pretty=format:%B "$sha")
+if [[ $git_commit_message == *"[release]"* ]]; then
+    # release commit - no suffixes
+    echo "$prefix"
+    exit 0
+fi
 
 commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
 number_of_commits=$(git rev-list --count "$sha")
