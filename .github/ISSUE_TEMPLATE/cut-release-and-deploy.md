@@ -25,8 +25,7 @@ Note: Some commands assume you are using the [fish](https://fishshell.com/) shel
     - Replace `Upcoming` by the target version
     - Fix any spelling mistakes and make sure the RST rendering is not broken
     - Check whether any important changes are missing, for example by briefly comparing the release notes with `git log 0.x.z..` (replace `0.x.z` with the prev version)
-  - [ ] Make sure the merge commit has a `[release]` tag so it gets published as a non-snapshot version. You may have to edit the commit message when pressing the merge button in the GitHub UI.
-- [ ] Create a release branch called `release-line-0.x.y` from the merged commit with the `[release]` tag
+- [ ] Create a release branch called `release-line-0.x.y` from the merged commit containing the finalized release notes.
   - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
 - [ ] Trigger a CircleCI pipeline on the release branch with `run-job: publish-public-artifacts`
 - [ ] Merge a PR into the _ancestor branch_ with the following changes:

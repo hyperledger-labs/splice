@@ -34,13 +34,6 @@ if [ -z "${RELEASE_VERSION-}" ] || [ -z "${RELEASE_COMMIT_REF-}" ]; then
   usage
 fi
 
-# Check if the base branch has a last commit with a [release] footer in the message
-LAST_COMMIT_MESSAGE=$(git log -1 --pretty=%B "$RELEASE_COMMIT_REF")
-if [[ "$LAST_COMMIT_MESSAGE" != *"[release]"* ]]; then
-  echo "The release_commit_ref '$RELEASE_COMMIT_REF' does not have a [release] footer in the message"
-  exit 1
-fi
-
 RELEASE_LINE_BRANCH_NAME="release-line-${RELEASE_VERSION}"
 if git show-ref --verify --quiet "refs/heads/$RELEASE_LINE_BRANCH_NAME"; then
   echo "Release line branch $RELEASE_LINE_BRANCH_NAME already exists"

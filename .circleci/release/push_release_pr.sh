@@ -59,8 +59,8 @@ git add cluster/deployment/testnet/.envrc.vars
 git add cluster/deployment/mainnet/.envrc.vars
 git add docs/src/release_notes.rst
 
-# Create a commit with the specified message and a [release] footer
-git commit -m "$COMMIT_MESSAGE" -m "[release]"
+# Create a commit with the specified message
+git commit -m "$COMMIT_MESSAGE"
 
 "$REPO_ROOT"/.circleci/release/update_latest_release.sh -v "$RELEASE_VERSION"
 git add VERSION LATEST_RELEASE
@@ -70,4 +70,4 @@ git commit -m "Updated LATEST_RELEASE to $RELEASE_VERSION and, if needed, the VE
 git push --force-with-lease --set-upstream origin "$BRANCH_NAME"
 
 # Create a pull request on GitHub using the GitHub CLI
-gh pr create --title "$COMMIT_MESSAGE" --body "[release]" --base main --head "$BRANCH_NAME"
+gh pr create --title "$COMMIT_MESSAGE" --base main --head "$BRANCH_NAME"
