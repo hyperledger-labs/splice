@@ -91,13 +91,7 @@ Deployment
 
 2) Export the current version to an environment variable: |image_tag_set|
 
-3) Login to the digitalasset-canton-network-docker.jfrog.io registry:
-
-  .. code-block:: bash
-
-    docker login digitalasset-canton-network-docker.jfrog.io
-
-4) Run the following command to start the validator node, and wait for it to become ready (could take a few minutes):
+3) Run the following command to start the validator node, and wait for it to become ready (could take a few minutes):
 
   .. code-block:: bash
 

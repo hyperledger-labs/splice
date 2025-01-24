@@ -435,12 +435,12 @@ Postgres in the Cluster
 
 If you wish to run the Postgres instances as pods in your cluster, you can use the `splice-postgres` Helm chart to install them:
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install sequencer-pg canton-network-helm/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-sequencer.yaml --wait
-    helm install mediator-pg canton-network-helm/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-mediator.yaml --wait
-    helm install participant-pg canton-network-helm/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-participant.yaml --wait
-    helm install apps-pg canton-network-helm/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-apps.yaml --wait
+    helm install sequencer-pg |helm_repo_prefix|/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-sequencer.yaml --wait
+    helm install mediator-pg |helm_repo_prefix|/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-mediator.yaml --wait
+    helm install participant-pg |helm_repo_prefix|/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-participant.yaml --wait
+    helm install apps-pg |helm_repo_prefix|/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-apps.yaml --wait
 
 Cloud-Hosted Postgres
 +++++++++++++++++++++
@@ -587,23 +587,22 @@ reaches a stable state prior to moving on to the next step.
 
 Install the Canton and CometBFT components:
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm repo update
-    helm install global-domain-${MIGRATION_ID}-cometbft canton-network-helm/splice-cometbft -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/cometbft-values.yaml --wait
-    helm install global-domain-${MIGRATION_ID} canton-network-helm/splice-global-domain -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/global-domain-values.yaml --wait
-    helm install participant-${MIGRATION_ID} canton-network-helm/splice-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
+    helm install global-domain-${MIGRATION_ID}-cometbft |helm_repo_prefix|/splice-cometbft -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/cometbft-values.yaml --wait
+    helm install global-domain-${MIGRATION_ID} |helm_repo_prefix|/splice-global-domain -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/global-domain-values.yaml --wait
+    helm install participant-${MIGRATION_ID} |helm_repo_prefix|/splice-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
 
 Note that we use the migration ID when naming Canton components.
 This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
 
 Install the SV node apps (replace ``helm install`` in these commands with ``helm upgrade`` if you are following :ref:`sv-upgrades-deploying-apps`):
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install sv canton-network-helm/splice-sv-node -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-values.yaml -f ${SV_IDENTITIES_FILE} -f ${UI_CONFIG_VALUES_FILE} --wait
-    helm install scan canton-network-helm/splice-scan -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
-    helm install validator canton-network-helm/splice-validator -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install sv |helm_repo_prefix|/splice-sv-node -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-values.yaml -f ${SV_IDENTITIES_FILE} -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install scan |helm_repo_prefix|/splice-scan -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install validator |helm_repo_prefix|/splice-validator -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
 
 
 
@@ -778,9 +777,9 @@ And install it to your cluster:
 A reference Helm chart installing a gateway that uses this service is also provided.
 To install it, run the following (assuming the environment variable `YOUR_HOSTNAME` is set to your hostname):
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install cluster-gateway canton-network-helm/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
+    helm install cluster-gateway |helm_repo_prefix|/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
 Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
@@ -792,9 +791,9 @@ Another reference Helm chart is provided for that, which can be installed after
 using:
 
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install cluster-ingress-sv canton-network-helm/splice-cluster-ingress-runbook -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-cluster-ingress-values.yaml
+    helm install cluster-ingress-sv |helm_repo_prefix|/splice-cluster-ingress-runbook -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-cluster-ingress-values.yaml
 
 
 

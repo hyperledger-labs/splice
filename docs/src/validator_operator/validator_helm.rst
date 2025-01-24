@@ -364,12 +364,11 @@ With these files in place, you can execute the following helm commands
 in sequence. It's generally a good idea to wait until each deployment
 reaches a stable state prior to moving on to the next step.
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm repo update
-    helm install postgres canton-network-helm/splice-postgres -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-validator-participant.yaml --wait
-    helm install participant canton-network-helm/splice-participant -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml -f splice-node/examples/sv-helm/standalone-participant-values.yaml --wait
-    helm install validator canton-network-helm/splice-validator -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/standalone-validator-values.yaml --wait
+    helm install postgres |helm_repo_prefix|/splice-postgres -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-validator-participant.yaml --wait
+    helm install participant |helm_repo_prefix|/splice-participant -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml -f splice-node/examples/sv-helm/standalone-participant-values.yaml --wait
+    helm install validator |helm_repo_prefix|/splice-validator -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/standalone-validator-values.yaml --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in the new
@@ -491,9 +490,9 @@ And install it to your cluster:
 A reference Helm chart installing a gateway that uses this service is also provided.
 To install it, run the following (assuming the environment variable `YOUR_HOSTNAME` is set to your hostname):
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install cluster-gateway canton-network-helm/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
+    helm install cluster-gateway |helm_repo_prefix|/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
 
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
@@ -506,9 +505,9 @@ Another reference Helm chart is provided for that, which can be installed after
 using:
 
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install cluster-ingress-validator canton-network-helm/splice-cluster-ingress-runbook -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-cluster-ingress-values.yaml
+    helm install cluster-ingress-validator |helm_repo_prefix|/splice-cluster-ingress-runbook -n validator --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-cluster-ingress-values.yaml
 
 
 .. _helm-validator-wallet-ui:
