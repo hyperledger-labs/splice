@@ -33,7 +33,6 @@ images := \
 	\
 	splice-test-postgres \
 	splice-test-ci \
-	splice-test-docker-runner \
 	splice-test-cometbft \
 	splice-test-temp-runner-hook \
 
