@@ -399,18 +399,6 @@ class SvAppBackendReference(
       httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
     }
 
-  def signSynchronizerBootstrappingState(domainIdPrefix: String): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvSoftDomainMigrationPocAppClient.SignSynchronizerBootstrappingState(domainIdPrefix)
-      )
-    }
-
-  def initializeSynchronizer(domainIdPrefix: String): Unit =
-    consoleEnvironment.run {
-      httpCommand(HttpSvSoftDomainMigrationPocAppClient.InitializeSynchronizer(domainIdPrefix))
-    }
-
   def reconcileSynchronizerDamlState(domainIdPrefix: String): Unit =
     consoleEnvironment.run {
       httpCommand(
@@ -440,13 +428,7 @@ class SvAppBackendReference(
     )
 
   def sequencerClient(domainId: DomainId): SequencerClientReference = {
-    val synchronizerConfig = config.synchronizerNodes.get(domainId.uid.identifier.str) match {
-      case Some(synchronizer) => synchronizer
-      case None =>
-        config.localSynchronizerNode.getOrElse(
-          throw new RuntimeException("No sequencer admin connection configured for SV App")
-        )
-    }
+    val synchronizerConfig = synchronizerConfigForDomain(domainId)
     new SequencerClientReference(
       consoleEnvironment,
       s"sequencer client for $name for domain $domainId",
@@ -463,17 +445,37 @@ class SvAppBackendReference(
     )
   }
 
+  def mediatorClient(domainId: DomainId): MediatorClientReference = {
+    val synchronizerConfig: SvSynchronizerNodeConfig = synchronizerConfigForDomain(domainId)
+    new MediatorClientReference(
+      consoleEnvironment,
+      s"mediator client for $name for domain $domainId",
+      synchronizerConfig.mediator.toCantonConfig,
+    )
+  }
+
   def mediatorClient(domainAlias: DomainAlias): MediatorClientReference = {
     val synchronizerConfig: SvSynchronizerNodeConfig = synchronizerConfigForDomain(domainAlias)
     new MediatorClientReference(
       consoleEnvironment,
-      s"mediator client for $name",
+      s"mediator client for $name for domain $domainAlias",
       synchronizerConfig.mediator.toCantonConfig,
     )
   }
 
   private def synchronizerConfigForDomain(alias: DomainAlias) = {
     val synchronizerConfig = config.synchronizerNodes.get(alias.toProtoPrimitive) match {
+      case Some(synchronizer) => synchronizer
+      case None =>
+        config.localSynchronizerNode.getOrElse(
+          throw new RuntimeException("No sequencer admin connection configured for SV App")
+        )
+    }
+    synchronizerConfig
+  }
+
+  private def synchronizerConfigForDomain(domainId: DomainId) = {
+    val synchronizerConfig = config.synchronizerNodes.get(domainId.uid.identifier.str) match {
       case Some(synchronizer) => synchronizer
       case None =>
         config.localSynchronizerNode.getOrElse(

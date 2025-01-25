@@ -62,9 +62,6 @@ redirects = {
 }
 
 
-todo_include_todos = True
-
-
 # Configure the sphinx copy-button plugin as per
 # https://sphinx-copybutton.readthedocs.io/en/latest/use.html#strip-and-configure-input-prompts-for-code-cells
 copybutton_prompt_text = "@ "
@@ -117,6 +114,9 @@ if not version:
     sys.exit(1)
 chart_version = version
 
+# TODO(#17226): Make the helm_repo_prefix also correct for snapshots (not an OCI one). For this case we'll also need to:
+# - put somewhere the "helm repo add" and "helm repo update" commands.
+# - put somewhere the docker login command to jfrog for docker-compose.
 if re.match(r"^[0-9]+.[0-9]+.[0-9]+$", version):
     # For releases, we download artifacts from GitHub Releases
     download_url = f"https://github.com/digital-asset/decentralized-canton-sync/releases/download/v{version}"
@@ -148,5 +148,5 @@ rst_prolog = f"""
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_splice-node.tar.gz">Download Bundle</a>`
 .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_openapi.tar.gz">Download OpenAPI specs</a>`
 
-.. |canton_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-{canton_version}.tar.gz">Download Canton enterprise</a>`
+.. |helm_repo_prefix| replace:: oci://ghcr.io/digital-asset/decentralized-canton-sync/helm
 """

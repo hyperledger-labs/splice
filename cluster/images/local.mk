@@ -33,12 +33,14 @@ images := \
 	\
 	splice-test-postgres \
 	splice-test-ci \
+	splice-test-docker-runner \
 	splice-test-cometbft \
 	splice-test-temp-runner-hook \
 
 canton-image := cluster/images/canton
 splice-image := cluster/images/splice-app
 splice-ui-image := cluster/images/splice-web-ui
+images_file := cluster/images/.images
 
 ifdef CI
     # never use the cache in CI on the master branch
@@ -88,7 +90,6 @@ $$(prefix)/get-docker-image-id: $$(prefix)/$(docker-image-tag)
 .PHONY: $$(prefix)/clean
 $$(prefix)/clean:
 	-rm -vfr $$(@D)/target
-
 endef # end DEFINE_PHONY_RULES
 
 $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
@@ -113,3 +114,18 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
 	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
+
+%/$(docker-copy-release-to-ghcr):  %/$(docker-image-tag) %/$(docker-build)
+	cd $(@D)/.. && copy_release_to_ghcr $$(cat $(abspath $<))
+
+#########
+# Global targets
+#########
+
+.PHONY: write-images
+write-images:
+	overwrite-if-changed '$(shell echo $(images) | tr ' ' '\n')' $(images_file)
+
+.PHONY: cluster/docker/copy_release_to_ghcr
+cluster/docker/copy_release_to_ghcr: write-images
+	./build-tools/copy_release_images_to_ghcr.sh -v '$(shell get-snapshot-version)' -f $(images_file)
