@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.SubscriptionReadyForPaymentTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
@@ -156,7 +157,11 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
           requestAndPayForEntry(aliceRefs, testEntryName)
           eventually() {
-            val entry = sv1ScanBackend.lookupEntryByName(testEntryName)
+            val entry =
+              try sv1ScanBackend.lookupEntryByName(testEntryName)
+              catch {
+                case e: CommandFailure if e.getMessage contains "Entry with name" => fail(e)
+              }
             entry.name shouldBe testEntryName
             entry.user shouldBe aliceRefs.userParty.toProtoPrimitive
           }

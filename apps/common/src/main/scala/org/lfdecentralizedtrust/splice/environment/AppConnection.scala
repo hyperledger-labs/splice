@@ -215,7 +215,7 @@ abstract class HttpAppConnection(
           retryProvider.getValueWithRetries(
             RetryFor.WaitingOnInitDependency,
             "app_version",
-            s"app version of ${config.url}",
+            s"app version of ${config.url}${basePath}",
             getHttpAppVersionInfo(),
             logger,
           )

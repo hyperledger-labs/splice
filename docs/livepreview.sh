@@ -9,4 +9,4 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 (cd "$REPO_ROOT"; sbt --batch damlBuild)
 ./gen-daml-docs.sh
 
-VERSION="live-preview-build-$(date)" sphinx-autobuild src html/html
+VERSION="live-preview-build-$(date)" sphinx-autobuild src html/html -D todo_include_todos=1

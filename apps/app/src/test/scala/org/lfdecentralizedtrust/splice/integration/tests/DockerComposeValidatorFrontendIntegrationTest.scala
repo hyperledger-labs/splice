@@ -250,7 +250,7 @@ class DockerComposeValidatorFrontendIntegrationTest
   }
 
   "docker-compose based validator with auth works" in { _ =>
-    val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
+    val validatorUserPassword = sys.env(s"COMPOSE_VALIDATOR_WEB_UI_PASSWORD")
 
     withComposeValidator(
       extraClue = "with auth",
@@ -263,13 +263,13 @@ class DockerComposeValidatorFrontendIntegrationTest
         eventuallySucceeds()(go to s"http://wallet.localhost")
         completeAuth0LoginWithAuthorization(
           "http://wallet.localhost",
-          "admin@validator.com",
+          "admin@compose-validator.com",
           validatorUserPassword,
           () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
         completeAuth0LoginWithAuthorization(
           "http://ans.localhost",
-          "admin@validator.com",
+          "admin@compose-validator.com",
           validatorUserPassword,
           () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )

@@ -25,4 +25,6 @@ RUN whoami && \
 
 ENV COURSIER_CACHE=/cache/coursier
 
+COPY target/LICENSE .
+
 WORKDIR /github/home/project
