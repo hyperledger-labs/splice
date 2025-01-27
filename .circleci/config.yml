@@ -5862,7 +5862,7 @@ workflows:
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: << pipeline.parameters.cluster >>
-          checkout-branch: "ciperiodic-migration-upgrade"
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           context:
             - artifactory
             - canton-network-vpn
@@ -5874,7 +5874,7 @@ workflows:
       - restore_node:
           cluster: << pipeline.parameters.cluster >>
           silence_deployment_alerts: true
-          checkout-branch: "ciperiodic-migration-upgrade"
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           namespace_name: "sv-3"
           context:
             - artifactory

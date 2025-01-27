@@ -38,7 +38,7 @@ export function parsedVersion(
         version: version,
         repository: repository(repositoryValue),
       }
-    : { type: 'local', repository: repository(repositoryValue) };
+    : { type: 'local', repository: repository(version == '0.3.8' ? 'public' : repositoryValue) };
 }
 
 export function repository(repositoryValue?: string): Repository {
