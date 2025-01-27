@@ -504,6 +504,9 @@ commands:
       deploy_retry_count:
         type: integer
         default: 2
+      base_version:
+        type: string
+        default: ""
     steps:
       - run_bash_command_in_nix:
           cmd_name: Install pulumi dependencies
@@ -540,6 +543,10 @@ commands:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
+            echo "BASE_VERSION = << parameters.base_version >>"
+            if [ "<< parameters.base_version >>" = "0.3.8" ]; then
+              SPLICE_ARTIFACTS_REPOSITORY=public
+            fi
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
             cncluster pulumi deployment up --skip-preview --diff

@@ -471,6 +471,7 @@ jobs:
       - deploy_operator:
           cluster: << parameters.cluster >>
           deploy_retry_count: << parameters.deploy_retry_count >>
+          base_version: << parameters.base_version >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,sv-runbook,validator-runbook"

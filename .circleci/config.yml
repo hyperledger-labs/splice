@@ -693,6 +693,9 @@ commands:
       deploy_retry_count:
         type: integer
         default: 2
+      base_version:
+        type: string
+        default: ""
     steps:
       - run_bash_command_in_nix:
           cmd_name: Install pulumi dependencies
@@ -729,6 +732,10 @@ commands:
           cmd_before_retry: |
             .circleci/post-slack-message.sh "Deployment of deployment stack to cluster << parameters.cluster >> failed. Retrying... ( <${CIRCLE_BUILD_URL}|CI Build> )"
           cmd: |
+            echo "BASE_VERSION = << parameters.base_version >>"
+            if [ "<< parameters.base_version >>" = "0.3.8" ]; then
+              SPLICE_ARTIFACTS_REPOSITORY=public
+            fi
             export CN_PULUMI_LOAD_ENV_CONFIG_FILE=true
             cncluster activate
             cncluster pulumi deployment up --skip-preview --diff
@@ -3045,6 +3052,7 @@ jobs:
       - deploy_operator:
           cluster: << parameters.cluster >>
           deploy_retry_count: << parameters.deploy_retry_count >>
+          base_version: << parameters.base_version >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
           pulumi_stack_names: "canton-network,infra,sv-runbook,validator-runbook"
@@ -5862,7 +5870,7 @@ workflows:
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: << pipeline.parameters.cluster >>
-          checkout-branch: "ciperiodic-migration-upgrade"
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           context:
             - artifactory
             - canton-network-vpn
@@ -5874,7 +5882,7 @@ workflows:
       - restore_node:
           cluster: << pipeline.parameters.cluster >>
           silence_deployment_alerts: true
-          checkout-branch: "ciperiodic-migration-upgrade"
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           namespace_name: "sv-3"
           context:
             - artifactory
