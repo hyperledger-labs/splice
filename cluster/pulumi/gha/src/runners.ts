@@ -322,6 +322,10 @@ function installDockerRunnerScaleSets(
           features: {
             'containerd-snapshotter': true,
           },
+          'registry-mirrors': [
+            'http://docker-registry-mirror.docker-mirror.svc.cluster.local:5000',
+          ],
+          'insecure-registries': ['docker-registry-mirror.docker-mirror.svc.cluster.local:5000'],
         }),
       },
     },
