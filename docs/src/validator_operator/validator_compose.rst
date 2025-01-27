@@ -45,6 +45,8 @@ Requirements
    b. ``curl``
    c. ``jq``
 
+   Note that both AMD64 and ARM64 architectures are supported.
+
 2) Your machine should either be connected to a VPN that is whitelisted on the network
    (contact your sponsor SV to obtain access), or have a static egress IP address.
    In the latter case, please provide that IP address to your sponsor SV to
