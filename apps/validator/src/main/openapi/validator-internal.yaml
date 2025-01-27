@@ -646,39 +646,6 @@ components:
         created_at:
           type: string
 
-    # Old format for backwards compat
-    # TODO(#13131) Remove this.
-    LegacyDomainMigrationDump:
-      type: object
-      required:
-        - participant
-        - acsSnapshot
-        - acsTimestamp
-        - dars
-        - migrationId
-        - domainId
-        - createdAt
-      properties:
-        participant:
-          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
-        acsSnapshot:
-          description: |
-            base64 encoded string of acs snapshot for the requested party id
-          type: string
-        acsTimestamp:
-          type: string
-        dars:
-          type: array
-          items:
-            $ref: "#/components/schemas/Dar"
-        migrationId:
-          type: integer
-          format: int64
-        domainId:
-          type: string
-        createdAt:
-          type: string
-
     GetValidatorDomainDataSnapshotResponse:
       type: object
       required:

@@ -21,9 +21,9 @@ function _info(){
 }
 
 function usage() {
-  echo "Usage: $0 -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> [-a] [-b] [-c <scan_address>] [-C <host_scan_address>] [-q <sequencer_address>] [-n <network_name>] [-m <migration_id>] [-M] [-i <identities_dump>] [-P <participant_id>] [-w] [-l]"
+  echo "Usage: $0 -s <sponsor_sv_address> -o <onboarding_secret> -p <party_hint> -m <migration_id> [-a] [-b] [-c <scan_address>] [-C <host_scan_address>] [-q <sequencer_address>] [-n <network_name>] [-M] [-i <identities_dump>] [-P <participant_id>] [-w] [-l]"
   echo "  -s <sponsor_sv_address>: The full URL of the sponsor SV"
-  echo "  -o <onboarding_secret>: The onboarding secret to use. If not provided, it will be fetched from the sponsor SV (possible on DevNet only)"
+  echo "  -o <onboarding_secret>: The onboarding secret to use. May be empty (\"\") if you are already onboarded."
   echo "  -p <party_hint>: The party hint to use for the validator operator, by default also your participant identifier."
   echo "  -P <participant_id>: The participant identifier."
   echo "  -a: Use this flag to enable authentication"
@@ -52,10 +52,10 @@ trust_single=0
 SPONSOR_SV_ADDRESS=""
 SCAN_ADDRESS=""
 host_scan_address=""
-ONBOARDING_SECRET=""
+ONBOARDING_SECRET="undefined"
 SEQUENCER_ADDRESS=""
 network_name=""
-migration_id=0
+migration_id=""
 migrating=0
 party_hint=""
 participant_id=""
@@ -142,8 +142,8 @@ if [ -z "${SPONSOR_SV_ADDRESS}" ]; then
   exit 1
 fi
 
-if [ -z "${ONBOARDING_SECRET}" ]; then
-  _error_msg "Please provide the onboarding secret"
+if [ "${ONBOARDING_SECRET}" == "undefined" ]; then
+  _error_msg "Please provide the onboarding secret. If you are already onboarded, you may leave the secret value itself empty, i.e. specify \`-o \"\"\`"
   usage
   exit 1
 fi
@@ -161,6 +161,12 @@ fi
 
 if [ $trust_single -eq 1 ] && [ -z "${SEQUENCER_ADDRESS}" ]; then
   _error_msg "Please provide the sequencer address when BFT reads&writes are disabled"
+  usage
+  exit 1
+fi
+
+if [ -z "${migration_id}" ]; then
+  _error_msg "Please provide a migration id, you can find the current migration id at https://sync.global/sv-network/ (make sure you select the right network)"
   usage
   exit 1
 fi

@@ -15,6 +15,7 @@ in pkgs.mkShell {
 
     # NOTE: please keep this list sorted for an easy overview and to avoid merge noise.
     istioctl
+    actionlint
     ammonite
     auth0-cli
     bc
@@ -28,6 +29,7 @@ in pkgs.mkShell {
     getopt
     gh
     git
+    git-search-replace
     (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
     grpcurl
     daml2js
@@ -76,7 +78,6 @@ in pkgs.mkShell {
     python3Packages.requests_toolbelt
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
-    git-search-replace
     python3.pkgs.sphinx-reredirects
     ripgrep
     rsync
@@ -84,6 +85,7 @@ in pkgs.mkShell {
     scala_2_13
     selenium-server-standalone
     shellcheck
+    skopeo
     sphinx
     sphinx-lint
     tmux

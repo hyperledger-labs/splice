@@ -3,7 +3,7 @@ services:
     environment:
       - CANTON_PARTICIPANT_ADMIN_USER_NAME=ledger-api-user
       - ADDITIONAL_CONFIG_DISABLE_AUTH=canton.participants.participant.ledger-api.auth-services=[]
-      - ADDITIONAL_CONFIG_ALLOW_INSECURE=canton.participants.participant.http-ledger-api-experimental.allow-insecure-tokens=true
+      - ADDITIONAL_CONFIG_ALLOW_INSECURE=canton.participants.participant.http-ledger-api.allow-insecure-tokens=true
 
   validator:
     environment:
