@@ -553,7 +553,7 @@ jobs:
           deploy_retry_count: << parameters.deploy_retry_count >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
-          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          pulumi_stack_names: "sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
