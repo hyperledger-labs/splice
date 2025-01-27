@@ -249,8 +249,6 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
     dso: dsoInfoData?.amuletRules.payload.dso!,
     isDevNet: dsoInfoData?.amuletRules.payload.isDevNet!,
     configSchedule: getAmuletConfigurationAsOfNow(dsoInfoData?.amuletRules.payload.configSchedule!),
-    config: getAmuletConfigurationAsOfNow(dsoInfoData?.amuletRules.payload.configSchedule!)
-      .initialValue,
   };
 
   return (

@@ -631,6 +631,57 @@ testDsoRulesConfigChange = do
                       synchronizerNodeConfigLimits = newConfig2.synchronizerNodeConfigLimits
                       decentralizedSynchronizer = newConfig2.decentralizedSynchronizer
 
+-- | Test tickDuration changes.
+testAmuletRulesTickDurationChange : Script ()
+testAmuletRulesTickDurationChange = do
+  (app, dso, (sv1, sv2, sv3, _)) <- initMainNet
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  [(_, amuletRules)] <- query @AmuletRules dso
+
+  -- config with new tickDuration
+  let initialConfig = amuletRules.configSchedule.initialValue
+  let newConfig = amuletRules.configSchedule.initialValue with tickDuration = seconds 20
+
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules dso
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+    requester = sv1
+    action = ARC_AmuletRules with
+      amuletRulesAction = CRARC_SetConfig AmuletRules_SetConfig with
+        newConfig = newConfig
+        baseConfig = amuletRules.configSchedule.initialValue
+    reason = Reason with url = ""; body = "they are not good for us!"
+    targetEffectiveAt = None
+    voteRequestTimeout = Some (days 2)
+
+  now <- getTime
+  -- vote on change
+  let request = result.voteRequest
+  request <- castVote app sv2 request True
+  request <- castVote app sv3 request True
+
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+    requestCid = request
+    amuletRulesCid = Some amuletRulesCid
+
+  result.completedAt === now
+  result.offboardedVoters === []
+  result.abstainingSvs === ["sv4"]
+  result.outcome === VRO_Accepted with effectiveAt = now
+
+  [(_, round1), (_, round2), (_, round3)] <- sortOn (._2.round) <$> query @OpenMiningRound dso
+  round1.tickDuration === initialConfig.tickDuration
+  round2.tickDuration === initialConfig.tickDuration
+  round3.tickDuration === initialConfig.tickDuration
+
+  runNextIssuanceD app 1.2
+
+  -- check that tickDuraction has changed
+  [(_, round1), (_, round2), (_, round3)] <- sortOn (._2.round) <$> query @OpenMiningRound dso
+  round1.tickDuration === initialConfig.tickDuration
+  round2.tickDuration === initialConfig.tickDuration
+  round3.tickDuration === newConfig.tickDuration
 
 -- | Test AmuletRules configuration changes.
 testAmuletRulesConfigChange : Script ()
@@ -683,6 +734,7 @@ testAmuletRulesConfigChange = do
   let newConfig1 = amuletRules.configSchedule.initialValue with
         transferConfig = defaultTransferConfig2
         issuanceCurve = defaultIssuanceCurve2
+        tickDuration = seconds 200
 
   -- second config that changes the other half of the parameters
   let newConfig2 = amuletRules.configSchedule.initialValue with
@@ -728,9 +780,7 @@ testAmuletRulesConfigChange = do
 
   -- the first request has been accepted and must reflect newConfig1
   [(amuletRulesCid, amuletRules)] <- query @AmuletRules dso
-  case amuletRules.config of
-    None -> error("not expected to be None")
-    Some config -> config === newConfig1
+  amuletRules.configSchedule.initialValue === newConfig1
 
   req2 <- castVote app sv2 req2 True
   req2 <- castVote app sv3 req2 True
@@ -746,10 +796,8 @@ testAmuletRulesConfigChange = do
 
   -- the second request has been accepted and must reflect newConfig1 with the changes introduced by newConfig2
   [(_, amuletRules)] <- query @AmuletRules dso
-  case amuletRules.config of
-    None -> error("not expected to be None")
-    Some config -> config === newConfig1 with
-                                decentralizedSynchronizer = newConfig2.decentralizedSynchronizer
+  amuletRules.configSchedule.initialValue === newConfig1 with
+    decentralizedSynchronizer = newConfig2.decentralizedSynchronizer
 
 -- | Test SV removal and GC of AmuletPriceVotes
 testOffboardSvAndAmuletPriceVotes : Script ()

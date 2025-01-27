@@ -86,7 +86,6 @@ template AmuletRules
     dso : Party
     configSchedule : Schedule Time (AmuletConfig Unit.USD)
     isDevNet : Bool
-    config : Optional (AmuletConfig Unit.USD)
   where
     ensure validSchedule configSchedule validAmuletConfig
 
@@ -550,10 +549,11 @@ template AmuletRules
         baseConfig : AmuletConfig Unit.USD
       controller dso
       do
+        require "futureValues is empty" (null this.configSchedule.futureValues)
         newAmuletRules <- create this with
-          config = case this.config of
-            Some conf -> Some (patch newConfig baseConfig conf)
-            None -> Some (newConfig)
+          configSchedule = Schedule with
+            initialValue = patch newConfig baseConfig this.configSchedule.initialValue
+            futureValues = []
         return AmuletRules_SetConfigResult with ..
 
     -- TODO(#16139): mark these choices as "deprecated"
