@@ -636,6 +636,19 @@ particularly if all helm charts are deployed at the same time. The
 ``splice-sv-node`` cannot start until ``participant`` is running and
 ``participant`` cannot start until ``postgres`` is running.
 
+.. _sv-network-diagram:
+
+SV Network Diagram
+------------------
+
+..
+   _LucidChart link: https://lucid.app/lucidchart/5d842236-5892-48cc-ad52-48f487998703/edit?viewport_loc=-5153%2C-3378%2C6108%2C3582%2C0_0&invitationId=inv_21f447be-632c-462e-abdd-2e2e29547d9f
+
+
+.. image:: images/sv-network-diagram.png
+  :width: 600
+  :alt: SV Network Diagram
+
 .. _helm-sv-ingress:
 
 Configuring the Cluster Ingress
