@@ -3113,7 +3113,7 @@ jobs:
             echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
+            # Add the upgrade config, do not touch active.
             cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars

@@ -183,6 +183,7 @@ function subcmd_hard_domain_migration_update_config_to_migrate() {
 
   yq e 'with(.synchronizerMigration; .legacy = .active | .active = .upgrade | del(.upgrade))' -i $configFile
   yq e '.synchronizerMigration.active.migratingFrom = 0' -i $configFile
+  # The legacy stack is deployed as internal which does not support a releaseReference.
   yq e 'del(.synchronizerMigration.legacy.releaseReference)' -i $configFile
 }
 
