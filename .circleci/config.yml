@@ -5049,24 +5049,6 @@ workflows:
           pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
           skip_if_regex: "\\[breaking\\]"
           skip_if_files_changed: "nix/canton-sources.json"
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test with docker images"
-          test_names_file: "test-full-class-names-docker-based.log"
-          start_canton_options: "-w -m"
-          additional_nix_args: >
-            --keep COMPOSE_VALIDATOR_WEB_UI_PASSWORD
-            --keep OIDC_AUTHORITY_VALIDATOR_AUDIENCE
-            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET
-          with_docker_images: true
-          resource_class: "2xlarge"
-          parallelism: 2
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail

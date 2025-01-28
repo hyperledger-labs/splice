@@ -31,8 +31,16 @@ inputs:
     description: "GCP Data Export service account credentials, relevant when with_gcp_creds == true (from GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS secret)"
     required: false
     default: ""
+  with_frontend_creds:
+    description: "Whether to provide frontend test credentials"
+    required: false
+    default: "false"
   is_frontend_test:
-    description: "Whether this is a frontend test"
+    description: "Whether this is a frontend test (implies with_frontend_creds)"
+    required: false
+    default: "false"
+  with_docker_images:
+    description: "Whether to build docker images for the tests"
     required: false
     default: "false"
   auth0_management_api_client_id:
@@ -41,6 +49,14 @@ inputs:
     default: ""
   auth0_management_api_client_secret:
     description: "Auth0 Management API Client ID, relevant for frontend tests (from AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET secret)"
+    required: false
+    default: ""
+  compose_validator_web_ui_password:
+    description: "password for the validator in docker-compose tests (from COMPOSE_VALIDATOR_WEB_UI_PASSWORD secret)"
+    required: false
+    default: ""
+  auth0_validator_audience:
+    description: "audience for the validator in docker-compose tests (from AUTH0_TESTS_VALIDATOR_AUDIENCE secret)"
     required: false
     default: ""
   slack_access_token:
@@ -105,15 +121,20 @@ runs:
         cache_version: 1
 
     - name: Prepare list of tests to run for sbt
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          splitted=$(echo "${{ toJson(inputs.test_names) }}" | jq -r '.[${{ inputs.runner_index }}].[]')
+          tests=$(echo "$splitted" | tr '\n' ' ')
+          count=$(echo "$tests" | wc -w)
+          echo "We are running $count tests in this batch:"
+          echo "$splitted"
+          echo "$tests" > /tmp/tests
+
+    - name: Set RUN_SPLITTED_TESTS_CMD
       id: list_tests
       shell: bash
-      run: |
-        splitted=$(echo "${{ toJson(inputs.test_names) }}" | jq -r '.[${{ inputs.runner_index }}].[]')
-        tests=$(echo "$splitted" | tr '\n' ' ')
-        count=$(echo "$tests" | wc -w)
-        echo "We are running $count tests in this batch:"
-        echo "$splitted"
-        echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $tests\"" >> "$GITHUB_OUTPUT"
+      run: echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests)\"" >> "$GITHUB_OUTPUT"
 
     # webpack uses inotify to watch for changes, and we need to increase the limit
     - name: increase inotify limit
@@ -124,6 +145,19 @@ runs:
         sysctl fs.inotify
         echo "Setting max_user_watches..."
         echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+    - name: Build Docker images
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
+          export ARTIFACTORY_PASSWORD="${{ inputs.artifactory_password }}"
+          /usr/bin/sudo mkdir -p ~/.docker/buildx
+          /usr/bin/sudo /usr/bin/chown $(whoami):docker ~/.docker/buildx
+          make docker-build -j
+        cmd_retry_count: 5 # Retry in case of dependency download errors
+        additional_nix_args: "--keep DOCKER_CERT_PATH --keep DOCKER_HOST --keep DOCKER_MACHINE_NAME --keep DOCKER_TLS_VERIFY --keep PULUMI_VERSION --keep NO_PROXY"
 
     - name: Wait for Canton to be ready
       shell: bash
@@ -150,9 +184,13 @@ runs:
             echo '${{ inputs.gcp_kms_creds }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
             export GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS='${{ inputs.gcp_data_export_creds }}'
           fi
-          if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
+          if [[ "${{ inputs.is_frontend_test }}" == "true" ]] || [[ "${{ inputs.with_frontend_creds }}" == "true" ]]; then
             export AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID="${{ inputs.auth0_management_api_client_id }}"
             export AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET="${{ inputs.auth0_management_api_client_secret }}"
+            export COMPOSE_VALIDATOR_WEB_UI_PASSWORD="${{ inputs.compose_validator_web_ui_password }}"
+            export OIDC_AUTHORITY_VALIDATOR_AUDIENCE="${{ inputs.auth0_validator_audience }}"
+          fi
+          if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
             ./start-frontends.sh -d -s
           fi
         post_sbt_cmd: |

@@ -1,4 +1,4 @@
-name: Scala Test
+name: Scala Test for docker-compose
 on:
   workflow_call:
     inputs:
@@ -17,22 +17,6 @@ on:
       test_name:
         type: string
         required: true
-      with_gcp_creds:
-        type: boolean
-        required: false
-        default: false
-      with_frontend_creds:
-        type: boolean
-        required: false
-        default: false
-      is_frontend_test:
-        type: boolean
-        required: false
-        default: false
-      with_docker_images:
-        type: boolean
-        required: false
-        default: false
 
 jobs:
 
@@ -67,20 +51,22 @@ jobs:
       matrix:
         runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
-    container:
-      # TODO(#15988): use a snapshot after this is merged, and a release after it's in a release
-      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.7-itai-dirty
 
     services:
       postgres:
         image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-postgres:0.3.4
         env:
           POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
 
     steps:
 
       - name: Check out repository code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_READ }}
+          submodules: recursive
 
       - name: Run Tests
         uses: ./.github/actions/tests/scala_test
@@ -91,12 +77,11 @@ jobs:
           test_suite_name: ${{ inputs.test_name }}
           test_names: ${{ needs.split_tests.outputs.test_names }}
           runner_index: ${{ matrix.runner-index }}
-          with_gcp_creds: ${{ inputs.with_gcp_creds }}
-          gcp_kms_creds: ${{ secrets.GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}
-          gcp_data_export_creds: ${{ secrets.GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}
-          is_frontend_test: ${{ inputs.is_frontend_test }}
+          with_frontend_creds: true
+          with_docker_images: true
           auth0_management_api_client_id: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID }}
           auth0_management_api_client_secret: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}
+          compose_validator_web_ui_password: ${{ secrets.COMPOSE_VALIDATOR_WEB_UI_PASSWORD }}
           auth0_validator_audience: ${{ secrets.AUTH0_TESTS_VALIDATOR_AUDIENCE }}
           slack_access_token: ${{ secrets.SLACK_ACCESS_TOKEN }}
           github_token: ${{ secrets.GH_ISSUES }}
