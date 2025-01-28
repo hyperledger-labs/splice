@@ -604,6 +604,8 @@ object SpliceConfig {
       }
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
+    implicit val participantPruningConfigReader: ConfigReader[ParticipantPruningConfig] =
+      deriveReader[ParticipantPruningConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig].emap { conf =>
         val participantIdentifier =
@@ -859,6 +861,8 @@ object SpliceConfig {
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
       deriveWriter[MigrateValidatorPartyConfig]
+    implicit val participantPruningConfigWriter: ConfigWriter[ParticipantPruningConfig] =
+      deriveWriter[ParticipantPruningConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
     implicit val validatorClientConfigWriter: ConfigWriter[ValidatorAppClientConfig] =
