@@ -366,7 +366,10 @@ lazy val `cnrc-token-test-daml` =
           (`cnrc-3-transfer-instruction-daml` / Compile / damlBuild).value ++
           (`cnrc-4-allocation-daml` / Compile / damlBuild).value ++
           (`cnrc-5-allocation-request-daml` / Compile / damlBuild).value ++
-          (`cnrc-6-allocation-instruction-daml` / Compile / damlBuild).value,
+          (`cnrc-6-allocation-instruction-daml` / Compile / damlBuild).value ++
+          (`splice-util-daml` / Compile / damlBuild).value ++
+          (`splice-amulet-daml` / Compile / damlBuild).value ++
+          (`splice-wallet-daml` / Compile / damlBuild).value,
     )
     .dependsOn(
       `canton-bindings-java`
