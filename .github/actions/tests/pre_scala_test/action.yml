@@ -1,0 +1,44 @@
+name: Pre-Scala Test
+description: Prepare for running a Scala test with parallelism
+inputs:
+  parallelism:
+    description: "Number of parallel test runs"
+    required: true
+  test_names_file:
+    description: "File containing the test names"
+    required: true
+outputs:
+  indices:
+    description: "Indices for parallel test runs"
+    value: ${{ steps.generate_index_list.outputs.json }}
+  test_names:
+    description: "Test names to run per parallel runner"
+    value: ${{ steps.split_tests.outputs.test_names }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate runner indices
+      id: generate_index_list
+      shell: bash
+      run: |
+        last_commit_msg=$(git log -1 --pretty=%B)
+        echo "Last commit message: $last_commit_msg"
+        if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
+          echo "Only static tests are running, returning an empty array so that no tests are run"
+          echo "json=[]" >> "$GITHUB_OUTPUT"
+        else
+          echo "Not a static test-only run, generating indices"
+          MAX_INDEX=$((${{ inputs.parallelism }}-1))
+          INDEX_LIST=$(seq 0 ${MAX_INDEX})
+          INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< "${INDEX_LIST}")
+          echo "json=${INDEX_JSON}" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Split tests
+      id: split_tests
+      uses: ./.github/actions/tests/split_tests
+      with:
+        test_reports_dir: '/cache/test-reports'
+        test_names_file: ${{ inputs.test_names_file }}
+        split_total: ${{ inputs.parallelism }}
