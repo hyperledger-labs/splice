@@ -40,6 +40,19 @@ TRUSTED_SCAN_URL
 
 Additional parameters describing your own setup as opposed to the connection to the network are described below.
 
+.. _validator-network-diagram:
+
+Validator Network Diagram
+-------------------------
+
+..
+   _LucidChart link: https://lucid.app/lucidchart/46af6ed2-25b8-4608-88f7-66fc19674fce/edit?viewport_loc=-5217%2C-3874%2C6157%2C3382%2C0_0&invitationId=inv_fc3a3c02-e9fd-4ca9-9388-8defdfaa7153
+
+
+.. image:: images/validator-network-diagram.png
+  :width: 600
+  :alt: Validator Network Diagram
+
 .. _validator-identity-token:
 
 Preparing a Cluster for Installation
