@@ -52,6 +52,14 @@ export function pulumiOptsWithPrefix(
   };
 }
 
+function getSecretsProvider() {
+  return `gcpkms://projects/${config.requireEnv(
+    'PULUMI_BACKEND_GCPKMS_PROJECT'
+  )}/locations/${config.requireEnv(
+    'CLOUDSDK_COMPUTE_REGION'
+  )}/keyRings/pulumi/cryptoKeys/${config.requireEnv('PULUMI_BACKEND_GCPKMS_NAME')}`;
+}
+
 export async function stack(
   project: string,
   stackName: string,
@@ -71,11 +79,7 @@ export async function stack(
     stackName: fullStackName,
   };
   const workspaceOpts: automation.LocalWorkspaceOptions = {
-    secretsProvider: `gcpkms://projects/${config.requireEnv(
-      'PULUMI_BACKEND_GCPKMS_PROJECT'
-    )}/locations/${config.requireEnv(
-      'CLOUDSDK_COMPUTE_REGION'
-    )}/keyRings/pulumi/cryptoKeys/${config.requireEnv('PULUMI_BACKEND_GCPKMS_NAME')}`,
+    secretsProvider: getSecretsProvider(),
     envVars: envVars,
     workDir: projectDirectory,
     pulumiCommand: command,
@@ -96,7 +100,10 @@ export async function refreshStack(
   // This nice API ensures that the local stack file is updated with the latest settings stored in the actual state file
   // if not done, pulumi automation will sometimes complain that the secrets passphrase is not set
   const settings = await stack.workspace.stackSettings(stack.name);
-  await stack.workspace.saveStackSettings(stack.name, settings);
+  await stack.workspace.saveStackSettings(stack.name, {
+    ...settings,
+    secretsProvider: getSecretsProvider(),
+  });
   await stack.refresh(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).catch(e => {
     abortController.abort(`Aborting because of caught exception`);
     throw e;
