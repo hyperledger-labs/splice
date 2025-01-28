@@ -6,8 +6,8 @@ jobs:
     runs-on: self-hosted-k8s-x-small
     timeout-minutes: 30
     container:
-      # TODO(#15988): use a snapshot after this is merged, and a release after it's in a release
-      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.7-itai-dirty
+      # TODO(#15988): use a release once 0.3.9 is out
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.9-snapshot.20250128.8151.0.v4bb647e2
 
     steps:
 

@@ -165,8 +165,8 @@ function installDockerRunnerScaleSet(
               {
                 name: 'runner',
                 image:
-                  // TODO(#15988): use a snapshot after this is merged, and a release after it's in a release
-                  'digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-docker-runner:0.3.7-itai-dirty',
+                  // TODO(#15988): use a release once 0.3.9 is out
+                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-docker-runner:0.3.9-snapshot.20250128.8151.0.v4bb647e2',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
