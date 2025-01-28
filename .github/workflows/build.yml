@@ -46,8 +46,8 @@ jobs:
     uses: ./.github/workflows/build.deployment_test.yml
     secrets: inherit
 
-  bundle:
-    uses: ./.github/workflows/build.bundle.yml
+  docker_images:
+    uses: ./.github/workflows/build.docker_images.yml
     secrets: inherit
 
   scala_test_sim_time:
@@ -157,7 +157,7 @@ jobs:
     - cancel_if_not_opt_in
     - static_tests
     - deployment_test
-    - bundle
+    - docker_images
     - scala_test_sim_time
     - scala_test_resource_intensive
     - scala_test_record_time_tolerance
@@ -171,7 +171,8 @@ jobs:
     - docs
     runs-on: self-hosted-docker-tiny
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.4
+      # TODO(#15988): use a snapshot after this is merged, and a release after it's in a release
+      image: digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/splice-test-ci:0.3.7-itai-dirty
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -190,7 +191,7 @@ jobs:
             # shellcheck disable=SC2129
             echo "FORCE=false" >> "$GITHUB_ENV"
             echo "JOBS<<EOF" >> "$GITHUB_ENV"
-            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests", "deployment_test", "bundle"}' >> "$GITHUB_ENV"
+            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "static_tests", "deployment_test", "docker_images"}' >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
           else
             echo "Checking if all jobs succeeded."

@@ -5,5 +5,6 @@ dir := $(call current_dir)
 
 $(dir)/$(docker-build): $(dir)/target/LICENSE
 
+
 $(dir)/target/LICENSE: LICENSE
 	cp $< $@
