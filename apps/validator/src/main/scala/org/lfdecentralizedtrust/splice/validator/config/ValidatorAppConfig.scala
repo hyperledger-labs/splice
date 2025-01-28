@@ -194,7 +194,7 @@ case class ValidatorAppBackendConfig(
     supportsSoftDomainMigrationPoc: Boolean = false,
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
-    participantPruningConfig: Option[ParticipantPruningConfig] = None,
+    participantPruningSchedule: Option[ParticipantPruningConfig] = None,
 ) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

@@ -65,7 +65,7 @@ class ManualStartIntegrationTest
               val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
               aliceValidatorConfig.copy(
                 domains = withoutExtraDomains,
-                participantPruningConfig = Some(
+                participantPruningSchedule = Some(
                   ParticipantPruningConfig(
                     "0 0 * * * ?",
                     PositiveDurationSeconds.tryFromDuration(1.hours),
