@@ -3117,6 +3117,12 @@ jobs:
             git add **/config.yaml || true
             git commit -m "Add migration config to deploy version $UPGRADE_VERSION to << parameters.cluster >>"
             git push origin $UPGRADE_VERSION_BRANCH
+            # if the base version is a release version ensure we use the public repository
+            # we add this as a workaround for deploying the operator from the upgrade branch
+            # we don't commit it as when we deploy with the upgrade version we actually want to use the  dev repository
+            if [[ $BASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "export SPLICE_ARTIFACTS_REPOSITORY=public" >> "$file"
+            fi
       - deploy_operator:
           cluster: << parameters.cluster >>
           deploy_retry_count: << parameters.deploy_retry_count >>
