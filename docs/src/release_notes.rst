@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+* SV UI
+
+  * Add better spacing between items and alerts/badges in navigation bar
+
 0.3.8
 -----
 
