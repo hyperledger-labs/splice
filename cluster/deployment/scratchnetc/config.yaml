@@ -7,3 +7,8 @@ pulumiProjectConfig:
     allowedArtifactories:
       - "public"
       - "private"
+validator1:
+  participantPruningSchedule:
+    cron: "0 /10 * * * ?" # Run every 10min
+    maxDuration: "5m"
+    retention: "1h" # Keep 1h of data

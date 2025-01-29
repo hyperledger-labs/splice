@@ -58,6 +58,7 @@ export async function installValidator1(
   );
 
   const kmsConfig = validator1Config?.kms;
+  const participantPruningConfig = validator1Config?.participantPruningSchedule;
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -127,6 +128,7 @@ export async function installValidator1(
     secrets: validatorSecrets,
     autoAcceptTransfers: autoAcceptTransfers,
     nodeIdentifier: 'validator1',
+    participantPruningConfig,
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 

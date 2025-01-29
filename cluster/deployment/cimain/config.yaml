@@ -2,3 +2,8 @@ infra:
   ipWhitelisting:
     extraWhitelistedIngress:
       - "35.225.102.103/32" # CI GKE cluster for CCI
+validator1:
+  participantPruningSchedule:
+    cron: "0 /10 * * * ?" # Run every 10min
+    maxDuration: "5m"
+    retention: "1h" # Keep 1h of data
