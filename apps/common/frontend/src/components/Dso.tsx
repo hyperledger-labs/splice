@@ -81,7 +81,7 @@ const GeneralInformationView: React.FC<{ dsoInfo: DsoInfo }> = ({ dsoInfo }) => 
     membersInfos.push(createRow(member.value, member.key, true));
   }
   const dsoInfos = [
-    createRow('dsoLeaderPartyId', dsoInfo.dsoRules.payload.dsoDelegate.toString(), true),
+    createRow('dsoDelegatePartyId', dsoInfo.dsoRules.payload.dsoDelegate.toString(), true),
     createRow('dsoPartyId', dsoInfo.dsoPartyId, true),
     createRow('dsoEpoch', dsoInfo.dsoRules.payload.epoch.toString()),
   ];

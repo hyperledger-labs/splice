@@ -342,6 +342,13 @@ class ValidatorApp(
                 }
               }
             }
+            _ <- config.participantPruningSchedule.traverse_ { pruningConfig =>
+              participantAdminConnection.ensurePruningSchedule(
+                pruningConfig.cron,
+                pruningConfig.maxDuration,
+                pruningConfig.retention,
+              )
+            }
           } yield ()
         }
     } yield ()

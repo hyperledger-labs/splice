@@ -55,6 +55,7 @@ const TransferPreapproval: React.FC = () => {
         id="create-transfer-preapproval"
         sx={{ textWrap: 'balance' }}
         disabled={!!transferPreapprovalQuery.data}
+        size="small"
       >
         Pre-approve incoming direct transfers of {config.spliceInstanceNames.amuletName}
       </Button>
