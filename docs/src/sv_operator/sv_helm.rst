@@ -677,7 +677,7 @@ as they ommit the ``enumerator`` part of the hostname.
 Ingress Configuration
 +++++++++++++++++++++
 
-An IP whitelisting json file ``allowed-ip-ranges-external.json`` will be provided in each SV operations announcement.
+An IP whitelisting json file ``allowed-ip-ranges.json`` will be provided in each SV operations announcement corresponding to the network to which you are connecting.
 This file contains other clusters' egress IPs that require access to your super validator's components. These IPs typically belong to peer super-validators, validators and the Digital Asset VPN.
 
 Each SV is required to configure their cluster ingress to allow traffic from these IPs to be operational.

@@ -1283,7 +1283,7 @@ kubectl delete namespace sv-1 sv-2 sv-3 sv-4 validator1 splitwell docs
 
 ### Allowed IP Ranges
 
-The allowed IP ranges are stored in [`allowed-ip-ranges-external.json`](./cn-svc-configs/configs/allowed-ip-ranges-external.json) for any external IP and
+The allowed IP ranges are stored in `allowed-ip-ranges.json` for the respective network for any external IP and
 [`allowed-ip-ranges-cn-internal.json`](./allowed-ip-ranges-cn-internal.json) for the IPs of our own clusters.
 
 Note that the external allowed IP ranges are managed in the
