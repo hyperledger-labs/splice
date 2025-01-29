@@ -38,7 +38,8 @@ export function installParticipant(
     : { kmsValues: {}, gkeCredentialsSecret: [] };
 
   const participantPostgres =
-    defaultPostgres || postgres.installPostgres(xns, `participant-pg`, `participant-pg`, true);
+    defaultPostgres ||
+    postgres.installPostgres(xns, `participant-pg`, `participant-pg`, activeVersion, true);
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
       OIDC_AUTHORITY_URL: auth0Config.auth0Domain,

@@ -1,6 +1,7 @@
 import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Output, Resource } from '@pulumi/pulumi';
 import {
+  activeVersion,
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
   ExactNamespace,
@@ -62,6 +63,7 @@ export function installCanton(
         xns,
         `sequencer-pg`,
         `sequencer-${migrationId}-pg`,
+        activeVersion,
         true,
         decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
         migrationId
@@ -72,6 +74,7 @@ export function installCanton(
         xns,
         `mediator-pg`,
         `mediator-${migrationId}-pg`,
+        activeVersion,
         true,
         decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
         migrationId
@@ -82,6 +85,7 @@ export function installCanton(
         xns,
         `participant-pg`,
         `participant-${migrationId}-pg`,
+        activeVersion,
         true,
         decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration,
         migrationId

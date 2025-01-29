@@ -34,7 +34,6 @@ export async function installValidator1(
   onboardingSecret: string,
   validatorWalletUser: string,
   splitPostgresInstances: boolean,
-
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   installSplitwell: boolean,
   backupConfig?: BackupConfig,
@@ -63,11 +62,12 @@ export async function installValidator1(
   const imagePullDeps = imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
-    ? postgres.installPostgres(xns, 'postgres', 'postgres', false)
+    ? postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false)
     : undefined;
 
   const validatorPostgres =
-    defaultPostgres || postgres.installPostgres(xns, `validator-pg`, `validator-pg`, true);
+    defaultPostgres ||
+    postgres.installPostgres(xns, `validator-pg`, `validator-pg`, activeVersion, true);
   const validatorDbName = `validator1`;
 
   const validatorSecrets = await installValidatorSecrets({

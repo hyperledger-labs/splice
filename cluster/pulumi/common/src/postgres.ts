@@ -4,8 +4,8 @@ import * as random from '@pulumi/random';
 import * as _ from 'lodash';
 import { Resource } from '@pulumi/pulumi';
 
+import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, config } from './config';
-import { activeVersion } from './domainMigration';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
@@ -171,7 +171,8 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     secretName: string,
     values?: ChartValues,
     overrideDbSizeFromValues?: boolean,
-    disableProtection?: boolean
+    disableProtection?: boolean,
+    version?: CnChartVersion
   ) {
     const logicalName = xns.logicalName + '-' + instanceName;
     const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
@@ -212,7 +213,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
           secretName: this.secretName,
         },
       }),
-      activeVersion,
+      version,
       {
         aliases: [
           { name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' },
@@ -237,6 +238,7 @@ export function installPostgres(
   xns: ExactNamespace,
   instanceName: string,
   alias: string,
+  version: CnChartVersion,
   uniqueSecretName = false,
   isActive: boolean = true,
   migrationId?: number,
@@ -255,7 +257,7 @@ export function installPostgres(
       migrationId?.toString()
     );
   } else {
-    ret = new SplicePostgres(xns, instanceName, alias, secretName);
+    ret = new SplicePostgres(xns, instanceName, alias, secretName, version);
   }
   return ret;
 }
