@@ -216,7 +216,9 @@ runs:
         save_caches: ${{ inputs.runner-index == 0 && inputs.test_suite_name == 'wall-clock-time' }}
 
     - name: Upload logs
-      if: ${{ failure() }}
+      # We upload the logs on not success so that we also capture them for cancelled runs
+      # Unfortunately when our apps don't init and stop with sys.exit(1) the run is considered cancelled (as it fails with a timeout) but we do need the logs
+      if: ${{ !success() }}
       uses: ./.github/actions/sbt/upload_logs
       with:
         name: "logs-${{ inputs.test_suite_name }}-${{ inputs.runner_index }}"
