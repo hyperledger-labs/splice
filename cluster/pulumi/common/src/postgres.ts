@@ -257,7 +257,16 @@ export function installPostgres(
       migrationId?.toString()
     );
   } else {
-    ret = new SplicePostgres(xns, instanceName, alias, secretName, version);
+    ret = new SplicePostgres(
+      xns,
+      instanceName,
+      alias,
+      secretName,
+      undefined,
+      undefined,
+      undefined,
+      version
+    );
   }
   return ret;
 }
