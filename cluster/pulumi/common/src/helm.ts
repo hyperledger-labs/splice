@@ -236,7 +236,7 @@ function versionStringWithPossibleOverride(
 
 // repository opts are not supported for oci charts
 export function repositoryOpts(version: CnChartVersion): inputs.helm.v3.RepositoryOpts | undefined {
-  if (version.type === 'local' || version.repository === repositories.private) {
+  if (version.type === 'local') {
     return undefined;
   } else {
     const creds = ArtifactoryCreds.getCreds().creds;
