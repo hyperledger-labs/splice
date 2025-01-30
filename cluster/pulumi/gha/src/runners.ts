@@ -86,7 +86,7 @@ const runnerSpecs = [
   {
     name: 'large',
     k8s: true,
-    docker: false,
+    docker: true,
     resources: {
       requests: {
         cpu: '5',
@@ -159,8 +159,8 @@ function installDockerRunnerScaleSet(
               {
                 name: 'runner',
                 image:
-                  // TODO(#15988): use a release once 0.3.9 is out
-                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-docker-runner:0.3.9-snapshot.20250128.8151.0.v4bb647e2',
+                  // TODO(#15988): use a release once 0.3.10 is out
+                  'digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-docker-runner:0.3.10-snapshot.20250130.8177.0.v73bb0744',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
