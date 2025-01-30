@@ -35,8 +35,8 @@ Requirements
 .. include:: required_network_parameters.rst
 
 TRUSTED_SCAN_URL
-    The scan URL of an SV that you trust and that is reachable by your validator. This should be of the form https://scan.sv-1.TARGET_CLUSTER.global.canton.network.YOUR_SV_SPONSOR,
-    e.g., https://scan.sv-1.TARGET_CLUSTER.global.canton.network.sync.global for the GSF SV.
+    The scan URL of an SV that you trust and that is reachable by your validator, often your SV sponsor. This should be of the form |generic_scan_url|,
+    e.g., for the Global Synchronizer Foundation SV it is |gsf_scan_url|.
 
 Additional parameters describing your own setup as opposed to the connection to the network are described below.
 

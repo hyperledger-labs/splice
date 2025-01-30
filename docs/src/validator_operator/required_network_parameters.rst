@@ -15,7 +15,7 @@ MIGRATION_ID
     The current migration id of the network (dev/test/mainnet) you are trying to connect to. You can find this on https://sync.global/sv-network/.
 
 SPONSOR_SV_URL
-    The URL of the SV app of your SV sponsor. This should be of the form https://sv.sv-1.TARGET_CLUSTER.global.canton.network.YOUR_SV_SPONSOR, e.g., https://sv.sv-1.TARGET_CLUSTER.global.canton.network.sync.global for the GSF SV.
+    The URL of the SV app of your SV sponsor. This should be of the form |generic_sv_url|, e.g., if the Global Synchronizer Foundation is your sponsor use |gsf_sv_url|.
 
 ONBOARDING_SECRET
    The onboarding secret provided by your sponsor. If you don't already have one, ask your sponsor. Note that onboarding secrets are one-time use and expire after 24h.
