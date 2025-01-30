@@ -1,26 +1,5 @@
 jobs:
 
-  # We put our Daml tests in their own job for more parallelization
-  daml_test:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
-          save: true
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          cmd: "damlTest"
-          timeout: "10m"
-          extra_env_vars: DAML_DEBUG=1
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-
   auth0_user_cleanup:
     executor: self_hosted
     environment:
@@ -584,7 +563,9 @@ jobs:
       - checkout_with_retry
       - skip_if_flag_set:
           flag: force
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in one job
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - run_bash_command_in_nix:

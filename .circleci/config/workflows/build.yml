@@ -38,15 +38,6 @@ workflow:
               ignore:
                 - /release-line-.*/
                 - main
-      # Daml
-      # TODO(#15988): In this job we currently also save the nix cache, if we migrate this
-      # before others, make sure to enable saving the nix cache in some other job instead.
-      - daml_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
@@ -59,6 +50,8 @@ workflow:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
+      # TODO(#15988): In this job we currently also save the nix cache. Before we retire it,
+      # make sure to enable saving the nix cache in some other job instead.
       - build_oss:
           <<: *notify-fail
           context:

@@ -3234,27 +3234,6 @@ jobs:
                 cluster: << parameters.cluster >>
 
 
-  # We put our Daml tests in their own job for more parallelization
-  daml_test:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
-          save: true
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          cmd: "damlTest"
-          timeout: "10m"
-          extra_env_vars: DAML_DEBUG=1
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-
   auth0_user_cleanup:
     executor: self_hosted
     environment:
@@ -3818,7 +3797,9 @@ jobs:
       - checkout_with_retry
       - skip_if_flag_set:
           flag: force
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in one job
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - run_bash_command_in_nix:
@@ -4743,15 +4724,6 @@ workflows:
               ignore:
                 - /release-line-.*/
                 - main
-      # Daml
-      # TODO(#15988): In this job we currently also save the nix cache, if we migrate this
-      # before others, make sure to enable saving the nix cache in some other job instead.
-      - daml_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
@@ -4764,6 +4736,8 @@ workflows:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
+      # TODO(#15988): In this job we currently also save the nix cache. Before we retire it,
+      # make sure to enable saving the nix cache in some other job instead.
       - build_oss:
           <<: *notify-fail
           context:

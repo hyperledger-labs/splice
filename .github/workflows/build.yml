@@ -46,6 +46,10 @@ jobs:
     uses: ./.github/workflows/build.deployment_test.yml
     secrets: inherit
 
+  daml_test:
+    uses: ./.github/workflows/build.daml_test.yml
+    secrets: inherit
+
   scala_test_sim_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
@@ -187,6 +191,7 @@ jobs:
     - cancel_if_not_opt_in
     - static_tests
     - deployment_test
+    - daml_test
     - scala_test_sim_time
     - scala_test_resource_intensive
     - scala_test_record_time_tolerance
