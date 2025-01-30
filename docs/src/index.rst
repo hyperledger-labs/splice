@@ -36,7 +36,12 @@ Global Synchronizer for the Canton Network
    :maxdepth: 2
    :caption: Application Development
 
-   app_dev/index.rst
+   app_dev/overview/index
+   app_dev/scan_api/index
+   app_dev/validator_api/index
+   app_dev/ledger_api/index
+   app_dev/daml_api/index
+   app_dev/testing/index
 
 .. todo:: Add Background section containing
 
