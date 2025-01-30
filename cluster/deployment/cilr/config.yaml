@@ -8,10 +8,14 @@ validator1:
     locationId: us-central1
     projectId: da-cn-ci-2
     keyRingId: validator1_validator
+  participantPruningSchedule:
+    cron: "0 /10 * * * ?" # Run every 10min
+    maxDuration: "5m"
+    retention: "25h" # Keep 25h of data, this must be bigger than the max dedup duration used which is 24h in our apps
 synchronizerMigration:
   active:
     id: 4
     provider: external
-    version: 0.3.7-snapshot.20250123.8098.0.v42c137a0
+    version: 0.3.9
     releaseReference: "refs/tags/cilr"
 persistentSequencerHeapDumps: true
