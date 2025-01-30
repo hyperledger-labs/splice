@@ -46,29 +46,7 @@ commands:
               .circleci/post-slack-message.sh "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*" "C05DT77QF5M"
             fi
           cmd_retry_count: 3
-  start_canton_in_background:
-    description: Start canton in the background
-    parameters:
-      start_canton_options:
-        type: string
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Start canton"
-          cmd: |
-            mkdir -p log
-            ./start-canton.sh << parameters.start_canton_options >> -b
-          background: true
-          additional_nix_args: "--keep CIRCLE_USERNAME --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_NUM --keep CIRCLE_JOB --keep CIRCLE_NODE_INDEX --keep PROMETHEUS_REMOTE_WRITE_JWT"
-          # Retrying as sometimes it fails finding the images
-          cmd_retry_count: 3
 
-  stop_canton:
-    description: Stop Canton
-    steps:
-      - run_bash_command_in_nix:
-          when: always
-          cmd_name: "Stop canton"
-          cmd: ./stop-canton.sh || true
   setup_vpn:
     steps:
       - run:
@@ -320,23 +298,6 @@ commands:
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-
-  docker_pull_test_images:
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Pull docker images used for integration tests"
-          additional_nix_args: "--keep DOCKER_CERT_PATH \
-                              --keep DOCKER_HOST \
-                              --keep DOCKER_MACHINE_NAME \
-                              --keep DOCKER_TLS_VERIFY \
-                              --keep NO_PROXY"
-          # Retrying as network stuff can be flaky
-          cmd_retry_count: 5
-          cmd: |
-            docker pull ${COMETBFT_DOCKER_IMAGE}
-            docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
-            docker pull ${OTEL_COLLECTOR_IMAGE}
-
 
   cancel_entire_workflow_if_this_job_failed:
     steps:
