@@ -34,5 +34,6 @@ You can find hardware requirements for both options in a :ref:`dedicated section
    validator_backups.rst
    validator_disaster_recovery.rst
    validator_users.rst
+   validator_monitoring.rst
 
 .. todo:: Add sections top-level sections on node onboarding, validator functionality
