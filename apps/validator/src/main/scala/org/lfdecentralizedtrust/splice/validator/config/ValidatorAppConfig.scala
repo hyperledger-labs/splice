@@ -127,6 +127,17 @@ final case class MigrateValidatorPartyConfig(
     partiesToMigrate: Option[Seq[String]] = None,
 )
 
+/** The schedule is specified in cron format and "max_duration" and "retention" durations. The cron string indicates
+  *      the points in time at which pruning should begin in the GMT time zone, and the maximum duration indicates how
+  *      long from the start time pruning is allowed to run as long as pruning has not finished pruning up to the
+  *      specified retention period.
+  */
+final case class ParticipantPruningConfig(
+    cron: String,
+    maxDuration: PositiveDurationSeconds,
+    retention: PositiveDurationSeconds,
+)
+
 case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: SpliceDbConfig,
@@ -183,6 +194,7 @@ case class ValidatorAppBackendConfig(
     supportsSoftDomainMigrationPoc: Boolean = false,
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
+    participantPruningSchedule: Option[ParticipantPruningConfig] = None,
 ) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

@@ -64,7 +64,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: 'Governance', path: 'votes', badgeCount: actionsPending?.length },
           ]}
         >
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
             <Divider key="divider" orientation="vertical" variant="middle" flexItem />
             <Button key="button" id="logout-button" onClick={logout} color="inherit">
               <Stack direction="row" alignItems="center">
@@ -84,4 +84,5 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
     </Box>
   );
 };
+
 export default Layout;
