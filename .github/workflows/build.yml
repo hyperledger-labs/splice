@@ -225,4 +225,3 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ env.JOBS }}
-          allowed-skips: docs

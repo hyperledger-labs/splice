@@ -3,7 +3,6 @@ on: workflow_call
 
 jobs:
   docs:
-    if: github.ref == 'refs/heads/main'
     runs-on: self-hosted-k8s-x-small
     container:
       image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.6-snapshot.20250113.8012.0.v6b097acb
@@ -34,6 +33,7 @@ jobs:
 
       - name: Push documentation
         uses: ./.github/actions/nix/run_bash_command_in_nix
+        if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
         with:
