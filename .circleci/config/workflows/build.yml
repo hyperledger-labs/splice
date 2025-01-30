@@ -47,22 +47,6 @@ workflow:
           context:
             - artifactory
             - slack-context
-      # Scala
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test app upgrade"
-          test_names_file: "test-full-class-names-app-upgrade.log"
-          start_canton_options: "-w"
-          resource_class: "xlarge"
-          parallelism: 1
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
-          skip_if_regex: "\\[breaking\\]"
-          skip_if_files_changed: "nix/canton-sources.json"
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail

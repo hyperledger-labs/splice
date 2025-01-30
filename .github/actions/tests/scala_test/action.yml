@@ -73,6 +73,10 @@ inputs:
     description: "Additional arguments to pass to the Nix command"
     required: false
     default: ""
+  pre_sbt_cmd:
+    description: "A bash command to run before starting SBT"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -205,6 +209,7 @@ runs:
           if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
             ./start-frontends.sh -d -s
           fi
+          ${{ inputs.pre_sbt_cmd }}
         post_sbt_cmd: |
           if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
             ./stop-frontends.sh
