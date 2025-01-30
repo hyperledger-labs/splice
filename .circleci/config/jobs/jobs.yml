@@ -82,6 +82,41 @@ jobs:
             . .envrc.vars
             .circleci/triggers/setup-pipeline.sh
 
+  build_tests_self_hosted:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
+          upload_caches: true
+
+  build_tests_circleci:
+    docker:
+      - image: cimg/base:2024.01
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "circleci"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - save_sbt_job_result:
+          runner_type: "circleci"
+          upload_caches: true
+
   artifacts_push:
     machine:
       image: ubuntu-2204:2024.01.1

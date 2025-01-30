@@ -45,6 +45,19 @@
           <<: *main-branch-never
           requires:
             - hold_set_scratchnet
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - build_tests_circleci:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - set_scratchnet
       - artifacts_push:
           <<: *main-branch-never
           context:
@@ -88,6 +101,7 @@
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - preflight_check_docker:
           <<: *main-branch-never
           context:
@@ -98,6 +112,7 @@
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
@@ -157,6 +172,7 @@
            cluster: "user-selected-scratchnet"
            requires:
              - deploy_cluster
+             - build_tests_self_hosted
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -175,6 +191,7 @@
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - deploy_arm_compose_validator:
           <<: *main-branch-never
           context:
@@ -184,6 +201,7 @@
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - reset_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"

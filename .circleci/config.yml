@@ -3316,6 +3316,41 @@ jobs:
             . .envrc.vars
             .circleci/triggers/setup-pipeline.sh
 
+  build_tests_self_hosted:
+    executor: self_hosted
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "selfhosted"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - save_sbt_job_result:
+          runner_type: "selfhosted"
+          upload_caches: true
+
+  build_tests_circleci:
+    docker:
+      - image: cimg/base:2024.01
+    environment:
+      <<: *env
+    steps:
+      - checkout_with_retry
+      - skip_if_flag_set:
+          flag: force
+      - setup_nix_self_hosted
+      - setup_sbt_test_job:
+          runner_type: "circleci"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - save_sbt_job_result:
+          runner_type: "circleci"
+          upload_caches: true
+
   artifacts_push:
     machine:
       image: ubuntu-2204:2024.01.1
@@ -5190,6 +5225,18 @@ workflows:
           context:
             - artifactory
             - slack-context
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - build_tests_circleci:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
       - wait_for_previous_pipeline:
           <<: *notify-fail
           <<: *main-branch-only
@@ -5231,6 +5278,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - preflight_check_docker:
           <<: *main-branch-only
           context:
@@ -5241,6 +5289,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:
@@ -5259,6 +5308,7 @@ workflows:
           cluster: "cimain"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -5277,6 +5327,7 @@ workflows:
           cluster: "cimain"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
@@ -5836,6 +5887,19 @@ workflows:
           <<: *main-branch-never
           requires:
             - hold_set_scratchnet
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - build_tests_circleci:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - set_scratchnet
       - artifacts_push:
           <<: *main-branch-never
           context:
@@ -5879,6 +5943,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - preflight_check_docker:
           <<: *main-branch-never
           context:
@@ -5889,6 +5954,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - backup_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
@@ -5948,6 +6014,7 @@ workflows:
            cluster: "user-selected-scratchnet"
            requires:
              - deploy_cluster
+             - build_tests_self_hosted
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -5966,6 +6033,7 @@ workflows:
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - deploy_arm_compose_validator:
           <<: *main-branch-never
           context:
@@ -5975,6 +6043,7 @@ workflows:
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - reset_cluster:
           <<: *main-branch-never
           cluster: "user-selected-scratchnet"
@@ -6786,6 +6855,12 @@ workflows:
           workflow_names: "deploy_upgrade"
           wait_type: "cancel_waiting_and_wait_workflow"
           branch_filter: << pipeline.parameters.branch-filter >>
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
       - autoscaler_prevent_scaledown:
           cluster: << pipeline.parameters.cluster >>
           requires:
@@ -6826,6 +6901,7 @@ workflows:
           wait_for_sv: false
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_upgrade"
           deploy_version: << pipeline.parameters.base-version >>
@@ -6847,6 +6923,7 @@ workflows:
           cluster: << pipeline.parameters.cluster >>
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_for_upgrade"
           deploy_version: << pipeline.parameters.base-version >>
@@ -6867,6 +6944,7 @@ workflows:
           cluster: << pipeline.parameters.cluster >>
           requires:
             - deploy_cluster_for_upgrade
+            - build_tests_self_hosted
       - artifacts_push:
           <<: *notify-fail
           context:
