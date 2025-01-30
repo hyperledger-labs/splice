@@ -8,4 +8,5 @@ Monitoring and Observability
 
 .. toctree::
 
+   metrics.rst
    metrics_reference.rst

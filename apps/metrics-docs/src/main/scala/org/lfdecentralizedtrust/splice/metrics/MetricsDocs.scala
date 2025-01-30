@@ -30,6 +30,8 @@ final case class GeneratedMetrics(
           |..
           |   SPDX-License-Identifier: Apache-2.0
           |
+          |.. _metrics-reference:
+          |
           |Metrics Reference
           |=================
           |""".stripMargin,

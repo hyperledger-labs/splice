@@ -16,7 +16,6 @@ Supervalidators
    sv_restore.rst
    sv_operations.rst
    sv_scratchnet.rst
-   sv_monitoring.rst
 
 .. todo:: Add sections top-level sections on upgrades, node onboarding, validator functionality, DR
 .. todo:: restructure the sv_operations section
