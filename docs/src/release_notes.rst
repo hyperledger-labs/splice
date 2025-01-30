@@ -8,12 +8,19 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.3.9
+-----
 
 * SV UI
 
   * Add better spacing between items and alerts/badges in navigation bar
+
+* Docs
+
+  * Added a section on hardware requirements to the validator docs.
+  * Improved the docs around required network parameters for starting a new validator.
+  * Added network diagrams of SVs and validators.
+  * Added initial docs on how to access metrics for validators and SVs.
 
 0.3.8
 -----
