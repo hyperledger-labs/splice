@@ -106,14 +106,18 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
     val dbLockPort: Int = 54321
     implicit val tc: TraceContext = TraceContext.empty
     logger.info("Acquiring SpliceDbTest lock")
-    val lockTimeout = 10.minutes // expectation: Db tests won't take longer than 5m
+    // Needs to be long enough to allow all other concurrently started tests to finish,
+    // we therefore use a time roughly equal to the expected maximal duration of the entire CI job.
+    val lockTimeout = 20.minutes
     dbLockSocket = BaseTest.eventually(lockTimeout)(
       Try(new ServerSocket(dbLockPort))
         .fold(
           e => {
             logger.debug(s"Acquiring SpliceDbTest lock: port $dbLockPort is in use")
             throw new TestFailedException(
-              s"Failed to acquire lock within timeout ($lockTimeout).",
+              s"Failed to acquire lock within timeout ($lockTimeout). " +
+                "We start many tests suites in parallel but wait for the lock before actually running test in this suite. " +
+                "Either increase the timeout, or reduce the number of test suites running in the same CI job.",
               e,
               0,
             )

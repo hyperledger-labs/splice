@@ -1,6 +1,10 @@
 name: Scala Test
 description: Run Scala tests
 inputs:
+  with_canton:
+    description: "Whether to run a shared canton instance in the background"
+    required: false
+    default: "true"
   start_canton_options:
     description: "Options for start-canton.sh"
     required: true
@@ -105,6 +109,10 @@ runs:
         COMETBFT_DOCKER_IP: 127.0.0.1
       with:
         cmd: |
+          if [[ "${{ inputs.with_canton }}" == "false" ]]; then
+            echo "This job does not require Canton"
+            exit 0
+          fi
           mkdir -p log
           ./start-canton.sh -p external -D ${{ inputs.start_canton_options }}
         additional_nix_args: "--keep POSTGRES_HOST --keep CANTON_DB_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD ${{ inputs.additional_nix_args }}"
@@ -162,6 +170,10 @@ runs:
     - name: Wait for Canton to be ready
       shell: bash
       run: |
+          if [[ "${{ inputs.with_canton }}" == "false" ]]; then
+            echo "This job does not require Canton"
+            exit 0
+          fi
           start_canton_options="${{ inputs.start_canton_options }}"
           if [[ "$start_canton_options" == *"-w"* ]]; then
             ./wait-for-canton.sh -w

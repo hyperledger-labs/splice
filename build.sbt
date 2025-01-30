@@ -1411,6 +1411,10 @@ printTests := {
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
 
+  def isIntegrationTest(name: String): Boolean =
+    name.contains("org.lfdecentralizedtrust.splice.integration.tests") || name.contains(
+      "IntegrationTest"
+    )
   def isCoreDeploymentPreflightIntegrationTest(name: String): Boolean = isPreflightIntegrationTest(
     name
   ) && !isValidator1DeploymentPreflightIntegrationTest(
@@ -1469,6 +1473,11 @@ printTests := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "Unit tests",
+      "test-full-class-names-non-integration.log",
+      (t: String) => !isIntegrationTest(t),
+    ),
     (
       "Daml ciupgrade vote",
       "test-daml-ciupgrade-vote.log",

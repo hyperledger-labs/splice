@@ -4,7 +4,8 @@ on:
     inputs:
       start_canton_options:
         type: string
-        required: true
+        required: false
+        default: "-h" # Prints version and exits, we want this input to be required unless with_canton is false
       runs_on:
         type: string
         required: true
@@ -33,6 +34,10 @@ on:
         type: boolean
         required: false
         default: false
+      with_canton:
+        type: boolean
+        required: false
+        default: true
 
 jobs:
 
@@ -85,6 +90,7 @@ jobs:
       - name: Run Tests
         uses: ./.github/actions/tests/scala_test
         with:
+          with_canton: ${{ inputs.with_canton }}
           start_canton_options: ${{ inputs.start_canton_options }}
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
