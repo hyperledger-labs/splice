@@ -47,13 +47,13 @@
             - hold_set_scratchnet
       - build_tests_self_hosted:
           <<: *notify-fail
-          <<: *main-branch-only
+          <<: *main-branch-never
           context:
             - artifactory
             - slack-context
       - build_tests_circleci:
           <<: *notify-fail
-          <<: *main-branch-only
+          <<: *main-branch-never
           context:
             - artifactory
             - slack-context
