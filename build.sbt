@@ -84,6 +84,7 @@ lazy val root: Project = (project in file("."))
     `apps-splitwell`,
     `apps-sv`,
     `apps-app`,
+    `apps-metrics-docs`,
     `apps-wallet`,
     `apps-frontends`,
     `splice-util-daml`,
@@ -186,7 +187,7 @@ lazy val docs = project
       val srcDir = sourceDirectory.value
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory
-      val cache = FileFunction.cached(cacheDir) { _ =>
+      val cacheDamlDocs = FileFunction.cached(cacheDir) { _ =>
         runCommand(
           Seq("./gen-daml-docs.sh"),
           log,
@@ -203,9 +204,30 @@ lazy val docs = project
           (`splice-validator-lifecycle-daml` / Compile / damlBuild).value ++
           (`splice-wallet-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value
-      cache(
+      cacheDamlDocs(
         damlSources.toSet
       ).toSeq
+      import scala.sys.process._
+      val classPath = (`apps-metrics-docs` / Runtime / dependencyClasspath).value.files
+      val cacheMetricsDocs = FileFunction.cached(cacheDir) { _ =>
+        val metricsReferencePath = srcDir / "deployment" / "observability" / "metrics_reference.rst"
+        // This seems to be the easiest way to run a target from another SBT project and has the advantage
+        // that it is much faster than the approach taken by Canton of running the target from bundle with a console script.
+        runCommand(
+          Seq(
+            "java",
+            "-cp",
+            classPath.mkString(":"),
+            "org.lfdecentralizedtrust.splice.metrics.MetricsDocs",
+            metricsReferencePath.toString,
+          ),
+          log,
+          None,
+          Some(baseDir),
+        )
+        Set.empty
+      }
+      cacheMetricsDocs(Set()).toSeq
     }.taskValue,
     bundle := {
       (Compile / resources).value
@@ -1317,7 +1339,20 @@ checkErrors := {
   checkLogs("log/canton_network_test.clog", Seq("canton_network_test_log"))
 }
 
-lazy val `apps-app` =
+lazy val `apps-metrics-docs` =
+  project
+    .in(file("apps/metrics-docs"))
+    .dependsOn(
+      `apps-common`,
+      `apps-scan`,
+      `apps-sv`,
+      `apps-validator`,
+    )
+    .settings(
+      Headers.ApacheDAHeaderSettings
+    )
+
+lazy val `apps-app`: Project =
   project
     .in(file("apps/app"))
     .dependsOn(
