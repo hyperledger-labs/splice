@@ -5893,12 +5893,16 @@ workflows:
           context:
             - artifactory
             - slack-context
+          requires:
+            - set_scratchnet
       - build_tests_circleci:
           <<: *notify-fail
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
+            - set_scratchnet
+          requires:
             - set_scratchnet
       - artifacts_push:
           <<: *main-branch-never
