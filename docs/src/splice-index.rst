@@ -21,3 +21,9 @@ Splice Documentation
    :caption: Application Developers
 
    app_dev/index.rst
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Metrics Reference
+
+   deployment/observability/metrics_reference.rst
