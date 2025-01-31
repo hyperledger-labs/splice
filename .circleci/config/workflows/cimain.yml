@@ -9,6 +9,22 @@ workflow:
           context:
             - artifactory
             - slack-context
+        # We build the tests early in the workflow to populate the caches already, otherwise
+        # the tests take longer since they may build the whole repo again.
+        # We do it separately on circleci and self-hosted because their caches are separate,
+        # and we use both for preflights.
+      - build_tests_self_hosted:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - build_tests_circleci:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
       - wait_for_previous_pipeline:
           <<: *notify-fail
           <<: *main-branch-only
@@ -50,6 +66,7 @@ workflow:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - preflight_check_docker:
           <<: *main-branch-only
           context:
@@ -60,6 +77,7 @@ workflow:
           wait_for_sv: false
           requires:
             - deploy_cluster
+            - build_tests_circleci
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:
@@ -78,6 +96,7 @@ workflow:
           cluster: "cimain"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -96,6 +115,7 @@ workflow:
           cluster: "cimain"
           requires:
             - deploy_cluster
+            - build_tests_self_hosted
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
