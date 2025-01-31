@@ -7,7 +7,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import path from 'path';
 
 import { ArtifactoryCreds } from './artifactory';
-import { CnChartVersion, repositories } from './artifacts';
+import { CnChartVersion } from './artifacts';
 import { config, imagePullPolicy } from './config';
 import { spliceConfig } from './config/config';
 import { activeVersion } from './domainMigration';
@@ -216,9 +216,7 @@ export function chartPath(chartName: string, version: CnChartVersion): string {
       : chartName.replace(/^splice/, 'cn');
   return version.type === 'local'
     ? `${path.relative(process.cwd(), REPO_ROOT)}/cluster/helm/${compatibleName}/`
-    : version.repository === repositories.private
-      ? `${version.repository.helm}/${compatibleName}`
-      : compatibleName;
+    : compatibleName;
 }
 
 function versionStringWithPossibleOverride(
