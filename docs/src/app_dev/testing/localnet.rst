@@ -3,7 +3,7 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-.. _compose_sv:
+.. _localnet:
 
 Docker-Compose Based Deployment of a Local Network
 ==================================================
