@@ -142,7 +142,7 @@ object DomainParamsStore {
       domainUnpausedPromise: Option[Promise[Unit]],
   )
 
-  private class Metrics(metricsFactory: LabeledMetricsFactory) extends AutoCloseable {
+  class Metrics(metricsFactory: LabeledMetricsFactory) extends AutoCloseable {
 
     private val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "domain_params_store"
 

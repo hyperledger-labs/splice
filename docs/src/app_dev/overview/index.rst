@@ -3,7 +3,7 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-
+.. _app_dev_overview:
 
 Overview
 ========
@@ -22,34 +22,6 @@ Overview
 .. todo:: add section on testing including spinning up localnet
 .. todo:: add section on deployment for app devs, e.g., DAR uploads
 
-Version Information
-===================
-
-.. list-table::
-   :header-rows: 0
-
-   * - Canton version used for validator and SV nodes
-     - |canton_version|
-   * - Daml SDK version used to compile ``.dars``
-     - |daml_sdk_version|
-   * - Daml SDK version used for Java and TS codegens
-     - |daml_sdk_tooling_version|
-
-Testing
-=======
-
-.. toctree::
-
-   localnet
-
-
-API Reference
-=============
-
-.. todo::
-
-   add overview over each API type, e.g., overview over scan
-
 .. todo::
 
     Add overview of how to integrate with CC at the Daml level
@@ -63,5 +35,5 @@ API Reference
 
 .. toctree::
 
-   splice_app_apis/index
-   daml
+  version_information
+  splice_app_apis
