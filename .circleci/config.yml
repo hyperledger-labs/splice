@@ -3321,6 +3321,10 @@ jobs:
       image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
+    parameters:
+      is_public:
+        type: boolean
+        default: false
     steps:
       - checkout_with_retry
       - restore_frontend_builds
@@ -3397,42 +3401,33 @@ jobs:
             # which would lead to an error due to a misisng `delete` permission
             gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
           # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
-      - run_bash_command_in_nix:
-          cmd_name: Copy artifacts to Github Container Registry
-          additional_nix_args: "--keep GITHUB_TOKEN \
-            --keep CIRCLE_BRANCH \
-            --keep ARTIFACTORY_USER \
-            --keep ARTIFACTORY_PASSWORD"
-          cmd: |
-            if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
-              export GITHUB_USER="canton-network-da"
-              make cluster/helm/copy_release_to_ghcr
-              make cluster/docker/copy_release_to_ghcr
-            else
-              echo "Not a release branch, skipping copying to Github Container Registry"
-            fi
-      - run_bash_command_in_nix:
-          cmd_name: tag git
-          additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD \
-           --keep GITHUB_TOKEN \
-           --keep CIRCLE_BRANCH"
-          cmd: |
-            git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            RELEASE_TAG=$(get-snapshot-version)
+      - when:
+          condition:
+            equal: [ << parameters.is_public >>, true ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Copy artifacts to Github Container Registry
+                additional_nix_args: "--keep GITHUB_TOKEN \
+                  --keep ARTIFACTORY_USER \
+                  --keep ARTIFACTORY_PASSWORD"
+                cmd: |
+                  export GITHUB_USER="canton-network-da"
+                  make cluster/helm/copy_release_to_ghcr
+                  make cluster/docker/copy_release_to_ghcr
+            - run_bash_command_in_nix:
+                cmd_name: tag git
+                additional_nix_args: "--keep GITHUB_TOKEN"
+                cmd: |
+                  git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+                  RELEASE_TAG=$(get-snapshot-version)
 
-            if [[ "${CIRCLE_BRANCH}" != *"$RELEASE_TAG"* && "$RELEASE_TAG" != *"snapshot"* ]]; then
-               echo "Release tag '$RELEASE_TAG' is not contained in the branch name '${CIRCLE_BRANCH}'."
-               echo "You are probably publishing the wrong version."
-               exit 1
-            fi
-
-            if [ $(git tag -l "${RELEASE_TAG}") ]; then
-              echo "tag ${RELEASE_TAG} already exists. not tagging"
-            else
-              git tag "${RELEASE_TAG}"
-              git push origin "${RELEASE_TAG}"
-            fi
+                  if [ $(git tag -l "${RELEASE_TAG}") ]; then
+                    echo "tag ${RELEASE_TAG} already exists."
+                    exit 1
+                  else
+                    git tag "${RELEASE_TAG}"
+                    git push origin "${RELEASE_TAG}"
+                  fi
 
       - save_frontend_builds
       - save_sbt_job_result:
@@ -4695,6 +4690,7 @@ workflows:
           context:
             - artifactory
             - slack-context
+          is_public: true
       - create_oss_pr:
           <<: *notify-fail
           context:
