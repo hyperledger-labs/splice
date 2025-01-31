@@ -37,6 +37,7 @@ const runnerSpecs = [
         memory: '256Mi',
       },
       limits: {
+        cpu: '0.5',
         memory: '512Mi',
       },
     },
@@ -51,6 +52,7 @@ const runnerSpecs = [
         memory: '8Gi',
       },
       limits: {
+        cpu: '4',
         memory: '10Gi',
       },
     },
@@ -65,6 +67,7 @@ const runnerSpecs = [
         memory: '16Gi',
       },
       limits: {
+        cpu: '4',
         memory: '18Gi',
       },
     },
@@ -79,6 +82,7 @@ const runnerSpecs = [
         memory: '20Gi',
       },
       limits: {
+        cpu: '5',
         memory: '24Gi',
       },
     },
@@ -93,6 +97,7 @@ const runnerSpecs = [
         memory: '24Gi',
       },
       limits: {
+        cpu: '6',
         memory: '32Gi',
       },
     },
@@ -107,6 +112,7 @@ const runnerSpecs = [
         memory: '32Gi',
       },
       limits: {
+        cpu: '6',
         memory: '40Gi',
       },
     },
