@@ -29,7 +29,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.transaction.SequencerDomainState
+import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.circe.parser.*
 import io.grpc.{Status, StatusRuntimeException}
@@ -546,13 +546,16 @@ class HttpSvHandler(
       sequenced <- retryProvider.getValueWithRetries(
         RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
         "sequencer_added_to_topology_state",
-        "New sequencer is observed in SequencerDomainState through existing sequencer",
+        "New sequencer is observed in SequencerSynchronizerState through existing sequencer",
         sequencerAdminConnection
-          .listSequencerDomainState(decentralizedSynchronizer, store.TimeQuery.Range(None, None))
+          .listSequencerSynchronizerState(
+            decentralizedSynchronizer,
+            store.TimeQuery.Range(None, None),
+          )
           .map { result =>
             result
               .sortBy(_.base.serial)
-              .foldLeft[Option[TopologyResult[SequencerDomainState]]](None) {
+              .foldLeft[Option[TopologyResult[SequencerSynchronizerState]]](None) {
                 case (_, newMapping) if !newMapping.mapping.allSequencers.contains(sequencerId) =>
                   None
                 case (None, newMapping) if newMapping.mapping.allSequencers.contains(sequencerId) =>
@@ -737,7 +740,7 @@ class HttpSvHandler(
       ) map (_.update)
       _ <- dsoStoreWithIngestion.connection
         .submit(Seq(svParty), Seq(dsoParty), cmds)
-        .withDomainId(dsoRules.domain)
+        .withSynchronizerId(dsoRules.domain)
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
         .yieldUnit()
     } yield ()

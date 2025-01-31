@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -10,7 +10,8 @@ import com.daml.metrics.{CacheMetrics, DatabaseMetrics}
 class IdentityProviderConfigStoreMetrics(
     prefix: MetricName,
     labeledMetricsFactory: LabeledMetricsFactory,
-) extends DatabaseMetricsFactory(prefix, labeledMetricsFactory) {
+) extends DatabaseMetricsFactory(prefix, labeledMetricsFactory)
+    with HasDocumentedMetrics {
 
   val idpConfigCache = new CacheMetrics(prefix :+ "idp_config_cache", labeledMetricsFactory)
   val verifierCache = new CacheMetrics(prefix :+ "verifier_cache", labeledMetricsFactory)

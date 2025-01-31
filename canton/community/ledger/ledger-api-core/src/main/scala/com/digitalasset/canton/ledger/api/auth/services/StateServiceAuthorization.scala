@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.auth.services
@@ -31,12 +31,12 @@ final class StateServiceAuthorization(
       service.getActiveContracts,
     )(request, responseObserver)
 
-  override def getConnectedDomains(
-      request: GetConnectedDomainsRequest
-  ): Future[GetConnectedDomainsResponse] =
+  override def getConnectedSynchronizers(
+      request: GetConnectedSynchronizersRequest
+  ): Future[GetConnectedSynchronizersResponse] =
     authorizer.requireReadClaimsForAllParties(
       List(request.party),
-      service.getConnectedDomains,
+      service.getConnectedSynchronizers,
     )(request)
 
   override def getLedgerEnd(request: GetLedgerEndRequest): Future[GetLedgerEndResponse] =

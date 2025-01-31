@@ -281,7 +281,7 @@ class SplitwellUpgradeFrontendIntegrationTest
   }
 
   private[this] def preferredAndPriorDomains(implicit env: FixtureParam) = {
-    val splitwellDomains = splitwellBackend.getSplitwellDomainIds()
+    val splitwellDomains = splitwellBackend.getSplitwellSynchronizerIds()
     (
       splitwellDomains.preferred,
       inside(splitwellDomains.others) { case Seq(d) =>

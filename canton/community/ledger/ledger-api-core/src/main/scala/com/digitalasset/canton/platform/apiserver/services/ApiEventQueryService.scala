@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -18,6 +18,7 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace.{
 }
 import com.digitalasset.canton.logging.TracedLoggerOps.TracedLoggerOps
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.util.Thereafter.syntax.*
 import io.grpc.*
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -55,7 +56,7 @@ final class ApiEventQueryService(
               request.contractId,
               request.requestingParties,
             )
-            .andThen(logger.logErrorsOnCall[GetEventsByContractIdResponse])
+            .thereafter(logger.logErrorsOnCall[GetEventsByContractIdResponse])
         },
       )
   }

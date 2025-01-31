@@ -37,8 +37,7 @@ import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurati
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpConfig
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -128,19 +127,19 @@ object SvUtil {
     List.empty.asJava,
   )
 
-  private def defaultDsoDecentralizedSynchronizerConfig(domainId: DomainId) =
+  private def defaultDsoDecentralizedSynchronizerConfig(synchronizerId: SynchronizerId) =
     new DsoDecentralizedSynchronizerConfig(
       // domains
       Map(
-        domainId.toProtoPrimitive -> new SynchronizerConfig(
+        synchronizerId.toProtoPrimitive -> new SynchronizerConfig(
           dso.decentralizedsynchronizer.SynchronizerState.DS_OPERATIONAL,
           "TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config.",
-          // TODO(M3-47): also share the Canton DomainId of the decentralized domain here
+          // TODO(M3-47): also share the Canton SynchronizerId of the decentralized domain here
           Optional.of(defaultAcsCommitmentReconciliationInterval.duration.toSeconds),
         )
       ).asJava,
-      domainId.toProtoPrimitive, // lastDomainId
-      domainId.toProtoPrimitive, // activeSynchronizer
+      synchronizerId.toProtoPrimitive, // lastSynchronizerId
+      synchronizerId.toProtoPrimitive, // activeSynchronizer
     )
 
   case class LocalSequencerConfig(sequencerId: String, url: String, migrationId: Long)
@@ -175,7 +174,7 @@ object SvUtil {
       cometBftNode: Option[CometBftNode],
       localSynchronizerNode: LocalSynchronizerNode,
       scanConfig: Option[SvScanConfig],
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       clock: Clock,
       migrationId: Long,
   )(implicit
@@ -224,7 +223,7 @@ object SvUtil {
       )
     } yield {
       Map(
-        domainId.toProtoPrimitive -> new SynchronizerNodeConfig(
+        synchronizerId.toProtoPrimitive -> new SynchronizerNodeConfig(
           cometBftConfig,
           sequencerConfig.toJava,
           mediatorConfig.toJava,
@@ -235,7 +234,7 @@ object SvUtil {
     }
   }
 
-  def defaultDsoRulesConfig(domainId: DomainId): DsoRulesConfig = new DsoRulesConfig(
+  def defaultDsoRulesConfig(synchronizerId: SynchronizerId): DsoRulesConfig = new DsoRulesConfig(
     10, // numUnclaimedRewardsThreshold
     5, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
     new RelTime(TimeUnit.HOURS.toMicros(1)), // actionConfirmationTimeout
@@ -245,7 +244,7 @@ object SvUtil {
     new RelTime(TimeUnit.SECONDS.toMicros(70)), // dsoDelegateInactiveTimeout
     defaultSynchronizerNodeConfigLimits,
     1024, // maxTextLength
-    defaultDsoDecentralizedSynchronizerConfig(domainId), // decentralizedSynchronizerConfig
+    defaultDsoDecentralizedSynchronizerConfig(synchronizerId), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
   )
 
@@ -327,11 +326,11 @@ object SvUtil {
 
   // TODO(#13301) Handle this in a nicer way, at least make the primary connection less magic.
   def getSequencerAdminConnection(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       primarySequencerAdminConnection: Option[SequencerAdminConnection],
       extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
   ): SequencerAdminConnection =
-    extraSynchronizerNodes.get(domainId.uid.identifier.str) match {
+    extraSynchronizerNodes.get(synchronizerId.uid.identifier.str) match {
       case Some(synchronizer) => synchronizer.sequencerAdminConnection
       case None =>
         primarySequencerAdminConnection.getOrElse(
@@ -343,11 +342,11 @@ object SvUtil {
 
   // TODO(#13301) Handle this in a nicer way, at least make the primary connection less magic.
   def getMediatorAdminConnection(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       primaryMediatorAdminConnection: Option[MediatorAdminConnection],
       extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
   ): MediatorAdminConnection =
-    extraSynchronizerNodes.get(domainId.uid.identifier.str) match {
+    extraSynchronizerNodes.get(synchronizerId.uid.identifier.str) match {
       case Some(synchronizer) => synchronizer.mediatorAdminConnection
       case None =>
         primaryMediatorAdminConnection.getOrElse(

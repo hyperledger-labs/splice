@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.provider.jce
 
 import com.digitalasset.canton.config.CommunityCryptoConfig
-import com.digitalasset.canton.config.CommunityCryptoProvider.Jce
+import com.digitalasset.canton.config.CryptoProvider.Jce
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.CryptoTestHelper.TestMessage
 import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CommunityCryptoPrivateStoreFactory
@@ -21,7 +21,8 @@ class JceCryptoTest
     with PrivateKeySerializationTest
     with PasswordBasedEncryptionTest
     with RandomTest
-    with PublicKeyValidationTest {
+    with PublicKeyValidationTest
+    with CryptoKeyFormatMigrationTest {
 
   "JceCrypto" can {
 
@@ -32,11 +33,17 @@ class JceCryptoTest
           new MemoryStorage(loggerFactory, timeouts),
           new CommunityCryptoPrivateStoreFactory,
           testedReleaseProtocolVersion,
+          nonStandardConfig = false,
+          futureSupervisor,
+          wallClock,
+          executionContext,
           timeouts,
           loggerFactory,
           NoReportingTracerProvider,
         )
         .valueOrFail("failed to create crypto")
+
+    behave like migrationTest(Jce.signingKeys.supported, Jce.encryptionKeys.supported, jceCrypto())
 
     behave like signingProvider(Jce.signingAlgorithms.supported, jceCrypto())
     behave like encryptionProvider(
@@ -61,12 +68,11 @@ class JceCryptoTest
 
             behave like hybridEncrypt(
               keySpec,
-              (message, publicKey, version) =>
+              (message, publicKey) =>
                 newCrypto.map(crypto =>
                   crypto.pureCrypto.encryptDeterministicWith(
                     message,
                     publicKey,
-                    version,
                     encryptionAlgorithmSpec,
                   )
                 ),
@@ -82,7 +88,6 @@ class JceCryptoTest
                   .encryptDeterministicWith(
                     message,
                     publicKey,
-                    testedProtocolVersion,
                     encryptionAlgorithmSpec,
                   )
                   .valueOrFail("encrypt")
@@ -91,13 +96,12 @@ class JceCryptoTest
                   .encryptDeterministicWith(
                     message,
                     publicKey,
-                    testedProtocolVersion,
                     encryptionAlgorithmSpec,
                   )
                   .valueOrFail("encrypt")
                 _ = assert(message.bytes != encrypted2.ciphertext)
               } yield encrypted1.ciphertext shouldEqual encrypted2.ciphertext
-            }.failOnShutdown
+            }
           }
       }
     }

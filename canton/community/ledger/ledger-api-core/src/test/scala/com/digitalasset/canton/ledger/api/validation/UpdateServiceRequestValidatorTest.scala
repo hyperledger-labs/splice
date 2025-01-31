@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -6,20 +6,19 @@ package com.digitalasset.canton.ledger.api.validation
 import com.daml.error.{ContextualizedErrorLogger, NoLogging}
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.api.v2.transaction_filter.{
-  CumulativeFilter,
+  CumulativeFilter as ProtoCumulativeFilter,
   Filters,
-  InterfaceFilter,
-  TemplateFilter,
+  InterfaceFilter as ProtoInterfaceFilter,
+  TemplateFilter as ProtoTemplateFilter,
   *,
 }
 import com.daml.ledger.api.v2.update_service.{
-  GetTransactionByEventIdRequest,
   GetTransactionByIdRequest,
+  GetTransactionByOffsetRequest,
   GetUpdatesRequest,
 }
 import com.daml.ledger.api.v2.value.Identifier
-import com.digitalasset.canton.ledger.api.domain
-import com.digitalasset.canton.platform.ApiOffset
+import com.digitalasset.canton.ledger.api.{CumulativeFilter, InterfaceFilter, TemplateFilter}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.TypeConRef
 import io.grpc.Status.Code.*
@@ -44,13 +43,15 @@ class UpdateServiceRequestValidatorTest
             Filters(
               templateIdsForParty
                 .map(tId =>
-                  CumulativeFilter(IdentifierFilter.TemplateFilter(TemplateFilter(Some(tId))))
+                  ProtoCumulativeFilter(
+                    IdentifierFilter.TemplateFilter(ProtoTemplateFilter(Some(tId)))
+                  )
                 )
                 ++
                   Seq(
-                    CumulativeFilter(
+                    ProtoCumulativeFilter(
                       IdentifierFilter.InterfaceFilter(
-                        InterfaceFilter(
+                        ProtoInterfaceFilter(
                           interfaceId = Some(
                             Identifier(
                               packageId,
@@ -75,8 +76,8 @@ class UpdateServiceRequestValidatorTest
     Seq(templateId.copy(packageId = Ref.PackageRef.Name(packageName).toString))
   )
 
-  private val txByEvIdReq =
-    GetTransactionByEventIdRequest(eventId, Seq(party))
+  private val txByOffsetReq =
+    GetTransactionByOffsetRequest(offsetLong, Seq(party))
 
   private val txByIdReq =
     GetTransactionByIdRequest(updateId, Seq(party))
@@ -91,8 +92,8 @@ class UpdateServiceRequestValidatorTest
 
       "accept simple requests" in {
         inside(validator.validate(txReq, ledgerEnd)) { case Right(req) =>
-          req.startExclusive shouldBe domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldBe Some(offset)
+          req.startExclusive shouldBe None
+          req.endInclusive shouldBe offset
           val filtersByParty = req.filter.filtersByParty
           filtersByParty should have size 1
           hasExpectedFilters(req)
@@ -130,7 +131,9 @@ class UpdateServiceRequestValidatorTest
             txReq.update(_.filter.filtersByParty.modify(_.map { case (p, f) =>
               p -> f.update(
                 _.cumulative := Seq(
-                  CumulativeFilter(IdentifierFilter.InterfaceFilter(InterfaceFilter(None, true)))
+                  ProtoCumulativeFilter(
+                    IdentifierFilter.InterfaceFilter(ProtoInterfaceFilter(None, true))
+                  )
                 )
               )
             })),
@@ -146,16 +149,12 @@ class UpdateServiceRequestValidatorTest
       "return the correct error when begin offset is after ledger end" in {
         requestMustFailWith(
           request = validator.validate(
-            txReq.withBeginExclusive(
-              ApiOffset.assertFromStringToLong(ledgerEnd) + 10L
-            ),
+            txReq.withBeginExclusive(ledgerEnd.value.unwrap + 10L),
             ledgerEnd,
           ),
           code = OUT_OF_RANGE,
           description =
-            s"OFFSET_AFTER_LEDGER_END(12,0): Begin offset (${ApiOffset.assertFromStringToLong(
-                ledgerEnd
-              ) + 10L}) is after ledger end (${ApiOffset.assertFromStringToLong(ledgerEnd)})",
+            s"OFFSET_AFTER_LEDGER_END(12,0): Begin offset (${ledgerEnd.value.unwrap + 10L}) is after ledger end (${ledgerEnd.value.unwrap})",
           metadata = Map.empty,
         )
       }
@@ -163,14 +162,12 @@ class UpdateServiceRequestValidatorTest
       "return the correct error when end offset is after ledger end" in {
         requestMustFailWith(
           request = validator.validate(
-            txReq.withEndInclusive(ApiOffset.assertFromStringToLongO(ledgerEnd).getOrElse(0L) + 10),
+            txReq.withEndInclusive(ledgerEnd.value.unwrap + 10),
             ledgerEnd,
           ),
           code = OUT_OF_RANGE,
           description =
-            s"OFFSET_AFTER_LEDGER_END(12,0): End offset (${ApiOffset.assertFromStringToLong(
-                ledgerEnd
-              ) + 10L}) is after ledger end (${ApiOffset.assertFromStringToLong(ledgerEnd)})",
+            s"OFFSET_AFTER_LEDGER_END(12,0): End offset (${ledgerEnd.value.unwrap + 10L}) is after ledger end (${ledgerEnd.value.unwrap})",
           metadata = Map.empty,
         )
       }
@@ -220,7 +217,7 @@ class UpdateServiceRequestValidatorTest
       "tolerate missing end" in {
         inside(validator.validate(txReq.update(_.optionalEndInclusive := None), ledgerEnd)) {
           case Right(req) =>
-            req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
+            req.startExclusive shouldEqual None
             req.endInclusive shouldEqual None
             val filtersByParty = req.filter.filtersByParty
             filtersByParty should have size 1
@@ -233,18 +230,18 @@ class UpdateServiceRequestValidatorTest
         inside(
           validator.validate(
             txReq.update(_.filter.filtersByParty.modify(_.map { case (p, f) =>
-              p -> f.update(_.cumulative := Seq(CumulativeFilter.defaultInstance))
+              p -> f.update(_.cumulative := Seq(ProtoCumulativeFilter.defaultInstance))
             })),
             ledgerEnd,
           )
         ) { case Right(req) =>
-          req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(offset)
+          req.startExclusive shouldEqual None
+          req.endInclusive shouldEqual offset
           val filtersByParty = req.filter.filtersByParty
           filtersByParty should have size 1
           inside(filtersByParty.headOption.value) { case (p, filters) =>
             p shouldEqual party
-            filters shouldEqual domain.CumulativeFilter.templateWildcardFilter()
+            filters shouldEqual CumulativeFilter.templateWildcardFilter()
           }
           req.verbose shouldEqual verbose
         }
@@ -259,13 +256,13 @@ class UpdateServiceRequestValidatorTest
             ledgerEnd,
           )
         ) { case Right(req) =>
-          req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(offset)
+          req.startExclusive shouldEqual None
+          req.endInclusive shouldEqual offset
           val filtersByParty = req.filter.filtersByParty
           filtersByParty should have size 1
           inside(filtersByParty.headOption.value) { case (p, filters) =>
             p shouldEqual party
-            filters shouldEqual domain.CumulativeFilter.templateWildcardFilter()
+            filters shouldEqual CumulativeFilter.templateWildcardFilter()
           }
           req.verbose shouldEqual verbose
         }
@@ -273,8 +270,8 @@ class UpdateServiceRequestValidatorTest
 
       "tolerate all fields filled out" in {
         inside(validator.validate(txReq, ledgerEnd)) { case Right(req) =>
-          req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(offset)
+          req.startExclusive shouldEqual None
+          req.endInclusive shouldEqual offset
           hasExpectedFilters(req)
           req.verbose shouldEqual verbose
         }
@@ -282,8 +279,8 @@ class UpdateServiceRequestValidatorTest
 
       "allow package-name scoped templates" in {
         inside(validator.validate(txReqWithPackageNameScoping, ledgerEnd)) { case Right(req) =>
-          req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(offset)
+          req.startExclusive shouldEqual None
+          req.endInclusive shouldEqual offset
           hasExpectedFilters(
             req,
             expectedTemplates =
@@ -295,14 +292,14 @@ class UpdateServiceRequestValidatorTest
 
       "still allow populated packageIds in templateIds (for backwards compatibility)" in {
         inside(validator.validate(txReq, ledgerEnd)) { case Right(req) =>
-          req.startExclusive shouldEqual domain.ParticipantOffset.ParticipantBegin
-          req.endInclusive shouldEqual Some(offset)
+          req.startExclusive shouldEqual None
+          req.endInclusive shouldEqual offset
           hasExpectedFilters(req)
           req.verbose shouldEqual verbose
         }
       }
 
-      "current definition populate the right domain request" in {
+      "current definition populate the right api request" in {
         val result = validator.validate(
           txReqBuilder(Seq.empty).copy(
             filter = Some(
@@ -310,9 +307,9 @@ class UpdateServiceRequestValidatorTest
                 Map(
                   party -> Filters(
                     Seq(
-                      CumulativeFilter(
+                      ProtoCumulativeFilter(
                         IdentifierFilter.InterfaceFilter(
-                          InterfaceFilter(
+                          ProtoInterfaceFilter(
                             interfaceId = Some(templateId),
                             includeInterfaceView = true,
                             includeCreatedEventBlob = true,
@@ -322,8 +319,10 @@ class UpdateServiceRequestValidatorTest
                     )
                       ++
                         Seq(
-                          CumulativeFilter(
-                            IdentifierFilter.TemplateFilter(TemplateFilter(Some(templateId), true))
+                          ProtoCumulativeFilter(
+                            IdentifierFilter.TemplateFilter(
+                              ProtoTemplateFilter(Some(templateId), true)
+                            )
                           )
                         )
                   )
@@ -336,15 +335,15 @@ class UpdateServiceRequestValidatorTest
         result.map(_.filter.filtersByParty) shouldBe Right(
           Map(
             party ->
-              domain.CumulativeFilter(
+              CumulativeFilter(
                 templateFilters = Set(
-                  domain.TemplateFilter(
+                  TemplateFilter(
                     TypeConRef.assertFromString("packageId:includedModule:includedTemplate"),
                     true,
                   )
                 ),
                 interfaceFilters = Set(
-                  domain.InterfaceFilter(
+                  InterfaceFilter(
                     interfaceTypeRef = Ref.TypeConRef.assertFromString(
                       "packageId:includedModule:includedTemplate"
                     ),
@@ -385,19 +384,29 @@ class UpdateServiceRequestValidatorTest
 
     "validating transaction by event id requests" should {
 
-      "fail on empty eventId" in {
+      "fail on zero offset" in {
         requestMustFailWith(
-          request = validator.validateTransactionByEventId(txByEvIdReq.withEventId("")),
+          request = validator.validateTransactionByOffset(txByOffsetReq.withOffset(0)),
           code = INVALID_ARGUMENT,
           description =
-            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: event_id",
+            "NON_POSITIVE_OFFSET(8,0): Offset 0 in offset is not a positive integer: the offset has to be a positive integer (>0)",
+          metadata = Map.empty,
+        )
+      }
+
+      "fail on negative offset" in {
+        requestMustFailWith(
+          request = validator.validateTransactionByOffset(txByOffsetReq.withOffset(-21)),
+          code = INVALID_ARGUMENT,
+          description =
+            "NON_POSITIVE_OFFSET(8,0): Offset -21 in offset is not a positive integer: the offset has to be a positive integer (>0)",
           metadata = Map.empty,
         )
       }
 
       "fail on empty requesting parties" in {
         requestMustFailWith(
-          request = validator.validateTransactionByEventId(txByEvIdReq.withRequestingParties(Nil)),
+          request = validator.validateTransactionByOffset(txByOffsetReq.withRequestingParties(Nil)),
           code = INVALID_ARGUMENT,
           description =
             "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: requesting_parties",

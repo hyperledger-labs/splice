@@ -37,6 +37,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
   WalletValidatorAppClientConfig,
 }
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.*
@@ -66,8 +67,8 @@ import scala.util.Try
 import scala.util.control.NoStackTrace
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
-import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
+import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
+import com.digitalasset.canton.synchronizer.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 
@@ -83,11 +84,6 @@ case class SpliceConfig(
     ansAppExternalClients: Map[InstanceName, AnsAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
-    // TODO(#736): we want to remove all of the configurations options below:
-    participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
-    remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
-    participantsX: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
-    remoteParticipantsX: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(
       timeouts = TimeoutSettings(
@@ -103,16 +99,16 @@ case class SpliceConfig(
     with ConfigDefaults[DefaultPorts, SpliceConfig] {
 
   override type ParticipantConfigType = CommunityParticipantConfig
+  // TODO(#736): we want to remove all of the configurations options below:
+  override val participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty
+  override val remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty
 
   override def validate: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
 
   private lazy val validatorAppParameters_ : Map[InstanceName, SharedSpliceAppParameters] =
     validatorApps.fmap { validatorConfig =>
       SharedSpliceAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.logging,
-        monitoring.logQueryCost,
+        monitoring,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
         UpgradesConfig(),
@@ -149,10 +145,7 @@ case class SpliceConfig(
   private lazy val svAppParameters_ : Map[InstanceName, SharedSpliceAppParameters] =
     svApps.fmap { svConfig =>
       SharedSpliceAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.logging,
-        monitoring.logQueryCost,
+        monitoring,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
         UpgradesConfig(),
@@ -188,10 +181,7 @@ case class SpliceConfig(
   private lazy val scanAppParameters_ : Map[InstanceName, SharedSpliceAppParameters] =
     scanApps.fmap { scanConfig =>
       SharedSpliceAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.logging,
-        monitoring.logQueryCost,
+        monitoring,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
         UpgradesConfig(),
@@ -227,10 +217,7 @@ case class SpliceConfig(
   private lazy val splitwellAppParameters_ : Map[InstanceName, SharedSpliceAppParameters] =
     splitwellApps.fmap { splitwellConfig =>
       SharedSpliceAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.logging,
-        monitoring.logQueryCost,
+        monitoring,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
         UpgradesConfig(),
@@ -315,7 +302,12 @@ object SpliceConfig {
       elc: ErrorLoggingContext
   ) {
     import CantonConfig.ConfigReaders.*
+    import BaseCantonConfig.Readers.*
+    import CantonCommunityConfig.dbConfigReader
 
+    implicit val configReader: ConfigReader[SynchronizerAlias] = ConfigReader.fromString(str =>
+      SynchronizerAlias.create(str).left.map(err => CannotConvert(str, "SynchronizerAlias", err))
+    )
     implicit val nonNegativeBigDecimalReader: ConfigReader[NonNegativeNumeric[BigDecimal]] =
       NonNegativeNumeric.nonNegativeNumericReader[BigDecimal]
 
@@ -349,10 +341,6 @@ object SpliceConfig {
 
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
-
-    implicit val postgresSpliceDbConfigReader: ConfigReader[SpliceDbConfig.Postgres] =
-      deriveReader[SpliceDbConfig.Postgres]
-    implicit val spliceDbConfigReader: ConfigReader[SpliceDbConfig] = deriveReader[SpliceDbConfig]
 
     implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
@@ -556,8 +544,6 @@ object SpliceConfig {
         } yield conf
       }
 
-    implicit val spliceAppParametersReader: ConfigReader[SharedSpliceAppParameters] =
-      deriveReader[SharedSpliceAppParameters]
     implicit val validatorOnboardingConfigReader: ConfigReader[ValidatorOnboardingConfig] =
       deriveReader[ValidatorOnboardingConfig]
     implicit val treasuryConfigReader: ConfigReader[TreasuryConfig] =
@@ -652,18 +638,20 @@ object SpliceConfig {
     implicit val splitwellClientConfigReader: ConfigReader[SplitwellAppClientConfig] =
       deriveReader[SplitwellAppClientConfig]
 
-    implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
-      deriveReader[CommunityParticipantConfig]
-
     implicit val spliceConfigReader: ConfigReader[SpliceConfig] = deriveReader[SpliceConfig]
   }
 
   @nowarn("cat=unused")
   class ConfigWriters(confidential: Boolean) {
     val writers = new CantonConfig.ConfigWriters(confidential)
+    import BaseCantonConfig.Writers.*
 
     import writers.*
     import DeprecatedConfigUtils.*
+    import CantonCommunityConfig.dbConfigWriter
+
+    implicit val configWriter: ConfigWriter[SynchronizerAlias] =
+      ConfigWriter.toString(_.toProtoPrimitive)
 
     implicit val nonNegativeBigDecimalWriter: ConfigWriter[NonNegativeNumeric[BigDecimal]] =
       ConfigWriter.toString(x => x.unwrap.toString)
@@ -702,12 +690,6 @@ object SpliceConfig {
       ConfigWriter.stringConfigWriter.contramap(_.toString())
     implicit val networkAppClientConfigReader: ConfigWriter[NetworkAppClientConfig] =
       deriveWriter[NetworkAppClientConfig]
-
-    implicit val postgresSpliceDbConfigWriter: ConfigWriter[SpliceDbConfig.Postgres] =
-      confidentialWriter[SpliceDbConfig.Postgres](pg =>
-        pg.copy(config = DbConfig.hideConfidential(pg.config))
-      )
-    implicit val spliceDbConfigWriter: ConfigWriter[SpliceDbConfig] = deriveWriter[SpliceDbConfig]
 
     implicit val upgradesConfig: ConfigWriter[UpgradesConfig] = deriveWriter[UpgradesConfig]
 
@@ -834,8 +816,6 @@ object SpliceConfig {
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 
-    implicit val spliceAppParametersWriter: ConfigWriter[SharedSpliceAppParameters] =
-      deriveWriter[SharedSpliceAppParameters]
     implicit val domainConfigWriter: ConfigWriter[SynchronizerConfig] =
       deriveWriter[SynchronizerConfig]
 
@@ -885,9 +865,6 @@ object SpliceConfig {
       deriveWriter[SplitwellAppBackendConfig]
     implicit val splitwellClientConfigWriter: ConfigWriter[SplitwellAppClientConfig] =
       deriveWriter[SplitwellAppClientConfig]
-
-    implicit val communityParticipantConfigWriter: ConfigWriter[CommunityParticipantConfig] =
-      deriveWriter[CommunityParticipantConfig]
 
     implicit val spliceConfigWriter: ConfigWriter[SpliceConfig] =
       deriveWriter[SpliceConfig]

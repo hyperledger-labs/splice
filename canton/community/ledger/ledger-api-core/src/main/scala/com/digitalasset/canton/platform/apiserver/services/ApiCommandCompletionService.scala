@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -12,7 +12,6 @@ import com.daml.ledger.api.v2.command_completion_service.{
 import com.daml.logging.entries.LoggingEntries
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
-import com.digitalasset.canton.ledger.api.domain.ParticipantOffset
 import com.digitalasset.canton.ledger.api.grpc.StreamingServiceLifecycleManagement
 import com.digitalasset.canton.ledger.api.validation.{
   CompletionServiceRequestValidator,
@@ -74,11 +73,10 @@ final class ApiCommandCompletionService(
                 s"Received request for completion subscription, ${loggingContextWithTrace
                     .serializeFiltered("parties", "offset")}"
               )
-              val offset = request.offset
 
               completionsService
                 .getCompletions(
-                  ParticipantOffset.fromString(offset),
+                  request.offset,
                   request.applicationId,
                   request.parties,
                 )

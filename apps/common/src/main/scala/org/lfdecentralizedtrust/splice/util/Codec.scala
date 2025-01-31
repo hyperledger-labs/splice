@@ -152,15 +152,15 @@ object Codec {
     def instance = timestampValue
   }
 
-  implicit val domainIdValue: Codec[topology.DomainId, String] =
-    new Codec[topology.DomainId, String] {
-      def encode(d: topology.DomainId) = d.toProtoPrimitive
-      def decode(e: String) = topology.DomainId.fromString(e)
+  implicit val synchronizerIdValue: Codec[topology.SynchronizerId, String] =
+    new Codec[topology.SynchronizerId, String] {
+      def encode(d: topology.SynchronizerId) = d.toProtoPrimitive
+      def decode(e: String) = topology.SynchronizerId.fromString(e)
     }
 
-  object DomainId extends CodecCompanion[topology.DomainId] {
+  object SynchronizerId extends CodecCompanion[topology.SynchronizerId] {
     type Enc = String
-    def instance = domainIdValue
+    def instance = synchronizerIdValue
   }
 
   private def failedToDecode(err: String) = {

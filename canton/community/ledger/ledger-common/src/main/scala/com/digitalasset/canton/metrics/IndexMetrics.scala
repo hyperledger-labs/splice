@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -33,7 +33,7 @@ class IndexHistograms(val prefix: MetricName)(implicit
 class IndexMetrics(
     inventory: IndexHistograms,
     openTelemetryMetricsFactory: LabeledMetricsFactory,
-) {
+) extends HasDocumentedMetrics {
 
   import MetricsContext.Implicits.empty
   private val prefix = inventory.prefix

@@ -36,7 +36,7 @@ import org.lfdecentralizedtrust.splice.util.{
   ContractWithState,
   DisclosedContracts,
 }
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -48,7 +48,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
-import com.digitalasset.canton.topology.{DomainId, Namespace, PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{SynchronizerId, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
@@ -147,7 +147,7 @@ class BaseLedgerConnection(
 
   def getConnectedDomains(party: PartyId)(implicit
       tc: TraceContext
-  ): Future[Map[DomainAlias, DomainId]] =
+  ): Future[Map[SynchronizerAlias, SynchronizerId]] =
     client.getConnectedDomains(party)
 
   def updates(
@@ -557,12 +557,6 @@ class SpliceLedgerSubscription[S](
   )
 
   private val (killSwitch, completed_) = PekkoUtil.runSupervised(
-    ex =>
-      if (retryProvider.isClosing) {
-        logger.info("Ignoring failure to handle transaction, as we are shutting down", ex)
-      } else {
-        logger.error("Fatally failed to handle transaction", ex)
-      },
     source
       // we place the kill switch before the map operator, such that
       // we can shut down the operator quickly and signal upstream to cancel further sending
@@ -588,6 +582,11 @@ class SpliceLedgerSubscription[S](
       // If we didn't, we'd get situations where e.g. two ingestions are running simultaneously (and break a lot).
       // For more information, see https://github.com/DACH-NY/canton-network-node/issues/10126.
       .toMat(Sink.ignore)(Keep.both),
+    errorLogMessagePrefix = if (retryProvider.isClosing) {
+      "Ignoring failure to handle transaction, as we are shutting down"
+    } else {
+      "Fatally failed to handle transaction"
+    },
   )
 
   def completed: Future[Done] =
@@ -707,15 +706,18 @@ class SpliceLedgerConnection(
     callCallbacksOnCompletion(result)(x => (None, x))
   }
 
-  private def verifyEnoughExtraTrafficRemains(domainId: DomainId, commandPriority: CommandPriority)(
-      implicit tc: TraceContext
+  private def verifyEnoughExtraTrafficRemains(
+      synchronizerId: SynchronizerId,
+      commandPriority: CommandPriority,
+  )(implicit
+      tc: TraceContext
   ): Future[Unit] = {
     trafficBalanceService
       .fold(Future.unit)(trafficBalanceService => {
-        trafficBalanceService.lookupReservedTraffic(domainId).flatMap {
+        trafficBalanceService.lookupReservedTraffic(synchronizerId).flatMap {
           case None => Future.unit
           case Some(reservedTraffic) =>
-            trafficBalanceService.lookupAvailableTraffic(domainId).flatMap {
+            trafficBalanceService.lookupAvailableTraffic(synchronizerId).flatMap {
               case None => Future.unit
               case Some(availableTraffic) =>
                 if (
@@ -785,17 +787,17 @@ class SpliceLedgerConnection(
       readAs: Seq[PartyId],
       update: C,
       commandIdDeduplicationOffset: CmdId,
-      domainId: DomId,
+      synchronizerId: DomId,
       disclosedContracts: DisclosedContracts,
       priority: CommandPriority,
       deadline: Option[NonNegativeFiniteDuration] = None,
   ) {
     private type DedupNotSpecifiedYet = CmdId =:= Any
-    private type DomainIdRequired = DomId <:< DomainId
+    private type SynchronizerIdRequired = DomId <:< SynchronizerId
 
     private[this] def copy[CmdId0, DomId0](
         commandIdDeduplicationOffset: CmdId0 = this.commandIdDeduplicationOffset,
-        domainId: DomId0 = this.domainId,
+        synchronizerId: DomId0 = this.synchronizerId,
         disclosedContracts: DisclosedContracts = this.disclosedContracts,
         deadline: Option[NonNegativeFiniteDuration] = this.deadline,
     ): submit[C, CmdId0, DomId0] =
@@ -804,7 +806,7 @@ class SpliceLedgerConnection(
         readAs,
         update,
         commandIdDeduplicationOffset,
-        domainId,
+        synchronizerId,
         disclosedContracts,
         priority,
         deadline,
@@ -827,36 +829,36 @@ class SpliceLedgerConnection(
     def noDedup(implicit cid: DedupNotSpecifiedYet): submit[C, Unit, DomId] =
       copy(commandIdDeduplicationOffset = ())
 
-    def withDomainId(
-        domainId: DomainId,
+    def withSynchronizerId(
+        synchronizerId: SynchronizerId,
         disclosedContracts: DisclosedContracts = DisclosedContracts(),
     )(implicit
         // if you statically know you have NE, use withDisclosedContracts instead
         notNE: disclosedContracts.type <:!< DisclosedContracts.NE
-    ): submit[C, CmdId, DomainId] =
+    ): submit[C, CmdId, SynchronizerId] =
       copy(
-        domainId = domainId,
-        disclosedContracts = disclosedContracts assertOnDomain domainId,
+        synchronizerId = synchronizerId,
+        disclosedContracts = disclosedContracts assertOnDomain synchronizerId,
       )
 
     def withDisclosedContracts(disclosedContracts: DisclosedContracts)(implicit
         dcAllowed: WithDisclosedContracts[C, DomId, disclosedContracts.type]
-    ): submit[C, CmdId, DomainId] =
+    ): submit[C, CmdId, SynchronizerId] =
       copy(
-        domainId = dcAllowed.inferDomain(update, domainId, disclosedContracts),
+        synchronizerId = dcAllowed.inferDomain(update, synchronizerId, disclosedContracts),
         disclosedContracts = disclosedContracts,
       )
 
     def yieldUnit()(implicit
         tc: TraceContext,
-        dom: DomainIdRequired,
+        dom: SynchronizerIdRequired,
         dedup: SubmitDedup[CmdId],
         commandOut: SubmitCommands[C],
     ): Future[Unit] = go()
 
     def yieldTransaction()(implicit
         tc: TraceContext,
-        dom: DomainIdRequired,
+        dom: SynchronizerIdRequired,
         dedup: SubmitDedup[CmdId],
         commandOut: SubmitCommands[C],
     ): Future[Transaction] = go()
@@ -864,7 +866,7 @@ class SpliceLedgerConnection(
     @annotation.nowarn("cat=unused&msg=pickT")
     def yieldResult[Z]()(implicit
         tc: TraceContext,
-        dom: DomainIdRequired,
+        dom: SynchronizerIdRequired,
         dedup: SubmitDedup[CmdId],
         commandOut: SubmitCommands[C],
         pickT: YieldResult[C, Z],
@@ -874,7 +876,7 @@ class SpliceLedgerConnection(
     @annotation.nowarn("cat=unused&msg=pickT")
     def yieldResultAndOffset[Z]()(implicit
         tc: TraceContext,
-        dom: DomainIdRequired,
+        dom: SynchronizerIdRequired,
         dedup: SubmitDedup[CmdId],
         commandOut: SubmitCommands[C],
         pickT: YieldResult[C, Z],
@@ -884,12 +886,12 @@ class SpliceLedgerConnection(
 
     private[this] def go[Z]()(implicit
         tc: TraceContext,
-        dom: DomainIdRequired,
+        dom: SynchronizerIdRequired,
         dedup: SubmitDedup[CmdId],
         commandOut: SubmitCommands[C],
         result: SubmitResult[C, Z],
     ): Future[Z] = {
-      verifyEnoughExtraTrafficRemains(domainId, priority)
+      verifyEnoughExtraTrafficRemains(synchronizerId, priority)
         .flatMap(_ => commandOut.run(update).toList.traverse(packageIdResolver.resolvePackageId(_)))
         .flatMap { commands =>
           import SubmitResult.*, LedgerClient.SubmitAndWaitFor as WF
@@ -898,7 +900,8 @@ class SpliceLedgerConnection(
           def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (Long, U)): Future[U] =
             callCallbacksOnCompletionAndWaitForOffset(
               client.submitAndWait(
-                domainId = disclosedContracts.overwriteDomain(domainId).toProtoPrimitive,
+                synchronizerId =
+                  disclosedContracts.overwriteDomain(synchronizerId).toProtoPrimitive,
                 applicationId = applicationId,
                 commandId = commandId,
                 deduplicationConfig = deduplicationConfig,
@@ -991,7 +994,7 @@ class SpliceLedgerConnection(
   }
 
   def prepareSubmission(
-      domainId: Option[DomainId],
+      synchronizerId: Option[SynchronizerId],
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       commands: Seq[Command],
@@ -1001,7 +1004,7 @@ class SpliceLedgerConnection(
       traceContext: TraceContext
   ): Future[lapi.interactive.interactive_submission_service.PrepareSubmissionResponse] = {
     client.prepareSubmission(
-      domainId = domainId.map(_.toProtoPrimitive),
+      synchronizerId = synchronizerId.map(_.toProtoPrimitive),
       applicationId = applicationId,
       // Command dedup with external submissions isn't required for our use atm.
       commandId = UUID.randomUUID().toString(),
@@ -1229,7 +1232,7 @@ object SpliceLedgerConnection {
       update: Update[T],
       transaction: TransactionTree,
   ): T = {
-    val rootEventIds = transaction.getRootEventIds.asScala.toSeq
+    val rootEventIds = transaction.getRootNodeIds.asScala.toSeq
     if (rootEventIds.size == 1) {
       val eventByIds = transaction.getEventsById.asScala
       val event = eventByIds(rootEventIds(0))
@@ -1285,7 +1288,7 @@ object SpliceLedgerConnection {
   final case class UpdateAssignment[-C, +DomId](private[SpliceLedgerConnection] val run: C => DomId)
   object UpdateAssignment extends UpdateAssignmentLow {
     implicit val assigned
-        : UpdateAssignment[Contract.Exercising[AssignedContract[?, ?], ?], DomainId] =
+        : UpdateAssignment[Contract.Exercising[AssignedContract[?, ?], ?], SynchronizerId] =
       UpdateAssignment(_.origin.domain)
   }
   sealed abstract class UpdateAssignmentLow {
@@ -1296,14 +1299,14 @@ object SpliceLedgerConnection {
     "withDisclosedContracts can only be used when ${C} is .exercise on an AssignedContract, or ${DomId} is Unit and ${Arg} is statically non-empty"
   )
   final case class WithDisclosedContracts[-C, -DomId, -Arg](
-      private[SpliceLedgerConnection] val inferDomain: (C, DomId, Arg) => DomainId
+      private[SpliceLedgerConnection] val inferDomain: (C, DomId, Arg) => SynchronizerId
   )
   object WithDisclosedContracts {
     @annotation.nowarn("cat=unused&msg=C")
     implicit def exercised[C](implicit
-        C: UpdateAssignment[C, DomainId] // proves that DomainId derives directly from C
-    ): WithDisclosedContracts[C, DomainId, DisclosedContracts] =
-      WithDisclosedContracts((_, domainId, _) => domainId)
+        C: UpdateAssignment[C, SynchronizerId] // proves that SynchronizerId derives directly from C
+    ): WithDisclosedContracts[C, SynchronizerId, DisclosedContracts] =
+      WithDisclosedContracts((_, synchronizerId, _) => synchronizerId)
     implicit val nonEmpty: WithDisclosedContracts[Any, Unit, DisclosedContracts.NE] =
       WithDisclosedContracts((_, _, dc) => dc.assignedDomain)
   }

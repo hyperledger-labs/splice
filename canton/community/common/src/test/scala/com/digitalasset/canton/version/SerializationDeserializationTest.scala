@@ -1,14 +1,25 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
 
-import com.digitalasset.canton.crypto.TestHash
+import com.digitalasset.canton.crypto.{SymmetricKey, TestHash}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
+import com.digitalasset.canton.pruning.*
 import com.digitalasset.canton.sequencing.SequencerConnections
+import com.digitalasset.canton.sequencing.channel.{
+  ConnectToSequencerChannelRequest,
+  ConnectToSequencerChannelResponse,
+}
+import com.digitalasset.canton.sequencing.protocol.channel.{
+  SequencerChannelConnectedToAllEndpoints,
+  SequencerChannelMetadata,
+  SequencerChannelSessionKey,
+  SequencerChannelSessionKeyAck,
+}
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
   AggregationRule,
@@ -19,8 +30,6 @@ import com.digitalasset.canton.sequencing.protocol.{
   GetTrafficStateForMemberResponse,
   MaxRequestSizeToDeserialize,
   SequencedEvent,
-  SequencerChannelConnectedToAllEndpoints,
-  SequencerChannelMetadata,
   SequencingSubmissionCost,
   SignedContent,
   SubmissionRequest,
@@ -30,6 +39,7 @@ import com.digitalasset.canton.sequencing.protocol.{
 import com.digitalasset.canton.topology.transaction.{
   GeneratorsTransaction,
   SignedTopologyTransaction,
+  SignedTopologyTransactions,
   TopologyTransaction,
 }
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
@@ -63,7 +73,6 @@ class SerializationDeserializationTest
     val generatorsProtocolSeq = new GeneratorsProtocolSequencing(
       version,
       generatorsMessages,
-      generatorsData,
     )
     val generatorsTrafficData = new GeneratorsTrafficData(
       version
@@ -77,11 +86,14 @@ class SerializationDeserializationTest
     import generatorsProtocol.*
     import generatorsProtocolSeq.*
     import generatorsTransaction.*
+    import com.digitalasset.canton.crypto.GeneratorsCrypto.*
 
     s"Serialization and deserialization methods using protocol version $version" should {
       "compose to the identity" in {
-        testProtocolVersioned(StaticDomainParameters, version)
-        testProtocolVersioned(DynamicDomainParameters, version)
+        testVersioned(SymmetricKey)
+
+        testProtocolVersioned(StaticSynchronizerParameters, version)
+        testProtocolVersioned(DynamicSynchronizerParameters, version)
         testProtocolVersioned(DynamicSequencingParameters, version)
 
         testProtocolVersioned(AcsCommitment, version)
@@ -92,6 +104,7 @@ class SerializationDeserializationTest
           version,
         )
         testProtocolVersionedAndValidation(SignedProtocolMessage, version)
+        testProtocolVersioned(ProtocolSymmetricKey, version)
 
         testProtocolVersioned(LocalVerdict, version)
         testProtocolVersionedWithCtxAndValidation(EnvelopeContent, TestHash, version)
@@ -136,6 +149,10 @@ class SerializationDeserializationTest
           SignedTopologyTransaction,
           ProtocolVersionValidation(version),
         )
+        testProtocolVersionedWithCtx(
+          SignedTopologyTransactions,
+          version,
+        )
 
         testMemoizedProtocolVersionedWithCtx(
           ViewParticipantData,
@@ -148,6 +165,7 @@ class SerializationDeserializationTest
           MaxRequestSizeToDeserialize.NoLimit,
         )
         testVersioned(SequencerConnections)
+        testVersioned(CounterParticipantIntervalsBehind)
         testProtocolVersioned(GetTrafficStateForMemberRequest, version)
         // This fails, which is expected, because PartySignatures serialization is only defined on PV.dev
         // We do this on purpose to make clear that this is a work in progress and should **NOT** be merged to 3.1
@@ -156,8 +174,12 @@ class SerializationDeserializationTest
         testProtocolVersioned(TopologyStateForInitRequest, version)
         testProtocolVersioned(SubscriptionRequest, version)
         if (version.isDev) {
+          testProtocolVersioned(ConnectToSequencerChannelRequest, version)
+          testProtocolVersioned(ConnectToSequencerChannelResponse, version)
           testProtocolVersioned(SequencerChannelMetadata, version)
           testProtocolVersioned(SequencerChannelConnectedToAllEndpoints, version)
+          testProtocolVersioned(SequencerChannelSessionKey, version)
+          testProtocolVersioned(SequencerChannelSessionKeyAck, version)
         }
         testMemoizedProtocolVersioned2(
           SequencedEvent,

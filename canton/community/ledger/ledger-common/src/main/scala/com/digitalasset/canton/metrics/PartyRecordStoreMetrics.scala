@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -10,7 +10,8 @@ import com.daml.metrics.api.MetricName
 class PartyRecordStoreMetrics(
     prefix: MetricName,
     labeledMetricsFactory: LabeledMetricsFactory,
-) extends DatabaseMetricsFactory(prefix, labeledMetricsFactory) {
+) extends DatabaseMetricsFactory(prefix, labeledMetricsFactory)
+    with HasDocumentedMetrics {
 
   val getPartyRecord: DatabaseMetrics = createDbMetrics("get_party_record")
   val partiesExist: DatabaseMetrics = createDbMetrics("parties_exist")

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -29,6 +29,7 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawTreeEvent,
   RawUnassignEvent,
 }
+import com.digitalasset.canton.platform.store.backend.common.TransactionPointwiseQueries.LookupKey
 import com.digitalasset.canton.platform.store.dao.{
   DbDispatcher,
   EventProjectionProperties,
@@ -44,8 +45,8 @@ import scala.util.{Failure, Success}
 
 /** @param flatTransactionsStreamReader Knows how to stream flat transactions
   * @param treeTransactionsStreamReader Knows how to stream tree transactions
-  * @param flatTransactionPointwiseReader Knows how to fetch a flat transaction by its id
-  * @param treeTransactionPointwiseReader Knows how to fetch a tree transaction by its id
+  * @param flatTransactionPointwiseReader Knows how to fetch a flat transaction by its id or its offset
+  * @param treeTransactionPointwiseReader Knows how to fetch a tree transaction by its id or its offset
   * @param dispatcher Executes the queries prepared by this object
   * @param queryValidRange
   * @param eventStorageBackend
@@ -69,21 +70,22 @@ private[dao] final class TransactionsReader(
   private val dbMetrics = metrics.index.db
 
   override def getFlatTransactions(
-      startExclusive: Offset,
+      startInclusive: Offset,
       endInclusive: Offset,
       filter: TemplatePartiesFilter,
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, GetUpdatesResponse), NotUsed] = {
-    val futureSource = getEventSeqIdRange(startExclusive, endInclusive)
-      .map(queryRange =>
-        flatTransactionsStreamReader.streamFlatTransactions(
-          queryRange,
-          filter,
-          eventProjectionProperties,
+    val futureSource =
+      getEventSeqIdRange(startInclusive, endInclusive)
+        .map(queryRange =>
+          flatTransactionsStreamReader.streamFlatTransactions(
+            queryRange,
+            filter,
+            eventProjectionProperties,
+          )
         )
-      )
     Source
       .futureSource(futureSource)
       .mapMaterializedValue((_: Future[NotUsed]) => NotUsed)
@@ -93,8 +95,21 @@ private[dao] final class TransactionsReader(
       updateId: data.UpdateId,
       requestingParties: Set[Party],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]] =
-    flatTransactionPointwiseReader.lookupTransactionById(
-      updateId = updateId,
+    flatTransactionPointwiseReader.lookupTransactionBy(
+      lookupKey = LookupKey.UpdateId(updateId),
+      requestingParties = requestingParties,
+      eventProjectionProperties = EventProjectionProperties(
+        verbose = true,
+        templateWildcardWitnesses = Some(requestingParties.map(_.toString)),
+      ),
+    )
+
+  override def lookupFlatTransactionByOffset(
+      offset: data.Offset,
+      requestingParties: Set[Party],
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Option[GetTransactionResponse]] =
+    flatTransactionPointwiseReader.lookupTransactionBy(
+      lookupKey = LookupKey.Offset(offset),
       requestingParties = requestingParties,
       eventProjectionProperties = EventProjectionProperties(
         verbose = true,
@@ -108,8 +123,23 @@ private[dao] final class TransactionsReader(
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Option[GetTransactionTreeResponse]] =
-    treeTransactionPointwiseReader.lookupTransactionById(
-      updateId = updateId,
+    treeTransactionPointwiseReader.lookupTransactionBy(
+      lookupKey = LookupKey.UpdateId(updateId),
+      requestingParties = requestingParties,
+      eventProjectionProperties = EventProjectionProperties(
+        verbose = true,
+        templateWildcardWitnesses = Some(requestingParties.map(_.toString)),
+      ),
+    )
+
+  override def lookupTransactionTreeByOffset(
+      offset: data.Offset,
+      requestingParties: Set[Party],
+  )(implicit
+      loggingContext: LoggingContextWithTrace
+  ): Future[Option[GetTransactionTreeResponse]] =
+    treeTransactionPointwiseReader.lookupTransactionBy(
+      lookupKey = LookupKey.Offset(offset),
       requestingParties = requestingParties,
       eventProjectionProperties = EventProjectionProperties(
         verbose = true,
@@ -118,45 +148,49 @@ private[dao] final class TransactionsReader(
     )
 
   override def getTransactionTrees(
-      startExclusive: Offset,
+      startInclusive: Offset,
       endInclusive: Offset,
       requestingParties: Option[Set[Party]],
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, GetUpdateTreesResponse), NotUsed] = {
-    val futureSource = getEventSeqIdRange(startExclusive, endInclusive)
-      .map(queryRange =>
-        treeTransactionsStreamReader.streamTreeTransaction(
-          queryRange = queryRange,
-          requestingParties = requestingParties,
-          eventProjectionProperties = eventProjectionProperties,
+    val futureSource =
+      getEventSeqIdRange(startInclusive, endInclusive)
+        .map(queryRange =>
+          treeTransactionsStreamReader.streamTreeTransaction(
+            queryRange = queryRange,
+            requestingParties = requestingParties,
+            eventProjectionProperties = eventProjectionProperties,
+          )
         )
-      )
     Source
       .futureSource(futureSource)
       .mapMaterializedValue((_: Future[NotUsed]) => NotUsed)
   }
 
   override def getActiveContracts(
-      activeAt: Offset,
+      activeAt: Option[Offset],
       filter: TemplatePartiesFilter,
       eventProjectionProperties: EventProjectionProperties,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Source[GetActiveContractsResponse, NotUsed] = {
-    val futureSource = getMaxAcsEventSeqId(activeAt)
-      .map(maxSeqId =>
-        acsReader.streamActiveContracts(
-          filter,
-          activeAt -> maxSeqId,
-          eventProjectionProperties,
-        )
-      )
-    Source
-      .futureSource(futureSource)
-      .mapMaterializedValue((_: Future[NotUsed]) => NotUsed)
-  }
+  ): Source[GetActiveContractsResponse, NotUsed] =
+    activeAt match {
+      case None => Source.empty
+      case Some(offset) =>
+        val futureSource = getMaxAcsEventSeqId(offset)
+          .map(maxSeqId =>
+            acsReader.streamActiveContracts(
+              filteringConstraints = filter,
+              activeAt = offset -> maxSeqId,
+              eventProjectionProperties = eventProjectionProperties,
+            )
+          )
+        Source
+          .futureSource(futureSource)
+          .mapMaterializedValue((_: Future[NotUsed]) => NotUsed)
+    }
 
   private def getMaxAcsEventSeqId(activeAt: Offset)(implicit
       loggingContext: LoggingContextWithTrace
@@ -176,32 +210,32 @@ private[dao] final class TransactionsReader(
               ledgerEndOffset = ledgerEnd,
             ),
         )(
-          eventStorageBackend.maxEventSequentialId(activeAt)(connection)
+          eventStorageBackend.maxEventSequentialId(Some(activeAt))(connection)
         )
       )
 
   private def getEventSeqIdRange(
-      startExclusive: Offset,
+      startInclusive: Offset,
       endInclusive: Offset,
   )(implicit loggingContext: LoggingContextWithTrace): Future[EventsRange] =
     dispatcher
       .executeSql(dbMetrics.getEventSeqIdRange)(implicit connection =>
         queryValidRange.withRangeNotPruned(
-          minOffsetExclusive = startExclusive,
+          minOffsetInclusive = startInclusive,
           maxOffsetInclusive = endInclusive,
           errorPruning = (prunedOffset: Offset) =>
-            s"Transactions request from ${startExclusive.toLong} to ${endInclusive.toLong} precedes pruned offset ${prunedOffset.toLong}",
-          errorLedgerEnd = (ledgerEndOffset: Offset) =>
-            s"Transactions request from ${startExclusive.toLong} to ${endInclusive.toLong} is beyond ledger end offset ${ledgerEndOffset.toLong}",
+            s"Transactions request from ${startInclusive.unwrap} to ${endInclusive.unwrap} precedes pruned offset ${prunedOffset.unwrap}",
+          errorLedgerEnd = (ledgerEndOffset: Option[Offset]) =>
+            s"Transactions request from ${startInclusive.unwrap} to ${endInclusive.unwrap} is beyond ledger end offset ${ledgerEndOffset
+                .fold(0L)(_.unwrap)}",
         ) {
           EventsRange(
-            startExclusiveOffset = startExclusive,
-            startExclusiveEventSeqId = eventStorageBackend.maxEventSequentialId(
-              startExclusive
-            )(connection),
+            startInclusiveOffset = startInclusive,
+            startInclusiveEventSeqId =
+              eventStorageBackend.maxEventSequentialId(startInclusive.decrement)(connection),
             endInclusiveOffset = endInclusive,
             endInclusiveEventSeqId =
-              eventStorageBackend.maxEventSequentialId(endInclusive)(connection),
+              eventStorageBackend.maxEventSequentialId(Some(endInclusive))(connection),
           )
         }
       )
@@ -259,8 +293,8 @@ private[dao] object TransactionsReader {
       contractId = rawUnassignEvent.contractId,
       templateId = Some(LfEngineToApi.toApiIdentifier(rawUnassignEvent.templateId)),
       packageName = rawUnassignEvent.packageName,
-      source = rawUnassignEvent.sourceDomainId,
-      target = rawUnassignEvent.targetDomainId,
+      source = rawUnassignEvent.sourceSynchronizerId,
+      target = rawUnassignEvent.targetSynchronizerId,
       submitter = rawUnassignEvent.submitter.getOrElse(""),
       reassignmentCounter = rawUnassignEvent.reassignmentCounter,
       assignmentExclusivity =
@@ -273,8 +307,8 @@ private[dao] object TransactionsReader {
       createdEvent: CreatedEvent,
   ): AssignedEvent =
     AssignedEvent(
-      source = rawAssignEvent.sourceDomainId,
-      target = rawAssignEvent.targetDomainId,
+      source = rawAssignEvent.sourceSynchronizerId,
+      target = rawAssignEvent.targetSynchronizerId,
       unassignId = rawAssignEvent.unassignId,
       submitter = rawAssignEvent.submitter.getOrElse(""),
       reassignmentCounter = rawAssignEvent.reassignmentCounter,

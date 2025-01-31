@@ -79,7 +79,7 @@ class WalletTransferOfferStatusIntegrationTest
         .by_id(parties, txId)
         .getOrElse(fail("Expected to see the transaction tree in the ledger."))
       val root = txTree.eventsById
-        .getOrElse(txTree.rootEventIds.head, fail("Must exist"))
+        .getOrElse(txTree.rootNodeIds.head, fail("Must exist"))
       txTree -> root
     }
 
@@ -119,7 +119,7 @@ class WalletTransferOfferStatusIntegrationTest
                   Set(aliceUserParty, bobUserParty),
                 )
                 exercise.getExercised.choice should be("TransferOffer_Accept")
-                val acceptChildren = exercise.getExercised.childEventIds.map(
+                val acceptChildren = exercise.getExercised.childNodeIds.map(
                   tree.eventsById.getOrElse(_, fail("Must exist"))
                 )
                 acceptChildren.map(_.getCreated.contractId) should contain(contractId)

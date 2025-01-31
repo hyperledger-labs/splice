@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.client
@@ -8,6 +8,7 @@ import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
@@ -21,13 +22,15 @@ import com.digitalasset.canton.topology.store.{
 }
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.*
-import com.digitalasset.canton.{BaseTest, HasExecutionContext, SequencerCounter}
+import com.digitalasset.canton.{BaseTest, FailOnShutdown, HasExecutionContext, SequencerCounter}
 import org.scalatest.wordspec.AsyncWordSpec
 
-import scala.concurrent.Future
-
 @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
-trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with HasExecutionContext {
+trait StoreBasedTopologySnapshotTest
+    extends AsyncWordSpec
+    with BaseTest
+    with HasExecutionContext
+    with FailOnShutdown {
 
   import EffectiveTimeTestHelpers.*
 
@@ -63,12 +66,11 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
     class Fixture {
       val store: TopologyStore[TopologyStoreId] = mk()
       val client =
-        new StoreBasedDomainTopologyClient(
+        new StoreBasedSynchronizerTopologyClient(
           mock[Clock],
-          domainId,
-          testedProtocolVersion,
+          synchronizerId,
           store,
-          StoreBasedDomainTopologyClient.NoPackageDependencies,
+          StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
           DefaultProcessingTimeouts.testing,
           FutureSupervisor.Noop,
           loggerFactory,
@@ -77,7 +79,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
       def add(
           timestamp: CantonTimestamp,
           transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-      ): Future[Unit] =
+      ): FutureUnlessShutdown[Unit] =
         for {
           _ <- store.update(
             SequencedTime(timestamp),
@@ -88,7 +90,6 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
           )
           _ <- client
             .observed(timestamp, timestamp, SequencerCounter(1), transactions)
-            .failOnShutdown(s"observe timestamp $timestamp")
         } yield ()
 
       def observed(ts: CantonTimestamp): Unit =
@@ -97,8 +98,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
       def observed(st: SequencedTime, et: EffectiveTime): Unit =
         client
           .observed(st, et, SequencerCounter(0), List())
-          .failOnShutdown(s"advance to ($st, $et)")
-          .futureValue
+          .futureValueUS
 
       def updateHead(
           st: SequencedTime,
@@ -254,7 +254,7 @@ trait StoreBasedTopologySnapshotTest extends AsyncWordSpec with BaseTest with Ha
       }
     }
 
-    "properly deals with participants with lower domain privileges" in {
+    "properly deals with participants with lower synchronizer privileges" in {
       val fixture = new Fixture()
       for {
         _ <- fixture.add(ts, Seq(dpc1, p1_otk, p1_dtc, party1participant1, p1_pdp_observation))
@@ -356,6 +356,7 @@ class StoreBasedTopologySnapshotTestInMemory extends StoreBasedTopologySnapshotT
     behave like topologySnapshot(() =>
       new InMemoryTopologyStore(
         TopologyStoreId.AuthorizedStore,
+        testedProtocolVersion,
         loggerFactory,
         timeouts,
       )
@@ -370,7 +371,7 @@ trait DbStoreBasedTopologySnapshotTest
   this: AsyncWordSpec with BaseTest with HasExecutionContext with DbTest =>
 
   "DbStoreBasedTopologySnapshot" should {
-    behave like topologySnapshot(() => createTopologyStore(DefaultTestIdentities.domainId))
+    behave like topologySnapshot(() => createTopologyStore(DefaultTestIdentities.synchronizerId))
   }
 
 }

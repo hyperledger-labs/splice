@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.time
@@ -388,14 +388,9 @@ class ClockTest extends AnyWordSpec with BaseTest with HasExecutionContext {
       val nowF = Future(env.clock.now)
 
       firstRequestObserved.future.futureValue
-      loggerFactory.assertLogs(
-        {
-          env.close()
-          nowF.futureValue shouldBe CantonTimestamp.MinValue.immediateSuccessor
-        },
-        // TODO(#21278): Ensure that shutdown works as expected
-        _.warningMessage should include("shutdown did not complete gracefully in allotted"),
-      )
+      env.close()
+      nowF.futureValue shouldBe CantonTimestamp.MinValue.immediateSuccessor
+
     }
   }
 

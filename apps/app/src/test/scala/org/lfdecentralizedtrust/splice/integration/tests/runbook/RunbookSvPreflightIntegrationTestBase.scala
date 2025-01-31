@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletFrontendTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -297,13 +297,13 @@ abstract class RunbookSvPreflightIntegrationTestBase
       svValidatorClient.dumpParticipantIdentities().id
     }
     val activeSynchronizer = clue("Can get active domain from Scan") {
-      val svActiveDomain = DomainId.tryFromString(
+      val svActiveDomain = SynchronizerId.tryFromString(
         svScanClient
           .getAmuletConfigAsOf(env.environment.clock.now)
           .decentralizedSynchronizer
           .activeSynchronizer
       )
-      val sv1ActiveDomain = DomainId.tryFromString(
+      val sv1ActiveDomain = SynchronizerId.tryFromString(
         sv1ScanClient
           .getAmuletConfigAsOf(env.environment.clock.now)
           .decentralizedSynchronizer

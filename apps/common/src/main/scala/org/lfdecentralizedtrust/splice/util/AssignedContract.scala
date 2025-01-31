@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import PrettyInstances.*
 
 /** A contract that is ready to be acted upon
@@ -16,7 +16,7 @@ import PrettyInstances.*
   */
 final case class AssignedContract[TCid, T](
     contract: Contract[TCid, T],
-    domain: DomainId,
+    domain: SynchronizerId,
 ) extends PrettyPrinting
     with Contract.Has[TCid, T] {
   override def pretty: Pretty[AssignedContract[TCid, T]] = prettyOfClass[AssignedContract[TCid, T]](
@@ -44,9 +44,9 @@ object AssignedContract {
   ): Either[String, AssignedContract[TCid, T]] =
     for {
       decodedContract <- Contract.fromHttp(companion)(contract.contract).left.map(_.toString)
-      domainId <- Codec.decode(Codec.DomainId)(contract.domainId)
+      synchronizerId <- Codec.decode(Codec.SynchronizerId)(contract.domainId)
     } yield AssignedContract(
       decodedContract,
-      domainId,
+      synchronizerId,
     )
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -119,6 +119,12 @@ object ErrorUtil {
       loggingContext: ErrorLoggingContext
   ): Future[Unit] =
     if (condition) Future.unit else internalErrorAsync(new IllegalArgumentException(message))
+
+  def requireArgumentAsyncShutdown(condition: Boolean, message: => String)(implicit
+      loggingContext: ErrorLoggingContext
+  ): FutureUnlessShutdown[Unit] =
+    if (condition) FutureUnlessShutdown.unit
+    else internalErrorAsyncShutdown(new IllegalArgumentException(message))
 
   /** If `condition` is not satisfied, log an ERROR and return a failed future with an [[java.lang.IllegalStateException]]
     */

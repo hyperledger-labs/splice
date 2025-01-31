@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.{SynchronizerId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -58,7 +58,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
       // We assume that we can switch over immediately to the new domain. The one case where this might break
       // is if there is a new SV being onboarded just around the time of the domain migration. This seems
       // like an acceptable limitation.
-      activeSynchronizerId = DomainId.tryFromString(
+      activeSynchronizerId = SynchronizerId.tryFromString(
         decentralizedSynchronizerConfig.activeSynchronizer
       )
       sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
@@ -100,7 +100,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
       // We must read the state here again to pick up on new serials
       (trafficState, sequencerState) <- (
         sequencerAdminConnection.getSequencerTrafficControlState(task.memberId),
-        sequencerAdminConnection.getSequencerDomainState(),
+        sequencerAdminConnection.getSequencerSynchronizerState(),
       ).tupled
       _ <- sequencerAdminConnection.setSequencerTrafficControlState(
         trafficState,
@@ -138,7 +138,7 @@ object SvOnboardingUnlimitedTrafficTrigger {
   val UnlimitedTraffic: NonNegativeLong = NonNegativeLong.maxValue
 
   final case class Task(
-      synchronizerId: DomainId,
+      synchronizerId: SynchronizerId,
       memberId: Member,
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =

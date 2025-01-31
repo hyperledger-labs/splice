@@ -22,7 +22,7 @@ lazy val `canton-community-app` = BuildCommon.`canton-community-app`
 lazy val `canton-community-app-base` = BuildCommon.`canton-community-app-base`
 lazy val `canton-community-base` = BuildCommon.`canton-community-base`
 lazy val `canton-community-common` = BuildCommon.`canton-community-common`
-lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
+lazy val `canton-community-synchronizer` = BuildCommon.`canton-community-synchronizer`
 lazy val `canton-community-participant` = BuildCommon.`canton-community-participant`
 lazy val `canton-community-admin-api` = BuildCommon.`canton-community-admin-api`
 lazy val `canton-community-integration-testing` = BuildCommon.`canton-community-integration-testing`
@@ -34,6 +34,7 @@ lazy val `canton-util-external` = BuildCommon.`canton-util-external`
 lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
 lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
 lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
+lazy val `canton-magnolify-addon` = BuildCommon.`canton-magnolify-addon`
 lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
@@ -46,6 +47,7 @@ lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
 lazy val `canton-bindings-java` = BuildCommon.`canton-bindings-java`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
+lazy val `canton-kms-driver-api` = BuildCommon.`canton-kms-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
 lazy val `canton-transcode` = BuildCommon.`canton-transcode`
 
@@ -111,7 +113,7 @@ lazy val root: Project = (project in file("."))
     `canton-wartremover-extension`,
     `canton-community-app`,
     `canton-community-app-base`,
-    `canton-community-domain`,
+    `canton-community-synchronizer`,
     `canton-community-participant`,
     `canton-ledger-common`,
     `canton-ledger-api-core`,

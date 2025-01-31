@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -46,7 +46,7 @@ class BatchAggregatorUSTest
 
   private def aggregatorWithDefaults(
       maximumInFlight: Int = defaultMaximumInFlight,
-      batchGetter: BatchGetterType = defaultBatchGetter,
+      batchGetter: BatchGetterType,
   ): BatchAggregatorUS[K, V] = {
     val processor = new BatchAggregatorUS.ProcessorUS[K, V] {
       override def kind: String = "item"
@@ -72,7 +72,7 @@ class BatchAggregatorUSTest
     */
   private def batchGetterWithCounter(
       requestsCountPerSize: TrieMap[Int, Int],
-      blocker: FutureUnlessShutdown[Unit] = FutureUnlessShutdown.unit,
+      blocker: FutureUnlessShutdown[Unit],
   ): BatchGetterType =
     keys => {
       requestsCountPerSize.updateWith(keys.size)(_.map(count => count + 1).orElse(Some(1)))
@@ -84,7 +84,7 @@ class BatchAggregatorUSTest
   case class CacheWithAggregator(aggregator: BatchAggregatorUS[K, V])(implicit
       traceContext: TraceContext
   ) {
-    private val cache = Scaffeine().buildAsync[K, V]()
+    private val cache = Scaffeine().executor(executorService).buildAsync[K, V]()
 
     def get(key: K): FutureUnlessShutdown[V] =
       FutureUnlessShutdown.outcomeF(cache.get(key, key => aggregator.run(key).futureValueUS))

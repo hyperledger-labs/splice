@@ -1,9 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data
 
 import com.daml.ledger.api.*
+import com.daml.ledger.api.v2.CommandsOuterClass
 import com.google.protobuf.{ByteString, Empty}
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.{Arbitrary, Gen}
@@ -240,6 +241,23 @@ object Generators {
       .build()
   }
 
+  def topologyEventGen: Gen[v2.TopologyTransactionOuterClass.TopologyEvent] = {
+    import v2.TopologyTransactionOuterClass.TopologyEvent
+    for {
+      event <- Gen.oneOf(
+        participantAuthorizationChangedGen.map(e =>
+          (b: TopologyEvent.Builder) => b.setParticipantAuthorizationChanged(e)
+        ),
+        participantAuthorizationRevokedGen.map(e =>
+          (b: TopologyEvent.Builder) => b.setParticipantAuthorizationRevoked(e)
+        ),
+      )
+    } yield v2.TopologyTransactionOuterClass.TopologyEvent
+      .newBuilder()
+      .pipe(event)
+      .build()
+  }
+
   private[this] val failingStatusGen = Gen const com.google.rpc.Status.getDefaultInstance
 
   private[this] val interfaceViewGen: Gen[v2.EventOuterClass.InterfaceView] =
@@ -248,7 +266,6 @@ object Generators {
       vs.fold(b.setViewValue, b.setViewStatus).build()
     }
 
-  val eventIdGen: Gen[String] = Arbitrary.arbString.arbitrary.suchThat(_.nonEmpty)
   val packageNameGen: Gen[String] = Arbitrary.arbString.arbitrary.suchThat(_.nonEmpty)
 
   val createdEventGen: Gen[v2.EventOuterClass.CreatedEvent] =
@@ -259,7 +276,8 @@ object Generators {
       createArgument <- recordGen
       createEventBlob <- byteStringGen
       interfaceViews <- Gen.listOf(interfaceViewGen)
-      eventId <- eventIdGen
+      offset <- Arbitrary.arbLong.arbitrary
+      nodeId <- Arbitrary.arbInt.arbitrary
       witnessParties <- Gen.listOf(Arbitrary.arbString.arbitrary)
       signatories <- Gen.listOf(Gen.asciiPrintableStr)
       observers <- Gen.listOf(Gen.asciiPrintableStr)
@@ -271,7 +289,8 @@ object Generators {
       .setCreateArguments(createArgument)
       .setCreatedEventBlob(createEventBlob)
       .addAllInterfaceViews(interfaceViews.asJava)
-      .setEventId(eventId)
+      .setOffset(offset)
+      .setNodeId(nodeId)
       .addAllWitnessParties(witnessParties.asJava)
       .addAllSignatories(signatories.asJava)
       .addAllObservers(observers.asJava)
@@ -281,14 +300,16 @@ object Generators {
     for {
       contractId <- contractIdValueGen.map(_.getContractId)
       templateId <- identifierGen
-      eventId <- eventIdGen
+      offset <- Arbitrary.arbLong.arbitrary
+      nodeId <- Arbitrary.arbInt.arbitrary
       witnessParties <- Gen.listOf(Arbitrary.arbString.arbitrary)
 
     } yield v2.EventOuterClass.ArchivedEvent
       .newBuilder()
       .setContractId(contractId)
       .setTemplateId(templateId)
-      .setEventId(eventId)
+      .setOffset(offset)
+      .setNodeId(nodeId)
       .addAllWitnessParties(witnessParties.asJava)
       .build()
 
@@ -297,7 +318,8 @@ object Generators {
       contractId <- contractIdValueGen.map(_.getContractId)
       templateId <- identifierGen
       actingParties <- Gen.listOf(Arbitrary.arbString.arbitrary)
-      eventId <- eventIdGen
+      offset <- Arbitrary.arbLong.arbitrary
+      nodeId <- Arbitrary.arbInt.arbitrary
       choice <- Arbitrary.arbString.arbitrary
       choiceArgument <- valueGen
       isConsuming <- Arbitrary.arbBool.arbitrary
@@ -311,9 +333,38 @@ object Generators {
       .setChoice(choice)
       .setChoiceArgument(choiceArgument)
       .setConsuming(isConsuming)
-      .setEventId(eventId)
+      .setOffset(offset)
+      .setNodeId(nodeId)
       .addAllWitnessParties(witnessParties.asJava)
       .setExerciseResult(exerciseResult)
+      .build()
+
+  val participantAuthorizationChangedGen
+      : Gen[v2.TopologyTransactionOuterClass.ParticipantAuthorizationChanged] =
+    for {
+      partyId <- Arbitrary.arbString.arbitrary
+      participantId <- Arbitrary.arbString.arbitrary
+      permission <- Gen.oneOf(
+        v2.StateServiceOuterClass.ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION,
+        v2.StateServiceOuterClass.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION,
+        v2.StateServiceOuterClass.ParticipantPermission.PARTICIPANT_PERMISSION_OBSERVATION,
+      )
+    } yield v2.TopologyTransactionOuterClass.ParticipantAuthorizationChanged
+      .newBuilder()
+      .setPartyId(partyId)
+      .setParticipantId(participantId)
+      .setParticiantPermission(permission)
+      .build()
+
+  val participantAuthorizationRevokedGen
+      : Gen[v2.TopologyTransactionOuterClass.ParticipantAuthorizationRevoked] =
+    for {
+      partyId <- Arbitrary.arbString.arbitrary
+      participantId <- Arbitrary.arbString.arbitrary
+    } yield v2.TopologyTransactionOuterClass.ParticipantAuthorizationRevoked
+      .newBuilder()
+      .setPartyId(partyId)
+      .setParticipantId(participantId)
       .build()
 
   def transactionFilterGen: Gen[v2.TransactionFilterOuterClass.TransactionFilter] =
@@ -418,12 +469,12 @@ object Generators {
   def activeContractGen: Gen[v2.StateServiceOuterClass.ActiveContract] =
     for {
       createdEvent <- createdEventGen
-      domainId <- Arbitrary.arbString.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
       reassignmentCounter <- Arbitrary.arbLong.arbitrary
     } yield v2.StateServiceOuterClass.ActiveContract
       .newBuilder()
       .setCreatedEvent(createdEvent)
-      .setDomainId(domainId)
+      .setSynchronizerId(synchronizerId)
       .setReassignmentCounter(reassignmentCounter)
       .build()
 
@@ -515,37 +566,39 @@ object Generators {
       .pipe(entryGen)
       .build()
 
-  def getConnectedDomainsRequestGen: Gen[v2.StateServiceOuterClass.GetConnectedDomainsRequest] =
+  def getConnectedSynchronizersRequestGen
+      : Gen[v2.StateServiceOuterClass.GetConnectedSynchronizersRequest] =
     for {
       party <- Arbitrary.arbString.arbitrary
-    } yield v2.StateServiceOuterClass.GetConnectedDomainsRequest
+    } yield v2.StateServiceOuterClass.GetConnectedSynchronizersRequest
       .newBuilder()
       .setParty(party)
       .build()
 
-  def connectedDomainGen
-      : Gen[v2.StateServiceOuterClass.GetConnectedDomainsResponse.ConnectedDomain] =
+  def connectedSynchronizerGen
+      : Gen[v2.StateServiceOuterClass.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =
     for {
-      domainAlias <- Arbitrary.arbString.arbitrary
-      domainId <- Arbitrary.arbString.arbitrary
+      synchronizerAlias <- Arbitrary.arbString.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
       permission <- Gen.oneOf(
         v2.StateServiceOuterClass.ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION,
         v2.StateServiceOuterClass.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION,
         v2.StateServiceOuterClass.ParticipantPermission.PARTICIPANT_PERMISSION_OBSERVATION,
       )
-    } yield v2.StateServiceOuterClass.GetConnectedDomainsResponse.ConnectedDomain
+    } yield v2.StateServiceOuterClass.GetConnectedSynchronizersResponse.ConnectedSynchronizer
       .newBuilder()
-      .setDomainAlias(domainAlias)
-      .setDomainId(domainId)
+      .setSynchronizerAlias(synchronizerAlias)
+      .setSynchronizerId(synchronizerId)
       .setPermission(permission)
       .build()
 
-  def getConnectedDomainsResponseGen: Gen[v2.StateServiceOuterClass.GetConnectedDomainsResponse] =
+  def getConnectedSynchronizersResponseGen
+      : Gen[v2.StateServiceOuterClass.GetConnectedSynchronizersResponse] =
     for {
-      domains <- Gen.listOf(connectedDomainGen)
-    } yield v2.StateServiceOuterClass.GetConnectedDomainsResponse
+      synchronizers <- Gen.listOf(connectedSynchronizerGen)
+    } yield v2.StateServiceOuterClass.GetConnectedSynchronizersResponse
       .newBuilder()
-      .addAllConnectedDomains(domains.asJava)
+      .addAllConnectedSynchronizers(synchronizers.asJava)
       .build()
 
   def getLedgerEndResponseGen: Gen[v2.StateServiceOuterClass.GetLedgerEndResponse] =
@@ -573,21 +626,21 @@ object Generators {
   def createdGen: Gen[v2.EventQueryServiceOuterClass.Created] =
     for {
       createdEvent <- createdEventGen
-      domainId <- Arbitrary.arbString.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
     } yield v2.EventQueryServiceOuterClass.Created
       .newBuilder()
       .setCreatedEvent(createdEvent)
-      .setDomainId(domainId)
+      .setSynchronizerId(synchronizerId)
       .build()
 
   def archivedGen: Gen[v2.EventQueryServiceOuterClass.Archived] =
     for {
       archivedEvent <- archivedEventGen
-      domainId <- Arbitrary.arbString.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
     } yield v2.EventQueryServiceOuterClass.Archived
       .newBuilder()
       .setArchivedEvent(archivedEvent)
-      .setDomainId(domainId)
+      .setSynchronizerId(synchronizerId)
       .build()
 
   def getEventsByContractIdResponseGen
@@ -640,7 +693,7 @@ object Generators {
       )
       traceContext <- Gen.const(Utils.newProtoTraceContext("parent", "state"))
       offset <- Arbitrary.arbLong.arbitrary
-      domainTime <- domainTimeGen
+      synchronizerTime <- synchronizerTimeGen
     } yield Completion
       .newBuilder()
       .setCommandId(commandId)
@@ -652,18 +705,18 @@ object Generators {
       .pipe(deduplication)
       .setTraceContext(traceContext)
       .setOffset(offset)
-      .setDomainTime(domainTime)
+      .setSynchronizerTime(synchronizerTime)
       .build()
   }
 
-  def domainTimeGen: Gen[v2.OffsetCheckpointOuterClass.DomainTime] = {
-    import v2.OffsetCheckpointOuterClass.DomainTime
+  def synchronizerTimeGen: Gen[v2.OffsetCheckpointOuterClass.SynchronizerTime] = {
+    import v2.OffsetCheckpointOuterClass.SynchronizerTime
     for {
-      domainId <- Arbitrary.arbString.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
       recordTime <- instantGen
-    } yield DomainTime
+    } yield SynchronizerTime
       .newBuilder()
-      .setDomainId(domainId)
+      .setSynchronizerId(synchronizerId)
       .setRecordTime(Utils.instantToProto(recordTime))
       .build()
   }
@@ -693,7 +746,7 @@ object Generators {
       effectiveAt <- instantGen
       events <- Gen.listOf(eventGen)
       offset <- Arbitrary.arbLong.arbitrary
-      domainId <- Arbitrary.arbString.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
       traceContext <- Gen.const(Utils.newProtoTraceContext("parent", "state"))
       recordTime <- instantGen
     } yield Transaction
@@ -704,7 +757,7 @@ object Generators {
       .setEffectiveAt(Utils.instantToProto(effectiveAt))
       .addAllEvents(events.asJava)
       .setOffset(offset)
-      .setDomainId(domainId)
+      .setSynchronizerId(synchronizerId)
       .setTraceContext(traceContext)
       .setRecordTime(Utils.instantToProto(recordTime))
       .build()
@@ -714,9 +767,9 @@ object Generators {
     import v2.TransactionOuterClass.{TransactionTree, TreeEvent}
     def idTreeEventPairGen =
       treeEventGen.map { e =>
-        val id = e.getKindCase match {
-          case TreeEvent.KindCase.CREATED => e.getCreated.getEventId
-          case TreeEvent.KindCase.EXERCISED => e.getExercised.getEventId
+        val id: Integer = e.getKindCase match {
+          case TreeEvent.KindCase.CREATED => e.getCreated.getNodeId
+          case TreeEvent.KindCase.EXERCISED => e.getExercised.getNodeId
           case TreeEvent.KindCase.KIND_NOT_SET => sys.error("unrecognized TreeEvent")
         }
         id -> e
@@ -727,9 +780,9 @@ object Generators {
       workflowId <- Arbitrary.arbString.arbitrary
       effectiveAt <- instantGen
       eventsById <- Gen.mapOfN(10, idTreeEventPairGen)
-      rootEventIds = eventsById.headOption.map(_._1).toList
+      rootNodeIds = eventsById.headOption.map(_._1).toList
       offset <- Arbitrary.arbLong.arbitrary
-      domainId <- Arbitrary.arbString.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
       traceContext <- Gen.const(Utils.newProtoTraceContext("parent", "state"))
       recordTime <- instantGen
     } yield TransactionTree
@@ -739,9 +792,29 @@ object Generators {
       .setWorkflowId(workflowId)
       .setEffectiveAt(Utils.instantToProto(effectiveAt))
       .putAllEventsById(eventsById.asJava)
-      .addAllRootEventIds(rootEventIds.asJava)
+      .addAllRootNodeIds(rootNodeIds.asJava)
       .setOffset(offset)
-      .setDomainId(domainId)
+      .setSynchronizerId(synchronizerId)
+      .setTraceContext(traceContext)
+      .setRecordTime(Utils.instantToProto(recordTime))
+      .build()
+  }
+
+  def topologyTransactionGen: Gen[v2.TopologyTransactionOuterClass.TopologyTransaction] = {
+    import v2.TopologyTransactionOuterClass.TopologyTransaction
+    for {
+      updateId <- Arbitrary.arbString.arbitrary
+      events <- Gen.listOf(topologyEventGen)
+      offset <- Arbitrary.arbLong.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
+      traceContext <- Gen.const(Utils.newProtoTraceContext("parent", "state"))
+      recordTime <- instantGen
+    } yield TopologyTransaction
+      .newBuilder()
+      .setUpdateId(updateId)
+      .addAllEvents(events.asJava)
+      .setOffset(offset)
+      .setSynchronizerId(synchronizerId)
       .setTraceContext(traceContext)
       .setRecordTime(Utils.instantToProto(recordTime))
       .build()
@@ -774,15 +847,15 @@ object Generators {
       .build()
   }
 
-  def getTransactionByEventIdRequestGen
-      : Gen[v2.UpdateServiceOuterClass.GetTransactionByEventIdRequest] = {
-    import v2.UpdateServiceOuterClass.GetTransactionByEventIdRequest as Request
+  def getTransactionByOffsetRequestGen
+      : Gen[v2.UpdateServiceOuterClass.GetTransactionByOffsetRequest] = {
+    import v2.UpdateServiceOuterClass.GetTransactionByOffsetRequest as Request
     for {
-      eventId <- eventIdGen
+      offset <- Arbitrary.arbLong.arbitrary
       requestingParties <- Gen.listOf(Arbitrary.arbString.arbitrary)
     } yield Request
       .newBuilder()
-      .setEventId(eventId)
+      .setOffset(offset)
       .addAllRequestingParties(requestingParties.asJava)
       .build()
   }
@@ -840,11 +913,11 @@ object Generators {
     import v2.OffsetCheckpointOuterClass.OffsetCheckpoint
     for {
       offset <- Arbitrary.arbLong.arbitrary
-      domainTimes <- Gen.listOf(domainTimeGen)
+      synchronizerTimes <- Gen.listOf(synchronizerTimeGen)
     } yield OffsetCheckpoint
       .newBuilder()
       .setOffset(offset)
-      .addAllDomainTimes(domainTimes.asJava)
+      .addAllSynchronizerTimes(synchronizerTimes.asJava)
       .build()
   }
 
@@ -858,6 +931,9 @@ object Generators {
         ),
         offsetCheckpointGen.map(checkpoint =>
           (b: Response.Builder) => b.setOffsetCheckpoint(checkpoint)
+        ),
+        topologyTransactionGen.map(topologyTransaction =>
+          (b: Response.Builder) => b.setTopologyTransaction(topologyTransaction)
         ),
       )
     } yield Response
@@ -878,6 +954,9 @@ object Generators {
         ),
         offsetCheckpointGen.map(checkpoint =>
           (b: Response.Builder) => b.setOffsetCheckpoint(checkpoint)
+        ),
+        topologyTransactionGen.map(topologyTransaction =>
+          (b: Response.Builder) => b.setTopologyTransaction(topologyTransaction)
         ),
       )
     } yield Response
@@ -980,7 +1059,7 @@ object Generators {
       readAs <- Gen.listOf(Arbitrary.arbString.arbitrary)
       submissionId <- Arbitrary.arbString.arbitrary
       disclosedContract <- disclosedContractGen
-      domainId <- Arbitrary.arbString.arbitrary
+      synchronizerId <- Arbitrary.arbString.arbitrary
     } yield Commands
       .newBuilder()
       .setWorkflowId(workflowId)
@@ -994,7 +1073,7 @@ object Generators {
       .addAllReadAs(readAs.asJava)
       .setSubmissionId(submissionId)
       .addDisclosedContracts(disclosedContract)
-      .setDomainId(domainId)
+      .setSynchronizerId(synchronizerId)
       .build()
   }
 
@@ -1084,4 +1163,14 @@ object Generators {
       .setTransaction(transaction)
       .build()
   }
+
+  val prefetchContractKeyGen: Gen[CommandsOuterClass.PrefetchContractKey] =
+    for {
+      templateId <- identifierGen
+      contractKey <- valueGen
+    } yield CommandsOuterClass.PrefetchContractKey
+      .newBuilder()
+      .setTemplateId(templateId)
+      .setContractKey(contractKey)
+      .build()
 }

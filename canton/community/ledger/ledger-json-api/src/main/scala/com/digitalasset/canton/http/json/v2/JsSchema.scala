@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -36,7 +36,7 @@ object JsSchema {
       effective_at: com.google.protobuf.timestamp.Timestamp,
       events: Seq[JsEvent.Event],
       offset: Long,
-      domain_id: String,
+      synchronizer_id: String,
       trace_context: Option[TraceContext],
       record_time: com.google.protobuf.timestamp.Timestamp,
   )
@@ -47,11 +47,20 @@ object JsSchema {
       workflow_id: String,
       effective_at: Option[protobuf.timestamp.Timestamp],
       offset: Long,
-      events_by_id: Map[String, JsTreeEvent.TreeEvent],
-      root_event_ids: Seq[String],
-      domain_id: String,
+      events_by_id: Map[Int, JsTreeEvent.TreeEvent],
+      root_node_ids: Seq[Int],
+      synchronizer_id: String,
       trace_context: Option[TraceContext],
       record_time: protobuf.timestamp.Timestamp,
+  )
+
+  final case class JsTopologyTransaction(
+      update_id: String,
+      events: Seq[JsTopologyEvent.Event],
+      offset: Long,
+      synchronizer_id: String,
+      trace_context: Option[TraceContext],
+      record_time: com.google.protobuf.timestamp.Timestamp,
   )
 
   final case class JsStatus(
@@ -70,7 +79,8 @@ object JsSchema {
     sealed trait Event
 
     final case class CreatedEvent(
-        event_id: String,
+        offset: Long,
+        node_id: Int,
         contract_id: String,
         template_id: String,
         contract_key: Option[Json],
@@ -85,7 +95,8 @@ object JsSchema {
     ) extends Event
 
     final case class ArchivedEvent(
-        event_id: String,
+        offset: Long,
+        node_id: Int,
         contract_id: String,
         template_id: String,
         witness_parties: Seq[String],
@@ -93,11 +104,27 @@ object JsSchema {
     ) extends Event
   }
 
+  object JsTopologyEvent {
+    sealed trait Event
+
+    final case class ParticipantAuthorizationChanged(
+        party_id: String,
+        participant_id: String,
+        particiant_permission: Int,
+    ) extends Event
+
+    final case class ParticipantAuthorizationRevoked(
+        party_id: String,
+        participant_id: String,
+    ) extends Event
+  }
+
   object JsTreeEvent {
     sealed trait TreeEvent
 
     final case class ExercisedTreeEvent(
-        event_id: String,
+        offset: Long,
+        node_id: Int,
         contract_id: String,
         template_id: String,
         interface_id: Option[String],
@@ -106,7 +133,7 @@ object JsSchema {
         acting_parties: Seq[String],
         consuming: Boolean,
         witness_parties: Seq[String],
-        child_event_ids: Seq[String],
+        child_node_ids: Seq[Int],
         exercise_result: Json,
         package_name: String,
     ) extends TreeEvent
@@ -183,7 +210,7 @@ object JsSchema {
             retryable = jsCantonError.retryInfo.map(duration =>
               ErrorCategoryRetry(FiniteDuration(duration.length, duration.unit))
             ),
-            securitySensitive = false,
+            redactDetails = false,
             asInt = jsCantonError.errorCategory,
             rank = 1,
           ),
@@ -197,6 +224,8 @@ object JsSchema {
       )
   }
   object DirectScalaPbRwImplicits {
+    import sttp.tapir.generic.auto.*
+    import sttp.tapir.json.circe.*
 
     implicit val om: Codec[ObjectMeta] = deriveCodec
     implicit val traceContext: Codec[TraceContext] = deriveCodec
@@ -266,24 +295,45 @@ object JsSchema {
       Decoder.decodeString.map(IdentifierConverter.fromJson)
 
     implicit val jsEvent: Codec[JsEvent.Event] = deriveCodec
+    implicit val jsCreatedEvent: Codec[JsEvent.CreatedEvent] = deriveCodec
+    implicit val jsArchivedEvent: Codec[JsEvent.ArchivedEvent] = deriveCodec
+
     implicit val any: Codec[com.google.protobuf.any.Any] = deriveCodec
     implicit val jsStatus: Codec[JsStatus] = deriveCodec
     implicit val jsInterfaceView: Codec[JsInterfaceView] = deriveCodec
-    implicit val jsCreatedEvent: Codec[JsEvent.CreatedEvent] = deriveCodec
-    implicit val jsArchivedEvent: Codec[JsEvent.ArchivedEvent] = deriveCodec
+
     implicit val jsTransactionTree: Codec[JsTransactionTree] = deriveCodec
+    implicit val jsTopologyTransaction: Codec[JsTopologyTransaction] = deriveCodec
     implicit val jsSubmitAndWaitForTransactionTreeResponse
         : Codec[JsSubmitAndWaitForTransactionTreeResponse] = deriveCodec
     implicit val jsTreeEvent: Codec[JsTreeEvent.TreeEvent] = deriveCodec
     implicit val jsExercisedTreeEvent: Codec[JsTreeEvent.ExercisedTreeEvent] = deriveCodec
     implicit val jsCreatedTreeEvent: Codec[JsTreeEvent.CreatedTreeEvent] = deriveCodec
+    implicit val jsTopologyEvent: Codec[JsTopologyEvent.Event] = deriveCodec
+    implicit val jsParticipantAuthorizationChanged
+        : Codec[JsTopologyEvent.ParticipantAuthorizationChanged] = deriveCodec
+    implicit val jsParticipantAuthorizationRevoked
+        : Codec[JsTopologyEvent.ParticipantAuthorizationRevoked] = deriveCodec
 
     implicit val offsetCheckpoint: Codec[offset_checkpoint.OffsetCheckpoint] = deriveCodec
-    implicit val offsetCheckpointDomainTime: Codec[offset_checkpoint.DomainTime] = deriveCodec
+    implicit val offsetCheckpointSynchronizerTime: Codec[offset_checkpoint.SynchronizerTime] =
+      deriveCodec
 
     implicit val grpcStatusRW: Codec[
       com.google.rpc.status.Status
     ] = deriveCodec
 
+    // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
+    @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+    implicit val jsEventSchema: Schema[JsEvent.Event] =
+      Schema.oneOfWrapped
+
+    @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+    implicit val jsTreeEventSchema: Schema[JsTreeEvent.TreeEvent] =
+      Schema.oneOfWrapped
+
+    implicit val identifierSchema: Schema[com.daml.ledger.api.v2.value.Identifier] = Schema.string
+
+    implicit val valueSchema: Schema[com.google.protobuf.struct.Value] = Schema.any
   }
 }

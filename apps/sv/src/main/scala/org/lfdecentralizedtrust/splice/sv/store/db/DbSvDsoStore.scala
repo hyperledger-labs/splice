@@ -70,7 +70,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
@@ -119,6 +119,7 @@ class DbSvDsoStore(
     with UpdateHistoryQueries
     with TxLogQueries[TxLogEntry]
     with DbVotesStoreQueryBuilder {
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   val dsoStoreMetrics = new DbSvDsoStoreMetrics(retryProvider.metricsFactory)
 
@@ -304,12 +305,16 @@ class DbSvDsoStore(
     } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
   }
 
-  override def listAppRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(implicit
+  override def listAppRewardCouponsOnDomain(
+      round: Long,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]]] =
-    listRewardCouponsOnDomain(AppRewardCoupon.COMPANION, round, domainId, limit)
+    listRewardCouponsOnDomain(AppRewardCoupon.COMPANION, round, synchronizerId, limit)
 
-  override def sumAppRewardCouponsOnDomain(round: Long, domainId: DomainId)(implicit
+  override def sumAppRewardCouponsOnDomain(round: Long, synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
   ): Future[AppRewardCouponsSum] = for {
     sums <- selectFromRewardCouponsOnDomain[(Option[BigDecimal], Option[BigDecimal])](
@@ -318,7 +323,7 @@ class DbSvDsoStore(
               sum(case app_reward_is_featured when true then 0 else reward_amount end)""",
       AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       round,
-      domainId,
+      synchronizerId,
     )
   } yield sums.headOption
     .map { case (featured, unfeatured) =>
@@ -326,73 +331,93 @@ class DbSvDsoStore(
     }
     .getOrElse(AppRewardCouponsSum(0L, 0L))
 
-  override def listValidatorRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(
-      implicit tc: TraceContext
-  ): Future[Seq[Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]]] =
-    listRewardCouponsOnDomain(ValidatorRewardCoupon.COMPANION, round, domainId, limit)
-
-  override def sumValidatorRewardCouponsOnDomain(round: Long, domainId: DomainId)(implicit
+  override def listValidatorRewardCouponsOnDomain(
+      round: Long,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
       tc: TraceContext
+  ): Future[Seq[Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]]] =
+    listRewardCouponsOnDomain(ValidatorRewardCoupon.COMPANION, round, synchronizerId, limit)
+
+  override def sumValidatorRewardCouponsOnDomain(round: Long, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[BigDecimal] =
     selectFromRewardCouponsOnDomain[Option[BigDecimal]](
       sql"select sum(reward_amount)",
       ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
       round,
-      domainId,
+      synchronizerId,
     ).map(_.headOption.flatten.getOrElse(BigDecimal(0)))
 
-  override def listValidatorFaucetCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(
-      implicit tc: TraceContext
+  override def listValidatorFaucetCouponsOnDomain(
+      round: Long,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]]] =
-    listRewardCouponsOnDomain(ValidatorFaucetCoupon.COMPANION, round, domainId, limit)
+    listRewardCouponsOnDomain(ValidatorFaucetCoupon.COMPANION, round, synchronizerId, limit)
 
   override def listValidatorLivenessActivityRecordsOnDomain(
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[
     Seq[Contract[ValidatorLivenessActivityRecord.ContractId, ValidatorLivenessActivityRecord]]
   ] =
-    listRewardCouponsOnDomain(ValidatorLivenessActivityRecord.COMPANION, round, domainId, limit)
+    listRewardCouponsOnDomain(
+      ValidatorLivenessActivityRecord.COMPANION,
+      round,
+      synchronizerId,
+      limit,
+    )
 
-  override def listSvRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(implicit
+  override def listSvRewardCouponsOnDomain(
+      round: Long,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[SvRewardCoupon.ContractId, SvRewardCoupon]]] =
-    listRewardCouponsOnDomain(SvRewardCoupon.COMPANION, round, domainId, limit)
+    listRewardCouponsOnDomain(SvRewardCoupon.COMPANION, round, synchronizerId, limit)
 
-  override def countValidatorFaucetCouponsOnDomain(round: Long, domainId: DomainId)(implicit
-      tc: TraceContext
+  override def countValidatorFaucetCouponsOnDomain(round: Long, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select count(*)",
     ValidatorFaucetCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
     round,
-    domainId,
+    synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
 
-  override def countValidatorLivenessActivityRecordsOnDomain(round: Long, domainId: DomainId)(
-      implicit tc: TraceContext
+  override def countValidatorLivenessActivityRecordsOnDomain(
+      round: Long,
+      synchronizerId: SynchronizerId,
+  )(implicit
+      tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select count(*)",
     ValidatorLivenessActivityRecord.COMPANION.TEMPLATE_ID,
     round,
-    domainId,
+    synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
 
-  override def sumSvRewardCouponWeightsOnDomain(round: Long, domainId: DomainId)(implicit
-      tc: TraceContext
+  override def sumSvRewardCouponWeightsOnDomain(round: Long, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select sum(reward_weight)",
     SvRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
     round,
-    domainId,
+    synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
 
   private def listRewardCouponsOnDomain[C, TCId <: ContractId[_], T](
       companion: C,
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
@@ -403,7 +428,7 @@ class DbSvDsoStore(
       sql"select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}",
       templateId,
       round,
-      domainId,
+      synchronizerId,
       limit = limit,
     ).map(_.map(contractFromRow(companion)(_)))
   }
@@ -412,7 +437,7 @@ class DbSvDsoStore(
       selectClause: SQLActionBuilder,
       templateId: Identifier,
       round: Long,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
@@ -428,7 +453,7 @@ class DbSvDsoStore(
                    where store_id = $storeId
                      and migration_id = $domainMigrationId
                      and template_id_qualified_name = ${QualifiedName(templateId)}
-                     and assigned_domain = $domainId
+                     and assigned_domain = $synchronizerId
                      and reward_round = $round
                      and reward_party is not null -- otherwise index is not used
                    limit ${sqlLimit(limit)}
@@ -441,7 +466,7 @@ class DbSvDsoStore(
   }
 
   override def listAppRewardCouponsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -453,7 +478,7 @@ class DbSvDsoStore(
     )
 
   override def listValidatorRewardCouponsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -465,7 +490,7 @@ class DbSvDsoStore(
     )
 
   override def listValidatorFaucetCouponsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -477,7 +502,7 @@ class DbSvDsoStore(
     )
 
   override def listValidatorLivenessActivityRecordsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
@@ -489,7 +514,7 @@ class DbSvDsoStore(
     )
 
   override def listSvRewardCouponsGroupedByCounterparty(
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit tc: TraceContext): Future[Seq[RoundCounterpartyBatch[SvRewardCoupon.ContractId]]] =
     listCouponsGroupedByCounterparty(
@@ -500,7 +525,7 @@ class DbSvDsoStore(
 
   private def listCouponsGroupedByCounterparty[C, TCId <: ContractId[_]: ClassTag, T](
       companion: C,
-      domain: DomainId,
+      domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
@@ -543,19 +568,25 @@ class DbSvDsoStore(
     waitUntilAcsIngested {
       (for {
         dsoRules <- OptionT(lookupDsoRules())
-        result <- storage.querySingle(
-          selectFromAcsTableWithState(
-            DsoTables.acsTableName,
-            storeId,
-            domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
+        result <- OptionT(
+          futureUnlessShutdownToFuture(
+            storage
+              .querySingle(
+                selectFromAcsTableWithState(
+                  DsoTables.acsTableName,
+                  storeId,
+                  domainMigrationId,
+                  where = sql"""template_id_qualified_name = ${QualifiedName(
+                      ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
+                    )}
               and assigned_domain = ${dsoRules.domain}
               and mining_round is not null""",
-            orderLimit = sql"""order by mining_round limit 1""",
-          ).headOption,
-          "lookupOldestClosedMiningRound",
+                  orderLimit = sql"""order by mining_round limit 1""",
+                ).headOption,
+                "lookupOldestClosedMiningRound",
+              )
+              .value
+          )
         )
       } yield assignedContractFromRow(ClosedMiningRound.COMPANION)(result)).value
     }
@@ -822,7 +853,7 @@ class DbSvDsoStore(
     implicit tc =>
       waitUntilAcsIngested {
         for {
-          domainId <- getDsoRules().map(_.domain)
+          synchronizerId <- getDsoRules().map(_.domain)
           rows <- storage.query(
             selectFromAcsTableWithState(
               DsoTables.acsTableName,
@@ -830,7 +861,7 @@ class DbSvDsoStore(
               domainMigrationId,
               where = sql"""
                 template_id_qualified_name = ${QualifiedName(companion.getTemplateIdWithPackageId)}
-                and assigned_domain = $domainId
+                and assigned_domain = $synchronizerId
                 and acs.amulet_round_of_expiry <= (
                   select mining_round - 2
                   from dso_acs_store
@@ -849,8 +880,12 @@ class DbSvDsoStore(
         } yield assigned
       }
 
-  override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Limit)(
-      implicit tc: TraceContext
+  override def listMemberTrafficContracts(
+      memberId: Member,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[MemberTraffic.ContractId, MemberTraffic]]] = waitUntilAcsIngested {
     for {
       result <- storage
@@ -863,7 +898,7 @@ class DbSvDsoStore(
                 MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                         and member_traffic_member = $memberId
-                        and member_traffic_domain = $domainId""",
+                        and member_traffic_domain = $synchronizerId""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listMemberTrafficContracts",
@@ -980,8 +1015,8 @@ class DbSvDsoStore(
         )
     } yield result.map(contractFromRow(ValidatorLicense.COMPANION)(_))
 
-  override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
-      tc: TraceContext
+  override def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[Long] = waitUntilAcsIngested {
     for {
       sum <- storage
@@ -995,7 +1030,7 @@ class DbSvDsoStore(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
-                and member_traffic_domain = $domainId
+                and member_traffic_domain = $synchronizerId
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",
         )
@@ -1423,7 +1458,7 @@ class DbSvDsoStore(
 
   override def listClosedRounds(
       roundNumbers: Set[Long],
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[splice.round.ClosedMiningRound.ContractId, splice.round.ClosedMiningRound]]
@@ -1442,7 +1477,7 @@ class DbSvDsoStore(
                 domainMigrationId,
                 where = (sql"""template_id_qualified_name = ${QualifiedName(
                     ClosedMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
-                  )} AND assigned_domain = $domainId AND mining_round IN """ ++ roundNumbersClause).toActionBuilder,
+                  )} AND assigned_domain = $synchronizerId AND mining_round IN """ ++ roundNumbersClause).toActionBuilder,
                 orderLimit = sql"""limit ${sqlLimit(limit)}""",
               ),
               "listClosedRounds",

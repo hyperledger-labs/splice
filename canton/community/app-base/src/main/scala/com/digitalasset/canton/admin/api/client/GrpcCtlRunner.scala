@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client
@@ -6,9 +6,13 @@ package com.digitalasset.canton.admin.api.client
 import cats.data.EitherT
 import com.daml.grpc.AuthCallCredentials
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.lifecycle.OnShutdownRunner
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
+import com.digitalasset.canton.networking.grpc.{
+  CantonGrpcUtil,
+  GrpcClient,
+  GrpcError,
+  GrpcManagedChannel,
+}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.LoggerUtil
 import io.grpc.ManagedChannel
@@ -22,7 +26,6 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcCtlRunner(
     maxRequestDebugLines: Int,
     maxRequestDebugStringLength: Int,
-    onShutdownRunner: OnShutdownRunner,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
@@ -32,21 +35,23 @@ class GrpcCtlRunner(
   def run[Req, Res, Result](
       instanceName: String,
       command: GrpcAdminCommand[Req, Res, Result],
-      channel: ManagedChannel,
+      managedChannel: GrpcManagedChannel,
       token: Option[String],
       timeout: Duration,
       retryPolicy: GrpcError => Boolean,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Result] = {
 
-    val baseService: command.Svc = command
-      .createServiceInternal(channel)
-      .withInterceptors(TraceContextGrpc.clientInterceptor)
-
-    val service = token.fold(baseService)(AuthCallCredentials.authorizingStub(baseService, _))
+    def service(channel: ManagedChannel): command.Svc = {
+      val baseService = command
+        .createServiceInternal(channel)
+        .withInterceptors(TraceContextGrpc.clientInterceptor)
+      token.toList.foldLeft(baseService)(AuthCallCredentials.authorizingStub)
+    }
+    val client = GrpcClient.create(managedChannel, service)
 
     for {
       request <- EitherT.fromEither[Future](command.createRequestInternal())
-      response <- submitRequest(command)(instanceName, service, request, timeout, retryPolicy)
+      response <- submitRequest(command)(instanceName, client, request, timeout, retryPolicy)
       result <- EitherT.fromEither[Future](command.handleResponseInternal(response))
     } yield result
   }
@@ -55,7 +60,7 @@ class GrpcCtlRunner(
       command: GrpcAdminCommand[Req, Res, Result]
   )(
       instanceName: String,
-      service: command.Svc,
+      service: GrpcClient[command.Svc],
       request: Req,
       timeout: Duration,
       retryPolicy: GrpcError => Boolean,
@@ -71,8 +76,7 @@ class GrpcCtlRunner(
         ),
         timeout,
         logger,
-        onShutdownRunner,
-        CantonGrpcUtil.silentLogPolicy, // silent log policy, as the ConsoleEnvironment will log the result
+        CantonGrpcUtil.SilentLogPolicy, // silent log policy, as the ConsoleEnvironment will log the result
         retryPolicy,
       )
       .leftMap(_.toString)

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -8,12 +8,17 @@ import com.daml.ledger.api.v2.state_service.*
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.{GrpcApiService, StreamingServiceLifecycleManagement}
-import com.digitalasset.canton.ledger.api.validation.{FieldValidator, TransactionFilterValidator}
-import com.digitalasset.canton.ledger.participant.state.WriteService
+import com.digitalasset.canton.ledger.api.validation.{
+  FieldValidator,
+  ParticipantOffsetValidator,
+  TransactionFilterValidator,
+}
+import com.digitalasset.canton.ledger.participant.state.SyncService
 import com.digitalasset.canton.ledger.participant.state.index.{
   IndexActiveContractsService as ACSBackend,
   IndexTransactionsService,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
   implicitExtractTraceContext,
   withEnrichedLoggingContext,
@@ -21,9 +26,10 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace.{
 import com.digitalasset.canton.logging.TracedLoggerOps.TracedLoggerOps
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.platform.ApiOffset
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.shutdownAsGrpcError
 import com.digitalasset.canton.topology.transaction.ParticipantPermission as TopologyParticipantPermission
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.Thereafter.syntax.*
 import io.grpc.ServerServiceDefinition
 import io.grpc.stub.StreamObserver
 import org.apache.pekko.stream.Materializer
@@ -33,7 +39,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 final class ApiStateService(
     acsService: ACSBackend,
-    writeService: WriteService,
+    syncService: SyncService,
     txService: IndexTransactionsService,
     metrics: LedgerApiServerMetrics,
     telemetry: Telemetry,
@@ -60,7 +66,7 @@ final class ApiStateService(
           request.getFilter
         )
 
-        activeAt <- FieldValidator.requireNonNegativeOffset(
+        activeAt <- ParticipantOffsetValidator.validateNonNegative(
           request.activeAtOffset,
           "active_at_offset",
         )
@@ -92,26 +98,26 @@ final class ApiStateService(
     }
   }
 
-  override def getConnectedDomains(
-      request: GetConnectedDomainsRequest
-  ): Future[GetConnectedDomainsResponse] = {
+  override def getConnectedSynchronizers(
+      request: GetConnectedSynchronizersRequest
+  ): Future[GetConnectedSynchronizersResponse] = {
     implicit val loggingContext: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory, telemetry)
-    (for {
+    val result = (for {
       party <- FieldValidator
         .requirePartyField(request.party, "party")
       participantId <- FieldValidator
         .optionalParticipantId(request.participantId, "participant_id")
-    } yield WriteService.ConnectedDomainRequest(party, participantId))
+    } yield SyncService.ConnectedSynchronizerRequest(party, participantId))
       .fold(
-        t => Future.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
+        t => FutureUnlessShutdown.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
         request =>
-          writeService
-            .getConnectedDomains(request)
+          syncService
+            .getConnectedSynchronizers(request)
             .map(response =>
-              GetConnectedDomainsResponse(
-                response.connectedDomains.flatMap { connectedDomain =>
-                  val permissions = connectedDomain.permission match {
+              GetConnectedSynchronizersResponse(
+                response.connectedSynchronizers.flatMap { connectedSynchronizer =>
+                  val permissions = connectedSynchronizer.permission match {
                     case TopologyParticipantPermission.Submission =>
                       Seq(ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION)
                     case TopologyParticipantPermission.Observation =>
@@ -121,9 +127,9 @@ final class ApiStateService(
                     case _ => Nil
                   }
                   permissions.map(permission =>
-                    GetConnectedDomainsResponse.ConnectedDomain(
-                      domainAlias = connectedDomain.domainAlias.toProtoPrimitive,
-                      domainId = connectedDomain.domainId.toProtoPrimitive,
+                    GetConnectedSynchronizersResponse.ConnectedSynchronizer(
+                      synchronizerAlias = connectedSynchronizer.synchronizerAlias.toProtoPrimitive,
+                      synchronizerId = connectedSynchronizer.synchronizerId.toProtoPrimitive,
                       permission = permission,
                     )
                   )
@@ -131,6 +137,7 @@ final class ApiStateService(
               )
             ),
       )
+    shutdownAsGrpcError(result)
   }
 
   override def getLedgerEnd(request: GetLedgerEndRequest): Future[GetLedgerEndResponse] = {
@@ -140,10 +147,10 @@ final class ApiStateService(
       .currentLedgerEnd()
       .map(offset =>
         GetLedgerEndResponse(
-          ApiOffset.assertFromStringToLong(offset)
+          offset.fold(0L)(_.unwrap)
         )
       )
-      .andThen(logger.logErrorsOnCall[GetLedgerEndResponse])
+      .thereafter(logger.logErrorsOnCall[GetLedgerEndResponse])
   }
 
   override def getLatestPrunedOffsets(
@@ -155,11 +162,11 @@ final class ApiStateService(
       .latestPrunedOffsets()
       .map { case (prunedUptoInclusive, divulgencePrunedUptoInclusive) =>
         GetLatestPrunedOffsetsResponse(
-          participantPrunedUpToInclusive = prunedUptoInclusive,
-          allDivulgedContractsPrunedUpToInclusive = divulgencePrunedUptoInclusive,
+          participantPrunedUpToInclusive = prunedUptoInclusive.fold(0L)(_.unwrap),
+          allDivulgedContractsPrunedUpToInclusive = divulgencePrunedUptoInclusive.fold(0L)(_.unwrap),
         )
       }
-      .andThen(logger.logErrorsOnCall[GetLatestPrunedOffsetsResponse])
+      .thereafter(logger.logErrorsOnCall[GetLatestPrunedOffsetsResponse])
   }
 
   override def bindService(): ServerServiceDefinition =

@@ -133,7 +133,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
       override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
         implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
-        import parameters.loggingConfig.api.*
+        import parameters.monitoringConfig.logging.api.*
         val logPayload = messagePayloads
         val pathLimited = request.uri.path.toString
           .limit(maxMethodLength)

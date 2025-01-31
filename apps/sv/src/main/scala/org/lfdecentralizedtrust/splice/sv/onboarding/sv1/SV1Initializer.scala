@@ -50,13 +50,13 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerAlias
-import com.digitalasset.canton.config.DomainTimeTrackerConfig
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -126,7 +126,7 @@ class SV1Initializer(
       tc: TraceContext
   ): Future[
     (
-        DomainId,
+        SynchronizerId,
         DsoPartyHosting,
         SvSvStore,
         SvSvAutomationService,
@@ -150,11 +150,11 @@ class SV1Initializer(
         loggerFactory,
         retryProvider,
       )
-      (namespace, domainId) <- bootstrapDomain(localSynchronizerNode)
+      (namespace, synchronizerId) <- bootstrapDomain(localSynchronizerNode)
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
       internalSequencerApi = localSynchronizerNode.sequencerInternalConfig
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
-        DomainConnectionConfig(
+        SynchronizerConnectionConfig(
           config.domains.global.alias,
           sequencerConnections = SequencerConnections.single(
             new GrpcSequencerConnection(
@@ -165,8 +165,8 @@ class SV1Initializer(
             )
           ),
           manualConnect = false,
-          domainId = None,
-          timeTracker = DomainTimeTrackerConfig(
+          synchronizerId = None,
+          timeTracker = SynchronizerTimeTrackerConfig(
             minObservationDuration = config.timeTrackerMinObservationDuration
           ),
         ),
@@ -174,7 +174,7 @@ class SV1Initializer(
       )
       _ = logger.info("Participant connected to domain")
       (dsoParty, svParty, _) <- (
-        setupDsoParty(domainId, initConnection, namespace),
+        setupDsoParty(synchronizerId, initConnection, namespace),
         SetupUtil.setupSvParty(
           initConnection,
           config,
@@ -286,7 +286,11 @@ class SV1Initializer(
       _ = dsoAutomation.registerPostOnboardingTriggers()
       _ = dsoAutomation.registerTrafficReconciliationTriggers()
       _ = dsoAutomation.registerPostUnlimitedTrafficTriggers()
-      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(dsoAutomation, dsoStore, domainId)
+      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
+        dsoAutomation,
+        dsoStore,
+        synchronizerId,
+      )
       // The previous foundDso step will set the domain node config if DsoRules is not yet bootstrapped.
       // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
       // for example if sv1 restarted after bootstrapping the DsoRules.
@@ -308,7 +312,7 @@ class SV1Initializer(
   private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
       dsoAutomation: SvDsoAutomationService,
       dsoStore: SvDsoStore,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit traceContext: TraceContext) =
     retryProvider
       .ensureThatB(
@@ -323,12 +327,12 @@ class SV1Initializer(
         checkIsInDecentralizedNamespaceAndStartTrigger(
           dsoAutomation,
           dsoStore,
-          domainId,
+          synchronizerId,
         )
       }
 
   private def setupDsoParty(
-      domain: DomainId,
+      domain: SynchronizerId,
       connection: BaseLedgerConnection,
       namespace: Namespace,
   )(implicit
@@ -336,7 +340,7 @@ class SV1Initializer(
   ): Future[PartyId] =
     for {
       dso <- connection.ensurePartyAllocated(
-        TopologyStoreId.DomainStore(domain),
+        TopologyStoreId.SynchronizerStore(domain),
         sv1Config.dsoPartyHint,
         Some(namespace),
         participantAdminConnection,
@@ -362,7 +366,7 @@ class SV1Initializer(
 
   private def bootstrapDomain(synchronizerNode: LocalSynchronizerNode)(implicit
       tc: TraceContext
-  ): Future[(Namespace, DomainId)] = {
+  ): Future[(Namespace, SynchronizerId)] = {
     withSpan("bootstrapDomain") { implicit tc => _ =>
       logger.info("Bootstrapping the domain as sv1")
 
@@ -373,13 +377,13 @@ class SV1Initializer(
       ).flatMapN { case (participantId, mediatorId, sequencerId) =>
         val namespace =
           DecentralizedNamespaceDefinition.computeNamespace(Set(participantId.uid.namespace))
-        val domainId = DomainId(
+        val synchronizerId = SynchronizerId(
           UniqueIdentifier.tryCreate(
             "global-domain",
             namespace,
           )
         )
-        val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v32)
+        val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v33)
         val values = initialValues.tryUpdate(
           // TODO(#6055) Consider increasing topology change delay again
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
@@ -398,7 +402,7 @@ class SV1Initializer(
             "init_sequencer",
             "sequencer is initialized",
             synchronizerNode.sequencerAdminConnection.getStatus
-              .map(_.successOption.map(_.domainId)),
+              .map(_.successOption.map(_.synchronizerId)),
             for {
               // must be done before the other topology transaction as the decentralize namespace is used for authorization
               decentralizedNamespace <- participantAdminConnection
@@ -409,7 +413,7 @@ class SV1Initializer(
                 )
               (
                 identityTransactions,
-                domainParametersState,
+                synchronizerParametersState,
                 sequencerState,
                 mediatorState,
               ) <- (
@@ -423,16 +427,16 @@ class SV1Initializer(
                     .flatMap(con.getIdentityTransactions(_, TopologyStoreId.AuthorizedStore))
                 }.map(_.flatten),
                 participantAdminConnection.proposeInitialDomainParameters(
-                  domainId,
+                  synchronizerId,
                   values,
                 ),
-                participantAdminConnection.proposeInitialSequencerDomainState(
-                  domainId,
+                participantAdminConnection.proposeInitialSequencerSynchronizerState(
+                  synchronizerId,
                   active = Seq(sequencerId),
                   observers = Seq.empty,
                 ),
-                participantAdminConnection.proposeInitialMediatorDomainState(
-                  domainId,
+                participantAdminConnection.proposeInitialMediatorSynchronizerState(
+                  synchronizerId,
                   group = NonNegativeInt.zero,
                   active = Seq(mediatorId),
                   observers = Seq.empty,
@@ -441,7 +445,7 @@ class SV1Initializer(
               bootstrapTransactions =
                 (Seq(
                   decentralizedNamespace,
-                  domainParametersState,
+                  synchronizerParametersState,
                   sequencerState,
                   mediatorState,
                 ) ++ identityTransactions).sorted
@@ -452,6 +456,7 @@ class SV1Initializer(
                       EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
                       None,
                       signed.copy(isProposal = false),
+                      None,
                     )
                   )
               _ <- synchronizerNode.sequencerAdminConnection.initializeFromBeginning(
@@ -467,12 +472,12 @@ class SV1Initializer(
             "mediator is initialized",
             synchronizerNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
             synchronizerNode.mediatorAdminConnection.initialize(
-              domainId,
+              synchronizerId,
               synchronizerNode.sequencerConnection,
             ),
             logger,
           )
-        } yield (namespace, domainId)
+        } yield (namespace, synchronizerId)
       }
     }
   }
@@ -501,7 +506,7 @@ class SV1Initializer(
     */
   private class WithDsoStore(
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   ) {
 
     private val dsoStore = dsoStoreWithIngestion.store
@@ -537,7 +542,7 @@ class SV1Initializer(
     ): Future[Unit] = {
       synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
         localSynchronizerNode,
-        domainId,
+        synchronizerId,
         SynchronizerNodeState.OnboardedImmediately,
         migrationId,
       )
@@ -547,7 +552,7 @@ class SV1Initializer(
     private def bootstrapDso()(implicit
         tc: TraceContext
     ): Future[Unit] = {
-      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(domainId)
+      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(synchronizerId)
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
@@ -567,7 +572,7 @@ class SV1Initializer(
                 val amuletConfig = defaultAmuletConfig(
                   sv1Config.initialTickDuration,
                   sv1Config.initialMaxNumInputs,
-                  domainId,
+                  synchronizerId,
                   sv1Config.initialSynchronizerFeesConfig.extraTrafficPrice.value,
                   sv1Config.initialSynchronizerFeesConfig.minTopupAmount.value,
                   sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
@@ -582,7 +587,7 @@ class SV1Initializer(
                     cometBftNode,
                     localSynchronizerNode,
                     config.scan,
-                    domainId,
+                    synchronizerId,
                     clock,
                     config.domainMigrationId,
                   )
@@ -636,7 +641,7 @@ class SV1Initializer(
                         ),
                       deduplicationOffset = offset,
                     )
-                    .withDomainId(domainId)
+                    .withSynchronizerId(synchronizerId)
                     .yieldUnit()
                 } yield ()
             }

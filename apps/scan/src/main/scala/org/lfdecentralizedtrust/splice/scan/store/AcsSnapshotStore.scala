@@ -14,13 +14,14 @@ import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, Up
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.{GetResult, JdbcProfile}
 
@@ -37,6 +38,8 @@ class AcsSnapshotStore(
     with AcsQueries
     with LimitHelpers
     with NamedLogging {
+
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   override val profile: JdbcProfile = storage.profile.jdbc
 
@@ -166,7 +169,7 @@ class AcsSnapshotStore(
           "queryAcsSnapshot.getSnapshot",
         )
         .getOrElseF(
-          Future.failed(
+          FutureUnlessShutdown.failed(
             io.grpc.Status.NOT_FOUND
               .withDescription(
                 s"Failed to find ACS snapshot for migration id $migrationId at $snapshot"
@@ -269,7 +272,7 @@ class AcsSnapshotStore(
           result.createdEventsInPage
             .filter { createdEvent =>
               AcsSnapshotStore
-                .decodeHoldingContract(createdEvent)
+                .decodeHoldingContract(createdEvent.event)
                 .fold(
                   locked =>
                     partyIds.contains(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner)),
@@ -297,7 +300,8 @@ class AcsSnapshotStore(
         partyIds,
       )
       .map { result =>
-        val contracts = result.createdEventsInPage.map(AcsSnapshotStore.decodeHoldingContract)
+        val contracts = result.createdEventsInPage
+          .map(event => AcsSnapshotStore.decodeHoldingContract(event.event))
         contracts.foldLeft(
           AcsSnapshotStore.HoldingsSummaryResult(migrationId, recordTime, asOfRound, Map.empty)
         ) {
@@ -346,7 +350,7 @@ object AcsSnapshotStore {
   case class QueryAcsSnapshotResult(
       migrationId: Long,
       snapshotRecordTime: CantonTimestamp,
-      createdEventsInPage: Vector[CreatedEvent],
+      createdEventsInPage: Vector[SpliceCreatedEvent],
       afterToken: Option[Long],
   )
 

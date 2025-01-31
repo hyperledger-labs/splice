@@ -3,6 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.sv
 
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
@@ -10,11 +15,6 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvSynchronizerNodeConfig
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
-import com.digitalasset.canton.domain.config.DomainParametersConfig
-import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import io.opentelemetry.api.trace.Tracer
 
 import java.time.Duration
 import scala.concurrent.ExecutionContextExecutor
@@ -23,7 +23,7 @@ import scala.concurrent.ExecutionContextExecutor
 final class ExtraSynchronizerNode(
     override val sequencerAdminConnection: SequencerAdminConnection,
     override val mediatorAdminConnection: MediatorAdminConnection,
-    val parameters: DomainParametersConfig,
+    val parameters: SynchronizerParametersConfig,
     val sequencerPublicApi: ClientConfig,
     override val sequencerExternalPublicUrl: String,
     override val sequencerAvailabilityDelay: Duration,
@@ -39,7 +39,7 @@ final class ExtraSynchronizerNode(
     with NamedLogging {
 
   override protected def onClosed(): Unit = {
-    Lifecycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
+    LifeCycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
   }
 }
 

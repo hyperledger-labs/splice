@@ -17,7 +17,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnectionValidation,
   SequencerConnections,
 }
-import com.digitalasset.canton.topology.{DomainId, MediatorId, NodeIdentity}
+import com.digitalasset.canton.topology.{SynchronizerId, MediatorId, NodeIdentity}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -53,12 +53,12 @@ class MediatorAdminConnection(
     getId().map(MediatorId(_))
 
   def initialize(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       sequencerConnection: SequencerConnection,
   )(implicit traceContext: TraceContext): Future[Unit] =
     runCmd(
       MediatorAdministrationCommands.Initialize(
-        domainId,
+        synchronizerId,
         SequencerConnections.single(sequencerConnection),
         SequencerConnectionValidation.All,
       )

@@ -3,9 +3,9 @@ build-options:
 - --target=2.1
 name: DamlDefinitionsServiceMain
 source: MainApp.daml
-version: 3.2.0
+version: 3.3.0
 dependencies:
 - daml-prim
 - daml-stdlib
 - daml3-script
-- ../../../../../.daml/dist/DamlDefinitionsServiceDep-3.2.0.dar
+- ../../../../../.daml/dist/DamlDefinitionsServiceDep-3.3.0.dar

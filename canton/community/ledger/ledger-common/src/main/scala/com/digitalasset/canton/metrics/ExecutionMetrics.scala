@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -114,7 +114,7 @@ class ExecutionHistograms(val prefix: MetricName)(implicit
 class ExecutionMetrics(
     inventory: ExecutionHistograms,
     openTelemetryMetricsFactory: LabeledMetricsFactory,
-) {
+) extends HasDocumentedMetrics {
 
   import com.daml.metrics.api.MetricsContext.Implicits.empty
   private val prefix = inventory.prefix

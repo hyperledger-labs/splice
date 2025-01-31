@@ -119,10 +119,10 @@ export class LedgerApiClient {
       disclosed_contracts: disclosedContracts.map(c => ({
         contractId: c.contractId,
         createdEventBlob: c.createdEventBlob,
-        domainId: '',
+        synchronizerId: '',
         templateId: c.templateId,
       })),
-      domain_id: domainId || '',
+      synchronizer_id: domainId || '',
       package_id_selection_preference: [],
     };
 
@@ -151,7 +151,7 @@ export class LedgerApiClient {
       });
 
     const tree = responseBody.transaction_tree;
-    const rootEvent = tree.events_by_id[tree.root_event_ids[0]];
+    const rootEvent = tree.events_by_id[tree.root_node_ids[0]];
     const exerciseResult = choice.resultDecoder.runWithException(
       rootEvent.ExercisedTreeEvent.exercise_result
     );

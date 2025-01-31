@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -17,6 +17,8 @@ import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TracerProvider
 
+import scala.concurrent.ExecutionContext
+
 final case class NodeFactoryArguments[
     NodeConfig <: LocalNodeConfig,
     ParameterConfig <: CantonNodeParameters,
@@ -32,6 +34,7 @@ final case class NodeFactoryArguments[
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
+    executionContext: ExecutionContext,
 ) {
   val tracerProvider: TracerProvider = TracerProvider.Factory(configuredOpenTelemetry, name)
 

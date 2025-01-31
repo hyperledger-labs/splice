@@ -8,31 +8,34 @@ CREATE ALIAS array_intersection FOR "com.digitalasset.canton.store.db.h2.H2Funct
 --
 -- This table is meant to have a single row storing all the parameters we have.
 -- We make sure the following invariant holds:
--- - The ledger_end and ledger_end_sequential_id are always defined at the same time. I.e., either
---   both are NULL, or both are defined.
+-- - The ledger_end, ledger_end_sequential_id, ledger_end_string_interning_id and
+--   ledger_end_publication_time are always defined at the same time. I.e., either
+--   all are NULL, or all are defined.
 ---------------------------------------------------------------------------------------------------
 CREATE TABLE lapi_parameters (
   participant_id VARCHAR(1000) NOT NULL,
-  ledger_end VARCHAR(4000) NOT NULL,
-  ledger_end_sequential_id BIGINT NOT NULL,
-  ledger_end_string_interning_id INTEGER NOT NULL,
-  ledger_end_publication_time BIGINT NOT NULL,
-  participant_pruned_up_to_inclusive VARCHAR(4000),
-  participant_all_divulged_contracts_pruned_up_to_inclusive VARCHAR(4000)
+  ledger_end BIGINT,
+  ledger_end_sequential_id BIGINT,
+  ledger_end_string_interning_id INTEGER,
+  ledger_end_publication_time BIGINT,
+  participant_pruned_up_to_inclusive BIGINT,
+  participant_all_divulged_contracts_pruned_up_to_inclusive BIGINT
 );
 
 CREATE TABLE lapi_post_processing_end (
-    post_processing_end VARCHAR(4000) NOT NULL
+    -- null signifies the participant begin
+    post_processing_end BIGINT
 );
 
 
-CREATE TABLE lapi_ledger_end_domain_index (
-  domain_id INTEGER PRIMARY KEY NOT NULL,
+CREATE TABLE lapi_ledger_end_synchronizer_index (
+  synchronizer_id INTEGER PRIMARY KEY NOT NULL,
   sequencer_counter BIGINT,
   sequencer_timestamp BIGINT,
   request_counter BIGINT,
   request_timestamp BIGINT,
-  request_sequencer_counter BIGINT
+  request_sequencer_counter BIGINT,
+  record_time BIGINT NOT NULL
 );
 
 ---------------------------------------------------------------------------------------------------
@@ -41,11 +44,10 @@ CREATE TABLE lapi_ledger_end_domain_index (
 -- A table for tracking party allocation submissions
 ---------------------------------------------------------------------------------------------------
 CREATE TABLE lapi_party_entries (
-    ledger_offset VARCHAR(4000) PRIMARY KEY NOT NULL,
+    ledger_offset BIGINT NOT NULL,
     recorded_at BIGINT NOT NULL,
     submission_id VARCHAR(1000),
     party VARCHAR(512),
-    display_name VARCHAR(1000),
     typ VARCHAR(1000) NOT NULL,
     rejection_reason VARCHAR(1000),
     is_local BOOLEAN,
@@ -66,7 +68,7 @@ CREATE INDEX lapi_party_entries_party_id_and_ledger_offset_idx ON lapi_party_ent
 -- Completions
 ---------------------------------------------------------------------------------------------------
 CREATE TABLE lapi_command_completions (
-    completion_offset VARCHAR(4000) NOT NULL,
+    completion_offset BIGINT NOT NULL,
     record_time BIGINT NOT NULL,
     publication_time BIGINT NOT NULL,
     application_id VARCHAR(1000) NOT NULL,
@@ -82,10 +84,9 @@ CREATE TABLE lapi_command_completions (
     -- 1. an initial offset
     -- 2. a duration (split into two columns, seconds and nanos, mapping protobuf's 1:1)
     -- 3. an initial timestamp
-    deduplication_offset VARCHAR(4000),
+    deduplication_offset BIGINT,
     deduplication_duration_seconds BIGINT,
     deduplication_duration_nanos INT,
-    deduplication_start BIGINT,
     -- The three columns below are `NULL` if the completion is for an accepted transaction.
     -- The `rejection_status_details` column contains a Protocol-Buffers-serialized message of type
     -- `daml.platform.index.StatusDetails`, containing the code, message, and further details
@@ -93,7 +94,7 @@ CREATE TABLE lapi_command_completions (
     rejection_status_code INTEGER,
     rejection_status_message VARCHAR(4000),
     rejection_status_details BINARY LARGE OBJECT,
-    domain_id INTEGER NOT NULL,
+    synchronizer_id INTEGER NOT NULL,
     message_uuid VARCHAR(4000),
     request_sequencer_counter BIGINT,
     is_transaction BOOLEAN NOT NULL,
@@ -103,8 +104,8 @@ CREATE TABLE lapi_command_completions (
 CREATE INDEX lapi_command_completions_application_id_offset_idx ON lapi_command_completions USING btree (application_id, completion_offset);
 CREATE INDEX lapi_command_completions_offset_idx ON lapi_command_completions USING btree (completion_offset);
 CREATE INDEX lapi_command_completions_publication_time_idx ON lapi_command_completions USING btree (publication_time, completion_offset);
-CREATE INDEX lapi_command_completions_domain_record_time_idx ON lapi_command_completions USING btree (domain_id, record_time);
-CREATE INDEX lapi_command_completions_domain_offset_idx ON lapi_command_completions USING btree (domain_id, completion_offset);
+CREATE INDEX lapi_command_completions_synchronizer_record_time_idx ON lapi_command_completions USING btree (synchronizer_id, record_time);
+CREATE INDEX lapi_command_completions_synchronizer_offset_idx ON lapi_command_completions USING btree (synchronizer_id, completion_offset);
 
 ---------------------------------------------------------------------------------------------------
 -- Events: create
@@ -113,10 +114,10 @@ CREATE TABLE lapi_events_create (
     -- * fixed-size columns first to avoid padding
     event_sequential_id bigint NOT NULL,      -- event identification: same ordering as event_offset
     ledger_effective_time bigint NOT NULL,    -- transaction metadata
-    node_index integer NOT NULL,              -- event metadata
+    node_id integer NOT NULL,                 -- event metadata
 
     -- * event identification
-    event_offset VARCHAR(4000) NOT NULL,
+    event_offset BIGINT NOT NULL,
 
     -- * transaction metadata
     update_id VARCHAR(4000) NOT NULL,
@@ -150,7 +151,7 @@ CREATE TABLE lapi_events_create (
     -- * contract driver metadata
     driver_metadata BINARY LARGE OBJECT NOT NULL,
 
-    domain_id INTEGER NOT NULL,
+    synchronizer_id INTEGER NOT NULL,
     trace_context BINARY LARGE OBJECT,
     record_time BIGINT NOT NULL
 );
@@ -161,7 +162,7 @@ CREATE INDEX lapi_events_create_event_offset_idx ON lapi_events_create (event_of
 -- sequential_id index for paging
 CREATE INDEX lapi_events_create_event_sequential_id_idx ON lapi_events_create (event_sequential_id);
 
--- lookup by contract id
+-- lookup by contract_id
 CREATE INDEX lapi_events_create_contract_id_idx ON lapi_events_create (contract_id);
 
 -- lookup by contract_key
@@ -174,10 +175,10 @@ CREATE TABLE lapi_events_consuming_exercise (
     -- * fixed-size columns first to avoid padding
     event_sequential_id bigint NOT NULL,      -- event identification: same ordering as event_offset
     ledger_effective_time bigint NOT NULL,    -- transaction metadata
-    node_index integer NOT NULL,              -- event metadata
+    node_id integer NOT NULL,                 -- event metadata
 
     -- * event identification
-    event_offset VARCHAR(4000) NOT NULL,
+    event_offset BIGINT NOT NULL,
 
     -- * transaction metadata
     update_id VARCHAR(4000) NOT NULL,
@@ -203,14 +204,15 @@ CREATE TABLE lapi_events_consuming_exercise (
     exercise_argument BINARY LARGE OBJECT NOT NULL,
     exercise_result BINARY LARGE OBJECT,
     exercise_actors INTEGER ARRAY NOT NULL,
-    exercise_child_event_ids VARCHAR(4000) ARRAY NOT NULL,
+    exercise_child_node_ids INTEGER ARRAY NOT NULL,
+    exercise_last_descendant_node_id INTEGER NOT NULL,
 
     -- * compression flags
     create_key_value_compression SMALLINT,
     exercise_argument_compression SMALLINT,
     exercise_result_compression SMALLINT,
 
-    domain_id INTEGER NOT NULL,
+    synchronizer_id INTEGER NOT NULL,
     trace_context BINARY LARGE OBJECT,
     record_time BIGINT NOT NULL
 );
@@ -231,10 +233,10 @@ CREATE TABLE lapi_events_non_consuming_exercise (
     -- * fixed-size columns first to avoid padding
     event_sequential_id bigint NOT NULL,      -- event identification: same ordering as event_offset
     ledger_effective_time bigint NOT NULL,    -- transaction metadata
-    node_index integer NOT NULL,              -- event metadata
+    node_id integer NOT NULL,                 -- event metadata
 
     -- * event identification
-    event_offset VARCHAR(4000) NOT NULL,
+    event_offset BIGINT NOT NULL,
 
     -- * transaction metadata
     update_id VARCHAR(4000) NOT NULL,
@@ -259,14 +261,15 @@ CREATE TABLE lapi_events_non_consuming_exercise (
     exercise_argument BINARY LARGE OBJECT NOT NULL,
     exercise_result BINARY LARGE OBJECT,
     exercise_actors INTEGER ARRAY NOT NULL,
-    exercise_child_event_ids VARCHAR(4000) ARRAY NOT NULL,
+    exercise_child_node_ids INTEGER ARRAY NOT NULL,
+    exercise_last_descendant_node_id INTEGER NOT NULL,
 
     -- * compression flags
     create_key_value_compression SMALLINT,
     exercise_argument_compression SMALLINT,
     exercise_result_compression SMALLINT,
 
-    domain_id INTEGER NOT NULL,
+    synchronizer_id INTEGER NOT NULL,
     trace_context BINARY LARGE OBJECT,
     record_time BIGINT NOT NULL
 );
@@ -290,7 +293,7 @@ CREATE TABLE lapi_events_unassign (
     event_sequential_id bigint NOT NULL,      -- event identification: same ordering as event_offset
 
     -- * event identification
-    event_offset VARCHAR(4000) NOT NULL,
+    event_offset BIGINT NOT NULL,
 
     -- * transaction metadata
     update_id VARCHAR(4000) NOT NULL,
@@ -308,8 +311,8 @@ CREATE TABLE lapi_events_unassign (
     flat_event_witnesses INTEGER ARRAY NOT NULL DEFAULT ARRAY[], -- stakeholders
 
     -- * common reassignment
-    source_domain_id INTEGER NOT NULL,
-    target_domain_id INTEGER NOT NULL,
+    source_synchronizer_id INTEGER NOT NULL,
+    target_synchronizer_id INTEGER NOT NULL,
     unassign_id VARCHAR(4000) NOT NULL,
     reassignment_counter BIGINT NOT NULL,
 
@@ -323,8 +326,8 @@ CREATE TABLE lapi_events_unassign (
 -- sequential_id index for paging
 CREATE INDEX lapi_events_unassign_event_sequential_id_idx ON lapi_events_unassign (event_sequential_id);
 
--- multi-column index supporting per contract per domain lookup before/after sequential id query
-CREATE INDEX lapi_events_unassign_contract_id_composite_idx ON lapi_events_unassign (contract_id, source_domain_id, event_sequential_id);
+-- multi-column index supporting per contract per synchronizer lookup before/after sequential id query
+CREATE INDEX lapi_events_unassign_contract_id_composite_idx ON lapi_events_unassign (contract_id, source_synchronizer_id, event_sequential_id);
 
 -- covering index for queries resolving offsets to sequential IDs. For temporary incomplete reassignments implementation.
 CREATE INDEX lapi_events_unassign_event_offset_idx ON lapi_events_unassign (event_offset, event_sequential_id);
@@ -337,7 +340,7 @@ CREATE TABLE lapi_events_assign (
     event_sequential_id bigint NOT NULL,      -- event identification: same ordering as event_offset
 
     -- * event identification
-    event_offset VARCHAR(4000) NOT NULL,
+    event_offset BIGINT NOT NULL,
 
     -- * transaction metadata
     update_id VARCHAR(4000) NOT NULL,
@@ -356,8 +359,8 @@ CREATE TABLE lapi_events_assign (
     flat_event_witnesses INTEGER ARRAY NOT NULL DEFAULT ARRAY[], -- stakeholders
 
     -- * common reassignment
-    source_domain_id INTEGER NOT NULL,
-    target_domain_id INTEGER NOT NULL,
+    source_synchronizer_id INTEGER NOT NULL,
+    target_synchronizer_id INTEGER NOT NULL,
     unassign_id VARCHAR(4000) NOT NULL,
     reassignment_counter BIGINT NOT NULL,
 
@@ -386,17 +389,20 @@ CREATE INDEX lapi_events_assign_event_offset_idx ON lapi_events_assign (event_of
 -- index for queries resolving contract ID to sequential IDs.
 CREATE INDEX lapi_events_assign_event_contract_id_idx ON lapi_events_assign (contract_id, event_sequential_id);
 
+-- index for queries resolving (contract ID, synchronizer id, sequential ID) to sequential IDs.
+CREATE INDEX lapi_events_assign_event_contract_id_synchronizer_id_seq_id_idx ON lapi_events_assign (contract_id, target_synchronizer_id, event_sequential_id);
+
 ---------------------------------------------------------------------------------------------------
 -- Events: Topology (participant authorization mappings)
 ---------------------------------------------------------------------------------------------------
 CREATE TABLE lapi_events_party_to_participant (
     event_sequential_id BIGINT NOT NULL,
-    event_offset VARCHAR(4000) NOT NULL,
+    event_offset BIGINT NOT NULL,
     update_id VARCHAR(4000) NOT NULL,
     party_id INTEGER NOT NULL,
     participant_id VARCHAR(1000) NOT NULL,
     participant_permission integer NOT NULL,
-    domain_id INTEGER NOT NULL,
+    synchronizer_id INTEGER NOT NULL,
     record_time BIGINT NOT NULL,
     trace_context BINARY LARGE OBJECT
 );
@@ -407,6 +413,11 @@ CREATE INDEX lapi_events_party_to_participant_event_offset_idx ON lapi_events_pa
 -- sequential_id index for paging
 CREATE INDEX lapi_events_party_to_participant_event_sequential_id_idx ON lapi_events_party_to_participant (event_sequential_id);
 
+-- party_id with event_sequential_id for id queries
+CREATE INDEX lapi_events_party_to_participant_event_party_sequential_id_idx ON lapi_events_party_to_participant (party_id, event_sequential_id);
+
+-- party_id with event_sequential_id for id queries
+CREATE INDEX lapi_events_party_to_participant_event_did_recordt_idx ON lapi_events_party_to_participant (synchronizer_id, record_time);
 -----------------------------
 -- Filter tables for events
 -----------------------------
@@ -480,18 +491,18 @@ CREATE INDEX lapi_pe_non_consuming_id_filter_informee_s_idx ON lapi_pe_non_consu
 ---------------------------------------------------------------------------------------------------
 CREATE TABLE lapi_transaction_meta(
     update_id VARCHAR(4000) NOT NULL,
-    event_offset VARCHAR(4000) NOT NULL,
+    event_offset BIGINT NOT NULL,
     publication_time BIGINT NOT NULL,
     record_time BIGINT NOT NULL,
-    domain_id INTEGER NOT NULL,
+    synchronizer_id INTEGER NOT NULL,
     event_sequential_id_first BIGINT NOT NULL,
     event_sequential_id_last BIGINT NOT NULL
 );
 CREATE INDEX lapi_transaction_meta_uid_idx ON lapi_transaction_meta(update_id);
 CREATE INDEX lapi_transaction_meta_event_offset_idx ON lapi_transaction_meta(event_offset);
 CREATE INDEX lapi_transaction_meta_publication_time_idx ON lapi_transaction_meta USING btree (publication_time, event_offset);
-CREATE INDEX lapi_transaction_meta_domain_record_time_idx ON lapi_transaction_meta USING btree (domain_id, record_time);
-CREATE INDEX lapi_transaction_meta_domain_offset_idx ON lapi_transaction_meta USING btree (domain_id, event_offset);
+CREATE INDEX lapi_transaction_meta_synchronizer_record_time_idx ON lapi_transaction_meta USING btree (synchronizer_id, record_time);
+CREATE INDEX lapi_transaction_meta_synchronizer_offset_idx ON lapi_transaction_meta USING btree (synchronizer_id, event_offset);
 
 ---------------------------------------------------------------------------------------------------
 -- Metering raw entries
@@ -502,7 +513,7 @@ CREATE TABLE lapi_transaction_metering (
     application_id VARCHAR(4000) NOT NULL,
     action_count INTEGER NOT NULL,
     metering_timestamp BIGINT NOT NULL,
-    ledger_offset VARCHAR(4000) NOT NULL
+    ledger_offset BIGINT
 );
 
 CREATE INDEX lapi_transaction_metering_ledger_offset_idx ON lapi_transaction_metering(ledger_offset);
@@ -513,7 +524,7 @@ CREATE INDEX lapi_transaction_metering_ledger_offset_idx ON lapi_transaction_met
 -- This table is meant to have a single row storing the current metering parameters.
 ---------------------------------------------------------------------------------------------------
 CREATE TABLE lapi_metering_parameters (
-    ledger_metering_end VARCHAR(4000),
+    ledger_metering_end BIGINT,
     ledger_metering_timestamp BIGINT NOT NULL
 );
 
@@ -527,7 +538,7 @@ CREATE TABLE lapi_participant_metering (
     from_timestamp BIGINT NOT NULL,
     to_timestamp BIGINT NOT NULL,
     action_count INTEGER NOT NULL,
-    ledger_offset VARCHAR(4000) NOT NULL
+    ledger_offset BIGINT
 );
 
 CREATE UNIQUE INDEX lapi_participant_metering_from_to_application_idx ON lapi_participant_metering(from_timestamp, to_timestamp, application_id);

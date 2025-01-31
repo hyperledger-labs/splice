@@ -72,7 +72,7 @@ import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, Te
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   CommunityCryptoConfig,
-  CommunityCryptoProvider,
+  CryptoProvider,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
@@ -81,8 +81,7 @@ import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsy
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.circe.Json
@@ -210,9 +209,9 @@ class SvApp(
             retryProvider,
           ),
           config.parameters
-            .toStaticDomainParameters(
-              CommunityCryptoConfig(provider = CommunityCryptoProvider.Jce),
-              ProtocolVersion.v32,
+            .toStaticSynchronizerParameters(
+              CommunityCryptoConfig(provider = CryptoProvider.Jce),
+              ProtocolVersion.v33,
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
@@ -706,7 +705,7 @@ class SvApp(
 
   private def expectConfiguredValidatorOnboardings(
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
-      decentralizedSynchronizer: DomainId,
+      decentralizedSynchronizer: SynchronizerId,
       clock: Clock,
   )(implicit tc: TraceContext): Future[List[Unit]] = {
     if (
@@ -732,7 +731,7 @@ class SvApp(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
-      decentralizedSynchronizer: DomainId,
+      decentralizedSynchronizer: SynchronizerId,
       clock: Clock,
   )(implicit tc: TraceContext): Future[Unit] =
     retryProvider.retry(
@@ -830,7 +829,7 @@ object SvApp {
       secret: ValidatorOnboardingSecret,
       expiresIn: NonNegativeFiniteDuration,
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
-      decentralizedSynchronizer: DomainId,
+      decentralizedSynchronizer: SynchronizerId,
       clock: Clock,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
@@ -867,7 +866,7 @@ object SvApp {
                       ),
                     deduplicationOffset = offset,
                   )
-                  .withDomainId(domainId = decentralizedSynchronizer)
+                  .withSynchronizerId(synchronizerId = decentralizedSynchronizer)
                   .yieldUnit()
               } yield {
                 logger.info("Created new ValidatorOnboarding contract.")

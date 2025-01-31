@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging.pretty
@@ -186,7 +186,7 @@ trait PrettyInstances {
     prettyOfString(id => show"${id.packageId}:${id.qualifiedName}")
 
   implicit def prettyLfPackageName: Pretty[com.digitalasset.daml.lf.data.Ref.PackageName] =
-    prettyOfString(packageName => show"${packageName.toString}")
+    prettyOfString(packageName => show"$packageName")
 
   implicit def prettyLfContractId: Pretty[LfContractId] = prettyOfString {
     case LfContractId.V1(discriminator, suffix)
@@ -241,7 +241,7 @@ trait PrettyInstances {
     ),
     paramIfNonEmpty(
       "resources",
-      _.resources.map { case (k, v) => s"${k.asString}=>$v".singleQuoted }.toSeq,
+      _.resources.map { case (k, v) => s"${k.asString}=>$v".singleQuoted },
     ),
   )
 

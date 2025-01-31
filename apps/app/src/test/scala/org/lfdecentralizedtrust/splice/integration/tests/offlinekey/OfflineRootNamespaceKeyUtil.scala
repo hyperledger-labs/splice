@@ -4,16 +4,15 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.console.InstanceReference
-import com.digitalasset.canton.crypto.KeyPurpose.Signing
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
-import com.digitalasset.canton.topology.{Namespace, ParticipantId}
 import com.digitalasset.canton.topology.transaction.{
   NamespaceDelegation,
   OwnerToKeyMapping,
   SignedTopologyTransaction,
   TopologyChangeOp,
 }
+import com.digitalasset.canton.topology.{Namespace, ParticipantId}
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -89,12 +88,6 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
           isRootDelegation = true,
           signedBy = Seq(offlineGeneratedNamespace.fingerprint),
         )
-
-      offlineParticipantClient.topology.owner_to_key_mappings.add_key(
-        offlineRootKey.fingerprint,
-        Signing,
-        signedBy = Seq(offlineGeneratedNamespace.fingerprint),
-      )
 
       val delegationTopologyTransaction =
         offlineParticipantClient.topology.namespace_delegations.propose_delegation(

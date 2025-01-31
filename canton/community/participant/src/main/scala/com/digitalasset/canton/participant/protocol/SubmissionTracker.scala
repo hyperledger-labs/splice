@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -7,7 +7,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.SubmissionTrackerData
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
@@ -17,14 +17,12 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.protocol.SubmissionTracker.SubmissionData
 import com.digitalasset.canton.participant.store.SubmissionTrackerStore
 import com.digitalasset.canton.protocol.{RequestId, RootHash}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
@@ -76,24 +74,20 @@ trait SubmissionTracker extends AutoCloseable {
   def provideSubmissionData(
       rootHash: RootHash,
       requestId: RequestId,
-      submissionData: SubmissionData,
+      submissionData: SubmissionTrackerData,
   )(implicit traceContext: TraceContext): Unit
 }
 
 object SubmissionTracker {
-  final case class SubmissionData(
-      submittingParticipant: ParticipantId,
-      maxSequencingTime: CantonTimestamp,
-  )
 
-  def apply(protocolVersion: ProtocolVersion)(
+  def apply(
       participantId: ParticipantId,
       store: SubmissionTrackerStore,
       futureSupervisor: FutureSupervisor,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): SubmissionTracker =
-    new SubmissionTrackerImpl(protocolVersion)(
+    new SubmissionTrackerImpl(
       participantId,
       store,
       futureSupervisor,
@@ -102,7 +96,7 @@ object SubmissionTracker {
     )
 }
 
-class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)(
+class SubmissionTrackerImpl private[protocol] (
     participantId: ParticipantId,
     store: SubmissionTrackerStore,
     futureSupervisor: FutureSupervisor,
@@ -237,7 +231,7 @@ class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)
   ): Unit =
     pendingRequests
       .updateWith(rootHash) {
-        case Some(RequestList(_, reqMap)) if reqMap.size == 1 =>
+        case Some(RequestList(_, reqMap)) if reqMap.sizeIs == 1 =>
           // We are the last request for this root hash
           // Consistency check
           if (!reqMap.contains(requestId)) {
@@ -281,7 +275,7 @@ class SubmissionTrackerImpl private[protocol] (protocolVersion: ProtocolVersion)
   override def provideSubmissionData(
       rootHash: RootHash,
       requestId: RequestId,
-      submissionData: SubmissionData,
+      submissionData: SubmissionTrackerData,
   )(implicit traceContext: TraceContext): Unit = {
     val Entry(prevFUS, nextPUS, resultPUS) = tryGetEntry(rootHash, requestId)
 

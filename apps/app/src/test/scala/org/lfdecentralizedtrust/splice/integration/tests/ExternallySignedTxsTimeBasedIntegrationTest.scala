@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.api.v2.interactive.InteractiveSubmissionServiceOuterClass.PreparedTransaction
-import com.digitalasset.canton.crypto.SigningPrivateKey
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.util.HexString
@@ -109,11 +109,13 @@ class ExternallySignedTxsTimeBasedIntegrationTest
               .signBytes(
                 HexString.parseToByteString(prepareSend.txHash).value,
                 onboarding1.privateKey.asInstanceOf[SigningPrivateKey],
+                usage = SigningKeyUsage.ProtocolOnly,
               )
               .value
+              .toProtoV30
               .signature
           ),
-          HexString.toHexString(onboarding1.publicKey.key),
+          publicKeyAsHexString(onboarding1.publicKey),
         ),
       )(
         "Validator automation completes transfer",

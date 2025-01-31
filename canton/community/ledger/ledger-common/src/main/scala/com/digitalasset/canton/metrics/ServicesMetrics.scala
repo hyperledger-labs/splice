@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -83,6 +83,9 @@ class ServicesHistograms(val prefix: MetricName)(implicit
   private[metrics] val transactionTrees: Item = extend("transaction_trees", baseInfo)
   private[metrics] val getTransactionById: Item = extend("get_transaction_by_id", baseInfo)
   private[metrics] val getTransactionTreeById: Item = extend("get_transaction_tree_by_id", baseInfo)
+  private[metrics] val getTransactionByOffset: Item = extend("get_transaction_by_offset", baseInfo)
+  private[metrics] val getTransactionTreeByOffset: Item =
+    extend("get_transaction_tree_by_offset", baseInfo)
   private[metrics] val getActiveContracts: Item = extend("get_active_contracts", baseInfo)
   private[metrics] val lookupActiveContract: Item = extend("lookup_active_contract", baseInfo)
   private[metrics] val lookupContractState: Item = extend("lookup_contract_state", baseInfo)
@@ -145,7 +148,8 @@ class ServicesHistograms(val prefix: MetricName)(implicit
   )
   private[metrics] val readStateUpdates: Item = extend("state_updates", readBaseInfo)
 
-  private[metrics] val readGetConnectedDomains: Item = extend("get_connected_domains", readBaseInfo)
+  private[metrics] val readGetConnectedSynchronizers: Item =
+    extend("get_connected_synchronizers", readBaseInfo)
 
   private[metrics] val readIncompleteReassignmentOffsets: Item =
     extend("incomplete_reassignment_offsets", readBaseInfo)
@@ -178,7 +182,7 @@ class ServicesHistograms(val prefix: MetricName)(implicit
 class ServicesMetrics(
     inventory: ServicesHistograms,
     openTelemetryMetricsFactory: LabeledMetricsFactory,
-) {
+) extends HasDocumentedMetrics {
 
   private val prefix = inventory.prefix
   private implicit val metricsContext: MetricsContext = MetricsContext.Empty
@@ -198,6 +202,10 @@ class ServicesMetrics(
       openTelemetryMetricsFactory.timer(inventory.getTransactionById.info)
     val getTransactionTreeById: Timer =
       openTelemetryMetricsFactory.timer(inventory.getTransactionTreeById.info)
+    val getTransactionByOffset: Timer =
+      openTelemetryMetricsFactory.timer(inventory.getTransactionByOffset.info)
+    val getTransactionTreeByOffset: Timer =
+      openTelemetryMetricsFactory.timer(inventory.getTransactionTreeByOffset.info)
     val getActiveContracts: Timer =
       openTelemetryMetricsFactory.timer(inventory.getActiveContracts.info)
     val lookupActiveContract: Timer =
@@ -298,8 +306,8 @@ class ServicesMetrics(
 
     val stateUpdates: Timer = openTelemetryMetricsFactory.timer(inventory.readStateUpdates.info)
 
-    val getConnectedDomains: Timer =
-      openTelemetryMetricsFactory.timer(inventory.readGetConnectedDomains.info)
+    val getConnectedSynchronizers: Timer =
+      openTelemetryMetricsFactory.timer(inventory.readGetConnectedSynchronizers.info)
 
     val incompleteReassignmentOffsets: Timer =
       openTelemetryMetricsFactory.timer(inventory.readIncompleteReassignmentOffsets.info)

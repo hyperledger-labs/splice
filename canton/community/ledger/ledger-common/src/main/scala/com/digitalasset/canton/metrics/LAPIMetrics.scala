@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -15,16 +15,19 @@ import com.daml.metrics.api.{
 class LAPIMetrics(
     val prefix: MetricName,
     val metricsFactory: LabeledMetricsFactory,
-) {
+) extends HasDocumentedMetrics {
+
+  override def docPoke(): Unit = {
+    threadpool.docPoke()
+    streams.docPoke()
+  }
 
   import MetricsContext.Implicits.empty
 
-  object threadpool {
+  object threadpool extends HasDocumentedMetrics {
     private val prefix: MetricName = LAPIMetrics.this.prefix :+ "threadpool"
 
-    val apiServices: MetricName = prefix :+ "api-services"
-
-    val inMemoryFanOut: MetricName = prefix :+ "in_memory_fan_out"
+    val apiReadServices: MetricName = prefix :+ "api_read_services"
 
     object indexBypass {
       private val prefix: MetricName = threadpool.prefix :+ "index_bypass"
@@ -33,7 +36,7 @@ class LAPIMetrics(
     }
   }
 
-  object streams {
+  object streams extends HasDocumentedMetrics {
     private val prefix: MetricName = LAPIMetrics.this.prefix :+ "streams"
 
     val transactionTrees: Counter = metricsFactory.counter(

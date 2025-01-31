@@ -49,7 +49,7 @@ private[splice] object TransactionTreeExtensions {
         case _: j.CreatedEvent => Iterator.empty
         case ex: j.ExercisedEvent =>
           val evs = self.getEventsById.asScala
-          ex.getChildEventIds.asScala.iterator flatMap { childId =>
+          ex.getChildNodeIds.asScala.iterator flatMap { childId =>
             evs
               .get(childId)
               .fold(Iterator.empty[j.TreeEvent])(child =>

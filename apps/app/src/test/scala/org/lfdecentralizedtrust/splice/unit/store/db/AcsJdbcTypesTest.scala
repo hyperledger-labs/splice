@@ -1,21 +1,21 @@
 package org.lfdecentralizedtrust.splice.unit.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.digitalasset.daml.lf.data.Bytes
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, SplicePostgresTest}
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.Offset
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import org.scalatest.wordspec.AsyncWordSpec
 import slick.jdbc.{JdbcProfile, PostgresProfile}
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 
 class AcsJdbcTypesTest
     extends AsyncWordSpec
@@ -25,6 +25,7 @@ class AcsJdbcTypesTest
 
   override val profile: JdbcProfile = PostgresProfile
 
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
   import storage.api.jdbcProfile.api.*
 
   val TestTable = new TableQuery(tag => new TestTableDef(tag))
@@ -36,13 +37,13 @@ class AcsJdbcTypesTest
         new ContractId[Any](
           "003daad4665efc696dfb505d8ca794034a18f264cda4ebd3f0549f03c0f1f4ef42ca011220df05a9d3d5a4180cec940aeed16e1f080e6f81ee3867ff433e4a37ce2a9769c1"
         ),
-        Offset(Bytes.assertFromString("ff00aa")),
+        Offset.tryFromLong(64),
         "bf196cb0db2637fd30850500c50984c3b2dc23c2f89b42d9a673c5dcad3649a2",
         QualifiedName(
           "Splice.Directory",
           "DirectoryEntry",
         ),
-        DomainId.tryFromString(
+        SynchronizerId.tryFromString(
           "domain_007c100515333195029920502::122083332c56ac1568312ccdccc7ebae45cb93005da7c4ff58c333588403efee5901"
         ),
         PartyId.tryFromProtoPrimitive("aaaa::bbbb"),
@@ -112,7 +113,7 @@ class AcsJdbcTypesTest
       offset: Offset,
       templateIdPackageId: String,
       templateIdQualifiedName: QualifiedName,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       partyId: PartyId,
       json: Json,
   )
@@ -125,7 +126,7 @@ class AcsJdbcTypesTest
     val templateIdPackageId: Rep[String] = column[String]("template_id_package_id")
     val templateIdQualifiedName: Rep[QualifiedName] =
       column[QualifiedName]("template_id_qualified_name")
-    val domainId: Rep[DomainId] = column[DomainId]("domain_id")
+    val synchronizerId: Rep[SynchronizerId] = column[SynchronizerId]("domain_id")
     val partyId: Rep[PartyId] = column[PartyId]("party_id")
     val json: Rep[Json] = column[Json]("jayson")
     def * = (
@@ -134,7 +135,7 @@ class AcsJdbcTypesTest
       offset,
       templateIdPackageId,
       templateIdQualifiedName,
-      domainId,
+      synchronizerId,
       partyId,
       json,
     ).<>(
@@ -152,7 +153,9 @@ class AcsJdbcTypesTest
     )
   }
 
-  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[Unit] = {
+  override def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     storage.update(
       DBIO.seq(
         sqlu"drop table if exists jdbc_types_test_table;"

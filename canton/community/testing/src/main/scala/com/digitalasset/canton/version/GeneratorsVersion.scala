@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
@@ -30,7 +30,7 @@ object GeneratorsVersion {
   )(implicit arb: Arbitrary[T]): Gen[Option[T]] =
     valueForEmptyOptionExactlyUntilExclusive(pv, invariant, arb.arbitrary)
 
-  def defaultValueGen[Comp <: HasProtocolVersionedWrapperCompanion[_, _], T](
+  def defaultValueGen[Comp <: HasProtocolVersionedWrapperCompanionWithDependency[_, _, _], T](
       protocolVersion: ProtocolVersion,
       defaultValue: Comp#DefaultValue[T],
       gen: Gen[T],

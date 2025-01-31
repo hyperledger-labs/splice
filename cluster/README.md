@@ -1565,8 +1565,8 @@ However, the following steps don't require an action from us:
    The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
    (Check the logs of failing pods to be sure that there is no other problem.)
    To get a sense for how many SVs still need to finish their post-migration init before the new synchronizer becomes operational,
-   you can filter participant logs for `Persisted.*DomainParametersState`
-   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ADomainParametersState;duration=PT15M?project=da-cn-devnet))
+   you can filter participant logs for `Persisted.*SynchronizerParametersState`
+   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ASynchronizerParametersState;duration=PT15M?project=da-cn-devnet))
    and inspect the (number of) signatures on the latest of those entries
    (you need slightly over 2/3 of SVs to sign this).
 1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
@@ -1639,8 +1639,8 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
    For more fine-grained control, you can append `core`, `sv` or `validator` to the command to tell it to change only one of these things,
    followed by `pulumi up` parameters such as `--yes --skip-preview`.
    To get a sense for how many SVs still need to finish their post-migration init before the new synchronizer becomes operational,
-   you can filter participant logs for `Persisted.*DomainParametersState`
-   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ADomainParametersState;duration=PT15M?project=da-cn-devnet))
+   you can filter participant logs for `Persisted.*SynchronizerParametersState`
+   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ASynchronizerParametersState;duration=PT15M?project=da-cn-devnet))
    and inspect the (number of) signatures on the latest of those entries
    (you need slightly over 2/3 of SVs to sign this).
 

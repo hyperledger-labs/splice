@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.validation
@@ -11,14 +11,8 @@ import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.InteractiveSubmission.*
 import com.digitalasset.canton.crypto.{Hash, InteractiveSubmission}
+import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewParticipantData.RootAction
-import com.digitalasset.canton.data.{
-  CantonTimestamp,
-  FullTransactionViewTree,
-  SubmitterMetadata,
-  TransactionView,
-  ViewPosition,
-}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -35,11 +29,7 @@ import com.digitalasset.canton.participant.protocol.validation.ModelConformanceC
   PackageNotFound,
   *,
 }
-import com.digitalasset.canton.participant.store.{
-  ContractLookup,
-  ExtendedContractLookup,
-  StoredContract,
-}
+import com.digitalasset.canton.participant.store.ExtendedContractLookup
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.participant.util.DAMLe.{
   HasReinterpret,
@@ -56,17 +46,16 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.{
 import com.digitalasset.canton.protocol.hash.HashTracer.NoOp
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.{ErrorUtil, MapsUtil}
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
-import com.digitalasset.canton.{LfCreateCommand, LfKeyResolver, LfPartyId, RequestCounter, checked}
+import com.digitalasset.canton.{LfCreateCommand, LfKeyResolver, LfPartyId, checked}
 import com.digitalasset.daml.lf.data.Ref.{CommandId, Identifier, PackageId, PackageName}
 
 import java.util.UUID
 import scala.collection.immutable.SortedMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** Allows for checking model conformance of a list of transaction view trees.
   * If successful, outputs the received transaction as LfVersionedTransaction along with TransactionMetadata.
@@ -96,7 +85,6 @@ class ModelConformanceChecker(
   private[protocol] def check(
       rootViewTrees: NonEmpty[Seq[FullTransactionViewTree]],
       keyResolverFor: TransactionView => LfKeyResolver,
-      requestCounter: RequestCounter,
       topologySnapshot: TopologySnapshot,
       commonData: CommonData,
       getEngineAbortStatus: GetEngineAbortStatus,
@@ -128,7 +116,6 @@ class ModelConformanceChecker(
             mediator,
             transactionUuid,
             keyResolverFor(view),
-            requestCounter,
             ledgerTime,
             submissionTime,
             submittingParticipantO,
@@ -208,11 +195,10 @@ class ModelConformanceChecker(
 
   private def validateInputContracts(
       view: TransactionView,
-      requestCounter: RequestCounter,
       getEngineAbortStatus: GetEngineAbortStatus,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, Error, Map[LfContractId, StoredContract]] =
+  ): EitherT[FutureUnlessShutdown, Error, Map[LfContractId, SerializableContract]] =
     view.tryFlattenToParticipantViews
       .flatMap(_.viewParticipantData.coreInputs)
       .parTraverse { case (cid, InputContract(contract, _)) =>
@@ -223,10 +209,9 @@ class ModelConformanceChecker(
             case ContractMismatch(actual, _) =>
               InvalidInputContract(cid, actual.templateId, view.viewHash): Error
           }
-          .map(_ => cid -> StoredContract(contract, requestCounter, isDivulged = true))
+          .map(_ => cid -> contract)
       }
       .map(_.toMap)
-      .mapK(FutureUnlessShutdown.outcomeK)
 
   private def buildPackageNameMap(
       packageIds: Set[PackageId]
@@ -253,12 +238,11 @@ class ModelConformanceChecker(
           ConflictingNameBindings(Map(participantId -> conflicts))
         }
       } yield nameBindings
-    }).mapK(FutureUnlessShutdown.outcomeK)
+    })
 
   def reInterpret(
       view: TransactionView,
       resolverFromView: LfKeyResolver,
-      requestCounter: RequestCounter,
       ledgerTime: CantonTimestamp,
       submissionTime: CantonTimestamp,
       getEngineAbortStatus: GetEngineAbortStatus,
@@ -272,12 +256,10 @@ class ModelConformanceChecker(
 
     val seed = viewParticipantData.actionDescription.seedOption
     for {
-      viewInputContracts <- validateInputContracts(view, requestCounter, getEngineAbortStatus)
+      viewInputContracts <- validateInputContracts(view, getEngineAbortStatus)
 
       contractLookupAndVerification =
         new ExtendedContractLookup(
-          // all contracts and keys specified explicitly
-          ContractLookup.noContracts(loggerFactory),
           viewInputContracts,
           resolverFromView,
           serializableContractAuthenticator,
@@ -299,7 +281,6 @@ class ModelConformanceChecker(
         )(traceContext)
         .leftMap(DAMLeError(_, view.viewHash))
         .leftWiden[Error]
-        .mapK(FutureUnlessShutdown.outcomeK)
     } yield ConformanceReInterpretationResult(
       lfTxAndMetadata,
       contractLookupAndVerification,
@@ -313,7 +294,6 @@ class ModelConformanceChecker(
       mediator: MediatorGroupRecipient,
       transactionUuid: UUID,
       resolverFromView: LfKeyResolver,
-      requestCounter: RequestCounter,
       ledgerTime: CantonTimestamp,
       submissionTime: CantonTimestamp,
       submitterMetadataO: Option[SubmitterMetadata],
@@ -338,7 +318,6 @@ class ModelConformanceChecker(
           reInterpret(
             view,
             resolverFromView,
-            requestCounter,
             ledgerTime,
             submissionTime,
             getEngineAbortStatus,
@@ -387,7 +366,7 @@ class ModelConformanceChecker(
             TransactionTreeFactory.contractInstanceLookup(contractLookupAndVerification),
           keyResolver = resolverFromReinterpretation,
         )
-      ).leftMap(err => TransactionTreeError(err, view.viewHash)).mapK(FutureUnlessShutdown.outcomeK)
+      ).leftMap(err => TransactionTreeError(err, view.viewHash))
 
       (reconstructedView, suffixedTx) = reconstructedViewAndTx
 
@@ -410,9 +389,9 @@ class ModelConformanceChecker(
     val informees = view.viewCommonData.tryUnwrap.viewConfirmationParameters.informees
 
     EitherT(for {
-      informeeParticipantsByParty <- FutureUnlessShutdown.outcomeF(
+      informeeParticipantsByParty <-
         snapshot.activeParticipantsOfParties(informees.toSeq)
-      )
+
       informeeParticipants = informeeParticipantsByParty.values.flatten.toSet
       unvetted <- informeeParticipants.toSeq
         .parTraverse(p =>
@@ -462,7 +441,7 @@ object ModelConformanceChecker {
   private[protocol] final case class ConformanceReInterpretationResult(
       reInterpretationResult: ReInterpretationResult,
       contractLookup: ExtendedContractLookup,
-      viewInputContracts: Map[LfContractId, StoredContract],
+      viewInputContracts: Map[LfContractId, SerializableContract],
   ) {
 
     /** Compute the hash of a re-interpreted transaction to validate external signatures.
@@ -474,7 +453,7 @@ object ModelConformanceChecker {
         commandId: CommandId,
         transactionUUID: UUID,
         mediatorGroup: Int,
-        domainId: DomainId,
+        synchronizerId: SynchronizerId,
         protocolVersion: ProtocolVersion,
         transactionEnricher: TransactionEnricher,
     )(implicit
@@ -496,16 +475,12 @@ object ModelConformanceChecker {
                 commandId,
                 transactionUUID,
                 mediatorGroup,
-                domainId,
+                synchronizerId,
                 Option.when(reInterpretationResult.usesLedgerTime)(
                   reInterpretationResult.metadata.ledgerTime.toLf
                 ),
                 reInterpretationResult.metadata.submissionTime.toLf,
-                SortedMap.from(
-                  viewInputContracts.map { case (cid, storedContract) =>
-                    cid -> storedContract.contract
-                  }
-                ),
+                SortedMap.from(viewInputContracts),
               ),
               reInterpretationResult.metadata.seeds,
               protocolVersion,
@@ -529,13 +504,15 @@ object ModelConformanceChecker {
         SerializableContract,
         GetEngineAbortStatus,
         TraceContext,
-    ) => EitherT[Future, ContractValidationFailure, Unit]
+    ) => EitherT[FutureUnlessShutdown, ContractValidationFailure, Unit]
 
   private def validateSerializedContract(damlE: DAMLe)(
       contract: SerializableContract,
       getEngineAbortStatus: GetEngineAbortStatus,
       traceContext: TraceContext,
-  )(implicit ec: ExecutionContext): EitherT[Future, ContractValidationFailure, Unit] = {
+  )(implicit
+      ec: ExecutionContext
+  ): EitherT[FutureUnlessShutdown, ContractValidationFailure, Unit] = {
 
     val instance = contract.rawContractInstance
     val unversioned = instance.contractInstance.unversioned
@@ -564,7 +541,7 @@ object ModelConformanceChecker {
         keyOpt = metadata.maybeKeyWithMaintainers,
         version = instance.contractInstance.version,
       )
-      _ <- EitherT.cond[Future](
+      _ <- EitherT.cond[FutureUnlessShutdown](
         actual == expected,
         (),
         ContractMismatch(actual, expected): ContractValidationFailure,

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.data
@@ -20,18 +20,18 @@ import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration,
   PositiveDurationSeconds,
 }
-import com.digitalasset.canton.domain.config.DomainParametersConfig
-import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
-import com.digitalasset.canton.protocol.DynamicDomainParameters.InvalidDynamicDomainParameters
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters.InvalidDynamicSynchronizerParameters
+import com.digitalasset.canton.protocol.SynchronizerParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.{
   AcsCommitmentsCatchUpConfig,
-  DynamicDomainParameters as DynamicDomainParametersInternal,
+  DynamicSynchronizerParameters as DynamicSynchronizerParametersInternal,
   OnboardingRestriction,
-  StaticDomainParameters as StaticDomainParametersInternal,
+  StaticSynchronizerParameters as StaticSynchronizerParametersInternal,
   v30,
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.time.{
   Clock,
   NonNegativeFiniteDuration as InternalNonNegativeFiniteDuration,
@@ -39,13 +39,14 @@ import com.digitalasset.canton.time.{
 }
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.version.{ProtoVersion, ProtocolVersion}
-import com.digitalasset.canton.{ProtoDeserializationError, config, crypto as DomainCrypto}
+import com.digitalasset.canton.{ProtoDeserializationError, config, crypto as SynchronizerCrypto}
 import com.google.common.annotations.VisibleForTesting
 import io.scalaland.chimney.dsl.*
 
 import scala.Ordering.Implicits.*
+import scala.annotation.nowarn
 
-final case class StaticDomainParameters(
+final case class StaticSynchronizerParameters(
     requiredSigningSpecs: RequiredSigningSpecs,
     requiredEncryptionSpecs: RequiredEncryptionSpecs,
     requiredSymmetricKeySchemes: NonEmpty[Set[SymmetricKeyScheme]],
@@ -56,59 +57,67 @@ final case class StaticDomainParameters(
   def writeToFile(outputFile: String): Unit =
     BinaryFileUtil.writeByteStringToFile(outputFile, toInternal.toByteString)
 
-  private[canton] def toInternal: StaticDomainParametersInternal =
-    this.transformInto[StaticDomainParametersInternal]
+  private[canton] def toInternal: StaticSynchronizerParametersInternal =
+    this.transformInto[StaticSynchronizerParametersInternal]: @nowarn(
+      "msg=Der in object CryptoKeyFormat is deprecated"
+    )
 }
 
-object StaticDomainParameters {
+object StaticSynchronizerParameters {
 
   // This method is unsafe. Not prefixing by `try` to have nicer docs snippets.
   def fromConfig(
-      config: DomainParametersConfig,
+      config: SynchronizerParametersConfig,
       cryptoConfig: CryptoConfig,
       protocolVersion: ProtocolVersion,
-  ): StaticDomainParameters = {
+  ): StaticSynchronizerParameters = {
     val internal = config
-      .toStaticDomainParameters(cryptoConfig, protocolVersion)
+      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion)
       .valueOr(err =>
-        throw new IllegalArgumentException(s"Cannot instantiate static domain parameters: $err")
+        throw new IllegalArgumentException(
+          s"Cannot instantiate static synchronizer parameters: $err"
+        )
       )
 
-    StaticDomainParameters(internal)
+    StaticSynchronizerParameters(internal)
   }
 
-  def defaultsWithoutKMS(protocolVersion: ProtocolVersion): StaticDomainParameters =
+  def defaultsWithoutKMS(protocolVersion: ProtocolVersion): StaticSynchronizerParameters =
     defaults(CommunityCryptoConfig(), protocolVersion)
 
   // This method is unsafe. Not prefixing by `try` to have nicer docs snippets.
   def defaults(
       cryptoConfig: CryptoConfig,
       protocolVersion: ProtocolVersion,
-  ): StaticDomainParameters = {
-    val internal = DomainParametersConfig()
-      .toStaticDomainParameters(cryptoConfig, protocolVersion)
-      .valueOr(err =>
-        throw new IllegalArgumentException(s"Cannot instantiate static domain parameters: $err")
-      )
-
-    StaticDomainParameters(internal)
-  }
-
-  def apply(
-      domain: StaticDomainParametersInternal
-  ): StaticDomainParameters =
-    domain.transformInto[StaticDomainParameters]
-
-  def tryReadFromFile(inputFile: String): StaticDomainParameters = {
-    val staticDomainParametersInternal = StaticDomainParametersInternal
-      .readFromTrustedFile(inputFile)
+  ): StaticSynchronizerParameters = {
+    val internal = SynchronizerParametersConfig()
+      .toStaticSynchronizerParameters(cryptoConfig, protocolVersion)
       .valueOr(err =>
         throw new IllegalArgumentException(
-          s"Reading static domain parameters from file $inputFile failed: $err"
+          s"Cannot instantiate static synchronizer parameters: $err"
         )
       )
 
-    StaticDomainParameters(staticDomainParametersInternal)
+    StaticSynchronizerParameters(internal)
+  }
+
+  def apply(
+      synchronizer: StaticSynchronizerParametersInternal
+  ): StaticSynchronizerParameters =
+    synchronizer.transformInto[StaticSynchronizerParameters]: @nowarn(
+      "msg=Der in object CryptoKeyFormat is deprecated"
+    )
+
+  def tryReadFromFile(inputFile: String): StaticSynchronizerParameters = {
+    val staticSynchronizerParametersInternal = StaticSynchronizerParametersInternal
+      .readFromTrustedFile(inputFile)
+      .valueOr(err =>
+        throw new IllegalArgumentException(
+          s"Reading static synchronizer parameters from file $inputFile failed: $err"
+        )
+      )
+
+    StaticSynchronizerParameters(staticSynchronizerParametersInternal)
   }
 
   private def requiredKeySchemes[P, A](
@@ -119,16 +128,16 @@ object StaticDomainParameters {
     ProtoConverter.parseRequiredNonEmpty(parse(field, _), field, content).map(_.toSet)
 
   def fromProtoV30(
-      domainParametersP: v30.StaticDomainParameters
-  ): ParsingResult[StaticDomainParameters] = {
-    val v30.StaticDomainParameters(
+      synchronizerParametersP: v30.StaticSynchronizerParameters
+  ): ParsingResult[StaticSynchronizerParameters] = {
+    val v30.StaticSynchronizerParameters(
       requiredSigningSpecsOP,
       requiredEncryptionSpecsOP,
       requiredSymmetricKeySchemesP,
       requiredHashAlgorithmsP,
       requiredCryptoKeyFormatsP,
       protocolVersionP,
-    ) = domainParametersP
+    ) = synchronizerParametersP
 
     for {
       requiredSigningSpecsP <- requiredSigningSpecsOP.toRight(
@@ -139,12 +148,12 @@ object StaticDomainParameters {
       requiredSigningAlgorithmSpecs <- requiredKeySchemes(
         "required_signing_algorithm_specs",
         requiredSigningSpecsP.algorithms,
-        DomainCrypto.SigningAlgorithmSpec.fromProtoEnum,
+        SynchronizerCrypto.SigningAlgorithmSpec.fromProtoEnum,
       )
       requiredSigningKeySpecs <- requiredKeySchemes(
         "required_signing_key_specs",
         requiredSigningSpecsP.keys,
-        DomainCrypto.SigningKeySpec.fromProtoEnum,
+        SynchronizerCrypto.SigningKeySpec.fromProtoEnum,
       )
       requiredEncryptionSpecsP <- requiredEncryptionSpecsOP.toRight(
         ProtoDeserializationError.FieldNotSet(
@@ -154,34 +163,35 @@ object StaticDomainParameters {
       requiredEncryptionAlgorithmSpecs <- requiredKeySchemes(
         "required_encryption_algorithm_specs",
         requiredEncryptionSpecsP.algorithms,
-        DomainCrypto.EncryptionAlgorithmSpec.fromProtoEnum,
+        SynchronizerCrypto.EncryptionAlgorithmSpec.fromProtoEnum,
       )
       requiredEncryptionKeySpecs <- requiredKeySchemes(
         "required_encryption_key_specs",
         requiredEncryptionSpecsP.keys,
-        DomainCrypto.EncryptionKeySpec.fromProtoEnum,
+        SynchronizerCrypto.EncryptionKeySpec.fromProtoEnum,
       )
       requiredSymmetricKeySchemes <- requiredKeySchemes(
         "required_symmetric_key_schemes",
         requiredSymmetricKeySchemesP,
-        DomainCrypto.SymmetricKeyScheme.fromProtoEnum,
+        SynchronizerCrypto.SymmetricKeyScheme.fromProtoEnum,
       )
       requiredHashAlgorithms <- requiredKeySchemes(
         "required_hash_algorithms",
         requiredHashAlgorithmsP,
-        DomainCrypto.HashAlgorithm.fromProtoEnum,
+        SynchronizerCrypto.HashAlgorithm.fromProtoEnum,
       )
       requiredCryptoKeyFormats <- requiredKeySchemes(
         "required_crypto_key_formats",
         requiredCryptoKeyFormatsP,
-        DomainCrypto.CryptoKeyFormat.fromProtoEnum,
+        SynchronizerCrypto.CryptoKeyFormat.fromProtoEnum,
       )
       // Data in the console is not really validated, so we allow for deleted
       protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP, allowDeleted = true)
-    } yield StaticDomainParameters(
-      StaticDomainParametersInternal(
-        DomainCrypto.RequiredSigningSpecs(requiredSigningAlgorithmSpecs, requiredSigningKeySpecs),
-        DomainCrypto
+    } yield StaticSynchronizerParameters(
+      StaticSynchronizerParametersInternal(
+        SynchronizerCrypto
+          .RequiredSigningSpecs(requiredSigningAlgorithmSpecs, requiredSigningKeySpecs),
+        SynchronizerCrypto
           .RequiredEncryptionSpecs(requiredEncryptionAlgorithmSpecs, requiredEncryptionKeySpecs),
         requiredSymmetricKeySchemes,
         requiredHashAlgorithms,
@@ -192,8 +202,8 @@ object StaticDomainParameters {
   }
 }
 
-// TODO(#15650) Properly expose new BFT parameters and domain limits
-final case class DynamicDomainParameters(
+// TODO(#15650) Properly expose new BFT parameters and synchronizer limits
+final case class DynamicSynchronizerParameters(
     confirmationResponseTimeout: NonNegativeFiniteDuration,
     mediatorReactionTimeout: NonNegativeFiniteDuration,
     assignmentExclusivityTimeout: NonNegativeFiniteDuration,
@@ -206,7 +216,7 @@ final case class DynamicDomainParameters(
     trafficControlParameters: Option[TrafficControlParameters],
     onboardingRestriction: OnboardingRestriction,
     acsCommitmentsCatchUpConfig: Option[AcsCommitmentsCatchUpConfig],
-    participantDomainLimits: ParticipantDomainLimits,
+    participantSynchronizerLimits: ParticipantSynchronizerLimits,
     submissionTimeRecordTimeTolerance: NonNegativeFiniteDuration,
 ) {
 
@@ -214,10 +224,10 @@ final case class DynamicDomainParameters(
     confirmationResponseTimeout + mediatorReactionTimeout
 
   @inline def confirmationRequestsMaxRate: NonNegativeInt =
-    participantDomainLimits.confirmationRequestsMaxRate
+    participantSynchronizerLimits.confirmationRequestsMaxRate
 
   if (submissionTimeRecordTimeTolerance * 2 > mediatorDeduplicationTimeout)
-    throw new InvalidDynamicDomainParameters(
+    throw new InvalidDynamicSynchronizerParameters(
       s"The submissionTimeRecordTimeTolerance ($submissionTimeRecordTimeTolerance) must be at most half of the " +
         s"mediatorDeduplicationTimeout ($mediatorDeduplicationTimeout)."
     )
@@ -252,7 +262,7 @@ final case class DynamicDomainParameters(
         acsCommitmentsCatchUpConfig,
       submissionTimeRecordTimeTolerance: NonNegativeFiniteDuration =
         submissionTimeRecordTimeTolerance,
-  ): DynamicDomainParameters = this.copy(
+  ): DynamicSynchronizerParameters = this.copy(
     confirmationResponseTimeout = confirmationResponseTimeout,
     mediatorReactionTimeout = mediatorReactionTimeout,
     assignmentExclusivityTimeout = assignmentExclusivityTimeout,
@@ -265,16 +275,16 @@ final case class DynamicDomainParameters(
     trafficControlParameters = trafficControlParameters,
     onboardingRestriction = onboardingRestriction,
     acsCommitmentsCatchUpConfig = acsCommitmentsCatchUpConfig,
-    participantDomainLimits = ParticipantDomainLimits(confirmationRequestsMaxRate),
+    participantSynchronizerLimits = ParticipantSynchronizerLimits(confirmationRequestsMaxRate),
     submissionTimeRecordTimeTolerance = submissionTimeRecordTimeTolerance,
   )
 
-  private[canton] def toInternal: Either[String, DynamicDomainParametersInternal] =
-    DynamicDomainParametersInternal
+  private[canton] def toInternal: Either[String, DynamicSynchronizerParametersInternal] =
+    DynamicSynchronizerParametersInternal
       .protocolVersionRepresentativeFor(ProtoVersion(30))
       .leftMap(_.message)
       .map { rpv =>
-        DynamicDomainParametersInternal.tryCreate(
+        DynamicSynchronizerParametersInternal.tryCreate(
           confirmationResponseTimeout =
             InternalNonNegativeFiniteDuration.fromConfig(confirmationResponseTimeout),
           mediatorReactionTimeout =
@@ -293,29 +303,29 @@ final case class DynamicDomainParameters(
           trafficControlParameters = trafficControlParameters.map(_.toInternal),
           onboardingRestriction = onboardingRestriction,
           acsCommitmentsCatchUpConfigParameter = acsCommitmentsCatchUpConfig,
-          participantDomainLimits = participantDomainLimits.toInternal,
+          participantSynchronizerLimits = participantSynchronizerLimits.toInternal,
           submissionTimeRecordTimeTolerance =
             InternalNonNegativeFiniteDuration.fromConfig(submissionTimeRecordTimeTolerance),
         )(rpv)
       }
 }
 
-object DynamicDomainParameters {
+object DynamicSynchronizerParameters {
 
-  /** Default dynamic domain parameters for non-static clocks */
+  /** Default dynamic synchronizer parameters for non-static clocks */
   @VisibleForTesting
-  def defaultValues(protocolVersion: ProtocolVersion): DynamicDomainParameters =
-    DynamicDomainParameters(
-      DynamicDomainParametersInternal.defaultValues(protocolVersion)
+  def defaultValues(protocolVersion: ProtocolVersion): DynamicSynchronizerParameters =
+    DynamicSynchronizerParameters(
+      DynamicSynchronizerParametersInternal.defaultValues(protocolVersion)
     )
 
   private[canton] def initialValues(clock: Clock, protocolVersion: ProtocolVersion) =
-    DynamicDomainParameters(
-      DynamicDomainParametersInternal.initialValues(clock, protocolVersion)
+    DynamicSynchronizerParameters(
+      DynamicSynchronizerParametersInternal.initialValues(clock, protocolVersion)
     )
 
   def apply(
-      domain: DynamicDomainParametersInternal
-  ): DynamicDomainParameters =
-    domain.transformInto[DynamicDomainParameters]
+      synchronizer: DynamicSynchronizerParametersInternal
+  ): DynamicSynchronizerParameters =
+    synchronizer.transformInto[DynamicSynchronizerParameters]
 }
