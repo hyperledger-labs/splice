@@ -46,11 +46,11 @@ while getopts "hw" opt; do
 done
 
 if [ -z "${IMAGE_TAG:-}" ]; then
-  if [ ! -f "${script_dir}/../VERSION" ]; then
-    _error_msg "Could not derive image tags automatically, ${script_dir}/../VERSION is missing. Please make sure that file exists, or export an image tag in IMAGE_TAG"
+  if [ ! -f "${script_dir}/../../VERSION" ]; then
+    _error_msg "Could not derive image tags automatically, ${script_dir}/../../VERSION is missing. Please make sure that file exists, or export an image tag in IMAGE_TAG"
     exit 1
   else
-    IMAGE_TAG=$(cat "${script_dir}/../VERSION")
+    IMAGE_TAG=$(cat "${script_dir}/../../VERSION")
     _info "Using version ${IMAGE_TAG}"
     export IMAGE_TAG
   fi
