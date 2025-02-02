@@ -1,5 +1,5 @@
 # Note that we don't currently support arm64 runners, so we build this only for amd64
-FROM --platform=$BUILDPLATFORM ghcr.io/actions/actions-runner:2.321.0
+FROM --platform=$BUILDPLATFORM ghcr.io/actions/actions-runner:2.322.0
 
 # TODO(#15988): can we reduce duplication between this and splice-test-ci ?
 
