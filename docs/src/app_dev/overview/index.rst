@@ -8,9 +8,25 @@
 Overview
 ========
 
-.. todo:: add section on deployment topology and hardware requirements
+An application on the Canton Network is defined by the kind of APIs it integrates with.
+We explain all the APIs available from the Global Synchronizer and a validator node :ref:`here <splice_app_apis>`.
 
-   - add overview over types of apps
+At a high-level, we can distinguish between the following two kinds of apps:
+
+* Read-Only Apps: these apps build functionality by using read-only APIs, and thus cannot mutate the ledger.
+* Daml Apps: these apps integrate directly or indirectly with the Ledger API
+  to create new contracts or exercise choices on the ledger to drive on-ledger workflows.
+
+You can find more information in the following sub-sections:
+
+.. toctree::
+
+   read-only-apps
+   daml-apps
+
+
+.. todo::
+
    - add overview over types of APIs and which apps need what
    - for Daml apps
 

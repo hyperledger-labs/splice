@@ -3,6 +3,8 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+.. _splice_app_apis:
+
 Splice App APIs
 ===============
 
