@@ -67,8 +67,15 @@ export class LedgerApiClient {
         const response = await fetch(`${this.jsonApiUrl}v2/users/${encodeURIComponent(userId)}`, {
           headers: this.headers,
         });
-        const responseBody = await response.json();
-        return responseBody.user;
+        if (response.ok) {
+          const responseBody = await response.json();
+          return responseBody.user;
+        } else {
+          const responseBody = await response.text();
+          throw new Error(
+            `getPrimaryParty: HTTP ${response.status} ${response.statusText}: ${responseBody}`
+          );
+        }
       },
       this.userId
     );
@@ -119,28 +126,27 @@ export class LedgerApiClient {
       package_id_selection_preference: [],
     };
 
+    const describeChoice = `Exercised choice: actAs=${JSON.stringify(
+      actAs
+    )}, readAs=${JSON.stringify(readAs)}, choiceName=${choice.choiceName}, templateId=${
+      choice.template().templateId
+    }, contractId=${contractId}`;
+
     const responseBody = await fetch(
       `${this.jsonApiUrl}v2/commands/submit-and-wait-for-transaction-tree`,
       { headers: this.headers, method: 'POST', body: JSON.stringify(body) }
     )
-      .then(r => {
-        console.debug(
-          `Exercised choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
-            readAs
-          )}, choiceName=${choice.choiceName}, templateId=${
-            choice.template().templateId
-          }, contractId=${contractId} succeeded.`
-        );
-        return r.json();
+      .then(async r => {
+        if (r.ok) {
+          console.debug(`${describeChoice} succeeded.`);
+          return r.json();
+        } else {
+          const body = await r.text();
+          throw new Error(`HTTP ${r.status} ${r.statusText}: ${body}`);
+        }
       })
       .catch(e => {
-        console.debug(
-          `Exercised choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
-            readAs
-          )}, choiceName=${choice.choiceName}, templateId=${
-            choice.template().templateId
-          }, contractId=${contractId} failed: ${JSON.stringify(e)}`
-        );
+        console.debug(`${describeChoice} failed: ${JSON.stringify(e)}`);
         throw e;
       });
 

@@ -132,8 +132,11 @@ rst_prolog = f"""
 
 .. |splice_cluster| replace:: :raw-html:`<span class="splice-cluster">unknown_cluster</span>`
 
-.. |da_hostname| replace:: :raw-html:`<span class="splice-url-prefix">unknown_cluster</span>global.canton.network.digitalasset.com`
-.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster</span>global.canton.network.sync.global`
+.. |da_hostname| replace:: :raw-html:`<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.digitalasset.com`
+.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
+.. |generic_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
+.. |gsf_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
+.. |generic_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
 
 .. |version_literal| replace:: ``{version}``
 .. |chart_version_literal| replace:: ``{chart_version}``
