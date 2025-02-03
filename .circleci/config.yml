@@ -3018,7 +3018,12 @@ jobs:
             git branch -f $BASE_VERSION_BRANCH HEAD
             git checkout $BASE_VERSION_BRANCH
             git push -f origin $BASE_VERSION_BRANCH
-            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            if [ -n "<< parameters.base_version >>" ]; then
+              base_version="<< parameters.base_version >>"
+            else
+              base_version=$(build-tools/get-snapshot-version)
+            fi
+            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
             cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $RELEASE_REF
 
@@ -3099,7 +3104,12 @@ jobs:
             git branch -f $UPGRADE_VERSION_BRANCH HEAD
             git checkout $UPGRADE_VERSION_BRANCH
             git push -f origin $UPGRADE_VERSION_BRANCH
-            BASE_VERSION=$(build-tools/get-charts-version "<< parameters.base_version >>")
+            if [ -n "<< parameters.base_version >>" ]; then
+              base_version="<< parameters.base_version >>"
+            else
+              base_version=$(build-tools/get-snapshot-version)
+            fi
+            BASE_VERSION=$(build-tools/get-charts-version "$base_version")
             BASE_RELEASE_REF="refs/heads/$BASE_VERSION_BRANCH"
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
             UPGRADE_VERSION=$(build-tools/get-snapshot-version)
