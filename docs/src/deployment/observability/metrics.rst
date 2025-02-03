@@ -43,3 +43,10 @@ Configuring a docker compose deployment to enable metrics
    Validator nodes only
 
 When using docker compose for the deployment, the metrics are enabled by default. These can be accessed at `http://validator.localhost/metrics` for the validator app and at `http://participant.localhost/metrics` for the participant.
+
+Grafana Dashboards
+++++++++++++++++++
+
+The release bundle (|bundle_download_link|) contains a set of Grafana dashboards that are built based on the metrics above.
+These dashboards can be imported into a Grafana instance. The dashboards are built assuming a K8s deployment, and may need to be modified for other deployment types.
+The dashboards can be found under the `grafana-dashboards` folder in the release bundle.
