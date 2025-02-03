@@ -146,7 +146,7 @@ class JoiningNodeInitializer(
         // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
         // This is changed to false after SV onboarding completes.
         manualConnect = true,
-      timeTracker = SynchronizerTimeTrackerConfig(
+        timeTracker = SynchronizerTimeTrackerConfig(
           minObservationDuration = config.timeTrackerMinObservationDuration
         ),
       )

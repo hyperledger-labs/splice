@@ -51,6 +51,10 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
 }
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
+  LocalSequencerConnectionsTrigger,
+  SignSynchronizerBootstrappingStateTrigger,
+}
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   ConfigScheduleUtil,
@@ -88,15 +92,13 @@ class SoftDomainMigrationIntegrationTest
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
-      // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
-      // .fromResources(
-      //   Seq("simple-topology.conf", "simple-topology-soft-domain-upgrade.conf"),
-      //   this.getClass.getSimpleName,
-      // )
-      // .withAllocatedUsers()
-      // .withInitializedNodes()
-      // .withTrafficTopupsEnabled
-      .simpleTopology1Sv(this.getClass.getSimpleName)
+      .fromResources(
+        Seq("simple-topology.conf", "simple-topology-soft-domain-upgrade.conf"),
+        this.getClass.getSimpleName,
+      )
+      .withAllocatedUsers()
+      .withInitializedNodes()
+      .withTrafficTopupsEnabled
       // TODO(#15569): Get rid of this once we retry transfer offer creation for this test
       .withTrafficBalanceCacheDisabled
       .addConfigTransformsToFront(
@@ -105,9 +107,8 @@ class SoftDomainMigrationIntegrationTest
             val synchronizerConfig = conf.localSynchronizerNode.value
             conf.copy(
               synchronizerNodes = Map(
-                "global-domain" -> synchronizerConfig,
                 "global-domain-new" -> ConfigTransforms
-                  .setSvSynchronizerConfigPortsPrefix(28, synchronizerConfig),
+                  .setSvSynchronizerConfigPortsPrefix(28, synchronizerConfig)
               ),
               supportsSoftDomainMigrationPoc = true,
             )
@@ -158,6 +159,12 @@ class SoftDomainMigrationIntegrationTest
               supportsSoftDomainMigrationPoc = true,
             )
           })(conf),
+        (_, conf) =>
+          ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
+            // TODO(#17032) The trigger needs to only be started after all SVs to have joined, otherwise it tries to bootstrap a domain with only a subset of SVs.
+            // Don't pause it once we fixed the trigger.
+            _.withPausedTrigger[SignSynchronizerBootstrappingStateTrigger]
+          )(conf),
       )
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
@@ -168,22 +175,14 @@ class SoftDomainMigrationIntegrationTest
     implicit val ec: ExecutionContext = env.executionContext
     val ledgerBeginSv1 = sv1Backend.participantClient.ledger_api.state.end()
     val (alice, bob) = onboardAliceAndBob()
-    // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
-    // env.scans.local should have size 4
-    env.scans.local should have size 1
+    env.scans.local should have size 4
     val prefix = "global-domain-new"
-    // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
-    // clue("DSO info has 4 synchronizer nodes") {
-    clue("DSO info has 1 synchronizer nodes") {
+    clue("DSO info has 4 synchronizer nodes") {
       eventually() {
         val dsoInfo = sv1Backend.getDsoInfo()
-        // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
-        // dsoInfo.svNodeStates.values.flatMap(
-        //   _.payload.state.synchronizerNodes.asScala.values.flatMap(_.scan.toScala)
-        // ) should have size 4
         dsoInfo.svNodeStates.values.flatMap(
           _.payload.state.synchronizerNodes.asScala.values.flatMap(_.scan.toScala)
-        ) should have size 1
+        ) should have size 4
       }
     }
     clue("All synchronizer nodes are initialized") {
@@ -191,8 +190,9 @@ class SoftDomainMigrationIntegrationTest
         waitForSynchronizerInitialized(sv)
       }
     }
-    // Enough time that the voting flow can go through
-    val scheduledTime = env.environment.clock.now.plus(java.time.Duration.ofSeconds(30)).toInstant
+    env.svs.local.foreach { sv =>
+      sv.dsoAutomation.trigger[SignSynchronizerBootstrappingStateTrigger].resume()
+    }
     val amuletConfig =
       sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue
     val existingSynchronizerId =
@@ -276,7 +276,8 @@ class SoftDomainMigrationIntegrationTest
 
       }
     }
-
+    // Enough time that the voting flow can go through
+    val scheduledTime = env.environment.clock.now.plus(java.time.Duration.ofSeconds(30)).toInstant
     val (_, voteRequest) = actAndCheck(
       "Creating amulet config vote request",
       eventuallySucceeds() {
@@ -300,25 +301,24 @@ class SoftDomainMigrationIntegrationTest
     )("amulet config vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
     // TODO(#8300) No need to pause once we can't get a timeout on a concurrent sequencer connection change anymore
-    // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
-    // setTriggersWithin(triggersToPauseAtStart =
-    //   Seq(sv2Backend, sv3Backend, sv4Backend).map(
-    //     _.dsoAutomation.trigger[LocalSequencerConnectionsTrigger]
-    //   )
-    // ) {
-    //   clue(s"sv2-4 accept amulet config vote request") {
-    //     Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
-    //       eventuallySucceeds() {
-    //         sv.castVote(
-    //           voteRequest.contractId,
-    //           true,
-    //           "url",
-    //           "description",
-    //         )
-    //       }
-    //     )
-    //   }
-    // }
+    setTriggersWithin(triggersToPauseAtStart =
+      Seq(sv2Backend, sv3Backend, sv4Backend).map(
+        _.dsoAutomation.trigger[LocalSequencerConnectionsTrigger]
+      )
+    ) {
+      clue(s"sv2-4 accept amulet config vote request") {
+        Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+          eventuallySucceeds() {
+            sv.castVote(
+              voteRequest.contractId,
+              true,
+              "url",
+              "description",
+            )
+          }
+        )
+      }
+    }
 
     eventually() {
       sv1ScanBackend.getAmuletRules().payload.configSchedule.futureValues should not be empty
@@ -329,9 +329,14 @@ class SoftDomainMigrationIntegrationTest
     clue("Bootstrap new domain") {
       clue("Wait for signed topology state to appear") {
         env.svs.local.map { sv =>
-          eventually() {
-            sv.participantClient.topology.synchronizer_parameters
-              .list(filterSynchronizer = "global-domain-new") should not be empty
+          clue(s"${sv.name} has signed bootstrapping state") {
+            eventually() {
+              val proposals = sv.participantClient.topology.synchronizer_parameters
+                .list(filterSynchronizer = "global-domain-new", proposals = true)
+              val nonProposals = sv.participantClient.topology.synchronizer_parameters
+                .list(filterSynchronizer = "global-domain-new", proposals = false)
+              (proposals ++ nonProposals) should not be empty
+            }
           }
         }
       }
@@ -386,19 +391,18 @@ class SoftDomainMigrationIntegrationTest
           "dsorules config vote request has been created",
           _ => sv1Backend.listVoteRequests().loneElement,
         )
-        // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
-        // clue(s"sv2-4 accept dsorules config vote request") {
-        //   Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
-        //     eventuallySucceeds() {
-        //       sv.castVote(
-        //         dsoRulesVoteRequest.contractId,
-        //         true,
-        //         "url",
-        //         "description",
-        //       )
-        //     }
-        //   )
-        // }
+        clue(s"sv2-4 accept dsorules config vote request") {
+          Seq(sv2Backend, sv3Backend, sv4Backend).map(sv =>
+            eventuallySucceeds() {
+              sv.castVote(
+                dsoRulesVoteRequest.contractId,
+                true,
+                "url",
+                "description",
+              )
+            }
+          )
+        }
       }
       clue("Reconcile Daml synchronizer state") {
         val reconciled = env.svs.local.map { sv =>
@@ -513,9 +517,7 @@ class SoftDomainMigrationIntegrationTest
           .list(filterStore = TopologyStoreId.SynchronizerStore(newSynchronizerId).filterName)
           .loneElement
         val mediators = mediatorState.item.active.forgetNE
-        // TODO(#16861) Switch back to 4 SVs once Canton properly handles reassignments for the DSO party
-        // mediators should have size 4
-        mediators should have size 1
+        mediators should have size 4
         forAll(mediators) { mediator =>
           sv1Backend
             .sequencerClient(newSynchronizerId)

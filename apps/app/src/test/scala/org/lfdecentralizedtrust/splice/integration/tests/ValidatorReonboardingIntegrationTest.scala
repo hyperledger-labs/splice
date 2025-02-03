@@ -107,7 +107,7 @@ class ValidatorReonboardingIntegrationTest
             adminApi =
               aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
             storage = aliceValidatorConfig.storage match {
-                    case c: DbConfig.Postgres =>
+              case c: DbConfig.Postgres =>
                 c.copy(
                   config = c.config
                     .withValue(
