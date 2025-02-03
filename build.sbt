@@ -1546,6 +1546,11 @@ printTests := {
       (t: String) => !isTimeBasedTest(t) && isDisasterRecoveryTest(t),
     ),
     (
+      "canton bft tests",
+      "test-full-class-names-canton-bft.log",
+      (t: String) => t.contains("BFTManualStartIntegrationTest"),
+    ),
+    (
       "app upgrade tests",
       "test-full-class-names-app-upgrade.log",
       (t: String) => !isTimeBasedTest(t) && isAppUpgradeTest(t),
