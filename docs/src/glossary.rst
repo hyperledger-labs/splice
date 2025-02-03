@@ -67,6 +67,13 @@ Glossary
       * validator app for admin operations by the validator operator like
         user/party management
 
+    CN Supervalidator
+
+      * One node in the CN
+      * In addition to CN Validator components, also consists of canton sequencer, canton mediator, sv app and scan app
+      * sv app for admin operations of the :term:`CN Global Domain`
+      * scan app for providing publicly visible data
+
     CN Wallet
 
       * provides payment APIs for other apps to build upon ("pay with CC") and corresponding UI, e.g., approve payment
