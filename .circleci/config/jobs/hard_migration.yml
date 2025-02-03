@@ -449,7 +449,7 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
+            BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
             git branch -f $BASE_VERSION_BRANCH HEAD
             git checkout $BASE_VERSION_BRANCH
             git push -f origin $BASE_VERSION_BRANCH
@@ -534,8 +534,8 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            BASE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-base"
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            BASE_VERSION_BRANCH="<< parameters.cluster >>-migration-base"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git branch -f $UPGRADE_VERSION_BRANCH HEAD
             git checkout $UPGRADE_VERSION_BRANCH
             git push -f origin $UPGRADE_VERSION_BRANCH
@@ -614,7 +614,7 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
@@ -666,7 +666,7 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
             UPGRADE_RELEASE_REF="refs/heads/$UPGRADE_VERSION_BRANCH"
 
@@ -722,7 +722,7 @@ jobs:
           cmd: |
             cncluster activate
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
 
             export GLOBAL_DOMAIN_SV_CANTON_EXTRA_MIGRATIONS_RESET='0,1'
@@ -741,7 +741,7 @@ jobs:
             git config user.name "DA Automation"
             git remote set-url origin https://canton-network-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
 
-            UPGRADE_VERSION_BRANCH="${GCP_CLUSTER_BASENAME}-migration-upgrade"
+            UPGRADE_VERSION_BRANCH="<< parameters.cluster >>-migration-upgrade"
             git checkout $UPGRADE_VERSION_BRANCH
 
             cncluster hard_domain_migration_update_config_to_remove_migrating_from
