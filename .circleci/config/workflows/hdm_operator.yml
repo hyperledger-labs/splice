@@ -8,6 +8,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+          # a bit weird that we're waiting on the periodic workflows but we're filtering on the branch so it should be fine
           workflow_names: "deploy_hdm_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
           branch_filter: << pipeline.git.branch >>
@@ -135,7 +136,7 @@ workflow:
       - backup_cluster:
           name: "backup_cluster_after_migration"
           cluster: << pipeline.parameters.cluster >>
-          checkout-branch: "ciperiodic-migration-upgrade"
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           context:
             - artifactory
             - canton-network-vpn
@@ -146,7 +147,7 @@ workflow:
             - preflight_check_migrated
       - restore_node:
           cluster: << pipeline.parameters.cluster >>
-          checkout-branch: "ciperiodic-migration-upgrade"
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           namespace_name: "sv-3"
           context:
             - artifactory
