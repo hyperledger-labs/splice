@@ -37,7 +37,6 @@ commands:
             if ! cncluster ci_assert_fresh_lock; then
               .circleci/post-slack-message.sh "The cluster lock on << parameters.cluster >> held by ${slack_mention_text} is too old. \n*Unlocking and resetting cluster.* :reaper: ( <${CIRCLE_BUILD_URL}|CI Build> )" "C05DT77QF5M"
 
-              cncluster prefresh
               cncluster ci_reset_unlock
 
               # Ensure the apps node pool can scale down (this might have been left as prevented if a scratchnet CCI deployment has failed)
