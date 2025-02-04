@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+* Metrics
+
+  Added ``splice_store_last_ingested_record_time_ms`` metric for the last ingested record time in each store and an
+  associated dashboard. This can be used to track general activity of the node.
+
 0.3.9
 -----
 
