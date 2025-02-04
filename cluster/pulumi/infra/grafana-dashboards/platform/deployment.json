@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2414,
+  "id": 403,
   "links": [],
   "panels": [
     {
@@ -236,7 +236,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "splice_deployment_pulumi_stack_condition{stack=~\".*${stack}.*\"}",
+          "expr": "splice_deployment_pulumi_stack_condition{stack=~\"${stack}\"}",
           "format": "table",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
@@ -300,7 +300,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 30
       },
       "id": 17,
       "panels": [],
@@ -338,7 +338,7 @@
         "h": 14,
         "w": 6,
         "x": 0,
-        "y": 23
+        "y": 31
       },
       "id": 12,
       "options": {
@@ -437,7 +437,7 @@
         "h": 14,
         "w": 18,
         "x": 6,
-        "y": 23
+        "y": 31
       },
       "id": 11,
       "options": {
@@ -527,7 +527,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 45
       },
       "id": 9,
       "options": {
@@ -631,7 +631,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 45
+        "y": 61
       },
       "id": 2,
       "options": {
@@ -699,7 +699,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 45
+        "y": 61
       },
       "id": 8,
       "options": {
@@ -823,7 +823,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 53
+        "y": 69
       },
       "id": 4,
       "options": {
@@ -935,7 +935,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 54
+        "y": 70
       },
       "id": 6,
       "options": {
@@ -1000,7 +1000,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(stack_info,stack)",
+        "definition": "label_values(splice_deployment_pulumi_stack_condition,stack)",
         "hide": 2,
         "includeAll": true,
         "multi": true,
@@ -1008,7 +1008,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(stack_info,stack)",
+          "query": "label_values(splice_deployment_pulumi_stack_condition,stack)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1018,13 +1018,13 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Pulumi Operator Stacks Dashboard",
   "uid": "QP_wDqDnz",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }

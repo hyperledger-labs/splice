@@ -18,10 +18,10 @@ const NetworkTotal: React.FC<{
         <Typography variant="h5" textTransform="uppercase" fontWeight="700" mb={2}>
           {title}
         </Typography>
-        <Typography variant="h1" mb={1} id={idCC}>
+        <Typography variant="h1" mb={1} id={idCC} data-testid="amulet-circulating-supply">
           <AmountDisplay amount={amount} currency="AmuletUnit" />
         </Typography>
-        <Typography variant="h4" id={idUSD}>
+        <Typography variant="h4" id={idUSD} data-testid="usd-circulating-supply">
           <AmountDisplay
             amount={amount}
             currency="AmuletUnit"

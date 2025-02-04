@@ -114,7 +114,7 @@ WARNING: Failed to fetch secret, retrying in 10 seconds
 .*Condition \[isDefined\("LOG_LAST_ERRORS"\)\] evaluated.*
 
 # This is actually not a warning
-Warning: No want/action statements, nothing to do
+.*No want/action statements, nothing to do
 
 .*The geckodriver version cannot be discovered.*
 

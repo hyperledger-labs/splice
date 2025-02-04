@@ -15,7 +15,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import SendIcon from '@mui/icons-material/Send';
 import {
   Button,
-  IconButton,
   Stack,
   Table,
   TableBody,
@@ -90,9 +89,16 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
         {vote ? 'Your Vote ' : 'You have not voted yet '}
         {!isEditing &&
           (vote ? (
-            <IconButton id="edit-vote-button" onClick={startEditing}>
-              <EditIcon fontSize={'small'} />
-            </IconButton>
+            <Button
+              id="edit-vote-button"
+              onClick={startEditing}
+              variant="outlined"
+              size="small"
+              sx={{ marginLeft: 1 }}
+              startIcon={<EditIcon fontSize={'small'} />}
+            >
+              Edit
+            </Button>
           ) : (
             <DisableConditionally
               conditions={[{ disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' }]}

@@ -20,8 +20,27 @@ const AppWithConfig: React.FC = () => {
 
 test('home screen shows up', async () => {
   render(<AppWithConfig />);
-  const a = await screen.findByText(`${spliceInstanceNames.amuletName} Scan`);
-  expect(a).toBeDefined();
+  const appName = await screen.findByText(`${spliceInstanceNames.amuletName} Scan`);
+
+  expect(appName).toBeDefined();
+});
+
+test('total circulating amulet balance is displayed', async () => {
+  render(<AppWithConfig />);
+
+  const circulatingSupplyTitle = await screen.findByRole('heading', {
+    name: /TOTAL CIRCULATING [A-Z]+/i,
+    level: 5,
+  });
+
+  const circulatingSupplyContainer = await screen.findByTestId('circulating-supply-container');
+
+  const amuletSupply = within(circulatingSupplyContainer).getByTestId('amulet-circulating-supply');
+  const usdSupply = within(circulatingSupplyContainer).getByTestId('usd-circulating-supply');
+
+  expect(circulatingSupplyTitle).toBeDefined();
+  expect(amuletSupply.toString()).toMatch(/\d+\d+ TLM/i);
+  expect(usdSupply.toString()).toMatch(/\d+\d+ USD/i);
 });
 
 test('recent activity link from tab opens a tab', async () => {

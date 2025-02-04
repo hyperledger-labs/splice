@@ -266,7 +266,7 @@ paths:
         a party to participant mapping topology transaction, which hosts the party on the participant with Confirmation rights,
         and a party to key mapping topology transaction, which sets the key to authorize daml transactions.
         The hash of each of these transactions will be signed along with the corresponding topology transaction (unchanged)
-        in the /v0/external-party-topology/submit endpoint
+        in the /v0/admin/external-party/topology/submit endpoint
       requestBody:
         required: true
         content:

@@ -203,3 +203,22 @@ components:
         commit_ts:
           type: string
           format: date-time
+  securitySchemes:
+    spliceAppBearerAuth:
+      description: |
+        HTTP bearer authentication with a JWT token of the form:
+        ```
+        {
+          "sub": "ledger-api-user",
+          "aud": "audience-of-app"
+        }
+        ```
+        The subject must be the ledger API user requests should be submitted at, e.g.,
+        if you want to operate as the validator operator this is the ledger-api-user configured in your validator config.
+
+        The audience must be the audience specified in the auth section of your app's configuration.
+
+        The token must be signed with the algorithm and configuration specified in the auth section of your app's configuration.
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
