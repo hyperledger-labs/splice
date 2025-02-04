@@ -859,6 +859,7 @@ class SvFrontendIntegrationTest
             "sv1 can see the create vote request button",
             _ => {
               find(id("create-voterequest-submit-button")) should not be empty
+              find(id("display-actions")) should not be empty
             },
           )
 
@@ -932,6 +933,7 @@ class SvFrontendIntegrationTest
               "sv1 can see the create vote request button",
               _ => {
                 find(id("create-voterequest-submit-button")) should not be empty
+                find(id("display-actions")) should not be empty
               },
             )
 
@@ -1106,6 +1108,8 @@ class SvFrontendIntegrationTest
                 .payload
                 .configSchedule
                 .futureValues should not be empty
+
+              find(id("display-actions")) should not be empty
             }
 
             val (_, requestIdUpdate) = actAndCheck(
@@ -1203,6 +1207,8 @@ class SvFrontendIntegrationTest
                 .payload
                 .configSchedule
                 .futureValues should not be empty
+
+              find(id("display-actions")) should not be empty
             }
 
             val (_, requestIdRemove) = actAndCheck(
