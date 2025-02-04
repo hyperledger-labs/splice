@@ -56,6 +56,14 @@ jobs:
           cache_version: 1
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
+      - name: Upload logs
+        # We upload the logs on not success so that we also capture them for cancelled runs
+        # Unfortunately when our apps don't init and stop with sys.exit(1) the run is considered cancelled (as it fails with a timeout) but we do need the logs
+        if: ${{ !success() }}
+        uses: ./.github/actions/sbt/upload_logs
+        with:
+          name: "vite-report"
+
       - name: Report Failures on Slack & Github
         if: failure() && github.event_name == 'push'
         shell: bash
