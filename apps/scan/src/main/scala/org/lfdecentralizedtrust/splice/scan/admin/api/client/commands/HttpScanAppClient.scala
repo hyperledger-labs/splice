@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
 import org.lfdecentralizedtrust.splice.http.v0.external.scan as externalHttp
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0 as tokenStandardHttp
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
@@ -52,6 +53,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0.definitions.GetFactoryRequest
 
 import java.util.Base64
 import java.time.Instant
@@ -83,6 +86,18 @@ object HttpScanAppClient {
         mat: Materializer,
     ): Client =
       externalHttp.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
+  }
+
+  abstract class TokenStandardBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = tokenStandardHttp.Client
+
+    override def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      tokenStandardHttp.Client.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
@@ -1310,6 +1325,39 @@ object HttpScanAppClient {
             ProtobufJsonScanHttpEncodings.httpToLapiUpdate(http).update
           )
         )
+    }
+  }
+
+  case class GetTransferFactory(choiceArgs: transferinstruction.TransferFactory_Transfer)
+      extends TokenStandardBaseCommand[
+        tokenStandardHttp.GetTransferFactoryResponse,
+        tokenStandardHttp.definitions.FactoryWithChoiceContext,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], tokenStandardHttp.GetTransferFactoryResponse] = {
+      val json = choiceArgs.toJson
+      val circeChoiceArgs = io.circe.parser
+        .parse(json)
+        .getOrElse(
+          throw new RuntimeException(
+            s"Failed to parse a just-encoded json: $json. This is not supposed to happen."
+          )
+        )
+      client.getTransferFactory(GetFactoryRequest(circeChoiceArgs, Some(true)), headers)
+    }
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      tokenStandardHttp.GetTransferFactoryResponse,
+      Either[String, tokenStandardHttp.definitions.FactoryWithChoiceContext],
+    ] = { case tokenStandardHttp.GetTransferFactoryResponse.OK(factory) =>
+      Right(factory)
     }
   }
 }

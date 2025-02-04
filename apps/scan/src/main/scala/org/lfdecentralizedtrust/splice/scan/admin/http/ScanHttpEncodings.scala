@@ -267,26 +267,27 @@ sealed trait ScanHttpEncodings {
 
   def httpToJavaExercisedEvent(http: httpApi.ExercisedEvent): javaApi.ExercisedEvent = {
     val templateId = parseTemplateId(http.templateId)
+    val interfaceId = http.interfaceId.map(parseTemplateId)
     new javaApi.ExercisedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
       http.eventId,
       templateId,
       http.packageName,
-      http.interfaceId.map(parseTemplateId(_)).toJava,
+      interfaceId.toJava,
       http.contractId,
       http.choice,
-      decodeChoiceArgument(templateId, http.choice, http.choiceArgument),
+      decodeChoiceArgument(templateId, interfaceId, http.choice, http.choiceArgument),
       http.actingParties.asJava,
       http.consuming,
       http.childEventIds.asJava,
-      decodeExerciseResult(templateId, http.choice, http.exerciseResult),
+      decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
     )
   }
 
-  private def templateIdString(templateId: javaApi.Identifier) =
+  def templateIdString(templateId: javaApi.Identifier) =
     s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}"
 
-  private def parseTemplateId(templateId: String) = {
+  def parseTemplateId(templateId: String) = {
     val pattern = "(.*):(.*):(.*)".r
     val split = pattern
       .findFirstMatchIn(templateId)
@@ -318,6 +319,7 @@ sealed trait ScanHttpEncodings {
 
   def decodeChoiceArgument(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: io.circe.Json,
   ): javaApi.Value
@@ -328,6 +330,7 @@ sealed trait ScanHttpEncodings {
 
   def decodeExerciseResult(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: io.circe.Json,
   ): javaApi.Value
@@ -538,11 +541,12 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
 
   override def decodeChoiceArgument(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: Json,
   ): javaApi.Value =
     ValueJsonCodecCodegen
-      .deserializeChoiceArgument(templateId, choice, json.noSpaces)
+      .deserializeChoiceArgument(templateId, interfaceId, choice, json.noSpaces)
       .fold(
         error =>
           throw new RuntimeException(
@@ -553,11 +557,12 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
 
   override def decodeExerciseResult(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: Json,
   ): javaApi.Value =
     ValueJsonCodecCodegen
-      .deserializeChoiceResult(templateId, choice, json.noSpaces)
+      .deserializeChoiceResult(templateId, interfaceId, choice, json.noSpaces)
       .fold(
         error =>
           throw new RuntimeException(s"Failed to decode choice result '${json.noSpaces}': $error"),
@@ -626,6 +631,7 @@ case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
 
   override def decodeChoiceArgument(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: Json,
   ): javaApi.Value =
@@ -633,6 +639,7 @@ case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
 
   override def decodeExerciseResult(
       templateId: javaApi.Identifier,
+      interfaceId: Option[javaApi.Identifier],
       choice: String,
       json: Json,
   ): javaApi.Value =

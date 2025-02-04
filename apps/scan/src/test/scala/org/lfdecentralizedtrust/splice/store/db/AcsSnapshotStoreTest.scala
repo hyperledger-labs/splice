@@ -447,6 +447,7 @@ class AcsSnapshotStoreTest
 
     "getHoldingsState" should {
 
+      // TODO (#17153): this test should pass once DarResources is back to normal
       "only include contracts where the parties provided are owners, not just stakeholders" in {
         val wantedParty1 = providerParty(1)
         val wantedParty2 = providerParty(2)

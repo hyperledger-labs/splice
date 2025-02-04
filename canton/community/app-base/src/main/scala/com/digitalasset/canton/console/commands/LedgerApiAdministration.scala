@@ -15,10 +15,10 @@ import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
-  ExecuteSubmissionResponse as ExecuteResponseProto,
   HashingSchemeVersion,
-  PrepareSubmissionResponse as PrepareResponseProto,
   PreparedTransaction,
+  ExecuteSubmissionResponse as ExecuteResponseProto,
+  PrepareSubmissionResponse as PrepareResponseProto,
 }
 import com.daml.ledger.api.v2.reassignment.Reassignment as ReassignmentProto
 import com.daml.ledger.api.v2.state_service.{
@@ -34,6 +34,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
   Filters,
   TransactionFilter as TransactionFilterProto,
 }
+import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.javaapi as javab
 import com.daml.ledger.javaapi.data.{
   GetUpdateTreesResponse,
@@ -957,6 +958,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             |- limit: limit (default set via canton.parameter.console)
             |- verbose: whether the resulting events should contain detailed type information
             |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
+            |- filterTemplate: list of interface ids to filter for, empty sequence acts as a wildcard
             |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
             |  must be no greater than the current ledger end offset and must be greater than or equal to the
             |  last pruning offset. If no offset is specified then the current participant end will be used.
@@ -970,6 +972,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -995,6 +998,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                   Set(party.toLf),
                   limit,
                   filterTemplates,
+                  filterInterfaces,
                   activeAt,
                   verbose,
                   timeout.asFiniteApproximation,
@@ -1029,6 +1033,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1038,6 +1043,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1066,6 +1072,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1075,6 +1082,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1104,6 +1112,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             includeCreatedEventBlob: Boolean = false,
@@ -1113,6 +1122,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit,
             verbose,
             filterTemplates,
+            filterInterfaces,
             activeAtOffsetO,
             timeout,
             includeCreatedEventBlob,
@@ -1145,6 +1155,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             limit: PositiveInt = defaultLimit,
             verbose: Boolean = true,
             filterTemplates: Seq[TemplateId] = Seq.empty,
+            filterInterfaces: Seq[Identifier] = Seq.empty,
             activeAtOffsetO: Option[Long] = None,
             timeout: config.NonNegativeDuration = timeouts.unbounded,
             identityProviderId: String = "",
@@ -1175,6 +1186,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                             localParties.toSet,
                             limit,
                             filterTemplates,
+                            filterInterfaces,
                             activeAtOffsetO.getOrElse(end()),
                             verbose,
                             timeout.asFiniteApproximation,

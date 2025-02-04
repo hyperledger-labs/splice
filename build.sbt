@@ -564,6 +564,13 @@ lazy val `apps-common` =
       `splice-validator-lifecycle-daml`,
       `splice-wallet-daml`,
       `splice-wallet-payments-daml`,
+      `cnrc-utils-daml`,
+      `cnrc-1-token-metadata-daml`,
+      `cnrc-2-holdings-daml`,
+      `cnrc-3-transfer-instruction-daml`,
+      `cnrc-4-allocation-daml`,
+      `cnrc-5-allocation-request-daml`,
+      `cnrc-6-allocation-instruction-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
@@ -749,8 +756,21 @@ lazy val `apps-scan` =
               modules = List("pekko-http-v1.0.0", "circe"),
               pkg = "org.lfdecentralizedtrust.splice.http.v0",
             ),
+          )
+        } :+ ScalaServer(
+          new File(
+            s"openapi-deps/token-standard/cnrc-3-transfer-instruction/openapi/transfer-instruction.yaml"
           ),
-        },
+          pkg = "org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0",
+          modules = List("pekko-http-v1.0.0", "circe"),
+          customExtraction = true,
+        ) :+ ScalaClient(
+          new File(
+            s"openapi-deps/token-standard/cnrc-3-transfer-instruction/openapi/transfer-instruction.yaml"
+          ),
+          modules = List("pekko-http-v1.0.0", "circe"),
+          pkg = "org.lfdecentralizedtrust.tokenstandard.transferinstruction.v0",
+        ),
     )
 
 lazy val `apps-common-frontend` = {

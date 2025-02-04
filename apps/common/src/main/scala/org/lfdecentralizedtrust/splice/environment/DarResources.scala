@@ -13,6 +13,46 @@ import scala.util.Using
 // TODO (#17153): all the old packages have been commented out to avoid
 // "DAR_NOT_VALID_UPGRADE [...] cannot be an upgrade of existing package P [...] Reason: Implementation of interface X
 object DarResources {
+  object TokenStandard {
+    val utilsAnyContractId = PackageResource(
+      DarResource(s"canton-network-token-utils-current.dar"),
+      Seq(DarResource(s"canton-network-token-utils-0.0.1.dar")),
+    )
+    val rc1TokenMetadata = PackageResource(
+      DarResource(s"canton-network-token-rc1-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc1-0.0.1.dar")),
+    )
+    val rc2Holding = PackageResource(
+      DarResource(s"canton-network-token-rc2-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc2-0.0.1.dar")),
+    )
+    val rc3TransferInstruction = PackageResource(
+      DarResource(s"canton-network-token-rc3-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc3-0.0.1.dar")),
+    )
+    val rc4Allocation = PackageResource(
+      DarResource(s"canton-network-token-rc4-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc4-0.0.1.dar")),
+    )
+    val rc5AllocationRequest = PackageResource(
+      DarResource(s"canton-network-token-rc5-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc5-0.0.1.dar")),
+    )
+    val rc6AllocationInstruction = PackageResource(
+      DarResource(s"canton-network-token-rc6-current.dar"),
+      Seq(DarResource(s"canton-network-token-rc6-0.0.1.dar")),
+    )
+    val allPackageResources = Seq(
+      utilsAnyContractId,
+      rc1TokenMetadata,
+      rc2Holding,
+      rc3TransferInstruction,
+      rc4Allocation,
+      rc5AllocationRequest,
+      rc6AllocationInstruction,
+    )
+  }
+
   val amulet_0_1_0 = DarResource("splice-amulet-0.1.0.dar")
   val amulet_0_1_1 = DarResource("splice-amulet-0.1.1.dar")
   val amulet_0_1_2 = DarResource("splice-amulet-0.1.2.dar")
@@ -178,7 +218,7 @@ object DarResources {
   )
 
   private val packageResources: Seq[PackageResource] =
-    Seq(
+    TokenStandard.allPackageResources ++ Seq(
       DarResources.amulet,
       DarResources.amuletNameService,
       DarResources.splitwell,
@@ -244,8 +284,12 @@ object DarResource {
   }
 
   def apply(file: String): DarResource = {
+    val input = getClass.getClassLoader.getResourceAsStream(file)
+    if (input == null) {
+      throw new IllegalArgumentException(s"Not found: $file")
+    }
     val (darBytes, dar) =
-      Using.resource(getClass.getClassLoader.getResourceAsStream(file)) { resourceStream =>
+      Using.resource(input) { resourceStream =>
         val bytes = ByteString.readFrom(resourceStream)
         val metadata = Using.resource(bytes.newInput())(DarUtil.readDar(file, _))
         (bytes, metadata)

@@ -8,10 +8,20 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   types as typesCodegen,
   validatorlicense as validatorlicenseCodegen,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
 import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTest}
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc1.tokenmetadata.anyvalue
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc2.holding
+import org.lfdecentralizedtrust.splice.codegen.java.canton.network.token.standard.utils.anycontractid.PhantomTemplate
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules
 
+import java.time.{Instant, LocalDate}
+import scala.jdk.OptionConverters.*
 import java.util.Optional
+import scala.jdk.CollectionConverters.*
 
 class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
 
@@ -102,6 +112,7 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
         val decodedArgument: JavaApi.DamlRecord = ValueJsonCodecCodegen
           .deserializeChoiceArgument(
             event.getTemplateId,
+            event.getInterfaceId.toScala,
             event.getChoice,
             encodedArgument,
           )
@@ -115,6 +126,73 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
         val decodedResult: JavaApi.Value = ValueJsonCodecCodegen
           .deserializeChoiceResult(
             event.getTemplateId,
+            event.getInterfaceId.toScala,
+            event.getChoice,
+            encodedResult,
+          )
+          .value
+
+        decodedResult shouldEqual originalResult
+      }
+    }
+
+    "convert between choice arguments/results that come from interfaces and JSON values" in {
+      val sender = providerParty(1).toProtoPrimitive
+      val receiver = providerParty(2).toProtoPrimitive
+      val originalArgument: JavaApi.DamlRecord = new transferinstruction.TransferFactory_Transfer(
+        new transferinstruction.Transfer(
+          sender,
+          receiver,
+          numeric(6.12947561),
+          new holding.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
+          Some(
+            new holding.Lock(java.util.List.of(sender, receiver), Optional.of(Instant.now()))
+          ).toJava,
+          someMetadata,
+        ),
+        List(validContractId(1), validContractId(2)).map(new holding.Holding.ContractId(_)).asJava,
+        new tokenmetadata.ExtraArgs(
+          allAnyValuesMap.asJava,
+          someMetadata,
+        ),
+      ).toValue
+      val originalResult: JavaApi.DamlRecord =
+        new transferinstruction.TransferFactory_TransferResult(
+          Optional.of(new transferinstruction.TransferInstruction.ContractId(validContractId(333))),
+          someMetadata,
+        ).toValue
+
+      val event = exercisedEvent(
+        contractId = validContractId(3),
+        templateId = externalpartyamuletrules.ExternalPartyAmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
+        interfaceId =
+          Some(transferinstruction.TransferFactory.INTERFACE.TEMPLATE_ID_WITH_PACKAGE_ID),
+        choice = transferinstruction.TransferFactory.CHOICE_TransferFactory_Transfer.name,
+        consuming = false,
+        argument = originalArgument,
+        result = originalResult,
+      )
+
+      clue("argument") {
+        val encodedArgument: String = ValueJsonCodecCodegen.serializeChoiceArgument(event).value
+        val decodedArgument: JavaApi.DamlRecord = ValueJsonCodecCodegen
+          .deserializeChoiceArgument(
+            event.getTemplateId,
+            event.getInterfaceId.toScala,
+            event.getChoice,
+            encodedArgument,
+          )
+          .value
+
+        decodedArgument shouldEqual originalArgument
+      }
+
+      clue("result") {
+        val encodedResult: String = ValueJsonCodecCodegen.serializeChoiceResult(event).value
+        val decodedResult: JavaApi.Value = ValueJsonCodecCodegen
+          .deserializeChoiceResult(
+            event.getTemplateId,
+            event.getInterfaceId.toScala,
             event.getChoice,
             encodedResult,
           )
@@ -124,5 +202,25 @@ class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
       }
     }
   }
+
+  private lazy val allSimpleValuesMap: Map[String, tokenmetadata.AnyValue] = Map(
+    "av_decimal" -> new anyvalue.AV_Decimal(numeric(3.1957419)),
+    "av_party" -> new anyvalue.AV_Party(dsoParty.toProtoPrimitive),
+    "av_date" -> new anyvalue.AV_Date(LocalDate.now()),
+    "av_bool" -> new anyvalue.AV_Bool(scala.util.Random.nextBoolean()),
+    "av_contractid" -> new anyvalue.AV_ContractId(
+      new PhantomTemplate.ContractId(validContractId(42))
+    ),
+    "av_int" -> new anyvalue.AV_Int(scala.util.Random.nextLong()),
+    "av_time" -> new anyvalue.AV_Time(Instant.now()),
+    "av_text" -> new anyvalue.AV_Text(scala.util.Random.nextString(13)),
+    "av_reltime" -> new anyvalue.AV_RelTime(new RelTime(scala.util.Random.nextLong())),
+  )
+  private lazy val allAnyValuesMap: Map[String, tokenmetadata.AnyValue] = allSimpleValuesMap ++ Map(
+    "av_list" -> new anyvalue.AV_List(allSimpleValuesMap.values.toList.asJava),
+    "av_map" -> new anyvalue.AV_Map(allSimpleValuesMap.asJava),
+  )
+  private lazy val someMetadata =
+    new tokenmetadata.Metadata(Map("any" -> "thing", "goes" -> "here").asJava)
 
 }
