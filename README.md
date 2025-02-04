@@ -86,18 +86,22 @@ clusters.)
 
 ## Setting up Your Development Environment
 
-1. Clone the repository using `git clone --recurse-submodules git@github.com:DACH-NY/canton-network-node.git`.
-   If you cloned the repository before, you might want to set `git config submodule.recurse true` to make sure
-   the `cn-svc-configs` submodule is updated automatically on `git pull` and similar operations.
-2. Install [direnv](https://direnv.net/#basic-installation).
-3. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
-4. Enable support for nix flakes and the nix command by adding to the
+1. Clone the repository using `git clonegit@github.com:DACH-NY/canton-network-node.git`.
+1. Submodules:
+   - Initialize and update the configs submodule using `git submodule update --init cluster/configs`
+   - If you intend to deploy to clusters, also initialize and update the private configs
+     submodule using `git submodule update --init cluster/configs-private`. In this case,
+     you might want to set `git config submodule.recurse true` to make sure
+     both submodules are updated automatically on `git pull` and similar operations.
+1. Install [direnv](https://direnv.net/#basic-installation).
+1. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
+1. Enable support for nix flakes and the nix command by adding to the
    following to your nix config (either `/etc/nix/nix.conf` if you
    have a multi-user install or `~/.config/nix/nix.conf`):
     ```
     extra-experimental-features = nix-command flakes
     ```
-6. Configure artifactory credentials
+1. Configure artifactory credentials
    You can generate an artifactory Identity Token [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    If you need permissions - please email help@digitalasset.com and ask for artifactory permissions.
@@ -108,19 +112,19 @@ clusters.)
       login yourartifactoryusername
       password yourartifactoryidentitytoken
       ```
-   2. For access to the canton enterprise docker repo and for sbt to download internal dependencies
+   1. For access to the canton enterprise docker repo and for sbt to download internal dependencies
       To do so, the `ARTIFACTORY_USER` and `ARTIFACTORY_PASSWORD` must be configured.
       Best would be to add the to the `.envrc.private` file like so:
       ```
       export ARTIFACTORY_USER="yourartifactoryusername"
       export ARTIFACTORY_PASSWORD="yourartifactoryidentitytoken"
       ```
-7. After switching to the CC repo you should see a line like
+1. After switching to the CC repo you should see a line like
    ```
    direnv: error /home/moritz/daml-projects/canton-amulet/.envrc is blocked. Run `direnv allow` to approve its content
    ```
-8. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
-9. If you get an authorization exception, like the following:
+1. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
+1. If you get an authorization exception, like the following:
    ```
    direnv: using nix
    error: unable to download 'https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz': HTTP error 401 ('Unauthorized')
@@ -144,7 +148,7 @@ clusters.)
       ```
       nix develop --debug --verbose path:nix
       ```
-10. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
+1. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
     ```
     pre-commit install
     # or:
@@ -160,9 +164,9 @@ clusters.)
 
      If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
-11. On MacOS, please install the following globally:
+1. On MacOS, please install the following globally:
    1. Firefox, by following the process here: <https://www.firefox.com>
-12. Configure CircleCI.
+1. Configure CircleCI.
     Open `./.circleci/cluster-lock-users.json`, and add a line of the format
     ```
     "<circleci-username>": ["<local-username>"],
@@ -177,7 +181,7 @@ clusters.)
     ```
     to receive slack pings when your cluster lock is ~1hr away from expiring. Determine your user ID
     from your profile settings, as described [here](https://www.workast.com/help/article/how-to-find-a-slack-user-id/).
-13. On MacOS, activate admin privileges using the lock icon (🔒 → 🔓) in the Dock, go to
+1. On MacOS, activate admin privileges using the lock icon (🔒 → 🔓) in the Dock, go to
     System Settings → General → AirDrop & Handoff, and disable AirPlay Receiver. Otherwise
     you will see on `start-canton.sh` runs
     ```

@@ -364,7 +364,7 @@ If you are redeploying the validator app as part of a :ref:`synchronizer migrati
 
 Finally, please add the following values to your ``standalone-validator-values.yaml`` file:
 
-.. literalinclude:: ../../../cluster/cn-svc-configs/configs/ui-config-values.yaml
+.. literalinclude:: ../../../cluster/configs/configs/ui-config-values.yaml
     :language: yaml
 
 

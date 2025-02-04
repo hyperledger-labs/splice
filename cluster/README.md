@@ -1312,11 +1312,13 @@ The allowed IP ranges are stored in `allowed-ip-ranges.json` for the respective 
 [`allowed-ip-ranges-cn-internal.json`](./allowed-ip-ranges-cn-internal.json) for the IPs of our own clusters.
 
 Note that the external allowed IP ranges are managed in the
-[cn-svc-configs](https://github.com/DACH-NY/cn-svc-configs) repo so
-any change should be made there and then after merging it, bump the
+[configs-private](https://github.com/global-synchronizer-foundation/configs-private)
+repo so any change should be made there and then after merging it, bump the
 submodule in this repo.
 
-To update the submodule to a new commit
+To update the submodule to a new commit, use the following command. But please note that
+we don't necessarily need to accept any change pushed to the config repos. Please review
+all changes that you consume before applying this command.
 
 ```
 git submodule update --remote
@@ -1498,7 +1500,7 @@ The SV runbook prompts them to do so.
 
 #### Approving via SV config
 
-SV identities should be changed in the [cn-svc-configs](https://github.com/DACH-NY/cn-svc-configs) repo.
+SV identities should be changed in the [configs](https://github.com/global-synchronizer-foundation/configs) repo.
 After merging a PR there, bump the submodule in this repo.
 
 2. if you cannot wait the next update then, checkout the deployment branch of the cluster you want to update. You can run `make cluster/helm/build` to rebuild the helm charts, and then `cncluster apply` to redeploy the SVs.

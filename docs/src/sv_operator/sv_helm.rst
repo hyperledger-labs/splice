@@ -569,7 +569,7 @@ If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
-The `cn-svc-configs repo <https://github.com/DACH-NY/cn-svc-configs/>`_ contains recommended values for configuring your SV node. Store the paths to these YAML files in the following environment variables:
+The `configs repo <https://github.com/global-synchronizer-foundation/configs>`_ contains recommended values for configuring your SV node. Store the paths to these YAML files in the following environment variables:
 
 1. ``SV_IDENTITIES_FILE``: The list of SV identities for your node to auto-approve as peer SVs. Locate and review the ``approved-sv-id-values.yaml`` file corresponding to the network to which you are connecting.
 2. ``UI_CONFIG_VALUES_FILE``: The file is located at ``configs/ui-config-values.yaml``, and is the same for all networks.

@@ -196,10 +196,11 @@ export function fixedTokens(): boolean {
 
 const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
 
-export const cnSvcConfigsClusterDirectory = `${REPO_ROOT}/cluster/cn-svc-configs/configs/${clusterDirectory}`;
+export const svPublicConfigsClusterDirectory = `${REPO_ROOT}/cluster/configs/configs/${clusterDirectory}`;
+export const svPrivateConfigsClusterDirectory = `${REPO_ROOT}/cluster/configs-private/configs/${clusterDirectory}`;
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  return loadYamlFromFile(`${cnSvcConfigsClusterDirectory}/approved-sv-id-values.yaml`)
+  return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
     .approvedSvIdentities;
 }
 

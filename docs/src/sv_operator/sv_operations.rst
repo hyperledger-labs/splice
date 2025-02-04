@@ -130,5 +130,5 @@ Updating the reward weight of an SV
   Once that happens, the DSO info tab will show the updated reward weight,
   and the SV will earn rewards according to the new weight moving forward.
 
-- Make sure that the changed reward is also reflected on `the cn-svc-configs repository <https://github.com/DACH-NY/cn-svc-configs/>`_.
+- Make sure that the changed reward is also reflected on `the configs repository <https://github.com/global-synchronizer-foundation/configs>`_.
   Otherwise, the old value would become effective again in the event of an onboarding and reonboarding.
