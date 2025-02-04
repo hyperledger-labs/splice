@@ -58,3 +58,43 @@ Another thing which is often quite helpful to diagnose issue is to collect all c
 - The environment variables when using the docker container but not the helm charts.
 
 In addition to that also check the version you are using and the network (dev/test/mainnet) you are running against.
+
+Common Error Messages
+---------------------
+
+Traffic balance below reserved amount
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A log of the form shown below indicates that your validator app
+has not been able to purchase any traffic. The validator blocks
+transactions not required to purchase more traffic once the purchased
+traffic balance falls below a given number to
+avoid issues where the validator locks itself out by not having enough
+traffic to complete a traffic purchase. Check the logs for
+``TopupMemberTrafficTrigger`` to find possible causes.
+
+If you only want to rely on free traffic and do not want to purchase any extra traffic, remove
+the validator top-up config.
+
+.. code:: bash
+
+    ABORTED: Traffic balance below reserved traffic amount (0 < 200000)
+
+
+Insufficient funds to buy configured traffic amount
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A log of the form shown below indicates that your validator app
+attempted to purchase traffic but does not have enough in the wallet
+of the validator operator party. This is common on TestNet and MainNet
+for new nodes as they start out with a balance of 0 and only slowly
+accrue CC through validator liveness rewards. So often this just
+requires waiting until enough CC has accrued. Alternatively, an
+existing node with a CC balance can transfer CC to you to increase your balance.
+
+If you only want to rely on free traffic and do not want to purchase any extra traffic, remove
+the validator top-up config.
+
+.. code:: bash
+
+    Insufficient funds to buy configured traffic amount. Please ensure that the validator’s wallet has enough amulets to purchase 1.9998 MB of traffic to continue healthy operation.
