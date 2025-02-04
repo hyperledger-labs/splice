@@ -9,6 +9,9 @@ Validators
 ==========
 
 This section describes deployment and operations of a validator node.
+
+Before moving onto the deployment of your node, familiarize yourself with the general :ref:`validator_onboarding_process`.
+
 There are two primary ways to deploy a validator node: Either use a
 docker-compose based deployment or deploy it in a kubernetes cluster
 using Helm charts.
@@ -29,6 +32,7 @@ You can find hardware requirements for both options in a :ref:`dedicated section
 .. toctree::
    :maxdepth: 2
 
+   validator_onboarding.rst
    validator_hardware_requirements.rst
    validator_compose.rst
    validator_helm.rst
