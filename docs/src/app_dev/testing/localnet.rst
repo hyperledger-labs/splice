@@ -85,7 +85,7 @@ The following table lists the UIs available for the deployed nodes.
    * - Application
      - URL
      - Credentials
-   * - SV UI
+   * - Super Validator UI
      - http://sv.localhost:8080
      - ``administrator``
    * - Wallet

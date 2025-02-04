@@ -566,12 +566,12 @@ jobs:
     steps:
       - checkout_with_retry
       - run:
-          name: Skip slack notification if no documentation has benn changed
+          name: Send slack notification if documentation has been changed
           when: always
           command: |
             commit=$(git rev-parse HEAD)
-            changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md')
-            changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' | sed ':a;N;$!ba;s/\n/\\n/g')
+            changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst')
+            changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst' | sed ':a;N;$!ba;s/\n/\\n/g')
             if [ -n "$changed_files" ]; then
               echo "Setting GITHUB_COMMIT_URL as document change is detected in commit $commit"
               echo "export GITHUB_COMMIT_URL=\"https://github.com/DACH-NY/canton-network-node/commit/${commit}\"" >> "$BASH_ENV"
@@ -584,7 +584,7 @@ jobs:
           channel: << parameters.channel_notify >>
           event: always
           custom: |
-            { "text": "*📄Changes to any `.md` files are detected, and they are merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
+            { "text": "*📄Changes to `.md` or `.rst` files have been detected and merged into the main branch.*\n<${GITHUB_COMMIT_URL}| View change at $(git log -1 --oneline --no-color | sed s/\"//g)>\n\nChanged files:\n```\n${CHANGED_DOC_FILES}\n```" }
 
   build_oss:
     executor: self_hosted
