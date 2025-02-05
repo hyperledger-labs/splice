@@ -3,7 +3,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-set -eou pipefail
+set -eoxu pipefail
 
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
@@ -236,20 +236,20 @@ function subcmd_start {
   if [ $da_repo -eq 1 ]; then
     if [[ "$IMAGE_TAG" == *-dirty ]]; then
       export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
+    # if the base version is a release version ensure we use the public repository
+    elif [[ $IMAGE_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
     else
+      current_branch=""
       if [ -n "${CIRCLE_BRANCH:-}" ]; then
-        if [ "$CIRCLE_BRANCH" == "main" ] || [[ "$CIRCLE_BRANCH" == release-line-* ]]; then
-          export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
-        else
-          export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
-        fi
+        current_branch="${CIRCLE_BRANCH}"
       else
         current_branch=$(git rev-parse --abbrev-ref HEAD)
-        if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
-          export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
-        else
-          export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
-        fi
+      fi
+      if [ "$current_branch" == "main" ] || [[ "$current_branch" == release-line-* ]]; then
+        export IMAGE_REPO=digitalasset-canton-network-docker.jfrog.io/digitalasset/
+      else
+        export IMAGE_REPO=digitalasset-canton-network-docker-dev.jfrog.io/digitalasset/
       fi
     fi
   else
