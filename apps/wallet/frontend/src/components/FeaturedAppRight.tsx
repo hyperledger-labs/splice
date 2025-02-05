@@ -42,6 +42,7 @@ const FeaturedAppRight: React.FC = () => {
           onClick={selfGrant}
           id="self-feature"
           sx={{ textWrap: 'balance' }}
+          size="small"
         >
           Self-grant featured app rights
         </Button>

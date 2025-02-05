@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive
@@ -19,7 +19,7 @@ import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.apiserver.execution.CommandExecutionResult
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.PreparedTransactionCodec.*
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf
 import com.digitalasset.daml.lf.crypto
@@ -87,11 +87,6 @@ final class PreparedTransactionEncoder(
   ): Transformer[Option[ImmArray[A]], Seq[B]] =
     _.map(_.transformInto[Seq[B]]).getOrElse(Seq.empty)
 
-  private implicit def optSetToSeq[A, B](implicit
-      aToB: Transformer[A, B]
-  ): Transformer[Option[Set[A]], Seq[B]] =
-    _.toList.flatMap(_.map(_.transformInto[B]))
-
   /*
    * Straightforward encoders for simple LF classes
    */
@@ -101,17 +96,12 @@ final class PreparedTransactionEncoder(
   private implicit val hashTransformer: Transformer[lf.crypto.Hash, ByteString] =
     _.bytes.toByteString
 
-  private implicit val packageVersionTransformer: Transformer[lf.data.Ref.PackageVersion, String] =
-    _.toString()
-
   private implicit val partyVersionTransformer: Transformer[lf.data.Ref.Party, String] =
     Transformer.derive
 
   private implicit val languageVersionTransformer
       : Transformer[lf.language.LanguageVersion, String] =
     TransactionVersion.toProtoValue(_)
-
-  private implicit val packageIdTransformer: Transformer[lf.data.Ref.PackageId, String] = _.toString
 
   private implicit val nodeIdTransformer: Transformer[lf.transaction.NodeId, String] =
     _.index.toString
@@ -120,7 +110,8 @@ final class PreparedTransactionEncoder(
 
   private implicit val timestampTransformer: Transformer[lf.data.Time.Timestamp, Long] = _.micros
 
-  private implicit val domainIdTransformer: Transformer[DomainId, String] = _.toProtoPrimitive
+  private implicit val synchronizerIdTransformer: Transformer[SynchronizerId, String] =
+    _.toProtoPrimitive
 
   private implicit val nodeIdHashTransformer: Transformer[
     (lf.transaction.NodeId, lf.crypto.Hash),
@@ -297,7 +288,7 @@ final class PreparedTransactionEncoder(
 
   // Transformer for the transaction metadata
   private def resultToMetadataTransformer(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       transactionUUID: UUID,
       mediatorGroup: Int,
   ): PartialTransformer[CommandExecutionResult, iss.Metadata] =
@@ -320,7 +311,7 @@ final class PreparedTransactionEncoder(
             _.transformIntoPartial[iss.Metadata.ProcessedDisclosedContract]
           ),
       )
-      .withFieldConst(_.domainId, domainId.transformInto[String])
+      .withFieldConst(_.synchronizerId, synchronizerId.transformInto[String])
       .withFieldConst(_.transactionUuid, transactionUUID.toString)
       .withFieldConst(_.mediatorGroup, mediatorGroup)
       .buildTransformer
@@ -347,7 +338,7 @@ final class PreparedTransactionEncoder(
 
   def serializeCommandExecutionResult(
       result: CommandExecutionResult,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       transactionUUID: UUID,
       mediatorGroup: Int,
   )(implicit
@@ -357,7 +348,7 @@ final class PreparedTransactionEncoder(
   ): Future[iss.PreparedTransaction] = {
     implicit val traceContext: TraceContext = loggingContext.traceContext
     implicit val metadataTransformer: PartialTransformer[CommandExecutionResult, Metadata] =
-      resultToMetadataTransformer(domainId, transactionUUID, mediatorGroup)
+      resultToMetadataTransformer(synchronizerId, transactionUUID, mediatorGroup)
     val versionedTransaction = lf.transaction.VersionedTransaction(
       result.transaction.version,
       result.transaction.nodes,

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive
@@ -13,17 +13,18 @@ import com.daml.scalautil.future.FutureConversion.*
 import com.daml.timer.Delayed
 import com.digitalasset.canton.crypto.InteractiveSubmission
 import com.digitalasset.canton.crypto.InteractiveSubmission.TransactionMetadataForHashing
-import com.digitalasset.canton.ledger.api.domain.{Commands as ApiCommands, SubmissionId}
 import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService
 import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.{
   ExecuteRequest,
   PrepareRequest as PrepareRequestInternal,
 }
 import com.digitalasset.canton.ledger.api.util.TimeProvider
+import com.digitalasset.canton.ledger.api.{Commands as ApiCommands, SubmissionId}
 import com.digitalasset.canton.ledger.configuration.LedgerTimeModel
 import com.digitalasset.canton.ledger.error.groups.{CommandExecutionErrors, RequestValidationErrors}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.SubmissionResult
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.*
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
@@ -37,7 +38,7 @@ import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutionResult,
   CommandExecutor,
 }
-import com.digitalasset.canton.platform.apiserver.services.command.interactive.PreparedTransactionDecoder.DeserializationResult
+import com.digitalasset.canton.platform.apiserver.services.command.interactive.InteractiveSubmissionServiceImpl.ExecutionTimes
 import com.digitalasset.canton.platform.apiserver.services.{
   ErrorCause,
   RejectionGenerators,
@@ -47,23 +48,30 @@ import com.digitalasset.canton.platform.apiserver.services.{
 import com.digitalasset.canton.platform.config.InteractiveSubmissionServiceConfig
 import com.digitalasset.canton.platform.store.dao.events.LfValueTranslation
 import com.digitalasset.canton.protocol.hash.HashTracer
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import com.digitalasset.daml.lf.command.ApiCommand
 import com.digitalasset.daml.lf.crypto
+import com.digitalasset.daml.lf.data.Time
 import com.digitalasset.daml.lf.transaction.{FatContractInstance, SubmittedTransaction}
 import io.opentelemetry.api.trace.Tracer
 
-import java.time.Duration
+import java.time.{Duration, Instant}
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 private[apiserver] object InteractiveSubmissionServiceImpl {
+
+  private final case class ExecutionTimes(
+      ledgerEffective: Time.Timestamp,
+      submitAt: Option[Instant],
+  )
+
   def createApiService(
-      writeService: state.WriteService,
+      submissionSyncService: state.SyncService,
       timeProvider: TimeProvider,
       timeProviderType: TimeProviderType,
       seedService: SeedService,
@@ -77,7 +85,7 @@ private[apiserver] object InteractiveSubmissionServiceImpl {
       executionContext: ExecutionContext,
       tracer: Tracer,
   ): InteractiveSubmissionService & AutoCloseable = new InteractiveSubmissionServiceImpl(
-    writeService,
+    submissionSyncService,
     timeProvider,
     timeProviderType,
     seedService,
@@ -92,7 +100,7 @@ private[apiserver] object InteractiveSubmissionServiceImpl {
 }
 
 private[apiserver] final class InteractiveSubmissionServiceImpl private[services] (
-    writeService: state.WriteService,
+    syncService: state.SyncService,
     timeProvider: TimeProvider,
     timeProviderType: TimeProviderType,
     seedService: SeedService,
@@ -115,7 +123,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       request: PrepareRequestInternal
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[PrepareSubmissionResponse] =
+  ): FutureUnlessShutdown[PrepareSubmissionResponse] =
     withEnrichedLoggingContext(logging.commands(request.commands)) { implicit loggingContext =>
       logger.info(
         s"Requesting preparation of daml transaction with command ID ${request.commands.commandId}"
@@ -151,13 +159,15 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
 
   private def handleCommandExecutionResult(
       result: Either[ErrorCause, CommandExecutionResult]
-  )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Future[CommandExecutionResult] =
+  )(implicit
+      contextualizedErrorLogger: ContextualizedErrorLogger
+  ): FutureUnlessShutdown[CommandExecutionResult] =
     result.fold(
       error => {
         metrics.commands.failedCommandInterpretations.mark()
         failedOnCommandExecution(error)
       },
-      Future.successful,
+      FutureUnlessShutdown.pure,
     )
 
   private def evaluateAndHash(
@@ -167,8 +177,8 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
   )(implicit
       loggingContext: LoggingContextWithTrace,
       errorLoggingContext: ContextualizedErrorLogger,
-  ): Future[PrepareSubmissionResponse] = {
-    val result: EitherT[Future, DamlError, PrepareSubmissionResponse] = for {
+  ): FutureUnlessShutdown[PrepareSubmissionResponse] = {
+    val result: EitherT[FutureUnlessShutdown, DamlError, PrepareSubmissionResponse] = for {
       commandExecutionResultE <- withSpan("InteractiveSubmissionService.evaluate") { _ => _ =>
         EitherT.liftF(commandExecutor.execute(commands, submissionSeed))
       }
@@ -176,46 +186,50 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         handleCommandExecutionResult(commandExecutionResultE)
       )
       // We need to enrich the transaction before computing the hash, because record labels must be part of the hash
-      enrichedTransaction <- EitherT.liftF(
-        lfValueTranslation
-          .enrichVersionedTransaction(preEnrichedCommandExecutionResult.transaction)
-      )
+      enrichedTransaction <- EitherT
+        .liftF(
+          lfValueTranslation
+            .enrichVersionedTransaction(preEnrichedCommandExecutionResult.transaction)
+        )
+        .mapK(FutureUnlessShutdown.outcomeK)
       commandExecutionResult = preEnrichedCommandExecutionResult.copy(transaction =
         SubmittedTransaction(enrichedTransaction)
       )
-      // Domain is required to be explicitly provided for now
-      domainId <- EitherT.fromEither[Future](
-        commandExecutionResult.optDomainId.toRight(
-          RequestValidationErrors.MissingField.Reject("domain_id")
+      // Synchronizer is required to be explicitly provided for now
+      synchronizerId <- EitherT.fromEither[FutureUnlessShutdown](
+        commandExecutionResult.optSynchronizerId.toRight(
+          RequestValidationErrors.MissingField.Reject("synchronizer_id")
         )
       )
-      // Require this participant to be connected to the domain on which the transaction will be run
-      protocolVersionForChosenDomain <- EitherT.fromEither[Future](
-        protocolVersionForDomainId(domainId)
+      // Require this participant to be connected to the synchronizer on which the transaction will be run
+      protocolVersionForChosenSynchronizer <- EitherT.fromEither[FutureUnlessShutdown](
+        protocolVersionForSynchronizerId(synchronizerId)
       )
       // Use the highest hashing versions supported on that protocol version
       hashVersion = HashingSchemeVersion
-        .getHashingSchemeVersionsForProtocolVersion(protocolVersionForChosenDomain)
+        .getHashingSchemeVersionsForProtocolVersion(protocolVersionForChosenSynchronizer)
         .max1
       transactionUUID = UUID.randomUUID()
       mediatorGroup = 0
-      preparedTransaction <- EitherT.liftF(
-        transactionEncoder.serializeCommandExecutionResult(
-          commandExecutionResult,
-          // TODO(i20688) Domain ID should be picked by the domain router
-          domainId,
-          // TODO(i20688) Transaction UUID should be picked in the TransactionConfirmationRequestFactory
-          transactionUUID,
-          // TODO(i20688) Mediator group should be picked in the ProtocolProcessor
-          mediatorGroup,
+      preparedTransaction <- EitherT
+        .liftF(
+          transactionEncoder.serializeCommandExecutionResult(
+            commandExecutionResult,
+            // TODO(i20688) Synchronizer id should be picked by the synchronizer router
+            synchronizerId,
+            // TODO(i20688) Transaction UUID should be picked in the TransactionConfirmationRequestFactory
+            transactionUUID,
+            // TODO(i20688) Mediator group should be picked in the ProtocolProcessor
+            mediatorGroup,
+          )
         )
-      )
+        .mapK(FutureUnlessShutdown.outcomeK)
       metadataForHashing = TransactionMetadataForHashing.create(
         commandExecutionResult.submitterInfo.actAs.toSet,
         commandExecutionResult.submitterInfo.commandId,
         transactionUUID,
         mediatorGroup,
-        domainId,
+        synchronizerId,
         Option.when(commandExecutionResult.dependsOnLedgerTime)(
           commandExecutionResult.transactionMeta.ledgerEffectiveTime
         ),
@@ -237,7 +251,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         else
           HashTracer.NoOp
       transactionHash <- EitherT
-        .fromEither[Future](
+        .fromEither[FutureUnlessShutdown](
           InteractiveSubmission.computeVersionedHash(
             hashVersion,
             commandExecutionResult.transaction,
@@ -245,7 +259,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
             commandExecutionResult.transactionMeta.optNodeSeeds
               .map(_.toList.toMap)
               .getOrElse(Map.empty),
-            protocolVersionForChosenDomain,
+            protocolVersionForChosenSynchronizer,
             hashTracer,
           )
         )
@@ -271,13 +285,15 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       hashingDetails = hashingDetails,
     )
 
-    result.value.map(_.leftMap(_.asGrpcError).toTry).flatMap(Future.fromTry)
+    result.value.map(_.leftMap(_.asGrpcError).toTry).flatMap(FutureUnlessShutdown.fromTry)
   }
 
   private def failedOnCommandExecution(
       error: ErrorCause
-  )(implicit contextualizedErrorLogger: ContextualizedErrorLogger): Future[CommandExecutionResult] =
-    Future.failed(
+  )(implicit
+      contextualizedErrorLogger: ContextualizedErrorLogger
+  ): FutureUnlessShutdown[CommandExecutionResult] =
+    FutureUnlessShutdown.failed(
       RejectionGenerators
         .commandExecutorError(error)
         .asGrpcError
@@ -285,31 +301,17 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
 
   override def close(): Unit = ()
 
-  private def submitIfNotOverloaded(transactionInfo: CommandExecutionResult)(implicit
+  private def submitIfNotOverloaded(
+      transactionInfo: CommandExecutionResult,
+      submitAt: Option[Instant],
+  )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[SubmissionResult] =
     checkOverloaded(loggingContext.traceContext) match {
       case Some(submissionResult) => Future.successful(submissionResult)
-      case None => submitTransactionWithDelay(transactionInfo)
+      case None => submitTransactionAt(transactionInfo, submitAt)
     }
 
-  private def submitTransactionWithDelay(
-      transactionInfo: CommandExecutionResult
-  )(implicit
-      loggingContext: LoggingContextWithTrace
-  ): Future[state.SubmissionResult] = {
-    val submitAt = transactionInfo.transactionMeta.ledgerEffectiveTime.toInstant
-      .minus(LedgerTimeModel.maximumToleranceTimeModel.avgTransactionLatency)
-    val submissionDelay = Duration.between(timeProvider.getCurrentTime, submitAt)
-    if (submissionDelay.isNegative)
-      submitTransaction(transactionInfo)
-    else {
-      logger.info(s"Delaying submission by $submissionDelay")
-      metrics.commands.delayedSubmissions.mark()
-      val scalaDelay = scala.concurrent.duration.Duration.fromNanos(submissionDelay.toNanos)
-      Delayed.Future.by(scalaDelay)({ submitTransaction(transactionInfo) })
-    }
-  }
   private def submitTransaction(
       result: CommandExecutionResult
   )(implicit
@@ -317,10 +319,10 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
   ): Future[state.SubmissionResult] = {
     metrics.commands.validSubmissions.mark()
     logger.trace("Submitting transaction to ledger.")
-    writeService
+    syncService
       .submitTransaction(
         result.submitterInfo,
-        result.optDomainId,
+        result.optSynchronizerId,
         result.transactionMeta,
         result.transaction,
         result.interpretationTimeNanos,
@@ -330,14 +332,14 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       .toScalaUnwrapped
   }
 
-  private def protocolVersionForDomainId(
-      domainId: DomainId
+  private def protocolVersionForSynchronizerId(
+      synchronizerId: SynchronizerId
   )(implicit loggingContext: LoggingContextWithTrace): Either[DamlError, ProtocolVersion] =
-    writeService
-      .getProtocolVersionForDomain(Traced(domainId))
+    syncService
+      .getProtocolVersionForSynchronizer(Traced(synchronizerId))
       .toRight(
         CommandExecutionErrors.InteractiveSubmissionPreparationError
-          .Reject(s"Unknown domain ID $domainId")
+          .Reject(s"Unknown synchronizer id $synchronizerId")
       )
 
   private def handleSubmissionResult(result: Try[state.SubmissionResult])(implicit
@@ -361,33 +363,69 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
     }
   }
 
+  private def submitTransactionAt(
+      transactionInfo: CommandExecutionResult,
+      submitAt: Option[Instant],
+  )(implicit loggingContext: LoggingContextWithTrace): Future[state.SubmissionResult] = {
+    val delayO = submitAt.map(Duration.between(timeProvider.getCurrentTime, _))
+    delayO match {
+      case Some(delay) if delay.isNegative =>
+        submitTransaction(transactionInfo)
+      case Some(delay) =>
+        logger.info(s"Delaying submission by $delay")
+        metrics.commands.delayedSubmissions.mark()
+        val scalaDelay = scala.concurrent.duration.Duration.fromNanos(delay.toNanos)
+        Delayed.Future.by(scalaDelay)(submitTransaction(transactionInfo))
+      case None =>
+        submitTransaction(transactionInfo)
+    }
+  }
+
+  /** @param ledgerEffectiveTimeO - set if the ledger effective time was used when preparing the transaction */
+  private def deriveExecutionTimes(ledgerEffectiveTimeO: Option[Time.Timestamp]): ExecutionTimes =
+    (ledgerEffectiveTimeO, timeProviderType) match {
+      case (Some(let), _) =>
+        // Submit transactions such that they arrive at the ledger sequencer exactly when record time equals
+        // ledger time. If the ledger time of the transaction is far in the future (farther than the expected
+        // latency), the submission to the SyncService is delayed.
+        val submitAt =
+          let.toInstant.minus(LedgerTimeModel.maximumToleranceTimeModel.avgTransactionLatency)
+        ExecutionTimes(let, Some(submitAt))
+      case (None, _) =>
+        // If the ledger effective time was not set in the request, it means the transaction is assumed not to use time.
+        // So we use the current time here at submission time.
+        ExecutionTimes(Time.Timestamp.assertFromInstant(timeProvider.getCurrentTime), None)
+    }
+
   override def execute(
-      request: ExecuteRequest
-  )(implicit loggingContext: LoggingContextWithTrace): Future[ExecuteSubmissionResponse] = {
+      executionRequest: ExecuteRequest
+  )(implicit
+      loggingContext: LoggingContextWithTrace
+  ): FutureUnlessShutdown[ExecuteSubmissionResponse] = FutureUnlessShutdown.outcomeF {
     val commandIdLogging =
-      request.preparedTransaction.metadata
+      executionRequest.preparedTransaction.metadata
         .flatMap(_.submitterInfo.map(_.commandId))
         .map(logging.commandId)
         .toList
 
     withEnrichedLoggingContext(
-      logging.submissionId(request.submissionId),
+      logging.submissionId(executionRequest.submissionId),
       commandIdLogging*
     ) { implicit loggingContext =>
       logger.info(
-        s"Requesting execution of daml transaction with submission ID ${request.submissionId}"
+        s"Requesting execution of daml transaction with submission ID ${executionRequest.submissionId}"
       )
-      val result = for {
-        deserializationResult <- EitherT.liftF[Future, DamlError, DeserializationResult](
-          transactionDecoder.makeCommandExecutionResult(request)
+      for {
+        ledgerEffectiveTimeO <- transactionDecoder.extractLedgerEffectiveTime(executionRequest)
+        times = deriveExecutionTimes(ledgerEffectiveTimeO)
+        deserializationResult <- transactionDecoder.makeCommandExecutionResult(
+          executionRequest,
+          times.ledgerEffective,
         )
-        _ <- EitherT.liftF[Future, DamlError, Unit](
-          submitIfNotOverloaded(deserializationResult.commandExecutionResult)
-            .transform(handleSubmissionResult)
-        )
+        _ <- submitIfNotOverloaded(deserializationResult.commandExecutionResult, times.submitAt)
+          .transform(handleSubmissionResult)
       } yield ExecuteSubmissionResponse()
 
-      result.value.map(_.leftMap(_.asGrpcError).toTry).flatMap(Future.fromTry)
     }
   }
 }

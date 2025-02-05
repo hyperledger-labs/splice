@@ -17,7 +17,7 @@ trait AppStore extends NamedLogging with AutoCloseable with StoreErrors {
   /** Defines which create events are to be ingested into the store. */
   protected def acsContractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData]
 
-  def domains: DomainStore
+  def domains: SynchronizerStore
 
   def multiDomainAcsStore: MultiDomainAcsStore
 

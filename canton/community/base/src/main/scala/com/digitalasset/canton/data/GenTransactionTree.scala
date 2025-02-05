@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -230,10 +230,8 @@ final case class GenTransactionTree private (
         for {
           viewRecipients <- viewWitnesses
             .toRecipients(topologySnapshot)
-            .mapK(FutureUnlessShutdown.outcomeK)
           parentRecipients <- parentWitnessesO
             .traverse(_.toRecipients(topologySnapshot))
-            .mapK(FutureUnlessShutdown.outcomeK)
         } yield ViewWithWitnessesAndRecipients(tvt, viewWitnesses, viewRecipients, parentRecipients)
       }
     } yield allViewsWithMetadata

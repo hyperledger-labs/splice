@@ -65,10 +65,11 @@ import org.lfdecentralizedtrust.splice.util.{
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
 }
-import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
@@ -1297,7 +1298,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       svs: java.util.Map[String, SvInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
-    val newDomainId = "new-domain-id"
+    val newSynchronizerId = "new-domain-id"
     val template = new DsoRules(
       dsoParty.toProtoPrimitive,
       epoch,
@@ -1314,7 +1315,11 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         new RelTime(1),
         new SynchronizerNodeConfigLimits(new CometBftConfigLimits(1, 1, 1, 1, 1)),
         1,
-        new DsoDecentralizedSynchronizerConfig(Collections.emptyMap(), newDomainId, newDomainId),
+        new DsoDecentralizedSynchronizerConfig(
+          Collections.emptyMap(),
+          newSynchronizerId,
+          newSynchronizerId,
+        ),
         Optional.empty(),
       ),
       Collections.emptyMap(),
@@ -1337,11 +1342,15 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def memberTraffic(member: Member, domainId: DomainId, totalPurchased: Long) = {
+  private def memberTraffic(
+      member: Member,
+      synchronizerId: SynchronizerId,
+      totalPurchased: Long,
+  ) = {
     val template = new MemberTraffic(
       dsoParty.toProtoPrimitive,
       member.toProtoPrimitive,
-      domainId.toProtoPrimitive,
+      synchronizerId.toProtoPrimitive,
       domainMigrationId,
       totalPurchased,
       1,
@@ -1527,7 +1536,7 @@ class DbSvDsoStoreTest
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(DomainAlias.tryCreate(domain) -> dummyDomain)
+        Map(SynchronizerAlias.tryCreate(domain) -> dummyDomain)
       )
     } yield store
   }
@@ -1850,8 +1859,5 @@ class DbSvDsoStoreTest
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[?] =
-    for {
-      _ <- resetAllAppTables(storage)
-    } yield ()
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
 }

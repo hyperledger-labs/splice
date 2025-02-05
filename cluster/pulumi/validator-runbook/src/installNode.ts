@@ -224,7 +224,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
       {
         MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
-        YOUR_VALIDATOR_NAME: validatorConfig.nodeIdentifier,
+        YOUR_VALIDATOR_NODE_NAME: validatorConfig.nodeIdentifier,
       }
     ),
   };

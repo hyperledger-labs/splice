@@ -15,29 +15,24 @@ target cluster.
 Requirements
 ------------
 
-1) Access to the following two Artifactory repositories:
-
-    a. `Canton Network Docker repository <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_
-    b. `Canton Network Helm repository <https://digitalasset.jfrog.io/ui/native/canton-network-helm/>`_
-
-2) A running Kubernetes cluster in which you have administrator access to create and manage namespaces.
-3) A development workstation with the following:
+1) A running Kubernetes cluster in which you have administrator access to create and manage namespaces.
+2) A development workstation with the following:
 
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-4) Your cluster either needs to be connected to the GCP DA Canton
+3) Your cluster either needs to be connected to the GCP DA Canton
    VPN or you need a static egress IP. In the latter case,
    please provide that IP address to your contact at Digital Asset to
    add it to the firewall rules.
 
-5) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
+4) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
 .. parsed-literal::
 
   tar xzvf |version|\_splice-node.tar.gz
 
-6) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <sv-upgrades>`.
+5) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <sv-upgrades>`.
    If it has, please record the current migration ID of the synchronizer.
    The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
 
@@ -84,44 +79,15 @@ You will be using them every time you want to deploy a new SV node, i.e., also w
 The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
 For `DevNet` and the current early version of `TestNet`, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
 
-.. _identity-token:
-
 Preparing a Cluster for Installation
 ------------------------------------
 
-In the following, you will need your Artifactory credentials from
-https://digitalasset.jfrog.io/ui/user_profile. Based on that, set the following environment variables.
-
-====================== ==========================================================================================
-Name                   Value
----------------------- ------------------------------------------------------------------------------------------
-ARTIFACTORY_USER       Your Artifactory user name shown at the top right.
-ARTIFACTORY_PASSWORD   Your Artifactory Identity token. If you don't have one you can generate one on your profile page.
-====================== ==========================================================================================
-
-Ensure that your local helm installation has access to the Digital Asset Helm chart repository:
-
-.. code-block:: bash
-
-    helm repo add canton-network-helm \
-        https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm \
-        --username ${ARTIFACTORY_USER} \
-        --password ${ARTIFACTORY_PASSWORD}
-
-Create the application namespace within Kubernetes and ensure it has image pull credentials for fetching images from the Digital Asset Artifactory repository used for Docker images.
+Create the application namespace within Kubernetes.
 
 .. code-block:: bash
 
     kubectl create ns sv
 
-    kubectl create secret docker-registry docker-reg-cred \
-        --docker-server=digitalasset-canton-network-docker.jfrog.io \
-        --docker-username=${ARTIFACTORY_USER} \
-        --docker-password=${ARTIFACTORY_PASSWORD} \
-        -n sv
-
-    kubectl patch serviceaccount default -n sv \
-        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
 .. _helm-sv-auth:
 
@@ -360,18 +326,11 @@ Configuring your CometBft node
 Every SV node also deploys a CometBft node. This node must be configured to join the existing Global Synchronizer BFT chain.
 To do that, you first must generate the keys that will identify the node.
 
-.. note::
-  You need access to the canton `network docker repo <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_ to successfully generate the node identity.
-  You can access your username and get the Identity token for your Artifactory account through the UI, using the top right `Edit profile` option.
-
-  | This can be configured by running:
-  | :code:`docker login -u <your_artifactory_user> -p <your_artifactory_api_key> digitalasset-canton-network-docker.jfrog.io`
-
 .. _cometbft-identity:
 
 Generating your CometBft node keys
 ++++++++++++++++++++++++++++++++++
-To generate the node config you must have access to the CometBft docker image provided through the Canton Network artifacotry (digitalasset-canton-network-docker.jfrog.io).
+To generate the node config you use the CometBft docker image provided through Github Container Registry (ghcr.io/digital-asset/decentralized-canton-sync/docker).
 
 Use the following shell commands to generate the proper keys:
 
@@ -381,9 +340,9 @@ Use the following shell commands to generate the proper keys:
   mkdir cometbft
   cd cometbft
   # Init the node
-  docker run --rm -v "$(pwd):/init" digitalasset-canton-network-docker.jfrog.io/digitalasset/cometbft:|version| init --home /init
+  docker run --rm -v "$(pwd):/init" ghcr.io/digital-asset/decentralized-canton-sync/docker/cometbft:|version| init --home /init
   # Read the node id and keep a note of it for the deployment
-  docker run --rm -v "$(pwd):/init" digitalasset-canton-network-docker.jfrog.io/digitalasset/cometbft:|version| show-node-id --home /init
+  docker run --rm -v "$(pwd):/init" ghcr.io/digital-asset/decentralized-canton-sync/docker/cometbft:|version| show-node-id --home /init
 
 Please keep a note of the node ID printed out above.
 
@@ -476,12 +435,12 @@ Postgres in the Cluster
 
 If you wish to run the Postgres instances as pods in your cluster, you can use the `splice-postgres` Helm chart to install them:
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install sequencer-pg canton-network-helm/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-sequencer.yaml --wait
-    helm install mediator-pg canton-network-helm/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-mediator.yaml --wait
-    helm install participant-pg canton-network-helm/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-participant.yaml --wait
-    helm install apps-pg canton-network-helm/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-apps.yaml --wait
+    helm install sequencer-pg |helm_repo_prefix|/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-sequencer.yaml --wait
+    helm install mediator-pg |helm_repo_prefix|/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-mediator.yaml --wait
+    helm install participant-pg |helm_repo_prefix|/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-participant.yaml --wait
+    helm install apps-pg |helm_repo_prefix|/splice-postgres -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/postgres-values-apps.yaml --wait
 
 Cloud-Hosted Postgres
 +++++++++++++++++++++
@@ -628,23 +587,22 @@ reaches a stable state prior to moving on to the next step.
 
 Install the Canton and CometBFT components:
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm repo update
-    helm install global-domain-${MIGRATION_ID}-cometbft canton-network-helm/splice-cometbft -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/cometbft-values.yaml --wait
-    helm install global-domain-${MIGRATION_ID} canton-network-helm/splice-global-domain -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/global-domain-values.yaml --wait
-    helm install participant-${MIGRATION_ID} canton-network-helm/splice-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
+    helm install global-domain-${MIGRATION_ID}-cometbft |helm_repo_prefix|/splice-cometbft -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/cometbft-values.yaml --wait
+    helm install global-domain-${MIGRATION_ID} |helm_repo_prefix|/splice-global-domain -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/global-domain-values.yaml --wait
+    helm install participant-${MIGRATION_ID} |helm_repo_prefix|/splice-participant -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/participant-values.yaml --wait
 
 Note that we use the migration ID when naming Canton components.
 This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
 
 Install the SV node apps (replace ``helm install`` in these commands with ``helm upgrade`` if you are following :ref:`sv-upgrades-deploying-apps`):
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install sv canton-network-helm/splice-sv-node -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-values.yaml -f ${SV_IDENTITIES_FILE} -f ${UI_CONFIG_VALUES_FILE} --wait
-    helm install scan canton-network-helm/splice-scan -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
-    helm install validator canton-network-helm/splice-validator -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install sv |helm_repo_prefix|/splice-sv-node -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-values.yaml -f ${SV_IDENTITIES_FILE} -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install scan |helm_repo_prefix|/splice-scan -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
+    helm install validator |helm_repo_prefix|/splice-validator -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
 
 
 
@@ -678,6 +636,19 @@ particularly if all helm charts are deployed at the same time. The
 ``splice-sv-node`` cannot start until ``participant`` is running and
 ``participant`` cannot start until ``postgres`` is running.
 
+.. _sv-network-diagram:
+
+SV Network Diagram
+------------------
+
+..
+   _LucidChart link: https://lucid.app/lucidchart/5d842236-5892-48cc-ad52-48f487998703/edit?viewport_loc=-5153%2C-3378%2C6108%2C3582%2C0_0&invitationId=inv_21f447be-632c-462e-abdd-2e2e29547d9f
+
+
+.. image:: images/sv-network-diagram.png
+  :width: 600
+  :alt: SV Network Diagram
+
 .. _helm-sv-ingress:
 
 Configuring the Cluster Ingress
@@ -706,7 +677,7 @@ as they ommit the ``enumerator`` part of the hostname.
 Ingress Configuration
 +++++++++++++++++++++
 
-An IP whitelisting json file ``allowed-ip-ranges-external.json`` will be provided in each SV operations announcement.
+An IP whitelisting json file ``allowed-ip-ranges.json`` will be provided in each SV operations announcement corresponding to the network to which you are connecting.
 This file contains other clusters' egress IPs that require access to your super validator's components. These IPs typically belong to peer super-validators, validators and the Digital Asset VPN.
 
 Each SV is required to configure their cluster ingress to allow traffic from these IPs to be operational.
@@ -768,20 +739,11 @@ In order to install the reference charts, the following must be satisfied in you
 Installation Instructions
 +++++++++++++++++++++++++
 
-Create a `cluster-ingress` namespace with image pull permissions from the Artifactory docker repository:
+Create a `cluster-ingress` namespace:
 
 .. code-block:: bash
 
     kubectl create ns cluster-ingress
-
-    kubectl create secret docker-registry docker-reg-cred \
-        --docker-server=digitalasset-canton-network-docker.jfrog.io \
-        --docker-username=${ARTIFACTORY_USER} \
-        --docker-password=${ARTIFACTORY_PASSWORD} \
-        -n cluster-ingress
-
-    kubectl patch serviceaccount default -n cluster-ingress \
-        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
 
 Ensure that there is a cert-manager certificate available in a secret
@@ -828,9 +790,9 @@ And install it to your cluster:
 A reference Helm chart installing a gateway that uses this service is also provided.
 To install it, run the following (assuming the environment variable `YOUR_HOSTNAME` is set to your hostname):
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install cluster-gateway canton-network-helm/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
+    helm install cluster-gateway |helm_repo_prefix|/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
 Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
@@ -842,9 +804,9 @@ Another reference Helm chart is provided for that, which can be installed after
 using:
 
 
-.. code-block:: bash
+.. parsed-literal::
 
-    helm install cluster-ingress-sv canton-network-helm/splice-cluster-ingress-runbook -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-cluster-ingress-values.yaml
+    helm install cluster-ingress-sv |helm_repo_prefix|/splice-cluster-ingress-runbook -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/sv-cluster-ingress-values.yaml
 
 
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -11,6 +11,8 @@ import com.daml.metrics.grpc.{DamlGrpcServerHistograms, DamlGrpcServerMetrics}
 import com.daml.metrics.{DatabaseMetricsHistograms, HealthMetrics}
 import com.typesafe.scalalogging.LazyLogging
 import io.opentelemetry.api.metrics.Meter
+
+import scala.annotation.unused
 
 object LedgerApiServerMetrics extends LazyLogging {
 
@@ -40,7 +42,17 @@ object LedgerApiServerMetrics extends LazyLogging {
 final class LedgerApiServerMetrics(
     inventory: LedgerApiServerHistograms,
     val openTelemetryMetricsFactory: LabeledMetricsFactory,
-) {
+) extends HasDocumentedMetrics {
+
+  override def docPoke(): Unit = {
+    commands.docPoke()
+    execution.docPoke()
+    lapi.docPoke()
+    userManagement.docPoke()
+    partyRecordStore.docPoke()
+    identityProviderConfigStore.docPoke()
+    services.docPoke()
+  }
 
   private val prefix = inventory.prefix
 
@@ -102,9 +114,11 @@ class LedgerApiServerHistograms(val prefix: MetricName)(implicit
   private[metrics] val index = new IndexHistograms(prefix :+ "index")
   private[metrics] val indexer = new IndexerHistograms(prefix :+ "indexer")
 
+  @unused
   private val _grpc = new DamlGrpcServerHistograms()
   // the ledger api server creates these metrics all over the place, but their prefix
   // is anyway hardcoded
+  @unused
   private val _db = new DatabaseMetricsHistograms()
 
 }

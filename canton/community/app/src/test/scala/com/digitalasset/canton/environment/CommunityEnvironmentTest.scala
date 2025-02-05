@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -8,14 +8,17 @@ import cats.syntax.either.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{CantonCommunityConfig, TestingConfigInternal}
-import com.digitalasset.canton.domain.mediator.{CommunityMediatorNodeConfig, MediatorNodeBootstrap}
-import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrap
-import com.digitalasset.canton.domain.sequencing.config.CommunitySequencerNodeConfig
 import com.digitalasset.canton.integration.CommunityConfigTransforms
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.participant.sync.SyncServiceError
 import com.digitalasset.canton.participant.{ParticipantNode, ParticipantNodeBootstrap}
+import com.digitalasset.canton.synchronizer.mediator.{
+  CommunityMediatorNodeConfig,
+  MediatorNodeBootstrap,
+}
+import com.digitalasset.canton.synchronizer.sequencing.SequencerNodeBootstrap
+import com.digitalasset.canton.synchronizer.sequencing.config.CommunitySequencerNodeConfig
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, ConfigStubs, HasExecutionContext}
 import monocle.macros.syntax.lens.*
@@ -79,7 +82,7 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
       when(bootstrap.name).thenReturn(InstanceName.tryCreate("mockP"))
       when(bootstrap.start()).thenReturn(EitherT.pure[Future, String](()))
       when(bootstrap.getNode).thenReturn(Some(node))
-      when(node.reconnectDomainsIgnoreFailures()(any[TraceContext], any[ExecutionContext]))
+      when(node.reconnectSynchronizersIgnoreFailures()(any[TraceContext], any[ExecutionContext]))
         .thenReturn(EitherT.pure[FutureUnlessShutdown, SyncServiceError](()))
       when(node.config).thenReturn(participant1Config)
       (bootstrap, node)
@@ -140,7 +143,7 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
 
         environment.startAndReconnect(false) shouldBe Either.unit
         verify(pp.getNode.valueOrFail("node should be set"), times(2))
-          .reconnectDomainsIgnoreFailures()(any[TraceContext], any[ExecutionContext])
+          .reconnectSynchronizersIgnoreFailures()(any[TraceContext], any[ExecutionContext])
 
       }
 

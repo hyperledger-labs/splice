@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.db
@@ -7,11 +7,10 @@ import cats.data.OptionT
 import cats.syntax.option.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.participant.state.ChangeId
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.protocol.submission.ChangeIdHash
 import com.digitalasset.canton.participant.store.CommandDeduplicationStore.OffsetAndPublicationTime
 import com.digitalasset.canton.participant.store.{
@@ -65,7 +64,7 @@ class DbCommandDeduplicationStore(
         from par_command_deduplication
         where change_id_hash = $changeIdHash
         """.as[CommandDeduplicationData].headOption
-    storage.querySingleUnlessShutdown(query, functionFullName)
+    storage.querySingle(query, functionFullName)
   }
 
   override def storeDefiniteAnswers(
@@ -176,10 +175,9 @@ class DbCommandDeduplicationStore(
         setAcceptFlag()
       }
     // No need for synchronous commit across DB replicas, because this method is driven from the
-    // published events in the multi-domain event log, which itself uses synchronous commits and
-    // therefore ensures synchronization. After a crash, crash recovery will sync the
-    // command deduplication data with the indexer DB.
-    storage.queryAndUpdateUnlessShutdown(bulkUpdate, functionFullName).flatMap { rowCounts =>
+    // published events to the Ledger API Indexer, which ensures synchronization.
+    // After a crash, crash recovery will sync the command deduplication data with the indexer DB.
+    storage.queryAndUpdate(bulkUpdate, functionFullName).flatMap { rowCounts =>
       MonadUtil.sequentialTraverse_(rowCounts.iterator.zip(answers.tails)) {
         case (rowCount, currentAndLaterAnswers) =>
           val (changeId, definiteAnswerEvent, accepted) =
@@ -274,7 +272,7 @@ class DbCommandDeduplicationStore(
     }
   }
 
-  override def prune(upToInclusive: GlobalOffset, prunedPublicationTime: CantonTimestamp)(implicit
+  override def prune(upToInclusive: Offset, prunedPublicationTime: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = {
     cachedLastPruning.updateAndGet {
@@ -317,7 +315,7 @@ class DbCommandDeduplicationStore(
       }
       val doPrune =
         sqlu"""delete from par_command_deduplication where offset_definite_answer <= $upToInclusive"""
-      storage.updateUnlessShutdown_(updatePruneOffset.andThen(doPrune), functionFullName)
+      storage.update_(updatePruneOffset.andThen(doPrune), functionFullName)
     }
   }
 
@@ -332,7 +330,7 @@ class DbCommandDeduplicationStore(
           select pruning_offset, publication_time
           from par_command_deduplication_pruning
              """.as[OffsetAndPublicationTime].headOption
-          storage.querySingleUnlessShutdown(query, functionFullName)
+          storage.querySingle(query, functionFullName)
         }
           .transform { offset =>
             // only replace if we haven't raced with another thread

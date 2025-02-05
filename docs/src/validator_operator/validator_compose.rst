@@ -6,13 +6,10 @@
 .. TODO(#14303): consider reducing duplication. Some requirements & validator onboarding can be moved to a section before we choose the deployment method
 
 
-Docker-Compose Based Deployment
-===============================
-
 .. _compose_validator:
 
 Docker-Compose Based Deployment of a Validator Node
----------------------------------------------------
+===================================================
 
 This section describes how to deploy a standalone validator node on a local machine
 using Docker-Compose. The deployment consists of the validator node along with associated
@@ -42,33 +39,28 @@ This deployment is useful for:
 Requirements
 ++++++++++++
 
-1) Access to the following artifactory:
-
-    a. `Canton Network Docker repository <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_
-
-2) A linux/MacOS machine with the following:
+1) A linux/MacOS machine with the following:
 
    a. ``docker`` - at least version 2.26.0 for Docker Engine, or an up-to-date version of Docker Desktop.
    b. ``curl``
    c. ``jq``
 
-3) Your machine should either be connected to a VPN that is whitelisted on the network
+   Note that both AMD64 and ARM64 architectures are supported.
+
+2) Your machine should either be connected to a VPN that is whitelisted on the network
    (contact your sponsor SV to obtain access), or have a static egress IP address.
    In the latter case, please provide that IP address to your sponsor SV to
    add it to the firewall rules.
 
-4) Please download the release artifacts containing the docker-compose files, from here: |bundle_download_link|, and extract the bundle:
+3) Please download the release artifacts containing the docker-compose files, from here: |bundle_download_link|, and extract the bundle:
 
 .. parsed-literal::
 
   tar xzvf |version|\_splice-node.tar.gz
 
-5) Please inquire for the current migration ID of the synchronizer from your sponsor SV.
-   The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
+.. include:: required_network_parameters.rst
 
-.. code-block:: bash
-
-   export MIGRATION_ID=0
+Additional parameters describing your own setup as opposed to the connection to the network are described below.
 
 Preparing for Validator Onboarding
 ++++++++++++++++++++++++++++++++++
@@ -96,42 +88,22 @@ Deployment
 
    cd splice-node/docker-compose/validator
 
-.. TODO(#14303): get rid of the need to manually export the image tag
-
 2) Export the current version to an environment variable: |image_tag_set|
 
-3) Login to the digitalasset-canton-network-docker.jfrog.io registry:
+3) Run the following command to start the validator node, and wait for it to become ready (could take a few minutes):
 
   .. code-block:: bash
 
-    docker login digitalasset-canton-network-docker.jfrog.io
-
-4) Run the following command to start the validator node, and wait for it to become ready (could take a few minutes):
-
-  .. code-block:: bash
-
-    ./start.sh -s <sponsor_sv_address> -o "<onboarding_secret>" -p <party_hint> -m $MIGRATION_ID -w
-
+    ./start.sh -s "<SPONSOR_SV_URL>" -o "<ONBOARDING_SECRET>" -p "<party_hint>" -m "<MIGRATION_ID>" -w
 
   Where:
 
-  a) ``<sponsor_sv_address>`` is the URL of the sv-app app of the SV that is sponsoring you.
-     You should have received this from your SV sponsor, typically starts with `https://sv.sv-N`
-     for some number N.
-
-     For example, if your sponsor SV is the GSF, this URL would be |gsf_sv_url|
-
-  b) ``<onboarding_secret>``
-     is the onboarding secret you obtained above. Please surround
-     this with quotes to avoid shell interpretation of special characters.
-
-  c) ``<party_hint>`` will be used as the prefix of the Party ID of your validator's administrator.
+  ``<party_hint>`` will be used as the prefix of the Party ID of your validator's administrator.
      This must be of format `<organization>-<function>-<enumerator>`, e.g. `myCompany-myWallet-1`.
 
-  d) ``$MIGRATION_ID`` is the migration ID of the synchronizer on the target network, as exported above.
-
 Note that the validator may be stopped with the command `./stop.sh` and restarted again with the same `start`
-command as above. Its data will be retained between invocations.
+command as above. Its data will be retained between invocations. In subseqent invocations, the secret itself may be
+left empty, but the `-o` is still mandatory, so a `-o ""` argument should be provided.
 
 Logging into the wallet UI
 ++++++++++++++++++++++++++

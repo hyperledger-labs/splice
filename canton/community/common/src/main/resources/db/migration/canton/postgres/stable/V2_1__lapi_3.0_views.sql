@@ -145,11 +145,10 @@ create or replace view debug.lapi_command_completions as
     deduplication_offset,
     deduplication_duration_seconds,
     deduplication_duration_nanos,
-    debug.canton_timestamp(deduplication_start) as deduplication_start,
     debug.lapi_rejection_status_code(rejection_status_code) as rejection_status_code,
     rejection_status_message,
     rejection_status_details,
-    debug.resolve_lapi_interned_string(domain_id) as domain_id,
+    debug.resolve_lapi_interned_string(synchronizer_id) as synchronizer_id,
     message_uuid,
     request_sequencer_counter,
     is_transaction,
@@ -169,8 +168,8 @@ create or replace view debug.lapi_events_assign as
     debug.resolve_lapi_interned_string(package_name) as package_name,
     debug.resolve_lapi_interned_string(package_version) as package_version,
     debug.resolve_lapi_interned_strings(flat_event_witnesses) as flat_event_witnesses,
-    debug.resolve_lapi_interned_string(source_domain_id) as source_domain_id,
-    debug.resolve_lapi_interned_string(target_domain_id) as target_domain_id,
+    debug.resolve_lapi_interned_string(source_synchronizer_id) as source_synchronizer_id,
+    debug.resolve_lapi_interned_string(target_synchronizer_id) as target_synchronizer_id,
     unassign_id,
     reassignment_counter,
     create_argument,
@@ -192,7 +191,7 @@ create or replace view debug.lapi_events_consuming_exercise as
   select
     event_sequential_id,
     debug.canton_timestamp(ledger_effective_time) as ledger_effective_time,
-    node_index,
+    node_id,
     event_offset,
     update_id,
     workflow_id,
@@ -209,11 +208,12 @@ create or replace view debug.lapi_events_consuming_exercise as
     exercise_argument,
     exercise_result,
     debug.resolve_lapi_interned_strings(exercise_actors) as exercise_actors,
-    exercise_child_event_ids,
+    exercise_child_node_ids,
+    exercise_last_descendant_node_id,
     debug.lapi_compression(create_key_value_compression) as create_key_value_compression,
     debug.lapi_compression(exercise_argument_compression) as exercise_argument_compression,
     debug.lapi_compression(exercise_result_compression) as exercise_result_compression,
-    debug.resolve_lapi_interned_string(domain_id) as domain_id,
+    debug.resolve_lapi_interned_string(synchronizer_id) as synchronizer_id,
     trace_context,
     debug.canton_timestamp(record_time) as record_time
   from lapi_events_consuming_exercise;
@@ -222,7 +222,7 @@ create or replace view debug.lapi_events_create as
   select
     event_sequential_id,
     debug.canton_timestamp(ledger_effective_time) as ledger_effective_time,
-    node_index,
+    node_id,
     event_offset,
     update_id,
     workflow_id,
@@ -243,7 +243,7 @@ create or replace view debug.lapi_events_create as
     debug.lapi_compression(create_argument_compression) as create_argument_compression,
     debug.lapi_compression(create_key_value_compression) as create_key_value_compression,
     driver_metadata,
-    debug.resolve_lapi_interned_string(domain_id) as domain_id,
+    debug.resolve_lapi_interned_string(synchronizer_id) as synchronizer_id,
     debug.resolve_lapi_interned_strings(create_key_maintainers) as create_key_maintainers,
     trace_context,
     debug.canton_timestamp(record_time) as record_time
@@ -253,7 +253,7 @@ create or replace view debug.lapi_events_non_consuming_exercise as
   select
     event_sequential_id,
     debug.canton_timestamp(ledger_effective_time) as ledger_effective_time,
-    node_index,
+    node_id,
     event_offset,
     update_id,
     workflow_id,
@@ -269,11 +269,12 @@ create or replace view debug.lapi_events_non_consuming_exercise as
     exercise_argument,
     exercise_result,
     debug.resolve_lapi_interned_strings(exercise_actors) as exercise_actors,
-    exercise_child_event_ids,
+    exercise_child_node_ids,
+    exercise_last_descendant_node_id,
     debug.lapi_compression(create_key_value_compression) as create_key_value_compression,
     debug.lapi_compression(exercise_argument_compression) as exercise_argument_compression,
     debug.lapi_compression(exercise_result_compression) as exercise_result_compression,
-    debug.resolve_lapi_interned_string(domain_id) as domain_id,
+    debug.resolve_lapi_interned_string(synchronizer_id) as synchronizer_id,
     trace_context,
     debug.canton_timestamp(record_time) as record_time
   from lapi_events_non_consuming_exercise;
@@ -291,8 +292,8 @@ create or replace view debug.lapi_events_unassign as
     debug.resolve_lapi_interned_string(template_id) as template_id,
     debug.resolve_lapi_interned_string(package_name) as package_name,
     debug.resolve_lapi_interned_strings(flat_event_witnesses) as flat_event_witnesses,
-    debug.resolve_lapi_interned_string(source_domain_id) as source_domain_id,
-    debug.resolve_lapi_interned_string(target_domain_id) as target_domain_id,
+    debug.resolve_lapi_interned_string(source_synchronizer_id) as source_synchronizer_id,
+    debug.resolve_lapi_interned_string(target_synchronizer_id) as target_synchronizer_id,
     unassign_id,
     reassignment_counter,
     assignment_exclusivity,
@@ -308,7 +309,7 @@ select
     debug.resolve_lapi_interned_string(party_id) as party_id,
     participant_id,
     participant_permission,
-    debug.resolve_lapi_interned_string(domain_id) as domain_id,
+    debug.resolve_lapi_interned_string(synchronizer_id) as synchronizer_id,
     debug.canton_timestamp(record_time) as record_time,
     trace_context
   from lapi_events_party_to_participant;
@@ -345,7 +346,7 @@ create or replace view debug.lapi_transaction_meta as
     event_offset,
     debug.canton_timestamp(publication_time) as publication_time,
     debug.canton_timestamp(record_time) as record_time,
-    debug.resolve_lapi_interned_string(domain_id) as domain_id,
+    debug.resolve_lapi_interned_string(synchronizer_id) as synchronizer_id,
     event_sequential_id_first,
     event_sequential_id_last
   from lapi_transaction_meta;
@@ -383,7 +384,6 @@ create or replace view debug.lapi_party_entries as
     debug.canton_timestamp(recorded_at) as recorded_at,
     submission_id,
     party,
-    display_name,
     typ,
     rejection_reason,
     is_local,
@@ -442,15 +442,16 @@ create or replace view debug.lapi_string_interning as
     external_string
   from lapi_string_interning;
 
-create or replace view debug.lapi_ledger_end_domain_index as
+create or replace view debug.lapi_ledger_end_synchronizer_index as
   select
-    debug.resolve_lapi_interned_string(domain_id) as domain_id,
+    debug.resolve_lapi_interned_string(synchronizer_id) as synchronizer_id,
     sequencer_counter,
     debug.canton_timestamp(sequencer_timestamp) as sequencer_timestamp,
     request_counter,
     debug.canton_timestamp(request_timestamp) as request_timestamp,
-    request_sequencer_counter
-  from lapi_ledger_end_domain_index;
+    request_sequencer_counter,
+    debug.canton_timestamp(record_time) as record_time
+  from lapi_ledger_end_synchronizer_index;
 
 create or replace view debug.lapi_post_processing_end as
   select

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
@@ -68,6 +68,7 @@ object CommunityConfigValidations
       warnIfUnsafeMinProtocolVersion,
       adminTokenSafetyCheckParticipants,
       adminTokensMatchOnParticipants,
+      sessionSigningKeysOnlyWithKms,
     )
 
   /** Group node configs by db access to find matching db storage configs.
@@ -99,8 +100,8 @@ object CommunityConfigValidations
           port <- getPropInt("portNumber")
           dbName <- getPropStr("databaseName")
           url <- dbConfig match {
-            case _: H2DbConfig => Some(DbConfig.h2Url(dbName))
-            case _: PostgresDbConfig => Some(DbConfig.postgresUrl(server, port, dbName))
+            case _: DbConfig.H2 => Some(DbConfig.h2Url(dbName))
+            case _: DbConfig.Postgres => Some(DbConfig.postgresUrl(server, port, dbName))
             case other => throw new IllegalArgumentException(s"Unsupported DbConfig: $other")
           }
         } yield url
@@ -236,6 +237,24 @@ object CommunityConfigValidations
         s"if both ledger-api.admin-token and admin-api.admin-token provided, they must match for participant ${name.unwrap}"
       )
     }
+    toValidated(errors)
+  }
+
+  private def sessionSigningKeysOnlyWithKms(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = config.allNodes.toSeq.mapFilter { case (name, nodeConfig) =>
+      nodeConfig.crypto.provider match {
+        case CryptoProvider.Jce if nodeConfig.parameters.sessionSigningKeys.enabled =>
+          Some(
+            s"Session signing keys should not be enabled with the JCE crypto provider on node ${name.unwrap}"
+          )
+        case _ =>
+          // For KMS crypto provider or JCE with session signing keys disabled
+          None
+      }
+    }
+
     toValidated(errors)
   }
 }

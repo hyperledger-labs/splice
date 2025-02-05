@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.time
@@ -16,13 +16,25 @@ import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
-  Lifecycle,
+  LifeCycle,
   SyncCloseable,
   UnlessShutdown,
 }
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  NamedLoggerFactory,
+  NamedLogging,
+  TracedLogger,
+}
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcLogPolicy
 import com.digitalasset.canton.networking.grpc.GrpcError.GrpcServiceUnavailable
-import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, ClientChannelBuilder}
+import com.digitalasset.canton.networking.grpc.{
+  CantonGrpcUtil,
+  ClientChannelBuilder,
+  GrpcClient,
+  GrpcError,
+  GrpcManagedChannel,
+}
 import com.digitalasset.canton.time.Clock.SystemClockRunningBackwards
 import com.digitalasset.canton.topology.admin.v30.{
   CurrentTimeRequest,
@@ -99,7 +111,8 @@ abstract class Clock() extends TimeProvider with AutoCloseable with NamedLogging
       else {
         // emit warning if clock is running backwards
         if (
-          warnIfClockRunsBackwards && // turn of warning for simclock, as access to now and last might be racy
+          // Turn off warning for SimClock or WallClock with simulated skews, as access to now and last might be racy
+          warnIfClockRunsBackwards &&
           oldTs.isAfter(nowSnapshot.plusSeconds(1L)) && backwardsClockAlerted
             .get()
             .isBefore(nowSnapshot.minusSeconds(30))
@@ -200,7 +213,8 @@ object Clock extends ClockErrorGroup {
 
   @Explanation("""This error is emitted if the unique time generation detects that the host system clock is lagging behind
       |the unique time source by more than a second. This can occur if the system processes more than 2e6 events per second (unlikely)
-      |or when the underlying host system clock is running backwards.""")
+      |or when the underlying host system clock is running backwards. For example, a host system clock runs backwards when a clock
+      |synchronization method like the Network Time Protocol (NTP) adjusts the clock backwards.""")
   @Resolution(
     """Inspect your host system. Generally, the unique time source is not negatively affected by a clock moving backwards
       |and will keep functioning. Therefore, this message is just a warning about something strange being detected."""
@@ -221,7 +235,7 @@ object Clock extends ClockErrorGroup {
 
 }
 
-trait TickTock {
+sealed trait TickTock {
   def now: Instant
 }
 
@@ -230,7 +244,8 @@ object TickTock {
     private val jclock = JClock.systemUTC()
     def now: Instant = jclock.instant()
   }
-  class RandomSkew(maxSkewMillis: Int) extends TickTock {
+
+  final case class RandomSkew(maxSkewMillis: Int) extends TickTock {
 
     private val changeSkewMillis = Math.max(maxSkewMillis / 10, 1)
 
@@ -270,7 +285,11 @@ class WallClock(
   last.set(CantonTimestamp.assertFromInstant(tickTock.now))
 
   def now: CantonTimestamp = CantonTimestamp.assertFromInstant(tickTock.now)
-  override protected def warnIfClockRunsBackwards: Boolean = true
+  override protected val warnIfClockRunsBackwards: Boolean = tickTock match {
+    case TickTock.Native => true
+    // Simulated skews can trigger a backwards-going clock warning, due to the race condition in `internalMonotonicTime`
+    case TickTock.RandomSkew(_) => false
+  }
 
   // Keeping a dedicated scheduler, as it may have to run long running tasks.
   // Once all tasks are guaranteed to be "light", the environment scheduler can be used.
@@ -283,7 +302,7 @@ class WallClock(
   override def close(): Unit = {
     import com.digitalasset.canton.concurrent.*
     if (running.getAndSet(false)) {
-      Lifecycle.close(
+      LifeCycle.close(
         () => failTasks(),
         () => ExecutorServiceExtensions(scheduler)(logger, timeouts).close("clock"),
       )(logger)
@@ -350,14 +369,20 @@ class SimClock(
 
   override def flush(): Option[CantonTimestamp] = super.flush()
 
-  def advanceTo(timestamp: CantonTimestamp, doFlush: Boolean = true)(implicit
+  def advanceTo(
+      timestamp: CantonTimestamp,
+      doFlush: Boolean = true,
+      logAdvancement: Boolean = true,
+  )(implicit
       traceContext: TraceContext
   ): Unit = {
     ErrorUtil.requireArgument(
       now.isBefore(timestamp) || now == timestamp,
       s"advanceTo failed with time going backwards: current timestamp is $now and request is $timestamp",
     )
-    logger.info(s"Advancing sim clock to $timestamp")
+    if (logAdvancement) {
+      logger.info(s"Advancing sim clock to $timestamp")
+    }
     value.updateAndGet(_.max(timestamp))
     if (doFlush) {
       flush().discard[Option[CantonTimestamp]]
@@ -403,7 +428,10 @@ class RemoteClock(
     loggerFactory.threadName + "-remoteclock",
     noTracingLogger,
   )
-  private val service = IdentityInitializationServiceGrpc.stub(channel)
+
+  private val managedChannel =
+    GrpcManagedChannel("channel to remote clock server", channel, this, logger)
+  private val service = GrpcClient.create(managedChannel, IdentityInitializationServiceGrpc.stub)
 
   private val updating = new AtomicReference[Option[CantonTimestamp]](None)
 
@@ -477,6 +505,17 @@ class RemoteClock(
         )
     }
 
+  // Do not log warnings for unavailable servers as that can happen on cancellation of the grpc channel on shutdown.
+  private object LogPolicy extends GrpcLogPolicy {
+    override def log(err: GrpcError, logger: TracedLogger)(implicit
+        traceContext: TraceContext
+    ): Unit =
+      err match {
+        case unavailable: GrpcServiceUnavailable => logger.info(unavailable.toString)
+        case _ => err.log(logger)
+      }
+  }
+
   private def getCurrentRemoteTimeOnce(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, CantonTimestamp] =
@@ -487,17 +526,10 @@ class RemoteClock(
           "fetch remote time",
           timeouts.network.duration,
           logger,
-          this,
           // We retry at a higher level indefinitely and not here at all because we want a fairly short connection timeout here.
           retryPolicy = _ => false,
           // Do not log warnings for unavailable servers as that can happen on cancellation of the grpc channel on shutdown.
-          logPolicy = err =>
-            logger =>
-              implicit traceContext =>
-                err match {
-                  case unavailable: GrpcServiceUnavailable => logger.info(unavailable.toString)
-                  case _ => err.log(logger)
-                },
+          logPolicy = LogPolicy,
         )
         .bimap(_.toString, _.currentTime)
       timestamp <- EitherT.fromEither[FutureUnlessShutdown](
@@ -510,10 +542,9 @@ class RemoteClock(
   }
 
   override protected def onClosed(): Unit =
-    Lifecycle.close(
+    LifeCycle.close(
       // stopping the scheduler before the channel, so we don't get a failed call on shutdown
-      SyncCloseable("remote clock scheduler", scheduler.shutdown()),
-      Lifecycle.toCloseableChannel(channel, logger, "channel to remote clock server"),
+      SyncCloseable("remote clock scheduler", scheduler.shutdown())
     )(logger)
 }
 
@@ -524,7 +555,7 @@ object RemoteClock {
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContextExecutor): RemoteClock =
     new RemoteClock(
-      ClientChannelBuilder.createChannelToTrustedServer(config),
+      ClientChannelBuilder.createChannelBuilderToTrustedServer(config).build(),
       timeouts,
       loggerFactory,
     )
@@ -542,11 +573,15 @@ class DelegatingSimClock(
     loggerFactory: NamedLoggerFactory,
 ) extends SimClock(start, loggerFactory) {
 
-  override def advanceTo(timestamp: CantonTimestamp, doFlush: Boolean = true)(implicit
+  override def advanceTo(
+      timestamp: CantonTimestamp,
+      doFlush: Boolean = true,
+      logAdvancement: Boolean = true,
+  )(implicit
       traceContext: TraceContext
   ): Unit = ErrorUtil.withThrowableLogging {
     super.advanceTo(timestamp, doFlush)
-    currentClocks().foreach(_.advanceTo(now, doFlush = false))
+    currentClocks().foreach(_.advanceTo(now, doFlush = false, logAdvancement = logAdvancement))
     // avoid race conditions between nodes by first adjusting the time and then flushing the tasks
     if (doFlush)
       currentClocks().foreach(_.flush().discard)

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -27,31 +27,31 @@ import scala.collection.concurrent.TrieMap
   */
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 final case class ConcurrentHMap[R[_, _]] private (
-    underlying: concurrent.Map[Any, Any] = new TrieMap()
+    underlying: concurrent.Map[Any, Any]
 ) {
-  def get[K, V](k: K)(implicit @unused ev: R[K, V]): Option[V] =
+  def get[K, V](k: K)(implicit ev: R[K, V]): Option[V] =
     underlying.get(k).asInstanceOf[Option[V]]
 
-  def getOrElseUpdate[K, V](k: K, v: => V)(implicit @unused ev: R[K, V]): V =
+  def getOrElseUpdate[K, V](k: K, v: => V)(implicit ev: R[K, V]): V =
     underlying.getOrElseUpdate(k, v).asInstanceOf[V]
 
-  def putIfAbsent[K, V](k: K, v: V)(implicit @unused ev: R[K, V]): Option[V] =
+  def putIfAbsent[K, V](k: K, v: V)(implicit ev: R[K, V]): Option[V] =
     underlying.putIfAbsent(k, v).asInstanceOf[Option[V]]
 
-  def put_[K, V](k: K, v: V)(implicit @unused ev: R[K, V]): Unit =
+  def put_[K, V](k: K, v: V)(implicit ev: R[K, V]): Unit =
     underlying.put(k, v).discard
 
-  def replace_[K, V](k: K, v: V)(implicit @unused ev: R[K, V]): Unit =
+  def replace_[K, V](k: K, v: V)(implicit ev: R[K, V]): Unit =
     underlying.replace(k, v).discard
 
-  def remove[K, V](k: K)(implicit @unused ev: R[K, V]): Option[V] =
+  def remove[K, V](k: K)(implicit ev: R[K, V]): Option[V] =
     underlying.remove(k).asInstanceOf[Option[V]]
 
   def remove_[K](k: K): Unit = underlying.remove(k).discard
 }
 
 object ConcurrentHMap {
-  def empty[R[_, _]]: ConcurrentHMap[R] = new ConcurrentHMap[R]()
+  def empty[R[_, _]]: ConcurrentHMap[R] = ConcurrentHMap[R](TrieMap.empty[Any, Any])
 
   def apply[R[_, _]]: ConcurrentHMapPartiallyApplied[R] =
     new ConcurrentHMapPartiallyApplied[R](dummy = false)

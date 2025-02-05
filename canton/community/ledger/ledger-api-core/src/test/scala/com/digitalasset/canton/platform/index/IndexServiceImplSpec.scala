@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.index
@@ -7,7 +7,7 @@ import cats.syntax.either.*
 import com.daml.error.{ContextualizedErrorLogger, NoLogging}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.Offset
-import com.digitalasset.canton.ledger.api.domain.{
+import com.digitalasset.canton.ledger.api.{
   CumulativeFilter,
   InterfaceFilter,
   TemplateFilter,
@@ -755,20 +755,22 @@ class IndexServiceImplSpec
   behavior of "IndexServiceImpl.injectCheckpoint"
   val end = 10L
   def createSource(elements: Seq[Long]): Source[(Offset, Carrier[Unit]), NotUsed] = {
-    val elementsSource = Source(elements).map(Offset.fromLong).map((_, ()))
-    elementsSource.via(
-      rangeDecorator(
-        startExclusive = Offset.fromLong(elements.head - 1),
-        endInclusive = Offset.fromLong(elements.last),
-      )
-    )
+    val elementsSource = Source(elements).map(Offset.tryFromLong).map((_, ()))
 
+    elementsSource
+      .via(
+        rangeDecorator(
+          startInclusive = Offset.tryFromLong(elements.head),
+          endInclusive = Offset.tryFromLong(elements.last),
+        )
+      )
   }
 
   implicit val system: ActorSystem = ActorSystem("IndexServiceImplSpec")
 
   def fetchOffsetCheckpoint: Long => () => Option[OffsetCheckpoint] =
-    off => () => Some(OffsetCheckpoint(offset = Offset.fromLong(off), domainTimes = Map.empty))
+    off =>
+      () => Some(OffsetCheckpoint(offset = Offset.tryFromLong(off), synchronizerTimes = Map.empty))
 
   it should "add a checkpoint at the right position of the stream" in new Scope {
 
@@ -782,7 +784,7 @@ class IndexServiceImplSpec
             .runWith(Sink.seq)
             .futureValue
             .map(_._1)
-            .map(_.toLong)
+            .map(_.unwrap)
         out shouldBe elements.appended(checkpoint).sorted
       }
     }
@@ -800,7 +802,7 @@ class IndexServiceImplSpec
         .runWith(Sink.seq)
         .futureValue
         .map(_._1)
-        .map(_.toLong)
+        .map(_.unwrap)
     out shouldBe elements
   }
 
@@ -808,11 +810,11 @@ class IndexServiceImplSpec
     val elements = 1L to end
     val source: Source[(Offset, Carrier[Option[Long]]), NotUsed] =
       Source(elements)
-        .map(x => (Offset.fromLong(x), Some(x)))
+        .map(x => (Offset.tryFromLong(x), Some(x)))
         .via(
           rangeDecorator(
-            startExclusive = Offset.fromLong(elements.head - 1),
-            endInclusive = Offset.fromLong(elements.last),
+            startInclusive = Offset.tryFromLong(elements.head),
+            endInclusive = Offset.tryFromLong(elements.last),
           )
         )
 
@@ -837,14 +839,14 @@ class IndexServiceImplSpec
 
     val out: Seq[Long] =
       createSource(elements)
-        .concat(Source.single((Offset.beforeBegin, Timeout)))
+        .concat(Source.single((Offset.MaxValue, Timeout)))
         .via(
           injectCheckpoints(fetchOffsetCheckpoint(checkpoint), _ => ())
         )
         .runWith(Sink.seq)
         .futureValue
         .map(_._1)
-        .map(_.toLong)
+        .map(_.unwrap)
     out shouldBe elements :+ checkpoint
   }
 
@@ -854,14 +856,14 @@ class IndexServiceImplSpec
 
     val out: Seq[Long] =
       createSource(elements)
-        .concat(Source.single((Offset.beforeBegin, Timeout)))
+        .concat(Source.single((Offset.MaxValue, Timeout)))
         .via(
           injectCheckpoints(fetchOffsetCheckpoint(checkpoint), _ => ())
         )
         .runWith(Sink.seq)
         .futureValue
         .map(_._1)
-        .map(_.toLong)
+        .map(_.unwrap)
     out shouldBe elements :+ checkpoint
   }
 
@@ -871,14 +873,14 @@ class IndexServiceImplSpec
 
     val out: Seq[Long] =
       createSource(elements)
-        .concat(Source(Seq((Offset.beforeBegin, Timeout), (Offset.beforeBegin, Timeout))))
+        .concat(Source(Seq((Offset.MaxValue, Timeout), (Offset.MaxValue, Timeout))))
         .via(
           injectCheckpoints(fetchOffsetCheckpoint(checkpoint), _ => ())
         )
         .runWith(Sink.seq)
         .futureValue
         .map(_._1)
-        .map(_.toLong)
+        .map(_.unwrap)
     out shouldBe elements :+ checkpoint
   }
 
@@ -887,26 +889,28 @@ class IndexServiceImplSpec
   // (xx, RE) is the RangeEnd indicator at offset #xx
   // TO is the Timeout indicator
   // NC means no checkpoint is there
-  // e.g. (0,RB), C3, 1, 2, (2,RE), (2,RB), C3, 3, (3,RE) -shouldBe> 1, 2, 3, C3
+  // e.g. (1,RB), C3, 1, 2, (2,RE), (3,RB), C3, 3, (3,RE) -shouldBe> 1, 2, 3, C3
   private val u: Option[Unit] = Some(())
   private val e: Carrier[Option[Unit]] = Element(u)
   private val RB: Carrier[Option[Unit]] = RangeBegin
   private val RE: Carrier[Option[Unit]] = RangeEnd
-  private val TO: (Int, Carrier[Option[Unit]]) = (0, Timeout)
+  private val TO: (Int, Carrier[Option[Unit]]) = (Int.MaxValue, Timeout)
   private def fetchOffsetCheckpoints(
       checkpoints: mutable.Queue[Option[Int]]
   ): () => Option[OffsetCheckpoint] =
     () =>
       checkpoints
         .dequeue()
-        .map(x => OffsetCheckpoint(offset = Offset.fromLong(x.toLong), domainTimes = Map.empty))
+        .map(x =>
+          OffsetCheckpoint(offset = Offset.tryFromLong(x.toLong), synchronizerTimes = Map.empty)
+        )
 
   it should "add a checkpoint if checkpoint arrived faster than the elements" in new Scope {
-    // (0,RB), C3, 1, 2, (2,RE), (2,RB), C3, 3, (3,RE) -shouldBe> 1, 2, 3, C3
+    // (1,RB), C3, 1, 2, (2,RE), (3,RB), C3, 3, (3,RE) -shouldBe> 1, 2, 3, C3
 
     private val source = Source(
-      Seq((0, RB), (1, e), (2, e), (2, RE), (2, RB), (3, e), (3, RE))
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), (2, e), (2, RE), (3, RB), (3, e), (3, RE))
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] = mutable.Queue(Some(3), Some(3))
 
@@ -920,16 +924,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u), (3, None)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "add a checkpoint if checkpoint arrived exactly after the elements" in new Scope {
-    // (0,RB), NC, 1, 2, (2,RE), (2,RB), C2, 3, (3,RE) -shouldBe> 1, 2, C2, 3
+    // (1,RB), NC, 1, 2, (2,RE), (3,RB), C2, 3, (3,RE) -shouldBe> 1, 2, C2, 3
 
     private val source = Source(
-      Seq((0, RB), (1, e), (2, e), (2, RE), (2, RB), (3, e), (3, RE))
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), (2, e), (2, RE), (3, RB), (3, e), (3, RE))
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] = mutable.Queue(None, Some(2))
 
@@ -943,16 +947,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (2, None), (3, u)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "not add a checkpoint if checkpoint arrived later than the elements" in new Scope {
-    // (0,RB), NC, 1, 2, (2,RE), (2,RB), C1, 3, (3,RE) -shouldBe> 1, 2, 3
+    // (1,RB), NC, 1, 2, (2,RE), (3,RB), C1, 3, (3,RE) -shouldBe> 1, 2, 3
 
     private val source = Source(
-      Seq((0, RB), (1, e), (2, e), (2, RE), (2, RB), (3, e), (3, RE))
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), (2, e), (2, RE), (3, RB), (3, e), (3, RE))
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] = mutable.Queue(None, Some(1))
 
@@ -966,38 +970,38 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "add multiple checkpoints" in new Scope {
-    // (0,RB), NC, 1, 2, (2,RE), (2,RB), C2, 3, (3,RE), (3,RB), C3, (4,RE), (4,RB), C4, (5,RE), (7,RB), C4, (9,RE), (9,RB), C9, (10,RE), (10,RB), C12, 11, 13, 14, (15, RE)
+    // (1,RB), NC, 1, 2, (2,RE), (3,RB), C2, 3, (3,RE), (4,RB), C3, (4,RE), (5,RB), C4, (5,RE), (6,RB), C4, (9,RE), (10,RB), C9, (10,RE), (11,RB), C12, 11, 13, 14, (15, RE)
     // -shouldBe> 1, 2, C2, 3, C3, C4, C9, 11, C12, 13, 14
 
     private val source = Source(
       Seq(
-        (0, RB), // no checkpoint
+        (1, RB), // no checkpoint
         (1, e),
         (2, e),
         (2, RE),
-        (2, RB), // C2
+        (3, RB), // C2
         (3, e),
         (3, RE),
-        (3, RB), // C3
+        (4, RB), // C3
         (4, RE),
-        (4, RB), // C4
+        (5, RB), // C4
         (5, RE),
-        (7, RB), // C4
+        (6, RB), // C4
         (9, RE),
-        (9, RB), // C9
+        (10, RB), // C9
         (10, RE),
-        (10, RB), // C12
+        (11, RB), // C12
         (11, e),
         (13, e),
         (14, e),
         (15, RE),
       )
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] =
       mutable.Queue(None, Some(2), Some(3), Some(4), Some(4), Some(9), Some(12))
@@ -1025,16 +1029,16 @@ class IndexServiceImplSpec
         (13, u),
         (14, u),
       ).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "add checkpoints for dormant streams" in new Scope {
-    // (0,RB), NC, 1, 2, 3, (3,RE), (TO), C4 -shouldBe> 1, 2, 3, C4
+    // (1,RB), NC, 1, 2, 3, (3,RE), (TO), C4 -shouldBe> 1, 2, 3, C4
 
     private val source = Source(
-      Seq((0, RB), (1, e), (2, e), (3, e), (3, RE), TO)
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), (2, e), (3, e), (3, RE), TO)
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] = mutable.Queue(None, Some(3))
 
@@ -1048,16 +1052,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u), (3, None)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "add checkpoints at the right spot when streaming far from history" in new Scope {
-    // (0,RB), NC, 1, 2, 3, (3,RE), (TO), C5, (3, RB), (4, RE), (4, RB), 5, (5, RE) -shouldBe> 1, 2, 3, 5, C5
+    // (1,RB), NC, 1, 2, 3, (3,RE), (TO), C5, (4, RB), C5, (4, RE), (5, RB), C5, 5, (5, RE) -shouldBe> 1, 2, 3, 5, C5
 
     private val source = Source(
-      Seq((0, RB), (1, e), (2, e), (3, e), (3, RE), TO, (3, RB), (4, RE), (4, RB), (5, e), (5, RE))
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), (2, e), (3, e), (3, RE), TO, (4, RB), (4, RE), (5, RB), (5, e), (5, RE))
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] =
       mutable.Queue(None, Some(5), Some(5), Some(5))
@@ -1072,16 +1076,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u), (5, u), (5, None)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
-  it should "add checkpoints at the right spot when streaming far from history when ranges empty" in new Scope {
-    // (0,RB), NC, 1, 2, 3, (3,RE), (TO), C5, (3, RB), (4, RE), (4, RB), (5, RE) -shouldBe> 1, 2, 3, C5
+  it should "add checkpoints at the right spot when streaming far from history when element for offset is not output" in new Scope {
+    // (1,RB), NC, 1, 2, 3, (3,RE), (TO), C5, (4, RB), C5, (4, RE), (5, RB), C5, (5, RE) -shouldBe> 1, 2, 3, C5
 
     private val source = Source(
-      Seq((0, RB), (1, e), (2, e), (3, e), (3, RE), TO, (3, RB), (4, RE), (4, RB), (5, RE))
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), (2, e), (3, e), (3, RE), TO, (4, RB), (4, RE), (4, RB), (5, RE))
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] =
       mutable.Queue(None, Some(5), Some(5), Some(5))
@@ -1096,16 +1100,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u), (5, None)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "not repeat checkpoints after regular checkpoint" in new Scope {
-    // e.g. (0,RB), C3, 1, 2, 3, (3,RE), (TO), C3 -shouldBe> 1, 2, 3, C3
+    // e.g. (1,RB), C3, 1, 2, 3, (3,RE), (TO), C3 -shouldBe> 1, 2, 3, C3
 
     private val source = Source(
-      Seq((0, RB), (1, e), (2, e), (3, e), (3, RE), TO)
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), (2, e), (3, e), (3, RE), TO)
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] = mutable.Queue(Some(3), Some(3))
 
@@ -1119,16 +1123,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u), (3, None)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "not repeat checkpoints after timeout checkpoint" in new Scope {
-    // e.g. (0,RB), NC, 1, 2, 3, (3,RE), (TO), C3, (TO), C3 -shouldBe> 1, 2, 3, C3
+    // e.g. (1,RB), NC, 1, 2, 3, (3,RE), (TO), C3, (TO), C3 -shouldBe> 1, 2, 3, C3
 
     private val source = Source(
-      Seq((0, RB), (1, e), (2, e), (3, e), (3, RE), TO, TO)
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), (2, e), (3, e), (3, RE), TO, TO)
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] = mutable.Queue(None, Some(3), Some(3))
 
@@ -1142,16 +1146,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u), (3, None)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "not emit checkpoints when timeout is the first" in new Scope {
-    // e.g. NC, (TO), (0,RB), 1, 2, (2,RE), (2, RB), 3, (3, RE) -shouldBe> 1, 2, 3, C3
+    // e.g. NC, (TO), (1,RB), 1, 2, (2,RE), (2, RB), 3, (3, RE) -shouldBe> 1, 2, 3, C3
 
     private val source = Source(
-      Seq(TO, (0, RB), (1, e), (2, e), (2, RE), (2, RB), (3, e), (3, RE))
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq(TO, (1, RB), (1, e), (2, e), (2, RE), (2, RB), (3, e), (3, RE))
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] = mutable.Queue(Some(3), Some(3), Some(3))
 
@@ -1165,16 +1169,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u), (3, None)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "not add checkpoints in the middle of a range" in new Scope {
-    // (0,RB), NC, 1, (TO), C3, 2, 3, (3,RE) -shouldBe> 1, 2, 3
+    // (1,RB), NC, 1, (TO), C3, 2, 3, (3,RE) -shouldBe> 1, 2, 3
 
     private val source = Source(
-      Seq((0, RB), (1, e), TO, (2, e), (3, e), (3, RE))
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+      Seq((1, RB), (1, e), TO, (2, e), (3, e), (3, RE))
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] = mutable.Queue(None, Some(3))
 
@@ -1188,16 +1192,16 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 
   it should "continue regularly after idleness period" in new Scope {
-    // e.g. (0,RB), NC, 1, 2, 3, (3,RE), (TO), C3, (TO), C3, (TO), C3, (3, RB), C3, 4, (4,RE), (4,RB), C4, (5,RE) -shouldBe> 1, 2, 3, C3, 4, C4
+    // e.g. (1,RB), NC, 1, 2, 3, (3,RE), (TO), C3, (TO), C3, (TO), C3, (3, RB), C3, 4, (4,RE), (4,RB), C4, (5,RE) -shouldBe> 1, 2, 3, C3, 4, C4
 
     private val source = Source(
       Seq(
-        (0, RB), // no checkpoint
+        (1, RB), // no checkpoint
         (1, e),
         (2, e),
         (3, e),
@@ -1205,13 +1209,13 @@ class IndexServiceImplSpec
         TO, // C3
         TO, // C3
         TO, // C3
-        (3, RB), // C3
+        (4, RB), // C3
         (4, e),
         (4, RE),
-        (4, RB), // C4
+        (5, RB), // C4
         (5, RE),
       )
-    ).map { case (o, elem) => (Offset.fromLong(o.toLong), elem) }
+    ).map { case (o, elem) => (Offset.tryFromLong(o.toLong), elem) }
 
     private val checkpoints: mutable.Queue[Option[Int]] =
       mutable.Queue(None, Some(3), Some(3), Some(3), Some(3), Some(4))
@@ -1226,7 +1230,7 @@ class IndexServiceImplSpec
 
     out shouldBe
       Seq((1, u), (2, u), (3, u), (3, None), (4, u), (4, None)).map { case (o, elem) =>
-        (Offset.fromLong(o.toLong), elem)
+        (Offset.tryFromLong(o.toLong), elem)
       }
   }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interfaces
@@ -6,13 +6,14 @@ package com.digitalasset.canton.platform.store.interfaces
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.participant.state.ReassignmentInfo
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationLevel
 import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractStore.EventSequentialId
 import com.digitalasset.canton.platform.{ContractId, Identifier}
+import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext}
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{PackageName, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
-import com.digitalasset.daml.lf.ledger.EventId
 import com.digitalasset.daml.lf.transaction.GlobalKey
 import com.digitalasset.daml.lf.value.Value as LfValue
 
@@ -20,7 +21,7 @@ import com.digitalasset.daml.lf.value.Value as LfValue
   *
   * Used as data source template for in-memory fan-out buffers for Ledger API streams serving.
   */
-sealed trait TransactionLogUpdate extends Product with Serializable {
+sealed trait TransactionLogUpdate extends Product with Serializable with HasTraceContext {
   def offset: Offset
 }
 
@@ -44,9 +45,10 @@ object TransactionLogUpdate {
       offset: Offset,
       events: Vector[Event],
       completionStreamResponse: Option[CompletionStreamResponse],
-      domainId: String,
+      synchronizerId: String,
       recordTime: Timestamp,
-  ) extends TransactionLogUpdate
+  )(implicit override val traceContext: TraceContext)
+      extends TransactionLogUpdate
 
   /** A rejected submission.
     *
@@ -56,7 +58,8 @@ object TransactionLogUpdate {
   final case class TransactionRejected(
       offset: Offset,
       completionStreamResponse: CompletionStreamResponse,
-  ) extends TransactionLogUpdate
+  )(implicit override val traceContext: TraceContext)
+      extends TransactionLogUpdate
 
   final case class ReassignmentAccepted(
       updateId: String,
@@ -67,7 +70,17 @@ object TransactionLogUpdate {
       completionStreamResponse: Option[CompletionStreamResponse],
       reassignmentInfo: ReassignmentInfo,
       reassignment: ReassignmentAccepted.Reassignment,
-  ) extends TransactionLogUpdate
+  )(implicit override val traceContext: TraceContext)
+      extends TransactionLogUpdate
+
+  final case class TopologyTransactionEffective(
+      updateId: String,
+      offset: Offset,
+      effectiveTime: Timestamp,
+      synchronizerId: String,
+      events: Vector[PartyToParticipantAuthorization],
+  )(implicit override val traceContext: TraceContext)
+      extends TransactionLogUpdate
 
   object ReassignmentAccepted {
     sealed trait Reassignment
@@ -82,7 +95,6 @@ object TransactionLogUpdate {
     def eventOffset: Offset
     def eventSequentialId: EventSequentialId
     def updateId: String
-    def eventId: EventId
     def commandId: String
     def workflowId: String
     def ledgerEffectiveTime: Timestamp
@@ -96,9 +108,8 @@ object TransactionLogUpdate {
   final case class CreatedEvent(
       eventOffset: Offset,
       updateId: String,
-      nodeIndex: Int,
+      nodeId: Int,
       eventSequentialId: Long,
-      eventId: EventId,
       contractId: ContractId,
       ledgerEffectiveTime: Timestamp,
       templateId: Identifier,
@@ -122,9 +133,8 @@ object TransactionLogUpdate {
   final case class ExercisedEvent(
       eventOffset: Offset,
       updateId: String,
-      nodeIndex: Int,
+      nodeId: Int,
       eventSequentialId: Long,
-      eventId: EventId,
       contractId: ContractId,
       ledgerEffectiveTime: Timestamp,
       templateId: Identifier,
@@ -138,9 +148,17 @@ object TransactionLogUpdate {
       submitters: Set[Party],
       choice: String,
       actingParties: Set[Party],
-      children: Seq[String],
+      children: Seq[Int],
+      lastDescendantNodeId: Int,
       exerciseArgument: LfValue.VersionedValue,
       exerciseResult: Option[LfValue.VersionedValue],
       consuming: Boolean,
   ) extends Event
+
+  final case class PartyToParticipantAuthorization(
+      party: Party,
+      participant: Ref.ParticipantId,
+      level: AuthorizationLevel,
+  )
+
 }

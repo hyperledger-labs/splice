@@ -30,8 +30,8 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
       dsoParty: PartyId,
   )(implicit traceContext: TraceContext, ec: ExecutionContext): Unit = {
 
-    val domainId = nodes.head.newParticipantConnection
-      .getDomainId(
+    val synchronizerId = nodes.head.newParticipantConnection
+      .getSynchronizerId(
         nodes.head.newBackend.config.domains.global.alias
       )
       .futureValue
@@ -39,7 +39,7 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
     forAllNodesAssert(nodes)("party hosting is replicated on the new global domain") {
       _.newParticipantConnection
         .getPartyToParticipant(
-          domainId,
+          synchronizerId,
           dsoParty,
         )
     } {
@@ -49,13 +49,13 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
     forAllNodesAssert(nodes)("all topology is synced") { node =>
       node.oldParticipantConnection
         .listAllTransactions(
-          TopologyStoreId.DomainStore(domainId)
+          TopologyStoreId.SynchronizerStore(synchronizerId)
         )
         .map(node -> _)
     } { case (node, topologyState) =>
       node.newParticipantConnection
         .listAllTransactions(
-          TopologyStoreId.DomainStore(domainId)
+          TopologyStoreId.SynchronizerStore(synchronizerId)
         )
         .futureValue
         .size shouldBe topologyState.size
@@ -64,13 +64,13 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
     forAllNodesAssert(nodes)("decentralized namespace is replicated on the new global domain") {
       _.newParticipantConnection
         .getDecentralizedNamespaceDefinition(
-          domainId,
+          synchronizerId,
           dsoParty.uid.namespace,
         )
     } { oldMapping =>
       val decentralizedSynchronizerDecentralizedNamespaceDefinition =
         nodes.head.oldParticipantConnection
-          .getDecentralizedNamespaceDefinition(domainId, dsoParty.uid.namespace)
+          .getDecentralizedNamespaceDefinition(synchronizerId, dsoParty.uid.namespace)
           .futureValue
       oldMapping.mapping shouldBe decentralizedSynchronizerDecentralizedNamespaceDefinition.mapping
     }
@@ -78,7 +78,7 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
     forAllNodesAssert(nodes)(
       "domain is unpaused on the new nodes"
     )(
-      _.newParticipantConnection.getDomainParametersState(domainId)
+      _.newParticipantConnection.getSynchronizerParametersState(synchronizerId)
     )(
       _.mapping.parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
     )

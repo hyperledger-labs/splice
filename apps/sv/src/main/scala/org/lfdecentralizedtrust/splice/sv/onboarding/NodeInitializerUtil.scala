@@ -26,7 +26,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -179,9 +179,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                   synchronizerNodeConfig.cometBft.governanceKeys.asScala.map(_.pubKey).toSeq
                 case None => Seq.empty
               }
-              genesisKeysPubKey = CometBftRequestSigner.getGenesisSigner.PublicKeyBase64
               governanceKeyNotUpdatedInDsoState = governanceKeysPubKey.contains(
-                genesisKeysPubKey
+                CometBftRequestSigner.GenesisPubKeyBase64
               )
               _ = if (governanceKeyNotUpdatedInDsoState) {
                 for {
@@ -225,7 +224,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected def checkIsInDecentralizedNamespaceAndStartTrigger(
       dsoAutomation: SvDsoAutomationService,
       dsoStore: SvDsoStore,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
     retryProvider
       .ensureThatB(
@@ -236,7 +235,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
           for {
             _ <- participantAdminConnection
               .ensureDecentralizedNamespaceDefinitionProposalAccepted(
-                domainId,
+                synchronizerId,
                 dsoStore.key.dsoParty.uid.namespace,
                 dsoStore.key.svParty.uid.namespace,
                 RetryFor.WaitingOnInitDependency,

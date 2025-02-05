@@ -39,7 +39,7 @@ on:
 
 jobs:
   get_commit_sha:
-    runs-on: self-hosted-docker
+    runs-on: self-hosted-docker-tiny
     outputs:
       result: ${{ steps.get_commit_sha.outputs.result }}
     steps:
@@ -92,9 +92,9 @@ jobs:
         id: create_branch
         shell: bash
         run: |
-          commit_sha=$(echo ${{ needs.get_commit_sha.outputs.result }})
-          base_branch=$(echo ${{ inputs.base_branch }})
-          new_branch=$(echo "automation/backport-$commit_sha-$base_branch")
+          commit_sha="${{ needs.get_commit_sha.outputs.result }}"
+          base_branch="${{ inputs.base_branch }}"
+          new_branch="automation/backport-$commit_sha-$base_branch"
           echo "Backporting commit $commit_sha to branch $base_branch (using branch $new_branch)"
           git fetch origin $base_branch
           git fetch origin $commit_sha
@@ -103,7 +103,7 @@ jobs:
           git config user.name "DA Automation"
           git checkout -b $new_branch origin/$base_branch
           git cherry-pick $commit_sha
-          git commit -m "[ci]" --allow-empty
+          git commit -m "[static]" --allow-empty
           git push origin $new_branch
           # output the backport branch name for use in the next step
           echo "new_branch=$new_branch" >> "$GITHUB_OUTPUT"
@@ -116,6 +116,10 @@ jobs:
           input_commit_sha: ${{ inputs.commit_sha }}
           pr_number: ${{ inputs.pr_number }}
         with:
+          # Switch the GH token from the default repo token to the one for
+          # canton-network-da. This ensures this is treated as a regular pull request
+          # that can trigger CI.
+          github-token: ${{ secrets.GH_ISSUES }}
           retries: 3
           script: |
             const { new_branch, base_branch, input_commit_sha, pr_number } = process.env;
@@ -148,7 +152,7 @@ jobs:
               reviewers: [process.env.reviewer]
             });
   notify_on_failure:
-    runs-on: self-hosted-docker
+    runs-on: self-hosted-docker-tiny
     needs: do_backport
     # If a PR was given for backporting from, notify on failure as a comment on that PR
     if: ${{ failure() && inputs.pr_number }}

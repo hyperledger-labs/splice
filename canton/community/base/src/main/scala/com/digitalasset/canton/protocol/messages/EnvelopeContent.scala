@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
@@ -19,8 +19,8 @@ final case class EnvelopeContent(message: UnsignedProtocolMessage)(
 ) extends HasProtocolVersionedWrapper[EnvelopeContent] {
   @transient override protected lazy val companionObj: EnvelopeContent.type = EnvelopeContent
 
-  def toByteStringUnversioned: ByteString =
-    v30.EnvelopeContent(message.toProtoSomeEnvelopeContentV30).toByteString
+  private def toProtoV30: v30.EnvelopeContent =
+    v30.EnvelopeContent(message.toProtoSomeEnvelopeContentV30)
 }
 
 object EnvelopeContent
@@ -28,10 +28,10 @@ object EnvelopeContent
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> VersionedProtoConverter(
-      ProtocolVersion.v32
+      ProtocolVersion.v33
     )(v30.EnvelopeContent)(
       supportedProtoVersion(_)(fromProtoV30),
-      _.toByteStringUnversioned,
+      _.toProtoV30,
     )
   )
 

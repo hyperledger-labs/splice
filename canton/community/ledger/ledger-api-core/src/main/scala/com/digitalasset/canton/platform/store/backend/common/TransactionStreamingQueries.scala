@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
@@ -267,6 +267,7 @@ class TransactionStreamingQueries(
 
 object TransactionStreamingQueries {
 
+  // TODO(i22416): Rename the arguments of this function, as witnessO and templateIdO are inadequate for party topology events.
   /** @param tableName   one of filter tables for create, consuming or non-consuming events
     * @param witnessO    the party for which to fetch the event ids, if None the event ids for all the parties should be fetched
     * @param templateIdO NOTE: this parameter is not applicable for tree tx stream only oriented filters

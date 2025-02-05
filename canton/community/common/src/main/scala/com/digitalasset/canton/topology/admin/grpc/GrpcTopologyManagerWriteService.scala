@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.admin.grpc
@@ -23,19 +23,22 @@ import com.digitalasset.canton.topology.admin.v30.{
   GenerateTransactionsRequest,
   GenerateTransactionsResponse,
   ImportTopologySnapshotRequest,
+  ImportTopologySnapshotResponse,
 }
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactions, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
+import com.digitalasset.canton.util.GrpcStreamingUtils
 import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.google.protobuf.ByteString
+import io.grpc.stub.StreamObserver
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcTopologyManagerWriteService[PureCrypto <: CryptoPureApi](
     managers: => Seq[TopologyManager[TopologyStoreId, PureCrypto]],
-    crypto: Crypto,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends v30.TopologyManagerWriteServiceGrpc.TopologyManagerWriteService
@@ -131,24 +134,24 @@ class GrpcTopologyManagerWriteService[PureCrypto <: CryptoPureApi](
         NamespaceDelegation.fromProtoV30(mapping)
       case Mapping.IdentifierDelegation(mapping) =>
         IdentifierDelegation.fromProtoV30(mapping)
-      case Mapping.DomainParametersState(mapping) =>
-        DomainParametersState.fromProtoV30(mapping)
+      case Mapping.SynchronizerParametersState(mapping) =>
+        SynchronizerParametersState.fromProtoV30(mapping)
       case Mapping.SequencingDynamicParametersState(mapping) =>
         DynamicSequencingParametersState.fromProtoV30(mapping)
-      case Mapping.MediatorDomainState(mapping) =>
-        MediatorDomainState.fromProtoV30(mapping)
-      case Mapping.SequencerDomainState(mapping) =>
-        SequencerDomainState.fromProtoV30(mapping)
+      case Mapping.MediatorSynchronizerState(mapping) =>
+        MediatorSynchronizerState.fromProtoV30(mapping)
+      case Mapping.SequencerSynchronizerState(mapping) =>
+        SequencerSynchronizerState.fromProtoV30(mapping)
       case Mapping.PartyToParticipant(mapping) =>
         PartyToParticipant.fromProtoV30(mapping)
-      case Mapping.DomainTrustCertificate(mapping) =>
-        DomainTrustCertificate.fromProtoV30(mapping)
+      case Mapping.SynchronizerTrustCertificate(mapping) =>
+        SynchronizerTrustCertificate.fromProtoV30(mapping)
       case Mapping.OwnerToKeyMapping(mapping) =>
         OwnerToKeyMapping.fromProtoV30(mapping)
       case Mapping.VettedPackages(mapping) =>
         VettedPackages.fromProtoV30(mapping)
       case Mapping.ParticipantPermission(mapping) =>
-        ParticipantDomainPermission.fromProtoV30(mapping)
+        ParticipantSynchronizerPermission.fromProtoV30(mapping)
       case Mapping.PartyHostingLimits(mapping) =>
         PartyHostingLimits.fromProtoV30(mapping)
       case Mapping.PurgeTopologyTxs(mapping) =>
@@ -181,7 +184,9 @@ class GrpcTopologyManagerWriteService[PureCrypto <: CryptoPureApi](
       targetManager <- targetManagerET(requestP.store)
 
       extendedTransactions <- signedTxs.parTraverse(tx =>
-        targetManager.extendSignature(tx, signingKeys, forceFlags).leftWiden[CantonError]
+        targetManager
+          .extendSignature(tx, signingKeys, forceFlags)
+          .leftWiden[CantonError]
       )
     } yield extendedTransactions
 
@@ -212,17 +217,29 @@ class GrpcTopologyManagerWriteService[PureCrypto <: CryptoPureApi](
   }
 
   override def importTopologySnapshot(
-      request: ImportTopologySnapshotRequest
-  ): Future[v30.ImportTopologySnapshotResponse] = {
+      responseObserver: StreamObserver[ImportTopologySnapshotResponse]
+  ): StreamObserver[ImportTopologySnapshotRequest] =
+    GrpcStreamingUtils
+      .streamFromClient[ImportTopologySnapshotRequest, ImportTopologySnapshotResponse, String](
+        _.topologySnapshot,
+        _.store,
+        (topologySnapshot, store) => doImportTopologySnapshot(topologySnapshot, store),
+        responseObserver,
+      )
+
+  private def doImportTopologySnapshot(
+      topologySnapshot: ByteString,
+      store: String,
+  ): Future[ImportTopologySnapshotResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val res = for {
       storedTxs <- EitherT.fromEither[FutureUnlessShutdown](
         StoredTopologyTransactions
-          .fromTrustedByteString(request.topologySnapshot)
+          .fromTrustedByteString(topologySnapshot)
           .leftMap(ProtoDeserializationFailure.Wrap(_): CantonError)
       )
       signedTxs = storedTxs.result.map(_.transaction)
-      _ <- addTransactions(signedTxs, request.store, ForceFlags.all)
+      _ <- addTransactions(signedTxs, store, ForceFlags.all)
     } yield v30.ImportTopologySnapshotResponse()
     CantonGrpcUtil.mapErrNewEUS(res)
   }
@@ -291,9 +308,6 @@ class GrpcTopologyManagerWriteService[PureCrypto <: CryptoPureApi](
         manager <- targetManagerET(store)
         existingTransaction <- manager
           .findExistingTransaction(mapping)
-          .mapK(
-            FutureUnlessShutdown.outcomeK
-          )
         transaction <- manager
           .build(
             op,

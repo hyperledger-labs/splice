@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
@@ -17,7 +17,7 @@ import com.digitalasset.canton.config.{PackageMetadataViewConfig, ProcessingTime
 import com.digitalasset.canton.crypto.{Hash, HashOps}
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.ledger.error.PackageServiceErrors
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.CantonPackageServiceError.PackageRemovalErrorCode
 import com.digitalasset.canton.participant.admin.CantonPackageServiceError.PackageRemovalErrorCode.{
@@ -39,7 +39,6 @@ import com.digitalasset.canton.protocol.{PackageDescription, PackageInfoService}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.daml.lf.archive
 import com.digitalasset.daml.lf.archive.{DamlLf, DarParser, Error as LfArchiveError}
 import com.digitalasset.daml.lf.data.Ref.PackageId
@@ -51,7 +50,7 @@ import slick.jdbc.GetResult
 
 import java.util.UUID
 import java.util.zip.ZipInputStream
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 trait DarService {
   def upload(
@@ -67,10 +66,13 @@ trait DarService {
       filename: String,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, DamlError, Hash]
 
-  def getDar(hash: Hash)(implicit traceContext: TraceContext): Future[Option[PackageService.Dar]]
+  def getDar(hash: Hash)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[PackageService.Dar]]
+
   def listDars(limit: Option[Int])(implicit
       traceContext: TraceContext
-  ): Future[Seq[PackageService.DarDescriptor]]
+  ): FutureUnlessShutdown[Seq[PackageService.DarDescriptor]]
 }
 
 class PackageService(
@@ -92,26 +94,28 @@ class PackageService(
 
   def getLfArchive(packageId: PackageId)(implicit
       traceContext: TraceContext
-  ): Future[Option[DamlLf.Archive]] =
+  ): FutureUnlessShutdown[Option[DamlLf.Archive]] =
     packagesDarsStore.getPackage(packageId)
 
   def listPackages(limit: Option[Int] = None)(implicit
       traceContext: TraceContext
-  ): Future[Seq[PackageDescription]] =
+  ): FutureUnlessShutdown[Seq[PackageDescription]] =
     packagesDarsStore.listPackages(limit)
 
   def getDescription(packageId: PackageId)(implicit
       traceContext: TraceContext
-  ): Future[Option[PackageDescription]] =
+  ): FutureUnlessShutdown[Option[PackageDescription]] =
     packagesDarsStore.getPackageDescription(packageId)
 
   def getPackage(packageId: PackageId)(implicit
       traceContext: TraceContext
-  ): Future[Option[Package]] =
-    packageLoader.loadPackage(
-      packageId,
-      getLfArchive,
-      metrics.ledgerApiServer.execution.getLfPackage,
+  ): FutureUnlessShutdown[Option[Package]] =
+    FutureUnlessShutdown.recoverFromAbortException(
+      packageLoader.loadPackage(
+        packageId,
+        packageId => getLfArchive(packageId).failOnShutdownToAbortException("getLfArchive"),
+        metrics.ledgerApiServer.execution.getLfPackage,
+      )
     )
 
   def removePackage(
@@ -125,7 +129,7 @@ class PackageService(
       EitherT.right(packagesDarsStore.removePackage(packageId))
     } else {
       val checkUnused =
-        packageOps.checkPackageUnused(packageId).mapK(FutureUnlessShutdown.outcomeK)
+        packageOps.checkPackageUnused(packageId)
 
       val checkNotVetted =
         packageOps
@@ -180,7 +184,6 @@ class PackageService(
   ): EitherT[FutureUnlessShutdown, CantonError, Unit] =
     EitherT
       .liftF(packagesDarsStore.getDar(darHash))
-      .mapK(FutureUnlessShutdown.outcomeK)
       .flatMap {
         case None =>
           EitherT.leftT(
@@ -229,12 +232,12 @@ class PackageService(
 
       _mainUnused <- packageOps
         .checkPackageUnused(mainPkg)
-        .leftMap(err => new MainPackageInUse(err.pkg, darDescriptor, err.contract, err.domain))
-        .mapK(FutureUnlessShutdown.outcomeK)
+        .leftMap(err =>
+          new MainPackageInUse(err.pkg, darDescriptor, err.contract, err.synchronizerId)
+        )
 
       packageUsed <- EitherT
         .liftF(packages.parTraverse(p => packageOps.checkPackageUnused(p).value))
-        .mapK(FutureUnlessShutdown.outcomeK)
 
       usedPackages = packageUsed.mapFilter {
         case Left(packageInUse: PackageRemovalErrorCode.PackageInUse) => Some(packageInUse.pkg)
@@ -245,14 +248,12 @@ class PackageService(
         .anyPackagePreventsDarRemoval(usedPackages, darDescriptor)
         .toLeft(())
         .leftMap(p => new CannotRemoveOnlyDarForPackage(p, darDescriptor))
-        .mapK(FutureUnlessShutdown.outcomeK)
 
       packagesThatCanBeRemoved <- EitherT
         .liftF(
           packagesDarsStore
             .determinePackagesExclusivelyInDar(packages, darDescriptor)
         )
-        .mapK(FutureUnlessShutdown.outcomeK)
 
       _unit <- revokeVettingForDar(
         mainPkg,
@@ -307,8 +308,8 @@ class PackageService(
     * @param fileNameO The DAR filename, present if uploaded via the Admin API.
     * @param submissionIdO upstream submissionId for ledger api server to recognize previous package upload requests
     * @param vetAllPackages if true, then the packages will be vetted automatically
-    * @param synchronizeVetting a value of PackageVettingSynchronization, that checks that the packages have been vetted on all connected domains.
-    *                            The Future returned by the check will complete once all domains have observed the vetting for the new packages.
+    * @param synchronizeVetting a value of PackageVettingSynchronization, that checks that the packages have been vetted on all connected synchronizers.
+    *                            The Future returned by the check will complete once all synchronizers have observed the vetting for the new packages.
     *                            The caller may also pass be a no-op implementation that immediately returns, depending no the caller's needs for synchronization.
     */
   def upload(
@@ -335,16 +336,16 @@ class PackageService(
 
   override def getDar(hash: Hash)(implicit
       traceContext: TraceContext
-  ): Future[Option[PackageService.Dar]] =
+  ): FutureUnlessShutdown[Option[PackageService.Dar]] =
     packagesDarsStore.getDar(hash)
 
   override def listDars(limit: Option[Int])(implicit
       traceContext: TraceContext
-  ): Future[Seq[PackageService.DarDescriptor]] = packagesDarsStore.listDars(limit)
+  ): FutureUnlessShutdown[Seq[PackageService.DarDescriptor]] = packagesDarsStore.listDars(limit)
 
   def listDarContents(darId: Hash)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, String, (DarDescriptor, archive.Dar[DamlLf.Archive])] =
+  ): EitherT[FutureUnlessShutdown, String, (DarDescriptor, archive.Dar[DamlLf.Archive])] =
     EitherT(
       packagesDarsStore
         .getDar(darId)
@@ -364,7 +365,7 @@ class PackageService(
         CantonPackageServiceError.IdentityManagerParentError(err)
       }
 
-  override def onClosed(): Unit = Lifecycle.close(packageUploader, packageMetadataView)(logger)
+  override def onClosed(): Unit = LifeCycle.close(packageUploader, packageMetadataView)(logger)
 
 }
 

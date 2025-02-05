@@ -90,14 +90,14 @@ object HttpScanSoftDomainMigrationPocAppClient {
       )
   }
 
-  final case class GetSynchronizerIdentities(domainIdPrefix: String)
+  final case class GetSynchronizerIdentities(synchronizerIdPrefix: String)
       extends InternalBaseCommand[http.GetSynchronizerIdentitiesResponse, SynchronizerIdentities] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSynchronizerIdentitiesResponse] =
       client.getSynchronizerIdentities(
-        domainIdPrefix
+        synchronizerIdPrefix
       )
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
@@ -108,7 +108,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
 
   final case class SynchronizerBootstrappingTransactions(
       domainParameters: GenericSignedTopologyTransaction,
-      sequencerDomainState: GenericSignedTopologyTransaction,
+      sequencerSynchronizerState: GenericSignedTopologyTransaction,
       mediatorDomainState: GenericSignedTopologyTransaction,
   )
 
@@ -136,7 +136,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
       )).left.map(_.toString)
   }
 
-  final case class GetSynchronizerBootstrappingTransactions(domainIdPrefix: String)
+  final case class GetSynchronizerBootstrappingTransactions(synchronizerIdPrefix: String)
       extends InternalBaseCommand[
         http.GetSynchronizerBootstrappingTransactionsResponse,
         SynchronizerBootstrappingTransactions,
@@ -149,7 +149,7 @@ object HttpScanSoftDomainMigrationPocAppClient {
       HttpResponse,
     ], http.GetSynchronizerBootstrappingTransactionsResponse] =
       client.getSynchronizerBootstrappingTransactions(
-        domainIdPrefix
+        synchronizerIdPrefix
       )
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {

@@ -194,11 +194,13 @@ export function fixedTokens(): boolean {
   return _fixedTokens;
 }
 
+const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
+
+export const cnSvcConfigsClusterDirectory = `${REPO_ROOT}/cluster/cn-svc-configs/configs/${clusterDirectory}`;
+
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
-  return loadYamlFromFile(
-    `${REPO_ROOT}/cluster/cn-svc-configs/configs/${clusterDirectory}/approved-sv-id-values.yaml`
-  ).approvedSvIdentities;
+  return loadYamlFromFile(`${cnSvcConfigsClusterDirectory}/approved-sv-id-values.yaml`)
+    .approvedSvIdentities;
 }
 
 // Typically used for overriding chart values.

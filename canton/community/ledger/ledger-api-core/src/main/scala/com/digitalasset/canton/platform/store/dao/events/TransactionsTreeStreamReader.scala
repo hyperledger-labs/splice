@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -9,6 +9,7 @@ import com.daml.metrics.{DatabaseMetrics, Timed}
 import com.daml.nameof.NameOf.qualifiedNameOfCurrentFunc
 import com.daml.tracing
 import com.daml.tracing.Spans
+import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.TraceIdentifiers
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
@@ -24,6 +25,7 @@ import com.digitalasset.canton.platform.store.backend.common.{
 import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.IdPaginationState
 import com.digitalasset.canton.platform.store.dao.events.EventsTable.TransactionConversions
 import com.digitalasset.canton.platform.store.dao.events.ReassignmentStreamReader.ReassignmentStreamQueryParams
+import com.digitalasset.canton.platform.store.dao.events.TopologyTransactionsStreamReader.TopologyTransactionsStreamQueryParams
 import com.digitalasset.canton.platform.store.dao.{
   DbDispatcher,
   EventProjectionProperties,
@@ -35,6 +37,7 @@ import com.digitalasset.canton.platform.store.utils.{
   Telemetry,
 }
 import com.digitalasset.canton.platform.{Party, TemplatePartiesFilter}
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
@@ -55,6 +58,7 @@ class TransactionsTreeStreamReader(
     metrics: LedgerApiServerMetrics,
     tracer: Tracer,
     reassignmentStreamReader: ReassignmentStreamReader,
+    topologyTransactionsStreamReader: TopologyTransactionsStreamReader,
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
@@ -68,6 +72,8 @@ class TransactionsTreeStreamReader(
 
   private val paginatingAsyncStream = new PaginatingAsyncStream(loggerFactory)
 
+  private val directEC = DirectExecutionContext(logger)
+
   def streamTreeTransaction(
       queryRange: EventsRange,
       requestingParties: Option[Set[Party]],
@@ -78,13 +84,13 @@ class TransactionsTreeStreamReader(
     val span =
       Telemetry.Transactions.createSpan(
         tracer,
-        queryRange.startExclusiveOffset,
+        queryRange.startInclusiveOffset,
         queryRange.endInclusiveOffset,
       )(
         qualifiedNameOfCurrentFunc
       )
     logger.debug(
-      s"streamTreeTransaction(${queryRange.startExclusiveOffset}, ${queryRange.endInclusiveOffset}, $requestingParties, $eventProjectionProperties)"
+      s"streamTreeTransaction(${queryRange.startInclusiveOffset}, ${queryRange.endInclusiveOffset}, $requestingParties, $eventProjectionProperties)"
     )
     val sourceOfTreeTransactions = doStreamTreeTransaction(
       queryRange,
@@ -156,7 +162,7 @@ class TransactionsTreeStreamReader(
       paginatingAsyncStream.streamIdsFromSeekPagination(
         idPageSizing = idPageSizing,
         idPageBufferSize = maxPagesPerIdPagesBuffer,
-        initialFromIdExclusive = queryRange.startExclusiveEventSeqId,
+        initialFromIdExclusive = queryRange.startInclusiveEventSeqId,
       )(
         fetchPage = (state: IdPaginationState) => {
           maxParallelIdQueriesLimiter.execute {
@@ -191,12 +197,13 @@ class TransactionsTreeStreamReader(
             globalPayloadQueriesLimiter.execute {
               dbDispatcher.executeSql(metric) { implicit connection =>
                 queryValidRange.withRangeNotPruned(
-                  minOffsetExclusive = queryRange.startExclusiveOffset,
+                  minOffsetInclusive = queryRange.startInclusiveOffset,
                   maxOffsetInclusive = queryRange.endInclusiveOffset,
                   errorPruning = (prunedOffset: Offset) =>
-                    s"Transactions request from ${queryRange.startExclusiveOffset.toLong} to ${queryRange.endInclusiveOffset.toLong} precedes pruned offset ${prunedOffset.toLong}",
-                  errorLedgerEnd = (ledgerEndOffset: Offset) =>
-                    s"Transactions request from ${queryRange.startExclusiveOffset.toLong} to ${queryRange.endInclusiveOffset.toLong} is beyond ledger end offset ${ledgerEndOffset.toLong}",
+                    s"Transactions request from ${queryRange.startInclusiveOffset.unwrap} to ${queryRange.endInclusiveOffset.unwrap} precedes pruned offset ${prunedOffset.unwrap}",
+                  errorLedgerEnd = (ledgerEndOffset: Option[Offset]) =>
+                    s"Transactions request from ${queryRange.startInclusiveOffset.unwrap} to ${queryRange.endInclusiveOffset.unwrap} is beyond ledger end offset ${ledgerEndOffset
+                        .fold(0L)(_.unwrap)}",
                 ) {
                   eventStorageBackend.transactionStreamingQueries.fetchEventPayloadsTree(
                     target = target
@@ -299,39 +306,69 @@ class TransactionsTreeStreamReader(
       )
       .mapConcat { events =>
         val responses = TransactionConversions.toGetTransactionTreesResponse(events)
-        responses.map { case (offset, response) => Offset.fromLong(offset) -> response }
+        responses.map { case (offset, response) => Offset.tryFromLong(offset) -> response }
       }
 
-    reassignmentStreamReader
-      .streamReassignments(
-        ReassignmentStreamQueryParams(
-          queryRange = queryRange,
-          filteringConstraints = TemplatePartiesFilter(
-            relation = Map.empty,
-            templateWildcardParties = requestingParties,
-          ),
-          eventProjectionProperties = eventProjectionProperties,
-          payloadQueriesLimiter = payloadQueriesLimiter,
-          deserializationQueriesLimiter = deserializationQueriesLimiter,
-          idPageSizing = idPageSizing,
-          decomposedFilters = filterParties.map(DecomposedFilter(_, None)),
-          maxParallelIdAssignQueries = maxParallelIdAssignQueries,
-          maxParallelIdUnassignQueries = maxParallelIdUnassignQueries,
-          maxPagesPerIdPagesBuffer = maxPagesPerIdPagesBuffer,
-          maxPayloadsPerPayloadsPage = maxPayloadsPerPayloadsPage,
-          maxParallelPayloadAssignQueries = maxParallelPayloadAssignQueries,
-          maxParallelPayloadUnassignQueries = maxParallelPayloadUnassignQueries,
-          deserializationProcessingParallelism = transactionsProcessingParallelism,
+    val topologyTransactions =
+      topologyTransactionsStreamReader
+        .streamTopologyTransactions(
+          TopologyTransactionsStreamQueryParams(
+            queryRange = queryRange,
+            filteringConstraints = TemplatePartiesFilter(
+              relation = Map.empty,
+              templateWildcardParties = requestingParties,
+            ),
+            payloadQueriesLimiter = payloadQueriesLimiter,
+            idPageSizing = idPageSizing,
+            decomposedFilters = filterParties.map(DecomposedFilter(_, None)),
+            maxParallelIdQueries = maxParallelIdTopologyEventsQueries,
+            maxPagesPerIdPagesBuffer = maxPayloadsPerPayloadsPage,
+            maxPayloadsPerPayloadsPage = maxParallelPayloadTopologyEventsQueries,
+            maxParallelPayloadQueries = transactionsProcessingParallelism,
+          )
         )
-      )
-      .map { case (offset, reassignment) =>
-        offset -> GetUpdateTreesResponse(
-          GetUpdateTreesResponse.Update.Reassignment(reassignment)
+        .map { case (offset, topologyTransaction) =>
+          offset -> GetUpdateTreesResponse(
+            GetUpdateTreesResponse.Update.TopologyTransaction(topologyTransaction)
+          )
+        }
+
+    val reassignments =
+      reassignmentStreamReader
+        .streamReassignments(
+          ReassignmentStreamQueryParams(
+            queryRange = queryRange,
+            filteringConstraints = TemplatePartiesFilter(
+              relation = Map.empty,
+              templateWildcardParties = requestingParties,
+            ),
+            eventProjectionProperties = eventProjectionProperties,
+            payloadQueriesLimiter = payloadQueriesLimiter,
+            deserializationQueriesLimiter = deserializationQueriesLimiter,
+            idPageSizing = idPageSizing,
+            decomposedFilters = filterParties.map(DecomposedFilter(_, None)),
+            maxParallelIdAssignQueries = maxParallelIdAssignQueries,
+            maxParallelIdUnassignQueries = maxParallelIdUnassignQueries,
+            maxPagesPerIdPagesBuffer = maxPagesPerIdPagesBuffer,
+            maxPayloadsPerPayloadsPage = maxPayloadsPerPayloadsPage,
+            maxParallelPayloadAssignQueries = maxParallelPayloadAssignQueries,
+            maxParallelPayloadUnassignQueries = maxParallelPayloadUnassignQueries,
+            deserializationProcessingParallelism = transactionsProcessingParallelism,
+          )
         )
-      }
-      .mergeSorted(sourceOfTreeTransactions)(
-        Ordering.by(_._1)
-      )
+        .map { case (offset, reassignment) =>
+          offset -> GetUpdateTreesResponse(
+            GetUpdateTreesResponse.Update.Reassignment(reassignment)
+          )
+        }
+
+    sourceOfTreeTransactions
+      .mergeSorted(topologyTransactions.map { case (offset, response) =>
+        offset -> response
+      })(Ordering.by(_._1))
+      .mergeSorted(reassignments.map { case (offset, response) =>
+        offset -> response
+      })(Ordering.by(_._1))
   }
 
   private def mergeSortAndBatch(
@@ -348,11 +385,15 @@ class TransactionsTreeStreamReader(
   private def deserializeLfValues(
       rawEvents: Vector[Entry[RawTreeEvent]],
       eventProjectionProperties: EventProjectionProperties,
-  )(implicit lc: LoggingContextWithTrace): Future[Vector[Entry[TreeEvent]]] =
+  )(implicit lc: LoggingContextWithTrace): Future[Seq[Entry[TreeEvent]]] =
     Timed.future(
-      future = Future.traverse(rawEvents)(
-        TransactionsReader.deserializeTreeEvent(eventProjectionProperties, lfValueTranslation)
-      ),
+      future = Future.delegate {
+        implicit val executionContext: ExecutionContext =
+          directEC // Scala 2 implicit scope override: shadow the outer scope's implicit by name
+        MonadUtil.sequentialTraverse(rawEvents)(
+          TransactionsReader.deserializeTreeEvent(eventProjectionProperties, lfValueTranslation)
+        )
+      },
       timer = dbMetrics.treeTxStream.translationTimer,
     )
 

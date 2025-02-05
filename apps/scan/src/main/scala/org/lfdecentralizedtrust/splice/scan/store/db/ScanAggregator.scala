@@ -45,6 +45,7 @@ final class ScanAggregator(
     with FlagCloseableAsync {
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
   import profile.api.jdbcActionExtensionMethods
+  import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     Seq(SyncCloseable("scan_aggregates_reader", reader.close()))

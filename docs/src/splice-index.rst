@@ -20,4 +20,15 @@ Splice Documentation
    :maxdepth: 2
    :caption: Application Developers
 
-   app_dev/index.rst
+   app_dev/overview/index
+   app_dev/scan_api/index
+   app_dev/validator_api/index
+   app_dev/ledger_api/index
+   app_dev/daml_api/index
+   app_dev/testing/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Metrics Reference
+
+   deployment/observability/metrics_reference.rst

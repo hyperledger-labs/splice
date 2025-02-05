@@ -22,7 +22,7 @@ lazy val `canton-community-app` = BuildCommon.`canton-community-app`
 lazy val `canton-community-app-base` = BuildCommon.`canton-community-app-base`
 lazy val `canton-community-base` = BuildCommon.`canton-community-base`
 lazy val `canton-community-common` = BuildCommon.`canton-community-common`
-lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
+lazy val `canton-community-synchronizer` = BuildCommon.`canton-community-synchronizer`
 lazy val `canton-community-participant` = BuildCommon.`canton-community-participant`
 lazy val `canton-community-admin-api` = BuildCommon.`canton-community-admin-api`
 lazy val `canton-community-integration-testing` = BuildCommon.`canton-community-integration-testing`
@@ -34,6 +34,7 @@ lazy val `canton-util-external` = BuildCommon.`canton-util-external`
 lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
 lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
 lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
+lazy val `canton-magnolify-addon` = BuildCommon.`canton-magnolify-addon`
 lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-api-value` = BuildCommon.`canton-ledger-api-value`
@@ -46,6 +47,7 @@ lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
 lazy val `canton-bindings-java` = BuildCommon.`canton-bindings-java`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
+lazy val `canton-kms-driver-api` = BuildCommon.`canton-kms-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
 lazy val `canton-transcode` = BuildCommon.`canton-transcode`
 
@@ -84,6 +86,7 @@ lazy val root: Project = (project in file("."))
     `apps-splitwell`,
     `apps-sv`,
     `apps-app`,
+    `apps-metrics-docs`,
     `apps-wallet`,
     `apps-frontends`,
     `splice-util-daml`,
@@ -118,7 +121,7 @@ lazy val root: Project = (project in file("."))
     `canton-wartremover-extension`,
     `canton-community-app`,
     `canton-community-app-base`,
-    `canton-community-domain`,
+    `canton-community-synchronizer`,
     `canton-community-participant`,
     `canton-ledger-common`,
     `canton-ledger-api-core`,
@@ -194,7 +197,7 @@ lazy val docs = project
       val srcDir = sourceDirectory.value
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory
-      val cache = FileFunction.cached(cacheDir) { _ =>
+      val cacheDamlDocs = FileFunction.cached(cacheDir) { _ =>
         runCommand(
           Seq("./gen-daml-docs.sh"),
           log,
@@ -211,9 +214,30 @@ lazy val docs = project
           (`splice-validator-lifecycle-daml` / Compile / damlBuild).value ++
           (`splice-wallet-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value
-      cache(
+      cacheDamlDocs(
         damlSources.toSet
       ).toSeq
+      import scala.sys.process._
+      val classPath = (`apps-metrics-docs` / Runtime / dependencyClasspath).value.files
+      val cacheMetricsDocs = FileFunction.cached(cacheDir) { _ =>
+        val metricsReferencePath = srcDir / "deployment" / "observability" / "metrics_reference.rst"
+        // This seems to be the easiest way to run a target from another SBT project and has the advantage
+        // that it is much faster than the approach taken by Canton of running the target from bundle with a console script.
+        runCommand(
+          Seq(
+            "java",
+            "-cp",
+            classPath.mkString(":"),
+            "org.lfdecentralizedtrust.splice.metrics.MetricsDocs",
+            metricsReferencePath.toString,
+          ),
+          log,
+          None,
+          Some(baseDir),
+        )
+        Set.empty
+      }
+      cacheMetricsDocs(Set()).toSeq
     }.taskValue,
     bundle := {
       (Compile / resources).value
@@ -1482,7 +1506,20 @@ checkErrors := {
   checkLogs("log/canton_network_test.clog", Seq("canton_network_test_log"))
 }
 
-lazy val `apps-app` =
+lazy val `apps-metrics-docs` =
+  project
+    .in(file("apps/metrics-docs"))
+    .dependsOn(
+      `apps-common`,
+      `apps-scan`,
+      `apps-sv`,
+      `apps-validator`,
+    )
+    .settings(
+      Headers.ApacheDAHeaderSettings
+    )
+
+lazy val `apps-app`: Project =
   project
     .in(file("apps/app"))
     .dependsOn(
@@ -1541,6 +1578,10 @@ printTests := {
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
 
+  def isIntegrationTest(name: String): Boolean =
+    name.contains("org.lfdecentralizedtrust.splice.integration.tests") || name.contains(
+      "IntegrationTest"
+    )
   def isCoreDeploymentPreflightIntegrationTest(name: String): Boolean = isPreflightIntegrationTest(
     name
   ) && !isValidator1DeploymentPreflightIntegrationTest(
@@ -1599,6 +1640,11 @@ printTests := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "Unit tests",
+      "test-full-class-names-non-integration.log",
+      (t: String) => !isIntegrationTest(t),
+    ),
     (
       "Daml ciupgrade vote",
       "test-daml-ciupgrade-vote.log",
@@ -1663,6 +1709,11 @@ printTests := {
       "disaster recovery tests",
       "test-full-class-names-disaster-recovery.log",
       (t: String) => !isTimeBasedTest(t) && isDisasterRecoveryTest(t),
+    ),
+    (
+      "canton bft tests",
+      "test-full-class-names-canton-bft.log",
+      (t: String) => t.contains("BFTManualStartIntegrationTest"),
     ),
     (
       "app upgrade tests",

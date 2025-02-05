@@ -1,14 +1,11 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
 
-import cats.syntax.traverse.*
-import com.digitalasset.canton.config.CantonRequireTypes.LengthLimitedString.TopologyRequestId
-import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
-import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast.Broadcast
 import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.*
@@ -16,13 +13,12 @@ import com.digitalasset.canton.version.{
   HasProtocolVersionedWithContextCompanion,
   ProtoVersion,
   ProtocolVersion,
-  ProtocolVersionValidation,
   RepresentativeProtocolVersion,
 }
 
-final case class TopologyTransactionsBroadcast private (
-    override val domainId: DomainId,
-    broadcasts: Seq[Broadcast],
+final case class TopologyTransactionsBroadcast(
+    override val synchronizerId: SynchronizerId,
+    transactions: SignedTopologyTransactions[TopologyChangeOp, TopologyMapping],
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
       TopologyTransactionsBroadcast.type
@@ -37,10 +33,12 @@ final case class TopologyTransactionsBroadcast private (
     v30.EnvelopeContent.SomeEnvelopeContent.TopologyTransactionsBroadcast(toProtoV30)
 
   def toProtoV30: v30.TopologyTransactionsBroadcast = v30.TopologyTransactionsBroadcast(
-    domainId.toProtoPrimitive,
-    broadcasts = broadcasts.map(_.toProtoV30),
+    synchronizerId.toProtoPrimitive,
+    Some(transactions.toProtoV30),
   )
 
+  def signedTransactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+    transactions.transactions
 }
 
 object TopologyTransactionsBroadcast
@@ -49,12 +47,15 @@ object TopologyTransactionsBroadcast
       ProtocolVersion,
     ] {
 
-  def create(
-      domainId: DomainId,
-      broadcasts: Seq[Broadcast],
+  def apply(
+      synchronizerId: SynchronizerId,
+      transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
       protocolVersion: ProtocolVersion,
   ): TopologyTransactionsBroadcast =
-    TopologyTransactionsBroadcast(domainId = domainId, broadcasts = broadcasts)(
+    TopologyTransactionsBroadcast(
+      synchronizerId,
+      SignedTopologyTransactions(transactions, protocolVersion),
+    )(
       supportedProtoVersions.protocolVersionRepresentativeFor(protocolVersion)
     )
 
@@ -70,11 +71,11 @@ object TopologyTransactionsBroadcast
     }
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v33)(
       v30.TopologyTransactionsBroadcast
     )(
       supportedProtoVersion(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 
@@ -82,43 +83,23 @@ object TopologyTransactionsBroadcast
       expectedProtocolVersion: ProtocolVersion,
       message: v30.TopologyTransactionsBroadcast,
   ): ParsingResult[TopologyTransactionsBroadcast] = {
-    val v30.TopologyTransactionsBroadcast(domain, broadcasts) = message
+    val v30.TopologyTransactionsBroadcast(synchronizerP, signedTopologyTransactionsP) = message
     for {
-      domainId <- DomainId.fromProtoPrimitive(domain, "domain")
-      broadcasts <- broadcasts.traverse(broadcastFromProtoV30(expectedProtocolVersion))
+      synchronizerId <- SynchronizerId.fromProtoPrimitive(synchronizerP, "synchronizer_id")
+
+      signedTopologyTransactions <- ProtoConverter.parseRequired(
+        SignedTopologyTransactions.fromProtoV30(expectedProtocolVersion, _),
+        "signed_transactions",
+        signedTopologyTransactionsP,
+      )
+
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
-    } yield TopologyTransactionsBroadcast(domainId, broadcasts.toList)(rpv)
-  }
-
-  private def broadcastFromProtoV30(expectedProtocolVersion: ProtocolVersion)(
-      message: v30.TopologyTransactionsBroadcast.Broadcast
-  ): ParsingResult[Broadcast] = {
-    val v30.TopologyTransactionsBroadcast.Broadcast(broadcastId, transactions) = message
-    for {
-      broadcastId <- String255.fromProtoPrimitive(broadcastId, "broadcast_id")
-      transactions <- transactions.traverse(tx =>
-        SignedTopologyTransaction.fromProtoV30(
-          ProtocolVersionValidation(expectedProtocolVersion),
-          tx,
-        )
-      )
-    } yield Broadcast(broadcastId, transactions.toList)
-  }
-
-  final case class Broadcast(
-      broadcastId: TopologyRequestId,
-      transactions: List[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-  ) {
-    def toProtoV30: v30.TopologyTransactionsBroadcast.Broadcast =
-      v30.TopologyTransactionsBroadcast.Broadcast(
-        broadcastId = broadcastId.toProtoPrimitive,
-        transactions = transactions.map(_.toProtoV30),
-      )
+    } yield TopologyTransactionsBroadcast(synchronizerId, signedTopologyTransactions)(rpv)
   }
 
   /** The state of the submission of a topology transaction broadcast. In combination with the sequencer client
     * send tracker capability, State reflects that either the sequencer Accepted the submission or that the submission
-    * was Rejected due to an error or a timeout. See DomainTopologyService.
+    * was Rejected due to an error or a timeout. See SynchronizerTopologyService.
     */
   sealed trait State extends Product with Serializable
 

@@ -41,8 +41,8 @@ commands:
               git checkout "$CIRCLE_BRANCH"
 
               git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
-            
-              if [ << parameters.checkout-branch >> != "" ]; then
+
+              if [ "<< parameters.checkout-branch >>" != "" ]; then
                 echo "Checking out branch << parameters.checkout-branch >>."
                 git fetch origin << parameters.checkout-branch >>
                 git checkout << parameters.checkout-branch >>

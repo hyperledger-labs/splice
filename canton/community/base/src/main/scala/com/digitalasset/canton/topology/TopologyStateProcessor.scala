@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -12,6 +12,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.processing.{
@@ -27,6 +28,7 @@ import com.digitalasset.canton.topology.transaction.TopologyMapping.MappingHash
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
+  SignedTopologyTransactions,
   TopologyChangeOp,
   TopologyMapping,
   TopologyMappingChecks,
@@ -36,23 +38,24 @@ import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-/** @param outboxQueue If a [[DomainOutboxQueue]] is provided, the processed transactions are not directly stored,
-  *                    but rather sent to the domain via an ephemeral queue (i.e. no persistence).
+/** @param outboxQueue If a [[SynchronizerOutboxQueue]] is provided, the processed transactions are not directly stored,
+  *                    but rather sent to the synchronizer via an ephemeral queue (i.e. no persistence).
   */
 class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
     val store: TopologyStore[TopologyStoreId],
-    outboxQueue: Option[DomainOutboxQueue],
+    outboxQueue: Option[SynchronizerOutboxQueue],
     topologyMappingChecks: TopologyMappingChecks,
+    insecureIgnoreMissingExtraKeySignatures: Boolean,
     pureCrypto: PureCrypto,
     loggerFactoryParent: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
   override protected val loggerFactory: NamedLoggerFactory =
-    // only add the `store` key for the authorized store. In case this TopologyStateProcessor is for a domain,
-    // it will already have the `domain` key, so having `store` with the same domainId is just a waste
+    // only add the `store` key for the authorized store. In case this TopologyStateProcessor is for a synchronizer,
+    // it will already have the `synchronizer` key, so having `store` with the same synchronizerId is just a waste
     if (store.storeId == AuthorizedStore) {
       loggerFactoryParent.append("store", store.storeId.toString)
     } else loggerFactoryParent
@@ -89,6 +92,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       // if transactions are put directly into a store (ie there is no outbox queue)
       // then the authorization validation is final.
       validationIsFinal = outboxQueue.isEmpty,
+      insecureIgnoreMissingExtraKeySignatures = insecureIgnoreMissingExtraKeySignatures,
       loggerFactory.append("role", if (outboxQueue.isEmpty) "incoming" else "outgoing"),
     )
 
@@ -105,16 +109,19 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       effective: EffectiveTime,
       transactionsToValidate: Seq[GenericSignedTopologyTransaction],
       expectFullAuthorization: Boolean,
+      compactTransactions: Boolean = true,
   )(implicit
       traceContext: TraceContext
-  ): Future[Seq[GenericValidatedTopologyTransaction]] = {
-    // if transactions aren't persisted in the store but rather enqueued in the domain outbox queue,
+  ): FutureUnlessShutdown[Seq[GenericValidatedTopologyTransaction]] = {
+    // if transactions aren't persisted in the store but rather enqueued in the synchronizer outbox queue,
     // the processing should abort on errors, because we don't want to enqueue rejected transactions.
     val abortOnError = outboxQueue.nonEmpty
 
     type Lft = Seq[GenericValidatedTopologyTransaction]
 
-    val transactions = SignedTopologyTransactions.compact(transactionsToValidate)
+    val transactions =
+      if (compactTransactions) SignedTopologyTransactions.compact(transactionsToValidate)
+      else transactionsToValidate
 
     // first, pre-load the currently existing mappings and proposals for the given transactions
     val preloadTxsForMappingF = preloadTxsForMapping(effective, transactions)
@@ -144,7 +151,9 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
               tx.rejection.set(
                 Some(TopologyTransactionRejection.Duplicate(duplicateTimestamp.value))
               )
-              Future.successful(determineRemovesAndUpdatePending(tx, removeMappings, removeTxs))
+              FutureUnlessShutdown.pure(
+                determineRemovesAndUpdatePending(tx, removeMappings, removeTxs)
+              )
 
           }
         (removes, pendingWrites)
@@ -152,7 +161,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       removes <- EitherT.right[Lft](removesF)
       (mappingRemoves, txRemoves) = removes
       validatedTx = pendingWrites.map(pw => pw.validatedTx)
-      _ <- EitherT.cond[Future](
+      _ <- EitherT.cond[FutureUnlessShutdown](
         // TODO(#12390) differentiate error reason and only abort actual errors, not in-batch merges
         !abortOnError || validatedTx.forall(_.nonDuplicateRejectionReason.isEmpty),
         (), {
@@ -161,7 +170,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
           clearCaches()
           validatedTx
         }: Lft,
-      ): EitherT[Future, Lft, Unit]
+      ): EitherT[FutureUnlessShutdown, Lft, Unit]
       // string approx for output
       epsilon =
         s"${effective.value.toEpochMilli - sequenced.value.toEpochMilli}"
@@ -180,13 +189,15 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       }
       _ <- outboxQueue match {
         case Some(queue) =>
-          // if we use the domain outbox queue, we must also reset the caches, because the local validation
+          // if we use the synchronizer outbox queue, we must also reset the caches, because the local validation
           // doesn't automatically imply successful validation once the transactions have been sequenced.
           clearCaches()
-          EitherT.rightT[Future, Lft](queue.enqueue(validatedTx.map(_.transaction))).map { result =>
-            logger.info("Enqueued topology transactions:\n" + validatedTx.mkString(",\n"))
-            result
-          }
+          EitherT
+            .rightT[FutureUnlessShutdown, Lft](queue.enqueue(validatedTx.map(_.transaction)))
+            .map { result =>
+              logger.info("Enqueued topology transactions:\n" + validatedTx.mkString(",\n"))
+              result
+            }
 
         case None =>
           EitherT
@@ -226,14 +237,14 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
   private def preloadTxsForMapping(
       effective: EffectiveTime,
       transactions: Seq[GenericSignedTopologyTransaction],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val hashes = NonEmpty.from(
       transactions
         .map(x => x.mapping.uniqueKey)
         .filterNot(txForMapping.contains)
         .toSet
     )
-    hashes.fold(Future.unit) {
+    hashes.fold(FutureUnlessShutdown.unit) {
       store
         .findTransactionsForMapping(effective, _)
         .map(_.foreach { item =>
@@ -253,7 +264,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
   private def preloadProposalsForTx(
       effective: EffectiveTime,
       transactions: Seq[GenericSignedTopologyTransaction],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val hashes =
       NonEmpty.from(
         transactions
@@ -262,7 +273,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
           .toSet
       )
 
-    hashes.fold(Future.unit) {
+    hashes.fold(FutureUnlessShutdown.unit) {
       store
         .findProposalsByTxHash(effective, _)
         .map(_.foreach { item =>
@@ -296,7 +307,7 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       expectFullAuthorization: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TopologyTransactionRejection, GenericSignedTopologyTransaction] =
+  ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, GenericSignedTopologyTransaction] =
     EitherT
       .right(
         authValidator
@@ -326,27 +337,25 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
   private def findDuplicates(
       timestamp: EffectiveTime,
       transactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-  )(implicit traceContext: TraceContext): Future[Seq[Option[EffectiveTime]]] =
-    Future.sequence(
-      transactions.map { tx =>
-        // skip duplication check for non-adds
-        if (tx.operation == TopologyChangeOp.Remove)
-          Future.successful(None)
-        else {
-          // check that the transaction has not been added before (but allow it if it has a different version ...)
-          store
-            .findStored(timestamp.value, tx)
-            .map(
-              _.filter(x =>
-                // if the transaction to validate has the same proto version
-                x.transaction.protoVersion == tx.protoVersion &&
-                  // and the transaction to validate doesn't add new signatures
-                  tx.signatures.diff(x.transaction.signatures).isEmpty
-              ).map(_.validFrom)
-            )
-        }
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[Option[EffectiveTime]]] =
+    FutureUnlessShutdown.sequence((transactions.map { tx =>
+      // skip duplication check for non-adds
+      if (tx.operation == TopologyChangeOp.Remove)
+        FutureUnlessShutdown.pure(None)
+      else {
+        // check that the transaction has not been added before (but allow it if it has a different version ...)
+        store
+          .findStored(timestamp.value, tx)
+          .map(
+            _.filter(x =>
+              // if the transaction to validate has the same proto version
+              x.transaction.protoVersion == tx.protoVersion &&
+                // and the transaction to validate doesn't add new signatures
+                tx.signatures.diff(x.transaction.signatures).isEmpty
+            ).map(_.validFrom)
+          )
       }
-    )
+    }))
 
   private def mergeWithPendingProposal(
       toValidate: GenericSignedTopologyTransaction
@@ -361,7 +370,9 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
       effective: EffectiveTime,
       txA: GenericSignedTopologyTransaction,
       expectFullAuthorization: Boolean,
-  )(implicit traceContext: TraceContext): Future[GenericValidatedTopologyTransaction] = {
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[GenericValidatedTopologyTransaction] = {
     // get current valid transaction for the given mapping
     val tx_inStore = txForMapping.get(txA.mapping.uniqueKey).map(_.currentTx)
     // first, merge a pending proposal with this transaction. we do this as it might
@@ -387,9 +398,9 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
         // we potentially merge the transaction with the currently active if this is just a signature update
         // now, check if the serial is monotonically increasing
         if (isMerge) {
-          EitherTUtil.unit[TopologyTransactionRejection]
+          EitherTUtil.unitUS[TopologyTransactionRejection]
         } else {
-          EitherT.fromEither[Future](
+          EitherT.fromEither[FutureUnlessShutdown](
             serialIsMonotonicallyIncreasing(tx_inStore, tx_deduplicatedAndMerged).void
           )
         }
@@ -460,10 +471,10 @@ class TopologyStateProcessor[+PureCrypto <: CryptoPureApi](
         .foreach(
           _.foreach(proposal =>
             proposalsForTx.remove(proposal).foreach { existing =>
-              val cur = existing.rejection.getAndSet(
-                Some(TopologyTransactionRejection.Other("Outdated proposal within batch"))
+              ErrorUtil.requireState(
+                existing.expireImmediately.compareAndSet(false, true),
+                s"ExpireImmediately should be false for $existing",
               )
-              ErrorUtil.requireState(cur.isEmpty, s"Error state should be empty for $existing")
             }
           )
         )

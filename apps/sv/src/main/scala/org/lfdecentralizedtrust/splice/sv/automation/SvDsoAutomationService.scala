@@ -47,7 +47,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppB
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.{QualifiedName, TemplateJsonDecoder}
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
@@ -237,7 +237,7 @@ class SvDsoAutomationService(
       case _ => ()
     }
     registerTrigger(
-      new ReconcileDynamicDomainParametersTrigger(
+      new ReconcileDynamicSynchronizerParametersTrigger(
         triggerContext,
         dsoStore,
         participantAdminConnection,
@@ -245,6 +245,48 @@ class SvDsoAutomationService(
         config.mediatorDeduplicationTimeout,
       )
     )
+
+    if (config.supportsSoftDomainMigrationPoc) {
+      registerTrigger(
+        new AmuletConfigReassignmentTrigger(
+          triggerContext,
+          dsoStore,
+          connection,
+          dsoStore.key.dsoParty,
+          Seq[ConstrainedTemplate](
+            AmuletRules.COMPANION,
+            OpenMiningRound.COMPANION,
+            IssuingMiningRound.COMPANION,
+          ),
+          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
+        )
+      )
+
+      registerTrigger(
+        new SignSynchronizerBootstrappingStateTrigger(
+          dsoStore,
+          participantAdminConnection,
+          triggerContext,
+          localSynchronizerNode.getOrElse(
+            throw Status.INTERNAL
+              .withDescription("Soft domain migrations require a configured synchronizer node")
+              .asRuntimeException
+          ),
+          extraSynchronizerNodes,
+          upgradesConfig,
+        )
+      )
+
+      registerTrigger(
+        new InitializeSynchronizerTrigger(
+          dsoStore,
+          participantAdminConnection,
+          triggerContext,
+          extraSynchronizerNodes,
+          upgradesConfig,
+        )
+      )
+    }
   }
 
   def registerTrafficReconciliationTriggers(): Unit = {
@@ -288,37 +330,6 @@ class SvDsoAutomationService(
 
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
-    if (config.supportsSoftDomainMigrationPoc) {
-      registerTrigger(
-        new AmuletConfigReassignmentTrigger(
-          triggerContext,
-          dsoStore,
-          connection,
-          dsoStore.key.dsoParty,
-          Seq[ConstrainedTemplate](
-            AmuletRules.COMPANION,
-            OpenMiningRound.COMPANION,
-            IssuingMiningRound.COMPANION,
-          ),
-          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
-        )
-      )
-
-      registerTrigger(
-        new SignSynchronizerBootstrappingStateTrigger(
-          dsoStore,
-          participantAdminConnection,
-          triggerContext,
-          localSynchronizerNode.getOrElse(
-            throw Status.INTERNAL
-              .withDescription("Soft domain migrations require a configured synchronizer node")
-              .asRuntimeException
-          ),
-          extraSynchronizerNodes,
-          upgradesConfig,
-        )
-      )
-    }
     registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
     registerTrigger(
       new AnsSubscriptionInitialPaymentTrigger(
@@ -458,7 +469,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
 
   case class LocalSequencerClientConfig(
       sequencerInternalConfig: ClientConfig,
-      decentralizedSynchronizerAlias: DomainAlias,
+      decentralizedSynchronizerAlias: SynchronizerAlias,
   )
 
   private[automation] def bootstrapPackageIdResolver(
@@ -512,9 +523,10 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SubmitSvStatusReportTrigger],
       aTrigger[ReportSvStatusMetricsExportTrigger],
       aTrigger[ReportValidatorLicenseMetricsExportTrigger],
-      aTrigger[ReconcileDynamicDomainParametersTrigger],
+      aTrigger[ReconcileDynamicSynchronizerParametersTrigger],
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[ExternalPartyAmuletRulesTrigger],
       aTrigger[SignSynchronizerBootstrappingStateTrigger],
+      aTrigger[InitializeSynchronizerTrigger],
     )
 }

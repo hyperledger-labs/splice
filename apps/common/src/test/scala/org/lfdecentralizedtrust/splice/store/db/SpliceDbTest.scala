@@ -1,8 +1,9 @@
 package org.lfdecentralizedtrust.splice.store.db
 
-import org.lfdecentralizedtrust.splice.config.SpliceDbConfig
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.config.DbConfig.Postgres
 import com.digitalasset.canton.config.DbParametersConfig
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.store.db.{DbStorageSetup, DbTest}
@@ -13,9 +14,8 @@ import slick.dbio.SuccessAction
 import slick.lifted.{Rep, TableQuery}
 
 import java.net.ServerSocket
-import scala.concurrent.Future
-import scala.util.Try
 import scala.concurrent.duration.DurationInt
+import scala.util.Try
 
 trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
@@ -54,7 +54,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
   protected def resetAllAppTables(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     import storage.api.jdbcProfile.api.*
     logger.info("Resetting all Splice app database tables")
     for {
@@ -106,14 +106,18 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
     val dbLockPort: Int = 54321
     implicit val tc: TraceContext = TraceContext.empty
     logger.info("Acquiring SpliceDbTest lock")
-    val lockTimeout = 10.minutes // expectation: Db tests won't take longer than 5m
+    // Needs to be long enough to allow all other concurrently started tests to finish,
+    // we therefore use a time roughly equal to the expected maximal duration of the entire CI job.
+    val lockTimeout = 20.minutes
     dbLockSocket = BaseTest.eventually(lockTimeout)(
       Try(new ServerSocket(dbLockPort))
         .fold(
           e => {
             logger.debug(s"Acquiring SpliceDbTest lock: port $dbLockPort is in use")
             throw new TestFailedException(
-              s"Failed to acquire lock within timeout ($lockTimeout).",
+              s"Failed to acquire lock within timeout ($lockTimeout). " +
+                "We start many tests suites in parallel but wait for the lock before actually running test in this suite. " +
+                "Either increase the timeout, or reduce the number of test suites running in the same CI job.",
               e,
               0,
             )
@@ -136,8 +140,10 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 /** Run db test for running against postgres */
 trait SplicePostgresTest extends SpliceDbTest { this: Suite =>
 
-  override protected def mkDbConfig(basicConfig: DbBasicConfig): SpliceDbConfig.Postgres =
-    SpliceDbConfig.Postgres(
+  override protected def mkDbConfig(
+      basicConfig: DbBasicConfig
+  ): com.digitalasset.canton.config.DbConfig.Postgres =
+    Postgres(
       basicConfig.toPostgresConfig,
       parameters = DbParametersConfig(unsafeCleanOnValidationError = true),
     )

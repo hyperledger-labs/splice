@@ -135,7 +135,7 @@ class TokenStandardTransferIntegrationTest
                 java.util.Base64.getDecoder.decode(disclosedContract.createdEventBlob)
               )
             )
-            .setDomainId(disclosedContract.synchronizerId)
+            .setSynchronizerId(disclosedContract.synchronizerId)
             .setTemplateId(
               CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
             )
@@ -227,7 +227,7 @@ class TokenStandardTransferIntegrationTest
           disclosedContracts = aliceToBobDisclosedContracts.map(x =>
             com.daml.ledger.api.v2.commands.DisclosedContract.fromJavaProto(x)
           ),
-          domainId = Some(decentralizedSynchronizerId),
+          synchronizerId = Some(decentralizedSynchronizerId),
           verboseHashing = true,
         )
     prepareSend.hashingDetails should not be empty
@@ -243,6 +243,7 @@ class TokenStandardTransferIntegrationTest
                 .signBytes(
                   prepareSend.preparedTransactionHash,
                   alicePrivateKey.asInstanceOf[SigningPrivateKey],
+                  usage = SigningKeyUsage.ProtocolOnly,
                 )
                 .valueOrFail("Couldn't sign with alice's private key")
             )

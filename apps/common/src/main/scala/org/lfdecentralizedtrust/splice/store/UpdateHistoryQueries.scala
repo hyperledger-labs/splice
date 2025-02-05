@@ -20,7 +20,7 @@ trait UpdateHistoryQueries extends AcsJdbcTypes {
       companionClass: ContractCompanion[C, TCId, T]
   ): Contract[TCId, T] = {
     companionClass
-      .fromCreatedEvent(companion)(row.toCreatedEvent)
+      .fromCreatedEvent(companion)(row.toCreatedEvent.event)
       .getOrElse(throw new RuntimeException("Failed to decode contract"))
   }
 

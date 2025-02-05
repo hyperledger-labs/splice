@@ -216,7 +216,7 @@
           }
         ]
       },
-      "version": "0.3.5"
+      "version": "0.3.9"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -421,7 +421,7 @@
           }
         ]
       },
-      "version": "0.3.5"
+      "version": "0.3.9"
     },
     "name": "loopback",
     "provider": "",
@@ -490,7 +490,7 @@
           }
         ]
       },
-      "version": "0.3.5"
+      "version": "0.3.9"
     },
     "name": "scan",
     "provider": "",
@@ -753,7 +753,7 @@
           {
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 330000
+            "rewardWeightBps": 230000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -778,7 +778,7 @@
           {
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 100000
           }
         ],
         "auth": {
@@ -849,7 +849,7 @@
           }
         ]
       },
-      "version": "0.3.5"
+      "version": "0.3.9"
     },
     "name": "sv-app",
     "provider": "",
@@ -1272,7 +1272,7 @@
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       },
-      "version": "0.3.5"
+      "version": "0.3.9"
     },
     "name": "validator",
     "provider": "",

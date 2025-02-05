@@ -4,8 +4,10 @@ on: workflow_call
 jobs:
   static_tests:
     runs-on: self-hosted-k8s-x-small
+    timeout-minutes: 30
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.6-snapshot.20250113.8012.0.v6b097acb
+      # TODO(#15988): use a release once 0.3.9 is out
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.9-snapshot.20250128.8151.0.v4bb647e2
 
     steps:
 
@@ -20,6 +22,11 @@ jobs:
           save_nix_cache: true
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+      - name: Check that CCI config is up2date
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: .circleci/build-config.sh --check
 
       - name: Check trailing whitespace
         uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -56,6 +63,11 @@ jobs:
           name: todos
           path: todo-out/todos
 
+      - name: Lint GHA
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: actionlint
+
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
         with:
@@ -71,7 +83,7 @@ jobs:
       - name: Post-SBT job
         uses: ./.github/actions/sbt/post_sbt
         with:
-          cache_version: 0
+          cache_version: 1
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Report Failures on Slack & Github

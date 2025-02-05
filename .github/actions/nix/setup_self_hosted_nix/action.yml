@@ -30,9 +30,10 @@ runs:
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
         sudo mkdir -p /nix/store
         sudo chown -R $(whoami):$(whoami) /nix
+        cat /tmp/nix-cache-key
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         if [ -f "/cache/nix/$cache_key/cached" ]; then
-          echo "Restoring nix cache"
+          echo "Restoring nix cache (key $cache_key)"
           # we use rsync here because it's simply faster to install
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
@@ -47,8 +48,6 @@ runs:
       shell: bash
       run: |
           set -exuo pipefail
-          echo ~
-          chown -R $(whoami):$(whoami) ~
           echo 'source ~/.nix-profile/etc/profile.d/nix.sh' > nix.rc
           if [ -f ~/.config/nix/nix.conf ]; then
             exit 0
@@ -108,6 +107,9 @@ runs:
       if: ${{ inputs.should_save == 'true' }}
       run: |
           set -euxo pipefail
+          echo ~
+          chown -R $(whoami):$(whoami) ~
+          cat /tmp/nix-cache-key
           cache_key=($(md5sum "/tmp/nix-cache-key"))
           if [ ! -f "/cache/nix/$cache_key/cached" ]; then
             echo "Saving nix"

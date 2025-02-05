@@ -15,8 +15,8 @@ import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportFailure
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.topology.transaction.DomainParametersState
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -32,21 +32,26 @@ class AcsExporter(
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
-  private val domainStateTopology = new DomainParametersStateTopologyConnection(
+  private val domainStateTopology = new SynchronizerParametersStateTopologyConnection(
     participantAdminConnection
   )
-  def exportAcsAtTimestamp(domain: DomainId, timestamp: Instant, force: Boolean, parties: PartyId*)(
-      implicit tc: TraceContext
+  def exportAcsAtTimestamp(
+      domain: SynchronizerId,
+      timestamp: Instant,
+      force: Boolean,
+      parties: PartyId*
+  )(implicit
+      tc: TraceContext
   ): Future[ByteString] = {
     participantAdminConnection.downloadAcsSnapshot(
       parties = parties.toSet,
-      filterDomainId = Some(domain),
+      filterSynchronizerId = Some(domain),
       timestamp = Some(timestamp),
       force = force,
     )
   }
 
-  def safeExportParticipantPartiesAcsFromPausedDomain(domain: DomainId)(implicit
+  def safeExportParticipantPartiesAcsFromPausedDomain(domain: SynchronizerId)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
@@ -65,13 +70,13 @@ class AcsExporter(
     }
   }
 
-  private def safeExportAcsFromPausedDomain(domain: DomainId, parties: PartyId*)(implicit
+  private def safeExportAcsFromPausedDomain(domain: SynchronizerId, parties: PartyId*)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
     for {
       domainParamsStateTopology <- domainStateTopology
-        .firstAuthorizedStateForTheLatestDomainParametersState(domain)
+        .firstAuthorizedStateForTheLatestSynchronizerParametersState(domain)
         .toRight(AcsExporter.DomainStateNotFound)
       domainParamsState = domainParamsStateTopology.mapping.parameters
       _ <- EitherT.cond[Future](
@@ -86,7 +91,7 @@ class AcsExporter(
       snapshot <- EitherT.liftF[Future, AcsExportFailure, ByteString](
         participantAdminConnection.downloadAcsSnapshot(
           parties = parties.toSet,
-          filterDomainId = Some(domain),
+          filterSynchronizerId = Some(domain),
           timestamp = Some(acsSnapshotTimestamp),
           force = true,
         )
@@ -97,8 +102,8 @@ class AcsExporter(
   }
 
   private def waitForMediatorAndParticipantResponseTime(
-      domainId: DomainId,
-      domainParamsTopology: TopologyResult[DomainParametersState],
+      synchronizerId: SynchronizerId,
+      domainParamsTopology: TopologyResult[SynchronizerParametersState],
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
@@ -118,7 +123,7 @@ class AcsExporter(
           participantAdminConnection
             // This is an interactive call, and we'd rather not wait a full polling interval for it.
             .getDomainTimeLowerBound(
-              domainId,
+              synchronizerId,
               maxDomainTimeLag = NonNegativeFiniteDuration.ofSeconds(1),
             )
             .map(domainTimeResponse => {

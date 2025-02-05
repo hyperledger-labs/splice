@@ -47,7 +47,7 @@ class SvOffboardingMediatorTrigger(
   ): Future[Seq[MediatorId]] = {
     for {
       rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
-      currentMediatorState <- participantAdminConnection.getMediatorDomainState(
+      currentMediatorState <- participantAdminConnection.getMediatorSynchronizerState(
         rulesAndStates.dsoRules.domain
       )
     } yield {
@@ -79,7 +79,7 @@ class SvOffboardingMediatorTrigger(
   ): Future[TaskOutcome] = {
     for {
       dsoRules <- dsoStore.getDsoRules()
-      _ <- participantAdminConnection.ensureMediatorDomainStateRemovalProposal(
+      _ <- participantAdminConnection.ensureMediatorSynchronizerStateRemovalProposal(
         dsoRules.domain,
         task,
         RetryFor.Automation,

@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.migration.SynchronizerNodeIdentities.getSynchronizerNodeIdentities
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Codec, Decoder}
@@ -59,7 +59,7 @@ object DomainMigrationDump {
   )
 
   def getDomainMigrationDump(
-      domainAlias: DomainAlias,
+      synchronizerAlias: SynchronizerAlias,
       participantAdminConnection: ParticipantAdminConnection,
       synchronizerNode: LocalSynchronizerNode,
       loggerFactory: NamedLoggerFactory,
@@ -75,7 +75,7 @@ object DomainMigrationDump {
         participantAdminConnection,
         synchronizerNode,
         dsoStore,
-        domainAlias,
+        synchronizerAlias,
         loggerFactory,
       )
       snapshot <- domainDataSnapshotGenerator.getDomainMigrationSnapshot

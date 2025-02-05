@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.metrics
@@ -17,7 +17,7 @@ import com.daml.metrics.api.{
   MetricsContext,
 }
 import com.daml.metrics.grpc.GrpcServerMetrics
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.data.TaskSchedulerMetrics
 import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.http.metrics.{HttpApiHistograms, HttpApiMetrics}
@@ -43,10 +43,11 @@ class ParticipantHistograms(val parent: MetricName)(implicit
   private[metrics] val sequencerClient: SequencerClientHistograms = new SequencerClientHistograms(
     parent
   )
-  private[metrics] val syncDomain: SyncDomainHistograms = new SyncDomainHistograms(
-    prefix,
-    sequencerClient,
-  )
+  private[metrics] val connectedSynchronizer: ConnectedSynchronizerHistograms =
+    new ConnectedSynchronizerHistograms(
+      prefix,
+      sequencerClient,
+    )
   private[metrics] val pruning: PruningHistograms = new PruningHistograms(parent)
 
   private[metrics] val consolePrefix: MetricName = prefix :+ "console"
@@ -68,7 +69,19 @@ class ParticipantHistograms(val parent: MetricName)(implicit
 class ParticipantMetrics(
     inventory: ParticipantHistograms,
     override val openTelemetryMetricsFactory: LabeledMetricsFactory,
-) extends BaseMetrics {
+) extends BaseMetrics
+    with HasDocumentedMetrics {
+
+  override def docPoke(): Unit = {
+    dbStorage.docPoke()
+    consoleThroughput.docPoke()
+    pruning.docPoke()
+    (new ConnectedSynchronizerMetrics(
+      SynchronizerAlias.tryCreate("synchronizer"),
+      inventory.connectedSynchronizer,
+      openTelemetryMetricsFactory,
+    )).docPoke()
+  }
 
   private implicit val mc: MetricsContext = MetricsContext.Empty
 
@@ -80,7 +93,7 @@ class ParticipantMetrics(
 
   object dbStorage extends DbStorageMetrics(inventory.dbStorage, openTelemetryMetricsFactory)
 
-  object consoleThroughput {
+  object consoleThroughput extends HasDocumentedMetrics {
     private val prefix = ParticipantMetrics.this.prefix :+ "console"
     val metric: Meter =
       openTelemetryMetricsFactory.meter(
@@ -105,21 +118,25 @@ class ParticipantMetrics(
   val httpApiServer: HttpApiMetrics =
     new HttpApiMetrics(inventory.httpApi, openTelemetryMetricsFactory)
 
-  private val clients = TrieMap[DomainAlias, Eval[SyncDomainMetrics]]()
+  private val clients = TrieMap[SynchronizerAlias, Eval[ConnectedSynchronizerMetrics]]()
 
   object pruning extends ParticipantPruningMetrics(inventory.pruning, openTelemetryMetricsFactory)
 
-  def domainMetrics(alias: DomainAlias): SyncDomainMetrics =
+  def connectedSynchronizerMetrics(alias: SynchronizerAlias): ConnectedSynchronizerMetrics =
     clients
       .getOrElseUpdate(
         alias,
-        // Two concurrent calls with the same domain alias may cause getOrElseUpdate to evaluate the new value expression twice,
+        // Two concurrent calls with the same synchronizer alias may cause getOrElseUpdate to evaluate the new value expression twice,
         // even though only one of the results will be stored in the map.
-        // Eval.later ensures that we actually create only one instance of SyncDomainMetrics in such a case
+        // Eval.later ensures that we actually create only one instance of ConnectedSynchronizerMetrics in such a case
         // by delaying the creation until the getOrElseUpdate call has finished.
         Eval.later(
-          new SyncDomainMetrics(inventory.syncDomain, openTelemetryMetricsFactory)(
-            mc.withExtraLabels("domain" -> alias.unwrap)
+          new ConnectedSynchronizerMetrics(
+            alias,
+            inventory.connectedSynchronizer,
+            openTelemetryMetricsFactory,
+          )(
+            mc.withExtraLabels("synchronizer" -> alias.unwrap)
           )
         ),
       )
@@ -165,11 +182,13 @@ class ParticipantMetrics(
       maxInflightValidationRequestGaugeForDocs.info,
       () => value().getOrElse(-1),
     )
-
 }
 
-class SyncDomainHistograms(val parent: MetricName, val sequencerClient: SequencerClientHistograms)(
-    implicit inventory: HistogramInventory
+class ConnectedSynchronizerHistograms(
+    val parent: MetricName,
+    val sequencerClient: SequencerClientHistograms,
+)(implicit
+    inventory: HistogramInventory
 ) {
 
   private[metrics] val prefix: MetricName = parent :+ "sync"
@@ -181,14 +200,25 @@ class SyncDomainHistograms(val parent: MetricName, val sequencerClient: Sequence
 
 }
 
-class SyncDomainMetrics(
-    histograms: SyncDomainHistograms,
+class ConnectedSynchronizerMetrics(
+    synchronizerAlias: SynchronizerAlias,
+    histograms: ConnectedSynchronizerHistograms,
     factory: LabeledMetricsFactory,
-)(implicit metricsContext: MetricsContext) {
+)(implicit metricsContext: MetricsContext)
+    extends HasDocumentedMetrics {
+
+  override def docPoke(): Unit = {
+    sequencerClient.docPoke()
+    conflictDetection.docPoke()
+    commitments.docPoke()
+    transactionProcessing.docPoke()
+    recordOrderPublisher.docPoke()
+    inFlightSubmissionSynchronizerTracker.docPoke()
+  }
 
   object sequencerClient extends SequencerClientMetrics(histograms.sequencerClient, factory)
 
-  object conflictDetection extends TaskSchedulerMetrics {
+  object conflictDetection extends TaskSchedulerMetrics with HasDocumentedMetrics {
 
     private val prefix = histograms.prefix :+ "conflict-detection"
 
@@ -222,7 +252,7 @@ class SyncDomainMetrics(
 
   }
 
-  object commitments extends CommitmentMetrics(histograms.commitments, factory)
+  object commitments extends CommitmentMetrics(synchronizerAlias, histograms.commitments, factory)
 
   object transactionProcessing
       extends TransactionProcessingMetrics(histograms.transactionProcessing, factory)
@@ -230,15 +260,15 @@ class SyncDomainMetrics(
   val numInflightValidations: Counter = factory.counter(
     MetricInfo(
       histograms.prefix :+ "inflight-validations",
-      summary = "Number of requests being validated on the domain.",
-      description = """Number of requests that are currently being validated on the domain.
+      summary = "Number of requests being validated on the synchronizer.",
+      description = """Number of requests that are currently being validated on the synchronizer.
                     |This also covers requests submitted by other participants.
                     |""",
       qualification = MetricQualification.Saturation,
     )
   )
 
-  object recordOrderPublisher extends TaskSchedulerMetrics {
+  object recordOrderPublisher extends TaskSchedulerMetrics with HasDocumentedMetrics {
 
     private val prefix = histograms.prefix :+ "request-tracker"
 
@@ -263,7 +293,26 @@ class SyncDomainMetrics(
       ),
       0,
     )
+
     def taskQueue(size: () => Int): CloseableGauge =
       factory.gaugeWithSupplier(taskQueueForDoc.info, size)
+  }
+
+  object inFlightSubmissionSynchronizerTracker extends HasDocumentedMetrics {
+
+    private val prefix = histograms.prefix :+ "in-flight-submission-synchronizer-tracker"
+
+    val unsequencedInFlight: Gauge[Int] =
+      factory.gauge(
+        MetricInfo(
+          prefix :+ "unsequenced-in-flight-submissions",
+          summary = "Number of unsequenced submissions in-flight.",
+          description = """Number of unsequenced submissions in-flight.
+                          |Unsequenced in-flight submissions are tracked in-memory, so high amount here will boil down to memory pressure.
+                          |""",
+          qualification = MetricQualification.Saturation,
+        ),
+        0,
+      )
   }
 }

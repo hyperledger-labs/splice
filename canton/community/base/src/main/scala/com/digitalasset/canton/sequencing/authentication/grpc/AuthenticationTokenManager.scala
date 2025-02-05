@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.authentication.grpc
@@ -48,13 +48,7 @@ class AuthenticationTokenManager(
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
-
-  sealed trait State
-  case object NoToken extends State
-  case class Refreshing(
-      pending: EitherT[FutureUnlessShutdown, Status, AuthenticationTokenWithExpiry]
-  ) extends State
-  case class HaveToken(token: AuthenticationToken) extends State
+  import AuthenticationTokenManager.*
 
   private val state = new AtomicReference[State](NoToken)
 
@@ -165,13 +159,13 @@ class AuthenticationTokenManager(
     if (!isClosed) {
       clock
         .scheduleAt(
-          backgroundRefreshToken,
+          _ => backgroundRefreshToken(),
           expiresAt.minus(config.refreshAuthTokenBeforeExpiry.asJava),
         )
         .discard
     }
 
-  private def backgroundRefreshToken(_now: CantonTimestamp): Unit =
+  private def backgroundRefreshToken(): Unit =
     if (!isClosed) {
       // Create a fresh trace context for each refresh to avoid long-lasting trace IDs from other contexts
       TraceContext.withNewTraceContext { implicit traceContext =>
@@ -179,4 +173,13 @@ class AuthenticationTokenManager(
       }
     }
 
+}
+
+object AuthenticationTokenManager {
+  sealed trait State
+  case object NoToken extends State
+  final case class Refreshing(
+      pending: EitherT[FutureUnlessShutdown, Status, AuthenticationTokenWithExpiry]
+  ) extends State
+  final case class HaveToken(token: AuthenticationToken) extends State
 }

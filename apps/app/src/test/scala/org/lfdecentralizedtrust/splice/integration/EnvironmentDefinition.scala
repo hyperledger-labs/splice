@@ -409,7 +409,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
     env.amuletNodes.local.foreach(_.waitForInitialization())
 
   def allocateParty(participant: ParticipantClientReference, hint: String) =
-    participant.ledger_api.parties.allocate(hint, hint).party
+    participant.ledger_api.parties.allocate(hint).party
 
   private def withAllocatedAdminUser(
       user: String,

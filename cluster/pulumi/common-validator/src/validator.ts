@@ -21,6 +21,7 @@ import {
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
+  ParticipantPruningConfig,
   PersistenceConfig,
   spliceInstanceNames,
   validatorOnboardingSecretName,
@@ -70,6 +71,7 @@ type BasicValidatorConfig = {
   autoAcceptTransfers?: AutoAcceptTransfersConfig;
   nodeIdentifier: string;
   dependencies: CnInput<pulumi.Resource>[];
+  participantPruningConfig?: ParticipantPruningConfig;
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -220,6 +222,7 @@ export async function installValidatorApp(
       autoAcceptTransfers,
       contactPoint: daContactPoint,
       nodeIdentifier: config.nodeIdentifier,
+      participantPruningSchedule: config.participantPruningConfig,
       ...spliceInstanceNames,
     },
     chartVersion,

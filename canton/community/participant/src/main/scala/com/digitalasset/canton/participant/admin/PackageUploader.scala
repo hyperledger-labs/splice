@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
@@ -15,7 +15,7 @@ import com.digitalasset.canton.ledger.error.PackageServiceErrors
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
-  Lifecycle,
+  LifeCycle,
   UnlessShutdown,
 }
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
@@ -223,7 +223,6 @@ class PackageUploader(
         if (enableUpgradeValidation) {
           packageUpgradeValidator
             .validateUpgrade(packages)(LoggingContextWithTrace(loggerFactory))
-            .mapK(FutureUnlessShutdown.outcomeK)
         } else {
           logger.info(
             s"Skipping upgrade validation for packages ${packages.map(_._1).sorted.mkString(", ")}"
@@ -241,7 +240,7 @@ class PackageUploader(
     ).thereafter(_ => zipInputStream.close())
   }
 
-  override protected def onClosed(): Unit = Lifecycle.close(uploadDarExecutionQueue)(logger)
+  override protected def onClosed(): Unit = LifeCycle.close(uploadDarExecutionQueue)(logger)
 }
 
 object PackageUploader {

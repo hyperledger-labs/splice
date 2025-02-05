@@ -60,17 +60,17 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
   UploadablePackage,
 }
-import com.digitalasset.canton.config.DomainTimeTrackerConfig
+import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -122,7 +122,7 @@ class JoiningNodeInitializer(
 
   def joinDsoAndOnboardNodes(): Future[
     (
-        DomainId,
+        SynchronizerId,
         DsoPartyHosting,
         SvSvStore,
         SvSvAutomationService,
@@ -138,7 +138,7 @@ class JoiningNodeInitializer(
     // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
     // before establishing a domain connection, but allocating the SV party requires a domain connection.
     val domainConfigO = config.domains.global.url.map(url =>
-      DomainConnectionConfig(
+      SynchronizerConnectionConfig(
         config.domains.global.alias,
         SequencerConnections.single(
           GrpcSequencerConnection.tryCreate(url)
@@ -146,7 +146,7 @@ class JoiningNodeInitializer(
         // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
         // This is changed to false after SV onboarding completes.
         manualConnect = true,
-        timeTracker = DomainTimeTrackerConfig(
+        timeTracker = SynchronizerTimeTrackerConfig(
           minObservationDuration = config.timeTrackerMinObservationDuration
         ),
       )
@@ -275,7 +275,7 @@ class JoiningNodeInitializer(
         dsoAutomation,
       )
       // Set autoConnect=true now that DSO party migration is complete
-      _ <- participantAdminConnection.modifyDomainConnectionConfig(
+      _ <- participantAdminConnection.modifySynchronizerConnectionConfig(
         config.domains.global.alias,
         config => if (config.manualConnect) Some(config.copy(manualConnect = false)) else None,
       )
@@ -310,7 +310,7 @@ class JoiningNodeInitializer(
   }
 
   def onboard(
-      decentralizedSynchronizer: DomainId,
+      decentralizedSynchronizer: SynchronizerId,
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
       withSvStore: Option[WithSvStore],
@@ -403,7 +403,7 @@ class JoiningNodeInitializer(
   private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
       dsoAutomation: SvDsoAutomationService,
       dsoStore: SvDsoStore,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       withSvStore: Option[WithSvStore],
   ) =
     (withSvStore match {
@@ -443,11 +443,14 @@ class JoiningNodeInitializer(
         checkIsInDecentralizedNamespaceAndStartTrigger(
           dsoAutomation,
           dsoStore,
-          domainId,
+          synchronizerId,
         )
       }
 
-  private def waitForSvParticipantToHaveSubmissionRights(dsoParty: PartyId, domainId: DomainId) = {
+  private def waitForSvParticipantToHaveSubmissionRights(
+      dsoParty: PartyId,
+      synchronizerId: SynchronizerId,
+  ) = {
     val description =
       show"SV participant $participantId has Submission rights for party $dsoParty"
     retryProvider.getValueWithRetries(
@@ -456,7 +459,7 @@ class JoiningNodeInitializer(
       description,
       for {
         dsoPartyHosting <- participantAdminConnection
-          .getPartyToParticipant(domainId, dsoParty)
+          .getPartyToParticipant(synchronizerId, dsoParty)
       } yield {
         dsoPartyHosting.mapping.participants.find(_.participantId == participantId) match {
           case None =>
@@ -486,7 +489,7 @@ class JoiningNodeInitializer(
 
   private def waitForSvToObtainUnlimitedTraffic(
       localSynchronizerNode: LocalSynchronizerNode,
-      synchronizerId: DomainId,
+      synchronizerId: SynchronizerId,
   ) = {
     val description = "SV nodes have been granted unlimited traffic"
     retryProvider.getValueWithRetries(
@@ -592,7 +595,7 @@ class JoiningNodeInitializer(
   class WithSvStore(
       svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
       dsoPartyHosting: JoiningNodeDsoPartyHosting,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
   ) {
 
     private val svStore = svStoreWithIngestion.store
@@ -702,7 +705,7 @@ class JoiningNodeInitializer(
           _ = logger.info("Adding member to the decentralized namespace.")
           _ <- participantAdminConnection
             .ensureDecentralizedNamespaceDefinitionProposalAccepted(
-              domainId,
+              synchronizerId,
               dsoParty.uid.namespace,
               svParty.uid.namespace,
               RetryFor.WaitingOnInitDependency,
@@ -854,7 +857,12 @@ class JoiningNodeInitializer(
     private def startHostingDsoPartyInParticipant(): Future[Unit] = {
       dsoPartyHosting
         // TODO(#5364): consider inlining the relevant parts from DsoPartyHosting
-        .hostPartyOnOwnParticipant(config.domains.global.alias, domainId, participantId, svParty)
+        .hostPartyOnOwnParticipant(
+          config.domains.global.alias,
+          synchronizerId,
+          participantId,
+          svParty,
+        )
         .map(
           _.getOrElse(
             sys.error(s"Failed to host DSO party on participant $participantId")
@@ -926,20 +934,21 @@ class JoiningNodeInitializer(
     )
   }
 
-  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[DomainId] =
+  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[SynchronizerId] =
     retryProvider.retry(
       RetryFor.ClientCalls,
       "connect_domain",
       "Connect to global domain if not migrating party",
       for {
-        decentralizedSynchronizerId <- participantAdminConnection.getDomainIdWithoutConnecting(
-          config.domains.global.alias
-        )
+        decentralizedSynchronizerId <- participantAdminConnection
+          .getSynchronizerIdWithoutConnecting(
+            config.domains.global.alias
+          )
         participantId <- participantAdminConnection.getParticipantId()
         // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
         // we are in the middle of an DSO party migration so don't reconnect to the domain.
         proposals <- participantAdminConnection.listPartyToParticipant(
-          TopologyStoreId.DomainStore(decentralizedSynchronizerId).filterName,
+          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).filterName,
           filterParty = dsoPartyId.filterString,
           filterParticipant = participantId.filterString,
           proposals = TopologyTransactionType.ProposalSignedByOwnKey,

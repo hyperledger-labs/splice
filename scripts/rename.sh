@@ -954,7 +954,7 @@ function subcmd_internal_global_domain_synchronizer() {
     "'Domain///Synchronizer'" \
     "-i 'apps/sv/**/constants.ts'"
 
-  # remaining stuff in daml (mostly comments, but also fixes domainId)
+  # remaining stuff in daml (mostly comments, but also fixes synchronizerId)
   run_and_commit_rename "Global to Decentralized: daml files (mostly comments)" \
     "'Global///Decentralized'" \
     "-i 'daml/**'"

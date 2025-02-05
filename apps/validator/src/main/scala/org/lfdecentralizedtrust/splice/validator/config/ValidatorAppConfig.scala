@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
   TreasuryConfig,
   WalletSweepConfig,
 }
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 
@@ -77,7 +77,7 @@ final case class BuyExtraTrafficConfig(
 )
 
 case class ValidatorDecentralizedSynchronizerConfig(
-    alias: DomainAlias,
+    alias: SynchronizerAlias,
     /** An optional statically specified URL for a sequencer to use to connect to the domain.
       * By default (when a URL is not specified), the list of sequencer URLs will be read from Scan.
       */
@@ -108,7 +108,7 @@ case class ValidatorDecentralizedSynchronizerConfig(
 
 // Validators are responsible for establishing connections to domains and so need more information than just a `SynchronizerConfig`
 case class ValidatorExtraSynchronizerConfig(
-    alias: DomainAlias,
+    alias: SynchronizerAlias,
     url: String,
 )
 
@@ -127,9 +127,20 @@ final case class MigrateValidatorPartyConfig(
     partiesToMigrate: Option[Seq[String]] = None,
 )
 
+/** The schedule is specified in cron format and "max_duration" and "retention" durations. The cron string indicates
+  *      the points in time at which pruning should begin in the GMT time zone, and the maximum duration indicates how
+  *      long from the start time pruning is allowed to run as long as pruning has not finished pruning up to the
+  *      specified retention period.
+  */
+final case class ParticipantPruningConfig(
+    cron: String,
+    maxDuration: PositiveDurationSeconds,
+    retention: PositiveDurationSeconds,
+)
+
 case class ValidatorAppBackendConfig(
-    override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: SpliceDbConfig,
+    override val adminApi: AdminServerConfig = AdminServerConfig(),
+    override val storage: DbConfig,
     ledgerApiUser: String,
     // The hint to be used for the validator operator's party ID
     // Must be None for SV validators, Some(hint) for non-SV validators
@@ -183,6 +194,7 @@ case class ValidatorAppBackendConfig(
     supportsSoftDomainMigrationPoc: Boolean = false,
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
+    participantPruningSchedule: Option[ParticipantPruningConfig] = None,
 ) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

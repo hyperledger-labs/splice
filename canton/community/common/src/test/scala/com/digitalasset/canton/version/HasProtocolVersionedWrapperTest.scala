@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.version
@@ -11,6 +11,8 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.google.protobuf.ByteString
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.annotation.unused
 
 class HasProtocolVersionedWrapperTest extends AnyWordSpec with BaseTest {
 
@@ -122,7 +124,9 @@ class HasProtocolVersionedWrapperTest extends AnyWordSpec with BaseTest {
         import com.digitalasset.canton.version.HasProtocolVersionedWrapperTest.Message.*
 
         // Used by the compiled string below
+        @unused
         val stablePV = ProtocolVersion.createStable(10)
+        @unused
         val alphaPV = ProtocolVersion.createAlpha(11)
 
         def name: String = "message"
@@ -134,7 +138,7 @@ class HasProtocolVersionedWrapperTest extends AnyWordSpec with BaseTest {
             """
              val _ = VersionedProtoConverter(stablePV)(VersionedMessageV1)(
                supportedProtoVersionMemoized(_)(fromProtoV1),
-               _.toProtoV1.toByteString
+               _.toProtoV1
              )"""
           ): Assertion
         }
@@ -144,7 +148,7 @@ class HasProtocolVersionedWrapperTest extends AnyWordSpec with BaseTest {
             """
              val _ = VersionedProtoConverter(alphaPV)(VersionedMessageV1)(
                supportedProtoVersionMemoized(_)(fromProtoV1),
-               _.toProtoV1.toByteString
+               _.toProtoV1
              )"""
           ): Assertion
         }
@@ -154,7 +158,7 @@ class HasProtocolVersionedWrapperTest extends AnyWordSpec with BaseTest {
             """
              val _ = VersionedProtoConverter(alphaPV)(VersionedMessageV2)(
                supportedProtoVersionMemoized(_)(fromProtoV2),
-               _.toProtoV2.toByteString
+               _.toProtoV2
              )"""
           ): Assertion
         }
@@ -164,7 +168,7 @@ class HasProtocolVersionedWrapperTest extends AnyWordSpec with BaseTest {
             """
              val _ = VersionedProtoConverter(stablePV)(VersionedMessageV2)(
                supportedProtoVersionMemoized(_)(fromProtoV2),
-               _.toProtoV2.toByteString
+               _.toProtoV2
              )"""
           ): Assertion
         }
@@ -217,21 +221,21 @@ object HasProtocolVersionedWrapperTest {
         VersionedMessageV1
       )(
         supportedProtoVersionMemoized(_)(fromProtoV1),
-        _.toProtoV1.toByteString,
+        _.toProtoV1,
       ),
       // Can use a stable Protobuf message in a stable protocol version
       ProtoVersion(0) -> VersionedProtoConverter(ProtocolVersion.createStable(basePV.v))(
         VersionedMessageV0
       )(
         supportedProtoVersionMemoized(_)(fromProtoV0),
-        _.toProtoV0.toByteString,
+        _.toProtoV0,
       ),
       // Can use an alpha Protobuf message in an alpha protocol version
       ProtoVersion(2) -> VersionedProtoConverter(
         ProtocolVersion.createAlpha((basePV + 3).v)
       )(VersionedMessageV2)(
         supportedProtoVersionMemoized(_)(fromProtoV2),
-        _.toProtoV2.toByteString,
+        _.toProtoV2,
       ),
     )
 

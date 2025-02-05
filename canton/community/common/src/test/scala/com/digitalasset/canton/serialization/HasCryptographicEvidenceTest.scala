@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.serialization
 
 import com.digitalasset.canton.version.{
-  HasProtocolVersionedWrapperCompanion,
+  HasProtocolVersionedWrapperCompanionWithDependency,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
@@ -108,14 +108,15 @@ sealed case class MemoizedEvidenceSUT(b: Byte)(
 }
 
 object MemoizedEvidenceSUT
-    extends HasProtocolVersionedWrapperCompanion[MemoizedEvidenceSUT, Nothing] {
+    extends HasProtocolVersionedWrapperCompanionWithDependency[MemoizedEvidenceSUT, Nothing, Unit] {
 
   override type Deserializer = Unit
+  override type Codec = ProtoCodec
 
   val name: String = "MemoizedEvidenceSUT"
 
   val supportedProtoVersions: MemoizedEvidenceSUT.SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> UnsupportedProtoCodec(ProtocolVersion.v32)
+    ProtoVersion(30) -> UnsupportedProtoCodec(ProtocolVersion.v33)
   )
 
   private val defaultProtocolVersionRepresentative = protocolVersionRepresentativeFor(

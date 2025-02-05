@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.memory
@@ -6,10 +6,17 @@ package com.digitalasset.canton.participant.store.memory
 import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.GlobalOffset
+import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  PromiseUnlessShutdown,
+  UnlessShutdown,
+}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.reassignment.{
   IncompleteReassignmentData,
   ReassignmentData,
@@ -22,8 +29,8 @@ import com.digitalasset.canton.participant.store.ReassignmentStore.{
 import com.digitalasset.canton.participant.store.memory.ReassignmentCache.PendingReassignmentCompletion
 import com.digitalasset.canton.participant.store.{ReassignmentLookup, ReassignmentStore}
 import com.digitalasset.canton.participant.util.TimeOfChange
-import com.digitalasset.canton.protocol.ReassignmentId
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{Checked, CheckedT}
@@ -31,7 +38,7 @@ import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.ExecutionContext
 
 /** Adds an in-memory cache of pending completions on top of a [[store.ReassignmentStore]].
   * Completions appear atomic to reassignment lookups that go through the cache,
@@ -39,11 +46,14 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
   */
 class ReassignmentCache(
     reassignmentStore: ReassignmentStore,
+    futureSupervisor: FutureSupervisor,
+    override protected val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
     val ec: ExecutionContext
 ) extends ReassignmentLookup
-    with NamedLogging {
+    with NamedLogging
+    with FlagCloseable {
 
   @VisibleForTesting
   private[memory] val pendingCompletions
@@ -56,67 +66,63 @@ class ReassignmentCache(
     * @return The future completes when this completion or a completion of the same reassignment by an earlier request
     *         has been written to the underlying [[store.ReassignmentStore]].
     */
-  def completeReassignment(reassignmentId: ReassignmentId, timeOfCompletion: TimeOfChange)(implicit
+  def completeReassignment(reassignmentId: ReassignmentId, toc: TimeOfChange)(implicit
       traceContext: TraceContext
-  ): CheckedT[Future, Nothing, ReassignmentStoreError, Unit] = CheckedT {
+  ): CheckedT[FutureUnlessShutdown, Nothing, ReassignmentStoreError, Unit] = CheckedT {
     logger.trace(
-      s"Request ${timeOfCompletion.rc}: Marking reassignment $reassignmentId as completed in cache"
+      s"Request ${toc.rc}: Marking reassignment $reassignmentId as completed in cache"
     )
     pendingCompletions.putIfAbsent(
       reassignmentId,
-      PendingReassignmentCompletion(timeOfCompletion)(),
+      PendingReassignmentCompletion(toc, futureSupervisor),
     ) match {
       case None =>
-        reassignmentStore.completeReassignment(reassignmentId, timeOfCompletion).value.map {
-          result =>
-            logger
-              .trace(
-                s"Request ${timeOfCompletion.rc}: Marked reassignment $reassignmentId as completed"
+        reassignmentStore.completeReassignment(reassignmentId, toc).value.map { result =>
+          val pendingReassignmentCompletion = pendingCompletions
+            .remove(reassignmentId)
+            .getOrElse(
+              throw new IllegalStateException(
+                s"Unable to find reassignment `$reassignmentId` in pending completions"
               )
-            val pendingReassignmentCompletion = pendingCompletions
-              .remove(reassignmentId)
-              .getOrElse(
-                throw new IllegalStateException(
-                  s"Unable to find reassignment `$reassignmentId` in pending completions"
-                )
-              )
-            pendingReassignmentCompletion.completion.success(result)
-            result
+            )
+          pendingReassignmentCompletion.completion.success(UnlessShutdown.Outcome(result))
+          result
         }
 
       case Some(
-            pendingReassignmentCompletion @ PendingReassignmentCompletion(previousTimeOfCompletion)
+            pendingReassignmentCompletion @ PendingReassignmentCompletion(previousToc)
           ) =>
-        if (previousTimeOfCompletion.rc <= timeOfCompletion.rc) {
+        if (previousToc.rc <= toc.rc) {
           /* An earlier request (or the same) is already writing to the reassignment store.
            * Therefore, there is no point in trying to store this later request, too.
            * It suffices to piggy-back on the earlier write and forward the result.
            */
-          logger.trace(
-            s"Request ${timeOfCompletion.rc}: Omitting the reassignment completion write because the earlier request ${previousTimeOfCompletion.rc} is writing already."
+          logger.debug(
+            s"Request ${toc.rc}: Omitting the reassignment completion write because the earlier request ${previousToc.rc} is writing already."
           )
-          pendingReassignmentCompletion.completion.future.map { result =>
+          pendingReassignmentCompletion.completion.futureUS.map { result =>
             for {
               _ <- result
               _ <-
-                if (previousTimeOfCompletion == timeOfCompletion) Checked.result(())
+                if (previousToc == toc) Checked.result(())
                 else
-                  Checked.continue(ReassignmentAlreadyCompleted(reassignmentId, timeOfCompletion))
+                  Checked.continue(ReassignmentAlreadyCompleted(reassignmentId, toc))
             } yield ()
           }
+
         } else {
           /* A later request is already writing to the reassignment store.
-           * To ensure that the earliest assignment request is recorded, we write the request to the store.`
+           * To ensure that the earliest assignment request is recorded, we write the request to the store.
            * This write happens only after the ongoing write to not disturb the error reporting for the ongoing write.
            * However, it is not necessary to add this request to the cache
            * because the cache has already marked the reassignment as having been completed.
            */
           for {
-            _ <- pendingReassignmentCompletion.completion.future
-            _ = logger.trace(
-              s"Request ${timeOfCompletion.rc}: Overwriting the reassignment completion of the later request ${previousTimeOfCompletion.rc}"
+            _ <- pendingReassignmentCompletion.completion.futureUS
+            _ = logger.debug(
+              s"Request ${toc.rc}: Overwriting the reassignment completion of the later request ${previousToc.rc}"
             )
-            result <- reassignmentStore.completeReassignment(reassignmentId, timeOfCompletion).value
+            result <- reassignmentStore.completeReassignment(reassignmentId, toc).value
           } yield result
         }
     }
@@ -124,55 +130,91 @@ class ReassignmentCache(
 
   override def lookup(reassignmentId: ReassignmentId)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, ReassignmentStore.ReassignmentLookupError, ReassignmentData] =
+  ): EitherT[FutureUnlessShutdown, ReassignmentStore.ReassignmentLookupError, ReassignmentData] =
     pendingCompletions.get(reassignmentId).fold(reassignmentStore.lookup(reassignmentId)) {
       case PendingReassignmentCompletion(timeOfCompletion) =>
         EitherT.leftT(ReassignmentCompleted(reassignmentId, timeOfCompletion))
     }
 
   override def find(
-      filterSource: Option[Source[DomainId]],
+      filterSource: Option[Source[SynchronizerId]],
       filterRequestTimestamp: Option[CantonTimestamp],
       filterSubmitter: Option[LfPartyId],
       limit: Int,
-  )(implicit traceContext: TraceContext): Future[Seq[ReassignmentData]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[ReassignmentData]] =
     reassignmentStore
       .find(filterSource, filterRequestTimestamp, filterSubmitter, limit)
       .map(
         _.filter(reassignmentData => !pendingCompletions.contains(reassignmentData.reassignmentId))
       )
 
-  override def findAfter(requestAfter: Option[(CantonTimestamp, Source[DomainId])], limit: Int)(
-      implicit traceContext: TraceContext
-  ): Future[Seq[ReassignmentData]] = reassignmentStore
+  override def findAfter(
+      requestAfter: Option[(CantonTimestamp, Source[SynchronizerId])],
+      limit: Int,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Seq[ReassignmentData]] = reassignmentStore
     .findAfter(requestAfter, limit)
     .map(
       _.filter(reassignmentData => !pendingCompletions.contains(reassignmentData.reassignmentId))
     )
 
-  /** unassignment/assignment global offsets will be updated upon publication in the multi-domain event log, when
+  /** unassignment/assignment global offsets will be updated upon publication on Ledger API Indexer, when
     * the global offset is assigned to the event.
     * In order to avoid race conditions, the multi-domain event log will wait for the calls to
     * `ReassignmentStore.addReassignmentOffsets` to complete before updating ledger end.
     * Hence, we don't need additional synchronization here and we can directly query the store.
     */
   override def findIncomplete(
-      sourceDomain: Option[Source[DomainId]],
-      validAt: GlobalOffset,
+      sourceSynchronizer: Option[Source[SynchronizerId]],
+      validAt: Offset,
       stakeholders: Option[NonEmpty[Set[LfPartyId]]],
       limit: NonNegativeInt,
-  )(implicit traceContext: TraceContext): Future[Seq[IncompleteReassignmentData]] =
-    reassignmentStore.findIncomplete(sourceDomain, validAt, stakeholders, limit)
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[IncompleteReassignmentData]] =
+    reassignmentStore.findIncomplete(sourceSynchronizer, validAt, stakeholders, limit)
 
   def findEarliestIncomplete()(implicit
       traceContext: TraceContext
-  ): Future[Option[(GlobalOffset, ReassignmentId, Target[DomainId])]] =
+  ): FutureUnlessShutdown[Option[(Offset, ReassignmentId, Target[SynchronizerId])]] =
     reassignmentStore.findEarliestIncomplete()
+
+  override def onClosed(): Unit =
+    pendingCompletions.foreach { case (_, promise) =>
+      promise.completion.shutdown()
+    }
+
+  override def findContractReassignmentId(
+      contractIds: Seq[LfContractId],
+      sourceSynchronizer: Option[Source[SynchronizerId]],
+      unassignmentTs: Option[CantonTimestamp],
+      completionTs: Option[CantonTimestamp],
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[LfContractId, Seq[ReassignmentId]]] =
+    reassignmentStore.findContractReassignmentId(
+      contractIds,
+      sourceSynchronizer,
+      unassignmentTs,
+      completionTs,
+    )
 }
 
 object ReassignmentCache {
   final case class PendingReassignmentCompletion(timeOfCompletion: TimeOfChange)(
-      val completion: Promise[Checked[Nothing, ReassignmentStoreError, Unit]] =
-        Promise[Checked[Nothing, ReassignmentStoreError, Unit]]()
+      val completion: PromiseUnlessShutdown[Checked[Nothing, ReassignmentStoreError, Unit]]
   )
+
+  object PendingReassignmentCompletion {
+    def apply(toc: TimeOfChange, futureSupervisor: FutureSupervisor)(implicit
+        ecl: ErrorLoggingContext
+    ): PendingReassignmentCompletion = {
+
+      val promise = new PromiseUnlessShutdown[Checked[Nothing, ReassignmentStoreError, Unit]](
+        s"pending completion of reassignment with toc=$toc",
+        futureSupervisor,
+      )
+
+      PendingReassignmentCompletion(toc)(promise)
+    }
+  }
 }

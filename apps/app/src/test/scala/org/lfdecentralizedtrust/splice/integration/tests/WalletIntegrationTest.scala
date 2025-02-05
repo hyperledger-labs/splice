@@ -21,8 +21,8 @@ import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWall
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.{DomainAlias, HasExecutionContext}
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.{SynchronizerAlias, HasExecutionContext}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko.http.scaladsl.Http
@@ -404,12 +404,13 @@ class WalletIntegrationTest
     }
 
     "accept AppPaymentRequest created on 3rdparty synchronizer" in { implicit env =>
-      val splitwellDomainId = aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
-        DomainAlias.tryCreate("splitwell")
-      )
+      val splitwellSynchronizerId =
+        aliceValidatorBackend.participantClientWithAdminToken.synchronizers.id_of(
+          SynchronizerAlias.tryCreate("splitwell")
+        )
       val decentralizedSynchronizerId =
-        aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
-          DomainAlias.tryCreate("global")
+        aliceValidatorBackend.participantClientWithAdminToken.synchronizers.id_of(
+          SynchronizerAlias.tryCreate("global")
         )
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(50)
@@ -419,7 +420,7 @@ class WalletIntegrationTest
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,
           aliceParty,
-          domainId = Some(splitwellDomainId),
+          synchronizerId = Some(splitwellSynchronizerId),
         ),
       )(
         "request and delivery are created on splitwell domain id",
@@ -427,8 +428,8 @@ class WalletIntegrationTest
           val domains =
             aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
               .lookup_contract_domain(aliceParty, Set(request.contractId))
-          domains shouldBe Map[String, DomainId](
-            request.contractId -> splitwellDomainId
+          domains shouldBe Map[String, SynchronizerId](
+            request.contractId -> splitwellSynchronizerId
           )
           request
         },

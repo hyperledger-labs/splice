@@ -14,7 +14,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.{PartyToParticipant, TopologyChangeOp}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -34,12 +34,12 @@ class DsoPartyHosting(
 ) extends NamedLogging {
 
   def isDsoPartyAuthorizedOn(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Boolean] =
     for {
       mappings <-
-        listActivePartyToParticipantMappings(dsoParty, domainId, Some(participantId))
+        listActivePartyToParticipantMappings(dsoParty, synchronizerId, Some(participantId))
     } yield {
       logger.info("DSO party mappings to our participant: " + mappings.map(_.mapping))
       mappings.nonEmpty
@@ -47,7 +47,7 @@ class DsoPartyHosting(
 
   private def listActivePartyToParticipantMappings(
       party: PartyId,
-      domain: DomainId,
+      domain: SynchronizerId,
       participantId: Option[ParticipantId],
       timeQuery: TimeQuery = TimeQuery.HeadState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipant]]] =
@@ -64,7 +64,7 @@ class DsoPartyHosting(
   // It is used in both candidate and sponsor side to ensure the party to participant are added successfully.
   // It returns the timestamp when the authorization becomes valid.
   def waitForDsoPartyToParticipantAuthorization(
-      domain: DomainId,
+      domain: SynchronizerId,
       participantId: ParticipantId,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retry(
@@ -88,7 +88,7 @@ class DsoPartyHosting(
     * if the participant is still included in the latest state.
     */
   private def getDsoPartyToParticipantTransaction(
-      domain: DomainId,
+      domain: SynchronizerId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(for {

@@ -41,7 +41,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.canton.network.rc3.transferinstruction
 
@@ -302,22 +302,22 @@ abstract class ScanAppReference(
     "Get a member's (participant or mediator) traffic status as reported by the sequencer"
   )
   def getMemberTrafficStatus(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       memberId: Member,
   ): definitions.MemberTrafficStatus =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetMemberTrafficStatus(domainId, memberId))
+      httpCommand(HttpScanAppClient.GetMemberTrafficStatus(synchronizerId, memberId))
     }
 
   @Help.Summary(
     "Get the id of the participant hosting a given party"
   )
   def getPartyToParticipant(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       partyId: PartyId,
   ): ParticipantId =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetPartyToParticipant(domainId, partyId))
+      httpCommand(HttpScanAppClient.GetPartyToParticipant(synchronizerId, partyId))
     }
 
   @Help.Summary(

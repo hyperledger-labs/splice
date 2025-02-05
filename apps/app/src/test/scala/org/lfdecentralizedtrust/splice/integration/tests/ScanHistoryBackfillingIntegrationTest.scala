@@ -21,7 +21,7 @@ import org.lfdecentralizedtrust.splice.scan.automation.ScanHistoryBackfillingTri
 import org.lfdecentralizedtrust.splice.store.{PageLimit, TreeUpdateWithMigrationId}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
-import org.lfdecentralizedtrust.splice.util.{UpdateHistoryTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{EventId, UpdateHistoryTestUtil, WalletTestUtil}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 
@@ -223,7 +223,7 @@ class ScanHistoryBackfillingIntegrationTest
 
     clue("SV2 scan HTTP API refuses to return history") {
       assertThrowsAndLogsCommandFailures(
-        sv2ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson),
+        readUpdateHistoryFromScan(sv2ScanBackend),
         logEntry => {
           logEntry.errorMessage should include("HTTP 503 Service Unavailable")
           logEntry.errorMessage should include(
@@ -237,7 +237,11 @@ class ScanHistoryBackfillingIntegrationTest
       env.scans.local.filter(_.is_initialized).foreach { scan =>
         logger.debug(
           s"${scan.name} history before backfilling: " + shortDebugDescription(
-            allUpdatesFromScanBackend(scan).map(ProtobufJsonScanHttpEncodings.lapiToHttpUpdate)
+            allUpdatesFromScanBackend(scan)
+              .map(
+                ProtobufJsonScanHttpEncodings
+                  .lapiToHttpUpdate(_, EventId.prefixedFromUpdateIdAndNodeId)
+              )
           )
         )
       }
@@ -256,7 +260,7 @@ class ScanHistoryBackfillingIntegrationTest
             .getBackfillingState()
             .futureValue
             .exists(_.complete) should be(true)
-          sv1ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson) should not be empty
+          readUpdateHistoryFromScan(sv1ScanBackend) should not be empty
         }
         clue("SV2 backfilling is not complete") {
           sv2ScanBackend.appState.store.updateHistory
@@ -264,7 +268,7 @@ class ScanHistoryBackfillingIntegrationTest
             .futureValue
             .exists(_.complete) should be(false)
           assertThrowsAndLogsCommandFailures(
-            sv2ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson),
+            readUpdateHistoryFromScan(sv2ScanBackend),
             logEntry => {
               logEntry.errorMessage should include("HTTP 503 Service Unavailable")
               logEntry.errorMessage should include(
@@ -299,7 +303,11 @@ class ScanHistoryBackfillingIntegrationTest
       env.scans.local.filter(_.is_initialized).foreach { scan =>
         logger.debug(
           s"${scan.name} history after backfilling: " + shortDebugDescription(
-            allUpdatesFromScanBackend(scan).map(ProtobufJsonScanHttpEncodings.lapiToHttpUpdate)
+            allUpdatesFromScanBackend(scan)
+              .map(
+                ProtobufJsonScanHttpEncodings
+                  .lapiToHttpUpdate(_, EventId.prefixedFromUpdateIdAndNodeId)
+              )
           )
         )
       }
@@ -335,9 +343,9 @@ class ScanHistoryBackfillingIntegrationTest
 
     clue("Compare scan histories with each other using the v1 HTTP endpoint") {
       val sv1HttpUpdates =
-        sv1ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson)
+        readUpdateHistoryFromScan(sv1ScanBackend)
       val sv2HttpUpdates =
-        sv2ScanBackend.getUpdateHistory(1000, None, encoding = CompactJson)
+        readUpdateHistoryFromScan(sv2ScanBackend)
 
       // Compare common prefix, as there might be concurrent activity
       val commonLength = sv1HttpUpdates.length min sv2HttpUpdates.length
@@ -359,6 +367,11 @@ class ScanHistoryBackfillingIntegrationTest
       sv1BackfillTrigger.retrieveTasks().futureValue should be(empty)
       sv2BackfillTrigger.retrieveTasks().futureValue should be(empty)
     }
+  }
+
+  private def readUpdateHistoryFromScan(backend: ScanAppBackendReference) = {
+    backend
+      .getUpdateHistory(1000, None, encoding = CompactJson)
   }
 
   private def sv1BackfillTrigger(implicit env: SpliceTestConsoleEnvironment) =

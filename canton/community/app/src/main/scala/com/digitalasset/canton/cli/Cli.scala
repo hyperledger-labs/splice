@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.cli
@@ -144,7 +144,7 @@ object Cli {
   private def parser(printVersion: => Unit): OptionParser[Cli] =
     new scopt.OptionParser[Cli]("canton") {
 
-      private def inColumns(first: String = "", second: String = ""): String =
+      private def inColumns(first: String = "", second: String): String =
         f"  $first%-25s$second"
 
       head("Canton", s"v${BuildInfo.version}")
@@ -194,7 +194,7 @@ object Cli {
         .action((_, cli) => cli.copy(manualStart = true))
 
       opt[Unit]("auto-connect-local")
-        .text("Automatically connect all local participants to all local domains")
+        .text("Automatically connect all local participants to all local synchronizers")
         .action((_, cli) => cli.copy(autoConnectLocal = true))
 
       note(inColumns(first = "-D<property>=<value>", second = "Set a JVM property value"))

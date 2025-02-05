@@ -1,10 +1,11 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.RequireTypes.{InvariantViolation, NonNegativeInt}
 import com.digitalasset.canton.crypto.{HashOps, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -18,7 +19,7 @@ import com.digitalasset.canton.serialization.{
 }
 import com.digitalasset.canton.topology.{Member, ParticipantId}
 import com.digitalasset.canton.version.{
-  HasMemoizedProtocolVersionedWithContextCompanion,
+  HasMemoizedProtocolVersionedWithContextAndDependencyCompanion,
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
@@ -49,7 +50,7 @@ final case class SubmissionRequest private (
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
       SubmissionRequest.type
     ],
-    override val deserializedFrom: Option[ByteString] = None,
+    override val deserializedFrom: Option[ByteString],
 ) extends HasProtocolVersionedWrapper[SubmissionRequest]
     with ProtocolVersionedMemoizedEvidence {
   // Ensures the invariants related to default values hold
@@ -57,7 +58,6 @@ final case class SubmissionRequest private (
 
   @transient override protected lazy val companionObj: SubmissionRequest.type = SubmissionRequest
 
-  @VisibleForTesting
   def isConfirmationRequest: Boolean = {
     val hasParticipantRecipient = batch.allRecipients.exists {
       case MemberRecipient(_: ParticipantId) => true
@@ -80,6 +80,12 @@ final case class SubmissionRequest private (
     aggregationRule = aggregationRule.map(_.toProtoV30),
     submissionCost = submissionCost.map(_.toProtoV30),
   )
+
+  def updateAggregationRule(aggregationRule: AggregationRule): SubmissionRequest =
+    copy(aggregationRule = Some(aggregationRule))
+
+  def updateMaxSequencingTime(maxSequencingTime: CantonTimestamp): SubmissionRequest =
+    copy(maxSequencingTime = maxSequencingTime)
 
   @VisibleForTesting
   def copy(
@@ -128,7 +134,23 @@ final case class SubmissionRequest private (
     *   <li>The [[isConfirmationRequest]] flag because it is irrelevant for delivery or aggregation</li>
     * </ul>
     */
-  def aggregationId(hashOps: HashOps): Option[AggregationId] = aggregationRule.map { rule =>
+  def aggregationId(hashOps: HashOps): Either[ProtoDeserializationError, Option[AggregationId]] = {
+    // TODO(#12075) Use a deterministic serialization scheme for the recipients
+    val recipientsSerializerE: Either[ProtoDeserializationError, Recipients => ByteString] =
+      SubmissionRequest.converterFor(representativeProtocolVersion).map(_.dependencySerializer)
+
+    aggregationRule.traverse { rule =>
+      recipientsSerializerE.map { recipientsSerializer =>
+        aggregationIdInternal(hashOps, rule, recipientsSerializer)
+      }
+    }
+  }
+
+  private def aggregationIdInternal(
+      hashOps: HashOps,
+      rule: AggregationRule,
+      recipientsSerializer: Recipients => ByteString,
+  ): AggregationId = {
     val builder = hashOps.build(HashPurpose.AggregationId)
     builder.add(batch.envelopes.length)
     batch.envelopes.foreach { envelope =>
@@ -136,8 +158,7 @@ final case class SubmissionRequest private (
       builder.add(DeterministicEncoding.encodeBytes(content))
       builder.add(
         DeterministicEncoding.encodeBytes(
-          // TODO(#12075) Use a deterministic serialization scheme for the recipients
-          recipients.toProtoV30.toByteString
+          recipientsSerializer(recipients)
         )
       )
       builder.add(DeterministicEncoding.encodeByte(if (signatures.isEmpty) 0x00 else 0x01))
@@ -164,17 +185,23 @@ object MaxRequestSizeToDeserialize {
 }
 
 object SubmissionRequest
-    extends HasMemoizedProtocolVersionedWithContextCompanion[
+    extends HasMemoizedProtocolVersionedWithContextAndDependencyCompanion[
       SubmissionRequest,
       MaxRequestSizeToDeserialize,
+      // Recipients is a dependency because its versioning scheme needs to be aligned with this one
+      // such that SubmissionRequest and Recipiients can be versioned independently
+      Recipients,
     ] {
 
+  override type Codec = VersionedProtoConverterWithDependency
+
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(
-      ProtocolVersion.v32
+    ProtoVersion(30) -> VersionedProtoConverterWithDependency(
+      ProtocolVersion.v33
     )(v30.SubmissionRequest)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30, // Serialization of SubmissionRequest
+      _.toProtoV30, // Serialization of Recipients
     )
   )
 

@@ -235,29 +235,7 @@ commands:
               .circleci/post-slack-message.sh "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*" "C05DT77QF5M"
             fi
           cmd_retry_count: 3
-  start_canton_in_background:
-    description: Start canton in the background
-    parameters:
-      start_canton_options:
-        type: string
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Start canton"
-          cmd: |
-            mkdir -p log
-            ./start-canton.sh << parameters.start_canton_options >> -b
-          background: true
-          additional_nix_args: "--keep CIRCLE_USERNAME --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_NUM --keep CIRCLE_JOB --keep CIRCLE_NODE_INDEX --keep PROMETHEUS_REMOTE_WRITE_JWT"
-          # Retrying as sometimes it fails finding the images
-          cmd_retry_count: 3
 
-  stop_canton:
-    description: Stop Canton
-    steps:
-      - run_bash_command_in_nix:
-          when: always
-          cmd_name: "Stop canton"
-          cmd: ./stop-canton.sh || true
   setup_vpn:
     steps:
       - run:
@@ -509,23 +487,6 @@ commands:
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker-dev.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
-
-  docker_pull_test_images:
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Pull docker images used for integration tests"
-          additional_nix_args: "--keep DOCKER_CERT_PATH \
-                              --keep DOCKER_HOST \
-                              --keep DOCKER_MACHINE_NAME \
-                              --keep DOCKER_TLS_VERIFY \
-                              --keep NO_PROXY"
-          # Retrying as network stuff can be flaky
-          cmd_retry_count: 5
-          cmd: |
-            docker pull ${COMETBFT_DOCKER_IMAGE}
-            docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
-            docker pull ${OTEL_COLLECTOR_IMAGE}
-
 
   cancel_entire_workflow_if_this_job_failed:
     steps:
@@ -1402,49 +1363,6 @@ commands:
           path: tests
           destination: _tests # the _ is so this appears on top in the artifacts list
 
-
-  run_splitted_scala_tests:
-    description: run splitted scala tests
-    parameters:
-      pre_sbt_cmd:
-        type: string
-        default: ""
-      post_sbt_cmd:
-        type: string
-        default: ""
-      start_canton_options:
-        type: string
-      additional_nix_args:
-        type: string
-        default: ""
-    steps:
-      - run_bash_command_in_nix:
-          cmd_name: "Wait for canton to be ready before running tests"
-          cmd: |
-            if [[ "<< parameters.start_canton_options >>" == *"-w"* ]]; then
-              ./wait-for-canton.sh -w
-            elif [[ "<< parameters.start_canton_options >>" == *"-s"* ]]; then
-              ./wait-for-canton.sh -s
-            fi
-      - execute_sbt_command:
-          # run all tests except the live cluster ones
-          pre_sbt_cmd: |
-            << parameters.pre_sbt_cmd >>
-          extra_env_vars: POSTGRES_DB=postgres
-          cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
-          post_sbt_cmd: << parameters.post_sbt_cmd >>
-          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET << parameters.additional_nix_args >>"
-          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
-          # it is in our best interest for our tests to be faster than this,
-          # but failing CI because of slow tests is also not very nice
-          # TODO(#8608): reduce `timeout` to at least 25m again
-          timeout: "35m"
-          no_output_timeout: "20m"
-      - execute_sbt_command:
-          # we don't care if some integration test happened to make the repo dirty
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
-          cmd: "checkErrors"
-
   ##### Overall setup
   ###### Pre job
   setup_sbt_test_job:
@@ -1764,8 +1682,8 @@ commands:
               git checkout "$CIRCLE_BRANCH"
 
               git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
-            
-              if [ << parameters.checkout-branch >> != "" ]; then
+
+              if [ "<< parameters.checkout-branch >>" != "" ]; then
                 echo "Checking out branch << parameters.checkout-branch >>."
                 git fetch origin << parameters.checkout-branch >>
                 git checkout << parameters.checkout-branch >>
@@ -3113,7 +3031,9 @@ jobs:
             echo "export SPLICE_DOCKER_IMAGE_ARTIFACTS_REPOSITORY=\"google\"" >> "$file"
             echo "export SPLICE_DEPLOYMENT_SV_USE_INTERNAL_VALIDATOR_DNS=true" >> "$file"
 
-            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $UPGRADE_RELEASE_REF
+            # We start from the target branch which has no entry in `active` so add it again pointing at old version and release ref.
+            cncluster hard_domain_migration_update_config active 0 internal $BASE_VERSION $BASE_RELEASE_REF
+            # Add the new entry for the staging nodes.
             cncluster hard_domain_migration_update_config upgrade 1 external $UPGRADE_VERSION $UPGRADE_RELEASE_REF
 
             git add **/.envrc.vars
@@ -3125,7 +3045,7 @@ jobs:
           deploy_retry_count: << parameters.deploy_retry_count >>
       - wait_for_pulumi_stacks_updated:
           cluster: << parameters.cluster >>
-          pulumi_stack_names: "canton-network,infra,validator1,splitwell,sv-runbook,validator-runbook,sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
+          pulumi_stack_names: "sv-canton.sv-1-migration-1,sv-canton.sv-2-migration-1,sv-canton.sv-3-migration-1,sv-canton.sv-4-migration-1,sv-canton.sv-migration-1"
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - when:
@@ -3314,56 +3234,6 @@ jobs:
                 cluster: << parameters.cluster >>
 
 
-  # Inspired by Canton, we put the lint-like checks into their own CI job
-  static_tests:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - run_bash_command_in_nix:
-          cmd_name: Verify config.yml is up to date with source.
-          cmd: .circleci/build-config.sh --check
-      # Run the cheap checks before the sbt based ones to provide fast feedback
-      - run_trailing_whitespace_check
-      - run_daml_warts_check
-      - run_daml_return_types_check
-      - run_todo_script
-      - execute_sbt_command:
-          cmd: "Test/compile lint printTests"
-      - run_bash_command_in_nix:
-          cmd_name: Verify no changes in sbt test files
-          cmd: git add . && git diff --staged --exit-code test*.log
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-          upload_caches: true
-
-  # We put our Daml tests in their own job for more parallelization
-  daml_test:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - setup_nix_self_hosted:
-          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in the jobs with low parallelism
-          save: true
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - execute_sbt_command:
-          cmd: "damlTest"
-          timeout: "10m"
-          extra_env_vars: DAML_DEBUG=1
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-
   auth0_user_cleanup:
     executor: self_hosted
     environment:
@@ -3494,7 +3364,9 @@ jobs:
           cmd: make docker-push -j
           cmd_retry_count: 5
       - run_bash_command_in_nix:
-          additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLE_BRANCH"
+          additional_nix_args: "--keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD \
+            --keep CIRCLE_BRANCH"
           cmd_name: Push Helm Artifacts
           cmd: |
             make cluster/helm/clean # otherwise the digests seem to be ignored as the charts are built in "Build app"
@@ -3526,6 +3398,20 @@ jobs:
             gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
           # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - run_bash_command_in_nix:
+          cmd_name: Copy artifacts to Github Container Registry
+          additional_nix_args: "--keep GITHUB_TOKEN \
+            --keep CIRCLE_BRANCH \
+            --keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD"
+          cmd: |
+            if [[ "$CIRCLE_BRANCH" =~ ^release-line-.*$ ]]; then
+              export GITHUB_USER="canton-network-da"
+              make cluster/helm/copy_release_to_ghcr
+              make cluster/docker/copy_release_to_ghcr
+            else
+              echo "Not a release branch, skipping copying to Github Container Registry"
+            fi
+      - run_bash_command_in_nix:
           cmd_name: tag git
           additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD \
@@ -3551,37 +3437,6 @@ jobs:
       - save_frontend_builds
       - save_sbt_job_result:
           runner_type: "circleci"
-
-  docker_images_build:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    resource_class: xlarge
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - restore_frontend_builds
-      - setup_nix
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - run_bash_command_in_nix:
-          cmd_name: Build app
-          cmd: make build -j
-          cmd_retry_count: 5 # Retry in case of dependency download errors
-          additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD"
-      # compile everything so that caches for circleci runners are up to date
-      - execute_sbt_command:
-          cmd: "Test/compile"
-      - docker_login_artifactory
-      - docker_prep_build
-      - docker_build
-      - save_frontend_builds
-      - save_sbt_job_result:
-          runner_type: "circleci"
-          upload_caches: true
 
   wait_for_previous_pipeline:
     executor: self_hosted
@@ -3942,7 +3797,9 @@ jobs:
       - checkout_with_retry
       - skip_if_flag_set:
           flag: force
-      - setup_nix_self_hosted
+      - setup_nix_self_hosted:
+          # it's actually slower if we have lots of conflicting jobs trying to save the same nix so we save it just in one job
+          save: true
       - setup_sbt_test_job:
           runner_type: "selfhosted"
       - run_bash_command_in_nix:
@@ -4826,205 +4683,6 @@ jobs:
           channel_notify: << parameters.channel_notify >>
           cluster: << parameters.cluster >>
 
-  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
-  # work on anything but the Scala tests is duplicated across all parallel runs of this job
-  scala_test:
-    machine:
-      image: ubuntu-2204:2024.01.1
-    parameters:
-      test_names_file:
-        type: string
-      start_canton_options:
-        type: string
-      pre_sbt_cmd:
-        type: string
-        default: ""
-      post_sbt_cmd:
-        type: string
-        default: ""
-      parallelism:
-        type: integer
-      resource_class:
-        type: string
-      skip_if_regex:
-        type: string
-        default: ""
-      skip_if_files_changed:
-        type: string
-        default: ""
-      with_docker_images:
-        type: boolean
-        default: false
-      additional_nix_args:
-        type: string
-        default: ""
-    resource_class: << parameters.resource_class >>
-    environment:
-      <<: *env
-      POSTGRES_HOST: localhost
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    parallelism: << parameters.parallelism >>
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - skip_if_flag_set:
-          flag: static
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_regex >>" ]
-          steps:
-            - run:
-                name: Checking git commit against regex << parameters.skip_if_regex >>
-                command: |
-                  base=$(build-tools/get-latest-main-commit)
-                  msg=$(git log "$base"..HEAD --pretty=%B)
-                  if [[ $msg =~ << parameters.skip_if_regex >> ]]; then
-                    echo "Commit message ($msg) matches regex (<< parameters.skip_if_regex >>), breaking"
-                    circleci-agent step halt
-                  fi
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_files_changed >>" ]
-          steps:
-            - run:
-                name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
-                command: |
-                  latest_release=$(cat "LATEST_RELEASE")
-                  base=$(git rev-parse heads/origin/release-line-"${latest_release}")
-                  changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
-                  if [ -n "$changed" ]; then
-                    echo "Lock files changed ($changed), breaking"
-                    circleci-agent step halt
-                  fi
-      - setup_nix
-      - docker_prep_build
-      # Used to pull docker images for cometbft
-      - docker_login_artifactory
-      - docker_pull_test_images
-      # Start canton before compiling, as it takes a long time to start
-      # Note that we start canton before connecting VPN, so some initial
-      # metrics from Canton will be lost. Currently, they're Canton metrics
-      # before our actual tests start are not of interest for us,
-      # so we accept that.
-      - start_canton_in_background:
-          start_canton_options: << parameters.start_canton_options >>
-      - setup_sbt_test_job:
-          runner_type: "circleci"
-      - when:
-          condition:
-            equal: [ true, "<< parameters.with_docker_images >>" ]
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: Build app
-                cmd: make build -j
-                cmd_retry_count: 5 # Retry in case of dependency download errors
-                additional_nix_args: "--keep ARTIFACTORY_USER \
-                  --keep ARTIFACTORY_PASSWORD"
-            - docker_build
-      - split_tests_for_parallel_run:
-          test_names_file: << parameters.test_names_file >>
-      - run_splitted_scala_tests:
-          pre_sbt_cmd: << parameters.pre_sbt_cmd >>
-          post_sbt_cmd: << parameters.post_sbt_cmd >>
-          start_canton_options: << parameters.start_canton_options >>
-          additional_nix_args: << parameters.additional_nix_args >>
-      - stop_canton
-      - save_sbt_job_result:
-          runner_type: "circleci"
-  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
-  # work on anything but the Scala tests is duplicated across all parallel runs of this job
-  scala_test_self_hosted:
-    executor: self_hosted_large
-    parameters:
-      test_names_file:
-        type: string
-      start_canton_options:
-        type: string
-      pre_sbt_cmd:
-        type: string
-        default: ""
-      post_sbt_cmd:
-        type: string
-        default: ""
-      parallelism:
-        type: integer
-      skip_if_regex:
-        type: string
-        default: ""
-      skip_if_files_changed:
-        type: string
-        default: ""
-      additional_nix_args:
-        type: string
-        default: ""
-    environment:
-      <<: *env
-      POSTGRES_HOST: localhost
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-    parallelism: << parameters.parallelism >>
-    steps:
-      - checkout_with_retry
-      - skip_if_flag_set:
-          flag: force
-      - skip_if_flag_set:
-          flag: static
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_regex >>" ]
-          steps:
-            - run:
-                name: Checking git commit against regex << parameters.skip_if_regex >>
-                command: |
-                  base=$(build-tools/get-latest-main-commit)
-                  msg=$(git log "$base"..HEAD --pretty=%B)
-                  if [[ $msg =~ << parameters.skip_if_regex >> ]]; then
-                    echo "Commit message ($msg) matches regex (<< parameters.skip_if_regex >>), breaking"
-                    circleci-agent step halt
-                  fi
-      - when:
-          condition:
-            not:
-              equal: [ "", "<< parameters.skip_if_files_changed >>" ]
-          steps:
-            - run:
-                name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
-                command: |
-                  latest_release=$(cat "LATEST_RELEASE")
-                  base=$(git rev-parse heads/origin/release-line-"${latest_release}")
-                  changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
-                  if [ -n "$changed" ]; then
-                    echo "Lock files changed ($changed), breaking"
-                    circleci-agent step halt
-                  fi
-      - run:
-          name: "Prepare postgres"
-          command: |
-            sudo mkdir -p /run/postgresql
-            sudo chown $USER /run/postgresql
-      - setup_nix_self_hosted
-      - start_canton_in_background:
-          start_canton_options: << parameters.start_canton_options >> -p external
-      - setup_sbt_test_job:
-          runner_type: "selfhosted"
-      - split_tests_for_parallel_run:
-          test_names_file: << parameters.test_names_file >>
-      - run_splitted_scala_tests:
-          pre_sbt_cmd: << parameters.pre_sbt_cmd >>
-          post_sbt_cmd: << parameters.post_sbt_cmd >>
-          start_canton_options: << parameters.start_canton_options >>
-          additional_nix_args: << parameters.additional_nix_args >>
-      - stop_canton
-      - save_sbt_job_result:
-          runner_type: "selfhosted"
-
 workflows:
   version: 2
 
@@ -5066,58 +4724,10 @@ workflows:
               ignore:
                 - /release-line-.*/
                 - main
-      # Daml
-      # TODO(#15988): In this job we currently also save the nix cache, if we migrate this
-      # before others, make sure to enable saving the nix cache in some other job instead.
-      - daml_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-      # Scala
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test app upgrade"
-          test_names_file: "test-full-class-names-app-upgrade.log"
-          start_canton_options: "-w"
-          resource_class: "xlarge"
-          parallelism: 1
-          pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
-          skip_if_regex: "\\[breaking\\]"
-          skip_if_files_changed: "nix/canton-sources.json"
-      - scala_test:
-          <<: *minor-release-branch-never
-          <<: *notify-fail
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          name: "scala_test with docker images"
-          test_names_file: "test-full-class-names-docker-based.log"
-          start_canton_options: "-w -m"
-          additional_nix_args: >
-            --keep VALIDATOR_WEB_UI_PASSWORD
-            --keep OIDC_AUTHORITY_VALIDATOR_AUDIENCE
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
-          with_docker_images: true
-          resource_class: "2xlarge"
-          parallelism: 2
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
           <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-      - docker_images_build:
-          <<: *notify-fail
           context:
             - artifactory
             - slack-context
@@ -5126,6 +4736,8 @@ workflows:
           context:
             - slack-context
           channel_notify: C03J6NCPSE4
+      # TODO(#15988): In this job we currently also save the nix cache. Before we retire it,
+      # make sure to enable saving the nix cache in some other job instead.
       - build_oss:
           <<: *notify-fail
           context:

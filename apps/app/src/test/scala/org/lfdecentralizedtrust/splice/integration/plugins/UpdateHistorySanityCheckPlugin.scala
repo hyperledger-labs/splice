@@ -137,6 +137,7 @@ class UpdateHistorySanityCheckPlugin(
         case (otherItem, idx) if founderComparable(idx) != otherItem =>
           otherItem -> founderComparable(idx)
       }
+
       different should be(empty)
     }
   }

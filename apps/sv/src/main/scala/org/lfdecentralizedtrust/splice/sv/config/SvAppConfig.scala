@@ -12,22 +12,22 @@ import org.lfdecentralizedtrust.splice.config.{
   ParticipantBootstrapDumpConfig,
   ParticipantClientConfig,
   SpliceBackendConfig,
-  SpliceDbConfig,
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeLong,
   NonNegativeNumeric,
   PositiveNumeric,
 }
-import com.digitalasset.canton.domain.config.DomainParametersConfig
-import com.digitalasset.canton.domain.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.domain.sequencing.config.RemoteSequencerConfig
+import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
+import com.digitalasset.canton.synchronizer.sequencing.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.model.Uri
 
@@ -166,7 +166,7 @@ final case class SynchronizerFeesConfig(
 )
 
 final case class SvDecentralizedSynchronizerConfig(
-    alias: DomainAlias,
+    alias: SynchronizerAlias,
     /** This must be set for SVs that onboard to initiallly connect to their sponsoring SV’s sequencer.
       * Afterwards it can be unset.
       */
@@ -197,8 +197,8 @@ final case class BeneficiaryConfig(
 )
 
 case class SvAppBackendConfig(
-    override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: SpliceDbConfig,
+    override val adminApi: AdminServerConfig = AdminServerConfig(),
+    override val storage: DbConfig,
     ledgerApiUser: String,
     // The SV app shares the primary party with the validator app. To discover it we query the
     // validator user. Additionally, sv1 app is expected to create that user,
@@ -296,6 +296,8 @@ final case class SvSequencerConfig(
     // TODO (#8282): consider reading config value from participant instead of configuring here
     sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     pruning: Option[SequencerPruningConfig] = None,
+    isBftSequencer: Boolean = false,
+    bftPeerEndpoints: Seq[Endpoint] = Seq.empty,
 ) {
   def toCantonConfig: RemoteSequencerConfig = RemoteSequencerConfig(
     adminApi,
@@ -323,8 +325,9 @@ final case class SvScanConfig(
 final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
-    parameters: DomainParametersConfig = DomainParametersConfig(),
-)
+) {
+  val parameters: SynchronizerParametersConfig = SynchronizerParametersConfig()
+}
 
 final case class SvCantonIdentifierConfig(
     participant: String,

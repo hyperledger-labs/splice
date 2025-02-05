@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.conflictdetection
@@ -33,9 +33,11 @@ class NaiveRequestTrackerTest
     val reassignmentCache =
       new ReassignmentCache(
         new InMemoryReassignmentStore(
-          ReassignmentStoreTest.targetDomainId,
+          ReassignmentStoreTest.targetSynchronizerId,
           loggerFactory,
         ),
+        FutureSupervisor.Noop,
+        timeouts,
         loggerFactory,
       )
 
@@ -55,7 +57,7 @@ class NaiveRequestTrackerTest
       sc,
       ts,
       conflictDetector,
-      ParticipantTestMetrics.domain.conflictDetection,
+      ParticipantTestMetrics.synchronizer.conflictDetection,
       exitOnFatalFailures = false,
       timeouts,
       loggerFactory,
@@ -68,7 +70,7 @@ class NaiveRequestTrackerTest
     behave like requestTracker(mk)
   }
 
-  "requests are evicted when they are finalized" in {
+  "requests are evicted when they are finalized" inUS {
     for {
       acs <- mkAcs()
       rt = mk(SequencerCounter(0), CantonTimestamp.MinValue, acs)
@@ -113,7 +115,7 @@ class NaiveRequestTrackerTest
     } yield succeed
   }
 
-  "requests are evicted when they time out" in {
+  "requests are evicted when they time out" inUS {
     for {
       acs <- mkAcs()
       rt = mk(SequencerCounter(0), CantonTimestamp.Epoch, acs)

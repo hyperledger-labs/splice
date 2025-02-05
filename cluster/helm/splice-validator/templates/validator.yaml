@@ -220,6 +220,15 @@ spec:
               {{- end }}
             }
         {{- end }}
+        {{- with .Values.participantPruningSchedule }}
+        - name: ADDITIONAL_CONFIG_WALLET_SWEEP
+          value: |
+            canton.validator-apps.validator_backend.participant-pruning-schedule {
+                cron = {{ .cron | quote }}
+                max-duration = {{ .maxDuration | quote }}
+                retention = {{ .retention | quote }}
+            }
+        {{- end }}
         {{- if .Values.autoAcceptTransfers }}
         - name: ADDITIONAL_CONFIG_AUTO_ACCEPT_TRANSFERS
           value: |

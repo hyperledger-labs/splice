@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.setup
 import cats.implicits.{showInterpolator, toFoldableOps}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
-import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey, SigningPublicKeyWithName}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
@@ -241,7 +241,16 @@ class NodeInitializer(
       _ <-
         if (expectedId != dump.id) {
           connection.listMyKeys().flatMap { keys =>
-            NonEmpty.from(keys) match {
+            val nonNamespaceKeys = keys.filter { key =>
+              key.publicKeyWithName match {
+                case SigningPublicKeyWithName(signignKey, _)
+                    // namespace keys are implicitly owned and they cannot be used to prove ownership of other keys
+                    if signignKey.usage == SigningKeyUsage.NamespaceOnly =>
+                  false
+                case _ => true
+              }
+            }
+            NonEmpty.from(nonNamespaceKeys) match {
               case None =>
                 Future.failed(
                   Status.INTERNAL

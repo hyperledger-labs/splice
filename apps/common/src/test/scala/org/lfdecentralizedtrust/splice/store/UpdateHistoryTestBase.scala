@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
@@ -36,7 +37,7 @@ abstract class UpdateHistoryTestBase
   import UpdateHistoryTestBase.*
 
   protected def create(
-      domain: DomainId,
+      domain: SynchronizerId,
       contractId: String,
       offset: Long,
       party: PartyId,
@@ -59,8 +60,8 @@ abstract class UpdateHistoryTestBase
   }
 
   protected def assign(
-      domainTo: DomainId,
-      domainFrom: DomainId,
+      domainTo: SynchronizerId,
+      domainFrom: SynchronizerId,
       contractId: String,
       offset: Long,
       party: PartyId,
@@ -88,8 +89,8 @@ abstract class UpdateHistoryTestBase
   }
 
   protected def unassign(
-      domainFrom: DomainId,
-      domainTo: DomainId,
+      domainFrom: SynchronizerId,
+      domainTo: SynchronizerId,
       contractId: String,
       offset: Long,
       party: PartyId,
@@ -117,7 +118,7 @@ abstract class UpdateHistoryTestBase
   }
 
   protected def createMulti(
-      domain: DomainId,
+      domain: SynchronizerId,
       contractId: String,
       offset: Long,
       party: PartyId,
@@ -153,7 +154,7 @@ abstract class UpdateHistoryTestBase
   protected val endOffset = "9".repeat(16)
 
   protected def singleRootEvent(tree: TransactionTree): TreeEvent = {
-    val rootEventIds = tree.getRootEventIds.asScala
+    val rootEventIds = tree.getRootNodeIds.asScala
     rootEventIds.length should be(1)
     val rootEventId = rootEventIds.headOption.value
     tree.getEventsById.get(rootEventId)
@@ -167,13 +168,13 @@ abstract class UpdateHistoryTestBase
       case (GetTreeUpdatesResponse(TransactionTreeUpdate(tree), domain), expected) =>
         val rootEvent = singleRootEvent(tree)
         (rootEvent, expected) match {
-          case (rootEvent: CreatedEvent, ExpectedCreate(cid, domainId)) =>
+          case (rootEvent: CreatedEvent, ExpectedCreate(cid, synchronizerId)) =>
             rootEvent.getContractId should be(cid)
-            domain should be(domainId)
-          case (rootEvent: ExercisedEvent, ExpectedExercise(cid, domainId, choice)) =>
+            domain should be(synchronizerId)
+          case (rootEvent: ExercisedEvent, ExpectedExercise(cid, synchronizerId, choice)) =>
             rootEvent.getContractId should be(cid)
             rootEvent.getChoice should be(choice)
-            domain should be(domainId)
+            domain should be(synchronizerId)
           case (event, expected) =>
             throw new RuntimeException(s"Unexpected event type. event: $event, expected: $expected")
         }
@@ -181,13 +182,13 @@ abstract class UpdateHistoryTestBase
         (update.event, expected) match {
           case (unassign: ReassignmentEvent.Unassign, expected: ExpectedUnassign) =>
             unassign.contractId.contractId should be(expected.cid)
-            domain should be(expected.domainId)
-            unassign.source should be(expected.domainId)
+            domain should be(expected.synchronizerId)
+            unassign.source should be(expected.synchronizerId)
             unassign.target should be(expected.targetDomain)
           case (assign: ReassignmentEvent.Assign, expected: ExpectedAssign) =>
             assign.createdEvent.getContractId should be(expected.cid)
             assign.source should be(expected.sourceDomain)
-            assign.target should be(expected.domainId)
+            assign.target should be(expected.synchronizerId)
           case (event, expected) =>
             throw new RuntimeException(
               s"Unexpected reassignment type. event: $event, expected: $expected"
@@ -222,7 +223,9 @@ abstract class UpdateHistoryTestBase
     )
   }
 
-  override def cleanDb(storage: DbStorage)(implicit traceContext: TraceContext): Future[?] =
+  override def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()
@@ -234,8 +237,8 @@ abstract class UpdateHistoryTestBase
   protected val migration1 = 1L
   protected val migration2 = 2L
 
-  protected val domain1: DomainId = DomainId.tryFromString("domain1::domain")
-  protected val domain2: DomainId = DomainId.tryFromString("domain2::domain")
+  protected val domain1: SynchronizerId = SynchronizerId.tryFromString("domain1::domain")
+  protected val domain2: SynchronizerId = SynchronizerId.tryFromString("domain2::domain")
 
   protected val cid1 = validContractId(1)
   protected val cid2 = validContractId(2)
@@ -251,15 +254,22 @@ abstract class UpdateHistoryTestBase
 
 object UpdateHistoryTestBase {
   sealed trait ExpectedUpdate extends Product with Serializable
-  final case class ExpectedCreate(cid: String, domainId: DomainId) extends ExpectedUpdate
-  final case class ExpectedExercise(cid: String, domainId: DomainId, choice: String)
+  final case class ExpectedCreate(cid: String, synchronizerId: SynchronizerId)
+      extends ExpectedUpdate
+  final case class ExpectedExercise(cid: String, synchronizerId: SynchronizerId, choice: String)
       extends ExpectedUpdate
 
-  final case class ExpectedAssign(cid: String, sourceDomain: DomainId, domainId: DomainId)
-      extends ExpectedUpdate
+  final case class ExpectedAssign(
+      cid: String,
+      sourceDomain: SynchronizerId,
+      synchronizerId: SynchronizerId,
+  ) extends ExpectedUpdate
 
-  final case class ExpectedUnassign(cid: String, domainId: DomainId, targetDomain: DomainId)
-      extends ExpectedUpdate
+  final case class ExpectedUnassign(
+      cid: String,
+      synchronizerId: SynchronizerId,
+      targetDomain: SynchronizerId,
+  ) extends ExpectedUpdate
 
   sealed trait LostDataMode
 
@@ -311,8 +321,8 @@ object UpdateHistoryTestBase {
       /*effectiveAt = */ tree.getEffectiveAt,
       /*offset = */ tree.getOffset,
       /*eventsById = */ tree.getEventsById.asScala.view.mapValues(withoutLostData).toMap.asJava,
-      /*rootEventIds = */ tree.getRootEventIds,
-      /*domainId = */ tree.getDomainId,
+      /*rootEventIds = */ tree.getRootNodeIds,
+      /*synchronizerId = */ tree.getSynchronizerId,
 
       // We don't care about tracing information in the update history.
       /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance, // Not preserved
@@ -338,7 +348,8 @@ object UpdateHistoryTestBase {
       // so this would always end up being the operator party of our own application which is not very useful.
       /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
 
-      /*eventId = */ created.getEventId,
+      /*offset = */ 0, // not preserved
+      /*nodeId = */ created.getNodeId,
       /*templateId = */ created.getTemplateId,
       /*packageName = */ created.getPackageName,
       /*contractId = */ created.getContractId,
@@ -368,7 +379,8 @@ object UpdateHistoryTestBase {
       // so this would always end up being the operator party of our own application which is not very useful.
       /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
 
-      /*eventId = */ exercised.getEventId,
+      /*offset = */ 0, // not preserved
+      /*nodeId = */ exercised.getNodeId,
       /*templateId = */ exercised.getTemplateId,
       /*packageName = */ exercised.getPackageName,
       /*interfaceId = */ exercised.getInterfaceId,
@@ -377,7 +389,7 @@ object UpdateHistoryTestBase {
       /*choiceArgument = */ exercised.getChoiceArgument,
       /*actingParties = */ exercised.getActingParties,
       /*consuming = */ exercised.isConsuming,
-      /*childEventIds = */ exercised.getChildEventIds,
+      /*childEventIds = */ exercised.getChildNodeIds,
       /*exerciseResult = */ exercised.getExerciseResult,
     )
   }

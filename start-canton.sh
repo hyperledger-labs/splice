@@ -16,6 +16,7 @@ function usage() {
   echo "  -s               only start canton instance with simulated time"
   echo "  -f               start canton using the CometBFT driver for the global sequencers"
   echo "  -F               same as -f, but does not start cometBFT, but rather assumes it is already running"
+  echo "  -e               start canton using the canton provided BFT sequencer"
   echo "  -m               collect metrics and send them to our CI prometheus instance"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
@@ -29,10 +30,11 @@ CANTON=canton
 bootstrapScriptPath=bootstrap-canton.sc
 start_cometbft=0
 use_cometbft=0
+use_bft=0
 softDomainMigration=0
 collect_metrics=0
 
-args=$(getopt -o "hdDap:c:wsbtfFgm" -l "help,soft-domain-migration" -- "$@")
+args=$(getopt -o "hdDap:c:wsbtfFegm" -l "help,soft-domain-migration" -- "$@")
 
 eval set -- "$args"
 
@@ -82,6 +84,10 @@ do
             start_cometbft=0
             use_cometbft=1
             echo "start canton with the cometbft driver (assuming CometBFT is already running)"
+            ;;
+        -e)
+            use_bft=1
+            echo "start canton with the bft sequencer"
             ;;
         -m)
             collect_metrics=1
@@ -204,6 +210,10 @@ config_overrides_simtime=""
 
 if [[ $use_cometbft -eq 1 ]]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/cometbft-sequencer-global-domain-overrides.conf"
+fi;
+
+if [[ $use_bft -eq 1 ]]; then
+  config_overrides="$config_overrides -c ./apps/app/src/test/resources/bft-sequencer-global-domain-overrides.conf"
 fi;
 
 

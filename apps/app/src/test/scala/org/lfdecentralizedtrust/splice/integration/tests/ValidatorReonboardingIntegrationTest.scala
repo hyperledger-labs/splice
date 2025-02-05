@@ -6,7 +6,6 @@ import org.lfdecentralizedtrust.splice.config.{
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
   ParticipantClientConfig,
-  SpliceDbConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -21,7 +20,7 @@ import org.lfdecentralizedtrust.splice.validator.config.{
   ValidatorCantonIdentifierConfig,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ClientConfig, DbConfig}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -108,7 +107,7 @@ class ValidatorReonboardingIntegrationTest
             adminApi =
               aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
             storage = aliceValidatorConfig.storage match {
-              case c: SpliceDbConfig.Postgres =>
+              case c: DbConfig.Postgres =>
                 c.copy(
                   config = c.config
                     .withValue(

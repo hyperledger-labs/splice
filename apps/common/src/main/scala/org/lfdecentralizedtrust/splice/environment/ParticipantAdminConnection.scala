@@ -4,25 +4,32 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.syntax.either.*
 import cats.implicits.catsSyntaxParallelTraverse_
-import com.digitalasset.canton.DomainAlias
+import cats.syntax.either.*
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   ParticipantAdminCommands,
+  PruningSchedulerCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.{
-  ListConnectedDomainsResult,
+  ListConnectedSynchronizersResult,
   NodeStatus,
   ParticipantStatus,
+  PruningSchedule,
 }
-import com.digitalasset.canton.admin.participant.v30.{DarDescription, ExportAcsResponse}
+import com.digitalasset.canton.admin.participant.v30.{
+  DarDescription,
+  ExportAcsResponse,
+  PruningServiceGrpc,
+}
+import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.store.TopologyStoreId
@@ -34,7 +41,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyMapping,
 }
-import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
@@ -80,6 +87,16 @@ class ParticipantAdminConnection(
     with StatusAdminConnection {
   override val serviceName = "Canton Participant Admin API"
 
+  val pruningCommands = new PruningSchedulerCommands[PruningServiceStub](
+    PruningServiceGrpc.stub,
+    _.setSchedule(_),
+    _.clearSchedule(_),
+    _.setCron(_),
+    _.setMaxDuration(_),
+    _.setRetention(_),
+    _.getSchedule(_),
+  )
+
   override protected type Status = ParticipantStatus
 
   override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
@@ -92,8 +109,8 @@ class ParticipantAdminConnection(
 
   private def listConnectedDomains()(implicit
       traceContext: TraceContext
-  ): Future[Seq[ListConnectedDomainsResult]] = {
-    runCmd(ParticipantAdminCommands.DomainConnectivity.ListConnectedDomains())
+  ): Future[Seq[ListConnectedSynchronizersResult]] = {
+    runCmd(ParticipantAdminCommands.SynchronizerConnectivity.ListConnectedSynchronizers())
   }
 
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean] =
@@ -103,37 +120,41 @@ class ParticipantAdminConnection(
       case NodeStatus.Success(_) => true
     }
 
-  def getDomainId(domainAlias: DomainAlias)(implicit
+  def getSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
-  ): Future[DomainId] =
-    // We avoid ParticipantAdminCommands.DomainConnectivity.GetDomainId which tries to make
-    // a new request to the sequencer to query the domain id. ListConnectedDomains
+  ): Future[SynchronizerId] =
+    // We avoid ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId which tries to make
+    // a new request to the sequencer to query the domain id. ListConnectedSynchronizers
     // on the other hand relies on a cache
     listConnectedDomains().map(
       _.find(
-        _.domainAlias == domainAlias
+        _.synchronizerAlias == synchronizerAlias
       ).fold(
         throw Status.NOT_FOUND
-          .withDescription(s"Domain with alias $domainAlias is not connected")
+          .withDescription(s"Domain with alias $synchronizerAlias is not connected")
           .asRuntimeException()
-      )(_.domainId)
+      )(_.synchronizerId)
     )
 
-  /** Usually you want getDomainId instead which is much faster if the domain is connected
+  /** Usually you want getSynchronizerId instead which is much faster if the domain is connected
     *  but in some cases we want to check the domain id
     * without risking a full domain connection.
     */
-  def getDomainIdWithoutConnecting(domainAlias: DomainAlias)(implicit
+  def getSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
-  ): Future[DomainId] =
+  ): Future[SynchronizerId] =
     runCmd(
-      ParticipantAdminCommands.DomainConnectivity.GetDomainId(domainAlias)
+      ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
     )
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    runCmd(ParticipantAdminCommands.DomainConnectivity.ReconnectDomains(ignoreFailures = false))
+    runCmd(
+      ParticipantAdminCommands.SynchronizerConnectivity.ReconnectSynchronizers(ignoreFailures =
+        false
+      )
+    )
   }
 
   def disconnectFromAllDomains()(implicit
@@ -142,46 +163,51 @@ class ParticipantAdminConnection(
     domains <- listConnectedDomains()
     _ <- Future.sequence(
       domains.map(domain =>
-        runCmd(ParticipantAdminCommands.DomainConnectivity.DisconnectDomain(domain.domainAlias))
+        runCmd(
+          ParticipantAdminCommands.SynchronizerConnectivity.DisconnectSynchronizer(
+            domain.synchronizerAlias
+          )
+        )
       )
     )
   } yield ()
 
-  private def registerDomain(config: DomainConnectionConfig, handshakeOnly: Boolean)(implicit
+  private def registerDomain(config: SynchronizerConnectionConfig, handshakeOnly: Boolean)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
-      ParticipantAdminCommands.DomainConnectivity.RegisterDomain(
+      ParticipantAdminCommands.SynchronizerConnectivity.RegisterSynchronizer(
         config,
         handshakeOnly,
-        // TODO(#10985) Consider enabling this
-        SequencerConnectionValidation.Disabled,
+        SequencerConnectionValidation.All,
       )
     )
 
-  def connectDomain(alias: DomainAlias)(implicit
+  def connectDomain(alias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     retryProvider.retryForClientCalls(
       "connect_domain",
       s"participant is connected to $alias",
-      runCmd(ParticipantAdminCommands.DomainConnectivity.ReconnectDomain(alias, retry = false)).map(
-        isConnected =>
-          if (!isConnected) {
-            val msg = s"failed to connect to ${alias}"
-            throw Status.Code.FAILED_PRECONDITION.toStatus.withDescription(msg).asRuntimeException()
-          }
+      runCmd(
+        ParticipantAdminCommands.SynchronizerConnectivity
+          .ReconnectSynchronizer(alias, retry = false)
+      ).map(isConnected =>
+        if (!isConnected) {
+          val msg = s"failed to connect to ${alias}"
+          throw Status.Code.FAILED_PRECONDITION.toStatus.withDescription(msg).asRuntimeException()
+        }
       ),
       logger,
     )
 
-  private def disconnectDomain(alias: DomainAlias)(implicit
+  private def disconnectDomain(alias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
-    runCmd(ParticipantAdminCommands.DomainConnectivity.DisconnectDomain(alias))
+    runCmd(ParticipantAdminCommands.SynchronizerConnectivity.DisconnectSynchronizer(alias))
 
   def ensureDomainRegistered(
-      config: DomainConnectionConfig,
+      config: SynchronizerConnectionConfig,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
@@ -189,8 +215,8 @@ class ParticipantAdminConnection(
         .ensureThat(
           retryFor,
           "domain_registered_handshake",
-          s"participant registered ${config.domain} with handshake only",
-          lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
+          s"participant registered ${config.synchronizerAlias} with handshake only",
+          lookupSynchronizerConnectionConfig(config.synchronizerAlias).map(_.toRight(())),
           (_: Unit) => registerDomain(config, handshakeOnly = true),
           logger,
         )
@@ -198,7 +224,7 @@ class ParticipantAdminConnection(
   }
 
   def ensureDomainRegisteredNoHandshake(
-      config: DomainConnectionConfig,
+      config: SynchronizerConnectionConfig,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     require(
@@ -210,8 +236,8 @@ class ParticipantAdminConnection(
         .ensureThat(
           retryFor,
           "domain_registered_no_handshake",
-          s"participant registered ${config.domain}",
-          lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
+          s"participant registered ${config.synchronizerAlias}",
+          lookupSynchronizerConnectionConfig(config.synchronizerAlias).map(_.toRight(())),
           (_: Unit) => registerDomain(config, handshakeOnly = false),
           logger,
         )
@@ -219,35 +245,37 @@ class ParticipantAdminConnection(
   }
 
   def ensureDomainRegisteredAndConnected(
-      config: DomainConnectionConfig,
+      config: SynchronizerConnectionConfig,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = for {
     _ <- retryProvider
       .ensureThat(
         retryFor,
         "domain_registered",
-        s"participant registered ${config.domain} with config $config",
-        lookupDomainConnectionConfig(config.domain).map {
+        s"participant registered ${config.synchronizerAlias} with config $config",
+        lookupSynchronizerConnectionConfig(config.synchronizerAlias).map {
           case Some(existingConfig) if existingConfig == config => Right(())
           case Some(other) => Left(Some(other))
           case None => Left(None)
         },
-        (existingDomainConfig: Option[DomainConnectionConfig]) =>
+        (existingDomainConfig: Option[SynchronizerConnectionConfig]) =>
           existingDomainConfig match {
             case None =>
               logger.info(s"Registering new domain with config $config")
               registerDomain(config, handshakeOnly = false)
             case Some(_) =>
-              modifyDomainConnectionConfigAndReconnect(config.domain, _ => Some(config)).map(_ =>
-                ()
+              modifySynchronizerConnectionConfigAndReconnect(
+                config.synchronizerAlias,
+                _ => Some(config),
               )
+                .map(_ => ())
           },
         logger,
       )
-    _ <- connectDomain(config.domain)
+    _ <- connectDomain(config.synchronizerAlias)
   } yield ()
 
-  private def reconnectDomain(alias: DomainAlias)(implicit
+  private def reconnectDomain(alias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[Unit] = for {
     _ <- retryProvider.retryForClientCalls(
@@ -260,21 +288,21 @@ class ParticipantAdminConnection(
   } yield ()
 
   def getParticipantTrafficState(
-      domainId: DomainId
+      synchronizerId: SynchronizerId
   )(implicit traceContext: TraceContext): Future[TrafficState] = {
     runCmd(
-      ParticipantAdminCommands.TrafficControl.GetTrafficControlState(domainId)
+      ParticipantAdminCommands.TrafficControl.GetTrafficControlState(synchronizerId)
     )
   }
 
   def downloadAcsSnapshot(
       parties: Set[PartyId],
-      filterDomainId: Option[DomainId] = None,
+      filterSynchronizerId: Option[SynchronizerId] = None,
       timestamp: Option[Instant] = None,
       force: Boolean = false,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
     logger.debug(
-      show"Downloading ACS snapshot from domain $filterDomainId, for parties $parties at timestamp $timestamp"
+      show"Downloading ACS snapshot from domain $filterSynchronizerId, for parties $parties at timestamp $timestamp"
     )
     val requestComplete = Promise[ByteString]()
     // TODO(#3298) just concatenate the byteString here. Make it scale to 2M contracts.
@@ -283,7 +311,7 @@ class ParticipantAdminConnection(
       ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
         parties = parties,
         partiesOffboarding = false,
-        filterDomainId,
+        filterSynchronizerId,
         timestamp,
         observer,
         Map.empty,
@@ -316,25 +344,30 @@ class ParticipantAdminConnection(
 
   def listConnectedDomain()(implicit
       traceContext: TraceContext
-  ): Future[Seq[ListConnectedDomainsResult]] =
+  ): Future[Seq[ListConnectedSynchronizersResult]] =
     for {
-      connectedDomain <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListConnectedDomains())
+      connectedDomain <- runCmd(
+        ParticipantAdminCommands.SynchronizerConnectivity.ListConnectedSynchronizers()
+      )
     } yield connectedDomain
 
-  def lookupDomainConnectionConfig(
-      domain: DomainAlias
-  )(implicit traceContext: TraceContext): Future[Option[DomainConnectionConfig]] =
+  def lookupSynchronizerConnectionConfig(
+      domain: SynchronizerAlias
+  )(implicit traceContext: TraceContext): Future[Option[SynchronizerConnectionConfig]] =
     for {
-      configuredDomains <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListRegisteredDomains)
+      configuredDomains <- runCmd(
+        ParticipantAdminCommands.SynchronizerConnectivity.ListRegisteredSynchronizers
+      )
     } yield configuredDomains
       .collectFirst {
-        case (configuredDomain, _) if configuredDomain.domain == domain => configuredDomain
+        case (configuredDomain, _) if configuredDomain.synchronizerAlias == domain =>
+          configuredDomain
       }
 
-  def getDomainConnectionConfig(
-      domain: DomainAlias
-  )(implicit traceContext: TraceContext): Future[DomainConnectionConfig] =
-    lookupDomainConnectionConfig(domain).map(
+  def getSynchronizerConnectionConfig(
+      domain: SynchronizerAlias
+  )(implicit traceContext: TraceContext): Future[SynchronizerConnectionConfig] =
+    lookupSynchronizerConnectionConfig(domain).map(
       _.getOrElse(
         throw Status.NOT_FOUND
           .withDescription(s"Domain $domain is not configured on the participant")
@@ -342,23 +375,22 @@ class ParticipantAdminConnection(
       )
     )
 
-  private def setDomainConnectionConfig(config: DomainConnectionConfig)(implicit
+  private def setSynchronizerConnectionConfig(config: SynchronizerConnectionConfig)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
-      ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(
+      ParticipantAdminCommands.SynchronizerConnectivity.ModifySynchronizerConnection(
         config,
-        // TODO(#10985) Consider enabling this
-        SequencerConnectionValidation.Disabled,
+        SequencerConnectionValidation.All,
       )
     )
 
-  def modifyDomainConnectionConfig(
-      domain: DomainAlias,
-      f: DomainConnectionConfig => Option[DomainConnectionConfig],
+  def modifySynchronizerConnectionConfig(
+      domain: SynchronizerAlias,
+      f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Boolean] =
     for {
-      oldConfig <- getDomainConnectionConfig(domain)
+      oldConfig <- getSynchronizerConnectionConfig(domain)
       newConfig = f(oldConfig)
       configModified <- newConfig match {
         case None =>
@@ -369,26 +401,26 @@ class ParticipantAdminConnection(
             s"Updating to new domain connection config for domain $domain. Old config: $oldConfig, new config: $config"
           )
           for {
-            _ <- setDomainConnectionConfig(config)
+            _ <- setSynchronizerConnectionConfig(config)
           } yield true
       }
     } yield configModified
 
-  private def modifyOrRegisterDomainConnectionConfig(
-      config: DomainConnectionConfig,
-      f: DomainConnectionConfig => Option[DomainConnectionConfig],
+  private def modifyOrRegisterSynchronizerConnectionConfig(
+      config: SynchronizerConnectionConfig,
+      f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Boolean] =
     for {
-      configO <- lookupDomainConnectionConfig(config.domain)
+      configO <- lookupSynchronizerConnectionConfig(config.synchronizerAlias)
       needsReconnect <- configO match {
         case Some(config) =>
-          modifyDomainConnectionConfig(
-            config.domain,
+          modifySynchronizerConnectionConfig(
+            config.synchronizerAlias,
             f,
           )
         case None =>
-          logger.info(s"Domain ${config.domain} is new, registering")
+          logger.info(s"Domain ${config.synchronizerAlias} is new, registering")
           ensureDomainRegisteredAndConnected(
             config,
             retryFor,
@@ -396,12 +428,12 @@ class ParticipantAdminConnection(
       }
     } yield needsReconnect
 
-  def modifyDomainConnectionConfigAndReconnect(
-      domain: DomainAlias,
-      f: DomainConnectionConfig => Option[DomainConnectionConfig],
+  def modifySynchronizerConnectionConfigAndReconnect(
+      domain: SynchronizerAlias,
+      f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
-      configModified <- modifyDomainConnectionConfig(domain, f)
+      configModified <- modifySynchronizerConnectionConfig(domain, f)
       _ <-
         if (configModified) {
           logger.info(
@@ -411,19 +443,19 @@ class ParticipantAdminConnection(
         } else Future.unit
     } yield ()
 
-  def modifyOrRegisterDomainConnectionConfigAndReconnect(
-      config: DomainConnectionConfig,
-      f: DomainConnectionConfig => Option[DomainConnectionConfig],
+  def modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
+      config: SynchronizerConnectionConfig,
+      f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
-      configModified <- modifyOrRegisterDomainConnectionConfig(config, f, retryFor)
+      configModified <- modifyOrRegisterSynchronizerConnectionConfig(config, f, retryFor)
       _ <-
         if (configModified) {
           logger.info(
-            s"reconnect to the domain ${config.domain} for new sequencer configuration to take effect"
+            s"reconnect to the domain ${config.synchronizerAlias} for new sequencer configuration to take effect"
           )
-          reconnectDomain(config.domain)
+          reconnectDomain(config.synchronizerAlias)
         } else Future.unit
     } yield ()
 
@@ -600,7 +632,7 @@ class ParticipantAdminConnection(
   }
 
   def ensurePartyToParticipantRemovalProposal(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       party: PartyId,
       participantToRemove: ParticipantId,
   )(implicit
@@ -611,14 +643,14 @@ class ParticipantAdminConnection(
     }
     ensurePartyToParticipantProposal(
       s"Party $party is proposed to be removed from $participantToRemove",
-      domainId,
+      synchronizerId,
       party,
       removeParticipant,
     )
   }
 
   def ensurePartyToParticipantAdditionProposal(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       party: PartyId,
       newParticipant: ParticipantId,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
@@ -635,23 +667,23 @@ class ParticipantAdminConnection(
     }
     ensurePartyToParticipantProposal(
       s"Party $party is proposed to be added on $newParticipant",
-      domainId,
+      synchronizerId,
       party,
       addParticipant,
     )
   }
 
   def ensurePartyToParticipantAdditionProposalWithSerial(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       party: PartyId,
       newParticipant: ParticipantId,
       expectedSerial: PositiveInt,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     ensureTopologyMapping[PartyToParticipant](
-      TopologyStoreId.DomainStore(domainId),
+      TopologyStoreId.SynchronizerStore(synchronizerId),
       show"Party $party is authorized on $newParticipant",
       EitherT(
-        getPartyToParticipant(domainId, party)
+        getPartyToParticipant(synchronizerId, party)
           .map(result =>
             Either
               .cond(
@@ -687,7 +719,7 @@ class ParticipantAdminConnection(
   // the participantChange participant sequence must be ordering, if not canton will consider topology proposals with different ordering as fully different proposals and will not aggregate signatures
   private def ensurePartyToParticipantProposal(
       description: String,
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       party: PartyId,
       participantChange: Seq[HostingParticipant] => Seq[
         HostingParticipant
@@ -698,7 +730,7 @@ class ParticipantAdminConnection(
         case transactionType @ (TopologyTransactionType.ProposalSignedByOwnKey |
             TopologyTransactionType.AllProposals) =>
           listPartyToParticipant(
-            filterStore = domainId.filterString,
+            filterStore = synchronizerId.filterString,
             filterParty = party.filterString,
             proposals = transactionType,
           ).flatMap { proposals =>
@@ -734,7 +766,7 @@ class ParticipantAdminConnection(
                 .getOrElse(
                   throw Status.NOT_FOUND
                     .withDescription(
-                      s"No party to participant proposal for party $party on domain $domainId"
+                      s"No party to participant proposal for party $party on domain $synchronizerId"
                     )
                     .asRuntimeException()
                 )
@@ -742,7 +774,7 @@ class ParticipantAdminConnection(
             }
           }
         case TopologyTransactionType.AuthorizedState =>
-          getPartyToParticipant(domainId, party).map(result => {
+          getPartyToParticipant(synchronizerId, party).map(result => {
             val newHostingParticipants = participantChange(
               result.mapping.participants
             )
@@ -757,7 +789,7 @@ class ParticipantAdminConnection(
     }
 
     ensureTopologyProposal[PartyToParticipant](
-      TopologyStoreId.DomainStore(domainId),
+      TopologyStoreId.SynchronizerStore(synchronizerId),
       description,
       queryType => findPartyToParticipant(queryType),
       previous => {
@@ -775,7 +807,7 @@ class ParticipantAdminConnection(
   }
 
   def ensureHostingParticipantIsPromotedToSubmitter(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       party: PartyId,
       participantId: ParticipantId,
       retryFor: RetryFor,
@@ -789,9 +821,9 @@ class ParticipantAdminConnection(
     }
 
     ensureTopologyMapping[PartyToParticipant](
-      TopologyStoreId.DomainStore(domainId),
+      TopologyStoreId.SynchronizerStore(synchronizerId),
       s"Participant $participantId is promoted to have Submission permission for party $party",
-      EitherT(getPartyToParticipant(domainId, party).map(result => {
+      EitherT(getPartyToParticipant(synchronizerId, party).map(result => {
         Either.cond(
           result.mapping.participants
             .contains(HostingParticipant(participantId, ParticipantPermission.Submission)),
@@ -816,6 +848,37 @@ class ParticipantAdminConnection(
       isProposal = true,
     )
   }
+
+  private def setPruningSchedule(
+      cron: String,
+      maxDuration: PositiveDurationSeconds,
+      retention: PositiveDurationSeconds,
+  )(implicit tc: TraceContext): Future[Unit] =
+    runCmd(pruningCommands.SetScheduleCommand(cron, maxDuration, retention))
+
+  private def getPruningSchedule()(implicit tc: TraceContext): Future[Option[PruningSchedule]] =
+    runCmd(pruningCommands.GetScheduleCommand())
+
+  /** The schedule is specified in cron format and "max_duration" and "retention" durations. The cron string indicates
+    *      the points in time at which pruning should begin in the GMT time zone, and the maximum duration indicates how
+    *      long from the start time pruning is allowed to run as long as pruning has not finished pruning up to the
+    *      specified retention period.
+    */
+  def ensurePruningSchedule(
+      cron: String,
+      maxDuration: PositiveDurationSeconds,
+      retention: PositiveDurationSeconds,
+  )(implicit tc: TraceContext): Future[Unit] =
+    retryProvider.ensureThatB(
+      RetryFor.WaitingOnInitDependency,
+      "participant_pruning_schedule",
+      s"Pruning schedule is set to ($cron, $maxDuration, $retention)",
+      getPruningSchedule().map(scheduleO =>
+        scheduleO.exists(_ == PruningSchedule(cron, maxDuration, retention))
+      ),
+      setPruningSchedule(cron, maxDuration, retention),
+      logger,
+    )
 
   /** Version of [[ensureTopologyMapping]] that also handles proposals:
     * - a new topology transaction is created as a proposal

@@ -71,7 +71,7 @@ class CompleteBuyTrafficRequestTrigger(
               case domainError: invalidtransferreason.ITR_UnknownSynchronizer =>
                 cancelTrafficRequest(
                   trafficRequest,
-                  s"unknown domainId ${domainError.synchronizerId}",
+                  s"unknown synchronizerId ${domainError.synchronizerId}",
                 )
               case topupAmountError: invalidtransferreason.ITR_InsufficientTopupAmount =>
                 cancelTrafficRequest(

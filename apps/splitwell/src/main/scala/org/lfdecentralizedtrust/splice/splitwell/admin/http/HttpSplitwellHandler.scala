@@ -247,8 +247,8 @@ class HttpSplitwellHandler(
       } yield definitions.GetConnectedDomainsResponse(
         mappings
           .map(_.base.store)
-          .collect { case TopologyStore.Domain(domainId) =>
-            domainId.filterString
+          .collect { case TopologyStore.Synchronizer(synchronizerId) =>
+            synchronizerId.filterString
           }
           .toVector
       )

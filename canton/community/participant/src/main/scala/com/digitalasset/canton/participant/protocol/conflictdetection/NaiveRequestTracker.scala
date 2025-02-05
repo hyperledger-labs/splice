@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.conflictdetection
@@ -238,7 +238,7 @@ private[participant] class NaiveRequestTracker(
     }
   }
 
-  override def addCommitSet(rc: RequestCounter, commitSet: Try[CommitSet])(implicit
+  override def addCommitSet(rc: RequestCounter, commitSet: Try[UnlessShutdown[CommitSet]])(implicit
       traceContext: TraceContext
   ): Either[CommitSetError, EitherT[FutureUnlessShutdown, NonEmptyChain[
     RequestTrackerStoreError
@@ -254,7 +254,7 @@ private[participant] class NaiveRequestTracker(
     ], Unit]] =
       // Complete the promise only if we're not shutting down.
       performUnlessClosing(functionFullName) {
-        commitSetPromise.tryComplete(commitSet.map(UnlessShutdown.Outcome(_)))
+        commitSetPromise.tryComplete(commitSet)
       } match {
         case UnlessShutdown.AbortedDueToShutdown =>
           // Try to clean up as good as possible even though recovery of the ephemeral state will ultimately
@@ -271,7 +271,7 @@ private[participant] class NaiveRequestTracker(
                 withRC(rc, s"Completed commit set promise does not contain a value")
               )
             )
-          if (oldCommitSet == commitSet.map(UnlessShutdown.Outcome(_))) {
+          if (oldCommitSet == commitSet) {
             logger.debug(withRC(rc, s"Commit set added a second time."))
             Right(EitherT(finalizationResult))
           } else if (oldCommitSet.toEither.contains(AbortedDueToShutdown)) {
@@ -297,7 +297,7 @@ private[participant] class NaiveRequestTracker(
 
   override def getApproximateStates(coids: Seq[LfContractId])(implicit
       traceContext: TraceContext
-  ): Future[Map[LfContractId, ContractState]] =
+  ): FutureUnlessShutdown[Map[LfContractId, ContractState]] =
     conflictDetector.getApproximateStates(coids)
 
   /** Returns whether the request is in-flight, i.e., in the requests map. */
@@ -526,7 +526,7 @@ private[conflictdetection] object NaiveRequestTracker {
       override val sequencerCounter: SequencerCounter,
       val kind: Kind,
   )(implicit val traceContext: TraceContext)
-      extends TaskScheduler.TimedTask
+      extends TaskScheduler.TimedTaskWithSequencerCounter
 
   object TimedTask {
     def unapply(timedTask: TimedTask): Option[(CantonTimestamp, SequencerCounter, Kind)] =

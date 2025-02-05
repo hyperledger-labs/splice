@@ -443,7 +443,7 @@ compute service account within the new cluster.
 ### Docker Image Hosting
 
 Docker images for both local and GCE clusters are stored in the [private development artifactory docker registry](digitalasset-canton-network-docker-dev.jfrog.io) and
-the [public releases artifactory docker registry](digitalasset-canton-network-docker.jfrog.io).
+the [releases artifactory docker registry](digitalasset-canton-network-docker.jfrog.io) as well as [public releases Github Container Registry](ghcr.io/digital-asset/decentralized-canton-sync/docker) for public releases, which does not require credentials.
 
 Amongst others, the following environment
 variables are defined in [`.envrc.vars`](.envrc.vars):
@@ -1283,7 +1283,7 @@ kubectl delete namespace sv-1 sv-2 sv-3 sv-4 validator1 splitwell docs
 
 ### Allowed IP Ranges
 
-The allowed IP ranges are stored in [`allowed-ip-ranges-external.json`](./cn-svc-configs/configs/allowed-ip-ranges-external.json) for any external IP and
+The allowed IP ranges are stored in `allowed-ip-ranges.json` for the respective network for any external IP and
 [`allowed-ip-ranges-cn-internal.json`](./allowed-ip-ranges-cn-internal.json) for the IPs of our own clusters.
 
 Note that the external allowed IP ranges are managed in the
@@ -1565,8 +1565,8 @@ However, the following steps don't require an action from us:
    The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain.
    (Check the logs of failing pods to be sure that there is no other problem.)
    To get a sense for how many SVs still need to finish their post-migration init before the new synchronizer becomes operational,
-   you can filter participant logs for `Persisted.*DomainParametersState`
-   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ADomainParametersState;duration=PT15M?project=da-cn-devnet))
+   you can filter participant logs for `Persisted.*SynchronizerParametersState`
+   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ASynchronizerParametersState;duration=PT15M?project=da-cn-devnet))
    and inspect the (number of) signatures on the latest of those entries
    (you need slightly over 2/3 of SVs to sign this).
 1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
@@ -1639,8 +1639,8 @@ If this is the case: Please nevertheless complete all steps from the [operator-b
    For more fine-grained control, you can append `core`, `sv` or `validator` to the command to tell it to change only one of these things,
    followed by `pulumi up` parameters such as `--yes --skip-preview`.
    To get a sense for how many SVs still need to finish their post-migration init before the new synchronizer becomes operational,
-   you can filter participant logs for `Persisted.*DomainParametersState`
-   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ADomainParametersState;duration=PT15M?project=da-cn-devnet))
+   you can filter participant logs for `Persisted.*SynchronizerParametersState`
+   ([gcloud logs example](https://console.cloud.google.com/logs/query;query=resource.labels.namespace_name%3D%22sv-1%22%0Alabels.%22k8s-pod%2Fapp%22%3D%22participant-1%22%0APersisted%0ASynchronizerParametersState;duration=PT15M?project=da-cn-devnet))
    and inspect the (number of) signatures on the latest of those entries
    (you need slightly over 2/3 of SVs to sign this).
 

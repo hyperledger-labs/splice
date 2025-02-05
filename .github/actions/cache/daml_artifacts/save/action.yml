@@ -16,7 +16,7 @@ runs:
       shell: bash
       run: |
         mkdir -p /tmp/daml
-        find . -type d -name ".daml" | tar --use-compress-program=pigz -cvf /tmp/daml/daml.tar.gz -T -
+        find . -type d -name ".daml" | tar --use-compress-program=pigz -cf /tmp/daml/daml.tar.gz -T -
     - name: Not archiving Daml artifacts
       if: ${{ fromJson(inputs.load_cache_hit) }}
       shell: bash

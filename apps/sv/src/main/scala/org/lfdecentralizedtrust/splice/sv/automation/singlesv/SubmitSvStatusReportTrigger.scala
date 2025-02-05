@@ -22,7 +22,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 
 import java.time.Instant
 import scala.util.{Failure, Success}
@@ -94,7 +94,7 @@ class SubmitSvStatusReportTrigger(
     } yield false
   }
 
-  private def getDomainTimeLowerBound(connection: TopologyAdminConnection, domain: DomainId)(
+  private def getDomainTimeLowerBound(connection: TopologyAdminConnection, domain: SynchronizerId)(
       implicit tc: TraceContext
   ): Future[Instant] = {
     connection

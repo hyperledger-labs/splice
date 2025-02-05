@@ -1,5 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.Get
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.headers.Host
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
@@ -8,13 +14,12 @@ import org.lfdecentralizedtrust.splice.util.{
   FrontendLoginUtil,
   WalletFrontendTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import java.lang.ProcessBuilder
+import java.nio.file.{Path, Paths}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.sys.process.*
-import java.lang.ProcessBuilder
-import java.nio.file.{Path, Paths}
 
 class DockerComposeValidatorFrontendIntegrationTest
     extends FrontendIntegrationTest("frontend")
@@ -32,7 +37,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       extraClue: String = "",
       startFlags: Seq[String] = Seq.empty,
       extraEnv: Seq[(String, String)] = Seq.empty,
-  ) = {
+  ): Unit = {
     val command = (Seq(
       "build-tools/splice-compose.sh",
       "start",
@@ -246,11 +251,37 @@ class DockerComposeValidatorFrontendIntegrationTest
           )
         }
       }
+
+      clue("validator and participant metrics work") {
+        implicit val sys: ActorSystem = env.actorSystem
+        registerHttpConnectionPoolsCleanup(env)
+
+        def metricsAreAvailableFor(node: String) = {
+          val result = Http()
+            .singleRequest(
+              Get(s"http://localhost/metrics")
+                // java can't resolve the *.localhost domain, so we need to set the Host header manually
+                .withHeaders(Host(s"$node.localhost"))
+            )
+            .futureValue
+          result.status should be(StatusCodes.OK)
+          result.entity.toStrict(10.seconds).futureValue.data.utf8String should include(
+            "target_info" // basic metric included by opentelemtry
+          )
+        }
+
+        metricsAreAvailableFor(
+          "validator"
+        )
+        metricsAreAvailableFor(
+          "participant"
+        )
+      }
     }
   }
 
   "docker-compose based validator with auth works" in { _ =>
-    val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
+    val validatorUserPassword = sys.env(s"COMPOSE_VALIDATOR_WEB_UI_PASSWORD")
 
     withComposeValidator(
       extraClue = "with auth",
@@ -263,13 +294,13 @@ class DockerComposeValidatorFrontendIntegrationTest
         eventuallySucceeds()(go to s"http://wallet.localhost")
         completeAuth0LoginWithAuthorization(
           "http://wallet.localhost",
-          "admin@validator.com",
+          "admin@compose-validator.com",
           validatorUserPassword,
           () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
         completeAuth0LoginWithAuthorization(
           "http://ans.localhost",
-          "admin@validator.com",
+          "admin@compose-validator.com",
           validatorUserPassword,
           () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )

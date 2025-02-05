@@ -1,0 +1,58 @@
+name: Daml Tests
+on: workflow_call
+
+jobs:
+  daml_test:
+    runs-on: self-hosted-k8s-small
+    container:
+      # TODO(#15988): use a release once 0.3.9 is out
+      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.9-snapshot.20250128.8151.0.v4bb647e2
+
+    steps:
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Skip on [static]
+        id: skip
+        shell: bash
+        run: |
+          last_commit_msg=$(git log -1 --pretty=%B)
+          echo "Last commit message: $last_commit_msg"
+          if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
+            echo "Skipping UI tests because of [static] label"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup
+        if: steps.skip.outputs.skip != 'true'
+        id: setup
+        uses: ./.github/actions/tests/common_test_setup
+        with:
+          test_name: daml_test
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+      - name: Run Daml tests
+        if: steps.skip.outputs.skip != 'true'
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          cmd: "damlTest"
+          extra_env_vars: DAML_DEBUG=1
+
+      - name: Post-SBT job
+        if: steps.skip.outputs.skip != 'true'
+        uses: ./.github/actions/sbt/post_sbt
+        with:
+          cache_version: 1
+          setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        shell: bash
+        env:
+          SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
+        run: ./.circleci/notification-scripts/failure_notification.py

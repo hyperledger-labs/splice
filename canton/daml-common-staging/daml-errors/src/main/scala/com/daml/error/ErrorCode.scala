@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.daml.error
@@ -27,7 +27,7 @@ import scala.util.control.{NoStackTrace, NonFatal}
   *
   * object SyncServiceErrors extends ParticipantErrorGroup {
   *   object ConnectionErrors extends ErrorGroup {
-  *     object DomainUnavailable extends ErrorCode(id="DOMAIN_UNAVAILABLE", ..) {
+  *     object DomainUnavailable extends ErrorCode(id="SYNCHRONIZER_UNAVAILABLE", ..) {
   *        case class ActualError(someContext: Val) extends BaseError with SyncServiceError
   *        // this error will actually be referring to the same error code!
   *        case class OtherError(otherContext: Val) extends BaseError with SyncServiceError
@@ -79,7 +79,7 @@ abstract class ErrorCode(val id: String, val category: ErrorCategory)(implicit
     val loggedAs = s"This error is logged with log-level $logLevel on the server side"
     val apiLevel = (category.grpcCode, exposedViaApi) match {
       case (Some(grpcCode), true) =>
-        if (category.securitySensitive)
+        if (category.redactDetails)
           s". It is exposed on the API with grpc-status $grpcCode without any details for security reasons."
         else
           s" and exposed on the API with grpc-status $grpcCode including a detailed error message."
@@ -175,7 +175,7 @@ object ErrorCode {
           .newBuilder()
           .setCode(Code.INTERNAL.value())
           .setMessage(
-            BaseError.SecuritySensitiveMessage(correlationId = correlationId, traceId = traceId)
+            BaseError.RedactedMessage(correlationId = correlationId, traceId = traceId)
           )
           .build()
     }

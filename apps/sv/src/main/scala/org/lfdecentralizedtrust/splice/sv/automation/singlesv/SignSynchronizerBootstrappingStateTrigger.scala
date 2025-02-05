@@ -8,16 +8,14 @@ import cats.syntax.traverse.*
 import cats.syntax.traverseFilter.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.{DomainId, ForceFlag, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.{TimeQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.{
-  DomainParametersState,
-  MediatorDomainState,
-  SequencerDomainState,
-  TopologyMapping,
+  MediatorSynchronizerState,
+  SequencerSynchronizerState,
+  SynchronizerParametersState,
 }
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.topology.{ForceFlag, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -27,36 +25,33 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, Thresholds, UpgradesConfig}
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.config.{Thresholds, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanSoftDomainMigrationPocAppClient.SynchronizerIdentities
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.SingleScanConnection
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
-import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SignSynchronizerBootstrappingState.Task
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 
-import SignSynchronizerBootstrappingState.Task
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class SignSynchronizerBootstrappingStateTrigger(
-    dsoStore: SvDsoStore,
+    override val dsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
     override protected val context: TriggerContext,
     existingSynchronizer: LocalSynchronizerNode,
     synchronizerNodes: Map[String, ExtraSynchronizerNode],
-    upgradesConfig: UpgradesConfig,
+    override val upgradesConfig: UpgradesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
     mat: Materializer,
     templateJsonDecoder: TemplateJsonDecoder,
     tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[Task] {
+) extends PollingParallelTaskExecutionTrigger[Task]
+    with SoftMigrationTrigger {
 
   protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Task]] =
     for {
@@ -70,7 +65,7 @@ class SignSynchronizerBootstrappingStateTrigger(
           .map(identities =>
             Some(
               Task(
-                DomainId(
+                SynchronizerId(
                   UniqueIdentifier.tryCreate(
                     prefix,
                     dsoStore.key.dsoParty.uid.namespace,
@@ -94,14 +89,14 @@ class SignSynchronizerBootstrappingStateTrigger(
     for {
       decentralizedSynchronizerId <- dsoStore.getAmuletRulesDomain()(tc)
       // for now we just copy the parameters from the existing domain.
-      parameters <- existingSynchronizer.sequencerAdminConnection.getDomainParametersState(
+      parameters <- existingSynchronizer.sequencerAdminConnection.getSynchronizerParametersState(
         decentralizedSynchronizerId
       )
-      domainParameters = DomainParametersState(
+      domainParameters = SynchronizerParametersState(
         task.synchronizerId,
         parameters.mapping.parameters,
       )
-      sequencerDomainState = SequencerDomainState
+      sequencerDomainState = SequencerSynchronizerState
         .create(
           task.synchronizerId,
           Thresholds.sequencerConnectionsSizeThreshold(task.sequencerIds.size),
@@ -113,7 +108,7 @@ class SignSynchronizerBootstrappingStateTrigger(
             .withDescription(s"Failed to construct SequencerDomainState: $err")
             .asRuntimeException
         )
-      mediatorDomainState = MediatorDomainState
+      mediatorDomainState = MediatorSynchronizerState
         .create(
           task.synchronizerId,
           NonNegativeInt.zero,
@@ -127,7 +122,9 @@ class SignSynchronizerBootstrappingStateTrigger(
             .asRuntimeException
         )
       participantId <- participantAdminConnection.getParticipantId()
-      decentralizedNamespaceTxs <- getDecentralizedNamespaceDefinitionTransactions()
+      decentralizedNamespaceTxs <- getDecentralizedNamespaceDefinitionTransactions(
+        participantAdminConnection
+      )
       _ <- participantAdminConnection.addTopologyTransactions(
         TopologyStoreId.AuthorizedStore,
         decentralizedNamespaceTxs,
@@ -140,7 +137,7 @@ class SignSynchronizerBootstrappingStateTrigger(
         "domain parameters are signed",
         for {
           proposalsExist <- participantAdminConnection
-            .listDomainParametersState(
+            .listSynchronizerParametersState(
               TopologyStoreId.AuthorizedStore,
               task.synchronizerId,
               TopologyTransactionType.AllProposals,
@@ -149,7 +146,7 @@ class SignSynchronizerBootstrappingStateTrigger(
             .map(_.nonEmpty)
           authorizedExist <-
             participantAdminConnection
-              .listDomainParametersState(
+              .listSynchronizerParametersState(
                 TopologyStoreId.AuthorizedStore,
                 task.synchronizerId,
                 TopologyTransactionType.AuthorizedState,
@@ -178,7 +175,7 @@ class SignSynchronizerBootstrappingStateTrigger(
         "sequencer domain state is signed",
         for {
           proposalsExist <- participantAdminConnection
-            .listSequencerDomainState(
+            .listSequencerSynchronizerState(
               TopologyStoreId.AuthorizedStore,
               task.synchronizerId,
               TimeQuery.HeadState,
@@ -187,7 +184,7 @@ class SignSynchronizerBootstrappingStateTrigger(
             .map(_.nonEmpty)
           authorizedExist <-
             participantAdminConnection
-              .listSequencerDomainState(
+              .listSequencerSynchronizerState(
                 TopologyStoreId.AuthorizedStore,
                 task.synchronizerId,
                 TimeQuery.HeadState,
@@ -217,7 +214,7 @@ class SignSynchronizerBootstrappingStateTrigger(
         "mediator domain state is signed",
         for {
           proposalsExist <- participantAdminConnection
-            .listMediatorDomainState(
+            .listMediatorSynchronizerState(
               TopologyStoreId.AuthorizedStore,
               task.synchronizerId,
               true,
@@ -225,7 +222,7 @@ class SignSynchronizerBootstrappingStateTrigger(
             .map(_.nonEmpty)
           authorizedExist <-
             participantAdminConnection
-              .listMediatorDomainState(
+              .listMediatorSynchronizerState(
                 TopologyStoreId.AuthorizedStore,
                 task.synchronizerId,
                 false,
@@ -247,72 +244,11 @@ class SignSynchronizerBootstrappingStateTrigger(
   // TODO(#17032) Add a better staleness check
   protected def isStaleTask(task: Task)(implicit tc: TraceContext): Future[Boolean] =
     Future.successful(false)
-
-  private def getScanUrls()(implicit tc: TraceContext): Future[Seq[String]] = {
-    for {
-      // TODO(#13301) We should use the internal URL for the SV’s own scan to avoid a loopback requirement
-      dsoRulesWithSvNodeStates <- dsoStore.getDsoRulesWithSvNodeStates()
-    } yield dsoRulesWithSvNodeStates.svNodeStates.values
-      .flatMap(
-        _.payload.state.synchronizerNodes.asScala.values
-          .flatMap(_.scan.toScala.toList.map(_.publicUrl))
-      )
-      .toList
-      // sorted to make it deterministic
-      .sorted
-  }
-
-  private def withScanConnection[T](
-      url: String
-  )(f: SingleScanConnection => Future[T])(implicit tc: TraceContext): Future[T] =
-    SingleScanConnection.withSingleScanConnection(
-      ScanAppClientConfig(
-        NetworkAppClientConfig(
-          url
-        )
-      ),
-      upgradesConfig,
-      context.clock,
-      context.retryProvider,
-      loggerFactory,
-    )(f)
-
-  private def getDecentralizedNamespaceDefinitionTransactions()(implicit
-      tc: TraceContext
-  ): Future[Seq[GenericSignedTopologyTransaction]] = for {
-    decentralizedSynchronizerId <- dsoStore.getAmuletRulesDomain()(tc)
-    namespaceDefinitions <- participantAdminConnection.listDecentralizedNamespaceDefinition(
-      decentralizedSynchronizerId,
-      decentralizedSynchronizerId.uid.namespace,
-      timeQuery = TimeQuery.Range(None, None),
-    )
-    identityTransactions <- namespaceDefinitions
-      .flatMap(_.mapping.owners)
-      .toSet
-      .toList
-      .traverse { namespace =>
-        participantAdminConnection.listAllTransactions(
-          TopologyStoreId.DomainStore(decentralizedSynchronizerId),
-          TimeQuery.Range(None, None),
-          includeMappings = Set(
-            TopologyMapping.Code.OwnerToKeyMapping,
-            TopologyMapping.Code.NamespaceDelegation,
-          ),
-          filterNamespace = Some(namespace),
-        )
-      }
-      .map(_.flatten)
-    decentralizedNamespaceDefinition <- participantAdminConnection.listAllTransactions(
-      TopologyStoreId.DomainStore(decentralizedSynchronizerId),
-      TimeQuery.Range(None, None),
-      includeMappings = Set(TopologyMapping.Code.DecentralizedNamespaceDefinition),
-    )
-  } yield (identityTransactions ++ decentralizedNamespaceDefinition).map(_.transaction)
 }
 
 object SignSynchronizerBootstrappingState {
   final case class Task(
-      synchronizerId: DomainId,
+      synchronizerId: SynchronizerId,
       synchronizerIdentities: Seq[SynchronizerIdentities],
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = prettyOfClass(

@@ -13,6 +13,21 @@ function usage() {
   echo "  -w: Wait for the SV node to be ready"
 }
 
+# issue a user friendly red error
+function _error_msg(){
+  # shellcheck disable=SC2145
+  echo -e "\e[1;31mERROR: $@\e[0m" >&2
+}
+
+# issue a user friendly green informational message
+function _info(){
+  local first_line="INFO: "
+  while read -r; do
+    printf -- "\e[32;1m%s%s\e[0m\n" "${first_line:-     }" "${REPLY}"
+    unset first_line
+  done < <(echo -e "$@")
+}
+
 wait=0
 while getopts "hw" opt; do
   case ${opt} in

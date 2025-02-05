@@ -257,11 +257,13 @@ class ExternalPartySetupProposalIntegrationTest
             .signBytes(
               HexString.parseToByteString(prepareSend.txHash).value,
               alicePrivateKey.asInstanceOf[SigningPrivateKey],
+              usage = SigningKeyUsage.ProtocolOnly,
             )
             .value
+            .toProtoV30
             .signature
         ),
-        HexString.toHexString(alicePublicKey.key),
+        publicKeyAsHexString(alicePublicKey),
       ),
     )(
       "validator automation completes transfer",
@@ -431,11 +433,13 @@ class ExternalPartySetupProposalIntegrationTest
               .signBytes(
                 HexString.parseToByteString(prepareSendNoPreapproval.txHash).value,
                 alicePrivateKey.asInstanceOf[SigningPrivateKey],
+                usage = SigningKeyUsage.ProtocolOnly,
               )
               .value
+              .toProtoV30
               .signature
           ),
-          HexString.toHexString(alicePublicKey.key),
+          publicKeyAsHexString(alicePublicKey),
         ),
       )(
         "TransferCommand is created",

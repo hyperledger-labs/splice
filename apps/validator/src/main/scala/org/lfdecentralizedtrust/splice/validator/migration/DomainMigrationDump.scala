@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.migration.Dar
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.google.protobuf.ByteString
 import io.circe.{Codec, Decoder, Encoder}
 
@@ -17,7 +17,7 @@ import java.util.Base64
 import java.time.Instant
 
 final case class DomainMigrationDump(
-    domainId: DomainId,
+    domainId: SynchronizerId,
     migrationId: Long,
     participant: NodeIdentitiesDump,
     acsSnapshot: ByteString,
@@ -28,7 +28,7 @@ final case class DomainMigrationDump(
   override def pretty: Pretty[DomainMigrationDump.this.type] =
     Pretty.prettyNode(
       "DomainMigrationDump",
-      param("domainId", _.domainId),
+      param("synchronizerId", _.domainId),
       param("migrationId", _.migrationId),
       param("participant", _.participant),
       param("acsSnapshotSize", _.acsSnapshot.size),
@@ -64,7 +64,7 @@ object DomainMigrationDump {
     participant <- NodeIdentitiesDump
       .fromHttp(ParticipantId.tryFromProtoPrimitive, response.participant)
       .leftMap(_ => "Failed to parse Participant Node Identities")
-    domainId <- DomainId fromString response.domainId
+    domainId <- SynchronizerId fromString response.domainId
     migrationId = response.migrationId
     acsSnapshot = {
       val decoded = base64Decoder.decode(response.acsSnapshot)
