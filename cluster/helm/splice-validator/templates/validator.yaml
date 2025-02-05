@@ -221,7 +221,7 @@ spec:
             }
         {{- end }}
         {{- with .Values.participantPruningSchedule }}
-        - name: ADDITIONAL_CONFIG_WALLET_SWEEP
+        - name: ADDITIONAL_CONFIG_PARTICIPANT_PRUNING
           value: |
             canton.validator-apps.validator_backend.participant-pruning-schedule {
                 cron = {{ .cron | quote }}
