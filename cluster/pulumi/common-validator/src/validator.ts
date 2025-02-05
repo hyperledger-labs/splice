@@ -223,6 +223,22 @@ export async function installValidatorApp(
       contactPoint: daContactPoint,
       nodeIdentifier: config.nodeIdentifier,
       participantPruningSchedule: config.participantPruningConfig,
+      additionalEnvVars:
+        !config.svValidator && config.onboardingSecret
+          ? // TODO(#17447): This is a horrible hacky way to test that `valueFrom` does what it should here; this should be removed ASAP.
+            [
+              {
+                name: 'ONBOARDING_SECRET_ONLY_FOR_TESTING',
+                valueFrom: {
+                  secretKeyRef: {
+                    name: validatorOnboardingSecretName('validator'),
+                    key: 'secret',
+                    optional: false,
+                  },
+                },
+              },
+            ]
+          : undefined,
       ...spliceInstanceNames,
     },
     chartVersion,

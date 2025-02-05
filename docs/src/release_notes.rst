@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+* Validator app
+
+  Add support for :ref:`operating a validator participant with keys stored in an external Key Management Service (KMS) <validator-kms>`.
+
 * Metrics
 
   Added ``splice_store_last_ingested_record_time_ms`` metric for the last ingested record time in each store and an

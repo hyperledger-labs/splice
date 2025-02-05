@@ -1,0 +1,23 @@
+# Participant using GCP KMS (mock values; please modify to match your setup)
+# See https://docs.daml.com/canton/usermanual/kms/kms_gcp_setup.html
+
+kms:
+  type: gcp
+  # All Canton options supported; camelCase keys here are automatically converted to kebab-case
+  locationId: us-east1
+  projectId: gcp-kms-testing
+  keyRingId: canton-test-keys-2023
+
+# Adds an env var on the participant pod that points to the location of the Google credentials file
+additionalEnvVars:
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    value: "/app/gcp-credentials.json"
+# Mount the Google credentials file as a volume, reading its contents from a secret
+extraVolumeMounts:
+  - name: gcp-credentials
+    mountPath: "/app/gcp-credentials.json"
+    subPath: googleCredentials
+extraVolumes:
+  - name: gcp-credentials
+    secret:
+      secretName: gke-credentials

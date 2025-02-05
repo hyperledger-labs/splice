@@ -18,7 +18,9 @@ Backup of Node Identities
 +++++++++++++++++++++++++
 
 Once your validator node is up and onboarded, please make sure to backup the node identities of your node. **Note that this information
-is highly sensitive, and contains the private keys of your participant,** so make sure to store it in
+is highly sensitive, and contains the private keys of your participant**
+(unless you configured your validator to :ref:`use an external KMS <validator-kms>`),
+so make sure to store it in
 a secure location, such as a Secret Manager. On the other hand, it is crucial for maintaining your identity (and thus, e.g.
 access to your Canton Coin holdings), so must be backed up outside of the cluster.
 
