@@ -244,9 +244,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/round-of-latest-data:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getRoundOfLatestData"
+      description: |
+        Get the latest round number for which aggregated data is available and
+        the ledger effective time at which the round was closed.
       responses:
         "200":
           description: ok
@@ -258,9 +261,10 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/rewards-collected:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getRewardsCollected"
+      description: Get the total rewards collected ever
       parameters:
         - in: query
           name: round
@@ -279,9 +283,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-providers-by-app-rewards:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getTopProvidersByAppRewards"
+      description: |
+        Get a list of top-earning app providers, and the total earned app
+        rewards for each
       parameters:
         - in: query
           name: round
@@ -308,9 +315,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-validators-by-validator-rewards:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getTopValidatorsByValidatorRewards"
+      description: |
+        Get a list of top-earning validators, and the total earned validator
+        rewards for each
       parameters:
         - in: query
           name: round
@@ -337,12 +347,18 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-validators-by-validator-faucets:
     get:
-      tags: [scan]
+      tags: [scan, internal]
       x-jvm-package: scan
       operationId: "getTopValidatorsByValidatorFaucets"
+      description: |
+        Get a list of top validators by number of rounds in which they collected
+        faucets, and basis statistics on their round collection history
       parameters:
         - in: query
           name: limit
+          description: |
+            Maximum number of validator records that may be returned in the
+            response
           required: true
           schema:
             type: integer
@@ -360,9 +376,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-validators-by-purchased-traffic:
     get:
-      tags: [scan]
+      tags: [scan, deprecated]
       x-jvm-package: scan
       operationId: "getTopValidatorsByPurchasedTraffic"
+      description: |
+        Get a list of validators and their domain fees spends, sorted by the
+        amount of extra traffic purchased
       parameters:
         - in: query
           name: round
@@ -389,9 +408,12 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/dso-sequencers:
     get:
-      tags: [scan]
+      tags: [scan, external]
       x-jvm-package: scan
       operationId: "listDsoSequencers"
+      description: |
+        Retrieve Canton sequencer configuration for all SVs, grouped by
+        connected synchronizer ID
       responses:
         "200":
           description: ok
@@ -1407,6 +1429,9 @@ components:
       required: ["validatorsByReceivedFaucets"]
       properties:
         validatorsByReceivedFaucets:
+          description: |
+            Up to `limit` validators, sorted greatest number of rounds
+            collected first
           type: array
           items:
             $ref: "./scan-external.yaml#/components/schemas/ValidatorReceivedFaucets"
@@ -1455,8 +1480,10 @@ components:
       required: ["domainId", "sequencers"]
       properties:
         domainId:
+          description: the synchronizer ID for the associated sequencers
           type: string
         sequencers:
+          description: the sequencers associated with the synchronizer
           type: array
           items:
             $ref: "#/components/schemas/DsoSequencer"
@@ -1465,15 +1492,22 @@ components:
       required: ["migrationId", "id", "url", "svName", "availableAfter"]
       properties:
         migrationId:
+          description: |
+            The synchronizer migration id corresponding to this sequencer.
           type: integer
           format: int64
         id:
+          description: The id of the sequencer.
           type: string
         url:
+          description: The public accessible url of the sequencer.
           type: string
         svName:
+          description: The sequencer's operating SV name.
           type: string
         availableAfter:
+          description: |
+            Any participant should subscribe to this sequencer after this time.
           type: string
           format: date-time
     ListDsoScansResponse:
