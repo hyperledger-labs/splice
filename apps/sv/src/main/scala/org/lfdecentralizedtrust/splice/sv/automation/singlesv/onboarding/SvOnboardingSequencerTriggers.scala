@@ -29,6 +29,7 @@ class SequencerOnboarding(
     participantAdminConnection: ParticipantAdminConnection,
     logger: TracedLogger,
 ) extends DsoRulesTopologyStateReconciler[SequencerToOnboard] {
+
   override def diffDsoRulesWithTopology(
       dsoRulesAndState: DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[SequencerToOnboard]] = {

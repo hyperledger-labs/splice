@@ -24,6 +24,7 @@ import com.digitalasset.canton.config.RequireTypes.{
   NonNegativeNumeric,
   PositiveNumeric,
 }
+import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencing.config.RemoteSequencerConfig
@@ -295,6 +296,8 @@ final case class SvSequencerConfig(
     // TODO (#8282): consider reading config value from participant instead of configuring here
     sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     pruning: Option[SequencerPruningConfig] = None,
+    isBftSequencer: Boolean = false,
+    bftPeerEndpoints: Seq[Endpoint] = Seq.empty,
 ) {
   def toCantonConfig: RemoteSequencerConfig = RemoteSequencerConfig(
     adminApi,

@@ -222,6 +222,8 @@ class SvApp(
           config.sequencer.pruning,
           loggerFactory,
           retryProvider,
+          config.sequencer.isBftSequencer,
+          config.sequencer.bftPeerEndpoints,
         )
       )
     val extraSynchronizerNodes = config.synchronizerNodes.view.mapValues { c =>
@@ -518,6 +520,7 @@ class SvApp(
         ),
         cometBftClient,
         loggerFactory,
+        config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
       )
 
       adminHandler = new HttpSvAdminHandler(

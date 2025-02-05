@@ -51,6 +51,8 @@ final class LocalSynchronizerNode(
     val sequencerPruningConfig: Option[SequencerPruningConfig],
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
+    isBftSequencer: Boolean,
+    peers: Seq[Endpoint],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -405,6 +407,10 @@ final class LocalSynchronizerNode(
         },
         logger,
       )
+      _ <-
+        if (isBftSequencer) {
+          sequencerAdminConnection.setBftPeerEndpoints(peers)
+        } else Future.unit
       _ = logger.info(
         "Sequencer is initialized"
       )
