@@ -21,6 +21,7 @@ commands:
 
               START_TIME=$(date +%s)
               TIMEOUT=1800
+              LAST_UNLOCK_TIME=$START_TIME
               while true; do
                 LAST_SUCCESSFUL_COMMIT=$(kubectl get stack $STACK_NAME -n operator -ojsonpath="{.status.lastUpdate.lastSuccessfulCommit}" || true)
 
@@ -38,7 +39,16 @@ commands:
                   exit 1
                 fi
 
-                sleep 5
+                # TODO(#15978): remove this hack, this is only necessary because the operator restarts and gets stuck with its own lock.
+                LAST_UNLOCK_AGO=$((CURRENT_TIME - LAST_UNLOCK_TIME))
+                # we also unlock only for ciperiodic because this would break other clusters (scratches)
+                if [ $LAST_UNLOCK_AGO -ge 120 ]  && [ "<<parameters.cluster>>" = "ciperiodic" ]; then
+                  echo "Force-cancelling pulumi locks under the assumption that the operator got stuck."
+                  cncluster pcancel
+                  LAST_UNLOCK_TIME=$(date +%s)
+                else
+                  sleep 5
+                fi
               done
             }
 
