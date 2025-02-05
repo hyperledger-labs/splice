@@ -46,6 +46,7 @@
     - [Porting between branches](#porting-between-branches)
   - [Testing](#testing)
     - [Managing Canton for Tests](#managing-canton-for-tests)
+      - [Issues on macOS](#issues-on-macos)
       - [Using a local build of Canton](#using-a-local-build-of-canton)
     - [Managing Frontends for Tests](#managing-frontends-for-tests)
     - [Running and Debugging Integration Tests](#running-and-debugging-integration-tests)
@@ -894,7 +895,9 @@ with the running Canton instance so try restarting.
 ERROR c.d.n.e.CNNodeLedgerConnection$$anon$1:WalletIntegrationTest/DSO=dso-app - Failed to instantiate ledger client due to connection failure, exiting...
 ```
 
-NOTE: In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"),
+#### Issues on macOS
+
+In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"),
 put this command into ~/.tmux.conf or ~/.config/tmux/tmux.conf (for version 3.1 and later):
 
 ```
@@ -903,6 +906,9 @@ set-option default-terminal "screen-256color"
 
 This is sufficient for most cases. If you insist on using `tmux-256color` instead of switching to `screen-256color`,
 you will need to install ncurses and setup terminfo following the instructions [here](https://gist.github.com/bbqtd/a4ac060d6f6b9ea6fe3aabe735aa9d95).
+
+Another issue that you can experience on macOS is tmux being unresponsive (unable to switch windows) in the Terminal
+app (default). Then, you may need to switch to iTerm, for example.
 
 #### Using a local build of Canton
 
