@@ -1,6 +1,6 @@
 [submodule "cluster/configs"]
 	path = cluster/configs
-	url = git@github.com:global-synchronizer-foundation/configs.git
+	url = ../../global-synchronizer-foundation/configs.git
 [submodule "cluster/configs-private"]
 	path = cluster/configs-private
-	url = git@github.com:global-synchronizer-foundation/configs-private.git
+	url = ../../global-synchronizer-foundation/configs-private.git
