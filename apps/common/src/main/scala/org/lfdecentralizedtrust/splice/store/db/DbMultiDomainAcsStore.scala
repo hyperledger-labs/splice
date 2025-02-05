@@ -1491,6 +1491,13 @@ object DbMultiDomainAcsStore {
       // We update the metrics in here as it's the easiest way
       // to not miss any place that might need updating.
       metrics.acsSize.updateValue(newAcsSize.toLong)
+      synchronizerId.foreach { synchronizer =>
+        recordTime.foreach { recordTime =>
+          metrics
+            .getLastIngestedRecordTimeMsForSynchronizer(synchronizer)
+            .updateValue(recordTime.toEpochMilli)
+        }
+      }
       IngestionSummary(
         updateId = updateId,
         synchronizerId = synchronizerId,
