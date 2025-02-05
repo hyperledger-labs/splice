@@ -21,10 +21,8 @@ Requirements
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-3) Your cluster either needs to be connected to the GCP DA Canton
-   VPN or you need a static egress IP. In the latter case,
-   please provide that IP address to your contact at Digital Asset to
-   add it to the firewall rules.
+3) Your cluster needs a static egress IP. After acquiring that, provide it to your SV sponsor who will propose
+   adding it to the IP allowlist to the other SVs.
 
 4) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 

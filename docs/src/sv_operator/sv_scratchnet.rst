@@ -101,17 +101,9 @@ other helm values you may need to consider
 Infra-level things you might want to consider
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-IP allowlist: just set it to our devnet VPNs:
-
-::
-
-   allowlist_json_modified = merge(local.allowlist_json, {
-    scratchnet : {
-      vpns : {
-        "Digital Asset" : local.allowlist_json["devnet"].vpns["Digital Asset"]
-      }
-    }
-   })
+- Configure the IP allowlist to expose the cluster to an internal VPN
+  or similar network you control. It is not recommended to expose it
+  to the public internet at this point.
 
 -  approved SV identities (which make their way into sv helm values): if
    you are deploying a single bootstraping node, you can set this to []

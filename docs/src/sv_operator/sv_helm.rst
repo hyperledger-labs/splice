@@ -21,10 +21,7 @@ Requirements
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-3) Your cluster either needs to be connected to the GCP DA Canton
-   VPN or you need a static egress IP. In the latter case,
-   please provide that IP address to your contact at Digital Asset to
-   add it to the firewall rules.
+3) Your cluster needs a static egress IP. After acquiring that, propose to the other SVs to add it to the IP allowlist.
 
 4) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
@@ -678,7 +675,7 @@ Ingress Configuration
 +++++++++++++++++++++
 
 An IP whitelisting json file ``allowed-ip-ranges.json`` will be provided in each SV operations announcement corresponding to the network to which you are connecting.
-This file contains other clusters' egress IPs that require access to your super validator's components. These IPs typically belong to peer super-validators, validators and the Digital Asset VPN.
+This file contains other clusters' egress IPs that require access to your super validator's components. For example, it contains IPs belonging to peer super-validators and validators.
 
 Each SV is required to configure their cluster ingress to allow traffic from these IPs to be operational.
 
