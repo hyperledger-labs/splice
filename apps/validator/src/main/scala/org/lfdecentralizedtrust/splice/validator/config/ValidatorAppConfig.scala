@@ -195,6 +195,7 @@ case class ValidatorAppBackendConfig(
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
     participantPruningSchedule: Option[ParticipantPruningConfig] = None,
+    deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
 ) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

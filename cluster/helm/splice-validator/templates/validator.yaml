@@ -229,6 +229,11 @@ spec:
                 retention = {{ .retention | quote }}
             }
         {{- end }}
+        {{- with .Values.deduplicationDuration }}
+        - name: ADDITIONAL_CONFIG_DEDUPLICATION_DURATION
+          value: |
+            canton.validator-apps.validator_backend.deduplication-duration = {{ . | quote }}
+        {{- end }}
         {{- if .Values.autoAcceptTransfers }}
         - name: ADDITIONAL_CONFIG_AUTO_ACCEPT_TRANSFERS
           value: |

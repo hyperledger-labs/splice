@@ -72,6 +72,7 @@ type BasicValidatorConfig = {
   nodeIdentifier: string;
   dependencies: CnInput<pulumi.Resource>[];
   participantPruningConfig?: ParticipantPruningConfig;
+  deduplicationDuration?: string;
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -239,6 +240,7 @@ export async function installValidatorApp(
               },
             ]
           : undefined,
+      deduplicationDuration: config.deduplicationDuration,
       ...spliceInstanceNames,
     },
     chartVersion,

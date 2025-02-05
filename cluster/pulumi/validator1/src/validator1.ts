@@ -129,6 +129,7 @@ export async function installValidator1(
     autoAcceptTransfers: autoAcceptTransfers,
     nodeIdentifier: 'validator1',
     participantPruningConfig,
+    deduplicationDuration: validator1Config?.deduplicationDuration,
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 

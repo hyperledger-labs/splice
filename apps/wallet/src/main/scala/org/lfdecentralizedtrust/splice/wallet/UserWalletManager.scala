@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodeg
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.WalletAppInstall
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
@@ -60,6 +61,7 @@ class UserWalletManager(
     walletSweep: Map[String, WalletSweepConfig],
     autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig],
     supportsSoftDomainMigrationPoc: Boolean,
+    dedupDuration: DedupDuration,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -233,6 +235,7 @@ class UserWalletManager(
       walletSweep.get(endUserParty.toProtoPrimitive),
       autoAcceptTransfers.get(endUserParty.toProtoPrimitive),
       supportsSoftDomainMigrationPoc,
+      dedupDuration,
     )
     (userRetryProvider, walletService)
   }

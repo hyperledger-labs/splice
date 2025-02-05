@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
@@ -75,6 +76,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.api.util.DurationConversion
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
@@ -717,6 +719,10 @@ class ValidatorApp(
         config.domains.global.buyExtraTraffic.minTopupInterval,
         config.automation.topupTriggerPollingInterval_,
       )
+      dedupDuration = DedupDuration(
+        com.google.protobuf.duration.Duration
+          .toJavaProto(DurationConversion.toProto(config.deduplicationDuration.asJavaApproximation))
+      )
       walletManagerOpt =
         if (config.enableWallet) {
           val externalPartyWalletManager = new ExternalPartyWalletManager(
@@ -758,6 +764,7 @@ class ValidatorApp(
             config.walletSweep,
             config.autoAcceptTransfers,
             config.supportsSoftDomainMigrationPoc,
+            dedupDuration,
           )
           Some(walletManager)
         } else {
@@ -873,6 +880,7 @@ class ValidatorApp(
           loggerFactory,
           retryProvider,
           validatorTopupConfig,
+          dedupDuration,
         )
       )
 
