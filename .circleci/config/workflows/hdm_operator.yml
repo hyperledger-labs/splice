@@ -1,27 +1,29 @@
 workflow:
-  deploy_ciperiodic_migration_operator:
+  deploy_hdm_operator:
     when:
-      equal: [ deploy-ciperiodic-migration-operator, << pipeline.parameters.run-job >> ]
+      equal: [ deploy-hdm-operator, << pipeline.parameters.run-job >> ]
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          # a bit weird that we're waiting on the periodic workflows but we're filtering on the branch so it should be fine
+          workflow_names: "deploy_hdm_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
+          branch_filter: << pipeline.git.branch >>
       - artifacts_push:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
       - autoscaler_prevent_scaledown:
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - wait_for_previous_pipeline
       - reset_cluster:
           name: "reset_before_deploy"
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           extra_migrations_reset: "0,1"
           unlock_shared_cluster: false
           context:
@@ -33,7 +35,7 @@ workflow:
           context:
             - artifactory
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
           requires:
             - artifacts_push
@@ -44,7 +46,7 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - prepare_cluster_for_migration
       - pre_migration_compose_validator:
@@ -52,7 +54,7 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
           requires:
             - deploy_cluster_for_migration
@@ -60,7 +62,7 @@ workflow:
           context:
             - artifactory
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           base_version: << pipeline.parameters.base-version >>
           requires:
             - deploy_cluster_for_migration
@@ -69,14 +71,14 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - prepare_cluster_for_migration
       - migrate_cluster:
           context:
             - artifactory
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - trigger_global_domain_migration
             - pre_migration_compose_validator
@@ -86,7 +88,7 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
           requires:
@@ -97,7 +99,7 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
           requires:
@@ -107,7 +109,7 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - pre_migration_dump_identities
             - migrate_cluster
@@ -117,7 +119,7 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
           requires:
@@ -127,14 +129,14 @@ workflow:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           upgrade_version: << pipeline.parameters.upgrade-version >>
           requires:
             - migrate_cluster
       - backup_cluster:
           name: "backup_cluster_after_migration"
-          cluster: "ciperiodic"
-          checkout-branch: "ciperiodic-migration-upgrade"
+          cluster: << pipeline.parameters.cluster >>
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           context:
             - artifactory
             - canton-network-vpn
@@ -144,8 +146,8 @@ workflow:
             - preflight_validator_check_migrated
             - preflight_check_migrated
       - restore_node:
-          cluster: "ciperiodic"
-          checkout-branch: "ciperiodic-migration-upgrade"
+          cluster: << pipeline.parameters.cluster >>
+          checkout-branch: "<< pipeline.parameters.cluster >>-migration-upgrade"
           namespace_name: "sv-3"
           context:
             - artifactory
@@ -158,7 +160,7 @@ workflow:
           context:
             - artifactory
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - preflight_sv_check_migrated
             - preflight_validator_check_migrated
@@ -169,7 +171,7 @@ workflow:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           cluster_version: << pipeline.parameters.upgrade-version >>
           migration_id: 1
           requires:
@@ -179,13 +181,13 @@ workflow:
           context:
             - artifactory
             - slack-context
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - restore_node
             - preflight_sv_check_redeployed
             - post_migration_compose_validator
       - reset_cluster:
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           extra_migrations_reset: "0,1"
           context:
             - canton-network-vpn
@@ -193,6 +195,6 @@ workflow:
           requires:
             - archive_legacy_migration
       - autoscaler_allow_scaledown:
-          cluster: "ciperiodic"
+          cluster: << pipeline.parameters.cluster >>
           requires:
             - archive_legacy_migration
