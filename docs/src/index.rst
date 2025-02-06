@@ -29,7 +29,7 @@ Global Synchronizer for the Canton Network
    deployment.rst
    validator_operator/index.rst
    sv_operator/index.rst
-   deployment/observability/index.rst
+   deployment/index.rst
    troubleshooting.rst
 
 .. toctree::
