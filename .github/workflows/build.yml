@@ -53,7 +53,7 @@ jobs:
   scala_test_sim_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-medium
+      runs_on: self-hosted-k8s-large
       test_names_file: 'test-full-class-names-sim-time.log'
       start_canton_options: -s
       parallelism: 4
