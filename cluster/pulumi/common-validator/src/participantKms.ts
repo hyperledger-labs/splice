@@ -53,16 +53,14 @@ export const getParticipantKmsHelmResources = (
   });
 
   // Note that our Pulumi code supports only GCP KMS for now
-  const exampleKmsValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/kms-participant-gcp-values.yaml`
+  const kmsValues = loadYamlFromFile(
+    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/kms-participant-gcp-values.yaml`,
+    {
+      LOCATION_ID: kmsConfig.locationId,
+      PROJECT_ID: kmsConfig.projectId,
+      KEY_RING_ID: kmsConfig.keyRingId,
+    }
   );
-  const kmsValues = {
-    ...exampleKmsValues,
-    kms: {
-      ...exampleKmsValues.kms,
-      ...kmsConfig,
-    },
-  };
 
   return {
     kmsValues,

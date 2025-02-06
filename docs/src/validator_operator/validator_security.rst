@@ -43,27 +43,64 @@ Configuring a fresh validator to use an external KMS
 ----------------------------------------------------
 
 Please refer to the `Canton documentation on configuring KMS support <https://docs.daml.com/canton/usermanual/kms/kms_setup.html>`_ for determining the right configuration options to match your desired KMS provider and setup.
-We provide example Helm configurations for configuring Splice participants for either Google Cloud KMS (``splice-node/examples/sv-helm/kms-participant-gcp-values.yaml``)...
+We provide minimal Helm configuration examples for Google Cloud (GCP) KMS and Amazon Web Services (AWS) KMS below.
 
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/kms-participant-gcp-values.yaml
-    :language: yaml
-
-...or Amazon Web Services KMS (``splice-node/examples/sv-helm/kms-participant-aws-values.yaml``).
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/kms-participant-aws-values.yaml
-    :language: yaml
-
-Note the following:
+Whatever KMS provider you choose, please note:
 
 * Values in the ``kms`` section of the participant Helm chart are implicitly mapped to the Canton participant ``crypto.kms`` config.
-  This implies that all configuration keys supported by Canton are supported.
+  This implies that all configuration keys supported by Canton are supported, not only the ones shown in the examples above.
   Key names in camelCase are automatically converted to kebab-case.
 * For setting extra environment variables and mounting files to configure authentication to the KMS,
   you can use the ``.additionalEnvVars``, ``.extraVolumeMounts``, and ``.extraVolumes`` fields of the Splice participant Helm chart
-  (see the examples above).
+  (see the examples).
 * Make sure that your KMS configuration is always included in the values files you pass to ``helm install participant ...`` or ``helm upgrade participant ...``.
 * Only configuration changes to ``splice-participant`` are required to deploy a KMS-enabled validator.
 * You need to deploy a **fresh** participant in order for KMS to be used correctly,
   which implies that you will need to setup the remaining validator components afresh as well (see :ref:`above <validator-kms-migrating>`).
+
+Google Cloud KMS
+^^^^^^^^^^^^^^^^
+
+Below mock configuration for GCP KMS is included in ``splice-node/examples/sv-helm/kms-participant-gcp-values.yaml``:
+
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/kms-participant-gcp-values.yaml
+    :language: yaml
+
+Please refer to the `Canton documentation <https://docs.daml.com/canton/usermanual/kms/kms_gcp_setup.html>`_
+for a list of supported configuration options and their meaning,
+as well as for instructions on configuring authentication to the KMS.
+Note again that Splice participants support the External Key Storage mode of KMS usage,
+so that (per the `relevant Canton docs <https://docs.daml.com/canton/usermanual/kms/external_key_storage/external_key_storage_gcp.html>`_)
+the authentication credentials you supply must correspond to a GCP service account with the following IAM permissions:
+
+* `cloudkms.cryptoKeyVersions.create`
+* `cloudkms.cryptoKeyVersions.useToDecrypt`
+* `cloudkms.cryptoKeyVersions.useToSign`
+* `cloudkms.cryptoKeyVersions.get`
+* `cloudkms.cryptoKeyVersions.viewPublicKey`
+
+For example, you can grant the `Cloud KMS Admin` and `Cloud KMS Crypto Operator` roles to the validator KMS service account.
+
+Amazon Web Services KMS
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Below mock configuration for AWS KMS is included in ``splice-node/examples/sv-helm/kms-participant-aws-values.yaml``:
+
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/kms-participant-aws-values.yaml
+    :language: yaml
+
+Please refer to the `Canton documentation <https://docs.daml.com/canton/usermanual/kms/kms_aws_setup.html>`__
+for a list of supported configuration options and their meaning,
+as well as for instructions on configuring authentication to the KMS.
+Note again that Splice participants support the External Key Storage mode of KMS usage,
+so that (per the `relevant Canton docs <https://docs.daml.com/canton/usermanual/kms/external_key_storage/external_key_storage_aws.html>`__)
+the authentication credentials you supply must correspond to an entity with the following IAM permissions:
+
+* `kms:CreateKey`
+* `kms:TagResource`
+* `kms:Decrypt`
+* `kms:Sign`
+* `kms:DescribeKey`
+* `kms:GetPublicKey`
 
 .. TODO(#16720): Add a section about offline root namespace keys

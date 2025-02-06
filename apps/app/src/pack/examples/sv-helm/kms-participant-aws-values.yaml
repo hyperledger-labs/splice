@@ -2,11 +2,16 @@
 # See https://docs.daml.com/canton/usermanual/kms/kms_aws_setup.html
 kms:
   type: aws
-  # All Canton options supported; camelCase keys here are automatically converted to kebab-case
-  region: us-east-1
+  # Replace REGION based on your AWS KMS setup
+  region: REGION
+  # All other Canton options are supported as well;
+  # camelCase keys here are automatically converted to kebab-case
 
-# Adds env vars on the participant pod for configuring authentication to AWS,
-# reading the relevant values from a secret
+# Example for configuring authentication to the AWS KMS.
+# Adds env vars on the participant pod with credentials read from a k8s secret.
+# In order for this to work as-is, you need to create the appropriate k8s secret
+# and ensure that it holds valid credentials
+# (under the `accessKeyId` and `secretAccessKey` keys).
 additionalEnvVars:
   - name: AWS_ACCESS_KEY_ID
     valueFrom:
