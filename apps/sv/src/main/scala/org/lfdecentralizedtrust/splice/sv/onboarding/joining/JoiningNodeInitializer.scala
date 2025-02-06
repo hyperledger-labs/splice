@@ -47,6 +47,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.
 import org.lfdecentralizedtrust.splice.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,
+  SequencerBftPeerReconciler,
   SetupUtil,
   SynchronizerNodeInitializer,
   SynchronizerNodeReconciler,
@@ -70,7 +71,7 @@ import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerCon
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -350,6 +351,11 @@ class JoiningNodeInitializer(
         ),
       ).tupled
       _ <- localSynchronizerNode.traverse_ { localSynchronizerNode =>
+        val sequencerBftInitializer = new SequencerBftPeerReconciler(
+          dsoStore,
+          localSynchronizerNode.sequencerAdminConnection,
+          loggerFactory,
+        )
         for {
           // First, make sure the identity of the new domain nodes is known on the domain
           _ <-
@@ -370,7 +376,10 @@ class JoiningNodeInitializer(
           )
           // Finally, fully onboard the sequencer and mediator
           _ <-
-            localSynchronizerNode.onboardLocalSequencerIfRequired(svConnection.map(_._2))
+            localSynchronizerNode.onboardLocalSequencerIfRequired(
+              svConnection.map(_._2),
+              sequencerBftInitializer,
+            )
           // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
           _ = if (!skipTrafficReconciliationTriggers)
             dsoAutomationService.registerTrafficReconciliationTriggers()

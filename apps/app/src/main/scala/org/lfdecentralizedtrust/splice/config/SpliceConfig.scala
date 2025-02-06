@@ -442,13 +442,22 @@ object SpliceConfig {
       implicit val sequencerPruningConfig2 = sequencerPruningConfig
       deriveReader[SvSequencerConfig]
         .emap { sequencerConfig =>
-          UrlValidator
-            .isValid(sequencerConfig.externalPublicApiUrl)
-            .bimap(
-              invalidUrl =>
-                ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl"),
-              _ => sequencerConfig,
-            )
+          for {
+            _ <- UrlValidator
+              .isValid(sequencerConfig.externalPublicApiUrl)
+              .leftMap(invalidUrl =>
+                ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl")
+              )
+            _ <-
+              if (sequencerConfig.isBftSequencer) {
+                sequencerConfig.externalPeerApiUrl
+                  .toRight(
+                    ConfigValidationFailed(
+                      "Sequencer external peer url must be set for BFT sequencers"
+                    )
+                  )
+              } else Right(())
+          } yield sequencerConfig
         }
     }
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =

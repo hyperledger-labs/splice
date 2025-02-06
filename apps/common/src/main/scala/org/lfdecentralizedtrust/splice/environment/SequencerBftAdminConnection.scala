@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import cats.implicits.*
 import com.digitalasset.canton.admin.api.client.commands.SequencerBftAdminCommands
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.block.bftordering.admin.SequencerBftAdminData
@@ -15,14 +14,15 @@ trait SequencerBftAdminConnection {
   this: AppConnection =>
   implicit val ec: ExecutionContextExecutor
 
-  def setBftPeerEndpoints(peers: Seq[Endpoint])(implicit tc: TraceContext): Future[Unit] = {
-    peers.traverse_(addPeerEndpoint)
-  }
-
-  private def addPeerEndpoint(peer: Endpoint)(implicit tc: TraceContext) = {
-    // TODO(#17414) - reconcile the list
+  def addPeerEndpoint(peer: Endpoint)(implicit tc: TraceContext) = {
     runCmd(
       SequencerBftAdminCommands.AddPeerEndpoint(endpoint = peer)
+    )
+  }
+
+  def removePeerEndpoint(peer: Endpoint)(implicit tc: TraceContext) = {
+    runCmd(
+      SequencerBftAdminCommands.RemovePeerEndpoint(endpoint = peer)
     )
   }
 
@@ -32,6 +32,14 @@ trait SequencerBftAdminConnection {
     runCmd(
       SequencerBftAdminCommands.GetOrderingTopology()
     )
+  }
+
+  def listCurrentPeerEndpoints()(implicit
+      tc: TraceContext
+  ): Future[Seq[Endpoint]] = {
+    runCmd(
+      SequencerBftAdminCommands.GetPeerNetworkStatus(None)
+    ).map(_.endpointStatuses.map(_.endpoint))
   }
 
 }

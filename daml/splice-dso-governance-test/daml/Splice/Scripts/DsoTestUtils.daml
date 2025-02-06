@@ -92,6 +92,7 @@ initDecentralizedSynchronizer isDevNet = do
                   migrationId = 0
                   sequencerId = "sequencer-id"
                   url = "sequencer.address:1234"
+                  peerUrl = Some "http://sequencer.address:3000"
                   availableAfter = Some now
                 mediator = Some MediatorConfig with
                   mediatorId = "mediator-id"
