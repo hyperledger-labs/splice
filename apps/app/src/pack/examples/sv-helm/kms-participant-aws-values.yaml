@@ -1,0 +1,20 @@
+# Participant using AWS KMS (mock values; please modify to match your setup)
+# See https://docs.daml.com/canton/usermanual/kms/kms_aws_setup.html
+kms:
+  type: aws
+  # All Canton options supported; camelCase keys here are automatically converted to kebab-case
+  region: us-east-1
+
+# Adds env vars on the participant pod for configuring authentication to AWS,
+# reading the relevant values from a secret
+additionalEnvVars:
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: aws-credentials
+        key: accessKeyId
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: aws-credentials
+        key: secretAccessKey

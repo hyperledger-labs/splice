@@ -35,7 +35,8 @@ function check_patterns_locally() {
     '^[^:]+V001__create_schema\.sql:' # TODO (#15491) avoiding changing hashes
     'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (#15747) auth0 env names
     'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (#15741) new secret
-    'Headers.scala:.*"cn-svc-configs"' # TODO (#13695) directory moving/renaming
+    'Headers.scala:.*"configs"'
+    'Headers.scala:.*"configs-private"'
     'istio-gateway/.*gateway\.yaml:.*credentialName: cn-' # TODO (#15745) TLS credential names in istio-gateway
     'GcpConfig\.scala:' # cluster-specific
     '/da-cn-shared/cn-images|GOOGLE_CLOUD_PROJECT=da-cn-shared|"KMS_PROJECT_ID" -> "da-cn-shared"' # gcp

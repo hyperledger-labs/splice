@@ -62,7 +62,11 @@
 {{- define "splice-util-lib.additional-env-vars" -}}
 {{- range $var := . }}
 - name: {{ $var.name }}
-  value: {{ $var.value }}
+  {{- if $var.valueFrom }}
+  valueFrom: {{ toYaml $var.valueFrom | nindent 4 }}
+  {{- else if $var.value }}
+  value: {{ $var.value | quote }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- define "splice-util-lib.postgres-metrics" -}}
