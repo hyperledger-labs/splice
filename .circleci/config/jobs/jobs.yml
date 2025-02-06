@@ -433,7 +433,7 @@ jobs:
     steps:
       - checkout_with_retry
       - run:
-          name: Launches the deploy_ciperiodic_migration_operator workflow using the latest release branch as base_version
+          name: Launches the deploy_hdm_operator workflow using the latest release branch as base_version
           command: |
             source .envrc.vars
 

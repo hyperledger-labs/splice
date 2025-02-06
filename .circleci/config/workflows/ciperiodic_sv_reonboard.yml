@@ -9,7 +9,7 @@ workflow:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_ciperiodic_migration deploy_ciperiodic_migration_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
+          workflow_names: "deploy_ciperiodic_migration deploy_hdm_operator deploy_ciperiodic_sv_reonboard deploy_ciperiodic_non_devnet"
           wait_type: "wait_workflow"
       - artifacts_push:
           <<: *main-branch-only
